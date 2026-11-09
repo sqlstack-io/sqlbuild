@@ -36,3 +36,10 @@ pub(super) struct TextFamilyTestCase {
     pub(super) type_sql: &'static str,
     pub(super) expected_family: crate::type_system::models::TypeFamily,
 }
+
+pub(super) struct AliasGroupsTestCase {
+    pub(super) description: &'static str,
+    /// JSON: each dialect's groups of spellings of one type.
+    pub(super) groups: &'static str,
+    pub(super) expected_same: bool,
+}

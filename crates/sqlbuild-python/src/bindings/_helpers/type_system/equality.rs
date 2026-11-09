@@ -16,7 +16,7 @@ use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::type_system::normalization::normalization_error;
 
 const TYPE_NORMALIZATION_LOGGER: &str = "sqlbuild.adapter";
-const TYPE_PARSE_FALLBACK_MESSAGE: &str = "type normalization polyglot parse failed; falling back";
+const TYPE_PARSE_FALLBACK_MESSAGE: &str = "type normalization parse failed; falling back";
 const DEFAULT_DIALECT: &str = "generic";
 const CACHE_LIMIT: usize = 1024;
 
@@ -37,7 +37,6 @@ pub(crate) fn types_equal(dialect: &Bound<'_, PyAny>, left: &str, right: &str) -
 }
 
 fn normalized(dialect: &Bound<'_, PyAny>, name: &str, type_sql: &str) -> PyResult<NormalizedType> {
-    let py: Python<'_> = dialect.py();
     let cache: &Cache = NORMALIZED.get_or_init(|| Mutex::new(HashMap::new()));
     let key: (String, String) = (type_sql.to_owned(), name.to_owned());
     let cached: Option<NormalizedType> = cache
@@ -52,7 +51,7 @@ fn normalized(dialect: &Bound<'_, PyAny>, name: &str, type_sql: &str) -> PyResul
         normalized,
         parse_error,
     } = compiler_guard(|| Ok(normalize_type(type_sql, name)))?
-        .map_err(|error| normalization_error(py, &error))?;
+        .map_err(|error| normalization_error(&error))?;
     if let Some(parse_error) = parse_error {
         log_parse_fallback(dialect, type_sql, &parse_error)?;
     }

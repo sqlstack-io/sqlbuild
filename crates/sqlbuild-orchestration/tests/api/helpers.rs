@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::api::main::serve_api::serve_api;
 use crate::api::models::ApiAuthentication;
 use crate::api::tests::test_types::TestApi;
+use crate::runs::tests::test_types::ExactKeyPlanner;
 use crate::store::models::ControlStore;
 
 pub(crate) async fn start_api(store: &ControlStore) -> TestApi {
@@ -22,7 +23,11 @@ pub(crate) async fn start_api_with_authentication(
     let task = tokio::spawn(serve_api(
         store,
         listener,
-        (authentication, Vec::new(), Default::default()),
+        (
+            authentication,
+            (Vec::new(), std::sync::Arc::new(ExactKeyPlanner)),
+            Default::default(),
+        ),
         (|| {}, async {
             let _ = signal.await;
         }),
@@ -100,4 +105,54 @@ pub(crate) fn raw_get(address: &str, path: &str) -> (u16, String) {
         .parse()
         .expect("numeric status");
     (status, body.to_owned())
+}
+
+/// Gzip members that decompress to a JSON string field longer than the decompressed bound.
+pub(crate) fn gzip_bomb() -> Vec<u8> {
+    let filler = crate::store::main::compress::compress(&vec![b'a'; 1024 * 1024]).expect("gzip");
+    let mut body = crate::store::main::compress::compress(br#"{"padding":""#).expect("gzip");
+    for _ in 0..=crate::api::constants::DECOMPRESSED_BODY_BYTES / (1024 * 1024) {
+        body.extend_from_slice(&filler);
+    }
+    body
+}
+
+/// Plain JSON one byte longer than the wire bound.
+pub(crate) fn oversized_json() -> Vec<u8> {
+    let mut body = br#"{"padding":""#.to_vec();
+    body.resize(crate::api::constants::BODY_BYTES - 1, b'a');
+    body.extend_from_slice(br#""}"#);
+    body
+}
+
+pub(crate) fn gzipped_empty_object() -> Vec<u8> {
+    crate::store::main::compress::compress(b"{}").expect("gzip")
+}
+
+pub(crate) fn not_gzip() -> Vec<u8> {
+    b"{}".to_vec()
+}
+
+/// A DuckShop-10k-sized snapshot whose plain JSON is larger than the wire bound.
+pub(crate) fn large_snapshot(location_id: uuid::Uuid) -> crate::snapshots::models::SnapshotInput {
+    let mut input = crate::runs::tests::helpers::snapshot(location_id);
+    input.nodes = (0..10_282)
+        .map(|index| {
+            let sql = format!(
+                "select {index} as order_id, '{}' as note from orders_{index}",
+                "x".repeat(3_400)
+            );
+            (
+                format!("model:orders_{index}"),
+                crate::snapshots::models::SnapshotNode {
+                    kind: "model".into(),
+                    definition: serde_json::json!({"materialization": "table"}),
+                    raw_sql: Some(sql.clone()),
+                    compiled_sql: Some(sql),
+                    python_source: None,
+                },
+            )
+        })
+        .collect();
+    input
 }

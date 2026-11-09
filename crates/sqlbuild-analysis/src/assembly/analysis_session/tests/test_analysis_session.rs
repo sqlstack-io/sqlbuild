@@ -9,9 +9,9 @@ use crate::assembly::analysis_session::tests::helpers::{
     proven, recovered_facts, session_lines, session_steps, started,
 };
 use crate::assembly::analysis_session::tests::test_types::{
-    BareFunctionTestCase, CteRecoveryTestCase, KeptAnalysisTestCase, LegacyAnalysisTestCase,
-    ModelSpec, PivotTestCase, SessionFactsTestCase, SessionFailureTestCase, SessionTestCase,
-    StarExpansionTestCase, UnscheduledTestCase,
+    BareFunctionTestCase, CteRecoveryTestCase, DeepPivotTestCase, KeptAnalysisTestCase,
+    LegacyAnalysisTestCase, ModelSpec, PivotTestCase, SessionFactsTestCase, SessionFailureTestCase,
+    SessionTestCase, StarExpansionTestCase, UnscheduledTestCase,
 };
 
 /// A model whose missing column stays untyped over a known input, so completion re-analyses it.
@@ -442,6 +442,32 @@ fn given_dynamic_pivots_when_proving_then_matches_python_or_defers() {
             ),
         },
         PivotTestCase {
+            description: "a Snowflake cast aggregate renders its target type",
+            dialect: "snowflake",
+            sql: "WITH base AS (SELECT customer_id, status, amount FROM __source(\"raw_orders\")) \
+                SELECT * FROM base \
+                PIVOT (MAX(CAST(amount AS DECIMAL(12, 2))) FOR status IN (ANY ORDER BY status))",
+            family: Some(("status", "amount", "MAX")),
+            expected_outcome: proven(
+                &[("customer_id", "INTEGER", "non_null")],
+                Some("DECIMAL(12, 2)"),
+                "raw_orders",
+                false,
+            ),
+        },
+        PivotTestCase {
+            description: "a Snowflake passthrough reads its relation marker as the relation",
+            dialect: "snowflake",
+            sql: "SELECT * FROM __ref(\"status_amounts\")",
+            family: Some(("status", "amount", "MAX")),
+            expected_outcome: proven(
+                &[("customer_id", "INTEGER", "unknown")],
+                Some("DOUBLE"),
+                "status_amounts",
+                false,
+            ),
+        },
+        PivotTestCase {
             description: "a passthrough redeclaring the upstream families",
             dialect: "duckdb",
             sql: "SELECT * FROM __ref(\"status_amounts\")",
@@ -507,6 +533,16 @@ fn given_dynamic_pivots_when_proving_then_matches_python_or_defers() {
             expected_outcome: failed(
                 "dynamic-family passthrough from 'stra\u{df}e' must redeclare the upstream \
                  families exactly",
+            ),
+        },
+        PivotTestCase {
+            description: "a passthrough from a call that names no dependency",
+            dialect: "duckdb",
+            sql: "SELECT * FROM __dbt_ref(\"shop\", \"status_amounts\")",
+            family: Some(("status", "amount", "MAX")),
+            expected_outcome: failed(
+                "output must be a wildcard projection from one supported dynamic pivot or a \
+                 proven dynamic-family passthrough",
             ),
         },
         PivotTestCase {
@@ -783,6 +819,55 @@ fn given_a_project_function_called_by_its_bare_name_when_running_the_session_the
                 undeclared
             ),
             (Some(test_case.expected_last_line), Vec::new()),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_deeply_nested_pivot_input_when_proving_then_the_proof_fails_without_aborting() {
+    let too_deep = failed(
+        "dynamic pivot SQL could not be parsed: \
+         E_GUARD_AST_DEPTH_EXCEEDED: value 513 exceeds configured limit 512",
+    );
+    let test_cases = [
+        DeepPivotTestCase {
+            description: "a 50,000-term DuckDB projection",
+            dialect: "duckdb",
+            terms: 50_000,
+            expected_outcome: too_deep.clone(),
+        },
+        DeepPivotTestCase {
+            description: "a 50,000-term Snowflake projection",
+            dialect: "snowflake",
+            terms: 50_000,
+            expected_outcome: too_deep,
+        },
+    ];
+    for test_case in test_cases {
+        let sql = format!(
+            "WITH base AS (SELECT customer_id, status, amount, 1{} AS k \
+             FROM __source(\"raw_orders\")) \
+             SELECT * FROM base PIVOT (MAX(amount) FOR status IN (ANY ORDER BY status))",
+            " + 1".repeat(test_case.terms)
+        );
+        let request = pivot_request(test_case.dialect, &sql, Some(("status", "amount", "MAX")));
+        let session = finished_session(request.tables.clone());
+
+        let standalone = prove_dynamic_contracts(&request).expect("the proofs run");
+        let in_session =
+            prove_finished_dynamic_contracts(&session, &request.models).expect("the proofs run");
+
+        assert_eq!(
+            standalone,
+            vec![test_case.expected_outcome.clone(), PivotOutcome::Absent],
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            in_session,
+            vec![test_case.expected_outcome, PivotOutcome::Absent],
             "{}",
             test_case.description
         );

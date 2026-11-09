@@ -4126,7 +4126,6 @@ version = "0.0.0"
 dependencies = [
  "memchr",
  "polyglot-sql",
- "polyglot-sql-function-catalogs",
  "rayon",
  "regex",
  "rustc-hash",
@@ -4151,6 +4150,7 @@ dependencies = [
  "sqlquack-syntax-postgres",
  "sqlquack-syntax-sqlite",
  "sqlquack-syntax-sqlserver",
+ "stacker",
 ]
 
 [[package]]
@@ -4193,7 +4193,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.200.0"
+version = "0.204.0"
 dependencies = [
  "blake3",
  "chrono",
@@ -4207,6 +4207,7 @@ dependencies = [
  "same-file",
  "serde",
  "serde_json",
+ "sqlbuild-analysis",
  "sqlbuild-build-features",
  "sqlbuild-cache",
  "sqlbuild-config",
@@ -4348,7 +4349,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.200.0"
+version = "0.204.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -4438,7 +4439,6 @@ dependencies = [
  "blake3",
  "fensu-policy",
  "globset",
- "polyglot-sql",
  "rayon",
  "regex",
  "rustc-hash",
@@ -4452,6 +4452,7 @@ dependencies = [
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlclean",
+ "sqlquack-syntax",
  "stacker",
  "tempfile",
  "toml",

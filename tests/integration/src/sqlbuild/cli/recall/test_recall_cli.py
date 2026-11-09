@@ -150,6 +150,12 @@ def test_given_a_removed_format_when_querying_then_it_is_a_usage_error_naming_th
             unexpected_fragments=("RECORD",),
         ),
         QueryLayoutTestCase(
+            description="warehouse schema lists SQLBuild's state relations only",
+            args=("recall", "schema", "--backend", "warehouse"),
+            expected_fragments=("_sqlbuild_fingerprints", "BASE TABLE"),
+            unexpected_fragments=("│ orders ",),
+        ),
+        QueryLayoutTestCase(
             description="a limited result says how to see more",
             args=("query", "SELECT range AS order_id FROM range(30)"),
             expected_fragments=("20 rows shown (limit 20; use --limit or --no-limit)",),

@@ -292,6 +292,11 @@ fn given_a_dialect_no_native_module_reads_when_comparing_types_then_types_are_no
             expected_compared: false,
         },
         UnknownDialectTestCase {
+            description: "an enforced contract under a dialect no adapter ships",
+            dialect: "mysql",
+            expected_compared: false,
+        },
+        UnknownDialectTestCase {
             description: "the same contract under DuckDB reports its mismatch",
             dialect: "duckdb",
             expected_compared: true,

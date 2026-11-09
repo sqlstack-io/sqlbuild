@@ -35,6 +35,23 @@ fn valid_grant(grant: &RoleGrant) -> bool {
     !grant.nodes.is_empty() && !blank_selector && !grant.permissions.is_empty() && !administrative
 }
 
+/// Each published role's description by key; the document was validated when it was published.
+pub(crate) fn decode_roles_descriptions(
+    document: Option<&Value>,
+) -> Result<BTreeMap<String, String>, ControlError> {
+    let roles: BTreeMap<String, RoleDefinition> = document.map_or_else(
+        || Ok(BTreeMap::new()),
+        |document| {
+            serde_json::from_value(document.clone())
+                .map_err(|error| ControlError::Invalid(format!("roles: {error}")))
+        },
+    )?;
+    Ok(roles
+        .into_iter()
+        .map(|(key, role)| (key, role.description))
+        .collect())
+}
+
 pub(crate) fn decode_roles(
     document: Option<&Value>,
 ) -> Result<BTreeMap<String, Vec<RoleGrant>>, ControlError> {

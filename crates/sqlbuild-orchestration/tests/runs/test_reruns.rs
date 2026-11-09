@@ -81,6 +81,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     reason: "Build orders".into(),
                     priority: 1,
                     window: Some(RunWindow::Integer { start: -3, end: 11 }),
+                    full_refresh: false,
                 },
             )
             .await
@@ -142,6 +143,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                         error_code: None,
                         skipped_because_of: (outcome == NodeOutcome::Skipped)
                             .then(|| "orders".into()),
+                        error_message: None,
                     });
                 }
                 changes.push(RunChange::Finished {
@@ -267,6 +269,16 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     execution.description
                 );
                 let runs = list_runs(store, scope, 20).await.expect("list reruns");
+                assert!(
+                    runs.iter()
+                        .filter(|run| {
+                            run.run_id == request.run_id
+                                || run.parent_run_id == Some(request.run_id)
+                        })
+                        .all(|run| run.rewrite_history),
+                    "{}: a backfill's rerun and its children record that they rewrite history",
+                    execution.description
+                );
                 assert_eq!(
                     runs.iter()
                         .find(|run| run.run_id == request.run_id)

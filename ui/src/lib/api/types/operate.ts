@@ -210,13 +210,23 @@ export type RunNode = {
 	rowsAffected: number | null;
 	errorCode: string | null;
 	errorMessage: string | null;
-	/** Where in the project the failure points, e.g. the model file and line of the failing statement. */
-	errorLocation: { file: string; line: number } | null;
+	/** Where in the project the failure points: the model file, and the line when it is known. */
+	errorLocation: { file: string; line: number | null } | null;
 	/** Full error text (warehouse message, statement, trace); `errorMessage` is its first line. */
 	errorDetail: string | null;
 	skippedBecauseOf: SkippedBecauseOf | null;
 	/** Node failure stops the whole group (`critical = true`). */
 	critical: boolean;
+};
+
+/** A failed node's error, read on request because it can quote warehouse data. `view.evidence` on the node */
+export type RunNodeError = {
+	nodeKey: string;
+	errorCode: string | null;
+	/** Redacted and cut to 2,000 characters by the server; null when none was recorded. */
+	message: string | null;
+	/** The node's file, relative to the project root. */
+	file: string | null;
 };
 
 export type RunEdge = { from: string; to: string };
@@ -448,30 +458,31 @@ export type SnapshotNode = {
 
 // ---- ad-hoc runs (the run panel) ----
 
-export type LaunchVerb = 'build' | 'test' | 'seed' | 'load' | 'audit' | 'freshness';
+export type LaunchVerb = 'build' | 'test' | 'seed' | 'audit' | 'freshness';
 
+/** A command as argument tokens after `sqb`, never shell text; the server resolves its selectors. */
 export type AdhocRunRequest = {
-	verb: LaunchVerb;
-	select: string[];
-	exclude: string[];
-	/** Other flags exactly as typed, e.g. `{ '--full-refresh': true, '--max-microbatches': '4' }`. */
-	flags: Record<string, string | true>;
+	command: string[];
+	/** Above 0 the run jumps the queue and needs `run.prioritise`. */
+	priority: number;
 };
 
-export type RunCheckProblem = { code: string; message: string };
+/** One permission the run needs and whether the person holds it on every resolved node. */
+export type AdhocPermission = { action: Capability; allowed: boolean; reason: string | null };
 
+/** The server's dry run: what launching would run and whether this person may launch it. */
 export type AdhocRunCheck = {
-	resolvedNodes: string[];
-	/** Nodes the run would write; empty for read-only verbs. */
+	verb: LaunchVerb | null;
+	/** The exact nodes the worker would run. */
+	selection: string[];
+	/** Nodes the run would write and reserve; empty for read-only verbs. */
 	writeSet: string[];
-	/** `run.adhoc` must cover every node in the write set; otherwise the whole request is refused. */
-	adhoc: { required: Capability; allowed: boolean; outOfScope: string[] };
-	rewriteHistory: { required: boolean; reasons: string[]; allowed: boolean };
-	/** Active runs holding write claims on nodes in the write set: the run would queue behind them. */
-	claimConflicts: { runId: string; nodeKey: string }[];
-	problems: RunCheckProblem[];
-	/** Launchable as requested. */
-	ok: boolean;
+	/** Accepted flags as the worker receives them, by setting name. */
+	settings: Record<string, unknown>;
+	permissions: AdhocPermission[];
+	/** Why the command cannot run regardless of permissions, such as a refused flag or a selection that matches nothing. */
+	error: string | null;
+	launchable: boolean;
 };
 
 /** Cursor window for a launch, typed from the selected nodes' cursor type. */
@@ -525,14 +536,14 @@ export type ConcurrencyGroup = {
 
 export type JobGroupMember = {
 	jobKey: string;
-	/** Jobs this member waits for: lineage-derived plus declared `after`. */
-	upstream: { jobKey: string; source: 'lineage' | 'after' }[];
+	/** Jobs this member waits for: lineage-derived plus declared `after`; null where the cause isn't reported. */
+	upstream: { jobKey: string; source: 'lineage' | 'after' | null }[];
 	/** Position in the derived order; members in the same stage run side by side. */
 	stage: number;
 };
 
 export type JobDetail = Job & {
-	/** Null where the server doesn't report it, as for `settings`, `concurrency`, `groupMembers` and `memberOf`. */
+	/** Null where the server doesn't report it, as for `declaration`, `concurrency` and `targets`. */
 	declaration: { sourceFile: string; line: number; code: string } | null;
 	exclude: string[];
 	/** Settings are CLI flags validated against the command table. */
@@ -656,10 +667,14 @@ export type TriggerDetail = Trigger & {
 	upcoming: Iso[] | null;
 	/** Calendar schedules: times are computed ahead and stored up to `storedUntil`. */
 	calendar: {
-		horizon: string;
-		storedUntil: Iso;
-		lastRefreshedAt: Iso;
-		lowHorizonWarningBelow: string;
+		/** Null where the server doesn't report it. */
+		horizon: string | null;
+		/** The last stored time; null when none is stored. */
+		storedUntil: Iso | null;
+		lastRefreshedAt: Iso | null;
+		/** When the location next works out the calendar; absent where the server doesn't report it. */
+		nextRefreshAt?: Iso | null;
+		lowHorizonWarningBelow: string | null;
 		low: boolean;
 	} | null;
 	sensor: {

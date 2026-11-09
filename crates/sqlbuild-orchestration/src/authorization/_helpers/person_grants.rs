@@ -12,7 +12,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
 
-const ACTIONS: [Action; 14] = [
+const ACTIONS: [Action; 16] = [
     Action::View,
     Action::ViewSql,
     Action::ViewEvidence,
@@ -20,6 +20,8 @@ const ACTIONS: [Action; 14] = [
     Action::RunCancel,
     Action::RunRerun,
     Action::RunRewriteHistory,
+    Action::RunPrioritise,
+    Action::RunWarehouse,
     Action::TriggerToggle,
     Action::SensorResetCursor,
     Action::RunAdhoc,
@@ -56,6 +58,14 @@ fn role_allows(role: BuiltinRole, action: Action) -> bool {
                 | ConnectionTest
         ),
     }
+}
+
+/// A built-in role's actions on every node, in vocabulary order.
+pub(crate) fn builtin_actions(role: BuiltinRole) -> Vec<Action> {
+    ACTIONS
+        .into_iter()
+        .filter(|action| role_allows(role, *action))
+        .collect()
 }
 
 /// The assigned and group roles of an active person for `target`; `None` when the person is disabled or unknown.
@@ -116,26 +126,6 @@ pub(crate) fn decide_grant(
         return GrantDecision::Granted("default:viewer".into());
     }
     GrantDecision::Denied(missing)
-}
-
-/// The node keys of one snapshot.
-pub(crate) async fn snapshot_nodes(
-    transaction: ControlTransaction,
-    snapshot_id: Uuid,
-) -> Result<(ControlTransaction, BTreeSet<String>), ControlError> {
-    let (transaction, nodes) = query(
-        transaction,
-        "SELECT node_key FROM sqb_snapshot_nodes WHERE snapshot_id=$1",
-        vec![Parameter::Id(snapshot_id)],
-    )
-    .await?;
-    Ok((
-        transaction,
-        nodes
-            .iter()
-            .map(|row| row["node_key"].as_str().unwrap_or_default().to_owned())
-            .collect(),
-    ))
 }
 
 /// Actions granted on every node, or on at least one node of a non-empty set.

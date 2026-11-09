@@ -15,6 +15,9 @@ class WorkflowEvent:
     repository: str
     head_ref: str | None = None
     head_repository: str | None = None
+    action: str | None = None
+    label: str | None = None
+    partial: str | None = None
 
 
 @dataclass(frozen=True)

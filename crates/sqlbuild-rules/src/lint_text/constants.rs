@@ -110,6 +110,10 @@ pub(crate) const CTE_ARGUMENT: &str = "__cte";
 /// The help for mixed qualification in a SQL macro body, where slot reads are qualified through an alias.
 pub(crate) const MACRO_MIXED_QUALIFICATION_REMEDIATION: &str = "Use one consistent qualification style in this query scope. A plain slot read such as `@rel.column` counts as unqualified; to qualify it, read through an alias: `FROM @rel AS s`, then `s.@rel.column`.";
 pub(crate) const NATIVE_LINT_ERROR_CODE: &str = "L003";
+/// The warning code for SQL the native lint engine cannot parse in the project's dialect.
+pub(crate) const LINT_UNAVAILABLE_CODE: &str = "L007";
+pub(crate) const LINT_UNAVAILABLE_REMEDIATION: &str =
+    "This SQL was not linted. Review it by hand until SQL lint supports this dialect.";
 pub(crate) const PARSE_ERROR_POSITION_PATTERN: &str =
     r"^Parse error at line (?P<line>\d+), column (?P<column>\d+):";
 pub(crate) const HARNESS_CTE_PREFIXES: [&str; 13] = [
@@ -156,6 +160,8 @@ pub(crate) const NOT_AN_OBJECT: &str = "native lint diagnostic must be an object
 pub(crate) const NON_OBJECT_RESPONSE: &str = "native lint engine returned a non-object response";
 pub(crate) const UNSUPPORTED_VERSION: &str =
     "native lint engine returned an unsupported response version";
+pub(crate) const INVALID_UNAVAILABLE: &str =
+    "native lint response has a non-string unavailable reason";
 pub(crate) const MISSING_DIAGNOSTICS: &str = "native lint response is missing a diagnostics list";
 pub(crate) const INVALID_BATCH: &str = "native lint engine returned an invalid batch response";
 pub(crate) const NON_CONTIGUOUS_FIX: &str =

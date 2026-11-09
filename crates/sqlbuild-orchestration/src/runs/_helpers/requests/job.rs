@@ -5,7 +5,8 @@ use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::declarations::main::frozen_definitions::frozen_definitions;
-use crate::runs::models::{RunKind, RunOrigin, RunRequest};
+use crate::runs::constants::FULL_REFRESH_SETTING;
+use crate::runs::models::{RunCommand, RunKind, RunOrigin, RunRequest};
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
@@ -43,9 +44,14 @@ pub(crate) async fn frozen_group_children(
         if selection.is_empty() {
             continue;
         }
+        let mut settings = job.settings.clone();
+        if let Some(full_refresh) = request.settings.get(FULL_REFRESH_SETTING) {
+            settings.insert(FULL_REFRESH_SETTING.into(), full_refresh.clone());
+        }
         children.push(RunRequest {
             run_id: Uuid::new_v5(&request.run_id, name.as_bytes()),
             kind: RunKind::Job,
+            command: RunCommand::Build,
             job_key: Some(name.clone()),
             parent_run_id: Some(request.run_id),
             rerun_of_run_id: request
@@ -53,7 +59,7 @@ pub(crate) async fn frozen_group_children(
                 .map(|id| Uuid::new_v5(&id, name.as_bytes())),
             write_set: selection.intersection(&writers).cloned().collect(),
             selection,
-            settings: job.settings.clone(),
+            settings,
             concurrency_groups: job.concurrency_groups.clone(),
             ..request.clone()
         });

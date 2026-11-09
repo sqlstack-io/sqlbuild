@@ -1,4 +1,5 @@
-use polyglot_sql::Expression;
+use sqlquack_syntax::Expression;
+use sqlquack_syntax::tokens::models::TokenType;
 use std::collections::BTreeSet;
 
 use crate::lint_text::main::map_expanded_offset::map_expanded_offset;
@@ -192,7 +193,7 @@ impl QueryFacts {
     }
 }
 
-/// An SQL-test fixture query parsed with Polyglot, with the function-call facts its rules read.
+/// An SQL-test fixture query parsed with SQLQuack, with the function-call facts its rules read.
 #[derive(Debug)]
 pub(crate) struct ParsedFixture {
     pub(crate) statement: Expression,
@@ -365,4 +366,13 @@ impl<'a> ModelSource<'a> {
         let to = self.bytes[self.original(end).min(last)];
         self.sql.get(from..to.max(from)).unwrap_or_default()
     }
+}
+
+/// One code token of a normalized query: its type, source text and character range.
+#[derive(Debug)]
+pub(crate) struct CodeToken<'a> {
+    pub(crate) token_type: TokenType,
+    pub(crate) text: &'a str,
+    pub(crate) start: usize,
+    pub(crate) end: usize,
 }

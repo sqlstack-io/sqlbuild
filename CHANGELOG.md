@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.204.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.203.0...v0.204.0) (2026-11-09)
+
+
+### Features
+
+* publish column lineage and show it on catalog node pages ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* run test, seed, audit and freshness ad-hoc commands on workers ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** give and remove roles and disable people from the admin pages ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** show renames, old names and clean-ups on the Maintenance page ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** show the Overview from live runs, checks, models and deploys ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** tell a partial viewer why the Overview is empty ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** test a location's warehouse connection from the Locations page ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+
+
+### Bug Fixes
+
+* run every ad-hoc verb from the worker's verified project ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** show the approved logos and favicon from the website ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+
+## [0.203.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.202.0...v0.203.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* require run.prioritise for job runs and reruns above priority 0
+
+### Features
+
+* **contracts:** prove dynamic pivots from SQLQuack parse trees ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* **orchestration:** gzip location snapshot publishes ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* parse rule facts, types and syntax trees with SQLQuack ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* require run.prioritise for job runs and reruns above priority 0 ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* run ad-hoc sqb commands from the web UI ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* show run events, statements, SQL and output to people ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* **ui:** wire the platform and admin pages to the control API ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+
+
+### Bug Fixes
+
+* render SQL Server functions, schemas, merges and sources the engine accepts, and list warehouse Recall relations portably ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* **ui:** stop a burst of control API requests on every live refresh ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+
+## [0.202.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.201.0...v0.202.0) (2026-11-08)
+
+
+### Features
+
+* **ui:** show catalog node detail and finish the lineage pages ([#1377](https://github.com/sqlstack-io/sqlbuild/issues/1377)) ([0624bde](https://github.com/sqlstack-io/sqlbuild/commit/0624bded052898af855378a8f74afac04d60be9f))
+
+## [0.201.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.200.0...v0.201.0) (2026-11-08)
+
+
+### Features
+
+* **ui:** wire the lineage and changes pages to the live control API ([#1373](https://github.com/sqlstack-io/sqlbuild/issues/1373)) ([20c406a](https://github.com/sqlstack-io/sqlbuild/commit/20c406a4d09bc8d310b9a1537a618f77c12d9594))
+
 ## [0.200.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.199.0...v0.200.0) (2026-11-08)
 
 

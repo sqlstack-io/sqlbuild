@@ -1,8 +1,12 @@
 use crate::lint_text::_helpers::format_bodies::unwrapped_expression;
 use crate::lint_text::_helpers::sites::site_pattern;
-use crate::lint_text::_helpers::sql_diagnostics::interpolation_text_at;
+use crate::lint_text::_helpers::sql_diagnostics::{
+    AuthoredFile, body_diagnostics, interpolation_text_at, response_diagnostics,
+    unavailable_once_per_file,
+};
 use crate::lint_text::constants::SITE_START_BYTES;
 use crate::lint_text::errors::LintTextError;
+use crate::lint_text::main::counts_toward_exit::counts_toward_exit;
 use crate::lint_text::main::format_sql_bodies::format_sql_bodies;
 use crate::lint_text::main::frame_sql_macro_expression::frame_sql_macro_expression;
 use crate::lint_text::main::lint_sql_bodies::lint_sql_bodies;
@@ -16,9 +20,9 @@ use crate::lint_text::main::restore_interpolation::restore_interpolation;
 use crate::lint_text::models::{ExpansionSpan, FormatFile, LintSqlBody, LintSqlOptions};
 use crate::lint_text::tests::helpers::directive_finding;
 use crate::lint_text::tests::test_types::{
-    Finding, FormatBodiesTestCase, LintBodiesTestCase, NeutralizeTestCase, ParameterTestCase,
-    RestoreTestCase, SitePatternTestCase, SlotReadTestCase, SuppressionTestCase, TokenAtTestCase,
-    UnwrappedExpressionTestCase,
+    ExitCountTestCase, Finding, FormatBodiesTestCase, LintBodiesTestCase, NeutralizeTestCase,
+    ParameterTestCase, RestoreTestCase, SitePatternTestCase, SlotReadTestCase, SuppressionTestCase,
+    TokenAtTestCase, UnavailableFinding, UnavailableLintTestCase, UnwrappedExpressionTestCase,
 };
 use sqlbuild_analysis::sql_macros::main::parse_sql_macro::parse_sql_macro;
 
@@ -824,4 +828,98 @@ fn given_snowflake_table_function_calls_when_formatting_then_each_call_is_kept_w
         );
     }
     Ok(())
+}
+
+#[test]
+fn given_engine_response_when_dialect_is_unavailable_then_each_file_gets_one_warning() {
+    const REASON: &str =
+        "SQL lint is unavailable for the tsql dialect: SQLQuack does not parse it yet";
+    let test_cases = [
+        UnavailableLintTestCase {
+            description: "an unavailable reason warns once at the file's first body",
+            response: serde_json::json!({"Ok": {"version": 1, "diagnostics": [], "unavailable": REASON}}),
+            bodies_in_file: 2,
+            expected_findings: vec![("L007", 2, 1, false, REASON)],
+        },
+        UnavailableLintTestCase {
+            description: "a linted response without the key keeps its empty diagnostics",
+            response: serde_json::json!({"Ok": {"version": 1, "diagnostics": []}}),
+            bodies_in_file: 2,
+            expected_findings: Vec::new(),
+        },
+        UnavailableLintTestCase {
+            description: "a non-string reason is an invalid response, not a clean one",
+            response: serde_json::json!({"Ok": {"version": 1, "diagnostics": [], "unavailable": null}}),
+            bodies_in_file: 1,
+            expected_findings: vec![(
+                "L003",
+                2,
+                1,
+                true,
+                "Native SQL parser could not analyze this body: native lint response has a non-string unavailable reason",
+            )],
+        },
+    ];
+    let file = AuthoredFile::new("MODEL ();\nselect a from t\n", "tsql");
+    let body = LintSqlBody {
+        body_start: 10,
+        lint_text: "select a from t".to_string(),
+        ..LintSqlBody::default()
+    };
+
+    for test_case in test_cases {
+        let response = response_diagnostics(&test_case.response);
+        let diagnostics = unavailable_once_per_file(
+            (0..test_case.bodies_in_file)
+                .flat_map(|_| body_diagnostics(&response, (&body, None), &file))
+                .collect(),
+        );
+        let findings: Vec<UnavailableFinding<'_>> = diagnostics
+            .iter()
+            .map(|finding| {
+                (
+                    finding.code.as_str(),
+                    finding.line,
+                    finding.column,
+                    finding.fault,
+                    finding.message.as_str(),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            findings, test_case.expected_findings,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_findings_when_deciding_exit_then_only_lint_unavailable_never_fails_a_command() {
+    let test_cases = [
+        ExitCountTestCase {
+            description: "an unavailable-dialect warning reports our gap, not the user's SQL",
+            code: "L007",
+            expected_counts: false,
+        },
+        ExitCountTestCase {
+            description: "a SQL lint rule finding still fails",
+            code: "SQLCLEAN005",
+            expected_counts: true,
+        },
+        ExitCountTestCase {
+            description: "an engine fault still fails",
+            code: "L003",
+            expected_counts: true,
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            counts_toward_exit(test_case.code),
+            test_case.expected_counts,
+            "{}",
+            test_case.description
+        );
+    }
 }

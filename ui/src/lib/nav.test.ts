@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ApiClient, Capability } from '$lib/api';
-import { pageAvailable, visibleNav } from './nav';
+import { pageAvailable, pagesBeyondTarget, visibleNav } from './nav';
 
 const serving = (...methods: (keyof ApiClient)[]) => ({ supports: (method: keyof ApiClient) => methods.includes(method) });
 
@@ -30,6 +30,14 @@ describe('visibleNav', () => {
 		expect(labels(client, ['audit.view'])).toEqual([['Admin', ['Audit log']]]);
 		expect(labels(client, ['user.manage'])).toEqual([['Admin', ['People']]]);
 		expect(labels(client, ['role.assign'])).toEqual([['Admin', ['People', 'Roles']]]);
+	});
+});
+
+describe('pagesBeyondTarget', () => {
+	it('offers a partial viewer only the pages that do not list the whole target', () => {
+		const client = serving('overview', 'listCatalogNodes', 'listRunRows', 'listJobs', 'maintenanceHistory', 'listLocations', 'listAccounts', 'listAuditEntries');
+		expect(pagesBeyondTarget(client, ['view', 'audit.view']).map((i) => i.label)).toEqual(['Locations', 'Audit log']);
+		expect(pagesBeyondTarget(client, ['view']).map((i) => i.label)).toEqual(['Locations']);
 	});
 });
 

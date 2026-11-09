@@ -1,4 +1,4 @@
-// Plain banners above the run: lost contact, waiting, and cancel progress.
+// Plain banners above the run: lost contact, a failure no node explains, waiting, and cancel progress.
 
 import type { CancelProgress, RunDetail } from '$lib/api';
 import { formatAgo, formatStamp } from '$lib/format/time';
@@ -52,6 +52,9 @@ export function bannersFor(detail: RunDetail, now: number): Banner[] {
 			body: [{ text: 'Rerunning is safe: the run has been stopped. Use Rerun from failure to finish the nodes it didn’t complete.' }],
 			detail: run.statusReason ?? undefined
 		});
+	}
+	if (run.status === 'failed' && run.statusReason && run.nodeCounts.failed === 0) {
+		out.push({ key: 'failed', tone: 'error', title: 'The run failed.', body: [{ text: run.statusReason }] });
 	}
 	if (live?.state === 'never_started') {
 		out.push({

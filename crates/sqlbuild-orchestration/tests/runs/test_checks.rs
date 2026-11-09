@@ -1,4 +1,4 @@
-//! Check observations are claim-bound facts, never implicit runnable selection members.
+//! Check, audit and SQL test observations are claim-bound facts, never implicit runnable selection members.
 
 use std::collections::BTreeMap;
 
@@ -68,6 +68,22 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     },
                 );
             }
+            for (key, kind) in [
+                ("audit:not_null:model:orders:id", "audit"),
+                ("sql_test:orders_keeps_amount", "sql_test"),
+                ("sql_test:mislabelled", "audit"),
+            ] {
+                input.nodes.insert(
+                    key.into(),
+                    SnapshotNode {
+                        kind: kind.into(),
+                        definition: json!({"name": key}),
+                        raw_sql: None,
+                        compiled_sql: Some("SELECT 1".into()),
+                        python_source: None,
+                    },
+                );
+            }
             input
                 .nodes
                 .insert("check:products".into(), input.nodes["products"].clone());
@@ -113,6 +129,9 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     node_key: "check:products".into(),
                 },
                 RunChange::CheckStarted {
+                    node_key: "sql_test:mislabelled".into(),
+                },
+                RunChange::CheckStarted {
                     node_key: "orders".into(),
                 },
             ] {
@@ -124,15 +143,17 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     .expect("rejected facts rolled back"),
                 before
             );
-            for (name, outcome) in [
-                ("failed", NodeOutcome::Failed),
-                ("warned", NodeOutcome::Warn),
-                ("skipped", NodeOutcome::Skipped),
-                ("cancelled", NodeOutcome::Cancelled),
-                ("passed", NodeOutcome::Success),
+            for (key, outcome) in [
+                ("check:failed", NodeOutcome::Failed),
+                ("check:warned", NodeOutcome::Warn),
+                ("check:skipped", NodeOutcome::Skipped),
+                ("check:cancelled", NodeOutcome::Cancelled),
+                ("check:passed", NodeOutcome::Success),
+                ("audit:not_null:model:orders:id", NodeOutcome::Failed),
+                ("sql_test:orders_keeps_amount", NodeOutcome::Success),
             ] {
                 let started = report(RunChange::CheckStarted {
-                    node_key: format!("check:{name}"),
+                    node_key: key.into(),
                 });
                 assert!(
                     change_run(store, RunAuthority::Scheduler(&lease), &started)
@@ -162,7 +183,7 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                         .expect("idempotent start")
                 );
                 let finished = report(RunChange::CheckFinished {
-                    node_key: format!("check:{name}"),
+                    node_key: key.into(),
                     outcome,
                 });
                 assert!(
@@ -210,14 +231,14 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     .iter()
                     .filter(|row| row["event_type"] == "run_check_started")
                     .count(),
-                5
+                7
             );
             assert_eq!(
                 facts
                     .iter()
                     .filter(|row| row["event_type"] == "run_check_finished")
                     .count(),
-                6
+                8
             );
             for change in [
                 RunChange::NodeStarted {
@@ -229,6 +250,7 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     rows_affected: Some(1),
                     error_code: None,
                     skipped_because_of: None,
+                    error_message: None,
                 },
                 RunChange::Finished {
                     outcome: RunOutcome::Failed,

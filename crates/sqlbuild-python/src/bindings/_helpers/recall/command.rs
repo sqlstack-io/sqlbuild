@@ -33,6 +33,7 @@ use crate::bindings::_helpers::recall::constants::{
     DEFAULT_MAX_CELL_BYTES, DEFAULT_QUERY_LIMIT, JSON_FORMAT, LAST_INVOCATION,
     RECALL_AMBIGUOUS_CODE, RECALL_DISABLED_CODE, RECALL_NOT_FOUND_CODE, RECALL_OPTIONS,
     RECALL_QUERY_CODE, RECALL_SETTINGS_CODE, RECALL_STORE_CODE, WAREHOUSE_BACKEND,
+    WAREHOUSE_STATE_RELATIONS_SQL,
 };
 use crate::bindings::_helpers::recall::rendering::{QueryContext, render_result, render_schema};
 use crate::bindings::_helpers::records::construct::new_error;
@@ -402,10 +403,7 @@ fn run_schema(py: Python<'_>, recall: &RecallRequest) -> PyResult<i32> {
                  ORDER BY table_schema, ordinal_position",
                 relation.replace('\'', "''")
             ),
-            None => "SELECT table_schema, table_name, table_type FROM information_schema.tables \
-                     WHERE table_name LIKE '\\_sqlbuild\\_%' ESCAPE '\\' \
-                     ORDER BY table_schema, table_name"
-                .to_owned(),
+            None => WAREHOUSE_STATE_RELATIONS_SQL.to_owned(),
         };
         return warehouse_query(py, recall, &project_dir, (&sql, None));
     }

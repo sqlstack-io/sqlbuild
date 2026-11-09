@@ -26,8 +26,11 @@
 	const account = $derived(d.accounts.data?.find((a) => a.name === name && a.kind === 'user') ?? null);
 	const canSee = $derived(app.can('user.manage') || app.can('role.assign'));
 	const canExplain = $derived(app.can('role.assign') || app.can('audit.view') || name === app.user?.name);
+	// Panels the server has no read for stay hidden.
+	const showsAccess = $derived(app.client.supports('effectiveAccess'));
+	const showsChecker = $derived(app.client.supports('explainAccess'));
 
-	const access = createResource((client) => (canExplain && name ? client.effectiveAccess(name) : Promise.resolve(null)));
+	const access = createResource((client) => (showsAccess && canExplain && name ? client.effectiveAccess(name) : Promise.resolve(null)));
 
 	let why = $state<CheckInput | null>(null);
 	let checkerEl = $state<HTMLElement | null>(null);
@@ -101,7 +104,7 @@
 							{/if}
 						</Panel>
 
-						<Panel title="Effective access" note="Every action in every location, after adding up all their roles">
+						{#if showsAccess}<Panel title="Effective access" note="Every action in every location, after adding up all their roles">
 							{#if !canExplain}
 								<p class="muted">Requires “Give roles” (role.assign) or “See the audit log” (audit.view).</p>
 							{:else if access.data}
@@ -111,9 +114,9 @@
 							{:else}
 								<p class="muted">Loading…</p>
 							{/if}
-						</Panel>
+						</Panel>{/if}
 
-						{#if canExplain}
+						{#if canExplain && showsChecker}
 							<div bind:this={checkerEl}>
 								<Panel title="Why?" note="Pick a mark above, or check any action">
 									<AccessChecker principals={[account]} initial={why ?? { principal: account.name }} lockPrincipal />
@@ -126,7 +129,7 @@
 						<Panel title="Details">
 							<KeyValues
 								rows={[
-									{ label: 'Signs in with', value: accountSourceLabel[account.source] },
+									{ label: 'Signs in with', value: account.source ? accountSourceLabel[account.source] : '—' },
 									{ label: 'Email', value: account.email ?? '—' },
 									{ label: 'SSO groups', value: account.ssoGroups.join(', ') || '—' },
 									{ label: 'Last active', value: account.lastSeenAt ? formatAgo(account.lastSeenAt, app.now) : 'Never', title: formatStamp(account.lastSeenAt) },

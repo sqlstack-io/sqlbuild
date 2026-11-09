@@ -79,12 +79,6 @@
 			]
 		: []}
 >
-	{#snippet actions()}
-		<span class="note">
-			{#if tab === 'janitor'}Tables and views SQLBuild archived or deleted when cleaning up (<code>sqb janitor</code>).{:else if tab === 'views'}After a rename or move, a view under the old name keeps old queries working until its end date.{:else}Models renamed or moved to another schema (<code>sqb rename</code>, <code>sqb mv</code>).{/if}
-			Read-only; read back from the warehouse.
-		</span>
-	{/snippet}
 </ListToolbar>
 
 <div class="sb-list-wrap">
@@ -207,15 +201,6 @@
 </div>
 
 <style>
-	.note {
-		margin-left: 8px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.note code {
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-	}
 	:global(.sb-list.static tbody tr) {
 		cursor: default;
 	}

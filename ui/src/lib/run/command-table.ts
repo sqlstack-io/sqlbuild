@@ -1,7 +1,7 @@
-// The launchable verbs and flags, generated from the CLI's command table by
-// `npm run gen:command-table`. Never hand-edit the generated JSON.
+// The ad-hoc verbs and flags, generated from the CLI's command table and ad-hoc
+// allowlist by `npm run gen:command-table`. Never hand-edit the generated JSON.
 
-import type { LaunchVerb } from '$lib/api';
+import type { Capability, LaunchVerb } from '$lib/api';
 import table from './command-table.generated.json';
 
 export type FlagType = 'bool' | 'string' | 'int' | 'timestamp' | 'selector';
@@ -12,7 +12,8 @@ export type FlagSpec = {
 	type: FlagType;
 	choices: string[] | null;
 	repeatable: boolean;
-	rewritesHistory: boolean;
+	/** The permission beyond run.adhoc that setting this flag needs, as the server decides it. */
+	requires: Capability | null;
 	description: string;
 };
 

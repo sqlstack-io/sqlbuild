@@ -33,11 +33,11 @@
 		bind:value={() => tab, select}
 		tabs={[
 			{ value: 'roles', label: 'Roles', count: rs.roles.data?.length },
-			{ value: 'sso', label: 'SSO mappings', count: rs.sso.data?.length }
+			...(app.client.supports('listSsoMappings') ? [{ value: 'sso' as const, label: 'SSO mappings', count: rs.sso.data?.length }] : [])
 		]}
 	/>
 	<div class="min-h-0 flex-1 overflow-auto">
-		{#if tab === 'roles'}
+		{#if tab === 'roles' || !app.client.supports('listSsoMappings')}
 			<RolesTab {rs} />
 		{:else}
 			<SsoTab {rs} />

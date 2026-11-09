@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { cadenceOf, jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf, triggerKindOf } from './http-jobs';
+import { cadenceOf, jobDetailOf, runWindowOf, toJob, toTick, toTrigger, triggerDetailOf, triggerKindOf } from './http-jobs';
 import type { Run } from './types/operate';
 
 type W = components['schemas'];
@@ -63,9 +63,86 @@ describe('job mapping', () => {
 		const job = toJob(wire, triggers, [run('r-inv', 'inventory', null), run('r-ord', 'orders', null)]);
 		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrencyGroups: ['warehouse_heavy'], select: null, overlap: null, priority: null });
 		expect(job.lastRun?.id).toBe('r-ord');
-		const detail = jobDetailOf(job, wire);
+		const detail = jobDetailOf(job, { ...wire, settings: { vars: '[REDACTED]', concurrency: 4, empty_ok: true, models: ['a', 'b'] }, members: [], member_of: ['nightly'], critical_nodes: ['model:orders'] });
 		expect(detail.resolvedNodes).toEqual(['model:customers', 'model:orders']);
-		expect([detail.settings, detail.concurrency, detail.memberOf, detail.cursorType]).toEqual([null, null, null, null]);
+		expect(detail.settings).toEqual({ vars: '[REDACTED]', concurrency: '4', empty_ok: true, models: '["a","b"]' });
+		expect([detail.groupMembers, detail.members, detail.memberOf, detail.criticalNodes]).toEqual([null, null, ['nightly'], ['model:orders']]);
+		expect([detail.concurrency, detail.cursorType, detail.declaration]).toEqual([null, null, null]);
 		expect(toJob({ ...wire, job_key: 'nightly', kind: 'group' }, triggers, []).kind).toBe('group');
+	});
+
+	it("steps a group's members by what they wait for, in the server's run order rather than by name", () => {
+		const wire: W['JobDetailRecord'] = {
+			job_key: 'nightly',
+			kind: 'group',
+			description: 'Everything nightly',
+			selection: [],
+			concurrency_groups: [],
+			snapshot_id: SNAPSHOT,
+			settings: {},
+			member_of: [],
+			critical_nodes: [],
+			members: [
+				{ job_key: 'stock', waits_for: [] },
+				{ job_key: 'orders', waits_for: [] },
+				{ job_key: 'customers', waits_for: ['orders'] },
+				{ job_key: 'audit', waits_for: ['customers', 'stock'] }
+			]
+		};
+		const detail = jobDetailOf(toJob(wire, [], []), wire);
+		expect(detail.groupMembers?.map((m) => [m.jobKey, m.stage, m.upstream.map((u) => u.jobKey)])).toEqual([
+			['stock', 0, []],
+			['orders', 0, []],
+			['customers', 1, ['orders']],
+			['audit', 2, ['customers', 'stock']]
+		]);
+		expect(detail.groupMembers?.flatMap((m) => m.upstream.map((u) => u.source))).toEqual([null, null, null]);
+		expect(detail.members).toEqual(['stock', 'orders', 'customers', 'audit']);
+	});
+});
+
+describe('runWindowOf', () => {
+	const typed = (start: string, end: string) => runWindowOf({ type: 'timestamp', start, end });
+
+	it('sends whole numbers on both ends as an integer window, negatives included', () => {
+		expect(typed(' -3 ', '11')).toEqual({ kind: 'integer', start: -3, end: 11 });
+	});
+
+	it('sends anything else as typed for the server to validate, without reading zones or order', () => {
+		expect(typed('2026-10-31T00:00:00+02:00', '2026-10-01')).toEqual({ kind: 'timestamp', start: '2026-10-31T00:00:00+02:00', end: '2026-10-01' });
+		expect(typed('1200', 'yesterday')).toEqual({ kind: 'timestamp', start: '1200', end: 'yesterday' });
+	});
+
+	it('refuses a whole number JSON would round instead of sending another value', () => {
+		expect(() => typed('9007199254740993', '9007199254740995')).toThrow('exactly');
+	});
+});
+
+describe('schedule due times', () => {
+	// Stored out of order on purpose; one time is before the server's next due time.
+	const times = ['2026-11-10T09:00:00Z', '2026-11-06T09:00:00Z', '2026-11-07T09:00:00Z', '2026-11-08T09:00:00Z'];
+	const calendar = (nextDueAt: string | null) => ({
+		...trigger('t-cal', 'business_days', 'orders', { description: 'Business days', job_key: 'orders', schedule: { kind: 'calendar', times, refresh_at: '2026-11-08T00:00:00Z' } }),
+		next_due_at: nextDueAt
+	});
+	const detailOf = (wire: W['TriggerRecord']) => triggerDetailOf(toTrigger(wire, [], null), wire, []);
+
+	it('lists a calendar from the next due time on, in time order, with the last stored time and next refresh', () => {
+		const detail = detailOf(calendar('2026-11-07T09:00:00Z'));
+		expect(detail.upcoming).toEqual(['2026-11-07T09:00:00Z', '2026-11-08T09:00:00Z', '2026-11-10T09:00:00Z']);
+		expect(detail.calendar).toMatchObject({ storedUntil: '2026-11-10T09:00:00.000Z', nextRefreshAt: '2026-11-08T00:00:00Z', horizon: null, low: false });
+	});
+
+	it('has no upcoming calendar times once the server has no next due time', () => {
+		expect(detailOf(calendar(null)).upcoming).toEqual([]);
+	});
+
+	it('shows only the next due time for cron, without working out later ones', () => {
+		expect(detailOf(daily).upcoming).toEqual(['2026-11-07T06:00:00Z']);
+		expect(detailOf(daily).calendar).toBeNull();
+	});
+
+	it('has no due times for a sensor', () => {
+		expect(detailOf(onInventory).upcoming).toBeNull();
 	});
 });

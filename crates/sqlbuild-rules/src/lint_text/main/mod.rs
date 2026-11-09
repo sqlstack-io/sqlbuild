@@ -1,3 +1,4 @@
+pub mod counts_toward_exit;
 pub mod defined_cte_names;
 pub mod dependency_sites;
 pub mod first_header_only;

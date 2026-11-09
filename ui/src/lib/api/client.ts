@@ -22,6 +22,7 @@ import type {
 	RunDetail,
 	RunEventPage,
 	RunListQuery,
+	RunNodeError,
 	RunOutputLine,
 	RunRowPage,
 	RunRowQuery,
@@ -56,11 +57,15 @@ export interface ApiClient extends PlatformApi {
 	navCounts(scope: Scope): Promise<NavCounts>;
 
 	// ---- BUILD: overview, catalog and lineage, checks, changes (types/build.ts) ----
-	/** Health, attention items, metrics, build status by group and recent changes. */
-	overview(scope: Scope): Promise<Overview>;
+	/**
+	 * Health, attention items, metrics, build status by group and recent changes; null when the
+	 * person may view only part of the target, because its listings need view on every node.
+	 */
+	overview(scope: Scope): Promise<Overview | null>;
 	/** Every node in the current snapshot with its build state; also the lineage graph. */
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
-	getCatalogNode(scope: Scope, key: string): Promise<CatalogNodeDetail | null>;
+	/** `listing` is a current `listCatalogNodes` result the caller already holds, so it isn't read again. */
+	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null>;
 	/** The snapshot's column lineage around one node. */
 	getColumnLineage(scope: Scope, key: string): Promise<ColumnLineage | null>;
 	/** Every audit and check with its latest result. */
@@ -91,6 +96,8 @@ export interface ApiClient extends PlatformApi {
 	/** One statement's SQL, fetched when its row is expanded. `view.sql` */
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql>;
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]>;
+	/** One failed node's error text, fetched when its row is expanded. `view.evidence` on the node */
+	getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError>;
 	/** Queued runs in claim order, with why each one waits. */
 	listQueue(scope: Scope): Promise<QueueEntry[]>;
 	timeline(scope: Scope, window: { since: string; until: string }): Promise<Timeline>;
@@ -122,7 +129,8 @@ export interface ApiClient extends PlatformApi {
 
 	listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]>;
 
-	getWarehouseSync(scope: Scope): Promise<WarehouseSync>;
+	/** Null when the location has reported no recent sync. */
+	getWarehouseSync(scope: Scope): Promise<WarehouseSync | null>;
 
 	/** Live "changed" signals (SSE in the server client); consumers refetch. */
 	changes: ChangeSubscription;

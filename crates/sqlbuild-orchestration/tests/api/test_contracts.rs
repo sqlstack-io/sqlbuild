@@ -38,6 +38,8 @@ mod test_changes;
 mod test_checks;
 #[path = "test_cli_login.rs"]
 mod test_cli_login;
+#[path = "test_column_lineage.rs"]
+mod test_column_lineage;
 #[path = "test_contract.rs"]
 mod test_contract;
 #[path = "test_custom_roles.rs"]
@@ -70,8 +72,12 @@ mod test_person_location_work;
 mod test_person_sessions;
 #[path = "test_proxy.rs"]
 mod test_proxy;
+#[path = "test_publish_encoding.rs"]
+mod test_publish_encoding;
 #[path = "test_reads.rs"]
 mod test_reads;
+#[path = "test_server_errors.rs"]
+mod test_server_errors;
 #[path = "test_statistics_recovery.rs"]
 mod test_statistics_recovery;
 #[path = "test_types.rs"]

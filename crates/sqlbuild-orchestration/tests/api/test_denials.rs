@@ -20,9 +20,10 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 
 /// Location-scoped reads and the action each needs.
-const READS: [(&str, &str); 12] = [
+const READS: [(&str, &str); 13] = [
     ("runs", "view"),
     ("nodes", "view"),
+    ("nodes/orders/runs", "view"),
     ("jobs", "view"),
     ("triggers", "view"),
     ("changes", "view"),
@@ -90,6 +91,7 @@ fn given_refused_requests_when_people_send_them_then_no_node_is_named_and_unknow
                 reason: "Refresh orders".into(),
                 priority: 0,
                 window: None,
+                full_refresh: false,
             };
             assert!(
                 request_job_run(store, &roles.context, &queued)
@@ -132,6 +134,28 @@ fn given_refused_requests_when_people_send_them_then_no_node_is_named_and_unknow
                     )
                 })
                 .collect();
+            for part in [
+                "events",
+                "statements",
+                "statements/sql?statement_id=s",
+                "output",
+            ] {
+                cases.push((
+                    format!("run {part}"),
+                    "view",
+                    vec![
+                        (
+                            read(inventory, &format!("runs/{}/{part}", queued.run_id)),
+                            None,
+                        ),
+                        (read(inventory, &format!("runs/{unknown_run}/{part}")), None),
+                        (
+                            read(roles.location_id, &format!("runs/{unknown_run}/{part}")),
+                            None,
+                        ),
+                    ],
+                ));
+            }
             cases.extend([
                 (
                     "run nodes".to_owned(),

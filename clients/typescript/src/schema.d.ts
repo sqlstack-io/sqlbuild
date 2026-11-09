@@ -1,5 +1,37 @@
 // Generated from sqb server --openapi. Run npm run generate; do not edit.
 export interface paths {
+    "/api/admin/locations/{location_id}/targets/{target}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRoleDefinitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPeople"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/people/{principal_id}": {
         parameters: {
             query?: never;
@@ -23,7 +55,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["listRoleHoldings"];
         put?: never;
         post: operations["assignBuiltinRole"];
         delete?: never;
@@ -306,6 +338,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/column-lineage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonColumnLineage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/connection-tests": {
         parameters: {
             query?: never;
@@ -354,6 +402,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonLocationHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/jobs": {
         parameters: {
             query?: never;
@@ -362,6 +426,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPersonJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/jobs/{job_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonJob"];
         put?: never;
         post?: never;
         delete?: never;
@@ -434,6 +514,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonNodeRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql": {
         parameters: {
             query?: never;
@@ -466,6 +562,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonRunEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes": {
         parameters: {
             query?: never;
@@ -474,6 +586,70 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPersonRunNodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunNodeError"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonRunStatements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunStatementSql"];
         put?: never;
         post?: never;
         delete?: never;
@@ -546,6 +722,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/platform/problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonPlatformProblems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/runs": {
         parameters: {
             query?: never;
@@ -556,6 +748,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["requestJobRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/runs/adhoc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestAdhocRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/runs/adhoc/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["checkAdhocRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -954,7 +1178,50 @@ export interface components {
          * @description Closed permission vocabulary; unknown actions fail deserialization.
          * @enum {string}
          */
-        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "run.warehouse" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        /** @description What launching the command would run and whether this person may launch it. */
+        AdhocCheck: {
+            /** @description Why the command cannot run regardless of permissions, such as a refused flag or an unknown selector. */
+            error?: string | null;
+            launchable: boolean;
+            permissions: components["schemas"]["AdhocPermission"][];
+            selection: string[];
+            settings: {
+                [key: string]: unknown;
+            };
+            /** Format: uuid */
+            snapshot_id?: string | null;
+            verb?: string | null;
+            write_set: string[];
+        };
+        /** @description A dry run of a command; nothing is queued or audited. */
+        AdhocCheckRequest: {
+            command: string[];
+            /** Format: uuid */
+            location_id: string;
+            /** Format: int64 */
+            priority: number;
+            target: string;
+        };
+        /** @description One permission the run needs and whether the person holds it on every resolved node. */
+        AdhocPermission: {
+            action: components["schemas"]["Action"];
+            allowed: boolean;
+            /** @description Why it is refused, as the launch would report it. */
+            reason?: string | null;
+        };
+        /** @description A person's command as argument tokens after `sqb`, never shell text; selectors resolve on the server. */
+        AdhocRunRequest: {
+            command: string[];
+            /** Format: uuid */
+            location_id: string;
+            /** Format: int64 */
+            priority: number;
+            reason: string;
+            /** Format: uuid */
+            run_id: string;
+            target: string;
+        };
         /**
          * @description Administrator membership and person eligibility share the final-admin invariant.
          * @enum {string}
@@ -978,6 +1245,15 @@ export interface components {
          * @enum {string}
          */
         BatchState: "complete" | "gap" | "replay_required";
+        /** @description Every instance of this location target has missed two check-ins. */
+        BrokenLocation: {
+            /** Format: date-time */
+            last_seen_at: string;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            target: string;
+        };
         /** @enum {string} */
         BuiltinRole: "viewer" | "operator" | "developer" | "admin";
         /** @description Browser cancellation cannot supply an actor, claim or lifecycle transition. */
@@ -1106,6 +1382,21 @@ export interface components {
         CliLoginStartRequest: {
             client_hash: string;
         };
+        /** @description One published column lineage edge; `transform` is the compiler's transform kind, such as `direct` or `cast`. */
+        ColumnLineageEdge: {
+            source_column: string;
+            source_key: string;
+            target_column: string;
+            target_key: string;
+            transform: string;
+        };
+        /** @description The column lineage reaching or leaving one node, from the current snapshot; empty before one publishes lineage. */
+        ColumnLineageRead: {
+            edges: components["schemas"]["ColumnLineageEdge"][];
+            nodes: components["schemas"]["LineageNodeColumns"][];
+            /** Format: uuid */
+            snapshot_id?: string | null;
+        };
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -1197,6 +1488,14 @@ export interface components {
             source_event_id: string;
             version_hash: string;
         };
+        /** @description A role every member of an SSO group holds. */
+        GroupRole: {
+            group_name: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            role_key: string;
+            target?: string | null;
+        };
         HeartbeatResponse: {
             cancel_requested: boolean;
         };
@@ -1212,6 +1511,31 @@ export interface components {
             failed: components["schemas"]["Table"][];
             failure?: string | null;
         };
+        /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
+        JobDetailRecord: {
+            concurrency_groups: string[];
+            /** @description Selected nodes whose failure stops a group. */
+            critical_nodes: string[];
+            description: string;
+            job_key: string;
+            kind: components["schemas"]["RunKind"];
+            /** @description The groups this job belongs to. */
+            member_of: string[];
+            /** @description A group's member jobs in run order; empty for a job. */
+            members: components["schemas"]["JobMember"][];
+            selection: string[];
+            /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
+            settings: {
+                [key: string]: unknown;
+            };
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        JobMember: {
+            job_key: string;
+            /** @description Members this one waits for, from lineage and from the group's `after`. */
+            waits_for: string[];
+        };
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
             concurrency_groups: string[];
@@ -1225,6 +1549,8 @@ export interface components {
         };
         /** @description A trusted operator names a published job; execution inputs are never supplied by the caller. */
         JobRunRequest: {
+            /** @description Rebuild every selected model from scratch; it rewrites history, as a window does. */
+            full_refresh?: boolean;
             job_key: string;
             /** Format: uuid */
             location_id: string;
@@ -1235,6 +1561,16 @@ export interface components {
             run_id: string;
             target: string;
             window?: null | components["schemas"]["RunWindow"];
+        };
+        LineageColumn: {
+            data_type?: string | null;
+            name: string;
+        };
+        /** @description A node's columns as its compiled definition infers them; `data_type` is absent when inference could not tell. */
+        LineageNodeColumns: {
+            columns: components["schemas"]["LineageColumn"][];
+            kind: string;
+            node_key: string;
         };
         /** @description One location target the person can view, with the actions allowed on at least one of its nodes. */
         LocationAccess: {
@@ -1364,7 +1700,38 @@ export interface components {
             janitor_events: components["schemas"]["WarehouseJanitorRecord"][];
             migrations: components["schemas"]["WarehouseMigrationRecord"][];
             /** @description Every step recorded for the listed moves, oldest first; same-time steps are not in step order. */
-            old_name_views: components["schemas"]["WarehouseOldNameRecord"][];
+            old_name_views: components["schemas"]["MaintenanceOldNameView"][];
+        };
+        /** @description One old-name view step as people read it: copied grants are counted, never returned as statements. */
+        MaintenanceOldNameView: {
+            archive_name?: string | null;
+            column_aliases?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            destination_model: string;
+            drop_reason?: string | null;
+            event_id: string;
+            event_type: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /**
+             * Format: int64
+             * @description How many grants were copied onto the view; null until it exists or when the stored list is unreadable.
+             */
+            grants_copied?: number | null;
+            migration_event_id: string;
+            new_database?: string | null;
+            new_name: string;
+            new_schema: string;
+            old_database?: string | null;
+            old_name: string;
+            old_schema?: string | null;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_name?: string | null;
+            view_retention?: string | null;
+            view_sql?: string | null;
         };
         /** @description One bounded page of one state table from the registered reader of a published generation. */
         MetadataBatch: {
@@ -1409,6 +1776,23 @@ export interface components {
         NodeEventKind: "success" | "failed" | "recovered";
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
+        /** @description One build attempt of a node by a run in this target; the same metadata as the run's node list. */
+        NodeRunRecord: {
+            /** Format: date-time */
+            ended_at?: string | null;
+            error_code?: string | null;
+            job_key?: string | null;
+            /** Format: date-time */
+            queued_at: string;
+            /** Format: int64 */
+            rows_affected?: number | null;
+            /** Format: uuid */
+            run_id: string;
+            skipped_because_of?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: string;
+        };
         /** @description SQL inspection never returns Python source, execution artifacts or unrelated node metadata. */
         NodeSql: {
             compiled_sql?: string | null;
@@ -1472,6 +1856,18 @@ export interface components {
          * @enum {string}
          */
         OutputStream: "stdout" | "stderr";
+        /** @description A running schedule whose next tick is more than 30 seconds late. */
+        OverdueTick: {
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            /** Format: date-time */
+            scheduled_for: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
+        };
         PasswordChangeRequest: {
             current_password: string;
             new_password: string;
@@ -1492,6 +1888,42 @@ export interface components {
             /** Format: uuid */
             principal_id: string;
         };
+        /** @description A role assigned to one person, everywhere or on one location and target. */
+        PersonRole: {
+            /** Format: uuid */
+            assignment_id: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
+            role_key: string;
+            target?: string | null;
+        };
+        /** @description A person as administrators see them: how they sign in, their SSO groups and live sessions. */
+        PersonSummary: {
+            /**
+             * Format: int64
+             * @description Unrevoked, unexpired browser and CLI sessions; none while the person is disabled.
+             */
+            active_sessions: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            disabled_at?: string | null;
+            /** @description Groups the identity provider reported at the person's last SSO sign-in. */
+            groups: string[];
+            has_password: boolean;
+            /** Format: date-time */
+            last_signed_in_at?: string | null;
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
+        };
+        /** @description A trigger as people list it, with its newest tick so a list needs no read per trigger. */
+        PersonTriggerRecord: components["schemas"]["TriggerRecord"] & {
+            latest_tick?: null | components["schemas"]["TickRecord"];
+        };
         /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
         PhysicalEvidence: {
             observation: components["schemas"]["CatalogObservation"];
@@ -1504,6 +1936,17 @@ export interface components {
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
+        /** @description Problems derived from live state when read; nothing here is stored. */
+        PlatformProblems: {
+            broken_locations: components["schemas"]["BrokenLocation"][];
+            overdue_ticks: components["schemas"]["OverdueTick"][];
+            scheduler_leader: boolean;
+            /**
+             * Format: date-time
+             * @description When the last scheduler lease ran out, or will run out; absent until a server first leads.
+             */
+            scheduler_lease_expires_at?: string | null;
+        };
         /** @description A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles). */
         PublishedChange: {
             change_kind: string;
@@ -1580,8 +2023,35 @@ export interface components {
             role: components["schemas"]["RoleKey"];
             target?: string | null;
         };
+        /** @description Who holds which role where: assigned to people here, or mapped to SSO groups in server config. */
+        RoleHoldings: {
+            assignments: components["schemas"]["PersonRole"][];
+            group_roles: components["schemas"]["GroupRole"][];
+        };
         /** @description A built-in role by name, or a custom role a location publishes. */
         RoleKey: components["schemas"]["BuiltinRole"] | string;
+        /** @description A role usable on one location target: built in, or published by the location's project. */
+        RoleOverview: {
+            builtin: boolean;
+            /** @description The project's description; absent for built-in roles. */
+            description?: string | null;
+            /** @description Built-in roles: one grant without selectors, meaning every node. Custom roles: their published grants. */
+            grants: components["schemas"]["RoleOverviewGrant"][];
+            /**
+             * Format: int64
+             * @description Active people holding the role here or everywhere, assigned directly or through an SSO group.
+             */
+            holders: number;
+            key: string;
+        };
+        /** @description Node selectors, the actions they grant, and the nodes each selector matched when published. */
+        RoleOverviewGrant: {
+            matched: {
+                [key: string]: string[];
+            };
+            nodes: string[];
+            permissions: components["schemas"]["Action"][];
+        };
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
             container_id?: string | null;
@@ -1600,6 +2070,8 @@ export interface components {
             node_key: string;
         } | {
             error_code?: string | null;
+            /** @description Redacted and bounded on the way in, whoever sends it; absent from older workers. */
+            error_message?: string | null;
             /** @enum {string} */
             kind: "node_finished";
             node_key: string;
@@ -1650,8 +2122,44 @@ export interface components {
             claim_id: string;
             request: components["schemas"]["RunRequest"];
         };
+        /**
+         * @description The `sqb` command a run executes; job and group runs always build.
+         * @enum {string}
+         */
+        RunCommand: "build" | "test" | "seed" | "audit" | "freshness";
+        RunErrorText: {
+            error_type?: string | null;
+            invocation_id: string;
+            message: string;
+            occurred_at?: string | null;
+        };
         /** @enum {string} */
         RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled";
+        /** @description Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text. */
+        RunEventRecord: {
+            /** Format: int64 */
+            affected_rows?: number | null;
+            /** Format: double */
+            duration_ms?: number | null;
+            error_code?: string | null;
+            error_type?: string | null;
+            event_id: string;
+            event_type: string;
+            invocation_id: string;
+            occurred_at: string;
+            outcome?: string | null;
+            producer?: string | null;
+            resource_attempt_id?: string | null;
+            resource_id?: string | null;
+            resource_kind?: string | null;
+            resource_name?: string | null;
+            /** Format: int64 */
+            row_count?: number | null;
+            severity?: string | null;
+            statement_id?: string | null;
+            /** Format: int64 */
+            storage_id: number;
+        };
         /** @description Workers compile locally and compare against this immutable snapshot, not the current deploy. */
         RunExecution: {
             claim: components["schemas"]["RunClaim"];
@@ -1667,6 +2175,15 @@ export interface components {
         };
         /** @enum {string} */
         RunKind: "job" | "group" | "adhoc";
+        /** @description A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL. */
+        RunNodeFailure: {
+            error_code?: string | null;
+            /** @description Null when the worker reported none or the run's history has been pruned. */
+            message?: string | null;
+            node_key: string;
+            /** @description Relative to the project root, with `/` separators; null when the run's snapshot is gone. */
+            path?: string | null;
+        };
         RunNodeRecord: {
             /** Format: date-time */
             ended_at?: string | null;
@@ -1686,6 +2203,21 @@ export interface components {
          * @enum {string}
          */
         RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled";
+        /** @description Captured output and error text of a run's invocations; both can quote warehouse data. */
+        RunOutput: {
+            /** @description Invocation failures and error diagnostics, oldest first. */
+            errors: components["schemas"]["RunErrorText"][];
+            /** @description The newest captured lines per invocation, oldest first. */
+            lines: components["schemas"]["RunOutputLine"][];
+        };
+        RunOutputLine: {
+            invocation_id: string;
+            occurred_at: string;
+            /** Format: int64 */
+            sequence: number;
+            stream: string;
+            text: string;
+        };
         RunRecord: {
             /** Format: date-time */
             cancel_requested_at?: string | null;
@@ -1736,6 +2268,7 @@ export interface components {
         };
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {
+            command?: components["schemas"]["RunCommand"];
             concurrency_groups: string[];
             image_id?: string | null;
             job_key?: string | null;
@@ -1767,6 +2300,36 @@ export interface components {
             trigger_id?: string | null;
             window?: null | components["schemas"]["RunWindow"];
             write_set: string[];
+        };
+        /** @description Warehouse statement metadata of a run: kind, timing, counts and outcome, never the SQL text. */
+        RunStatementRecord: {
+            /** Format: int64 */
+            affected_rows?: number | null;
+            /** Format: double */
+            duration_ms?: number | null;
+            ended_at?: string | null;
+            error_code?: string | null;
+            error_type?: string | null;
+            intent?: string | null;
+            invocation_id: string;
+            outcome?: string | null;
+            purpose?: string | null;
+            query_id?: string | null;
+            resource_id?: string | null;
+            resource_kind?: string | null;
+            resource_name?: string | null;
+            /** Format: int64 */
+            row_count?: number | null;
+            sql_available: boolean;
+            sql_unavailable_reason?: string | null;
+            started_at?: string | null;
+            statement_id: string;
+            statement_kind?: string | null;
+        };
+        /** @description One statement's executed SQL; `sql` is null when capture was off or retention dropped it. */
+        RunStatementSql: {
+            sql?: string | null;
+            statement_id: string;
         };
         /** @enum {string} */
         RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled";
@@ -1802,6 +2365,8 @@ export interface components {
         SecurityAuditEvent: {
             action: string;
             actor: string;
+            /** @description The person's name when `actor` is a principal; person reads set it, exports leave it out. */
+            actor_name?: string | null;
             after_json: unknown;
             before_json: unknown;
             /** Format: uuid */
@@ -2096,33 +2661,6 @@ export interface components {
             /** Format: date-time */
             observed_at: string;
         };
-        /** @description Preserve nullable compatibility-view facts without projecting live warehouse existence. */
-        WarehouseOldNameRecord: {
-            archive_name?: string | null;
-            column_aliases?: string | null;
-            /** Format: date-time */
-            created_at: string;
-            destination_model: string;
-            drop_reason?: string | null;
-            event_id: string;
-            event_type: string;
-            /** Format: date-time */
-            expires_at?: string | null;
-            grants_copied?: string | null;
-            migration_event_id: string;
-            new_database?: string | null;
-            new_name: string;
-            new_schema: string;
-            old_database?: string | null;
-            old_name: string;
-            old_schema?: string | null;
-            run_id: string;
-            state_database?: string | null;
-            state_schema: string;
-            target_name?: string | null;
-            view_retention?: string | null;
-            view_sql?: string | null;
-        };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
             database?: string | null;
@@ -2168,6 +2706,78 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listRoleDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Built-in roles, then the target's published custom roles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOverview"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listPeople: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonSummary"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     changeAdministrator: {
         parameters: {
             query?: never;
@@ -2201,6 +2811,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
                 };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listRoleHoldings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleHoldings"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             403: {
                 headers: {
@@ -2540,6 +3184,8 @@ export interface operations {
             query?: {
                 /** @description Exclusive storage-order cursor */
                 after?: number;
+                /** @description Exclusive upper cursor; when set, the page is newest first */
+                before?: number;
                 limit?: number;
             };
             header?: never;
@@ -2854,6 +3500,46 @@ export interface operations {
             };
         };
     };
+    readPersonColumnLineage: {
+        parameters: {
+            query: {
+                /** @description The node whose upstream and downstream column lineage to return */
+                node_key: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnLineageRead"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     requestConnectionTest: {
         parameters: {
             query?: never;
@@ -2996,6 +3682,44 @@ export interface operations {
             };
         };
     };
+    readPersonLocationHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This target's newest health observations and instance check-ins */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationHealthObservation"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     listPersonJobs: {
         parameters: {
             query?: never;
@@ -3030,6 +3754,52 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
+            };
+        };
+    };
+    readPersonJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                job_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobDetailRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view on every current node of the target */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description No published job by that name */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -3202,6 +3972,48 @@ export interface operations {
             };
         };
     };
+    listPersonNodeRuns: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent runs; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                node_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs that built the node, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRunRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     readPersonNodeSql: {
         parameters: {
             query?: never;
@@ -3279,6 +4091,57 @@ export interface operations {
             };
         };
     };
+    listPersonRunEvents: {
+        parameters: {
+            query?: {
+                /** @description Return events after this storage cursor */
+                after?: number;
+                /** @description Maximum events; defaults to 1000, capped at 5000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event metadata oldest first, without payloads */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunEventRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listPersonRunNodes: {
         parameters: {
             query?: never;
@@ -3316,6 +4179,197 @@ export interface operations {
                 };
             };
             /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunNodeError: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+                node_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunNodeFailure"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on the node */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Node not found in this run */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunOutput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOutput"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listPersonRunStatements: {
+        parameters: {
+            query?: {
+                /** @description Maximum statements; defaults to 1000, capped at 5000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Statement metadata in start order, without SQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStatementRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunStatementSql: {
+        parameters: {
+            query: {
+                /** @description One statement of this run */
+                statement_id: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStatementSql"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.sql on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run or statement not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3429,12 +4483,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Published triggers with their newest tick */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TriggerRecord"][];
+                    "application/json": components["schemas"]["PersonTriggerRecord"][];
                 };
             };
             /** @description Session rejected */
@@ -3502,6 +4557,33 @@ export interface operations {
             };
         };
     };
+    readPersonPlatformProblems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live scheduler state, and broken locations and late ticks of targets the person lists */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformProblems"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     requestJobRun: {
         parameters: {
             query?: never;
@@ -3539,6 +4621,86 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
+            };
+        };
+    };
+    requestAdhocRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdhocRunRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    checkAdhocRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdhocCheckRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdhocCheck"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4224,6 +5386,20 @@ export interface operations {
             };
             /** @description Stale generation */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Body over its wire or decompressed bound */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Content encoding other than gzip */
+            415: {
                 headers: {
                     [name: string]: unknown;
                 };

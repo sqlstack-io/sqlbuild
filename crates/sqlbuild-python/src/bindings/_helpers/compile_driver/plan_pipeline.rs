@@ -1,9 +1,10 @@
 //! The compile-and-plan pipeline of execution commands: compile, rules gate, then planning.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
@@ -135,10 +136,17 @@ fn run_rules_gate<'py>(
         let message: String = rules_progress(elapsed, &result, true)?;
         on_progress.call1((message,))?;
     }
-    let findings: Bound<'py, PyAny> = native_field(&result, "findings")?;
-    if !findings.is_truthy()? {
+    let mut failing: Vec<Bound<'py, PyAny>> = Vec::new();
+    for finding in native_field(&result, "findings")?.try_iter()? {
+        let finding: Bound<'py, PyAny> = finding?;
+        if counts_toward_exit(&native_field(&finding, "code")?.extract::<String>()?) {
+            failing.push(finding);
+        }
+    }
+    if failing.is_empty() {
         return Ok(());
     }
+    let findings: Bound<'py, PyAny> = PyTuple::new(py, failing)?.into_any();
     let summary: Bound<'py, PyAny> = new_record_with(
         py,
         RecordId::RulesResult,

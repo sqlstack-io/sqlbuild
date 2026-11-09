@@ -1,6 +1,7 @@
 //! `sqb audit`: compile the selected audits, run them with nested progress, and report.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyInt, PyString};
@@ -13,6 +14,7 @@ use sqlbuild_core::audit_command::models::AuditCounts;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome};
+use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords, within};
 use crate::bindings::_helpers::build_progress::audit_progress::AuditProgressReporter;
@@ -23,6 +25,7 @@ use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
@@ -35,6 +38,8 @@ use crate::bindings::_helpers::result_output::documents::{
     audit_execution_json, audit_projection, write_execution_json_output,
 };
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
+use crate::bindings::_helpers::result_output::projection::audit_check_id;
+use crate::bindings::_helpers::result_output::resource_ids::audit_identity;
 
 const EXECUTION_COMMAND: &str = "sqb audit";
 
@@ -54,6 +59,7 @@ fn literal_location<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny
 /// Forward audit results to the event writer and connection timing to its reporter.
 #[pyclass(module = "sqlbuild._native", frozen)]
 struct AuditCallbackRelay {
+    worker: Option<Arc<WorkerBuild>>,
     event_writer: Py<PyAny>,
     plan: Py<PyAny>,
     connection: Py<PyAny>,
@@ -62,6 +68,15 @@ struct AuditCallbackRelay {
 #[pymethods]
 impl AuditCallbackRelay {
     fn on_result(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
+        if let Some(worker) = &self.worker {
+            let outcome = match AuditExecutionResult::read(&result)?.outcome {
+                AuditOutcome::Pass => NodeOutcome::Success,
+                AuditOutcome::Warn | AuditOutcome::Insufficient => NodeOutcome::Warn,
+                AuditOutcome::Skipped => NodeOutcome::Skipped,
+                AuditOutcome::Error => NodeOutcome::Failed,
+            };
+            worker.finish_attached(py, &audit_check_id(&result)?, outcome)?;
+        }
         call_with(
             &self.event_writer.bind(py).getattr("write_build_result")?,
             &[
@@ -289,10 +304,15 @@ fn write_headers(
 fn execute<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
-    run: &AuditRun<'py>,
+    (run, worker): (&AuditRun<'py>, Option<Arc<WorkerBuild>>),
 ) -> PyResult<Vec<AuditExecutionResult<Bound<'py, PyAny>>>> {
     let py: Python<'py> = invocation.py();
     let plan: Bound<'py, PyAny> = native_field(pipeline, "plan_output")?;
+    if let Some(worker) = &worker {
+        for entry in native_field(&plan, "audit_entries")?.try_iter()? {
+            worker.start_attached(py, &audit_identity(&entry?, "name")?)?;
+        }
+    }
     let project: Bound<'py, PyAny> = native_field(pipeline, "project")?;
     let event_writer: Bound<'py, PyAny> = ExecutionEventWriter::new(py, None)
         .and_then(|value| pyo3::Bound::new(py, value))
@@ -300,6 +320,7 @@ fn execute<'py>(
     let relay: Bound<'py, AuditCallbackRelay> = Bound::new(
         py,
         AuditCallbackRelay {
+            worker,
             event_writer: event_writer.clone().unbind(),
             plan: plan.clone().unbind(),
             connection: run.connection.clone().unbind(),
@@ -509,15 +530,25 @@ fn complete(
 #[pyfunction]
 #[pyo3(signature = (*, request))]
 pub(crate) fn run_audit_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> PyResult<i32> {
+    run_audit(py, request, None)
+}
+
+/// Run one `sqb audit` request; a claimed run's audits come from its verified inputs and report to its worker.
+pub(crate) fn run_audit<'py>(
+    py: Python<'py>,
+    request: &Bound<'py, PyAny>,
+    verified: Option<VerifiedRun<'_, 'py>>,
+) -> PyResult<i32> {
+    let (worker, discovered) = verified.unzip();
     let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
         request,
         &record_class(py, RecordId::AuditInvocation)?,
-        true,
+        (true, discovered),
     )?;
     let pipeline: Bound<'_, PyAny> = compile_audits(request, &invocation)?;
     let run: AuditRun<'_> = prepare_run(request, &invocation, &pipeline)?;
     write_headers(&invocation, &pipeline, run.concurrency)?;
-    let results = execute(&invocation, &pipeline, &run)?;
+    let results = execute(&invocation, &pipeline, (&run, worker))?;
     complete(request, &invocation, &results, &run)
 }
 

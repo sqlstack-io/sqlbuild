@@ -16,15 +16,8 @@
 	const canRewrite = $derived(app.can('run.rewrite_history'));
 	const canFullRefresh = $derived(app.client.supports('launchJobFromScratch'));
 	const rewrites = $derived(fullRefresh || useWindow);
-	const placeholder = $derived(job.cursorType === 'integer' ? 'e.g. 1200' : 'e.g. 2026-10-01T00:00:00Z');
-	const windowInvalid = $derived(
-		useWindow &&
-			(!start && !end
-				? 'Give a start or an end'
-				: job.cursorType === 'integer'
-					? [start, end].some((v) => v && !/^\d+$/.test(v)) && 'Use whole numbers'
-					: [start, end].some((v) => v && Number.isNaN(Date.parse(v))) && 'Use a date and time like 2026-10-01T00:00:00Z')
-	);
+	// The server checks the bounds against the job's cursors and reports anything it refuses.
+	const windowInvalid = $derived(useWindow && (!start.trim() || !end.trim()) && 'Give a start and an end');
 
 	async function launch() {
 		const scope = app.scope;
@@ -32,7 +25,7 @@
 		busy = true;
 		error = null;
 		try {
-			const options = { window: useWindow && job.cursorType ? { type: job.cursorType, start: start || null, end: end || null } : undefined };
+			const options = { window: useWindow ? { type: job.cursorType ?? 'timestamp', start, end } : undefined };
 			const run = fullRefresh ? await app.client.launchJobFromScratch(scope, job.key, options) : await app.client.launchJob(scope, job.key, options);
 			onclose();
 			await goto(`/runs/${run.id}`);
@@ -49,7 +42,7 @@
 	<p class="faint">
 		{job.kind === 'group' ? `Starts a group run, with one run per job in it${job.members ? ` (${job.members.length})` : ''}.` : `Builds ${job.nodeCount} nodes with the job's options.`} If another run is updating the same data, it waits for it to finish.
 	</p>
-	{#if canFullRefresh || job.cursorType}
+	{#if canFullRefresh || canRewrite}
 	<div class="opts" title={canRewrite ? undefined : "You don't have permission to rebuild history (run.rewrite_history)"}>
 		{#if canFullRefresh}
 		<label class:off={!canRewrite}>
@@ -57,18 +50,19 @@
 			Rebuild from scratch <code title="Same as sqb --full-refresh">--full-refresh</code>
 		</label>
 		{/if}
-		{#if job.cursorType}
-			<label class:off={!canRewrite}>
-				<input type="checkbox" class="sb-check" bind:checked={useWindow} disabled={!canRewrite} />
-				Only a range of {job.cursorType === 'integer' ? 'IDs' : 'time'} <span class="faint" title="A cursor window: incremental models and loaders process only this range">(cursor window)</span>
+		{#if canRewrite}
+			<label>
+				<input type="checkbox" class="sb-check" bind:checked={useWindow} />
+				Backfill a range <span class="faint" title="A cursor window, as sqb build --start-cursor-ts or --start-cursor-int: incremental models and loaders process only this range">(cursor window)</span>
 			</label>
 			{#if useWindow}
 				<div class="window">
-					<input bind:value={start} {placeholder} aria-label="Window start" />
+					<input bind:value={start} placeholder="2026-10-01T00:00:00Z or 1200" aria-label="Window start" />
 					<span class="faint">to</span>
-					<input bind:value={end} {placeholder} aria-label="Window end" />
+					<input bind:value={end} placeholder="2026-10-31T00:00:00Z or 1500" aria-label="Window end" />
 				</div>
-				{#if windowInvalid}<p class="err">{windowInvalid}</p>{/if}
+				<p class="faint pad">Both ends are included. Whole numbers backfill an integer cursor; anything else is read as a date and time with its zone.</p>
+				{#if windowInvalid}<p class="err pad">{windowInvalid}</p>{/if}
 			{/if}
 		{/if}
 		{#if !canRewrite}<p class="faint">Rebuilding or reprocessing a range needs extra permission (<code>run.rewrite_history</code>).</p>{:else if rewrites}<p class="warn">This replaces data that was already built. It's recorded in the audit log.</p>{/if}
@@ -128,13 +122,16 @@
 		padding-left: 22px;
 	}
 	.window input {
-		width: 150px;
+		width: 190px;
 		padding: 3px 6px;
 		border: 1px solid var(--border);
 		border-radius: 2px;
 		background: var(--background);
 		font-family: var(--font-mono);
 		font-size: 11.5px;
+	}
+	.pad {
+		padding-left: 22px;
 	}
 	.err {
 		color: var(--sb-error);

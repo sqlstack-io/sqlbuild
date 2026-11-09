@@ -3,10 +3,17 @@
 	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
-	import { heartbeatLate, replicaLive, schedulerWords, sinkWords } from './utils';
+	import { heartbeatLate, openRecord, replicaLive, schedulerWords, sinkWords } from './utils';
 
 	const health = createResource((client) => client.platformHealth(), ['platform_events']);
-	const serverEvents = createResource((client) => client.listPlatformEventHistory({ locationId: null }), ['platform_events']);
+	// Without recorded history, the open server problems are the ones the problems read derives now.
+	const serverEvents = createResource(
+		(client) =>
+			client.supports('listPlatformEventHistory')
+				? client.listPlatformEventHistory({ locationId: null })
+				: client.listPlatformEvents({ activeOnly: true }).then((events) => events.filter((e) => e.locationId === null).map(openRecord)),
+		['platform_events']
+	);
 
 	// Scheduler, replicas and forwarding are liveness signals; poll them while the page is open.
 	$effect(() => {
@@ -16,8 +23,8 @@
 
 	const h = $derived(health.data ?? null);
 	const scheduler = $derived(h ? schedulerWords(h.scheduler, app.now) : null);
-	const sink = $derived(h ? sinkWords(h.sink, app.now) : null);
-	const late = $derived(!!h && heartbeatLate(h.heartbeat, app.now));
+	const sink = $derived(h && h.sink !== undefined ? sinkWords(h.sink, app.now) : null);
+	const late = $derived(!!h?.heartbeat && heartbeatLate(h.heartbeat, app.now));
 	const openServerProblems = $derived((serverEvents.data ?? []).filter((e) => e.active).length);
 	let open = $state(false);
 
@@ -30,65 +37,78 @@
 <section id="server" class="strip" aria-label="Server status">
 	{#if health.error}
 		<span class="err">Couldn't load the server status: {health.error}</span>
-	{:else if !h || !scheduler || !sink}
+	{:else if !h || !scheduler}
 		<span class="muted">Loading server status…</span>
 	{:else}
 		<span class="item" title={scheduler.title}>
 			Scheduler <i style:background={scheduler.tone}></i><b>{scheduler.text}</b>
 			{#if scheduler.checkIn}<span class="muted">· last check-in {scheduler.checkIn}</span>{/if}
 		</span>
-		<span class="sep">·</span>
-		<span class="item" title={sink.title}>Event forwarding <i style:background={sink.tone}></i><b>{sink.text}</b></span>
+		{#if sink}
+			<span class="sep">·</span>
+			<span class="item" title={sink.title}>Event forwarding <i style:background={sink.tone}></i><b>{sink.text}</b></span>
+		{/if}
 		{#if openServerProblems}<span class="sep">·</span><span class="warn">{openServerProblems} open server problem{openServerProblems === 1 ? '' : 's'}</span>{/if}
 	{/if}
 	<button class="toggle" onclick={() => (open = !open)} aria-expanded={open}>{open ? 'Hide details' : 'Details'}</button>
 </section>
 
 {#if open && h}
+	{@const lease = h.scheduler.lease}
 	<div class="details">
-		<div class="cols">
-			<div>
-				<h4>Servers</h4>
-				<ul>
-					{#each h.scheduler.instances as i (i.instanceId)}
-						<li title="Started {formatStamp(i.startedAt)} · version {i.version}">
-							<i style:background={replicaLive(i.lastSeenAt, app.now) ? 'var(--sb-success)' : 'var(--sb-error)'}></i>
-							<code>{i.instanceId}</code>
-							<span class="muted">
-								{!i.schedulerEnabled ? 'web and API only' : h.scheduler.lease?.holder === i.instanceId ? 'running the scheduler' : 'standing by to take over'}
-							</span>
-							<span class="faint">seen {formatAgo(i.lastSeenAt, app.now)}</span>
-						</li>
-					{/each}
-				</ul>
-				{#if h.scheduler.lease}
-					<p class="faint">
-						Leader lease held by <code>{h.scheduler.lease.holder}</code> for {formatDuration(h.scheduler.lease.acquiredAt, null, app.now)}; renewed {formatAgo(h.scheduler.lease.renewedAt, app.now)}, expires {formatIn(h.scheduler.lease.expiresAt, app.now)}.
-					</p>
+		{#if h.scheduler.instances || h.heartbeat || h.sink !== undefined}
+			<div class="cols">
+				{#if h.scheduler.instances}
+					<div>
+						<h4>Servers</h4>
+						<ul>
+							{#each h.scheduler.instances as i (i.instanceId)}
+								<li title="Started {formatStamp(i.startedAt)} · version {i.version}">
+									<i style:background={replicaLive(i.lastSeenAt, app.now) ? 'var(--sb-success)' : 'var(--sb-error)'}></i>
+									<code>{i.instanceId}</code>
+									<span class="muted">
+										{!i.schedulerEnabled ? 'web and API only' : lease?.holder === i.instanceId ? 'running the scheduler' : 'standing by to take over'}
+									</span>
+									<span class="faint">seen {formatAgo(i.lastSeenAt, app.now)}</span>
+								</li>
+							{/each}
+						</ul>
+						{#if lease?.holder && lease.acquiredAt && lease.renewedAt}
+							<p class="faint">
+								Leader lease held by <code>{lease.holder}</code> for {formatDuration(lease.acquiredAt, null, app.now)}; renewed {formatAgo(lease.renewedAt, app.now)}, expires {formatIn(lease.expiresAt, app.now)}.
+							</p>
+						{/if}
+					</div>
+				{/if}
+				{#if h.heartbeat}
+					<div>
+						<h4>Heartbeat</h4>
+						<p class:warn={late}>
+							{h.heartbeat.lastEmittedAt ? `Sent ${formatAgo(h.heartbeat.lastEmittedAt, app.now)}` : 'Never sent'}{late ? ' — late' : ''}
+						</p>
+						<p class="faint">The server sends a heartbeat event every {h.heartbeat.intervalSeconds}s. If it stops arriving where you forward events, the server is down.</p>
+					</div>
+				{/if}
+				{#if h.sink !== undefined}
+					<div>
+						<h4>Event forwarding</h4>
+						{#if h.sink}
+							<p>Sends problems as they happen to a {h.sink.kind} set in the server config (<code>{h.sink.destinationSource}</code>).</p>
+							<p class="faint">
+								{h.sink.eventKinds.length ? h.sink.eventKinds.join(', ') : 'Every kind of event'} · {h.sink.pendingEvents} waiting · last tried {formatAgo(h.sink.lastAttemptAt, app.now)}
+							</p>
+							{#if h.sink.lastError}<p class="err">{h.sink.lastError}</p>{/if}
+						{:else}
+							<p class="faint">Not set up. Sensors still see every problem; forwarding pushes them out without code.</p>
+						{/if}
+					</div>
 				{/if}
 			</div>
-			<div>
-				<h4>Heartbeat</h4>
-				<p class:warn={late}>
-					{h.heartbeat.lastEmittedAt ? `Sent ${formatAgo(h.heartbeat.lastEmittedAt, app.now)}` : 'Never sent'}{late ? ' — late' : ''}
-				</p>
-				<p class="faint">The server sends a heartbeat event every {h.heartbeat.intervalSeconds}s. If it stops arriving where you forward events, the server is down.</p>
-			</div>
-			<div>
-				<h4>Event forwarding</h4>
-				{#if h.sink}
-					<p>Sends problems as they happen to a {h.sink.kind} set in the server config (<code>{h.sink.destinationSource}</code>).</p>
-					<p class="faint">
-						{h.sink.eventKinds.length ? h.sink.eventKinds.join(', ') : 'Every kind of event'} · {h.sink.pendingEvents} waiting · last tried {formatAgo(h.sink.lastAttemptAt, app.now)}
-					</p>
-					{#if h.sink.lastError}<p class="err">{h.sink.lastError}</p>{/if}
-				{:else}
-					<p class="faint">Not set up. Sensors still see every problem; forwarding pushes them out without code.</p>
-				{/if}
-			</div>
-		</div>
-		<h4 class="mt">Server problems</h4>
-		<ProblemList events={serverEvents.data ?? []} resource={serverEvents} empty="No server problems recorded." />
+			<h4 class="mt">Server problems</h4>
+		{:else}
+			<h4>Server problems</h4>
+		{/if}
+		<ProblemList events={serverEvents.data ?? []} resource={serverEvents} empty={app.client.supports('listPlatformEventHistory') ? 'No server problems recorded.' : 'No open server problems.'} />
 	</div>
 {/if}
 

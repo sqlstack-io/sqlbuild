@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-dupes-new check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill \
+.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-dupes-new check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client \
 	check-e2e-shards test-e2e-duckdb test-e2e-duckdb-build-core \
 	test-e2e-duckdb-build-incremental \
 	test-e2e-duckdb-cli-data test-e2e-duckdb-cli test-e2e-duckdb-inspection \
@@ -706,12 +706,19 @@ verify-quick:
 	exit $$status
 
 
-check-ci: check-dupes-new check-e2e-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill rust-lint
+check-ci: check-dupes-new check-e2e-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client rust-lint
 	uv run ruff format --check .
 	uv run ruff check .
 	uv run ty check src tests
 	uv run pytest tests/unit/src/sqlbuild/adapter/contract/classes/strict_adapter/test_strict_adapter.py -q
 	uv run fensu check
+
+
+# The generated TypeScript control client must match the OpenAPI document of the installed sqb.
+check-control-client:
+	npm --prefix clients/typescript ci
+	uv run --no-sync npm --prefix clients/typescript run check
+	uv run --no-sync npm --prefix clients/typescript test
 
 
 check-native-layering:

@@ -25,7 +25,7 @@
 	let topView = $state<'timeline' | 'graph'>('timeline');
 	/** The graph needs dependency edges and the bottom pane needs execution reads; servers without them show neither. */
 	const hasGraph = $derived((detail?.edges.length ?? 0) > 0);
-	const hasBottom = $derived(bottomTabs(app.client).length > 0);
+	const hasBottom = $derived(bottomTabs(app.client, (c) => app.can(c)).length > 0);
 
 	/** The axis starts at the first node start, not at queue time. */
 	const origin = $derived.by(() => {
@@ -42,6 +42,14 @@
 	let topFrac = $state(0.5);
 	let dragging = $state(false);
 	let splitEl = $state<HTMLDivElement>();
+	// The timeline starts as tall as its rows, so a short run leaves the room to the log below.
+	let sized = false;
+	$effect(() => {
+		if (sized || !splitEl || !nodes.length || !hasBottom || !splitEl.clientHeight) return;
+		sized = true;
+		const rows = nodes.length + (groups.length > 1 ? groups.length : 0);
+		topFrac = Math.min(0.6, Math.max(0.22, (125 + rows * 32) / splitEl.clientHeight));
+	});
 	function onDrag(e: PointerEvent) {
 		if (!dragging || !splitEl) return;
 		const r = splitEl.getBoundingClientRect();

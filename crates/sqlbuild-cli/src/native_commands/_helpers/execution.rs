@@ -11,9 +11,9 @@ use serde_json::json;
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use sqlbuild_orchestration::api::models::{
-    ApiAuthentication, DevelopmentScope, DockerImageSource, HumanLogin,
-};
+
+use crate::adhoc::main::adhoc_planner::adhoc_planner;
+use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, HumanLogin};
 use sqlbuild_orchestration::credentials::models::AuditRetention;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
@@ -22,6 +22,7 @@ use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
     WarehouseSyncFailure,
 };
+use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
@@ -111,7 +112,7 @@ pub(crate) async fn run_development_roles(
         (ApiAuthentication {
             login: HumanLogin::Development(scope),
             ..ApiAuthentication::default()
-        }, Vec::new(), Default::default()),
+        }, (Vec::new(), adhoc_planner()), Default::default()),
         (move || {
             drop(write_output(&[(Stream::Stderr, &format!(
                 "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",
@@ -814,7 +815,7 @@ pub(crate) async fn open_control_store(
 /// Decode privileged CLI configuration before handing process ownership to the workers domain.
 pub(crate) fn open_control_workers(
     namespace: &Namespace,
-) -> Result<(Workers, Vec<DockerImageSource>), ControlError> {
+) -> Result<(Workers, RunHandoff), ControlError> {
     let workers = open_workers(
         text(namespace, "control_launchers").as_deref(),
         text(namespace, "control_database_env")
@@ -822,7 +823,7 @@ pub(crate) fn open_control_workers(
         !flag(namespace, "control_no_scheduler"),
     )?;
     let images = docker_image_sources(&workers);
-    Ok((workers, images))
+    Ok((workers, (images, adhoc_planner())))
 }
 
 pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {

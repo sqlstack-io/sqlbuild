@@ -114,15 +114,14 @@
 	.ml-auto {
 		margin-left: auto;
 	}
+	/* A preview is read at a glance, so long lines wrap; the full viewer scrolls. */
 	.body {
 		padding: 8px 0;
-		overflow-x: auto;
 		color: var(--sb-mono);
 		font: 12px/1.7 var(--font-mono);
 	}
 	.line {
 		display: flex;
-		min-width: max-content;
 		padding-right: 12px;
 	}
 	.ln {
@@ -134,8 +133,10 @@
 		user-select: none;
 	}
 	.line code {
+		min-width: 0;
 		font: inherit;
-		white-space: pre;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 	}
 	.more {
 		display: block;

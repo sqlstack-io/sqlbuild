@@ -29,11 +29,13 @@ fn given_dependency_tokens_when_classifying_imports_then_preserves_dialect_and_o
             expected_messages: &[],
         },
         test_types::DependencyTokenTestCase {
-            description: "backtick quoting and comment-separated source arguments",
+            description: "backtick quoting and comment-separated source arguments, reported unavailable until SQLBuild parses the dialect",
             expected_columns: &[],
             dialect: "bigquery",
             query_sql: "WITH imported AS (SELECT * FROM __source /* ignored */ (`Orders`)) SELECT order_id FROM imported",
-            expected_messages: &[],
+            expected_messages: &[
+                "SQLBuild cannot parse bigquery SQL for built-in rules yet, so these rules were not evaluated: SQBRMODEL101",
+            ],
         },
         test_types::DependencyTokenTestCase {
             description: "dollar strings do not contribute spurious calls",
@@ -519,7 +521,8 @@ fn given_snowflake_expression_when_evaluating_rules_then_uses_project_dialect() 
                 "CAST(amounts AS ARRAY(NUMBER(38, 10))) AS amounts, ",
                 "OBJECT_CONSTRUCT_KEEP_NULL('group_id', group_id) AS details, ",
                 "FROM __table_fn(\"inventory_items\")(42)"
-            ),
+            )
+            .to_owned(),
             expected_code: "SQBRCONTRACT101",
         },
         test_types::DialectEvaluationTestCase {
@@ -528,13 +531,14 @@ fn given_snowflake_expression_when_evaluating_rules_then_uses_project_dialect() 
             query_sql: concat!(
                 "WITH lines AS (SELECT * FROM __table_fn(\"lines_for\")('B-1', __ref(\"orders\").k) AS l)\n",
                 "SELECT l.item_id FROM lines AS l"
-            ),
+            )
+            .to_owned(),
             expected_code: "SQBRCONTRACT101",
         },
         test_types::DialectEvaluationTestCase {
             description: "a Snowflake table function already written inside TABLE( ) is not wrapped twice",
             dialect: "snowflake",
-            query_sql: "SELECT item_id FROM table ( __table_fn(\"inventory_items\")(42) )",
+            query_sql: "SELECT item_id FROM table ( __table_fn(\"inventory_items\")(42) )".to_owned(),
             expected_code: "SQBRCONTRACT101",
         },
     ];
@@ -572,26 +576,29 @@ fn given_dialect_quoting_around_table_functions_when_evaluating_rules_then_model
             query_sql: concat!(
                 "SELECT 'it\\'s (' AS label, item_id ",
                 "FROM __table_fn(\"inventory_items\")(42)"
-            ),
+            )
+            .to_owned(),
             expected_code: "SQBRCONTRACT101",
         },
         test_types::DialectEvaluationTestCase {
-            description: "BigQuery backslash-escaped quote inside table function arguments",
+            description: "BigQuery backslash-escaped quote inside table function arguments, reported unavailable until SQLBuild parses the dialect",
             dialect: "bigquery",
             query_sql: concat!(
                 "SELECT item_id ",
                 "FROM __table_fn(\"inventory_items\", 'a\\')')(42)"
-            ),
-            expected_code: "SQBRCONTRACT101",
+            )
+            .to_owned(),
+            expected_code: "L007",
         },
         test_types::DialectEvaluationTestCase {
-            description: "BigQuery backtick identifier containing a parenthesis in arguments",
+            description: "BigQuery backtick identifier containing a parenthesis in arguments, reported unavailable until SQLBuild parses the dialect",
             dialect: "bigquery",
             query_sql: concat!(
                 "SELECT item_id ",
                 "FROM __table_fn(\"inventory_items\", `batch)size`)(42)"
-            ),
-            expected_code: "SQBRCONTRACT101",
+            )
+            .to_owned(),
+            expected_code: "L007",
         },
     ];
 
@@ -615,12 +622,27 @@ fn given_dialect_quoting_around_table_functions_when_evaluating_rules_then_model
 #[test]
 fn given_unparseable_model_when_evaluating_then_retains_named_rule_fault() -> Result<(), String> {
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
-    let test_cases = [test_types::DialectEvaluationTestCase {
-        description: "invalid query is missing evidence rather than a passing contract",
-        dialect: "duckdb",
-        query_sql: "SELECT (",
-        expected_code: "SQBRCONTRACT101",
-    }];
+    let deep_sql = format!("SELECT {}1 AS order_id FROM orders", "1 + ".repeat(50_000));
+    let test_cases = [
+        test_types::DialectEvaluationTestCase {
+            description: "invalid query is missing evidence rather than a passing contract",
+            dialect: "duckdb",
+            query_sql: "SELECT (".to_owned(),
+            expected_code: "SQBRCONTRACT101",
+        },
+        test_types::DialectEvaluationTestCase {
+            description: "a DuckDB expression deeper than the AST limit is refused, not a crash",
+            dialect: "duckdb",
+            query_sql: deep_sql.clone(),
+            expected_code: "SQBRCONTRACT101",
+        },
+        test_types::DialectEvaluationTestCase {
+            description: "a Snowflake expression deeper than the AST limit is refused, not a crash",
+            dialect: "snowflake",
+            query_sql: deep_sql,
+            expected_code: "SQBRCONTRACT101",
+        },
+    ];
     for test_case in test_cases {
         let config = json!({"select": ["SQBRCONTRACT101"], "cache": {"enabled": false}});
         let mut request: Value = serde_json::from_str(&helpers::request(&project_dir, &config))
@@ -663,19 +685,19 @@ fn given_comment_apostrophes_when_generic_fallback_normalizes_rules_sql_then_mod
         test_types::DialectEvaluationTestCase {
             description: "line comment apostrophe before a colon path",
             dialect: "postgres",
-            query_sql: "-- don't drop the customer path\nSELECT payload:customer_id AS customer_id FROM orders",
+            query_sql: "-- don't drop the customer path\nSELECT payload:customer_id AS customer_id FROM orders".to_owned(),
             expected_code: "SQBRCONTRACT101",
         },
         test_types::DialectEvaluationTestCase {
             description: "block comment apostrophe before a colon path",
             dialect: "postgres",
-            query_sql: "/* customer's path */ SELECT payload:customer_id AS customer_id FROM orders",
+            query_sql: "/* customer's path */ SELECT payload:customer_id AS customer_id FROM orders".to_owned(),
             expected_code: "SQBRCONTRACT101",
         },
         test_types::DialectEvaluationTestCase {
             description: "colon inside a line comment stays commented",
             dialect: "postgres",
-            query_sql: "SELECT payload:customer_id AS customer_id -- note: it's nested\nFROM orders",
+            query_sql: "SELECT payload:customer_id AS customer_id -- note: it's nested\nFROM orders".to_owned(),
             expected_code: "SQBRCONTRACT101",
         },
     ];

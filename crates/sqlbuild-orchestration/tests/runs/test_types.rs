@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use uuid::Uuid;
+
 use crate::credentials::models::BuiltinRole;
 use crate::runs::models::{RerunRequest, RunStatus};
 
@@ -113,4 +115,91 @@ pub(crate) struct MixedAdmissionTestCase {
     pub(crate) physical_priority: i64,
     pub(crate) parent_priority: i64,
     pub(crate) expected_selections: [&'static str; 2],
+}
+
+/// Who runs an ad-hoc case: Admin, Developer, Operator, or a person with no role.
+#[derive(Clone, Copy)]
+pub(crate) enum AdhocPerson {
+    Admin,
+    Developer,
+    Operator,
+    Stranger,
+}
+
+/// The people the ad-hoc fixture provisions.
+pub(crate) struct AdhocPeople {
+    pub(crate) admin: Uuid,
+    pub(crate) developer: Uuid,
+    pub(crate) operator: Uuid,
+    pub(crate) stranger: Uuid,
+}
+
+impl AdhocPeople {
+    pub(crate) fn of(&self, person: AdhocPerson) -> Uuid {
+        match person {
+            AdhocPerson::Admin => self.admin,
+            AdhocPerson::Developer => self.developer,
+            AdhocPerson::Operator => self.operator,
+            AdhocPerson::Stranger => self.stranger,
+        }
+    }
+}
+
+/// One person's command: what its dry run decides and what launching it does.
+pub(crate) struct AdhocCommandTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) person: AdhocPerson,
+    pub(crate) command: &'static [&'static str],
+    pub(crate) priority: i64,
+    pub(crate) reason: &'static str,
+    pub(crate) expected_check: serde_json::Value,
+    pub(crate) expected_launch: Result<bool, u16>,
+}
+
+/// The CLI's planner reduced to exact node keys, `--full-refresh` and `--warehouse NAME`.
+pub(crate) struct ExactKeyPlanner;
+
+impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
+    fn plan(
+        &self,
+        command: &[String],
+        resources: &[crate::runs::models::PlannerResource],
+    ) -> Result<crate::runs::models::CommandPlan, String> {
+        let mut plan = crate::runs::models::CommandPlan {
+            verb: command.first().cloned().unwrap_or_default(),
+            selection: Default::default(),
+            settings: Default::default(),
+        };
+        let mut tokens = command.iter().skip(1);
+        while let Some(token) = tokens.next() {
+            match token.as_str() {
+                "--full-refresh" => {
+                    plan.settings
+                        .insert("full_refresh".into(), serde_json::json!(true));
+                }
+                "--warehouse" => {
+                    let name = tokens.next().ok_or("--warehouse needs a name")?;
+                    plan.settings
+                        .insert("warehouse".into(), serde_json::json!(name));
+                }
+                key if resources.iter().any(|resource| resource.key == key) => {
+                    plan.selection.insert(key.to_owned());
+                }
+                other => return Err(format!("{other} is not available for ad-hoc runs")),
+            }
+        }
+        Ok(plan)
+    }
+}
+
+pub(crate) struct RunNodeErrorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_message: &'static str,
+}
+
+pub(crate) struct JobDetailTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_order: [&'static str; 2],
 }

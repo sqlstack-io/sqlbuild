@@ -27,16 +27,18 @@ export type SchedulerInstance = {
 };
 
 export type SchedulerLease = {
-	holder: string;
-	acquiredAt: Iso;
-	renewedAt: Iso;
+	/** Null when the server doesn't say which replica holds it, nor since when. */
+	holder: string | null;
+	acquiredAt: Iso | null;
+	renewedAt: Iso | null;
 	expiresAt: Iso;
 };
 
 export type SchedulerStatus = {
 	/** Null when no replica holds the leader lease. */
 	lease: SchedulerLease | null;
-	instances: SchedulerInstance[];
+	/** Null when the server doesn't list its replicas. */
+	instances: SchedulerInstance[] | null;
 };
 
 export type HeartbeatStatus = {
@@ -62,9 +64,10 @@ export type SinkStatus = {
 
 export type PlatformHealth = {
 	scheduler: SchedulerStatus;
-	heartbeat: HeartbeatStatus;
-	/** Null when no server-side sink is configured. */
-	sink: SinkStatus | null;
+	/** Null when the server doesn't report its heartbeat. */
+	heartbeat: HeartbeatStatus | null;
+	/** Null when no server-side sink is configured; absent when the server doesn't report forwarding. */
+	sink?: SinkStatus | null;
 };
 
 export type PlatformEventLink =
@@ -137,9 +140,10 @@ export type ConnectionTest = {
 
 export type LocationInstance = {
 	id: string;
-	imageId: string;
-	gitRevision: string;
-	startedAt: Iso;
+	/** Null when the server doesn't report what the process runs or when it started. */
+	imageId: string | null;
+	gitRevision: string | null;
+	startedAt: Iso | null;
 	lastSeenAt: Iso;
 	/** `stale` once heartbeats stop; `gone` after deregistering. */
 	state: 'live' | 'stale' | 'gone';
@@ -149,21 +153,28 @@ export type LocationDetail = {
 	id: string;
 	name: string;
 	health: LocationHealth;
-	createdAt: Iso;
-	brokenDeployPolicy: BrokenDeployPolicy;
+	/** Null when the server doesn't report it. */
+	createdAt: Iso | null;
+	/** Null when the server doesn't report it. */
+	brokenDeployPolicy: BrokenDeployPolicy | null;
 	/** The latest deploy that never published; null when the latest deploy is current. */
 	failedDeploy: FailedDeploy | null;
 	lastLoadError: string | null;
 	instances: LocationInstance[];
 	target: LocationTarget;
 	snapshot: Snapshot | null;
-	/** Image the current snapshot was published from; runs start from it. Null for local processes. */
-	imageId: string | null;
-	warehouseConnection: string;
+	/** Image the current snapshot was published from; runs start from it. Null for local processes; absent when the server doesn't report it. */
+	imageId?: string | null;
+	/** Null when the server doesn't name it. */
+	warehouseConnection: string | null;
 	connectionTest: ConnectionTest | null;
 };
 
-export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'health' | 'brokenDeployPolicy' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
+export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
+	/** Null when the server can't report it to this person. */
+	health: LocationHealth | null;
+	/** Null when the server doesn't report the policy. */
+	brokenDeployPolicy: BrokenDeployPolicy | null;
 	/** Unresolved platform events of this location. */
 	activeProblems: number;
 	liveInstances: number;
@@ -296,7 +307,8 @@ export type AccountSource = 'oidc' | 'trusted_proxy' | 'password';
 export type Account = Principal & {
 	kind: 'user';
 	email: string | null;
-	source: AccountSource;
+	/** Null when the server can't tell, such as a person with no password who hasn't used SSO. */
+	source: AccountSource | null;
 	ssoGroups: string[];
 	createdAt: Iso;
 	lastSeenAt: Iso | null;
@@ -327,8 +339,8 @@ export type RoleDefinition = {
 	grants: RoleGrant[];
 	/** People holding the role somewhere. */
 	holders: number;
-	/** Nodes the role's selectors started matching in the last 7 days. */
-	recentlyMatched: number;
+	/** Nodes the role's selectors started matching in the last 7 days; null when unknown. */
+	recentlyMatched: number | null;
 };
 
 /** What one selector of a role matches in the current snapshot. */
@@ -344,8 +356,8 @@ export type RoleDetail = RoleDefinition & {
 	baseGrants: RoleGrant[];
 	selectors: SelectorMatch[];
 	assignments: RoleAssignment[];
-	/** The role's definition as written, read-only. */
-	definition: string;
+	/** The role's definition as published, read-only; null for built-in roles. */
+	definition: string | null;
 };
 
 /** `locationId: null` applies everywhere. */
@@ -369,7 +381,7 @@ export type RoleAssignment = {
 	/** For policy and built-in assignments: where they are set, `path:line`. */
 	definedIn: string | null;
 	assignedBy: Principal | null;
-	assignedAt: Iso;
+	assignedAt: Iso | null;
 	/** The role no longer exists in code; the assignment shows but grants nothing. */
 	stale: boolean;
 };
@@ -395,7 +407,8 @@ export type AuditEntry = {
 	id: string;
 	at: Iso;
 	actor: Principal;
-	action: Capability | 'session.login';
+	/** A capability, or a recorded event such as `token.issued`; a denial carries the refused capability. */
+	action: string;
 	outcome: AuditOutcome;
 	scope: AssignmentScope & { subject: string | null };
 	/** Role that granted the action, or for denials null. */

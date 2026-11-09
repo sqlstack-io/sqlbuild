@@ -14,22 +14,37 @@ use crate::api::_helpers::resources::{
 #[openapi(paths(
     administrators::change,
     administrators::assign,
+    administrators::people,
+    administrators::holdings,
+    administrators::definitions,
     audit::read,
     person_operations::request_job,
+    person_operations::request_adhoc,
+    person_operations::check_adhoc,
     person_operations::cancel_run,
     person_operations::rerun,
     person_operations::change_trigger,
     person_operations::recent_runs,
     person_reads::run_nodes,
     person_reads::nodes,
+    person_reads::node_runs,
+    person_reads::run_events,
+    person_reads::run_statements,
+    person_reads::run_statement_sql,
+    person_reads::run_output,
+    person_reads::run_node_error,
     person_reads::jobs,
+    person_reads::job,
     person_reads::triggers,
     person_reads::ticks,
     person_reads::snapshots,
+    person_reads::health,
+    person_reads::problems,
     person_operations::catalog,
     person_operations::statistics,
     person_operations::fingerprint,
     person_operations::node_status,
+    person_operations::column_lineage,
     person_checks::list,
     person_checks::history,
     person_checks::sql,
@@ -85,8 +100,22 @@ pub(crate) struct ReadQuery {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct RunEventsQuery {
+    pub(crate) after: Option<i64>,
+    pub(crate) limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct StatementSqlQuery {
+    pub(crate) statement_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ReadAuditQuery {
     pub(crate) after: Option<i64>,
+    pub(crate) before: Option<i64>,
     pub(crate) limit: Option<u32>,
 }
 
@@ -103,6 +132,14 @@ pub(crate) struct CheckResultPath {
     pub(crate) target: String,
     pub(crate) binding_key: String,
     pub(crate) event_id: uuid::Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct RunNodePath {
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) run_id: uuid::Uuid,
+    pub(crate) node_key: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -430,4 +467,12 @@ pub(crate) struct ControlClient {
 pub(crate) struct UiAsset {
     pub(crate) path: &'static str,
     pub(crate) body: &'static [u8],
+}
+
+/// A decompressing reader that fails once it would yield more than `remaining` bytes.
+#[derive(Debug)]
+pub(crate) struct BoundedReader<R> {
+    pub(crate) inner: R,
+    pub(crate) remaining: usize,
+    pub(crate) exceeded: bool,
 }

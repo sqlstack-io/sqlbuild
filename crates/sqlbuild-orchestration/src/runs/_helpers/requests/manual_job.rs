@@ -57,6 +57,11 @@ pub(crate) async fn request_job_run_in(
             "backfill window start must not follow end".into(),
         ));
     }
+    if request.full_refresh && request.window.is_some() {
+        return Err(ControlError::Invalid(
+            "a backfill window and a full refresh cannot be combined".into(),
+        ));
+    }
     let event_id = Uuid::new_v5(&request.run_id, MANUAL_JOB_AUDIT_TAG);
     let (transaction, retry) =
         request_retry(transaction, &context, (request.run_id, &json!(request))).await?;

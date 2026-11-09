@@ -404,7 +404,7 @@ fn run_implementation<'py>(
         "run_debug_command" => run_debug_command(py, options())?,
         "run_diff_command" => run_diff_command(py, &request()?)?,
         "run_format_command" => run_format_command(py, options())?,
-        "run_freshness_command" => run_freshness_command(py, &request()?)?,
+        "run_freshness_command" => run_freshness_command(py, &request()?, None)?,
         "run_init_command" => run_init_command(
             py,
             argument(&arguments, "project_dir")?.filter(|value| !value.is_none()),

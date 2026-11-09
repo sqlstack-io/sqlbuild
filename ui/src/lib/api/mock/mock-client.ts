@@ -19,6 +19,7 @@ import type {
 	RunDetail,
 	RunEventPage,
 	RunListQuery,
+	RunNodeError,
 	RunOutputLine,
 	RunStatement,
 	Scope,
@@ -212,6 +213,12 @@ export class MockApiClient implements ApiClient {
 	async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
 		this.#location(scope);
 		return this.#operate.listRunOutput(scope, runId);
+	}
+
+	async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {
+		const node = (await this.getRunDetail(scope, runId))?.nodes.find((n) => n.runId === runId && n.nodeKey === nodeKey);
+		if (!node) throw new ApiError('node not found in this run', 404);
+		return { nodeKey, errorCode: node.errorCode, message: node.errorDetail ?? node.errorMessage, file: node.errorLocation?.file ?? null };
 	}
 
 	async listQueue(scope: Scope): Promise<QueueEntry[]> {

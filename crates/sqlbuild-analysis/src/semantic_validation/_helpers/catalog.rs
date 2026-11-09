@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use crate::semantic_validation::models::{
-    CatalogInput, Columns, CompactAnalysisJob, DiagnosticRow, FunctionProbes, ProjectCatalog,
+    CatalogInput, Columns, CompactAnalysisJob, DiagnosticRow, ProjectCatalog,
 };
 use crate::semantic_validation::types::{
     BindingRequest, NormalizationRequest, PreparedCompactAnalysis, Relations,
@@ -160,7 +160,6 @@ impl ProjectCatalog {
             tables: HashMap::new(),
             overrides: Vec::new(),
             analysis_tables: HashMap::new(),
-            function_probes: Arc::new(FunctionProbes::default()),
             analysis_pool: Arc::default(),
             running_analyses: Arc::default(),
         };
@@ -176,15 +175,9 @@ impl ProjectCatalog {
 
     pub fn with_relations(&self, relations: Relations) -> Self {
         let mut catalog = Self {
-            dialect: self.dialect,
-            options: self.options.clone(),
-            quoted_ignore_case: self.quoted_ignore_case,
             tables: self.tables.clone(),
-            overrides: Vec::new(),
             analysis_tables: self.analysis_tables.clone(),
-            function_probes: Arc::new(FunctionProbes::default()),
-            analysis_pool: Arc::clone(&self.analysis_pool),
-            running_analyses: Arc::clone(&self.running_analyses),
+            ..self.analysis_view()
         };
         catalog.update_relations(relations);
         catalog
@@ -285,12 +278,7 @@ impl ProjectCatalog {
                 .map(|(sql, references, overrides)| {
                     let schema = self.schema(&references, overrides)?;
                     let result = self.validate(&sql, &schema)?;
-                    let result = diagnostics::map_diagnostics(
-                        &sql,
-                        self.dialect,
-                        result,
-                        &self.function_probes,
-                    )?;
+                    let result = diagnostics::map_diagnostics(&sql, self.dialect, result)?;
                     Ok(result.errors.into_iter().map(diagnostic_row).collect())
                 })
                 .collect::<Result<Vec<_>, String>>()
@@ -356,7 +344,6 @@ impl ProjectCatalog {
             tables: HashMap::new(),
             overrides: Vec::new(),
             analysis_tables: HashMap::new(),
-            function_probes: Arc::clone(&self.function_probes),
             analysis_pool: Arc::clone(&self.analysis_pool),
             running_analyses: Arc::clone(&self.running_analyses),
         }
@@ -388,7 +375,6 @@ impl ProjectCatalog {
             tables: HashMap::new(),
             overrides: Vec::new(),
             analysis_tables: HashMap::new(),
-            function_probes: Arc::new(FunctionProbes::default()),
             analysis_pool: Arc::default(),
             running_analyses: Arc::default(),
         }

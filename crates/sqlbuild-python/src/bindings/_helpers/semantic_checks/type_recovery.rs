@@ -97,7 +97,7 @@ pub(crate) fn recovered_types<'py>(
     let step = py
         .compiler_detach(|| Ok(plan_type_recovery(&request, shared.catalog)))
         .map_err(compiler_error)?
-        .map_err(|failure| semantic_error(py, &failure))?;
+        .map_err(|failure| semantic_error(&failure))?;
     if step.status() == UNCHANGED {
         return Ok(project.clone());
     }

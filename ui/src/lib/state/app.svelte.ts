@@ -18,6 +18,8 @@ import {
 } from '$lib/api';
 
 const SCOPE_KEY = 'sb-scope';
+/** How often the shell rereads live problems and warehouse sync; locations report every 30 seconds. */
+const POLL_MS = 30_000;
 
 /**
  * App-wide state: the bootstrap, the selected location, and the
@@ -44,6 +46,7 @@ class AppState {
 	readonly capabilities = $derived([...(this.bootstrap?.capabilities ?? []), ...(this.location?.capabilities ?? [])]);
 
 	#started = false;
+	#syncRefused = new Set<string>();
 
 	constructor() {
 		this.client = createClient(new URLSearchParams(browser ? window.location.search : ''), () => this.#signIn());
@@ -88,6 +91,11 @@ class AppState {
 		this.#restoreScope();
 		this.client.changes.follow(this.scope);
 		void this.#loadPlatformEvents();
+		// Problems and sync reports come from time passing and location reports, so no change notice announces them.
+		setInterval(() => {
+			void this.#loadPlatformEvents();
+			void this.#loadWarehouseSync();
+		}, POLL_MS);
 		this.#loadScoped();
 	}
 
@@ -147,11 +155,17 @@ class AppState {
 		if (!this.client.supports('getWarehouseSync')) return;
 		const scope = this.scope;
 		if (!scope) return;
+		// Each refusal is audited, so a target the person may not list is asked once per page load, not every poll.
+		if (this.#syncRefused.has(scope.locationId)) {
+			this.warehouseSync = null;
+			return;
+		}
 		try {
 			const sync = await this.client.getWarehouseSync(scope);
 			if (this.scope === scope) this.warehouseSync = sync;
-		} catch {
-			this.warehouseSync = null;
+		} catch (error) {
+			if (error instanceof ApiError && error.status === 403) this.#syncRefused.add(scope.locationId);
+			if (this.scope === scope) this.warehouseSync = null;
 		}
 	}
 

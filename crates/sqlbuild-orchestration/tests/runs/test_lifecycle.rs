@@ -246,6 +246,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                         rows_affected: Some(17),
                         error_code: (outcome == NodeOutcome::Failed).then(|| "E100".into()),
                         skipped_because_of: None,
+                        error_message: None,
                     },
                     ..started.clone()
                 };

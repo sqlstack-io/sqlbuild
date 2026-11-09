@@ -16,11 +16,20 @@
 	import { healthLabel, healthTone, shortImage, targetWords } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { openRecord } from '../utils';
 	import { firstLine, summariseProcesses } from './utils';
 
 	const id = $derived(page.params.id ?? '');
 	const location = createResource((client) => client.getLocation(id), ['snapshot', 'warehouse_sync']);
-	const problems = createResource((client) => client.listPlatformEventHistory({ locationId: id }), ['platform_events']);
+	// Without recorded history, the page lists the open problems the server derives now.
+	const history = $derived(app.client.supports('listPlatformEventHistory'));
+	const problems = createResource(
+		(client) =>
+			client.supports('listPlatformEventHistory')
+				? client.listPlatformEventHistory({ locationId: id })
+				: client.listPlatformEvents({ activeOnly: true }).then((events) => events.filter((e) => e.locationId === id).map(openRecord)),
+		['platform_events']
+	);
 	const detail = $derived(location.data ?? null);
 	let problemView = $state<'open' | 'all'>('open');
 	const problemRows = $derived((problems.data ?? []).filter((e) => problemView === 'all' || e.active));
@@ -74,8 +83,8 @@
 				<span class="muted">
 					{#if processes.live.length === 1 && running}
 						<b class="fg">Running</b> ·
-						{#if detail.imageId}image <code title={running.imageId}>{shortImage(running.imageId)}</code>{:else}<span title="Runs start as local processes, not containers">local process</span>{/if}
-						· <span title={formatStamp(running.lastSeenAt)}>last check-in {formatAgo(running.lastSeenAt, app.now)}</span>
+						{#if running.imageId}image <code title={running.imageId}>{shortImage(running.imageId)}</code> ·{:else if detail.imageId === null}<span title="Runs start as local processes, not containers">local process</span> ·{/if}
+						<span title={formatStamp(running.lastSeenAt)}>last check-in {formatAgo(running.lastSeenAt, app.now)}</span>
 					{:else if processes.live.length > 1}
 						<b class="fg">{processes.live.length} processes running</b> · usually a deploy in progress: the new one takes over once it loads
 					{:else}
@@ -83,7 +92,7 @@
 					{/if}
 				</span>
 				<span class="right">
-					<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection} last={detail.connectionTest} />
+					<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection ?? 'warehouse'} last={detail.connectionTest} />
 				</span>
 			</div>
 
@@ -93,8 +102,8 @@
 						<li class:off={i.state === 'gone'}>
 							<StatusLabel tone={instanceTone[i.state]} label={instanceLabel[i.state]} muted={i.state !== 'live'} />
 							<code class="muted" title={i.id}>{i.id}</code>
-							<span class="muted">image <code title={i.imageId}>{shortImage(i.imageId)}</code> · commit <code>{i.gitRevision}</code></span>
-							<span class="muted">started <RelativeTime value={formatAgo(i.startedAt, app.now)} exact={formatStamp(i.startedAt)} /> · last check-in <RelativeTime value={formatAgo(i.lastSeenAt, app.now)} exact={formatStamp(i.lastSeenAt)} /></span>
+							{#if i.imageId && i.gitRevision}<span class="muted">image <code title={i.imageId}>{shortImage(i.imageId)}</code> · commit <code>{i.gitRevision}</code></span>{/if}
+							<span class="muted">{#if i.startedAt}started <RelativeTime value={formatAgo(i.startedAt, app.now)} exact={formatStamp(i.startedAt)} /> ·{/if} last check-in <RelativeTime value={formatAgo(i.lastSeenAt, app.now)} exact={formatStamp(i.lastSeenAt)} /></span>
 						</li>
 					{/each}
 				</ul>
@@ -125,6 +134,14 @@
 					</summary>
 					<div class="alert-body"><pre>{detail.lastLoadError}</pre></div>
 				</details>
+			{:else if detail.health === 'falling_back'}
+				<div class="alert note">
+					<TriangleAlertIcon size={14} />
+					<span class="summary-text">
+						<b>The last reload failed</b> — still running {detail.snapshot ? `version ${detail.snapshot.generation}` : 'the last version that loaded'}. The location keeps the error: see its output, or run
+						<code>sqb compile</code> in its project.
+					</span>
+				</div>
 			{/if}
 
 			<details class="facts">
@@ -133,11 +150,14 @@
 					<KeyValues
 						rows={[
 							{ label: 'Location ID', value: detail.id, mono: true },
-							{ label: 'Created', value: formatAgo(detail.createdAt, app.now), title: formatStamp(detail.createdAt) },
-							{ label: 'Target', value: `${targetWords(detail.target)} · ${detail.target.connectionSummary}` },
-							{ label: 'Warehouse connection', value: detail.warehouseConnection, mono: true },
-							{ label: 'If a deploy fails', value: detail.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : 'Hold scheduled runs until a deploy works' }
-						]}
+							detail.createdAt && { label: 'Created', value: formatAgo(detail.createdAt, app.now), title: formatStamp(detail.createdAt) },
+							{ label: 'Target', value: [targetWords(detail.target), detail.target.connectionSummary].filter(Boolean).join(' · ') },
+							detail.warehouseConnection && { label: 'Warehouse connection', value: detail.warehouseConnection, mono: true },
+							detail.brokenDeployPolicy && {
+								label: 'If a deploy fails',
+								value: detail.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : 'Hold scheduled runs until a deploy works'
+							}
+						].filter((row) => !!row)}
 					/>
 				</div>
 			</details>
@@ -145,21 +165,24 @@
 
 		<div class="min-h-0 flex-1 overflow-auto p-6">
 			<div id="problems">
-				<Panel title="Problems" note="Overdue schedules, failed deploys, runs that couldn’t start, connection tests and warehouse syncs that failed">
+				<Panel
+					title="Problems"
+					note={history ? 'Overdue schedules, failed deploys, runs that couldn’t start, connection tests and warehouse syncs that failed' : 'Late schedules, and the location no longer checking in'}
+				>
 					{#snippet actions()}
-						<SegmentedFilter
+						{#if history}<SegmentedFilter
 							bind:value={problemView}
 							options={[
 								{ value: 'open', label: 'Open', count: openProblems },
 								{ value: 'all', label: 'History', count: problems.data?.length ?? 0 }
 							]}
-						/>
+						/>{/if}
 					{/snippet}
 					<ProblemList events={problemRows} resource={problems} currentLocationId={id} empty={problemView === 'open' ? 'No open problems. Everything is running normally.' : 'No problems recorded for this location.'} />
 				</Panel>
 			</div>
 
-			{#if app.can('location.manage')}
+			{#if app.can('location.manage') && app.client.supports('listLocationTokens')}
 				<Panel title="Access tokens" note="Lets this location's processes connect to the server. Can't do anything else.">
 					<LocationTokens locationId={detail.id} />
 				</Panel>
@@ -256,6 +279,20 @@
 	}
 	.alert[open] .more {
 		visibility: hidden;
+	}
+	.note {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		padding: 7px 10px;
+	}
+	.note > :global(svg) {
+		flex: 0 0 auto;
+		align-self: center;
+		color: var(--sb-warning);
+	}
+	.note .summary-text {
+		white-space: normal;
 	}
 	.alert-body {
 		padding: 0 10px 10px 32px;

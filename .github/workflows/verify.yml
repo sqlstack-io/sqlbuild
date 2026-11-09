@@ -2,6 +2,8 @@ name: Verify
 
 on:
   pull_request:
+    # Labelling a pull request `full-verify` (or removing the label) changes how much it runs.
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
   workflow_dispatch:
 
@@ -9,16 +11,25 @@ permissions:
   contents: read
 
 # Each merge group has its own gh-readonly-queue ref, so queued groups never cancel each other; the
-# queue itself discards a group's run when it rebuilds the group.
+# queue itself discards a group's run when it rebuilds the group. A push to a pull request cancels
+# its older run. Adding or removing any label other than `full-verify` starts a run in a group of its
+# own that verifies nothing, so it never cancels the pull request's real run.
 concurrency:
-  group: verify-${{ github.workflow }}-${{ github.event.merge_group.head_ref || github.ref }}
+  group: >-
+    verify-${{ github.workflow }}-${{ github.event.merge_group.head_ref || github.ref }}${{
+    (github.event.action == 'labeled' || github.event.action == 'unlabeled')
+    && github.event.label.name != 'full-verify' && format('-label-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 jobs:
   changes:
     name: Classify verification scope
+    # A label other than `full-verify` changes nothing this workflow verifies.
+    if: ${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify') }}
     runs-on: ubuntu-24.04
     outputs:
+      full: ${{ steps.depth.outputs.full }}
+      partial: ${{ steps.depth.outputs.partial }}
       checks: ${{ steps.scope.outputs.checks }}
       compiler_differential: ${{ steps.scope.outputs.compiler_differential }}
       duckdb: ${{ steps.scope.outputs.duckdb }}
@@ -138,6 +149,9 @@ jobs:
           # skill pages generated from the website docs skips the Python checks and test suites.
           # The website builds in its own workflow.
           docs_only=true
+          # A change that only touches the web UI (and documentation) runs the UI checks and the
+          # wheels that embed its build, but not the Python and native checks it cannot affect.
+          ui_only=true
           while IFS= read -r -d '' path; do
             changed=true
             case "${path}" in
@@ -148,14 +162,22 @@ jobs:
               *) docs_only=false ;;
             esac
             case "${path}" in
+              ui/*|website/*|.github/workflows/website.yml|.github/demos/*) ;;
+              src/sqlbuild/.agents/skills/sqlbuild/references/docs/*.md) ;;
+              */*) ui_only=false ;;
+              *.md) ;;
+              *) ui_only=false ;;
+            esac
+            case "${path}" in
               crates/*|ui/*|Cargo.toml|Cargo.lock|pyproject.toml|.github/workflows/verify.yml|.github/workflows/build-distributions.yml|deploy/Dockerfile|deploy/project/*|deploy/compose*|compose.yml|.dockerignore|Makefile|tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py|tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/*|benchmarks/duckshop/edge_cases/orchestration/container_deployment.json)
                 wheels=true
                 ;;
             esac
             case "${path}" in
-              ui/*|clients/typescript/*|.github/workflows/verify.yml)
+              ui/*|clients/typescript/*|.github/workflows/verify.yml|website/src/assets/logo-light.png|website/src/assets/logo-dark.png|website/public/favicon.png)
                 # The web UI's own checks and unit tests; the wheels embed its build. It compiles
-                # against the generated control client, so client changes run them too.
+                # against the generated control client, so client changes run them too, and it
+                # imports the website's logos and favicon, so moving them fails its build.
                 ui=true
                 ;;
             esac
@@ -232,7 +254,7 @@ jobs:
           fi
 
           checks=true
-          if [[ "${docs_only}" == "true" ]]; then
+          if [[ "${docs_only}" == "true" || "${ui_only}" == "true" ]]; then
             checks=false
           fi
 
@@ -256,8 +278,36 @@ jobs:
             "${recovery}" \
             "${ui}"
 
+      # Pull requests run the fast Linux core: static checks, unit and integration tests, native
+      # workspace checks and the UI checks. The rest of the matrix (wheels, Compose, Windows, macOS,
+      # DuckDB E2E, warehouse, compiler-golden and timing jobs) runs only once a pull request is
+      # labelled `full-verify` and is not a draft, and always on merge groups and manual runs. A
+      # run that leaves out suites its change needs reports under another name, so the required
+      # Verify stays missing and blocks the merge until the full matrix has passed.
+      - name: Choose the fast core or the full matrix
+        id: depth
+        env:
+          FULL: >-
+            ${{ github.event_name != 'pull_request'
+            || (contains(github.event.pull_request.labels.*.name, 'full-verify')
+            && !github.event.pull_request.draft) }}
+          HEAVY_SELECTED: >-
+            ${{ steps.scope.outputs.duckdb == 'true' || steps.scope.outputs.postgres == 'true' || steps.scope.outputs.clickhouse == 'true' || steps.scope.outputs.performance == 'true' || steps.scope.outputs.format_performance == 'true' || steps.scope.outputs.rules_performance == 'true' || steps.scope.outputs.wheels == 'true' || steps.scope.outputs.compiler_differential == 'true' || steps.scope.outputs.recovery == 'true' }}
+        run: |
+          partial=false
+          if [[ "${FULL}" != "true" && "${HEAVY_SELECTED}" == "true" ]]; then
+            partial=true
+            echo "Fast core only: label the pull request full-verify to run the full matrix Verify needs" \
+              | tee -a "${GITHUB_STEP_SUMMARY}"
+          fi
+          {
+            echo "full=${FULL}"
+            echo "partial=${partial}"
+          } >> "${GITHUB_OUTPUT}"
+
   lockfile:
     name: Lockfile consistency
+    if: ${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -308,11 +358,6 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: clients/typescript/package-lock.json
-      - name: Check generated control client against the built native API
-        run: |
-          npm --prefix clients/typescript ci
-          uv run --no-sync npm --prefix clients/typescript run check
-          uv run --no-sync npm --prefix clients/typescript test
       - name: Fetch the base for the new-duplicate check
         run: git fetch --no-tags --depth=1 origin "$BASE_REF"
         env:
@@ -365,7 +410,7 @@ jobs:
   e2e_shards:
     name: DuckDB E2E (${{ matrix.name }})
     needs: [changes, lockfile]
-    if: needs.changes.outputs.duckdb == 'true'
+    if: needs.changes.outputs.duckdb == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -442,7 +487,7 @@ jobs:
   compiler_differential:
     name: Compiler golden outputs
     needs: [changes, lockfile]
-    if: needs.changes.outputs.compiler_differential == 'true'
+    if: needs.changes.outputs.compiler_differential == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -483,7 +528,7 @@ jobs:
   compiler_differential_python_versions:
     name: Native compiler on Python ${{ matrix.python }}
     needs: [changes, lockfile]
-    if: needs.changes.outputs.compiler_differential == 'true'
+    if: needs.changes.outputs.compiler_differential == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -523,7 +568,7 @@ jobs:
   native_discovery_windows:
     name: Native compiler on Windows
     needs: [changes, lockfile]
-    if: needs.changes.outputs.compiler_differential == 'true'
+    if: needs.changes.outputs.compiler_differential == 'true' && needs.changes.outputs.full == 'true'
     runs-on: windows-2025
     timeout-minutes: 45
     defaults:
@@ -580,7 +625,7 @@ jobs:
   scheduler_recovery:
     name: Scheduler recovery (${{ matrix.name }})
     needs: [changes, lockfile]
-    if: needs.changes.outputs.recovery == 'true'
+    if: needs.changes.outputs.recovery == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 75
     strategy:
@@ -632,7 +677,7 @@ jobs:
   format_performance:
     name: Formatter performance guards
     needs: [changes, lockfile]
-    if: needs.changes.outputs.format_performance == 'true'
+    if: needs.changes.outputs.format_performance == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -696,7 +741,7 @@ jobs:
   cold_compile_performance:
     name: Fresh-process compile (${{ matrix.models }} models)
     needs: [changes, lockfile]
-    if: needs.changes.outputs.performance == 'true'
+    if: needs.changes.outputs.performance == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -747,7 +792,7 @@ jobs:
   dense_compile_performance:
     name: Dense all-rules compile (${{ matrix.models }} models)
     needs: [changes, lockfile]
-    if: needs.changes.outputs.performance == 'true'
+    if: needs.changes.outputs.performance == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     # The 3k and 10k cells also run the delta edit-loop guard, about five minutes at 10k.
     timeout-minutes: 45
@@ -791,7 +836,7 @@ jobs:
   compile_performance_ratio:
     name: Same-runner compile ratio (${{ matrix.label || matrix.kind }} 3000 models)
     needs: [changes, lockfile]
-    if: needs.changes.outputs.performance == 'true'
+    if: needs.changes.outputs.performance == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -894,7 +939,7 @@ jobs:
   cache_compile_performance:
     name: Fresh-process compile cache (${{ matrix.models }} models)
     needs: [changes, lockfile]
-    if: needs.changes.outputs.performance == 'true'
+    if: needs.changes.outputs.performance == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -1019,7 +1064,7 @@ jobs:
   postgres:
     name: PostgreSQL integration and E2E tests
     needs: [changes, lockfile]
-    if: needs.changes.outputs.postgres == 'true'
+    if: needs.changes.outputs.postgres == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -1056,7 +1101,7 @@ jobs:
   clickhouse:
     name: ClickHouse integration and E2E tests
     needs: [changes, lockfile]
-    if: needs.changes.outputs.clickhouse == 'true'
+    if: needs.changes.outputs.clickhouse == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -1093,7 +1138,7 @@ jobs:
   wheels:
     name: Wheels
     needs: [changes]
-    if: needs.changes.outputs.wheels == 'true'
+    if: needs.changes.outputs.wheels == 'true' && needs.changes.outputs.full == 'true'
     uses: ./.github/workflows/build-distributions.yml
     with:
       sdist: false
@@ -1105,7 +1150,7 @@ jobs:
   compose:
     name: Packaged Compose lifecycle
     needs: [changes, lockfile, wheels]
-    if: needs.changes.outputs.wheels == 'true'
+    if: needs.changes.outputs.wheels == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -1158,11 +1203,16 @@ jobs:
     # metadata-only pass can never satisfy Verify first; a skipped job would count as passing, so
     # the job always runs and only its name changes. Until those checks post Verify on the head,
     # the pull request waits for an expected check, and every new push to the branch waits again.
+    # The same holds for a fast-core run that leaves out suites its change needs, and for a run
+    # started by an unrelated label: neither reports as Verify.
     name: >-
       ${{ (github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
       && startsWith(github.event.pull_request.head.ref, 'release-please--branches--'))
-      && 'Release pull request suites' || 'Verify' }}
+      && 'Release pull request suites'
+      || ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify') && 'Label change (nothing verified)'
+      || needs.changes.outputs.partial == 'true' && 'Fast core (label full-verify for Verify)'
+      || 'Verify' }}
     if: always()
     needs:
       [
@@ -1215,7 +1265,21 @@ jobs:
           COMPOSE_RESULT: ${{ needs.compose.result }}
           UI_SELECTED: ${{ needs.changes.outputs.ui }}
           UI_RESULT: ${{ needs.ui.result }}
+          LABEL_ONLY: ${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify' }}
+          PARTIAL: ${{ needs.changes.outputs.partial }}
+          DUCKDB_SELECTED: ${{ needs.changes.outputs.duckdb }}
+          COMPILER_DIFFERENTIAL_SELECTED: ${{ needs.changes.outputs.compiler_differential }}
+          RECOVERY_SELECTED: ${{ needs.changes.outputs.recovery }}
+          FORMAT_PERFORMANCE_SELECTED: ${{ needs.changes.outputs.format_performance }}
+          PERFORMANCE_SELECTED: ${{ needs.changes.outputs.performance }}
+          POSTGRES_SELECTED: ${{ needs.changes.outputs.postgres }}
+          CLICKHOUSE_SELECTED: ${{ needs.changes.outputs.clickhouse }}
+          WHEELS_SELECTED: ${{ needs.changes.outputs.wheels }}
         run: |
+          if [[ "${LABEL_ONLY}" == "true" ]]; then
+            echo "A label other than full-verify changed; this run verifies nothing"
+            exit 0
+          fi
           if [[ "${CHANGES_RESULT}" != "success" || "${LOCKFILE_RESULT}" != "success" ]]; then
             echo "Required classification or lockfile checks did not pass" >&2
             exit 1
@@ -1257,5 +1321,31 @@ jobs:
              ! [[ "${UI_SELECTED}" != "true" && "${UI_RESULT}" == "skipped" ]]; then
             echo "Required UI checks did not pass: ${UI_RESULT}" >&2
             exit 1
+          fi
+          # A full run must have run every suite its change selected; a skip here is never a pass.
+          if [[ "${PARTIAL}" != "true" ]]; then
+            for pair in \
+              "${DUCKDB_SELECTED}:${E2E_SHARDS_RESULT}" \
+              "${COMPILER_DIFFERENTIAL_SELECTED}:${COMPILER_DIFFERENTIAL_RESULT}" \
+              "${COMPILER_DIFFERENTIAL_SELECTED}:${COMPILER_DIFFERENTIAL_PYTHON_VERSIONS_RESULT}" \
+              "${COMPILER_DIFFERENTIAL_SELECTED}:${NATIVE_DISCOVERY_WINDOWS_RESULT}" \
+              "${RECOVERY_SELECTED}:${SCHEDULER_RECOVERY_RESULT}" \
+              "${FORMAT_PERFORMANCE_SELECTED}:${FORMAT_PERFORMANCE_RESULT}" \
+              "${PERFORMANCE_SELECTED}:${COLD_COMPILE_PERFORMANCE_RESULT}" \
+              "${PERFORMANCE_SELECTED}:${DENSE_COMPILE_PERFORMANCE_RESULT}" \
+              "${PERFORMANCE_SELECTED}:${COMPILE_PERFORMANCE_RATIO_RESULT}" \
+              "${PERFORMANCE_SELECTED}:${CACHE_COMPILE_PERFORMANCE_RESULT}" \
+              "${POSTGRES_SELECTED}:${POSTGRES_RESULT}" \
+              "${CLICKHOUSE_SELECTED}:${CLICKHOUSE_RESULT}" \
+              "${WHEELS_SELECTED}:${WHEELS_RESULT}" \
+              "${WHEELS_SELECTED}:${COMPOSE_RESULT}"; do
+              if [[ "${pair%%:*}" == "true" && "${pair#*:}" != "success" ]]; then
+                echo "A suite this change needs did not run to success: ${pair#*:}" >&2
+                exit 1
+              fi
+            done
+          else
+            echo "Fast core passed; the full matrix runs once the pull request is labelled full-verify"
+            exit 0
           fi
           echo "All path-relevant verification jobs passed"

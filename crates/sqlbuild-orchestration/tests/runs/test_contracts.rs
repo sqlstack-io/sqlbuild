@@ -6,6 +6,8 @@ pub(crate) mod helpers;
 mod monitor_helpers;
 #[path = "termination/helpers.rs"]
 pub(crate) mod terminal_helpers;
+#[path = "test_adhoc.rs"]
+mod test_adhoc;
 #[path = "test_checks.rs"]
 mod test_checks;
 #[path = "test_claims.rs"]
@@ -18,10 +20,14 @@ mod test_faults;
 mod test_group_admission;
 #[path = "test_groups.rs"]
 mod test_groups;
+#[path = "test_job_detail.rs"]
+mod test_job_detail;
 #[path = "test_lifecycle.rs"]
 mod test_lifecycle;
 #[path = "test_monitor.rs"]
 mod test_monitor;
+#[path = "test_node_errors.rs"]
+mod test_node_errors;
 #[path = "test_permissions.rs"]
 mod test_permissions;
 #[path = "test_requests.rs"]
@@ -29,4 +35,4 @@ mod test_requests;
 #[path = "test_reruns.rs"]
 mod test_reruns;
 #[path = "test_types.rs"]
-mod test_types;
+pub(crate) mod test_types;

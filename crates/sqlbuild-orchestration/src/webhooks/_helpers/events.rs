@@ -1,6 +1,6 @@
 //! Source-specific readers retain authority; delivery owns only acknowledgements.
 
-use crate::authorization::main::read_audit_events::read_audit_events;
+use crate::credentials::main::audit::read_audit_events::read_audit_events;
 use crate::platform::main::read_platform_events::read_platform_events;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
@@ -20,7 +20,8 @@ pub(crate) async fn read_events(
             ))
         }
         WebhookSource::SecurityAudit => {
-            let (transaction, events) = read_audit_events(transaction, (after, 100)).await?;
+            let (transaction, events) =
+                read_audit_events(transaction, ((after, None), 100)).await?;
             Ok((
                 transaction,
                 events

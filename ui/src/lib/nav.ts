@@ -17,27 +17,30 @@ import type { Component } from 'svelte';
 import { ADMIN_CAPABILITIES, hasAnyCapability, type ApiClient, type Capability, type NavCounts } from '$lib/api';
 
 export type NavBadge = { value: (counts: NavCounts) => number; tone: 'muted' | 'warning' | 'error' | 'live' };
-/** `loads` is the client method the page cannot work without; the entry hides when the server lacks it. */
-export type NavItem = { label: string; href: string; icon: Component; loads: keyof ApiClient; badge?: NavBadge; requires?: readonly Capability[] };
+/**
+ * `loads` is the client method the page cannot work without; the entry hides when the server lacks it.
+ * `wholeTarget` pages list the selected target, which needs view on every node in it.
+ */
+export type NavItem = { label: string; href: string; icon: Component; loads: keyof ApiClient; badge?: NavBadge; requires?: readonly Capability[]; wholeTarget?: true };
 export type NavGroup = { section: string | null; items: NavItem[]; requires?: readonly Capability[] };
 
 export const NAV: readonly NavGroup[] = [
-	{ section: null, items: [{ label: 'Overview', href: '/', icon: LayoutDashboardIcon, loads: 'overview' }] },
+	{ section: null, items: [{ label: 'Overview', href: '/', icon: LayoutDashboardIcon, loads: 'overview', wholeTarget: true }] },
 	{
 		section: 'Build',
 		items: [
-			{ label: 'Lineage', href: '/lineage', icon: GitBranchIcon, loads: 'listCatalogNodes' },
-			{ label: 'Catalog', href: '/catalog', icon: DatabaseIcon, loads: 'listCatalogNodes', badge: { value: (c) => c.catalogNodes, tone: 'muted' } },
-			{ label: 'Checks', href: '/checks', icon: CheckCircleIcon, loads: 'listChecks', badge: { value: (c) => c.failingChecks, tone: 'warning' } },
-			{ label: 'Changes', href: '/changes', icon: GitCompareIcon, loads: 'listSnapshotChanges' }
+			{ label: 'Lineage', href: '/lineage', icon: GitBranchIcon, loads: 'listCatalogNodes', wholeTarget: true },
+			{ label: 'Catalog', href: '/catalog', icon: DatabaseIcon, loads: 'listCatalogNodes', badge: { value: (c) => c.catalogNodes, tone: 'muted' }, wholeTarget: true },
+			{ label: 'Checks', href: '/checks', icon: CheckCircleIcon, loads: 'listChecks', badge: { value: (c) => c.failingChecks, tone: 'warning' }, wholeTarget: true },
+			{ label: 'Changes', href: '/changes', icon: GitCompareIcon, loads: 'listSnapshotChanges', wholeTarget: true }
 		]
 	},
 	{
 		section: 'Operate',
 		items: [
-			{ label: 'Runs', href: '/runs', icon: ListIcon, loads: 'listRunRows', badge: { value: (c) => c.activeRuns, tone: 'live' } },
-			{ label: 'Jobs', href: '/jobs', icon: PlayIcon, loads: 'listJobs' },
-			{ label: 'Triggers', href: '/triggers', icon: ClockIcon, loads: 'listTriggers', badge: { value: (c) => c.pausedTriggers, tone: 'muted' } }
+			{ label: 'Runs', href: '/runs', icon: ListIcon, loads: 'listRunRows', badge: { value: (c) => c.activeRuns, tone: 'live' }, wholeTarget: true },
+			{ label: 'Jobs', href: '/jobs', icon: PlayIcon, loads: 'listJobs', wholeTarget: true },
+			{ label: 'Triggers', href: '/triggers', icon: ClockIcon, loads: 'listTriggers', badge: { value: (c) => c.pausedTriggers, tone: 'muted' }, wholeTarget: true }
 		]
 	},
 	{
@@ -46,7 +49,7 @@ export const NAV: readonly NavGroup[] = [
 			{ label: 'Locations', href: '/locations', icon: MapPinIcon, loads: 'listLocations', badge: { value: (c) => c.activePlatformEvents, tone: 'error' } },
 			{ label: 'Connections', href: '/connections', icon: PlugIcon, loads: 'listWarehouseConnections' },
 			{ label: 'Providers', href: '/providers', icon: PuzzleIcon, loads: 'listProviders' },
-			{ label: 'Maintenance', href: '/maintenance', icon: WrenchIcon, loads: 'maintenanceHistory' }
+			{ label: 'Maintenance', href: '/maintenance', icon: WrenchIcon, loads: 'maintenanceHistory', wholeTarget: true }
 		]
 	},
 	{
@@ -68,6 +71,13 @@ export function visibleNav(client: Pick<ApiClient, 'supports'>, capabilities: re
 			items: g.items.filter((i) => client.supports(i.loads) && (!i.requires || hasAnyCapability(capabilities, i.requires)))
 		}))
 		.filter((g) => g.items.length > 0);
+}
+
+/** Pages that don't list the selected target, so a person with view on only part of it can still use them. */
+export function pagesBeyondTarget(client: Pick<ApiClient, 'supports'>, capabilities: readonly Capability[]): NavItem[] {
+	return visibleNav(client, capabilities)
+		.flatMap((g) => g.items)
+		.filter((i) => !i.wholeTarget);
 }
 
 /** Whether the server can load the page at `path`; pages outside the navigation are not gated here. */

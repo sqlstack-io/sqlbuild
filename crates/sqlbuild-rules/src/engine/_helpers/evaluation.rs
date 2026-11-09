@@ -1,6 +1,7 @@
 use crate::configuration::main::validate as config;
 use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY, RELATION_EXCEPTION_RULES};
 use crate::engine::_helpers::cache::{Cache, PendingBucketWrite, RuleCacheEntry};
+use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
 use crate::models::{
     EvaluateRequest, EvaluateResponse, Fault, Model, RuleException, RuleMetadata, RuleScope,
     RulesCodeGrammar, RulesConfig,
@@ -580,11 +581,15 @@ pub(crate) fn finalize_findings(
     apply_fault_policy(&request, evaluated_codes, findings)
 }
 
+/// Apply rule exceptions to `faults`; lint-unavailable warnings report our gap, not a rule, so they pass through unsuppressed.
 fn apply_fault_policy(
     request: &EvaluateRequest,
     evaluated_codes: &[String],
     faults: Vec<Fault>,
 ) -> Result<Vec<Fault>, String> {
+    let (unavailable, faults): (Vec<Fault>, Vec<Fault>) = faults
+        .into_iter()
+        .partition(|fault| fault.code == LINT_UNAVAILABLE_CODE);
     let unevaluated: BTreeSet<_> = faults
         .iter()
         .filter(|fault| fault.unevaluated)
@@ -641,6 +646,7 @@ fn apply_fault_policy(
             ));
             fault
         })
+        .chain(unavailable)
         .collect())
 }
 

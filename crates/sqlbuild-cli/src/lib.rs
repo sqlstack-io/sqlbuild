@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod adhoc;
 pub mod argv;
 pub mod compute_logs;
 pub mod cost_store;
