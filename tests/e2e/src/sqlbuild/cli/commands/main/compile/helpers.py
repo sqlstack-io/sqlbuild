@@ -56,6 +56,7 @@ from sqlbuild.compiler.compile.types import CompiledProjectView
 from sqlbuild.compiler.macro_bridge.constants import MACRO_CALL_STORE_FILE_NAME
 from sqlbuild.observability import EventDispatcher, LifecycleEvent
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
+    DialectSyntaxCompileE2ETestCase,
     FreshProcessCompileCachePerformanceGuardTestCase,
     IncrementalEditStep,
     SemanticCorpusCase,
@@ -81,6 +82,20 @@ NATIVE_REUSE_DIRECTORY_NAME: str = "project-reuse-v3"
 NATIVE_REUSE_SUFFIX: str = ".store"
 NATIVE_REUSE_OUTPUT_SUFFIX: str = ".output"
 RETIRED_REUSE_DIRECTORY_NAME: str = "project-reuse-v1"
+DIALECT_SYNTAX_CONNECTIONS: dict[str, str] = {
+    "duckdb": '[connection]\ndatabase = "shop.duckdb"\n',
+    "snowflake": (
+        '[connection]\naccount = "example"\nuser = "builder"\n\n'
+        '[defaults]\ndatabase = "ANALYTICS"\nschema = "MARTS"\n'
+    ),
+    "clickhouse": (
+        '[connection]\nhost = "localhost"\ndatabase = "default"\n\n[defaults]\nschema = "default"\n'
+    ),
+    "bigquery": (
+        '[connection]\nproject = "example"\ndataset = "marts"\n\n'
+        '[defaults]\ndatabase = "example"\nschema = "marts"\n'
+    ),
+}
 REUSE_LOGGER_NAME: str = "sqlbuild.compile.reuse"
 _DBT_SHAPED_SQL_SIZE_PROFILE: tuple[tuple[float, int], ...] = (
     (0.50, 1_800),
@@ -5411,6 +5426,40 @@ def dialect_ignored_rules_entry(codes: tuple[str, ...]) -> str:
         f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["models/**"]\n'
         'reason = "The case covers parsing this SQL shape."\n'
     )
+
+
+def compile_dialect_syntax_project(
+    test_case: DialectSyntaxCompileE2ETestCase, tmp_path: Path
+) -> tuple[subprocess.CompletedProcess[str], tuple[str, ...], dict[str, int]]:
+    """Compile a dialect-syntax case's project; return the run, its codes and column counts."""
+
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="shop",
+        repo_files={
+            "sqlbuild_project.toml": (
+                f'name = "shop"\nadapter = "{test_case.adapter}"\n\n'
+                f"{DIALECT_SYNTAX_CONNECTIONS[test_case.adapter]}\n"
+                "[scopes]\nenforce_placement = false\n"
+                + {True: dialect_ignored_rules_entry(test_case.ignored_rules), False: ""}[
+                    bool(test_case.ignored_rules)
+                ]
+            ),
+            **{f"models/{name}.sql": sql for name, sql in test_case.models.items()},
+        },
+    )
+
+    compiled: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "compile", "--json"), project_dir=project_dir
+    )
+
+    report: dict[str, Any] = json.loads(compiled.stdout)
+    column_counts: dict[str, int] = {
+        model["name"]: model["column_count"]
+        for model in report.get("resources", {}).get("models", [])
+    }
+    codes: tuple[str, ...] = tuple(item["code"] for item in report["diagnostics"])
+    return compiled, codes, column_counts
 
 
 def append_to_compiled_sql_tests(project_dir: Path) -> None:
