@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::decide_person_scopes::decide_person_scopes;
 use crate::credentials::main::audit::append_audit::append_audit;
-use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::credentials::models::{Action, AuditContext, DefaultRole};
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::_helpers::requests::permissions::{authorize_execution, execution_scopes};
 use crate::runs::_helpers::requests::publication::{
@@ -183,30 +183,6 @@ fn texts(value: Option<&Value>) -> Vec<String> {
         .flatten()
         .filter_map(|item| item.as_str().map(str::to_owned))
         .collect()
-}
-
-/// Whether the person may view every current node, decided without recording a denial.
-pub(in crate::runs) async fn may_view_target(
-    transaction: ControlTransaction,
-    principal_id: Uuid,
-    request: &AdhocCheckRequest,
-) -> Result<(ControlTransaction, bool), ControlError> {
-    let (transaction, current) = query(transaction,
-        "SELECT n.node_key FROM sqb_snapshot_nodes n JOIN sqb_current_snapshots c ON c.snapshot_id=n.snapshot_id \
-         WHERE c.location_id=$1 AND c.target=$2",
-        vec![Parameter::Id(request.location_id), Parameter::Text(request.target.clone())]).await?;
-    let view = PermissionScope {
-        action: Action::View,
-        location_id: Some(request.location_id),
-        target: Some(request.target.clone()),
-        nodes: current
-            .iter()
-            .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
-            .collect(),
-    };
-    let (transaction, refusals) =
-        decide_person_scopes(transaction, principal_id, (&request.target, &[view])).await?;
-    Ok((transaction, refusals.as_deref() == Some(&[None])))
 }
 
 /// Every permission launching `frozen` needs, decided as the launch would but without recording a denial.
