@@ -502,8 +502,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toColumnLineage(data, nodes);
 		},
-		async getCatalogNode(scope: Scope, ref: string): Promise<CatalogNodeDetail | null> {
-			const nodes = await implemented.listCatalogNodes(scope);
+		async getCatalogNode(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null> {
+			const nodes = listing ?? (await implemented.listCatalogNodes(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);

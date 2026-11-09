@@ -64,7 +64,8 @@ export interface ApiClient extends PlatformApi {
 	overview(scope: Scope): Promise<Overview | null>;
 	/** Every node in the current snapshot with its build state; also the lineage graph. */
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
-	getCatalogNode(scope: Scope, key: string): Promise<CatalogNodeDetail | null>;
+	/** `listing` is a current `listCatalogNodes` result the caller already holds, so it isn't read again. */
+	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null>;
 	/** The snapshot's column lineage around one node. */
 	getColumnLineage(scope: Scope, key: string): Promise<ColumnLineage | null>;
 	/** Every audit and check with its latest result. */

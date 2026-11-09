@@ -24,11 +24,6 @@
 </AppTopbar>
 
 <div class="min-h-0 flex-1 overflow-auto px-6 pt-5">
-	<p class="lede">
-		How SQLBuild reaches the warehouse for <b>{app.location?.name}</b> (target <b>{app.target?.name}</b>). Set in the project config and read-only here; secrets show only where they come from, never their value.
-		APIs, storage and webhooks are under <a href="/providers">Providers</a>.
-	</p>
-
 	{#if connections.error}
 		<p class="err">Couldn't load connections: {connections.error} <button class="retry" onclick={() => connections.refresh()}>Retry</button></p>
 	{/if}
@@ -59,11 +54,6 @@
 </div>
 
 <style>
-	.lede {
-		margin-bottom: 18px;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
 	.err {
 		margin-bottom: 16px;
 		color: var(--sb-error);
@@ -127,8 +117,5 @@
 		color: var(--muted-foreground);
 		font-family: var(--font-mono);
 		font-size: 12px;
-	}
-	.lede a {
-		color: var(--primary);
 	}
 </style>

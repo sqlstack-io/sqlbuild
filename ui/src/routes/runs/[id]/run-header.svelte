@@ -31,8 +31,15 @@
 					{#if run.jobKey}<a href="/jobs/{run.jobKey}">{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
 				</h2>
 				<RunStatusPill status={run.status} size="md" />
-				<a class="chip" href="/runs?q=kind:{run.kind}" title="All {runKindLabel[run.kind].toLowerCase()} runs">{runKindLabel[run.kind].toLowerCase()}</a>
-				<a class="chip" href="/runs?q=origin:{run.origin}" title="All {runOriginLabel[run.origin].toLowerCase()} runs">{run.origin === 'rerun' ? 'rerun' : runOriginLabel[run.origin].toLowerCase()}{#if run.triggerName}: {run.triggerName}{/if}</a>
+				<!-- The kind is a fact about this run; the origin opens what started it, when that has a page. -->
+				<span class="chip" title="{runKindLabel[run.kind]} run">{runKindLabel[run.kind].toLowerCase()}</span>
+				{#if run.triggerId}
+					<a class="chip link" href="/triggers/{run.triggerId}" title="Open the {runOriginLabel[run.origin].toLowerCase()} that started this run">{runOriginLabel[run.origin].toLowerCase()}{#if run.triggerName}: {run.triggerName}{/if}</a>
+				{:else if run.rerunOfRunId}
+					<a class="chip link" href="/runs/{run.rerunOfRunId}" title="Open the run this one repeats">rerun of {shortRunId(run.rerunOfRunId)}</a>
+				{:else}
+					<span class="chip">{runOriginLabel[run.origin].toLowerCase()}</span>
+				{/if}
 			</div>
 			<div class="meta">
 				{#if run.startedAt}
@@ -136,7 +143,7 @@
 		font-size: 12px;
 		line-height: 20px;
 	}
-	.chip:hover {
+	.chip.link:hover {
 		color: var(--foreground);
 		background: var(--sb-hover);
 	}
