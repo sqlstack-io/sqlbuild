@@ -6,6 +6,12 @@ pub(crate) const ADHOC_VERBS: [&str; 5] = ["build", "test", "seed", "audit", "fr
 /// The verb whose settings must also form valid job settings.
 pub(crate) const BUILD_VERB: &str = "build";
 
+/// The verb that runs only the seeds of its selection.
+pub(crate) const SEED_VERB: &str = "seed";
+
+/// The verb that observes sources, including those upstream of selected models.
+pub(crate) const FRESHNESS_VERB: &str = "freshness";
+
 /// The parser destination holding the verb itself, which is not a setting.
 pub(crate) const COMMAND_DEST: &str = "command";
 

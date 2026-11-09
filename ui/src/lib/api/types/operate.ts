@@ -470,7 +470,7 @@ export type AdhocRunCheck = {
 	/** Accepted flags as the worker receives them, by setting name. */
 	settings: Record<string, unknown>;
 	permissions: AdhocPermission[];
-	/** Why the command cannot run regardless of permissions, such as a refused flag or a verb workers can't run yet. */
+	/** Why the command cannot run regardless of permissions, such as a refused flag or a selection that matches nothing. */
 	error: string | null;
 	launchable: boolean;
 };

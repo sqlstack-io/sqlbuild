@@ -1,7 +1,7 @@
 //! Deterministic tick insertion gates all run facts; retries cannot queue a second run.
 
 use crate::runs::main::queue_run::queue_run;
-use crate::runs::models::{RunKind, RunOrigin, RunRequest};
+use crate::runs::models::{RunCommand, RunKind, RunOrigin, RunRequest};
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickDecision, TickPlan};
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
@@ -48,6 +48,7 @@ pub(crate) async fn persist_ticks(
                 snapshot_id: trigger.snapshot_id,
                 image_id: trigger.image_id.clone(),
                 kind: trigger.run_kind,
+                command: RunCommand::Build,
                 origin: RunOrigin::Schedule,
                 job_key: Some(trigger.job_key.clone()),
                 parent_run_id: None,

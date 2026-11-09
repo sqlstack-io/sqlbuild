@@ -56,8 +56,11 @@ export interface ApiClient extends PlatformApi {
 	navCounts(scope: Scope): Promise<NavCounts>;
 
 	// ---- BUILD: overview, catalog and lineage, checks, changes (types/build.ts) ----
-	/** Health, attention items, metrics, build status by group and recent changes. */
-	overview(scope: Scope): Promise<Overview>;
+	/**
+	 * Health, attention items, metrics, build status by group and recent changes; null when the
+	 * person may view only part of the target, because its listings need view on every node.
+	 */
+	overview(scope: Scope): Promise<Overview | null>;
 	/** Every node in the current snapshot with its build state; also the lineage graph. */
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
 	getCatalogNode(scope: Scope, key: string): Promise<CatalogNodeDetail | null>;

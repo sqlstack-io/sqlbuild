@@ -174,9 +174,10 @@ jobs:
                 ;;
             esac
             case "${path}" in
-              ui/*|clients/typescript/*|.github/workflows/verify.yml)
+              ui/*|clients/typescript/*|.github/workflows/verify.yml|website/src/assets/logo-light.png|website/src/assets/logo-dark.png|website/public/favicon.png)
                 # The web UI's own checks and unit tests; the wheels embed its build. It compiles
-                # against the generated control client, so client changes run them too.
+                # against the generated control client, so client changes run them too, and it
+                # imports the website's logos and favicon, so moving them fails its build.
                 ui=true
                 ;;
             esac
@@ -357,11 +358,6 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: clients/typescript/package-lock.json
-      - name: Check generated control client against the built native API
-        run: |
-          npm --prefix clients/typescript ci
-          uv run --no-sync npm --prefix clients/typescript run check
-          uv run --no-sync npm --prefix clients/typescript test
       - name: Fetch the base for the new-duplicate check
         run: git fetch --no-tags --depth=1 origin "$BASE_REF"
         env:

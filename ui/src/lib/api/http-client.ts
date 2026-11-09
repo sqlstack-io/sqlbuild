@@ -2,19 +2,21 @@ import createFetch from 'openapi-fetch';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns } from './http-catalog';
+import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns, toColumnLineage } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { toLocationSummary, warehouseSyncOf } from './http-locations';
+import { manualConnectionTest, toLocationSummary, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments } from './http-people';
+import { toMaintenanceHistory } from './http-maintenance';
+import { overviewOf } from './http-overview';
 import { toPlatformEvents } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, LocationSummary, RoleAssignment, RoleDefinition, RoleDetail } from './types/platform';
-import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationSummary, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
@@ -23,6 +25,7 @@ type Wire = components['schemas'];
 const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'supports',
 	'bootstrap',
+	'overview',
 	'changes',
 	'listRunRows',
 	'runTabCounts',
@@ -49,19 +52,30 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getCheckEvidence',
 	'listCatalogNodes',
 	'getCatalogNode',
+	'getColumnLineage',
 	'listSnapshotChanges',
 	'listAuditEntries',
 	'listAccounts',
 	'listRoleAssignments',
+	'createRoleAssignment',
+	'deleteRoleAssignment',
+	'disableAccount',
+	'enableAccount',
 	'listLocations',
 	'listPlatformEvents',
 	'listRoles',
 	'getRole',
 	'getWarehouseSync',
+	'maintenanceHistory',
+	'testConnection',
 	'listSnapshotNodes',
 	'checkAdhocRun',
 	'launchAdhocRun'
 ]);
+
+/** How often a connection test asks for the location's answer, and the longest it waits. */
+const CONNECTION_TEST_POLL_MS = 1000;
+const CONNECTION_TEST_WAIT_MS = 60_000;
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
 const AUDIT_PAGE = 100;
@@ -374,6 +388,38 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return warehouseSyncOf(data);
 		},
+		/** Asks the location to connect, then waits for its answer until the request expires. */
+		async testConnection(scope: Scope): Promise<ConnectionTest> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const path = { location_id: locationId, target };
+			const requestId = crypto.randomUUID();
+			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/connection-tests', {
+				body: { request_id: requestId, reason: 'Tested from the web UI' },
+				params: { path, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (asked.response.status === 401) onUnauthorized();
+			if (!asked.response.ok) throw new ApiError(errorText(asked.error, asked.response), asked.response.status);
+			let expiresAt = Date.now() + CONNECTION_TEST_WAIT_MS;
+			while (Date.now() < expiresAt) {
+				await new Promise((resolve) => setTimeout(resolve, CONNECTION_TEST_POLL_MS));
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/connection-tests/{request_id}', {
+					params: { path: { ...path, request_id: requestId } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+				const finished = manualConnectionTest(data ?? null);
+				if (finished) return finished;
+				if (data) expiresAt = Math.min(expiresAt, Date.parse(data.expires_at));
+			}
+			throw new ApiError('The location did not answer the connection test in time; check that it is running', 504);
+		},
+		async maintenanceHistory(scope: Scope): Promise<MaintenanceHistory> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/maintenance', { params: { path: { location_id: locationId, target } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toMaintenanceHistory(data);
+		},
 		async listPlatformEvents(): Promise<PlatformEvent[]> {
 			const { data, error, response } = await http.GET('/api/control/platform/problems');
 			if (response.status === 401) onUnauthorized();
@@ -406,11 +452,38 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return role ? roleDetailOf(role, assignments, locationId) : null;
 		},
 		async listRoleAssignments(): Promise<RoleAssignment[]> {
-			const { data, error, response } = await http.GET('/api/admin/roles');
+			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
+			return toRoleAssignments(await roleHoldings(), await people().catch(() => []));
+		},
+		async createRoleAssignment(request: RoleAssignmentRequest): Promise<RoleAssignment> {
+			const person = await personNamed(request.principal);
+			const { locationId, target } = request.scope.locationId ? parseLocationKey(request.scope.locationId) : { locationId: null, target: null };
+			await changeRole({ principal_id: person.principal_id, role: request.role, location_id: locationId, target, revoke: false });
+			// The server answers only whether it changed anything; an assignment that already existed is found too.
+			const given = (await implemented.listRoleAssignments()).find(
+				(a) => a.source === 'manual' && a.principal.name === request.principal && a.role === request.role && a.scope.locationId === request.scope.locationId
+			);
+			if (!given) throw new ApiError(`${request.role} was not given to ${request.principal}`, 409);
+			return given;
+		},
+		async deleteRoleAssignment(assignmentId: string): Promise<void> {
+			const held = (await roleHoldings()).assignments.find((a) => a.assignment_id === assignmentId);
+			if (!held) throw new ApiError('That role assignment no longer exists', 404);
+			await changeRole({ principal_id: held.principal_id, role: held.role_key, location_id: held.location_id ?? null, target: held.target ?? null, revoke: true });
+		},
+		disableAccount: (name: string): Promise<Account> => changePerson(name, 'disable'),
+		enableAccount: (name: string): Promise<Account> => changePerson(name, 'enable'),
+		async getColumnLineage(scope: Scope, ref: string): Promise<ColumnLineage | null> {
+			const nodes = await implemented.listCatalogNodes(scope);
+			const node = findNode(nodes, ref);
+			if (!node) return null;
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/column-lineage', {
+				params: { path: { location_id: locationId, target }, query: { node_key: node.key } }
+			});
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
-			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
-			return toRoleAssignments(data, await people().catch(() => []));
+			return toColumnLineage(data, nodes);
 		},
 		async getCatalogNode(scope: Scope, ref: string): Promise<CatalogNodeDetail | null> {
 			const nodes = await implemented.listCatalogNodes(scope);
@@ -433,6 +506,24 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
 			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), { runs: runs?.data ? toNodeRuns(runs.data) : null, jobs });
+		},
+		async overview(scope: Scope): Promise<Overview | null> {
+			// A week of publications for the models metric; the server returns at most 100.
+			const reads = Promise.all([
+				recentRuns(scope),
+				implemented.listChecks(scope),
+				implemented.listCatalogNodes(scope),
+				implemented.listSnapshotChanges(scope, { limit: 100 }),
+				implemented.listPlatformEvents()
+			]);
+			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
+			const read = await reads.catch((error: unknown) => {
+				if (error instanceof ApiError && error.status === 403) return null;
+				throw error;
+			});
+			if (!read) return null;
+			const [runs, checks, nodes, changes, events] = read;
+			return overviewOf({ runs, checks, nodes, changes, events, now: Date.now() });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
@@ -542,6 +633,37 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return data;
+	}
+
+	async function roleHoldings() {
+		const { data, error, response } = await http.GET('/api/admin/roles');
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function changeRole(body: Wire['RoleAssignmentRequest']) {
+		const { error, response } = await http.POST('/api/admin/roles', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+		if (response.status === 401) onUnauthorized();
+		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+	}
+
+	async function personNamed(name: string) {
+		const person = (await people()).find((p) => p.name === name);
+		if (!person) throw new ApiError(`Unknown person ${name}`, 404);
+		return person;
+	}
+
+	/** The server refuses to disable the last enabled installation administrator. */
+	async function changePerson(name: string, change: 'disable' | 'enable'): Promise<Account> {
+		const person = await personNamed(name);
+		const { error, response } = await http.POST('/api/admin/people/{principal_id}', {
+			body: change,
+			params: { path: { principal_id: person.principal_id }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		return toAccount(await personNamed(name));
 	}
 
 	async function people() {

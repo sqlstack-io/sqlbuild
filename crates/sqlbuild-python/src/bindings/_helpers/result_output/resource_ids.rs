@@ -80,8 +80,11 @@ pub(crate) fn sql_test_identity(
     )
 }
 
-/// `audit_resource_id` of one audit result.
-pub(crate) fn audit_identity(result: &Bound<'_, PyAny>) -> PyResult<String> {
+/// `audit_resource_id` of one audit result or plan entry, whose name is in `audit_name_field`.
+pub(crate) fn audit_identity(
+    result: &Bound<'_, PyAny>,
+    audit_name_field: &str,
+) -> PyResult<String> {
     let target_kind: Bound<'_, PyAny> = native_field(result, "attached_target_kind")?;
     let kind: Bound<'_, PyAny> = if target_kind.is_none() {
         native_field(result, "attachment_kind")?
@@ -89,7 +92,7 @@ pub(crate) fn audit_identity(result: &Bound<'_, PyAny>) -> PyResult<String> {
         target_kind
     };
     audit_identity_of(
-        &native_field(result, "audit_name")?,
+        &native_field(result, audit_name_field)?,
         &kind,
         (
             &native_field(result, "attached_target_name")?,

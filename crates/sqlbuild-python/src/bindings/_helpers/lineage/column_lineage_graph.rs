@@ -343,6 +343,16 @@ impl ProjectColumnLineage {
         Ok(())
     }
 
+    /// Every edge's fields in model order, from the compact records, without building Python edges.
+    pub(crate) fn edge_keys(&mut self, py: Python<'_>) -> PyResult<Vec<EdgeKey>> {
+        self.ensure_records(&LineageClasses::new(py)?)?;
+        Ok(self
+            .records
+            .as_ref()
+            .map(|records| records.keys.clone())
+            .unwrap_or_default())
+    }
+
     fn positions(&self, select: impl Fn(&EdgeIndex) -> Option<&Vec<usize>>) -> Vec<usize> {
         self.records
             .as_ref()

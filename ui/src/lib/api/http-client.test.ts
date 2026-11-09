@@ -326,6 +326,145 @@ function queuedAdhocRun(id: string) {
 	};
 }
 
+describe('overview', () => {
+	function server(nodesStatus: number) {
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (path.endsWith('/nodes') && nodesStatus !== 200) return Response.json({ error: 'refused' }, { status: nodesStatus });
+				if (path.endsWith('/platform/problems')) return Response.json({ scheduler_leader: 'server-1', scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] });
+				return Response.json([]);
+			})
+		);
+		return createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+	}
+
+	it('is null for a person who may view only part of the target, with no partial counts', async () => {
+		expect(await server(403).overview(ORDERS)).toBeNull();
+	});
+
+	it('still fails on any other error', async () => {
+		await expect(server(500).overview(ORDERS)).rejects.toMatchObject({ status: 500 });
+	});
+
+	it('summarises the target when every listing is allowed', async () => {
+		expect((await server(200).overview(ORDERS))?.metrics.runs24h.total).toBe(0);
+	});
+});
+
+describe('administration writes', () => {
+	const ada = { principal_id: 'p-ada', name: 'ada', created_at: '2026-11-01T00:00:00Z', disabled_at: null, has_password: true, groups: [], active_sessions: 2, last_signed_in_at: null };
+
+	function server(refuse = false) {
+		const posts: [string, unknown][] = [];
+		const state = { disabled: false, assignments: [{ assignment_id: 'a-1', principal_id: 'p-ada', name: 'ada', role_key: 'operator', location_id: 'loc-orders', target: 'development' }] };
+		vi.stubGlobal('document', { cookie: 'sqb-csrf=token-1' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (request.method === 'POST') {
+					const body = await request.json();
+					posts.push([path, body]);
+					if (refuse) return Response.json({ error: 'cannot remove or disable the final installation administrator' }, { status: 403 });
+					if (body === 'disable') state.disabled = true;
+					if (body?.role && !body.revoke) state.assignments.push({ assignment_id: 'a-2', principal_id: body.principal_id, name: 'ada', role_key: body.role, location_id: body.location_id, target: body.target });
+					return Response.json({ applied: true });
+				}
+				if (path === '/api/admin/people') return Response.json([{ ...ada, disabled_at: state.disabled ? '2026-11-09T00:00:00Z' : null }]);
+				if (path === '/api/admin/roles') return Response.json({ assignments: state.assignments, group_roles: [] });
+				return Response.json([]);
+			})
+		);
+		return { posts, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('gives a role in one location target by person ID and returns the new assignment', async () => {
+		const { posts, client } = server();
+		const given = await client.createRoleAssignment({ principal: 'ada', role: 'developer', scope: { locationId: 'loc-orders:development' } });
+		expect(posts).toEqual([['/api/admin/roles', { principal_id: 'p-ada', role: 'developer', location_id: 'loc-orders', target: 'development', revoke: false }]]);
+		expect([given.id, given.scope.locationId]).toEqual(['a-2', 'loc-orders:development']);
+	});
+
+	it('gives a role everywhere with no location or target', async () => {
+		const { posts, client } = server();
+		await client.createRoleAssignment({ principal: 'ada', role: 'viewer', scope: { locationId: null } });
+		expect(posts[0][1]).toMatchObject({ location_id: null, target: null });
+	});
+
+	it('removes an assignment by revoking exactly its person, role and scope', async () => {
+		const { posts, client } = server();
+		await client.deleteRoleAssignment('a-1');
+		expect(posts).toEqual([['/api/admin/roles', { principal_id: 'p-ada', role: 'operator', location_id: 'loc-orders', target: 'development', revoke: true }]]);
+	});
+
+	it('disables a person by ID and returns them disabled', async () => {
+		const { posts, client } = server();
+		const account = await client.disableAccount('ada');
+		expect(posts).toEqual([['/api/admin/people/p-ada', 'disable']]);
+		expect(account.disabled).toBe(true);
+	});
+
+	it('reports a refusal from the server', async () => {
+		const { client } = server(true);
+		await expect(client.disableAccount('ada')).rejects.toMatchObject({ status: 403 });
+	});
+});
+
+describe('testConnection', () => {
+	const record = (completed: string | null, outcome: unknown = null) => ({
+		generation: 1,
+		requested_at: '2026-11-09T10:00:00Z',
+		requested_by: 'ada',
+		expires_at: '2026-11-09T10:05:00Z',
+		completed_at: completed,
+		request_json: { location_id: 'loc', target: 'development', request_id: 'r', reason: 'x', work: { kind: 'check_connection' } },
+		result_json: outcome ? { claim_id: 'c', session_id: 's', outcome } : null
+	});
+
+	function server(answers: unknown[]) {
+		const calls: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				calls.push(request.method);
+				if (request.method === 'POST') return Response.json({ applied: true });
+				return Response.json(answers.length > 1 ? answers.shift() : answers[0]);
+			})
+		);
+		return { calls, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('asks the location once and waits until it answers', async () => {
+		vi.setSystemTime(Date.parse('2026-11-09T10:00:00Z'));
+		const { calls, client } = server([null, record(null), record('2026-11-09T10:00:03Z', { kind: 'connection', healthy: false })]);
+		const result = client.testConnection(ORDERS, 'warehouse');
+		await vi.advanceTimersByTimeAsync(3000);
+		expect(await result).toMatchObject({ outcome: 'failed', durationMs: 3000, trigger: 'manual' });
+		expect(calls).toEqual(['POST', 'GET', 'GET', 'GET']);
+	});
+
+	it('reports a test replaced by a newer request instead of a result', async () => {
+		const { client } = server([record('2026-11-09T10:00:01Z', { kind: 'superseded' })]);
+		const result = client.testConnection(ORDERS, 'warehouse');
+		const settled = expect(result).rejects.toThrow('A newer request replaced this connection test');
+		await vi.advanceTimersByTimeAsync(1000);
+		await settled;
+	});
+
+	it('gives up when the location never answers', async () => {
+		const { calls, client } = server([null]);
+		const result = client.testConnection(ORDERS, 'warehouse');
+		const settled = expect(result).rejects.toMatchObject({ status: 504 });
+		await vi.advanceTimersByTimeAsync(61_000);
+		await settled;
+		expect(calls.length).toBe(61);
+	});
+});
+
 describe('getCatalogNode', () => {
 	/** Answers the reads a node page makes; anything else, such as node status, is refused. */
 	function serve(actions: string[], sqlStatus = 200) {

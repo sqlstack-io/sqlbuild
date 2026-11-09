@@ -22,7 +22,7 @@
 				<span class:denied={e.outcome === 'denied'}>
 					{e.outcome === 'denied' ? 'Denied: ' : ''}<span title={e.action}>{auditActionLabel(e.action)}</span>{#if e.scope.subject}&nbsp;· <code>{e.scope.subject}</code>{/if}
 				</span>
-				{#if e.decisionId}
+				{#if e.decisionId && app.client.supports('lookupDecision')}
 					<a href={checkHref({ decision: e.decisionId })} title="Check this request again">Check this</a>
 				{/if}
 			</li>
@@ -69,7 +69,9 @@
 		font-size: 12.5px;
 	}
 	code {
+		min-width: 0;
 		font-family: var(--font-mono);
 		font-size: 11.5px;
+		overflow-wrap: anywhere;
 	}
 </style>

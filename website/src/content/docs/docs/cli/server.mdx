@@ -156,14 +156,21 @@ would be accepted. A dry run queues nothing and records no audit entry.
 To launch, `POST /api/control/runs/adhoc` with the same fields plus a new `run_id` and a
 `reason`. The response is `{"applied": true}`; sending the same `run_id` again returns
 `{"applied": false}` and starts nothing. The server resolves selectors against the current
-publication, and the worker runs exactly the resolved nodes. The target is always the one in the
-request.
+publication, and the worker runs exactly the resolved nodes, from the project it verified against
+that publication; files that change on the location after that check are not used. The target is
+always the one in the request.
 
-| Verb | Ad-hoc runs |
+| Verb | What the worker runs |
 | --- | --- |
-| `build` | Dry run and launch |
-| `test`, `seed`, `audit`, `freshness` | Dry run only; workers can't run them yet |
+| `build` | The selected nodes, with their tests and audits |
+| `test` | The SQL tests of the selected models |
+| `audit` | The audits of the selected nodes, against what is already built |
+| `seed` | The selected seeds; other selected nodes are left out |
+| `freshness` | The selected sources and every source upstream of the selection |
 | Any other verb | Refused |
+
+Only `build` and `seed` write, so `test`, `audit` and `freshness` runs never wait for other runs.
+A `test` or `audit` run reports each selected node with the worst result of its tests or audits.
 
 Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:` and `test:`, with `+`
 for upstream or downstream nodes. Positional selectors work as on the command line.

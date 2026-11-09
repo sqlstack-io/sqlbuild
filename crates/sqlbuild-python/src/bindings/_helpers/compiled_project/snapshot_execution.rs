@@ -1,13 +1,16 @@
 //! Frozen selection, executor callbacks and completion belong to one verified worker build.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::{PyKeyboardInterrupt, PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyStringMethods;
 use sqlbuild_core::models::ResourceKind;
-use sqlbuild_orchestration::runs::models::{NodeOutcome, RunChange, RunExecution, RunOutcome};
+use sqlbuild_orchestration::runs::models::{
+    NodeOutcome, RunChange, RunCommand, RunExecution, RunOutcome,
+};
 
 use crate::bindings::_helpers::compiled_project::constants::{NO_CHANGE_REASON, SKIP_ACTION};
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
@@ -20,23 +23,49 @@ pub(crate) struct WorkerBuild {
     execution: RunExecution,
     completed: Mutex<BTreeMap<String, NodeOutcome>>,
     checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
+    /// The snapshot's audits and SQL tests, each with the node keys it checks.
+    attached: BTreeMap<String, Vec<String>>,
+    /// The worst attached outcome of each node, for commands that only run tests or audits.
+    checked: Mutex<BTreeMap<String, NodeOutcome>>,
+    /// Whether the command returned, having run every check it planned, rather than being refused or raising.
+    returned: AtomicBool,
     /// Why the worker refused the run before executing anything, reported as the run's status reason.
     refusal: Mutex<Option<String>>,
 }
 
 impl WorkerBuild {
-    pub(crate) fn new(worker: &Bound<'_, NativeOrchestrationWorker>) -> PyResult<Arc<Self>> {
+    pub(crate) fn new(
+        worker: &Bound<'_, NativeOrchestrationWorker>,
+        attached: BTreeMap<String, Vec<String>>,
+    ) -> PyResult<Arc<Self>> {
         let state = Arc::new(Self {
             execution: worker.get().execution(worker.py())?,
             worker: worker.clone().unbind(),
             completed: Mutex::default(),
             checks: Mutex::default(),
+            attached,
+            checked: Mutex::default(),
+            returned: AtomicBool::new(false),
             refusal: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
             state.complete(worker.py(), key, (NodeOutcome::Skipped, None, None))?;
         }
         Ok(state)
+    }
+
+    pub(crate) fn command(&self) -> RunCommand {
+        self.execution.claim.request.command
+    }
+
+    /// Test and audit runs execute only attached checks, so their nodes take the checks' outcome.
+    fn checks_only(&self) -> bool {
+        matches!(self.command(), RunCommand::Test | RunCommand::Audit)
+    }
+
+    /// Record that the command returned instead of being refused or raising.
+    pub(crate) fn command_returned(&self) {
+        self.returned.store(true, Ordering::SeqCst);
     }
 
     pub(crate) fn has_work(&self) -> bool {
@@ -59,6 +88,24 @@ impl WorkerBuild {
             return Err(PyKeyboardInterrupt::new_err("run cancellation requested"));
         }
         Ok(())
+    }
+
+    /// Reject writers outside the frozen write set before any executor connection.
+    pub(crate) fn enforce_writers(
+        &self,
+        py: Python<'_>,
+        keys: &[String],
+    ) -> Result<(), pyo3::PyErr> {
+        self.check_cancelled(py)?;
+        match keys
+            .iter()
+            .find(|key| !self.execution.claim.request.write_set.contains(*key))
+        {
+            Some(key) => Err(PyValueError::new_err(format!(
+                "planned writer {key} is outside the frozen run write set"
+            ))),
+            None => Ok(()),
+        }
     }
 
     /// Reject an implicitly expanded write set before any executor connection or schema change.
@@ -157,13 +204,101 @@ impl WorkerBuild {
             "table" | "view" | "snapshot" | "custom" => "model",
             kind => kind,
         };
-        let key = format!("{kind}:{name}");
-        if self.execution.claim.request.selection.contains(&key) {
+        self.start_key(py, &format!("{kind}:{name}"))
+    }
+
+    /// Report a selected node as started; the deterministic event ID makes a repeat a no-op.
+    pub(crate) fn start_key(&self, py: Python<'_>, key: &str) -> PyResult<()> {
+        self.check_cancelled(py)?;
+        if self.execution.claim.request.selection.contains(key) {
             self.worker.bind(py).get().change(
                 py,
                 &format!("node-started/{key}"),
-                RunChange::NodeStarted { node_key: key },
+                RunChange::NodeStarted {
+                    node_key: key.into(),
+                },
             )?;
+        }
+        Ok(())
+    }
+
+    /// Report a selected node's outcome when the command reports no executor result for it.
+    pub(crate) fn finish_key(
+        &self,
+        py: Python<'_>,
+        key: &str,
+        outcome: NodeOutcome,
+    ) -> PyResult<()> {
+        self.complete(py, key, (outcome, None, None))
+    }
+
+    /// A test or audit the snapshot records has started; the node it attaches to starts with it.
+    pub(crate) fn start_attached(&self, py: Python<'_>, key: &str) -> PyResult<()> {
+        self.check_cancelled(py)?;
+        let Some(nodes) = self.attached.get(key) else {
+            return Ok(());
+        };
+        if self
+            .checks
+            .lock()
+            .map_err(|_| poisoned())?
+            .contains_key(key)
+        {
+            return Ok(());
+        }
+        self.worker.bind(py).get().change(
+            py,
+            &format!("check-started/{key}"),
+            RunChange::CheckStarted {
+                node_key: key.into(),
+            },
+        )?;
+        self.checks
+            .lock()
+            .map_err(|_| poisoned())?
+            .insert(key.into(), None);
+        if self.checks_only() {
+            for node in nodes {
+                self.start_key(py, node)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// A test or audit finished; a check the snapshot does not record is not reported.
+    pub(crate) fn finish_attached(
+        &self,
+        py: Python<'_>,
+        key: &str,
+        outcome: NodeOutcome,
+    ) -> PyResult<()> {
+        let Some(nodes) = self.attached.get(key) else {
+            return Ok(());
+        };
+        if outcome != NodeOutcome::Skipped {
+            self.start_attached(py, key)?;
+        }
+        let outcome = if outcome == NodeOutcome::Failed
+            && self.worker.bind(py).get().refresh_cancellation(py)?
+        {
+            NodeOutcome::Cancelled
+        } else {
+            outcome
+        };
+        self.finish_check(py, key, outcome)?;
+        if outcome == NodeOutcome::Skipped {
+            return Ok(());
+        }
+        let mut checked = self.checked.lock().map_err(|_| poisoned())?;
+        for node in nodes {
+            let worst = checked.get(node).map_or(outcome, |previous| {
+                if severity(outcome) > severity(*previous) {
+                    outcome
+                } else {
+                    *previous
+                }
+            });
+            checked.insert(node.clone(), worst);
         }
         Ok(())
     }
@@ -275,9 +410,27 @@ impl WorkerBuild {
         Ok(())
     }
 
-    /// Never call missing selected nodes successful merely because the executor returned zero.
+    /// Never call unseen nodes successful unless the executor returned; a refused command proves only its failures.
     pub(crate) fn outcome(&self, py: Python<'_>, exit_code: i32) -> PyResult<RunOutcome> {
         let cancelled = self.worker.bind(py).get().refresh_cancellation(py)?;
+        let checks_only = self.checks_only();
+        if checks_only && !cancelled {
+            let checked = self.checked.lock().map_err(|_| poisoned())?.clone();
+            let returned = self.returned.load(Ordering::SeqCst);
+            for key in &self.execution.claim.request.selection {
+                let seen = checked.get(key).copied();
+                let outcome = if returned {
+                    Some(seen.unwrap_or(NodeOutcome::Success))
+                } else {
+                    seen.filter(|outcome| {
+                        matches!(outcome, NodeOutcome::Failed | NodeOutcome::Cancelled)
+                    })
+                };
+                if let Some(outcome) = outcome {
+                    self.complete(py, key, (outcome, None, None))?;
+                }
+            }
+        }
         for key in &self.execution.claim.request.selection {
             self.complete(
                 py,
@@ -295,10 +448,11 @@ impl WorkerBuild {
         }
         let outcome = {
             let completed = self.completed.lock().map_err(|_| poisoned())?;
-            let good = completed
-                .values()
+            let outcomes: Vec<NodeOutcome> = completed.values().copied().collect();
+            let good = outcomes
+                .iter()
                 .any(|value| matches!(value, NodeOutcome::Success | NodeOutcome::Warn));
-            let bad = completed.values().any(|value| {
+            let bad = outcomes.iter().any(|value| {
                 matches!(
                     value,
                     NodeOutcome::Failed | NodeOutcome::Skipped | NodeOutcome::Cancelled
@@ -310,7 +464,7 @@ impl WorkerBuild {
                 RunOutcome::Partial
             } else if bad || exit_code != 0 {
                 RunOutcome::Failed
-            } else if completed.values().any(|value| *value == NodeOutcome::Warn) {
+            } else if outcomes.contains(&NodeOutcome::Warn) {
                 RunOutcome::Warn
             } else {
                 RunOutcome::Success
@@ -357,6 +511,20 @@ impl WorkerBuild {
             },
         )?;
         Ok(outcome)
+    }
+}
+
+/// A claimed run's worker build and the project inputs it verified against the frozen snapshot.
+pub(crate) type VerifiedRun<'a, 'py> = (Arc<WorkerBuild>, &'a Bound<'py, PyAny>);
+
+/// Failure outranks cancellation, then warnings, then success.
+fn severity(outcome: NodeOutcome) -> u8 {
+    match outcome {
+        NodeOutcome::Skipped => 0,
+        NodeOutcome::Success => 1,
+        NodeOutcome::Warn => 2,
+        NodeOutcome::Cancelled => 3,
+        NodeOutcome::Failed => 4,
     }
 }
 

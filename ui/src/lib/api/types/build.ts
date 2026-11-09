@@ -193,9 +193,9 @@ export type CatalogNodeDetail = Omit<CatalogNode, 'stale' | 'checks'> & {
 export type ColumnLens = 'raw' | 'passthrough' | 'rename' | 'transform';
 
 export type ColumnLineage = {
-	models: { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src'; columns: { name: string; type: string }[] }[];
-	/** `model.column` pairs from upstream to downstream. */
-	edges: [string, string, ColumnLens][];
+	models: { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src' | 'none'; columns: { name: string; type: string }[] }[];
+	/** `model.column` pairs from upstream to downstream, with an optional label naming the transform, such as `Cast`. */
+	edges: [string, string, ColumnLens, string?][];
 	sql: Record<string, string>;
 	/** The defining expression of each column, per model. */
 	expressions: Record<string, Record<string, string>>;
@@ -352,8 +352,8 @@ export type OverviewMetrics = {
 	models: { total: number; addedThisWeek: number; removedThisWeek: number };
 	runs24h: { total: number; success: number; warn: number; partial: number; failed: number; active: number };
 	checks: CheckCounts;
-	/** Distinct stale nodes, and how many are changed or behind (a node can be both). */
-	stale: { nodes: number; changed: number; behind: number; sources: number };
+	/** Distinct stale nodes, and how many are changed or behind (a node can be both); null when the server reports no project-wide build state. */
+	stale: { nodes: number; changed: number; behind: number; sources: number } | null;
 	/** Null when the adapter has no cost data. */
 	cost: { last24h: number; baseline: number; baselineDays: number; unit: CostUnit } | null;
 };
@@ -364,7 +364,8 @@ export type GroupStatus = { group: string; total: number; current: number; chang
 export type Overview = {
 	metrics: OverviewMetrics;
 	attention: AttentionItem[];
-	groups: GroupStatus[];
+	/** Null when the server reports no per-group build state. */
+	groups: GroupStatus[] | null;
 	recentChanges: SnapshotChange[];
 	latestRun: (Pick<Run, 'id' | 'endedAt'> & { status: RunStatus }) | null;
 };

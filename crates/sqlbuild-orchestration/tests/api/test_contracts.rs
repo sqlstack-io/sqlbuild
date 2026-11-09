@@ -38,6 +38,8 @@ mod test_changes;
 mod test_checks;
 #[path = "test_cli_login.rs"]
 mod test_cli_login;
+#[path = "test_column_lineage.rs"]
+mod test_column_lineage;
 #[path = "test_contract.rs"]
 mod test_contract;
 #[path = "test_custom_roles.rs"]

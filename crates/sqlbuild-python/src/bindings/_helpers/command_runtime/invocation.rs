@@ -68,7 +68,7 @@ pub(crate) fn resolve_adapter_connection_context<'py>(
 
 fn invocation_context<'py>(
     request: &Bound<'py, PyAny>,
-    require_connection: bool,
+    (require_connection, verified): (bool, Option<&Bound<'py, PyAny>>),
 ) -> PyResult<InvocationContext<'py>> {
     let py: Python<'py> = request.py();
     let requested: Bound<'py, PyAny> = native_field(request, "project_dir")?;
@@ -77,10 +77,13 @@ fn invocation_context<'py>(
     } else {
         requested
     };
-    let discovered: Bound<'py, PyAny> = discover_project_inputs(
-        py,
-        Some(keywords(py, &[("project_dir", project_dir.clone())])?),
-    )?;
+    let discovered: Bound<'py, PyAny> = match verified {
+        Some(discovered) => discovered.clone(),
+        None => discover_project_inputs(
+            py,
+            Some(keywords(py, &[("project_dir", project_dir.clone())])?),
+        )?,
+    };
     let adapter_context: Bound<'py, PyAny> = resolve_adapter_connection_context(
         &discovered,
         &project_dir,
@@ -134,12 +137,13 @@ fn context_fields<'py>(
     ])
 }
 
-/// `invocation_type(...)` with discovery, adapter, connection and output context.
+/// `invocation_type(...)` with discovery (or a worker's `verified` inputs), adapter, connection and output context.
 pub(crate) fn resolve_command_invocation<'py>(
     request: &Bound<'py, PyAny>,
     invocation_type: &Bound<'py, PyAny>,
+    verified: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let context: InvocationContext<'py> = invocation_context(request, true)?;
+    let context: InvocationContext<'py> = invocation_context(request, (true, verified))?;
     call_with(invocation_type, &context_fields(&context)?)
 }
 
@@ -147,10 +151,11 @@ pub(crate) fn resolve_command_invocation<'py>(
 pub(crate) fn resolve_reported_command_invocation<'py>(
     request: &Bound<'py, PyAny>,
     invocation_type: &Bound<'py, PyAny>,
-    require_connection: bool,
+    (require_connection, verified): (bool, Option<&Bound<'py, PyAny>>),
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = request.py();
-    let context: InvocationContext<'py> = invocation_context(request, require_connection)?;
+    let context: InvocationContext<'py> =
+        invocation_context(request, (require_connection, verified))?;
     let InvocationContext {
         adapter_context,
         use_color,

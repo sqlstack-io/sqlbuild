@@ -80,7 +80,7 @@ export interface PlatformApi {
 	getRole(locationId: string, name: string): Promise<RoleDetail | null>;
 	/** `role.assign` */
 	listRoleAssignments(): Promise<RoleAssignment[]>;
-	/** You can only give a role you hold in that scope. `role.assign` */
+	/** Built-in roles everywhere or in one location, custom roles in their location, admin everywhere only. `role.assign` */
 	createRoleAssignment(request: RoleAssignmentRequest): Promise<RoleAssignment>;
 	/** Manual assignments only; SSO, policy and built-in ones follow their source. `role.assign` */
 	deleteRoleAssignment(assignmentId: string): Promise<void>;
