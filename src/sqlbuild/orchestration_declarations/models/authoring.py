@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Literal
 
+from sqlbuild._native import declaration_site
 from sqlbuild.orchestration_declarations.types import NodeEventKind, PlatformEventKind, RunEventKind
 
 
@@ -33,6 +34,10 @@ class Job:
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
+    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_declared_at", declaration_site())
 
 
 @dataclass(frozen=True, eq=False)
@@ -46,6 +51,10 @@ class JobGroup:
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
+    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_declared_at", declaration_site())
 
 
 @dataclass(frozen=True, kw_only=True)

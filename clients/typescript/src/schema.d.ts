@@ -1499,6 +1499,12 @@ export interface components {
             /** @enum {string} */
             status: "timed_out";
         };
+        /** @description Where a declaration was written, relative to the project root. */
+        DeclaredAt: {
+            /** Format: int32 */
+            line: number;
+            path: string;
+        };
         /** @description Local definition identity only, not upstream data or graph currency. */
         DefinitionEvidence: {
             local_hash: string;
@@ -1564,13 +1570,18 @@ export interface components {
             concurrency_groups: string[];
             /** @description Selected nodes whose failure stops a group. */
             critical_nodes: string[];
+            /** @description The cursor type every selected cursor node shares; absent when none has a cursor or types differ. */
+            cursor_type?: string | null;
+            declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
+            exclude?: string | null;
             job_key: string;
             kind: components["schemas"]["RunKind"];
             /** @description The groups this job belongs to. */
             member_of: string[];
             /** @description A group's member jobs in run order; empty for a job. */
             members: components["schemas"]["JobMember"][];
+            select?: string | null;
             selection: string[];
             /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
             settings: {
@@ -1578,6 +1589,8 @@ export interface components {
             };
             /** Format: uuid */
             snapshot_id: string;
+            /** @description Empty when the declaration applies to every target. */
+            targets: string[];
         };
         JobMember: {
             job_key: string;
@@ -1587,10 +1600,13 @@ export interface components {
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
             concurrency_groups: string[];
+            declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
             job_key: string;
             /** @description `job` or `group`; a group's selection is the union of its member jobs' selections. */
             kind: components["schemas"]["RunKind"];
+            /** @description A job's selectors as written; absent for a group and for snapshots published before they were recorded. */
+            select?: string | null;
             selection: string[];
             /** Format: uuid */
             snapshot_id: string;

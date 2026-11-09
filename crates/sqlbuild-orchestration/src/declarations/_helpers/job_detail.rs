@@ -91,3 +91,16 @@ pub(crate) fn critical_nodes(nodes: &BTreeMap<String, SnapshotNode>) -> BTreeSet
         .map(|(key, _)| key.clone())
         .collect()
 }
+
+/// The one cursor type of the selected nodes that have a cursor, so a backfill window can be typed.
+pub(crate) fn cursor_type(nodes: &BTreeMap<String, SnapshotNode>) -> Option<String> {
+    let types: BTreeSet<&str> = nodes
+        .values()
+        .filter_map(|node| node.definition["config"]["cursor_type"].as_str())
+        .collect();
+    let mut types = types.into_iter();
+    match (types.next(), types.next()) {
+        (Some(only), None) => Some(only.to_owned()),
+        _ => None,
+    }
+}

@@ -86,6 +86,8 @@ pub(crate) async fn jobs_in(
             selection: job.definition_json.selection,
             concurrency_groups: job.definition_json.concurrency_groups,
             snapshot_id: job.snapshot_id,
+            select: job.definition_json.select,
+            declared_at: job.definition_json.declared_at,
         })
         .collect();
     Ok((transaction, jobs))
