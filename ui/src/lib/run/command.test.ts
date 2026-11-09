@@ -10,7 +10,7 @@ const NODES: SnapshotNode[] = [
 	node('source:shop.orders', 'source', 'sources.yml')
 ];
 
-describe('the run panel command line', () => {
+describe('the plan page command line', () => {
 	it('sends the tokens after sqb exactly as typed, for the server to resolve', () => {
 		expect(commandTokens('  sqb build customers+ --exclude tag:finance   --warehouse WH_S ')).toEqual(['build', 'customers+', '--exclude', 'tag:finance', '--warehouse', 'WH_S']);
 	});

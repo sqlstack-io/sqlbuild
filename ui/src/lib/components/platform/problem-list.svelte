@@ -95,7 +95,7 @@
 		{:else}
 			<tr class="load-row">
 				<td colspan="4" class="empty">
-					{#if resource.error}<span class="err">Couldn't load problems: {resource.error}</span>{:else if resource.loading && !events.length}Loading…{:else}{empty}{/if}
+					{#if resource.error}<span class="err">Couldn't load problems: {resource.error}</span>{:else if resource.loading && !events.length}{resource.slow ? 'Loading…' : ''}{:else}{empty}{/if}
 				</td>
 			</tr>
 		{/each}

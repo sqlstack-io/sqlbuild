@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Extracts the run panel's verbs and flags from the CLI's command table, so the
+// Extracts the plan page's verbs and flags from the CLI's command table, so the
 // panel offers exactly the flags an ad-hoc run accepts.
 //
 //   node scripts/extract-command-table.mjs           # rewrite the generated file

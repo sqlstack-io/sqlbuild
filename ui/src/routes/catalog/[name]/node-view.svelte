@@ -10,7 +10,7 @@
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
 	import ScopedLineage from '$lib/lineage/scoped-lineage.svelte';
 	import ColumnLineage from '$lib/lineage/column-lineage.svelte';
-	import RunPanel from '$lib/run/run-panel.svelte';
+	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo } from '$lib/format/time';
@@ -74,11 +74,8 @@
 	});
 
 	const canRun = app.client.supports('launchAdhocRun');
-	let runOpen = $state(false);
-	let runSelection = $state<string[]>([]);
 	function execute(selection: string[]) {
-		runSelection = selection;
-		runOpen = true;
+		void goto(planHref(selection));
 	}
 	const Glyph = $derived(n ? (nodeIcon[nodeIconKey(n)] ?? nodeIcon.table) : nodeIcon.table);
 </script>
@@ -89,8 +86,6 @@
 		<GatedButton requires="run.adhoc" variant="default" onclick={() => execute([name])}>▷ Build</GatedButton>
 	{/if}
 </AppTopbar>
-
-{#if canRun}<RunPanel bind:open={runOpen} selection={runSelection} />{/if}
 
 <div class="asset-page">
 	<header class="asset-header">
