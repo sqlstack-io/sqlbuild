@@ -13,36 +13,20 @@ from tests.unit.src.sqlbuild.lint._test_types import (
 )
 from tests.unit.src.sqlbuild.lint.helpers import keyword_name_positions, reserved_keyword_pairs
 
-_DATABRICKS_KEYWORD_NAME_FOLD: pytest.MarkDecorator = pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "SQLQuack 804864d2 fingerprints Databricks identifiers named Any, Some or Order"
-        " case-insensitively, like keywords; its fix lands at the next SQLQuack pin"
-    ),
-)
-_KNOWN_FINGERPRINT_FOLDS: dict[tuple[str, str, str], pytest.MarkDecorator] = {
-    ("databricks", name, position): _DATABRICKS_KEYWORD_NAME_FOLD
-    for name in ("Any", "Some", "Order")
-    for position in ("projection", "table", "operand")
-}
-
 
 @pytest.mark.parametrize(
     "test_case",
     [
-        pytest.param(
-            KeywordNamedIdentifierFormatTestCase(
-                description=f"{dialect} {name} as {position}",
-                dialect=dialect,
-                sql=template.format(name=name),
-                name=name,
-                expected_name_occurrences=1,
-            ),
-            id=f"{dialect} {name} as {position}",
-            marks=_KNOWN_FINGERPRINT_FOLDS.get((dialect, name, position), ()),
+        KeywordNamedIdentifierFormatTestCase(
+            description=f"{dialect} {name} as {position}",
+            dialect=dialect,
+            sql=template.format(name=name),
+            name=name,
+            expected_name_occurrences=1,
         )
         for dialect, name, position, template in keyword_name_positions()
     ],
+    ids=lambda case: case.description,
 )
 def test_given_keyword_named_identifier_when_formatting_then_case_is_kept_and_fingerprinted(
     test_case: KeywordNamedIdentifierFormatTestCase,
@@ -58,6 +42,45 @@ def test_given_keyword_named_identifier_when_formatting_then_case_is_kept_and_fi
     assert response["formatted"] is False or (
         printed.count(test_case.name) == test_case.expected_name_occurrences
     ), test_case.description
+    assert native_module.query_fingerprint(
+        test_case.sql, test_case.dialect
+    ) != native_module.query_fingerprint(swapped, test_case.dialect), test_case.description
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "SQLQuack 804864d2 fingerprints Databricks identifiers named Any, Some or Order"
+        " without case, like keywords; its fix lands at the next SQLQuack pin"
+    ),
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        KeywordNamedIdentifierFormatTestCase(
+            description=f"{dialect} {name} as {position}",
+            dialect=dialect,
+            sql=template.format(name=name),
+            name=name,
+            expected_name_occurrences=1,
+        )
+        for dialect, name, position, template in keyword_name_positions(known_fold=True)
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_databricks_keyword_named_identifier_when_fingerprinting_then_case_is_kept(
+    test_case: KeywordNamedIdentifierFormatTestCase,
+) -> None:
+    printed: str = str(
+        json.loads(
+            native_module.format_sql_json(
+                json.dumps({"version": 1, "sql": test_case.sql, "dialect": test_case.dialect})
+            )
+        )["sql"]
+    )
+    swapped: str = test_case.sql.replace(test_case.name, test_case.name.swapcase())
+
+    assert printed.count(test_case.name) == test_case.expected_name_occurrences
     assert native_module.query_fingerprint(
         test_case.sql, test_case.dialect
     ) != native_module.query_fingerprint(swapped, test_case.dialect), test_case.description

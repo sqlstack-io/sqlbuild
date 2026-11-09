@@ -125,8 +125,17 @@ def reserved_keywords(dialect: str) -> frozenset[str]:
     return _RESERVED_NAMES[dialect]
 
 
-def keyword_name_positions() -> tuple[tuple[str, str, str, str], ...]:
-    """Return (dialect, name, position, template) for names that must keep their case."""
+_DATABRICKS_KEYWORD_NAME_FOLDS: frozenset[tuple[str, ...]] = frozenset(
+    itertools.product(("databricks",), ("Any", "Some", "Order"), ("projection", "table", "operand"))
+)
+
+
+def keyword_name_positions(*, known_fold: bool = False) -> tuple[tuple[str, str, str, str], ...]:
+    """Return (dialect, name, position, template) for names that must keep their case.
+
+    With `known_fold`, only the Databricks names SQLQuack 804864d2 fingerprints without case;
+    otherwise every other position.
+    """
 
     positions: list[tuple[str, str, str, str]] = []
     for dialect, name in itertools.product(_DIALECTS, _KEYWORD_NAMED_IDENTIFIERS):
@@ -141,7 +150,10 @@ def keyword_name_positions() -> tuple[tuple[str, str, str, str], ...]:
             }[name.lower() in reserved_keywords(dialect)]
         )
         positions.extend((dialect, name, shape, template) for shape, template in shapes)
-    return tuple(positions)
+    partitioned: dict[bool, list[tuple[str, str, str, str]]] = {False: [], True: []}
+    for position in positions:
+        partitioned[position[:3] in _DATABRICKS_KEYWORD_NAME_FOLDS].append(position)
+    return tuple(partitioned[known_fold])
 
 
 def reserved_keyword_pairs() -> tuple[tuple[str, str], ...]:
