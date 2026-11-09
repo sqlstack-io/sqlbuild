@@ -10,7 +10,7 @@ use crate::platform::main::enqueue_location_work::enqueue_location_work;
 use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkRequest, PlanRequest};
 use crate::runs::_helpers::requests::adhoc::frozen_adhoc_request;
-use crate::runs::constants::PLAN_REASON;
+use crate::runs::constants::{PLAN_IGNORED_SETTING, PLAN_REASON};
 use crate::runs::models::{AdhocCheckRequest, RunCommand};
 use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
@@ -98,7 +98,11 @@ pub(in crate::runs) async fn request_plan_in(
         work: LocationWork::Plan {
             command: request.command.clone(),
             selection: frozen.selection,
-            settings: frozen.settings,
+            settings: frozen
+                .settings
+                .into_iter()
+                .filter(|(name, _)| name != PLAN_IGNORED_SETTING)
+                .collect(),
         },
     };
     let transaction = enqueue_location_work(
