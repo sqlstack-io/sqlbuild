@@ -2265,6 +2265,11 @@ export interface components {
         };
         /** @enum {string} */
         RunKind: "job" | "group" | "adhoc";
+        /** @description The `sqb build` selectors one run of a job was narrowed with. */
+        RunNarrowing: {
+            exclude: string[];
+            select: string[];
+        };
         /** @description A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL. */
         RunNodeFailure: {
             error_code?: string | null;
@@ -2321,6 +2326,7 @@ export interface components {
             launched_at?: string | null;
             /** Format: uuid */
             location_id: string;
+            narrowing?: null | components["schemas"]["RunNarrowing"];
             node_counts_json: {
                 [key: string]: number;
             };
