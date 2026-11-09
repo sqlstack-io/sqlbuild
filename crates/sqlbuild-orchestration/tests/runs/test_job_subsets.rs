@@ -1,4 +1,4 @@
-//! A narrowed job run keeps only the job's own nodes, stays a run of that job and writes only what it selects.
+//! A narrowed job run keeps only the job's own nodes, stays a run of that job, writes only what it selects and needs view on every node.
 
 use std::collections::BTreeSet;
 
@@ -7,10 +7,14 @@ use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
+use crate::credentials::tests::role_helpers::{
+    SUPPORT_ROLE, credentials, orders_grant, role_fixture,
+};
 use crate::runs::main::request_job_run::request_job_run;
-use crate::runs::models::{JobRunRequest, RunKind, RunRequest};
+use crate::runs::main::request_person_run::request_person_run;
+use crate::runs::models::{JobRunRequest, PersonRunRequest, RunKind, RunRequest};
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
-use crate::runs::tests::test_types::{ExactKeyPlanner, JobSubsetTestCase};
+use crate::runs::tests::test_types::{ExactKeyPlanner, JobSubsetTestCase, NarrowingDenialTestCase};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -173,6 +177,93 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
                 ),
                 "{backend:?}: a caller without a planner cannot narrow a job"
             );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_member_without_view_on_every_node_when_narrowing_a_job_then_every_selector_is_refused_alike()
+ {
+    let test_cases = [
+        NarrowingDenialTestCase {
+            description: "a node the member may run",
+            select: &["orders"],
+            exclude: &[],
+            expected_denied: true,
+        },
+        NarrowingDenialTestCase {
+            description: "a node that does not exist",
+            select: &[],
+            exclude: &["shipments"],
+            expected_denied: true,
+        },
+        NarrowingDenialTestCase {
+            description: "a node outside the job",
+            select: &["products"],
+            exclude: &[],
+            expected_denied: true,
+        },
+        NarrowingDenialTestCase {
+            description: "a job node without a grant",
+            select: &["customers"],
+            exclude: &[],
+            expected_denied: true,
+        },
+        NarrowingDenialTestCase {
+            description: "a job selector",
+            select: &["job:daily_orders"],
+            exclude: &[],
+            expected_denied: true,
+        },
+    ];
+    for backend in [Backend::Sqlite, Backend::Postgres] {
+        run(async {
+            let Some(fixture) = open_test_store(backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let mut input = snapshot(roles.location_id);
+            input.generation = 2;
+            input.documents.insert(
+                "roles".into(),
+                json!({SUPPORT_ROLE: {"description": "Answer order questions",
+                    "grants": [orders_grant(json!(["view", "job.run"]), &["orders"])]}}),
+            );
+            input.documents.insert("jobs".into(), json!({"daily_orders": {
+                "description": "Orders and stock", "selection": ["customers", "inventory", "orders"]}}));
+            publish_snapshot(store, &input).await.expect("publish jobs");
+            let member = (&roles.context, credentials(&roles.member));
+            let strings =
+                |tokens: &[&str]| tokens.iter().map(|token| (*token).to_owned()).collect();
+            for test_case in &test_cases {
+                let request = JobRunRequest {
+                    run_id: Uuid::now_v7(),
+                    location_id: roles.location_id,
+                    target: "development".into(),
+                    job_key: "daily_orders".into(),
+                    reason: "Rebuild part of the job".into(),
+                    priority: 0,
+                    window: None,
+                    full_refresh: false,
+                    select: strings(test_case.select),
+                    exclude: strings(test_case.exclude),
+                };
+                let outcome = request_person_run(
+                    store,
+                    member,
+                    PersonRunRequest::Job(&ExactKeyPlanner, &request),
+                )
+                .await;
+                assert_eq!(
+                    matches!(outcome, Err(ControlError::Denied { .. })),
+                    test_case.expected_denied,
+                    "{backend:?}: {}: denied before any selector resolves, so nothing about the nodes leaks: {outcome:?}",
+                    test_case.description
+                );
+            }
             close_test_store(fixture).await;
         });
     }
