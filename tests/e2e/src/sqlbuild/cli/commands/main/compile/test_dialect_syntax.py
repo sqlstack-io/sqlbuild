@@ -14,6 +14,21 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
     dialect_syntax_model,
 )
 
+_SNOWFLAKE_SYNTAX_ERRORS: list[DialectSyntaxCompileE2ETestCase] = [
+    DialectSyntaxCompileE2ETestCase(
+        description="Snowflake rejects a CTE whose body is a bare VALUES list",
+        adapter="snowflake",
+        models={
+            "codes": dialect_syntax_model(
+                "Codes.", "WITH v AS (VALUES (1), (2)) SELECT v.column1 AS code FROM v"
+            ),
+        },
+        expected_exit_code=1,
+        expected_codes=("P001",),
+        expected_column_counts={},
+    ),
+]
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -164,35 +179,24 @@ def test_given_dialect_syntax_when_compiling_then_analysis_parses_and_types_it(
     } == test_case.expected_column_counts, test_case.description
 
 
+@pytest.mark.parametrize("test_case", _SNOWFLAKE_SYNTAX_ERRORS, ids=lambda case: case.description)
+def test_given_snowflake_syntax_error_when_compiling_then_compile_fails_with_an_error(
+    test_case: DialectSyntaxCompileE2ETestCase, tmp_path: Path
+) -> None:
+    compiled, codes, _ = compile_dialect_syntax_project(test_case, tmp_path)
+
+    assert compiled.returncode == test_case.expected_exit_code, compiled.stdout + compiled.stderr
+    assert codes, compiled.stdout + compiled.stderr
+
+
 @pytest.mark.xfail(
     strict=True,
     reason="Native Snowflake parse errors carry no syntax flag, so a bare VALUES CTE reports P026",
 )
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        DialectSyntaxCompileE2ETestCase(
-            description="Snowflake rejects a CTE whose body is a bare VALUES list",
-            adapter="snowflake",
-            models={
-                "codes": dialect_syntax_model(
-                    "Codes.", "WITH v AS (VALUES (1), (2)) SELECT v.column1 AS code FROM v"
-                ),
-            },
-            expected_exit_code=1,
-            expected_codes=("P001",),
-            expected_column_counts={},
-        ),
-    ],
-    ids=lambda case: case.description,
-)
+@pytest.mark.parametrize("test_case", _SNOWFLAKE_SYNTAX_ERRORS, ids=lambda case: case.description)
 def test_given_snowflake_syntax_error_when_compiling_then_it_is_reported_as_p001(
     test_case: DialectSyntaxCompileE2ETestCase, tmp_path: Path
 ) -> None:
-    compiled, codes, column_counts = compile_dialect_syntax_project(test_case, tmp_path)
+    _, codes, _ = compile_dialect_syntax_project(test_case, tmp_path)
 
-    assert compiled.returncode == test_case.expected_exit_code, compiled.stdout + compiled.stderr
     assert codes == test_case.expected_codes
-    assert {
-        name: column_counts[name] for name in test_case.expected_column_counts
-    } == test_case.expected_column_counts, test_case.description
