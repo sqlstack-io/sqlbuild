@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { TriggerDetail } from '$lib/api';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -44,7 +45,7 @@
 		{sensor.minimumIntervalSeconds ? `Checks at most every ${sensor.minimumIntervalSeconds}s` : 'Checks each time something relevant happens'}{sensor.timeoutSeconds ? ` · a check is stopped if it takes over ${sensor.timeoutSeconds}s` : ''}
 	</p>
 	{#if trigger.kind === 'platform_sensor'}
-		<p class="faint"><a href="/locations/{app.locationId}#problems">Problems it handled ↗</a></p>
+		<p class="faint"><a href={to(`/locations/${app.locationId}#problems`)}>Problems it handled ↗</a></p>
 	{/if}
 	{#if changed}
 		<p class="warn" title="Fingerprint {sensor.lastEvaluatedFingerprint} → {sensor.currentFingerprint}">Its code changed since it last checked. The next check uses the new code.</p>
@@ -109,7 +110,7 @@
 				{#each trigger.runRequests as r (r.runKey)}
 					<tr>
 						<td class="mono">{r.runKey}</td>
-						<td class="mono"><a href="/runs/{r.runId}" title={r.runId}>{shortRunId(r.runId)}</a></td>
+						<td class="mono"><a href={to(`/runs/${r.runId}`)} title={r.runId}>{shortRunId(r.runId)}</a></td>
 						<td><i class="dot" style:background={runStatusTone[r.runStatus]}></i>{runStatusLabel[r.runStatus]}</td>
 						<td class="faint" title={formatStamp(r.requestedAt)}>{formatAgo(r.requestedAt, app.now)}</td>
 					</tr>

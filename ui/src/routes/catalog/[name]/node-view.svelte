@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -31,7 +32,7 @@
 	const n = $derived(res.data ?? null);
 	// Checks and migrations link nodes by bare name; settle on the node key so the graph and links agree.
 	$effect(() => {
-		if (n && n.key !== name) goto(`/catalog/${n.key}${page.url.search}`, { replaceState: true });
+		if (n && n.key !== name) goto(to(`/catalog/${n.key}${page.url.search}`), { replaceState: true });
 	});
 	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs']);
 	const colLineage = createResource((client, scope) => client.getColumnLineage(scope, name), ['snapshot']);
@@ -75,7 +76,7 @@
 
 	const canRun = app.client.supports('launchAdhocRun');
 	function execute(selection: string[]) {
-		void goto(planHref(selection));
+		void goto(to(planHref(selection)));
 	}
 	const Glyph = $derived(n ? (nodeIcon[nodeIconKey(n)] ?? nodeIcon.table) : nodeIcon.table);
 </script>
@@ -89,7 +90,7 @@
 
 <div class="asset-page">
 	<header class="asset-header">
-		<nav class="crumbs"><a href="/catalog">Catalog</a><span>/</span>{#if n}<a href="/catalog?kind={n.kind}">{nodeKindPlural[n.kind]}</a>{/if}</nav>
+		<nav class="crumbs"><a href={to(`/catalog`)}>Catalog</a><span>/</span>{#if n}<a href={to(`/catalog?kind=${n.kind}`)}>{nodeKindPlural[n.kind]}</a>{/if}</nav>
 		<div class="title-row">
 			<Glyph size={18} strokeWidth={1.75} />
 			<h2 title={name}>{shortName(n?.key ?? name)}</h2>
@@ -104,7 +105,7 @@
 				<StaleBadges reasons={n.stale} />
 			{/if}
 			<div class="header-actions">
-				<a class="btn-ghost" href="/lineage?select={name}">View in lineage</a>
+				<a class="btn-ghost" href={to(`/lineage?select=${name}`)}>View in lineage</a>
 			</div>
 		</div>
 		{#if n}
@@ -143,13 +144,13 @@
 				</table>
 			{:else if tab === 'sql'}
 				{#if n.sql}
-					<SqlViewer name={shortName(n.key)} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={viewerMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(`/catalog/${m}?tab=sql`)} />
+					<SqlViewer name={shortName(n.key)} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={viewerMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(to(`/catalog/${m}?tab=sql`))} />
 				{:else if n.code}
 					<div class="p-5"><CodePreview file={n.code.file} code={n.code.source} language="text" maxLines={200} /></div>
 				{/if}
 			{:else if tab === 'drift' && n.sql}
 				<DriftTab node={n}>
-					<SqlViewer name={shortName(n.key)} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={driftMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(`/catalog/${m}?tab=drift`)} />
+					<SqlViewer name={shortName(n.key)} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={driftMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(to(`/catalog/${m}?tab=drift`))} />
 				</DriftTab>
 			{:else if tab === 'lineage'}
 				{#if graph.nodes.length}

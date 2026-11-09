@@ -7,11 +7,12 @@
 	import { pageAvailable } from '$lib/nav';
 	import { SERVER_DOCS } from '$lib/boot-failure';
 	import { app } from '$lib/state/app.svelte';
+	import { appPath } from '$lib/paths';
 	import favicon from '$website/public/favicon.png';
 
 	let { children } = $props();
 
-	const signingIn = $derived(page.url.pathname === '/login');
+	const signingIn = $derived(appPath(page.url.pathname) === '/login');
 
 	onMount(() => {
 		if (!signingIn) void app.start();
@@ -49,7 +50,7 @@
 	<div class="flex h-screen overflow-hidden">
 		<AppSidebar />
 		<div class="flex min-w-0 flex-1 flex-col">
-			{#if pageAvailable(app.client, page.url.pathname)}
+			{#if pageAvailable(app.client, appPath(page.url.pathname))}
 				{@render children()}
 			{:else}
 				<AppTopbar title="Not available" />

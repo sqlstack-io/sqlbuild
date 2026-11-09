@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -68,7 +69,7 @@
 
 <AppTopbar title="Checks">
 	<Button variant="outline" size="sm" onclick={() => checks.refresh()}>↻ Refresh</Button>
-	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(filtered.length === all.length ? [] : runSelection, 'audit'))}>▷ Run checks</GatedButton>{/if}
+	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(filtered.length === all.length ? [] : runSelection, 'audit')))}>▷ Run checks</GatedButton>{/if}
 </AppTopbar>
 
 
@@ -106,19 +107,19 @@
 		<tbody>
 			{#each filtered as c (c.id)}
 				{@const o = outcomeOf(c)}
-				<tr onclick={() => goto(`/checks/${c.id}`)}>
+				<tr onclick={() => goto(to(`/checks/${c.id}`))}>
 					<td>
 						<div class="cell-name">
 							<ShieldCheckIcon size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								<a href="/checks/{c.id}" class="check-name" onclick={(e) => e.stopPropagation()}>{c.name}</a>
+								<a href={to(`/checks/${c.id}`)} class="check-name" onclick={(e) => e.stopPropagation()}>{c.name}</a>
 								<div class="cell-desc">{kindLabel(c)}</div>
 							</div>
 						</div>
 					</td>
 					<td><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /></td>
 					<td>
-						{#if c.node}{#if linksNodes}<a href="/catalog/{c.node}" class="link" onclick={(e) => e.stopPropagation()}>{c.node}</a>{:else}<span>{c.node}</span>{/if}{#if c.column}<span class="muted">.{c.column}</span>{/if}
+						{#if c.node}{#if linksNodes}<a href={to(`/catalog/${c.node}`)} class="link" onclick={(e) => e.stopPropagation()}>{c.node}</a>{:else}<span>{c.node}</span>{/if}{#if c.column}<span class="muted">.{c.column}</span>{/if}
 						{:else}<span class="muted">{attachmentLabel[c.attachment]}</span>{/if}
 					</td>
 					<td class="muted capitalize">{c.severity}</td>

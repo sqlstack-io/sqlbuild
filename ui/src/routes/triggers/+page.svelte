@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import CalendarIcon from '@lucide/svelte/icons/calendar-days';
 	import RadioIcon from '@lucide/svelte/icons/radio';
@@ -157,7 +158,7 @@
 		</thead>
 		<tbody>
 			{#each filtered as t (t.id)}
-				<tr class:sb-row-off={t.state === 'paused'} onclick={() => goto(`/triggers/${t.id}`)}>
+				<tr class:sb-row-off={t.state === 'paused'} onclick={() => goto(to(`/triggers/${t.id}`))}>
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<td class="check-col" onclick={(e) => e.stopPropagation()} title={canToggle ? undefined : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
@@ -178,7 +179,7 @@
 								></button>
 							</span>
 							<div class="min-w-0">
-								<a href="/triggers/{t.id}" onclick={(e) => e.stopPropagation()}>{t.name}</a>
+								<a href={to(`/triggers/${t.id}`)} onclick={(e) => e.stopPropagation()}>{t.name}</a>
 								<div class="cell-desc">{t.cadence}</div>
 							</div>
 							{#if t.warning}<span class="warn-icon" title={t.warning}><TriangleAlertIcon size={14} /></span>{/if}
@@ -191,7 +192,7 @@
 						</span>
 					</td>
 					<td>
-						{#if t.jobKey}<a class="link" href="/jobs/{t.jobKey}" onclick={(e) => e.stopPropagation()}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Runs its own code</span>{/if}
+						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)} onclick={(e) => e.stopPropagation()}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Runs its own code</span>{/if}
 					</td>
 					<td>
 						<span class:muted={t.state === 'paused'}>{t.state === 'running' ? 'On' : 'Paused'}</span>
@@ -212,7 +213,7 @@
 					<td class="muted" title={t.lastTick ? `${tickOutcomeHelp[t.lastTick.outcome]}${t.lastTick.reason ? `\n${t.lastTick.reason}` : ''}` : undefined}>
 						{#if t.lastTick}
 							<span class="tick" style:--c={tickOutcomeTone[t.lastTick.outcome]}>{tickOutcomeText[t.lastTick.outcome]}</span>
-							{#if t.lastTick.coveredByRunId}into run <a class="link code" href="/runs/{t.lastTick.coveredByRunId}" onclick={(e) => e.stopPropagation()}>{shortRunId(t.lastTick.coveredByRunId)}</a>{/if}
+							{#if t.lastTick.coveredByRunId}into run <a class="link code" href={to(`/runs/${t.lastTick.coveredByRunId}`)} onclick={(e) => e.stopPropagation()}>{shortRunId(t.lastTick.coveredByRunId)}</a>{/if}
 							<div class="cell-desc">{formatAgo(t.lastTick.scheduledFor, app.now)}</div>
 						{:else}
 							{t.type === 'sensor' ? 'See its checks' : 'Not due yet'}
@@ -220,7 +221,7 @@
 					</td>
 					<td>
 						{#if t.lastRun}
-							<a href="/runs/{t.lastRun.id}" class="last-run" onclick={(e) => e.stopPropagation()}>
+							<a href={to(`/runs/${t.lastRun.id}`)} class="last-run" onclick={(e) => e.stopPropagation()}>
 								<StatusLabel tone={runStatusTone[t.lastRun.status]} label={runStatusLabel[t.lastRun.status]} />
 								{#if t.lastRun.startedAt}<RelativeTime value={formatAgo(t.lastRun.startedAt, app.now)} exact={formatStamp(t.lastRun.startedAt)} />{/if}
 							</a>

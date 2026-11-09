@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import OctagonAlertIcon from '@lucide/svelte/icons/octagon-alert';
 	import type { PlatformEvent } from '$lib/api';
@@ -30,7 +31,7 @@
 					<strong>{eventKindLabel[event.kind]}</strong>
 					<span title={event.message}>{event.message}</span>
 					<small>{formatAgo(event.occurredAt, app.now)}</small>
-					{#if link}<a href={link.href}>{link.text}</a>{/if}
+					{#if link}<a href={to(link.href)}>{link.text}</a>{/if}
 				</li>
 			{/each}
 		</ul>

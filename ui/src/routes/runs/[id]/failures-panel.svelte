@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { untrack } from 'svelte';
 	import { app } from '$lib/state/app.svelte';
 	import CopyButton from '$lib/components/copy-button.svelte';
@@ -68,7 +69,7 @@
 					<li>
 						<div class="row">
 							{#if app.client.supports('listRunStatements')}<button class="node mono" onclick={() => view.focusNode(n.nodeKey, 'statements')} title="Show this node's queries below">{n.nodeKey}</button>{:else}<span class="node mono">{n.nodeKey}</span>{/if}
-							{#if n.runId !== view.run?.id}<a class="faint" href="/runs/{n.runId}">in {n.jobKey ?? shortRunId(n.runId)}</a>{/if}
+							{#if n.runId !== view.run?.id}<a class="faint" href={to(`/runs/${n.runId}`)}>in {n.jobKey ?? shortRunId(n.runId)}</a>{/if}
 							<span class="msg">{n.errorMessage ?? loaded?.message?.split('\n')[0] ?? (n.errorCode ? `Failed with ${n.errorCode}` : 'Failed')}</span>
 							{#if where}
 								<span class="loc mono" title="Where the failure points in the project">{where}</span>

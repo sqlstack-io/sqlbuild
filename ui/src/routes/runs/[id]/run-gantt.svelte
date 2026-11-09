@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { onMount } from 'svelte';
 	import type { RunNode } from '$lib/api';
 	import { nodeStatusTone } from '$lib/operate/labels';
@@ -143,7 +144,7 @@
 					<div class="row group-row">
 						<div class="gutter cell" class:shadow={scrolledX} style:width="{gutterW}px">
 							<i style:background={row.group.tone}></i>
-							<a href={row.group.href}>{row.group.label}</a>
+							<a href={to(row.group.href)}>{row.group.label}</a>
 							<span class="faint">{row.count}</span>
 						</div>
 					</div>

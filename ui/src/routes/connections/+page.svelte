@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import DatabaseIcon from '@lucide/svelte/icons/database';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -30,7 +31,7 @@
 			<div class="connection">
 				<div class="head">
 					<DatabaseIcon size={15} strokeWidth={1.75} />
-					<a href="/locations/{encodeURIComponent(c.id)}" class="name">Warehouse</a>
+					<a href={to(`/locations/${encodeURIComponent(c.id)}`)} class="name">Warehouse</a>
 					<div class="test"><ConnectionTest scope={{ locationId: c.id }} connection={c.target} last={c.lastTest} ontested={() => connections.refresh()} /></div>
 				</div>
 				{#if c.tables.length}

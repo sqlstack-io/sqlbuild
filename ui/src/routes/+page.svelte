@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import AlertCircleIcon from '@lucide/svelte/icons/circle-alert';
@@ -69,7 +70,7 @@
 			{#if otherPages.length}
 				<p>Pages you can use:</p>
 				<ul>
-					{#each otherPages as item (item.href)}<li><a href={item.href}>{item.label} →</a></li>{/each}
+					{#each otherPages as item (item.href)}<li><a href={to(item.href)}>{item.label} →</a></li>{/each}
 				</ul>
 			{/if}
 			{#if (app.bootstrap?.locations.length ?? 0) > 1}<p>Or choose another location from the menu at the top of the sidebar.</p>{/if}
@@ -97,7 +98,7 @@
 							{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
 						</div>
 					{/if}
-					{#if latest}<a href="/runs/{latest.id}">View latest run →</a>{/if}
+					{#if latest}<a href={to(`/runs/${latest.id}`)}>View latest run →</a>{/if}
 				</div>
 				{#if issues.length}
 					<div class="issues">
@@ -105,14 +106,14 @@
 							{@const Glyph = attentionIcon[view.tone]}
 							<div class="issue">
 								<span class="issue-icon {view.tone}"><Glyph size={14} /></span>
-								<a class="issue-title" href={view.href}>{view.title}</a>
+								<a class="issue-title" href={to(view.href)}>{view.title}</a>
 								<span class="issue-detail" title={view.detail}>{view.detail}</span>
 								<small>{view.since}</small>
 								<span class="issue-actions">
 									{#if item.kind === 'stale_models'}
-										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(planHref(staleSelection))}>Rebuild {staleSelection.length}</GatedButton>
+										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(planHref(staleSelection)))}>Rebuild {staleSelection.length}</GatedButton>
 									{/if}
-									<a href={view.href}>{view.action} →</a>
+									<a href={to(view.href)}>{view.action} →</a>
 								</span>
 							</div>
 						{/each}
@@ -158,7 +159,7 @@
 				<section class="surface-panel flex min-w-0 flex-col">
 					<div class="panel-heading">
 						<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
-						<a href="/runs?view=timeline">Open full timeline →</a>
+						<a href={to(`/runs?view=timeline`)}>Open full timeline →</a>
 					</div>
 					<RunTimeline scroll={false} stickyTop={0} />
 				</section>
@@ -168,12 +169,12 @@
 				{#if showGroups}<section class="surface-panel">
 					<div class="panel-heading">
 						<div><h2>Build status by group</h2><span>Current, stale and failed nodes · {app.location?.name}</span></div>
-						<a href="/catalog">Open catalog →</a>
+						<a href={to(`/catalog`)}>Open catalog →</a>
 					</div>
 					<div class="groups">
 						<div class="group-row head"><span>Group</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
 						{#each groups as g (g.group)}
-							<a class="group-row" href="/catalog?group={g.group}">
+							<a class="group-row" href={to(`/catalog?group=${g.group}`)}>
 								<span>{g.group}</span>
 								<span class="group-bar" title="{g.current} of {g.total} current">
 									<i class="fresh" style:width="{(g.current / g.total) * 100}%"></i>
@@ -193,11 +194,11 @@
 				<section class="surface-panel">
 					<div class="panel-heading">
 						<div><h2>Recent changes</h2><span>Recent deploys</span></div>
-						<a href="/changes">All changes →</a>
+						<a href={to(`/changes`)}>All changes →</a>
 					</div>
 					<div>
 						{#each data?.recentChanges ?? [] as c (c.snapshotId)}
-							<a class="change" href="/changes#gen-{c.generation}">
+							<a class="change" href={to(`/changes#gen-${c.generation}`)}>
 								<span class="change-rev" title={c.gitRevision ? `Commit ${c.gitRevision}` : 'Published outside a git checkout'}><code>{c.gitRevision?.slice(0, 7) ?? '—'}</code><small>version {c.generation}</small></span>
 								<span class="change-copy">
 									<strong>{summarizeChange(c)}</strong>

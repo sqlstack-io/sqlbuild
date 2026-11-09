@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { PlatformEventLink, PlatformEventReaction, PlatformEventRecord } from '$lib/api';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
 	import { eventKindLabel, eventLinkHref, eventLinkLabel, reactionHref, reactionLabel, reactionTone, severityTone } from '$lib/platform/labels';
@@ -82,7 +83,7 @@
 				{#if showAffected}
 				<td>
 					{#each shownLinks(e) as link (eventLinkHref(link))}
-						<a class="link stacked" href={eventLinkHref(link)} onclick={() => followLink(link)}>{eventLinkLabel(link, app.bootstrap?.locations)}</a>
+						<a class="link stacked" href={to(eventLinkHref(link))} onclick={() => followLink(link)}>{eventLinkLabel(link, app.bootstrap?.locations)}</a>
 					{:else}
 						<span class="muted">—</span>
 					{/each}
@@ -91,7 +92,7 @@
 				{#if showReactions}
 				<td>
 					{#each e.reactions as r (r.triggerId)}
-						<a class="link stacked reaction" href={reactionHref(r)} onclick={() => follow(r)} title={reactionTitle(r)}>
+						<a class="link stacked reaction" href={to(reactionHref(r))} onclick={() => follow(r)} title={reactionTitle(r)}>
 							<span class="dot" style:background={reactionTone[r.outcome]}></span>{r.triggerName}
 							<span class="muted">{reactionLabel[r.outcome]}</span>
 						</a>

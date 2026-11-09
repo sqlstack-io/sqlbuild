@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import AccessChecker from '$lib/components/admin/access-checker.svelte';
@@ -31,7 +32,7 @@
 	<div class="max-w-[1100px]">
 		<AccessChecker principals={canCheckOthers ? (accounts.data ?? []) : []} {initial} />
 	</div>
-	<p class="back"><a href="/admin/people">← People</a></p>
+	<p class="back"><a href={to(`/admin/people`)}>← People</a></p>
 </div>
 
 <style>

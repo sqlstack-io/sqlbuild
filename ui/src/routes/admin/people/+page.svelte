@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import ShieldQuestionIcon from '@lucide/svelte/icons/shield-question';
@@ -55,7 +56,7 @@
 			</label>{/if}
 		{/snippet}
 		{#snippet actions()}
-			{#if app.client.supports('explainAccess')}<Button variant="outline" size="sm" href="/admin/check-access"><ShieldQuestionIcon size={14} /> Check access</Button>{/if}
+			{#if app.client.supports('explainAccess')}<Button variant="outline" size="sm" href={to(`/admin/check-access`)}><ShieldQuestionIcon size={14} /> Check access</Button>{/if}
 		{/snippet}
 	</ListToolbar>
 	<div class="sb-list-wrap">
@@ -72,12 +73,12 @@
 			<tbody>
 				{#each people.shown as a (a.name)}
 					{@const risky = d.riskyOf(a.name)}
-					<tr class:sb-row-off={a.disabled} class:static={!opensPeople} onclick={() => opensPeople && goto(personHref(a))}>
+					<tr class:sb-row-off={a.disabled} class:static={!opensPeople} onclick={() => opensPeople && goto(to(personHref(a)))}>
 						<td>
 							<div class="cell-name">
 								<UserIcon size={15} strokeWidth={1.75} />
 								<div class="min-w-0">
-									{#if opensPeople}<a href={personHref(a)} onclick={(e) => e.stopPropagation()}>{a.displayName}</a>{:else}{a.displayName}{/if}
+									{#if opensPeople}<a href={to(personHref(a))} onclick={(e) => e.stopPropagation()}>{a.displayName}</a>{:else}{a.displayName}{/if}
 									<div class="cell-desc"><code>{a.name}</code> · {a.source === 'oidc' ? 'SSO' : a.source ? accountSourceLabel[a.source] : 'no password'}</div>
 								</div>
 							</div>

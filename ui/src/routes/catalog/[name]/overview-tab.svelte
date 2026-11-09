@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
 	import type { CatalogNodeDetail } from '$lib/api';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
@@ -89,7 +90,7 @@
 				<div class="rows">
 					{#each node.checkResults as c (c.id)}
 						{@const o = c.latest?.outcome ?? 'skipped'}
-						<a class="row" href="/checks/{c.id}"><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /><code>{c.name}</code><span class="muted ml-auto">{runScopePhaseLabel[c.runScopePhase]} · {c.severity}</span></a>
+						<a class="row" href={to(`/checks/${c.id}`)}><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /><code>{c.name}</code><span class="muted ml-auto">{runScopePhaseLabel[c.runScopePhase]} · {c.severity}</span></a>
 					{/each}
 				</div>
 			</section>
@@ -109,11 +110,11 @@
 		<section class="section deps">
 			<div>
 				<h3>Upstream <span>{node.upstream.length}</span></h3>
-				{#each node.upstream as u (u)}<a href="/catalog/{u}">{u}</a>{:else}<span class="muted">None</span>{/each}
+				{#each node.upstream as u (u)}<a href={to(`/catalog/${u}`)}>{u}</a>{:else}<span class="muted">None</span>{/each}
 			</div>
 			<div>
 				<h3>Downstream <span>{node.downstream.length}</span></h3>
-				{#each node.downstream as d (d)}<a href="/catalog/{d}">{d}</a>{:else}<span class="muted">None</span>{/each}
+				{#each node.downstream as d (d)}<a href={to(`/catalog/${d}`)}>{d}</a>{:else}<span class="muted">None</span>{/each}
 			</div>
 		</section>
 	</main>
@@ -142,7 +143,7 @@
 			<section>
 				<h3>Jobs</h3>
 				{#each node.jobs as j (j.key)}
-					<a class="job-row" href="/jobs/{j.key}"><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${j.triggerIds.length} ${j.triggerIds.length === 1 ? 'trigger' : 'triggers'}` : ' · manual'}</small></a>
+					<a class="job-row" href={to(`/jobs/${j.key}`)}><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${j.triggerIds.length} ${j.triggerIds.length === 1 ? 'trigger' : 'triggers'}` : ' · manual'}</small></a>
 				{:else}
 					<p class="muted">No job selects this node.</p>
 				{/each}

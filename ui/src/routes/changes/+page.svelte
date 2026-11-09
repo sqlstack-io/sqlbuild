@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import GitCommitIcon from '@lucide/svelte/icons/git-commit-horizontal';
 	import PackageIcon from '@lucide/svelte/icons/package';
 	import type { SnapshotChange } from '$lib/api';
@@ -115,7 +116,7 @@
 							<div class="row">
 								<span class="op" style:--tone={changeOpTone[r.op]}>{changeOpLabel[r.op]}</span>
 								{#if !r.role}<span class="faint" title="Only people who can give roles see which role changed">a role</span>
-								{:else if app.client.supports('getRole')}<a class="key" href="/admin/roles/{encodeURIComponent(r.role)}">{r.role}</a>
+								{:else if app.client.supports('getRole')}<a class="key" href={to(`/admin/roles/${encodeURIComponent(r.role)}`)}>{r.role}</a>
 								{:else}<code>{r.role}</code>{/if}
 								<span class="detail">
 									{#if r.coverage}<b>now covers {r.coverage.after} {r.coverage.after === 1 ? 'node' : 'nodes'}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
@@ -142,7 +143,7 @@
 						{#each c.costChanges as cc (cc.jobKey)}
 							{@const pct = percentChange(cc.before, cc.after)}
 							<div class="row">
-								<a class="key" href="/jobs/{cc.jobKey}">{cc.jobKey}</a>
+								<a class="key" href={to(`/jobs/${cc.jobKey}`)}>{cc.jobKey}</a>
 								<span class="detail">{formatCredits(cc.before)} → {formatCredits(cc.after)} per run <b class:up={pct > 0} class:down={pct < 0}>{pct > 0 ? '+' : ''}{pct}%</b> <span class="faint">over {cc.runsAfter} {cc.runsAfter === 1 ? 'run' : 'runs'} since revision {c.gitRevision}</span></span>
 							</div>
 						{/each}
@@ -154,7 +155,7 @@
 					{#if c.followingRuns.length}
 						<div class="runs">
 							{#each c.followingRuns as r (r.id)}
-								<a class="run" href="/runs/{r.id}" title="{runStatusLabel[r.status]} · {formatStamp(r.startedAt ?? r.queuedAt)}">
+								<a class="run" href={to(`/runs/${r.id}`)} title="{runStatusLabel[r.status]} · {formatStamp(r.startedAt ?? r.queuedAt)}">
 									<i style:background={runStatusTone[r.status]}></i>
 									<code>{r.id}</code>
 									<span class="faint">{r.jobKey ?? 'started by hand'} · {formatAgo(r.startedAt ?? r.queuedAt, app.now)}</span>

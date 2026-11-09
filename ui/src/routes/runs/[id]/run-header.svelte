@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import RunStatusPill from '$lib/components/operate/run-status-pill.svelte';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
@@ -19,8 +20,8 @@
 <div class="head">
 	<div class="left">
 		<nav class="crumbs" aria-label="Breadcrumb">
-			<a href="/runs">Runs</a>
-			{#if run?.parentRunId}<span>/</span><a href="/runs/{run.parentRunId}" title="Group run {run.parentRunId}">group {shortRunId(run.parentRunId)}</a>{/if}
+			<a href={to(`/runs`)}>Runs</a>
+			{#if run?.parentRunId}<span>/</span><a href={to(`/runs/${run.parentRunId}`)} title="Group run {run.parentRunId}">group {shortRunId(run.parentRunId)}</a>{/if}
 			<span>/</span>
 			<span class="mono" title={runId}>{shortRunId(runId)}</span>
 			<CopyButton value={runId} label="Copy run ID" />
@@ -28,7 +29,7 @@
 		{#if run}
 			<div class="title-row">
 				<h2>
-					{#if run.jobKey}<a href="/jobs/{run.jobKey}">{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
+					{#if run.jobKey}<a href={to(`/jobs/${run.jobKey}`)}>{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
 				</h2>
 				<RunStatusPill status={run.status} size="md" />
 				<!-- The kind is a fact about this run; the origin opens what started it, when that has a page. -->
@@ -40,9 +41,9 @@
 					<span class="chip part" title="Processed only this cursor range, both ends included" data-testid="run-window">window · <code>{run.window.start} → {run.window.end}</code></span>
 				{/if}
 				{#if run.triggerId}
-					<a class="chip link" href="/triggers/{run.triggerId}" title="Open the {runOriginLabel[run.origin].toLowerCase()} that started this run">{runOriginLabel[run.origin].toLowerCase()}{#if run.triggerName}: {run.triggerName}{/if}</a>
+					<a class="chip link" href={to(`/triggers/${run.triggerId}`)} title="Open the {runOriginLabel[run.origin].toLowerCase()} that started this run">{runOriginLabel[run.origin].toLowerCase()}{#if run.triggerName}: {run.triggerName}{/if}</a>
 				{:else if run.rerunOfRunId}
-					<a class="chip link" href="/runs/{run.rerunOfRunId}" title="Open the run this one repeats">rerun of {shortRunId(run.rerunOfRunId)}</a>
+					<a class="chip link" href={to(`/runs/${run.rerunOfRunId}`)} title="Open the run this one repeats">rerun of {shortRunId(run.rerunOfRunId)}</a>
 				{:else}
 					<span class="chip">{runOriginLabel[run.origin].toLowerCase()}</span>
 				{/if}
@@ -66,7 +67,7 @@
 				{#if view.detail?.provenance}
 					{@const p = view.detail.provenance}
 					<span>·</span>
-					<a href="/changes" title="Project version {p.snapshotGeneration}, commit {p.gitRevision}{p.gitDirty ? ' with uncommitted changes' : ''}">version {p.snapshotGeneration}</a>
+					<a href={to(`/changes`)} title="Project version {p.snapshotGeneration}, commit {p.gitRevision}{p.gitDirty ? ' with uncommitted changes' : ''}">version {p.snapshotGeneration}</a>
 				{/if}
 				<button class="details-btn" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Version, command, image, worker and other technical details">{view.showDetails ? 'Hide details' : 'Details'}</button>
 			</div>

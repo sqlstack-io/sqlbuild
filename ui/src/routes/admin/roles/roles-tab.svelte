@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RoleSourceBadge from '$lib/components/admin/role-source-badge.svelte';
@@ -22,9 +23,9 @@
 		</thead>
 		<tbody>
 			{#each rs.roles.data ?? [] as r (r.name)}
-				<tr onclick={() => goto(roleHref(r.name))}>
+				<tr onclick={() => goto(to(roleHref(r.name)))}>
 					<td>
-						<a class="link" href={roleHref(r.name)} onclick={(e) => e.stopPropagation()}><strong>{r.name}</strong></a>
+						<a class="link" href={to(roleHref(r.name))} onclick={(e) => e.stopPropagation()}><strong>{r.name}</strong></a>
 						<div class="cell-desc">{r.description}</div>
 					</td>
 					<td><RoleSourceBadge role={r} /></td>

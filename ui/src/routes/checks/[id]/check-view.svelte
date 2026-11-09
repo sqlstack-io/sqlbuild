@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import type { CheckEvidence, CheckSql } from '$lib/api';
@@ -66,14 +67,14 @@
 
 <AppTopbar title="Checks">
 	{#if c && app.client.supports('launchAdhocRun')}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(c?.node ? [c.node] : [], 'audit'))}>▷ Run check</GatedButton>
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(c?.node ? [c.node] : [], 'audit')))}>▷ Run check</GatedButton>
 	{/if}
 </AppTopbar>
 
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
-		<a href="/checks" class="back">← Checks</a>
+		<a href={to(`/checks`)} class="back">← Checks</a>
 		<code class="title">{c?.name ?? id}</code>
 		{#if c}
 			<StatusLabel tone={checkOutcomeTone[outcome]} label={checkOutcomeLabel[outcome]} />
@@ -104,7 +105,7 @@
 									</td>
 									<td class="num">{checkValue(e, c.evaluationMode)}</td>
 									<td>
-										{#if e.runId}<a class="mono link" href="/runs/{e.runId}">{e.runId}</a>
+										{#if e.runId}<a class="mono link" href={to(`/runs/${e.runId}`)}>{e.runId}</a>
 										{:else}<span class="faint" title="The sqb run that evaluated it: {e.fingerprintRunId}">sqb run <code>{shortRunId(e.fingerprintRunId)}</code></span>{/if}
 									</td>
 									<td>
@@ -168,7 +169,7 @@
 				/>
 				{#if c.node}
 					<h3>Node</h3>
-					<p>{#if app.client.supports('getCatalogNode')}<a class="link mono" href="/catalog/{c.node}?tab=checks">{c.node}</a>{:else}<code>{c.node}</code>{/if}</p>
+					<p>{#if app.client.supports('getCatalogNode')}<a class="link mono" href={to(`/catalog/${c.node}?tab=checks`)}>{c.node}</a>{:else}<code>{c.node}</code>{/if}</p>
 				{/if}
 				{#if c.latest}
 					<h3>Latest</h3>

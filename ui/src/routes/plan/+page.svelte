@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { appPath, to } from '$lib/paths';
 	// Every Run button opens this page with its command. A build is planned by the location against the
 	// warehouse (`sqb plan`); other verbs show the server's dry run. Nothing is queued until Run is pressed.
 	// With a job, the command only narrows that job: Run starts a run of the job, not an ad-hoc command.
@@ -54,7 +55,7 @@
 	$effect(() => {
 		const href = `/plan?cmd=${encodeURIComponent(cmd.trim())}${job ? `&job=${encodeURIComponent(job)}` : ''}`;
 		const timer = setTimeout(() => {
-			if (page.url.pathname === '/plan' && page.url.pathname + page.url.search !== href) void goto(href, { replaceState: true, keepFocus: true, noScroll: true });
+			if (appPath(page.url.pathname) === '/plan' && appPath(page.url.pathname) + page.url.search !== href) void goto(to(href), { replaceState: true, keepFocus: true, noScroll: true });
 		}, 400);
 		return () => clearTimeout(timer);
 	});
@@ -279,7 +280,7 @@
 			const run = job
 				? await (fullRefresh ? app.client.launchJobFromScratch(scope, job, narrowing) : app.client.launchJob(scope, job, narrowing))
 				: await app.client.launchAdhocRun(scope, request);
-			await goto(`/runs/${run.id}`);
+			await goto(to(`/runs/${run.id}`));
 		} catch (e) {
 			launchError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -294,7 +295,7 @@
 	<div class="cmd">
 		{#if job}
 			<span class="jobchip" data-testid="plan-job">
-				<span class="faint">Job</span><a href="/jobs/{encodeURIComponent(job)}">{job}</a>
+				<span class="faint">Job</span><a href={to(`/jobs/${encodeURIComponent(job)}`)}>{job}</a>
 				<button onclick={detachJob} title="Run the command on its own, not as part of {job}" aria-label="Remove the job">×</button>
 			</span>
 		{:else}
@@ -372,7 +373,7 @@
 							<tr class="group"><td colspan="5"><i style:background={g.tone}></i>{g.label} · {g.models.length}</td></tr>
 							{#each g.models as m (m.name)}
 								<tr>
-									<td><a href="/catalog/model:{m.name}" class="mono">{m.name}</a></td>
+									<td><a href={to(`/catalog/model:${m.name}`)} class="mono">{m.name}</a></td>
 									<td class="faint">{m.materialization_type}{m.incremental_strategy ? ` · ${m.incremental_strategy}` : ''}</td>
 									<td>{ACTIONS[m.action] ?? m.action.replaceAll('_', ' ')}</td>
 									<td class="faint wrap">{detail(m)}</td>
@@ -396,7 +397,7 @@
 						{#each picked as key (key)}
 							{@const node = byKey.get(key)}
 							<tr>
-								<td><a href="/catalog/{key}" class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
+								<td><a href={to(`/catalog/${key}`)} class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
 								<td class="faint">{node ? kindLine(node) : ''}</td>
 								<td class="faint right">{node?.lastBuild ? `built ${formatAgo(node.lastBuild.builtAt, app.now)}` : ''}</td>
 							</tr>

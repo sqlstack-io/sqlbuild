@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { JobDetail } from '$lib/api';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -31,7 +32,7 @@
 			const options = { window: useWindow && cursorType ? { type: cursorType, start, end } : undefined };
 			const run = fullRefresh ? await app.client.launchJobFromScratch(scope, job.key, options) : await app.client.launchJob(scope, job.key, options);
 			onclose();
-			await goto(`/runs/${run.id}`);
+			await goto(to(`/runs/${run.id}`));
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {

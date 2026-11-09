@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
 	import UserIcon from '@lucide/svelte/icons/user';
@@ -73,7 +74,7 @@
 {:else}
 	<div class="flex min-h-0 flex-1 flex-col">
 		<div class="head">
-			<a href="/admin/people" class="back">← People</a>
+			<a href={to(`/admin/people`)} class="back">← People</a>
 			<UserIcon size={16} strokeWidth={1.75} />
 			<span class="title">{account?.displayName ?? name}</span>
 			<code class="muted">{name}</code>

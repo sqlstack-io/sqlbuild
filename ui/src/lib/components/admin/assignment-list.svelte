@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import GatedButton from '$lib/components/platform/gated-button.svelte';
@@ -93,7 +94,7 @@
 				{@const hint = lockedHint(a)}
 				<tr class:sb-row-off={a.stale}>
 					<td>
-						{#if role}<a class="link" href={roleHref(a.role)}>{a.role}</a>{:else}<span>{a.role}</span>{/if}
+						{#if role}<a class="link" href={to(roleHref(a.role))}>{a.role}</a>{:else}<span>{a.role}</span>{/if}
 						{#if role}<div class="cell-desc">{roleSummary(role)}</div>{/if}
 						{#if a.stale}<div class="cell-desc warn">This role no longer exists in the code, so it gives nothing</div>{/if}
 						{#if isOwnLastAdmin(a)}<div class="cell-desc warn"><TriangleAlertIcon size={11} /> Your last admin role: removing it locks you out of administration</div>{/if}
@@ -108,7 +109,7 @@
 						{#if a.source === 'manual'}
 							<GatedButton requires="role.assign" size="xs" variant="destructive" busy={busy === a.id} onclick={() => remove(a)}>Remove</GatedButton>
 						{:else if a.source === 'sso'}
-							<a class="locked" href="/admin/roles?tab=sso" title={hint}>See SSO mapping</a>
+							<a class="locked" href={to(`/admin/roles?tab=sso`)} title={hint}>See SSO mapping</a>
 						{:else}
 							<span class="locked" title={hint}>{a.source === 'policy' ? `Change in ${a.definedIn}` : 'Default role'}</span>
 						{/if}

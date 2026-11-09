@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { MicrobatchCoverage, WarehouseObject } from '$lib/api';
 	import KeyValues from '$lib/components/platform/key-values.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
@@ -78,7 +79,7 @@
 		<Panel title="Microbatch coverage" note="Tracked only for concurrent microbatch models · {microbatch.cursorColumn} · {microbatch.batchSize} batches · complete up to {bound(microbatch.contiguousFrontier)}">
 			<div class="batches">
 				{#each microbatch.batches as b (b.start)}
-					<a class="batch" href={b.runId ? `/runs/${b.runId}` : undefined} style:background={batchTone[b.state]} title="{bound(b.start)} – {bound(b.end)} · {batchLabel[b.state]}{b.runId ? ` · ${b.runId}` : ''}"><span class="sr-only">{batchLabel[b.state]}</span></a>
+					<a class="batch" href={b.runId ? to(`/runs/${b.runId}`) : undefined} style:background={batchTone[b.state]} title="{bound(b.start)} – {bound(b.end)} · {batchLabel[b.state]}{b.runId ? ` · ${b.runId}` : ''}"><span class="sr-only">{batchLabel[b.state]}</span></a>
 				{/each}
 			</div>
 			<div class="legend">

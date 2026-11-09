@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -35,7 +36,7 @@
 			{#each mappings as m (m.group + m.role)}
 				<tr class:sb-row-off={m.membersSynced === 0}>
 					<td><code>{m.group}</code></td>
-					<td><a class="link" href={roleHref(m.role)}>{m.role}</a></td>
+					<td><a class="link" href={to(roleHref(m.role))}>{m.role}</a></td>
 					<td class="muted">{scopeWords(m.scope.locationId, locations)}</td>
 					<td class="num">{m.membersSynced === 0 ? 'none yet' : m.membersSynced}</td>
 					<td>{#if m.lastSyncedAt}<RelativeTime value={formatAgo(m.lastSyncedAt, app.now)} exact={formatStamp(m.lastSyncedAt)} />{:else}<span class="muted">Never</span>{/if}</td>
