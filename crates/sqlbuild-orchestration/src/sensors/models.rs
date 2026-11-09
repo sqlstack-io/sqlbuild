@@ -190,3 +190,73 @@ pub(crate) struct DueSensor {
     pub(crate) definition_json: SensorDefinition,
     pub(crate) status: TriggerStatus,
 }
+
+/// A sensor's committed position and recent checks, for a person who may list the target.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonSensorState {
+    /// Absent until the sensor first commits a cursor.
+    pub cursor: Option<PersonSensorCursor>,
+    /// Fingerprint of the published definition; a check with another one ran older code.
+    pub definition_fingerprint: String,
+    /// Newest first.
+    pub evaluations: Vec<PersonSensorEvaluation>,
+    /// Runs the sensor requested, by run key, newest first.
+    pub run_requests: Vec<PersonSensorRunRequest>,
+}
+
+/// The control event position built-in conditions read from, and a custom sensor's own value after secret redaction.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonSensorCursor {
+    pub event_storage_id: i64,
+    pub custom: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonSensorEvaluation {
+    pub evaluation_id: Uuid,
+    /// The latest phase: `requested` alone means the check is in flight; otherwise `completed`, `failed`, `timed_out` or `abandoned`.
+    pub phase: String,
+    pub requested_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub cursor_before: PersonSensorCursor,
+    /// Present when the check completed.
+    pub cursor_after: Option<PersonSensorCursor>,
+    pub run_count: usize,
+    /// The failure code of a failed check.
+    pub failure_code: Option<String>,
+    pub definition_fingerprint: String,
+}
+
+/// A run key is redacted like the custom cursor it usually derives from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonSensorRunRequest {
+    pub run_key: String,
+    pub run_id: Uuid,
+    pub evaluation_id: Uuid,
+    pub queued_at: DateTime<Utc>,
+    pub status: crate::runs::models::RunStatus,
+}
+
+/// A published sensor and its committed cursor.
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredSensor {
+    pub(crate) definition_json: SensorDefinition,
+    pub(crate) cursor_json: Option<SensorCursor>,
+}
+
+/// One recorded phase of a sensor check.
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredEvaluationEvent {
+    pub(crate) occurred_at: DateTime<Utc>,
+    pub(crate) fact_json: SensorEvaluationFact,
+}
+
+/// A run key the sensor requested and the run it made.
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredRunRequest {
+    pub(crate) run_key: String,
+    pub(crate) run_id: Uuid,
+    pub(crate) evaluation_id: Uuid,
+    pub(crate) queued_at: DateTime<Utc>,
+    pub(crate) status: crate::runs::models::RunStatus,
+}

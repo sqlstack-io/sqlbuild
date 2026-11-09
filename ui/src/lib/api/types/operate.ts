@@ -675,7 +675,6 @@ export type SensorEvaluationOutcome = 'requested' | 'completed' | 'failed' | 'ti
 
 export type SensorEvaluation = {
 	id: string;
-	sequence: number;
 	/** The latest phase recorded; `requested` alone means in flight. */
 	outcome: SensorEvaluationOutcome;
 	requestedAt: Iso;

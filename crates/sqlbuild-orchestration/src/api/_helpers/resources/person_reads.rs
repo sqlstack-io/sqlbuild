@@ -25,6 +25,8 @@ use crate::runs::models::{
 };
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
+use crate::sensors::main::read_person_sensor::read_person_sensor;
+use crate::sensors::models::PersonSensorState;
 use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;
 use crate::store::models::ControlStore;
@@ -365,6 +367,37 @@ pub(crate) async fn trigger_changes(
     .await?
     .map(Json)
     .ok_or_else(|| not_found("trigger not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/sensor", operation_id = "readPersonSensorState",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("trigger_id" = Uuid, Path),
+        ("limit" = Option<u32>, Query, description = "Maximum recent checks and run requests; defaults to 100, capped at 1000")),
+    responses((status = 200, body = PersonSensorState, description = "The cursor, recent checks newest first and requested runs"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 404, description = "Sensor not found for a person who may view the whole target")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn sensor_state(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, trigger_id)), Query(options)): (
+        Path<(Uuid, String, Uuid)>,
+        Query<ReadQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<PersonSensorState>, ApiError> {
+    read_person_sensor(
+        &store,
+        (&context, principal),
+        (
+            (location_id, &target),
+            (trigger_id, options.limit.unwrap_or(100)),
+        ),
+        default_role,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("sensor not found"))
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/snapshots", operation_id = "listPersonSnapshots",

@@ -10,6 +10,8 @@ mod test_delivery;
 mod test_execution_bounds;
 #[path = "test_nodes.rs"]
 mod test_nodes;
+#[path = "test_person_state.rs"]
+mod test_person_state;
 #[path = "test_recovery.rs"]
 mod test_recovery;
 #[path = "test_runs.rs"]

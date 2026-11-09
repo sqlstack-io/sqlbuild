@@ -75,13 +75,12 @@
 
 {#if trigger.evaluations}
 <section>
-	<h3 title="Each time the sensor ran its check (an evaluation)">Checks · {trigger.evaluations.length}</h3>
+	<h3 title="Each time the sensor ran its check (an evaluation), newest first">Recent checks</h3>
 	<table>
-		<thead><tr><th>#</th><th>When</th><th>Result</th><th title="Cursor before → after">Position</th><th class="num">Runs started</th><th>Detail</th></tr></thead>
+		<thead><tr><th>When</th><th>Result</th><th title="Cursor before → after">Position</th><th class="num">Runs started</th><th>Detail</th></tr></thead>
 		<tbody>
 			{#each trigger.evaluations.slice(0, shown) as e (e.id)}
 				<tr>
-					<td class="faint">{e.sequence}</td>
 					<td class="nowrap" title={formatStamp(e.requestedAt)}>{formatAgo(e.requestedAt, app.now)}</td>
 					<td><span class="outcome" style:--c={evaluationTone[e.outcome]} title="{e.outcome} · {e.id}">{outcomeText[e.outcome] ?? e.outcome}</span></td>
 					<td class="mono faint">{e.cursorBefore ?? '∅'}{#if e.cursorAfter && e.cursorAfter !== e.cursorBefore} → {e.cursorAfter}{/if}</td>
@@ -92,7 +91,7 @@
 					</td>
 				</tr>
 			{:else}
-				<tr><td colspan="6" class="empty">It hasn't checked yet.</td></tr>
+				<tr><td colspan="5" class="empty">It hasn't checked yet.</td></tr>
 			{/each}
 		</tbody>
 	</table>

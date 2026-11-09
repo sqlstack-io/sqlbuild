@@ -754,6 +754,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/sensor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonSensorState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks": {
         parameters: {
             query?: never;
@@ -1977,6 +1993,49 @@ export interface components {
             principal_id: string;
             role_key: string;
             target?: string | null;
+        };
+        /** @description The control event position built-in conditions read from, and a custom sensor's own value after secret redaction. */
+        PersonSensorCursor: {
+            custom?: string | null;
+            /** Format: int64 */
+            event_storage_id: number;
+        };
+        PersonSensorEvaluation: {
+            cursor_after?: null | components["schemas"]["PersonSensorCursor"];
+            cursor_before: components["schemas"]["PersonSensorCursor"];
+            definition_fingerprint: string;
+            /** Format: uuid */
+            evaluation_id: string;
+            /** @description The failure code of a failed check. */
+            failure_code?: string | null;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** @description The latest phase: `requested` alone means the check is in flight; otherwise `completed`, `failed`, `timed_out` or `abandoned`. */
+            phase: string;
+            /** Format: date-time */
+            requested_at: string;
+            run_count: number;
+        };
+        /** @description A run key is redacted like the custom cursor it usually derives from. */
+        PersonSensorRunRequest: {
+            /** Format: uuid */
+            evaluation_id: string;
+            /** Format: date-time */
+            queued_at: string;
+            /** Format: uuid */
+            run_id: string;
+            run_key: string;
+            status: components["schemas"]["RunStatus"];
+        };
+        /** @description A sensor's committed position and recent checks, for a person who may list the target. */
+        PersonSensorState: {
+            cursor?: null | components["schemas"]["PersonSensorCursor"];
+            /** @description Fingerprint of the published definition; a check with another one ran older code. */
+            definition_fingerprint: string;
+            /** @description Newest first. */
+            evaluations: components["schemas"]["PersonSensorEvaluation"][];
+            /** @description Runs the sensor requested, by run key, newest first. */
+            run_requests: components["schemas"]["PersonSensorRunRequest"][];
         };
         /** @description A person as administrators see them: how they sign in, their SSO groups and live sessions. */
         PersonSummary: {
@@ -4752,6 +4811,55 @@ export interface operations {
                 };
             };
             /** @description Trigger not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonSensorState: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent checks and run requests; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cursor, recent checks newest first and requested runs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonSensorState"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Sensor not found for a person who may view the whole target */
             404: {
                 headers: {
                     [name: string]: unknown;
