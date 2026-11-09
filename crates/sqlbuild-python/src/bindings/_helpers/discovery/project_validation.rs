@@ -33,10 +33,12 @@ fn validate_discovered_project_inputs(
     nodes: Vec<NodeRow>,
 ) -> Result<(), PyErr> {
     let facts: ProjectFacts = project_facts(py, &inputs, nodes)?;
-    let Err(failure) = validate_project_inputs(&facts) else {
-        return Ok(());
-    };
-    Err(match failure {
+    validate_project_inputs(&facts).map_err(|failure| validation_error(py, failure))
+}
+
+/// The Python exception a failed project validation raises.
+pub(crate) fn validation_error(py: Python<'_>, failure: ValidationFailure) -> PyErr {
+    match failure {
         ValidationFailure::Discovery(failure) => failure_error(py, failure),
         ValidationFailure::Unreadable {
             absolute_path,
@@ -56,7 +58,7 @@ fn validate_discovered_project_inputs(
         ),
         ValidationFailure::CsvDialect(error) => {
             if !CSV_DIALECT_ERRORS.contains(&error.class.as_str()) {
-                return Err(PyKeyError::new_err(error.class.to_string()));
+                return PyKeyError::new_err(error.class.to_string());
             }
             raised(
                 py.import(BUILTINS_MODULE)
@@ -64,7 +66,7 @@ fn validate_discovered_project_inputs(
                     .and_then(|class| class.call1((error.message,))),
             )
         }
-    })
+    }
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -1,9 +1,11 @@
+use crate::models::FailureKind;
 use crate::project_validation::_helpers::csv_header::csv_header;
 use crate::project_validation::main::validate_project_inputs::validate_project_inputs;
 use crate::project_validation::models::{
-    CsvSettings, DependencyFact, ModelFact, NamedPath, NodeFact, NodeKind, ProjectFacts,
-    SchemaFileFact, SeedEntryFact, SeedFileFact, ValidationFailure,
+    CsvSettings, DependencyFact, ModelFact, NamedPath, NodeFact, NodeKind, OrchestrationNameFact,
+    ProjectFacts, SchemaFileFact, SeedEntryFact, SeedFileFact, ValidationFailure,
 };
+use crate::project_validation::tests::test_types::failure;
 
 /// The header the reader returns, or its error's message.
 pub(super) fn read_header(
@@ -87,4 +89,25 @@ pub(super) fn path_default_facts(paths: &[&str], keys: &[&str]) -> ProjectFacts 
         path_default_keys: keys.iter().map(|key| (*key).to_owned()).collect(),
         ..ProjectFacts::default()
     }
+}
+
+/// An orchestration declaration named `name`, of `kind`, in one module.
+pub(super) fn declared(name: &str, kind: &'static str) -> OrchestrationNameFact {
+    OrchestrationNameFact {
+        name: name.to_owned(),
+        kind,
+        path: "orchestration/daily.py".to_owned(),
+    }
+}
+
+/// A global unique-name conflict that `message` begins.
+pub(super) fn collision(message: &str) -> Result<(), String> {
+    failure(
+        FailureKind::Conflict,
+        &format!(
+            "{message}; model, source, seed, function, loader, task, asset, check, provider, \
+             hook, unit test, scenario, job, job group, sensor, and calendar schedule names must \
+             be globally unique"
+        ),
+    )
 }

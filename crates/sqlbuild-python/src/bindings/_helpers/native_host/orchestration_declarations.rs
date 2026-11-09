@@ -8,9 +8,12 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
 use serde_json::Value;
+use sqlbuild_discovery::project_validation::models::OrchestrationNameFact;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::native_host::constants::RUN_EVENT_CONDITION;
+use crate::bindings::_helpers::native_host::constants::{
+    AUTHORING_MODULE, CALENDAR_LABEL, GROUP_LABEL, JOB_LABEL, RUN_EVENT_CONDITION, SENSOR_LABEL,
+};
 use crate::bindings::_helpers::native_host::host::entry;
 
 #[derive(FromPyObject)]
@@ -230,4 +233,75 @@ pub(crate) fn collect_declarations<'py>(
         collected.push(authored);
     }
     Ok(collected)
+}
+
+/// Every named declaration reachable from `roots`, labelled with the module of the root that reaches it first.
+pub(crate) fn orchestration_names(
+    py: Python<'_>,
+    roots: &[(Bound<'_, PyAny>, String)],
+) -> PyResult<Vec<OrchestrationNameFact>> {
+    let authoring = py.import(AUTHORING_MODULE)?;
+    let classes = [
+        (authoring.getattr("Job")?, JOB_LABEL),
+        (authoring.getattr("JobGroup")?, GROUP_LABEL),
+        (authoring.getattr("Sensor")?, SENSOR_LABEL),
+        (authoring.getattr("CalendarSchedule")?, CALENDAR_LABEL),
+    ];
+    let mut seen: HashSet<usize> = HashSet::new();
+    let mut names: Vec<OrchestrationNameFact> = Vec::new();
+    for (root, path) in roots {
+        let mut pending: Vec<Bound<'_, PyAny>> = vec![root.clone()];
+        while let Some(declaration) = pending.pop() {
+            if !seen.insert(declaration.as_ptr() as usize) {
+                continue;
+            }
+            let Some(kind) = classes
+                .iter()
+                .find(|(class, _)| declaration.is_instance(class).unwrap_or(false))
+                .map(|(_, kind)| *kind)
+            else {
+                continue;
+            };
+            pending.extend(nested_declarations(&declaration, kind)?);
+            let name: Option<String> = if kind == CALENDAR_LABEL {
+                let function = declaration.getattr("function")?;
+                (!function.is_none())
+                    .then(|| function.getattr("__name__")?.extract())
+                    .transpose()?
+            } else {
+                Some(declaration.getattr("name")?.extract()?)
+            };
+            names.extend(name.map(|name| OrchestrationNameFact {
+                name,
+                kind,
+                path: path.clone(),
+            }));
+        }
+    }
+    Ok(names)
+}
+
+/// The declarations one declaration refers to: a group's jobs, a calendar's job, a sensor's job and run-event job.
+fn nested_declarations<'py>(
+    declaration: &Bound<'py, PyAny>,
+    kind: &str,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    Ok(match kind {
+        GROUP_LABEL => declaration
+            .getattr("jobs")?
+            .try_iter()?
+            .collect::<PyResult<Vec<_>>>()?,
+        CALENDAR_LABEL => vec![declaration.getattr("job")?],
+        SENSOR_LABEL => {
+            let condition = declaration.getattr("when")?;
+            let mut nested = vec![declaration.getattr("run")?];
+            if !condition.is_none()
+                && condition.getattr("kind")?.extract::<String>()? == RUN_EVENT_CONDITION
+            {
+                nested.push(condition.getattr("job")?);
+            }
+            nested
+        }
+        _ => Vec::new(),
+    })
 }

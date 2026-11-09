@@ -75,7 +75,7 @@ def test_given_explicit_backfill_bounds_when_running_and_rerunning_a_group_then_
             "sources/raw_orders.yml": "sources:\n  - name: raw_orders\n    description: Synthetic order windows.\n    schema: main\n    table: raw_orders\n",
             "orchestration/orders.py": (
                 "from sqlbuild.orchestration import job, job_group\n"
-                "orders = job('orders', description='Windowed orders.', select='orders', "
+                "orders = job('windowed_orders', description='Windowed orders.', select='orders', "
                 "settings={'start_cursor': '0', 'end_cursor': '1'})\n"
                 "annual_orders = job_group('annual_orders', description='Windowed group.', jobs=[orders])\n"
             ),

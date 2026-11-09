@@ -152,7 +152,7 @@ def test_given_test_names_when_selecting_then_exactly_those_tests_run(
             expected_output_fragments=(
                 "Project resource name 'orders' is declared as both model in models/orders.sql "
                 "and unit test in tests/unit/orders.sql",
-                "unit test, and scenario names must be globally unique",
+                "and calendar schedule names must be globally unique",
             ),
         ),
     ),

@@ -6,5 +6,7 @@ mod csv_header;
 mod helpers;
 #[path = "tests/test_types.rs"]
 mod test_types;
+#[path = "tests/test_validate_orchestration_names.rs"]
+mod validate_orchestration_names;
 #[path = "tests/test_validate_project_inputs.rs"]
 mod validate_project_inputs;

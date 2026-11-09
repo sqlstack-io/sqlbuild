@@ -233,9 +233,6 @@ pub(crate) fn compile_calendars(
                     "calendar {name} needs a description and a published job"
                 )));
             }
-            if definitions.triggers.contains_key(&name) {
-                return Err(PyValueError::new_err(format!("duplicate trigger {name}")));
-            }
             let schedule = calendar_times(calendar, &session, &by_name, start)?;
             let mut trigger = compile_trigger(calendar, &job_key, &description, schedule)?;
             trigger.starts_at.get_or_insert(start);
@@ -256,14 +253,7 @@ pub(crate) fn compile_sensors(
     } else {
         String::new()
     };
-    let mut names: BTreeSet<String> = BTreeSet::new();
     for sensor in authored {
-        if !names.insert(sensor.name.clone()) || definitions.triggers.contains_key(&sensor.name) {
-            return Err(PyValueError::new_err(format!(
-                "duplicate trigger {}",
-                sensor.name
-            )));
-        }
         if !sensor.targets.is_empty() && !sensor.targets.iter().any(|value| value == &input.target)
         {
             continue;

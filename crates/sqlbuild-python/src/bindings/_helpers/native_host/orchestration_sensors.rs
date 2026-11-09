@@ -35,7 +35,7 @@ pub(crate) fn evaluate_sensor(
     let authoring = py.import("sqlbuild.orchestration_declarations.models.authoring")?;
     let sensor_class = authoring.getattr("Sensor")?;
     let mut matches: Vec<Bound<'_, PyAny>> = Vec::new();
-    for declaration in discover_declarations(py, project_dir)? {
+    for (declaration, _) in discover_declarations(py, project_dir)? {
         if declaration.is_instance(&sensor_class)?
             && declaration.getattr("name")?.extract::<String>()? == *name
         {

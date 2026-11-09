@@ -3,7 +3,7 @@
 from sqlbuild.orchestration import job
 
 orders = job(
-    "orders",
+    "refresh_orders",
     description="Refresh orders.",
     select="orders",
     settings={"load_sources": False, "reload": True},

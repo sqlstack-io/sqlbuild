@@ -1,4 +1,4 @@
-//! Python's `_validate_unique_project_resource_names`: one namespace across resource kinds.
+//! One namespace across resource kinds, orchestration declarations included.
 
 use std::collections::{HashMap, HashSet};
 
@@ -16,8 +16,8 @@ pub(crate) fn validate_unique_project_resource_names(
             return Err(conflict(format!(
                 "Project resource name '{name}' is declared as both {existing_kind} in \
                  {existing_path} and {kind} in {path}; model, source, seed, function, loader, \
-                 task, asset, check, provider, hook, unit test, and scenario names must be \
-                 globally unique"
+                 task, asset, check, provider, hook, unit test, scenario, job, job group, sensor, \
+                 and calendar schedule names must be globally unique"
             )));
         }
         seen.insert(name.to_owned(), (kind.to_owned(), path.to_owned()));
@@ -68,6 +68,9 @@ pub(crate) fn validate_unique_project_resource_names(
             }
             declare(name, "unit test", &test.file.path)?;
         }
+    }
+    for declaration in &facts.orchestration {
+        declare(&declaration.name, declaration.kind, &declaration.path)?;
     }
     Ok(())
 }
