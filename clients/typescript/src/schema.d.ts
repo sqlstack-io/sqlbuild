@@ -2030,6 +2030,11 @@ export interface components {
             claim_id: string;
             request: components["schemas"]["RunRequest"];
         };
+        /**
+         * @description The `sqb` command a run executes; job and group runs always build.
+         * @enum {string}
+         */
+        RunCommand: "build" | "test" | "seed" | "audit" | "freshness";
         RunErrorText: {
             error_type?: string | null;
             invocation_id: string;
@@ -2162,6 +2167,7 @@ export interface components {
         };
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {
+            command?: components["schemas"]["RunCommand"];
             concurrency_groups: string[];
             image_id?: string | null;
             job_key?: string | null;
