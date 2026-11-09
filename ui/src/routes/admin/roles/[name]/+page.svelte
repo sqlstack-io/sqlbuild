@@ -77,7 +77,7 @@
 										inherit further than one built-in role.
 									</p>
 								{:else}
-									<p class="muted">Starts from nothing; only the additions below apply, on top of any built-in role a person also holds.</p>
+									<p class="muted">No built-in base.</p>
 								{/if}
 								{#if compare}
 									<table class="compare">

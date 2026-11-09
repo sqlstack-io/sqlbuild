@@ -87,7 +87,7 @@
 				{/if}
 				{#if t.declaration}
 					<section>
-						<h3>Code <span>read-only; change it in the project and deploy</span></h3>
+						<h3>Code</h3>
 						<CodePreview file="{t.declaration.sourceFile}:{t.declaration.line}" code={t.declaration.code} language="text" maxLines={20} />
 					</section>
 				{/if}
@@ -109,7 +109,7 @@
 				{#if isSchedule && t.upcoming}
 					<h3>Next runs</h3>
 					{#if t.state === 'paused'}
-						<p class="faint">Paused, so it isn't starting runs. When you turn it back on, it makes up missed times as set under “After downtime”.</p>
+						<p class="faint">Paused.</p>
 					{:else if t.upcoming.length}
 						{#each t.upcoming as due, i (due)}
 							<p class:faint={i > 0}>{formatStamp(due)} <span class="faint">{formatIn(due, app.now)}</span></p>
@@ -128,7 +128,6 @@
 						{#if t.calendar.nextRefreshAt}<div><dt>Next update</dt><dd title={formatStamp(t.calendar.nextRefreshAt)}>{Date.parse(t.calendar.nextRefreshAt) > app.now ? formatIn(t.calendar.nextRefreshAt, app.now) : `due ${formatAgo(t.calendar.nextRefreshAt, app.now)}`}</dd></div>{/if}
 						{#if t.calendar.lowHorizonWarningBelow}<div><dt>Warns when under</dt><dd>{t.calendar.lowHorizonWarningBelow}</dd></div>{/if}
 					</dl>
-					<p class="help">The calendar's code runs in the location after each deploy and on a regular refresh, and the dates it returns are saved. If they run out, the schedule stops starting runs.</p>
 				{/if}
 
 				<h3>Last run</h3>
@@ -149,7 +148,7 @@
 						</div>
 					{/each}
 				{:else}
-					<p class="faint">Never switched here: it's on or paused as the code says.</p>
+					<p class="faint">None.</p>
 				{/if}
 				{/if}
 			</aside>
@@ -218,9 +217,6 @@
 		font-size: 12px;
 		font-weight: 500;
 	}
-	h3 span {
-		font-weight: 400;
-	}
 	section h3,
 	.rail h3:first-child {
 		margin-top: 0;
@@ -255,12 +251,6 @@
 	}
 	p {
 		padding: 2px 0;
-	}
-	.help {
-		margin-top: 6px;
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		line-height: 1.5;
 	}
 	.dot {
 		display: inline-block;

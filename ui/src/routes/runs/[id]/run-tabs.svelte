@@ -39,8 +39,6 @@
 			Filtered: <b>{chipText}</b>
 			<button onclick={() => view.clearSelection()} aria-label="Clear the node filter"><XIcon size={12} /></button>
 		</span>
-	{:else}
-		<span class="hint">Click a node above to filter</span>
 	{/if}
 </div>
 
@@ -103,11 +101,6 @@
 	.chip button:hover {
 		background: var(--sb-hover);
 		color: var(--foreground);
-	}
-	.hint {
-		margin-left: 12px;
-		color: var(--sb-text-faint);
-		font-size: 12px;
 	}
 	.body {
 		min-height: 0;
