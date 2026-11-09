@@ -236,6 +236,20 @@ pub struct RunRecord {
     pub selection_json: BTreeSet<String>,
     pub node_counts_json: BTreeMap<String, i64>,
     pub last_event_storage_id: i64,
+    /// How a person narrowed this run of a job, as typed; `None` when it runs the whole job.
+    #[serde(
+        default,
+        alias = "authored_json",
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::authored_narrowing"
+    )]
+    pub narrowing: Option<RunNarrowing>,
+}
+
+/// The `sqb build` selectors one run of a job was narrowed with.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunNarrowing {
+    pub select: Vec<String>,
+    pub exclude: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

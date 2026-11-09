@@ -4,6 +4,7 @@ pub(in crate::runs) mod checks;
 pub(in crate::runs) mod claims;
 pub(crate) mod error_text;
 pub(in crate::runs) mod events;
+pub(crate) mod narrowing;
 pub(in crate::runs) mod nodes;
 pub(in crate::runs) mod output;
 pub(in crate::runs) mod projection;
