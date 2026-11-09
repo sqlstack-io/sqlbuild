@@ -483,6 +483,7 @@ export class MockOperate {
 		const user = this.#ctx.user();
 		const id = this.#newId();
 		if (job.kind === 'group') {
+			if (options.select?.length || options.exclude?.length) throw new ApiError('invalid control-plane data: a job group cannot be narrowed; narrow one of its jobs', 400);
 			const parent = this.#create({ id, origin: 'manual', jobKey: key, by: user, select: [], exclude: [], flags, nodes: [], priority: job.priority });
 			job.members.forEach((m, i) => {
 				const member = jobDef(m)!;
@@ -492,7 +493,13 @@ export class MockOperate {
 			this.#ctx.changes.emit('runs');
 			return this.#ctx.reply(this.#view(parent, scope));
 		}
-		const rec = this.#create({ id, origin: 'manual', jobKey: key, by: user, select: selectorTerms(job), exclude: job.exclude, flags, nodes: jobNodes(key), priority: job.priority });
+		const named = (names: string[] | undefined, node: string) => !!names?.includes(node.slice(node.indexOf(':') + 1));
+		const narrowed = !!(options.select?.length || options.exclude?.length);
+		if (narrowed) this.#need('view');
+		const nodes = jobNodes(key).filter((n) => (!options.select?.length || named(options.select, n)) && !named(options.exclude, n));
+		if (narrowed && !nodes.length) throw new ApiError("invalid control-plane data: the selectors leave none of the job's nodes", 400);
+		const narrowing = narrowed ? { select: options.select ?? [], exclude: options.exclude ?? [] } : null;
+		const rec = this.#create({ id, origin: 'manual', jobKey: key, narrowing, by: user, select: selectorTerms(job), exclude: job.exclude, flags, nodes, priority: job.priority });
 		this.#ctx.changes.emit('runs');
 		return this.#ctx.reply(this.#view(rec, scope));
 	}
@@ -880,6 +887,7 @@ export class MockOperate {
 		id: string;
 		origin: Run['origin'];
 		jobKey: string | null;
+		narrowing?: Run['narrowing'];
 		by: Principal;
 		select: string[];
 		exclude: string[];
@@ -909,6 +917,7 @@ export class MockOperate {
 				tickScheduledFor: null,
 				runKey: null,
 				rerunOfRunId: spec.rerunOf ?? null,
+				narrowing: spec.narrowing ?? null,
 				requestedBy: spec.by,
 				priority: spec.priority,
 				rewriteHistory: Object.keys(spec.flags).some((f) => flagSpec(spec.verb ?? 'build', f)?.requires === 'run.rewrite_history'),

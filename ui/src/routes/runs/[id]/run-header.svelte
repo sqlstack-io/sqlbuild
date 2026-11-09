@@ -2,7 +2,7 @@
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import RunStatusPill from '$lib/components/operate/run-status-pill.svelte';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
-	import { shortRunId } from '$lib/operate/labels';
+	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { runKindLabel, runOriginLabel, runStatusTone } from '$lib/status';
 	import RerunButton from './rerun-button.svelte';
@@ -33,6 +33,9 @@
 				<RunStatusPill status={run.status} size="md" />
 				<!-- The kind is a fact about this run; the origin opens what started it, when that has a page. -->
 				<span class="chip" title="{runKindLabel[run.kind]} run">{runKindLabel[run.kind].toLowerCase()}</span>
+				{#if run.narrowing}
+					<span class="chip part" title="Ran part of {run.jobKey}: sqb build {narrowingText(run.narrowing)}" data-testid="run-narrowing">part · <code>{narrowingText(run.narrowing)}</code></span>
+				{/if}
 				{#if run.triggerId}
 					<a class="chip link" href="/triggers/{run.triggerId}" title="Open the {runOriginLabel[run.origin].toLowerCase()} that started this run">{runOriginLabel[run.origin].toLowerCase()}{#if run.triggerName}: {run.triggerName}{/if}</a>
 				{:else if run.rerunOfRunId}
@@ -164,6 +167,15 @@
 		color: var(--muted-foreground);
 		font-size: 12px;
 		line-height: 20px;
+	}
+	.chip.part {
+		max-width: 420px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.chip.part code {
+		font-size: 11.5px;
 	}
 	.chip.link:hover {
 		color: var(--foreground);

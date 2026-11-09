@@ -249,3 +249,8 @@ export function clockTime(iso: string): string {
 	const pad = (n: number, w = 2) => String(n).padStart(w, '0');
 	return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
 }
+
+/** The selectors a run of part of a job was narrowed with, as `sqb build` options. */
+export function narrowingText(narrowing: { select: string[]; exclude: string[] }): string {
+	return [narrowing.select.length ? `--select ${narrowing.select.join(' ')}` : '', narrowing.exclude.length ? `--exclude ${narrowing.exclude.join(' ')}` : ''].filter(Boolean).join(' ');
+}

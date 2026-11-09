@@ -10,7 +10,7 @@
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { formatCost, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
+	import { formatCost, narrowingText, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import LaunchForm from './launch-form.svelte';
 
@@ -42,7 +42,7 @@
 	const canToggle = $derived(app.can('trigger.toggle'));
 	let launchOpen = $state(false);
 	let tab = $state<'overview' | 'runs' | 'code'>('overview');
-	// Nodes picked in the graph, by catalog key; running them starts an ad-hoc run of just those.
+	// Nodes picked in the graph, by catalog key. A job runs with or without them; a group's pick runs as an ad-hoc command.
 	let picked = $state<string[]>([]);
 	let graph = $state<{ clear: () => void }>();
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
@@ -72,7 +72,11 @@
 </script>
 
 <AppTopbar title="Jobs">
-	{#if picked.length && canRunPicked}
+	{#if picked.length && def?.kind === 'job'}
+		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
+		<GatedButton requires="job.run" variant="outline" onclick={() => goto(planHref([], 'build', { job: name, exclude: picked }))}>▷ Run all but {picked.length}</GatedButton>
+		<GatedButton requires="job.run" variant="default" onclick={() => goto(planHref(picked, 'build', { job: name }))}>▷ Run {picked.length} selected</GatedButton>
+	{:else if picked.length && canRunPicked}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
 		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(pickedNodes.map((n) => n.key)))}>▷ Run {picked.length} selected</GatedButton>
 	{:else}
@@ -204,7 +208,7 @@
 							{#each runs as r (r.id)}
 								<tr onclick={() => goto(`/runs/${r.id}`)}>
 									<td><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
-									<td><a href="/runs/{r.id}" class="mono" title={r.id}>{shortRunId(r.id)}</a></td>
+									<td><a href="/runs/{r.id}" class="mono" title={r.id}>{shortRunId(r.id)}</a>{#if r.narrowing}<span class="part" title="Ran part of the job: sqb build {narrowingText(r.narrowing)}">part</span>{/if}</td>
 									<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>
 									<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
 									<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
@@ -263,6 +267,11 @@
 	}
 	.chip i,
 	dd i,
+	.runs td .part {
+		margin-left: 8px;
+		color: var(--muted-foreground);
+		font-size: 11.5px;
+	}
 	.runs td i {
 		display: inline-block;
 		width: 7px;

@@ -815,8 +815,20 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	async function startJob(scope: Scope, key: string, options: JobLaunchOptions | undefined, fullRefresh: boolean): Promise<Run> {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const window = options?.window ? runWindowOf(options.window) : undefined;
-		const reason = fullRefresh ? 'Full refresh started from the web UI' : window ? 'Backfill started from the web UI' : 'Started from the web UI';
-		const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason, window, full_refresh: fullRefresh || undefined };
+		const narrowed = !!(options?.select?.length || options?.exclude?.length);
+		const reason = fullRefresh ? 'Full refresh started from the web UI' : window ? 'Backfill started from the web UI' : narrowed ? 'Part of the job started from the web UI' : 'Started from the web UI';
+		const body = {
+			run_id: crypto.randomUUID(),
+			location_id: locationId,
+			target,
+			job_key: key,
+			priority: 0,
+			reason,
+			window,
+			full_refresh: fullRefresh || undefined,
+			select: options?.select?.length ? options.select : undefined,
+			exclude: options?.exclude?.length ? options.exclude : undefined
+		};
 		const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
 		inFlight.clear();
 		if (response.status === 401) onUnauthorized();
