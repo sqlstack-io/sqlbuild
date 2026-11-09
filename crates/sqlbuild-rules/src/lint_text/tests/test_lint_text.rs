@@ -455,6 +455,42 @@ fn given_sql_files_when_formatting_bodies_then_sites_and_fixture_ceremony_surviv
             expected_fault_lines: vec![],
         },
         FormatBodiesTestCase {
+            description: "a table function's VALUES body stays a query",
+            dialect: "duckdb",
+            relative_parts: Some(vec![
+                "functions".to_string(),
+                "sql".to_string(),
+                "pairs.sql".to_string(),
+            ]),
+            contents: "FUNCTION (returns table (a INTEGER));\n\nVALUES (1), (2)\n",
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a table function's parenthesized query keeps its layout",
+            dialect: "snowflake",
+            relative_parts: Some(vec![
+                "functions".to_string(),
+                "sql".to_string(),
+                "nested_orders.sql".to_string(),
+            ]),
+            contents: "FUNCTION (returns table (a INTEGER));\n\n(\n  SELECT a\n  FROM t\n)\n",
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a scalar function body after a comment keeps its column",
+            dialect: "duckdb",
+            relative_parts: Some(vec![
+                "functions".to_string(),
+                "sql".to_string(),
+                "bounded_quantity.sql".to_string(),
+            ]),
+            contents: "FUNCTION (arguments (q INTEGER), returns INTEGER);\n\n-- note\nCASE WHEN q > 1 THEN q ELSE 0 END\n",
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
             description: "a quoted hook argument stands as a string",
             dialect: "snowflake",
             relative_parts: Some(vec![

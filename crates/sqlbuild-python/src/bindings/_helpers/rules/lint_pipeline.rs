@@ -15,6 +15,7 @@ use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::text::main::python_isspace::python_isspace;
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 use sqlbuild_core::text::main::python_strip::python_strip;
+use sqlbuild_rules::dsl_headers::main::declares_table_returns::declares_table_returns;
 use sqlbuild_rules::dsl_headers::main::measurement_body_ranges::measurement_body_ranges;
 use sqlbuild_rules::dsl_headers::main::scan_headers::scan_headers;
 use sqlbuild_rules::dsl_headers::main::sql_body_ranges::sql_body_ranges;
@@ -788,7 +789,9 @@ fn plan_bodies(
             ceremonial = ceremonial || form == SqlMacroForm::CteList;
             body.macro_form = Some(form);
         }
-    } else if headers.iter().any(|header| header.kind == FUNCTION_KIND) {
+    } else if headers.iter().any(|header| {
+        header.kind == FUNCTION_KIND && !declares_table_returns(&text[header.start..header.end])
+    }) {
         for body in &mut bodies {
             if sql_macro_body_form(&body.input) == SqlMacroForm::Expression {
                 body.macro_form = Some(SqlMacroForm::Expression);

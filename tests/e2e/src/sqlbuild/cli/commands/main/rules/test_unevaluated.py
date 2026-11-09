@@ -316,6 +316,23 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
             ),
         ),
         SnowflakeBodyShapeCase(
+            "table function body opening with a parenthesis",
+            (
+                (
+                    "functions/sql/open_orders.sql",
+                    "FUNCTION (\n  description 'Open orders.',\n"
+                    "  returns table (order_id INTEGER),\n"
+                    "  database warehouse,\n  schema analytics,\n);\n\n"
+                    "(\n  SELECT 1 AS order_id\n)\n",
+                ),
+                (
+                    "models/orders.sql",
+                    "MODEL (description 'Orders.', database warehouse, schema analytics);\n\n"
+                    'SELECT o.order_id\nFROM __table_fn("open_orders")() AS o\n',
+                ),
+            ),
+        ),
+        SnowflakeBodyShapeCase(
             "quoted hook argument where a string is required",
             (
                 (
