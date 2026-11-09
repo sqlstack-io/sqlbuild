@@ -79,7 +79,7 @@ export interface ApiClient extends PlatformApi {
 	listSnapshotChanges(scope: Scope, query?: { limit?: number }): Promise<SnapshotChange[]>;
 	// ---- end BUILD ----
 
-	// ---- OPERATE: runs, queue, run panel, jobs and triggers (types/operate.ts) ----
+	// ---- OPERATE: runs, queue, plan page, jobs and triggers (types/operate.ts) ----
 	listRuns(scope: Scope, query?: RunListQuery): Promise<Run[]>;
 	/** One page of the runs list, newest first, with the facts each row's status line needs. */
 	listRunRows(scope: Scope, query?: RunRowQuery): Promise<RunRowPage>;

@@ -12,7 +12,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
-	import RunPanel from '$lib/run/run-panel.svelte';
+	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -77,15 +77,13 @@
 
 	const filteredRunnable = $derived(filtered.filter((n) => n.kind !== 'source').map((n) => n.key));
 	const narrowed = $derived(filtered.length !== all.length);
-	let runOpen = $state(false);
 </script>
 
 <AppTopbar title="Catalog">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
-	{#if canRun}<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Execute{narrowed ? ` ${filteredRunnable.length}` : ''}</GatedButton>{/if}
+	{#if canRun}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(narrowed ? filteredRunnable : []))}>▷ Execute{narrowed ? ` ${filteredRunnable.length}` : ''}</GatedButton>{/if}
 </AppTopbar>
 
-{#if canRun}<RunPanel bind:open={runOpen} selection={narrowed ? filteredRunnable : []} />{/if}
 
 <ListToolbar
 	bind:query

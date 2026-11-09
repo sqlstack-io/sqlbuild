@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
-	import RunPanel from '$lib/run/run-panel.svelte';
+	import { planHref } from '$lib/run/command';
 	import { createResource } from '$lib/state/resource.svelte';
 	import BulkBar from './bulk-bar.svelte';
 	import RunList from './run-list.svelte';
@@ -15,7 +16,6 @@
 
 	const list = createRunsState();
 	const queue = createResource((client, scope) => (client.supports('listQueue') ? client.listQueue(scope) : Promise.resolve([])), ['runs']);
-	let panelOpen = $state(false);
 	let timelineQuery = $state('');
 
 	const p = $derived(list.params);
@@ -39,7 +39,7 @@
 
 <AppTopbar title="Runs">
 	{#if app.client.supports('launchAdhocRun')}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => (panelOpen = true)}>▷ New run</GatedButton>
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref())}>▷ New run</GatedButton>
 	{/if}
 </AppTopbar>
 
@@ -54,7 +54,6 @@
 	<RunList {list} onfilter={filterBy} {emptyText} />
 {/if}
 
-{#if app.client.supports('launchAdhocRun')}<RunPanel bind:open={panelOpen} />{/if}
 
 <style>
 	.timeline-page {

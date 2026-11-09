@@ -2,21 +2,21 @@
 	import '@xyflow/svelte/dist/style.css';
 	import { Background, Controls, SvelteFlow, type Edge, type Node } from '@xyflow/svelte';
 	import { tick, untrack } from 'svelte';
-	import type { CatalogNode, JobDetail, RunRef } from '$lib/api';
+	import type { CatalogNode, JobGroupMember } from '$lib/api';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { jobGraph, layoutJobGraph, type JobBox } from '$lib/lineage/job-graph';
 	import JobBoxNode from './job-box-node.svelte';
 
-	// The job's nodes and the lineage between them; a group draws each member job as a box around its nodes.
+	// Nodes and the lineage between them; each box, such as a group's member job, is drawn around its nodes.
 	// Clicking a node selects it; Shift, Ctrl or Cmd adds to the selection.
 	let {
-		job,
+		keys,
 		catalog,
-		memberNodes,
-		lastRuns,
+		boxes = [],
+		members = [],
 		onselect
-	}: { job: JobDetail; catalog: CatalogNode[]; memberNodes: Map<string, string[]>; lastRuns: Map<string, RunRef | null>; onselect: (keys: string[]) => void } = $props();
+	}: { keys: string[]; catalog: CatalogNode[]; boxes?: JobBox[]; members?: JobGroupMember[]; onselect: (keys: string[]) => void } = $props();
 
 	const nodeTypes = { asset: AssetNode, job: JobBoxNode };
 	let nodes = $state.raw<Node[]>([]);
@@ -32,8 +32,7 @@
 	}
 
 	$effect(() => {
-		const boxes: JobBox[] = job.kind === 'group' ? [...(job.groupMembers ?? [])].sort((a, b) => a.stage - b.stage).map((m) => ({ jobKey: m.jobKey, nodes: memberNodes.get(m.jobKey) ?? [], lastRun: lastRuns.get(m.jobKey) })) : [];
-		const next = jobGraph(job.resolvedNodes, catalog, boxes, job.groupMembers ?? []);
+		const next = jobGraph(keys, catalog, boxes, members);
 		const sig = next.nodes.map((n) => `${n.id}@${n.parentId ?? ''}`).join(',');
 		if (sig === shape) {
 			// Same shape: keep positions and sizes, refresh build states.

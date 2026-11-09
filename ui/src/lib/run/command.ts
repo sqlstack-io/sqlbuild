@@ -1,4 +1,4 @@
-// Splits the run panel's command line into the tokens the server checks, and
+// Splits the plan page's command line into the tokens the server checks, and
 // produces autocomplete suggestions from the command table and the snapshot's
 // nodes. The server resolves selectors and refuses flags; nothing here decides
 // whether a command may run. Pure: no side effects.
@@ -85,6 +85,12 @@ export function tokenAt(text: string, caret: number): TokenContext {
 	const previous = tokenize(before.slice(0, start)).reverse();
 	const lastFlag = previous.find((t) => t.startsWith('-')) ?? null;
 	return { start, end, text: text.slice(start, caret), previousFlag: lastFlag };
+}
+
+/** The plan page for a command, opened by every Run button before anything runs. */
+export function planHref(selection: string[] = [], verb: LaunchVerb = 'build'): string {
+	const command = `sqb ${verb}${selection.length ? ` --select ${selection.map(selectorOf).join(' ')}` : ''}`;
+	return `/plan?cmd=${encodeURIComponent(command)}`;
 }
 
 /** How `sqb` names a node in a selector: seeds and sources by kind, everything else by bare name. */

@@ -9,9 +9,9 @@
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine } from '$lib/build-area/labels';
-	import RunPanel from '$lib/run/run-panel.svelte';
+	import { planHref } from '$lib/run/command';
 	import { formatCost, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
-	import JobGraph from './job-graph.svelte';
+	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import LaunchForm from './launch-form.svelte';
 
 	let { name }: { name: string } = $props();
@@ -45,11 +45,16 @@
 	// Nodes picked in the graph, by catalog key; running them starts an ad-hoc run of just those.
 	let picked = $state<string[]>([]);
 	let graph = $state<{ clear: () => void }>();
-	let runOpen = $state(false);
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const pickedNodes = $derived(picked.map((k) => byKey.get(k)).filter((n) => !!n));
 	const canRunPicked = $derived(app.client.supports('launchAdhocRun'));
 	const latest = $derived(runs[0] ?? null);
+	// A group draws each member job, in run order, as a box around the nodes it builds.
+	const boxes = $derived(
+		def?.kind === 'group'
+			? [...(def.groupMembers ?? [])].sort((a, b) => a.stage - b.stage).map((m) => ({ jobKey: m.jobKey, nodes: members.data?.nodes.get(m.jobKey) ?? [], lastRun: members.data?.lastRuns.get(m.jobKey) }))
+			: []
+	);
 	let actionError = $state<string | null>(null);
 
 	async function toggleTrigger(t: Trigger) {
@@ -69,7 +74,7 @@
 <AppTopbar title="Jobs">
 	{#if picked.length && canRunPicked}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Run {picked.length} selected</GatedButton>
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(pickedNodes.map((n) => n.key)))}>▷ Run {picked.length} selected</GatedButton>
 	{:else}
 		<div class="relative">
 			<GatedButton
@@ -83,7 +88,6 @@
 		</div>
 	{/if}
 </AppTopbar>
-{#if canRunPicked}<RunPanel bind:open={runOpen} selection={pickedNodes.map((n) => n.key)} />{/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
@@ -129,7 +133,7 @@
 			<div class="flex min-h-0 flex-1">
 				<div class="canvas">
 					{#if catalog.data && (def.kind !== 'group' || members.data)}
-						<JobGraph bind:this={graph} job={def} catalog={catalog.data} memberNodes={members.data?.nodes ?? new Map()} lastRuns={members.data?.lastRuns ?? new Map()} onselect={(keys) => (picked = keys)} />
+						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} {boxes} members={def.groupMembers ?? []} onselect={(keys) => (picked = keys)} />
 					{:else}
 						<p class="faint graph-wait">{catalog.error ?? members.error ?? (catalog.slow || members.slow ? 'Loading…' : '')}</p>
 					{/if}
