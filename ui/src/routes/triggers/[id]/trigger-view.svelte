@@ -46,7 +46,7 @@
 
 <AppTopbar title="Triggers">
 	{#if t}
-		<input class="reason" bind:value={reason} placeholder="Why? (saved in the history)" aria-label="Reason for the change" />
+		{#if app.can('trigger.toggle')}<input class="reason" bind:value={reason} placeholder="Why? (saved in the history)" aria-label="Reason for the change" />{/if}
 		{#if t.state !== t.defaultState}
 			<GatedButton requires="trigger.toggle" {busy} onclick={resetDefault}>Set back to the code ({t.defaultState === 'running' ? 'on' : 'paused'})</GatedButton>
 		{/if}
