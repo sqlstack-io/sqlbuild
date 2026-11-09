@@ -282,8 +282,7 @@ fn semantic_uses(
     };
     let uses: Bound<'_, PyAny> = build_direct_semantic_uses(
         &native_field(graph, "project")?,
-        adapter
-            .call_method0("sql_analysis_dialect")?
+        native_field(adapter, "sql_analysis_dialect_name")?
             .extract::<Option<String>>()?
             .as_deref(),
         PyFrozenSet::new(py, model_names)?.as_any(),
@@ -425,7 +424,7 @@ fn column_trace(
         ));
     }
     let candidates: ColumnCandidates = column_candidates(index, &key, (direction, depth));
-    let dialect: Bound<'_, PyAny> = adapter.call_method0("sql_analysis_dialect")?;
+    let dialect: Bound<'_, PyAny> = native_field(adapter, "sql_analysis_dialect_name")?;
     let lineage: Bound<'_, PyAny> = column_lineage(py, (graph, &dialect, mode), &candidates)?;
     if lineage.is_none() {
         return Err(compiled_graph_error(

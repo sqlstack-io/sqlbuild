@@ -200,7 +200,7 @@ fn analyzed<'py>(
     };
     let (discovered, discover_ms): (Bound<'py, PyAny>, u64) = driver.discover()?;
     let adapter: Bound<'py, PyAny> = driver.adapter(&discovered)?;
-    let dialect: Bound<'py, PyAny> = adapter.call_method0("sql_analysis_dialect")?;
+    let dialect: Bound<'py, PyAny> = native_field(&adapter, "sql_analysis_dialect_name")?;
     let lint_dialect: Bound<'py, PyAny> = if dialect.is_truthy()? {
         dialect.clone()
     } else {

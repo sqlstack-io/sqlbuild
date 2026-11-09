@@ -408,7 +408,7 @@ fn validate(
         let affected: BTreeMap<String, Vec<String>> = affected_columns(
             (
                 &native_field(graph, "project")?,
-                &adapter.call_method0("sql_analysis_dialect")?,
+                &native_field(adapter, "sql_analysis_dialect_name")?,
             ),
             (&changed, &affected_set),
             &comparisons.by_node,

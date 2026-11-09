@@ -295,8 +295,11 @@ pub(crate) fn evaluate_model_contracts<'py>(
     adapter_default: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let settings: Bound<'py, PyAny> = native_field(project, "settings")?;
-    let mode: String = settings.getattr("column_contract_mode")?.str()?.extract()?;
-    let explicit_promotion: Option<String> = settings.getattr("table_promotion_mode")?.extract()?;
+    let mode: String = native_field(&settings, "column_contract_mode")?
+        .str()?
+        .extract()?;
+    let explicit_promotion: Option<String> =
+        native_field(&settings, "table_promotion_mode")?.extract()?;
     let promotion: Option<String> = match explicit_promotion {
         Some(explicit) => Some(explicit),
         None => adapter_default
@@ -355,9 +358,8 @@ pub(crate) fn promotion_conflict_diagnostics<'py>(
     adapter_default: &Bound<'py, PyAny>,
     settings_file: String,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let explicit_mode: Option<String> = native_field(project, "settings")?
-        .getattr("table_promotion_mode")?
-        .extract()?;
+    let explicit_mode: Option<String> =
+        native_field(&native_field(project, "settings")?, "table_promotion_mode")?.extract()?;
     let native: Bound<'py, PyAny> = native_project(project)?;
     let native: PyRef<'py, NativeCompiledProject> = native.extract()?;
     let conflicts: Vec<ConflictRow> = project_promotion_conflicts(

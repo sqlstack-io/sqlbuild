@@ -21,6 +21,7 @@ use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::discovery::hook_entries::hook_entries;
+use crate::bindings::_helpers::microbatches::conversion::timestamp;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_identity::hashing::{
     baselined_function_definition_hash, function_definition_hash,
@@ -313,9 +314,7 @@ fn latest_recorded_function_hashes(
     for item in mapping_items(&native_field(recorded, "models")?)?.try_iter()? {
         let (_, fingerprint): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
         rows.push((
-            native_field(&fingerprint, "ts")?
-                .call_method0("timestamp")?
-                .extract()?,
+            timestamp(&native_field(&fingerprint, "ts")?)?,
             native_field(&fingerprint, "metadata_json")?.extract()?,
         ));
     }
