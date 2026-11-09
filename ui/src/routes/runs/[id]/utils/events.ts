@@ -62,7 +62,7 @@ export function eventSummary(e: RunEvent): string {
 	}
 }
 
-/** One row of the run log: an event, or a line the run printed. */
+/** One row of the run log: an event, or a block the run printed. */
 export type LogEntry = {
 	id: string;
 	runId: string;
@@ -75,31 +75,64 @@ export type LogEntry = {
 	title: string;
 	tone: string;
 	stream: 'stdout' | 'stderr' | null;
-	/** Query events link to their statement's SQL. */
+	/** Query rows link to their statement's SQL. */
 	statementId: string | null;
+	/** A node's finished queries, folded under its outcome row. */
+	queries: LogEntry[];
+	/** Shown even with printed output hidden: a failing run's last printed block, which ends with its failures. */
+	pinned: boolean;
 };
 
+const QUERY_DONE = new Set(['statement_completed', 'statement_failed']);
+const NODE_ENDS = new Set(['resource_attempt_completed', 'resource_attempt_failed', 'resource_attempt_skipped']);
+
+function entryOf(e: RunEvent): LogEntry {
+	const text = eventSummary(e);
+	return {
+		id: e.id,
+		runId: e.runId,
+		at: e.occurredAt,
+		nodeKey: e.nodeKey,
+		level: e.level,
+		category: eventCategory(e),
+		text,
+		title: `${e.producer === 'scheduler' ? 'Scheduler' : 'sqb'} event ${e.type}${e.message !== text ? `\n${e.message}` : ''}`,
+		tone: eventTone(e),
+		stream: null,
+		statementId: e.statementId,
+		queries: [],
+		pinned: false
+	};
+}
+
 /**
- * Events and printed lines in one time-ordered log. Printed lines count as info, so the level
- * filter applies to events; stderr is told apart by its stream, since sqb prints progress there.
+ * The run's story in time order: run and node milestones, checks, failures, and printed output.
+ * A node's finished queries fold under its outcome row, and its start row goes once it has one;
+ * a failed query keeps its own row. Run-level bookkeeping queries and query progress are left to
+ * the Statements tab.
  */
 export function logEntries(events: readonly RunEvent[], output: readonly (RunOutputLine & { runId: string })[]): LogEntry[] {
-	const fromEvents = events.map((e): LogEntry => {
-		const text = eventSummary(e);
-		return {
-			id: e.id,
-			runId: e.runId,
-			at: e.occurredAt,
-			nodeKey: e.nodeKey,
-			level: e.level,
-			category: eventCategory(e),
-			text,
-			title: `${e.producer === 'scheduler' ? 'Scheduler' : 'sqb'} event ${e.type}${e.message !== text ? `\n${e.message}` : ''}`,
-			tone: eventTone(e),
-			stream: null,
-			statementId: e.statementId
-		};
+	const nodeOf = (e: RunEvent) => `${e.runId}|${e.nodeKey}`;
+	const queries = new Map<string, LogEntry[]>();
+	const ended = new Set<string>();
+	for (const e of events) {
+		if (!e.nodeKey) continue;
+		if (QUERY_DONE.has(e.type)) queries.set(nodeOf(e), [...(queries.get(nodeOf(e)) ?? []), entryOf(e)]);
+		if (NODE_ENDS.has(e.type)) ended.add(nodeOf(e));
+	}
+
+	const fromEvents = events.flatMap((e): LogEntry[] => {
+		if (e.type.startsWith('statement_')) return e.type === 'statement_failed' ? [entryOf(e)] : [];
+		if (e.type === 'resource_attempt_started' && ended.has(nodeOf(e))) return [];
+		const entry = entryOf(e);
+		if (!NODE_ENDS.has(e.type)) return [entry];
+		const text = e.type === 'resource_attempt_completed' ? ['Finished', entry.text].filter(Boolean).join(' · ') : entry.text;
+		return [{ ...entry, text, queries: queries.get(nodeOf(e)) ?? [] }];
 	});
+
+	const failing = new Set(fromEvents.filter((e) => e.level === 'error').map((e) => e.runId));
+	const lastStderr = new Map<string, number>();
+	output.forEach((l, i) => l.stream === 'stderr' && failing.has(l.runId) && lastStderr.set(l.runId, i));
 	const fromOutput = output.map(
 		(l, i): LogEntry => ({
 			id: `out-${l.runId}-${i}`,
@@ -112,7 +145,9 @@ export function logEntries(events: readonly RunEvent[], output: readonly (RunOut
 			title: l.stream,
 			tone: l.stream === 'stderr' ? 'var(--sb-warning)' : 'var(--sb-text-faint)',
 			stream: l.stream,
-			statementId: null
+			statementId: null,
+			queries: [],
+			pinned: lastStderr.get(l.runId) === i
 		})
 	);
 	// A stable sort keeps each source's own order for equal times.

@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
 import { ApiError } from './client';
-import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind } from './types/operate';
+import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind, TriggerStateEvent, TriggerStateEventKind } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -95,7 +95,28 @@ function upcomingOf(d: Wire['TriggerDeclaration'], nextDueAt: string | null): st
 }
 
 /** A trigger's detail; parts with no server source are null and their widgets stay hidden. */
-export function triggerDetailOf(trigger: Trigger, wire: Wire['TriggerRecord'], ticks: Tick[]): TriggerDetail {
+const CHANGE_KINDS: Record<Wire['TriggerChange']['kind'], TriggerStateEventKind> = {
+	enable: 'enabled',
+	pause: 'paused',
+	reset_default: 'reset_to_default',
+	set_cursor: 'cursor_set',
+	reset_cursor: 'cursor_reset'
+};
+
+/** One operator change, newest first as the server lists them; a person shows by name. */
+export function toTriggerStateEvent(wire: Wire['PersonTriggerChange']): TriggerStateEvent {
+	const name = wire.actor_name ?? wire.actor;
+	return {
+		id: wire.event_id,
+		at: wire.occurred_at,
+		kind: CHANGE_KINDS[wire.change.kind],
+		actor: { kind: wire.actor_name ? 'user' : 'system', name, displayName: name },
+		reason: wire.reason.trim() || null,
+		value: wire.change.kind === 'set_cursor' ? wire.change.time : null
+	};
+}
+
+export function triggerDetailOf(trigger: Trigger, wire: Wire['TriggerRecord'], ticks: Tick[], history: TriggerStateEvent[]): TriggerDetail {
 	const d = wire.definition_json;
 	const calendar = isSchedule(d) && d.schedule.kind === 'calendar' ? d.schedule : null;
 	const stored = calendar ? calendar.times.map(Date.parse) : [];
@@ -129,7 +150,7 @@ export function triggerDetailOf(trigger: Trigger, wire: Wire['TriggerRecord'], t
 		ticks,
 		evaluations: null,
 		runRequests: null,
-		stateHistory: null
+		stateHistory: history
 	};
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { cadenceOf, jobDetailOf, runWindowOf, toJob, toTick, toTrigger, triggerDetailOf, triggerKindOf } from './http-jobs';
+import { cadenceOf, jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf, triggerKindOf } from './http-jobs';
 import type { Run } from './types/operate';
 
 type W = components['schemas'];
@@ -49,10 +49,10 @@ describe('trigger mapping', () => {
 	it('reports lateness from evaluation time and hides sensor parts the server lacks', () => {
 		const tick = toTick({ tick_id: 'k1', trigger_id: 't-daily', epoch: 1, scheduled_for: '2026-11-07T06:00:00Z', evaluated_at: '2026-11-07T06:02:30Z', outcome: 'requested', run_id: 'r-new' });
 		expect(tick.lateBySeconds).toBe(150);
-		const detail = triggerDetailOf(toTrigger(onInventory, [], tick), onInventory, [tick]);
+		const detail = triggerDetailOf(toTrigger(onInventory, [], tick), onInventory, [tick], []);
 		expect(detail.sensor).toMatchObject({ minimumIntervalSeconds: 60, cursorKnown: false });
-		expect([detail.declaration, detail.upcoming, detail.evaluations, detail.stateHistory]).toEqual([null, null, null, null]);
-		expect(triggerDetailOf(toTrigger(daily, [], null), daily, []).sensor).toBeNull();
+		expect([detail.declaration, detail.upcoming, detail.evaluations, detail.stateHistory]).toEqual([null, null, null, []]);
+		expect(triggerDetailOf(toTrigger(daily, [], null), daily, [], []).sensor).toBeNull();
 	});
 });
 
@@ -125,7 +125,7 @@ describe('schedule due times', () => {
 		...trigger('t-cal', 'business_days', 'orders', { description: 'Business days', job_key: 'orders', schedule: { kind: 'calendar', times, refresh_at: '2026-11-08T00:00:00Z' } }),
 		next_due_at: nextDueAt
 	});
-	const detailOf = (wire: W['TriggerRecord']) => triggerDetailOf(toTrigger(wire, [], null), wire, []);
+	const detailOf = (wire: W['TriggerRecord']) => triggerDetailOf(toTrigger(wire, [], null), wire, [], []);
 
 	it('lists a calendar from the next due time on, in time order, with the last stored time and next refresh', () => {
 		const detail = detailOf(calendar('2026-11-07T09:00:00Z'));
@@ -144,5 +144,30 @@ describe('schedule due times', () => {
 
 	it('has no due times for a sensor', () => {
 		expect(detailOf(onInventory).upcoming).toBeNull();
+	});
+});
+
+describe('trigger on/off history', () => {
+	it('names a person, keeps a system actor, carries a set cursor and drops a blank reason', () => {
+		const change = (extra: Partial<W['PersonTriggerChange']>): W['PersonTriggerChange'] => ({
+			event_id: 'e1',
+			change: { kind: 'pause' },
+			actor: 'principal:0193',
+			actor_name: 'ada-admin',
+			reason: 'Hold for the warehouse upgrade',
+			occurred_at: '2026-11-09T08:00:00Z',
+			snapshot_id: 's1',
+			...extra
+		});
+		expect(toTriggerStateEvent(change({}))).toEqual({
+			id: 'e1',
+			at: '2026-11-09T08:00:00Z',
+			kind: 'paused',
+			actor: { kind: 'user', name: 'ada-admin', displayName: 'ada-admin' },
+			reason: 'Hold for the warehouse upgrade',
+			value: null
+		});
+		const cursor = toTriggerStateEvent(change({ change: { kind: 'set_cursor', time: '2026-11-01T00:00:00Z' }, actor: 'local-operator', actor_name: null, reason: '  ' }));
+		expect([cursor.kind, cursor.value, cursor.actor.kind, cursor.actor.name, cursor.reason]).toEqual(['cursor_set', '2026-11-01T00:00:00Z', 'system', 'local-operator', null]);
 	});
 });

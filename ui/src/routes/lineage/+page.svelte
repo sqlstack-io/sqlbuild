@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import '@xyflow/svelte/dist/style.css';
 	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
@@ -21,7 +22,7 @@
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
-	import RunPanel from '$lib/run/run-panel.svelte';
+	import { planHref } from '$lib/run/command';
 	import { page } from '$app/state';
 	import { scaleGraph } from '$lib/mock/scale-graph';
 	import { layoutDag } from '$lib/lineage/graph-layout';
@@ -41,7 +42,6 @@
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { catalogGraph, cardData } from '$lib/lineage/catalog-graph';
 
-	let runOpen = $state(false);
 	let browserOpen = $state(false);
 	let inspectorOpen = $state(true);
 	let neighbourhoodOnly = $state(false);
@@ -477,10 +477,9 @@
 
 <AppTopbar title="Lineage">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
-	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>{/if}
+	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(runSelection))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>{/if}
 </AppTopbar>
 
-<RunPanel bind:open={runOpen} selection={runSelection} />
 
 <!-- filter toolbar -->
 <div class="lineage-page">

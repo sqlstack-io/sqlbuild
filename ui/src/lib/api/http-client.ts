@@ -11,7 +11,7 @@ import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
 import { toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
-import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
+import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, groupRunNodes, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
@@ -569,8 +569,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const [wires, runs] = await Promise.all([listedTriggers(scope), recentRuns(scope)]);
 			const wire = wires.find((t) => t.trigger_id === id);
 			if (!wire) return null;
-			const ticks = (await ticksOf(scope, id, 100)).map(toTick);
-			return triggerDetailOf(toTrigger(wire, runs, ticks[0] ?? null), wire, ticks);
+			const [ticks, changes] = await Promise.all([ticksOf(scope, id, 100).then((t) => t.map(toTick)), triggerChangesOf(scope, id)]);
+			return triggerDetailOf(toTrigger(wire, runs, ticks[0] ?? null), wire, ticks, changes.map(toTriggerStateEvent));
 		},
 		async setTriggerStates(scope: Scope, ids: string[], state: TriggerState, reason?: string | null): Promise<Trigger[]> {
 			for (const [done, id] of ids.entries()) {
@@ -638,6 +638,16 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks', {
 			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function triggerChangesOf(scope: Scope, triggerId: string) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/changes', {
+			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit: 100 } }
 		});
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);

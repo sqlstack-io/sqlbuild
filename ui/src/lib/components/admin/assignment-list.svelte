@@ -131,7 +131,6 @@
 				{#each choices as r (r.name)}<option value={r.name}>{r.name} · {roleSummary(r)}</option>{/each}
 			</select>
 			<GatedButton requires="role.assign" variant="default" busy={busy === 'add'} disabled={!newRole} title="Pick a role" onclick={add}>Give role</GatedButton>
-			<span class="faint">Admin is given for every location; custom roles for the location that defines them.</span>
 		</div>
 	{/if}
 	{#if error}<p class="err">{error}</p>{/if}
@@ -172,10 +171,6 @@
 		background: var(--background);
 		color: var(--foreground);
 		font-size: 12.5px;
-	}
-	.faint {
-		color: var(--sb-text-faint);
-		font-size: 12px;
 	}
 	.err {
 		margin-top: 8px;

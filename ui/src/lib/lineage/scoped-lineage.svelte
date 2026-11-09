@@ -23,7 +23,7 @@
 		focal: string;
 		graphNodes: GraphNode[];
 		graphEdges: [string, string][];
-		/** Opens the run panel on the selection. */
+		/** Opens the plan page on the selection. */
 		onExecute?: (selection: string[]) => void;
 	} = $props();
 

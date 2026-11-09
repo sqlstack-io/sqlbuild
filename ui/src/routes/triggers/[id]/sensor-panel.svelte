@@ -44,7 +44,7 @@
 		{sensor.minimumIntervalSeconds ? `Checks at most every ${sensor.minimumIntervalSeconds}s` : 'Checks each time something relevant happens'}{sensor.timeoutSeconds ? ` · a check is stopped if it takes over ${sensor.timeoutSeconds}s` : ''}
 	</p>
 	{#if trigger.kind === 'platform_sensor'}
-		<p class="faint">Reacts to problems such as failed deploys or late schedules. <a href="/locations/{app.locationId}#problems">See the problems and how it handled them on the location page</a>.</p>
+		<p class="faint"><a href="/locations/{app.locationId}#problems">Problems it handled ↗</a></p>
 	{/if}
 	{#if changed}
 		<p class="warn" title="Fingerprint {sensor.lastEvaluatedFingerprint} → {sensor.currentFingerprint}">Its code changed since it last checked. The next check uses the new code.</p>
@@ -57,8 +57,6 @@
 		{#if sensor.cursorKnown}
 			<code>{sensor.cursor ?? '(the start: nothing handled yet)'}</code>
 			{#if sensor.cursorUpdatedAt}<span class="faint" title={formatStamp(sensor.cursorUpdatedAt)}>updated {formatAgo(sensor.cursorUpdatedAt, app.now)}</span>{/if}
-		{:else}
-			<span class="faint">Starting over makes the next check look at everything again.</span>
 		{/if}
 		<GatedButton requires="sensor.reset_cursor" size="xs" disabled={sensor.cursorKnown && sensor.cursor === null} reason="It's already at the start" onclick={() => (confirmReset = !confirmReset)}>Start over</GatedButton>
 	</div>
@@ -119,7 +117,6 @@
 				{/each}
 			</tbody>
 		</table>
-		<p class="faint small">One run per run key: the same key never starts a second run.</p>
 	{:else}
 		<p class="faint">{trigger.jobKey ? 'It hasn’t started any runs yet.' : 'This sensor only runs its own code; it doesn’t start runs.'}</p>
 	{/if}
@@ -147,10 +144,6 @@
 	}
 	.faint {
 		color: var(--muted-foreground);
-	}
-	.small {
-		margin-top: 6px;
-		font-size: 11.5px;
 	}
 	.warn {
 		padding: 6px 10px;
