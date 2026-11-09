@@ -105,6 +105,7 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                         reason: "Exercise wide execution evidence".into(),
                         priority: 10,
                         window: None,
+                        full_refresh: false,
                     },
                 )
                 .await

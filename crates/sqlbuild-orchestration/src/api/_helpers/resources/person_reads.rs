@@ -1,4 +1,4 @@
-//! Person reads of run nodes and their errors, node run history, catalog nodes, jobs, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
+//! Person reads of run nodes and their errors, node run history, catalog nodes, jobs and one job's declaration, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -10,7 +10,8 @@ use crate::api::models::{ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQue
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
-use crate::declarations::models::{JobRecord, PersonTriggerRecord};
+use crate::declarations::main::read_person_job::read_person_job;
+use crate::declarations::models::{JobDetailRecord, JobRecord, PersonTriggerRecord};
 use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::read_person_problems::read_person_problems;
 use crate::platform::models::{LocationHealthObservation, PlatformProblems};
@@ -235,6 +236,29 @@ pub(crate) async fn run_output(
     .await?
     .map(Json)
     .ok_or_else(|| not_found("run not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/jobs/{job_key}", operation_id = "readPersonJob",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("job_key" = String, Path)),
+    responses((status = 200, body = JobDetailRecord), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody, description = "Needs view on every current node of the target"),
+        (status = 404, description = "No published job by that name")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn job(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    Path((location_id, target, job_key)): Path<(Uuid, String, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<JobDetailRecord>, ApiError> {
+    read_person_job(
+        &store,
+        (&context, principal),
+        (location_id, &target, &job_key),
+        default_role,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("job not found"))
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/jobs", operation_id = "listPersonJobs",

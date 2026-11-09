@@ -169,6 +169,7 @@ pub(crate) async fn finish_run(
             reason: "Exercise terminal sensor scope".into(),
             priority: 10,
             window: None,
+            full_refresh: false,
         },
     )
     .await

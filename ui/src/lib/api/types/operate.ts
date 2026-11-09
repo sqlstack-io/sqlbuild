@@ -536,14 +536,14 @@ export type ConcurrencyGroup = {
 
 export type JobGroupMember = {
 	jobKey: string;
-	/** Jobs this member waits for: lineage-derived plus declared `after`. */
-	upstream: { jobKey: string; source: 'lineage' | 'after' }[];
+	/** Jobs this member waits for: lineage-derived plus declared `after`; null where the cause isn't reported. */
+	upstream: { jobKey: string; source: 'lineage' | 'after' | null }[];
 	/** Position in the derived order; members in the same stage run side by side. */
 	stage: number;
 };
 
 export type JobDetail = Job & {
-	/** Null where the server doesn't report it, as for `settings`, `concurrency`, `groupMembers` and `memberOf`. */
+	/** Null where the server doesn't report it, as for `declaration`, `concurrency` and `targets`. */
 	declaration: { sourceFile: string; line: number; code: string } | null;
 	exclude: string[];
 	/** Settings are CLI flags validated against the command table. */

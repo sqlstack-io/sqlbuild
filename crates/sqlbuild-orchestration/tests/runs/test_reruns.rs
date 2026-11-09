@@ -81,6 +81,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     reason: "Build orders".into(),
                     priority: 1,
                     window: Some(RunWindow::Integer { start: -3, end: 11 }),
+                    full_refresh: false,
                 },
             )
             .await

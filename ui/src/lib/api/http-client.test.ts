@@ -436,9 +436,17 @@ describe('launchJob', () => {
 		expect(posts[0]).toMatchObject({ job_key: 'daily', target: 'development', window: { kind: 'integer', start: 1200, end: 1500 } });
 	});
 
-	it('leaves the window out of an ordinary run', async () => {
+	it('leaves the window and full refresh out of an ordinary run', async () => {
 		const { posts, client } = server(Response.json({ error: 'stop here' }, { status: 409 }));
 		await expect(client.launchJob(ORDERS, 'daily')).rejects.toThrow();
+		expect(posts[0]).not.toHaveProperty('window');
+		expect(posts[0]).not.toHaveProperty('full_refresh');
+	});
+
+	it("asks for a full refresh and shows the server's refusal as it comes", async () => {
+		const { posts, client } = server(Response.json({ error: 'run.rewrite_history is required; decision 7' }, { status: 403 }));
+		await expect(client.launchJobFromScratch(ORDERS, 'daily')).rejects.toMatchObject({ status: 403, message: expect.stringContaining('run.rewrite_history') });
+		expect(posts[0]).toMatchObject({ job_key: 'daily', full_refresh: true, reason: 'Full refresh started from the web UI' });
 		expect(posts[0]).not.toHaveProperty('window');
 	});
 
@@ -459,6 +467,22 @@ describe('launchJob', () => {
 			status: 400,
 			message: expect.stringContaining('backfill window start must not follow end')
 		});
+	});
+});
+
+describe('getJob', () => {
+	function server(job: Response) {
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => (new URL(request.url).pathname.endsWith('/jobs/nightly') ? job.clone() : Response.json([])))
+		);
+		return createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+	}
+
+	it('treats an unknown job as not found, and keeps a refusal as an error', async () => {
+		await expect(server(Response.json({ error: 'job not found' }, { status: 404 })).getJob(ORDERS, 'nightly')).resolves.toBeNull();
+		await expect(server(Response.json({ error: 'view is required; decision 3' }, { status: 403 })).getJob(ORDERS, 'nightly')).rejects.toMatchObject({ status: 403 });
 	});
 });
 

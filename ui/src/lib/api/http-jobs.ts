@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
 import { ApiError } from './client';
-import type { CursorWindow, Job, JobDetail, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind } from './types/operate';
+import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -129,18 +129,33 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 	};
 }
 
-export function jobDetailOf(job: Job, wire: Wire['JobRecord']): JobDetail {
+/** A setting as shown: text and flags as stored, anything else as JSON. */
+const shownSetting = (value: unknown): string | boolean => (typeof value === 'string' || typeof value === 'boolean' ? value : JSON.stringify(value));
+
+/** Members in the server's run order; a member's step follows the latest step it waits for. */
+function groupMembersOf(members: Wire['JobMember'][]): JobGroupMember[] {
+	const stageOf = new Map<string, number>();
+	return members.map((m) => {
+		const stage = Math.max(-1, ...m.waits_for.map((w) => stageOf.get(w) ?? -1)) + 1;
+		stageOf.set(m.job_key, stage);
+		// The server reports the waits, not whether lineage or `after` caused each one.
+		return { jobKey: m.job_key, upstream: m.waits_for.map((jobKey) => ({ jobKey, source: null })), stage };
+	});
+}
+
+export function jobDetailOf(job: Job, wire: Wire['JobDetailRecord']): JobDetail {
 	return {
 		...job,
+		members: wire.kind === 'group' ? wire.members.map((m) => m.job_key) : null,
 		declaration: null,
 		exclude: [],
-		settings: null,
+		settings: Object.fromEntries(Object.entries(wire.settings).map(([name, value]) => [name, shownSetting(value)])),
 		resolvedNodes: wire.selection,
 		concurrency: null,
 		targets: null,
-		groupMembers: null,
-		criticalNodes: [],
-		memberOf: null,
+		groupMembers: wire.kind === 'group' ? groupMembersOf(wire.members) : null,
+		criticalNodes: wire.critical_nodes,
+		memberOf: wire.member_of,
 		cursorType: null
 	};
 }

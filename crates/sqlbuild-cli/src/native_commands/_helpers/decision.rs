@@ -183,6 +183,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     reason,
                     priority,
                     window,
+                    full_refresh: false,
                 }));
             }
             if action.as_deref() == Some("cancel-run") {

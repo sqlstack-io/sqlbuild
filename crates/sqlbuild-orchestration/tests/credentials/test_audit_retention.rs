@@ -79,6 +79,7 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_rows_survive_and_retrie
                 reason: "Refresh orders".into(),
                 priority: 1,
                 window: None,
+                full_refresh: false,
             };
             assert!(
                 request_job_run(store, &context, &request)

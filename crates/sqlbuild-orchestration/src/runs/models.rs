@@ -174,6 +174,9 @@ pub struct JobRunRequest {
     pub priority: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<RunWindow>,
+    /// Rebuild every selected model from scratch; it rewrites history, as a window does.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub full_refresh: bool,
 }
 
 /// A retry derives its execution scope from a terminal run, never from caller selectors.

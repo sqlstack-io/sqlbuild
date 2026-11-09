@@ -2,6 +2,7 @@
 
 use crate::credentials::models::AuditContext;
 use crate::declarations::models::JobDefinition;
+use crate::runs::constants::FULL_REFRESH_SETTING;
 use crate::runs::models::{JobRunRequest, RunCommand, RunKind, RunOrigin, RunRequest};
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
@@ -25,12 +26,17 @@ pub(crate) async fn frozen_job_request(
     })?;
     let snapshot_id = serde_json::from_value(row["snapshot_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let definition: JobDefinition = serde_json::from_value(row["definition_json"].clone())
+    let mut definition: JobDefinition = serde_json::from_value(row["definition_json"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let image_id = serde_json::from_value(row["image_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let kind: RunKind = serde_json::from_value(row["kind"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
+    if request.full_refresh {
+        definition
+            .settings
+            .insert(FULL_REFRESH_SETTING.into(), serde_json::Value::Bool(true));
+    }
     let (transaction, write_set) =
         job_write_set(transaction, snapshot_id, &definition.selection).await?;
     Ok((

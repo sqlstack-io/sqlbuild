@@ -42,6 +42,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listJobs',
 	'getJob',
 	'launchJob',
+	'launchJobFromScratch',
 	'listTriggers',
 	'getTrigger',
 	'setTriggerStates',
@@ -331,21 +332,22 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return jobs.map((job) => toJob(job, triggers, runs));
 		},
 		async getJob(scope: Scope, key: string): Promise<JobDetail | null> {
-			const [jobs, triggers, runs] = await Promise.all([listedJobs(scope), triggersOf(scope), recentRuns(scope)]);
-			const wire = jobs.find((job) => job.job_key === key);
-			return wire ? jobDetailOf(toJob(wire, triggers, runs), wire) : null;
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const [read, triggers, runs] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/jobs/{job_key}', { params: { path: { location_id: locationId, target, job_key: key } } }),
+				triggersOf(scope),
+				recentRuns(scope)
+			]);
+			const { data, error, response } = read;
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 404) return null;
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return jobDetailOf(toJob(data, triggers, runs), data);
 		},
 		/** A window makes it a backfill, which the server also checks against `run.rewrite_history`. */
-		async launchJob(scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> {
-			const { locationId, target } = parseLocationKey(scope.locationId);
-			const window = options?.window ? runWindowOf(options.window) : undefined;
-			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason: window ? 'Backfill started from the web UI' : 'Started from the web UI', window };
-			const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-			inFlight.clear();
-			if (response.status === 401) onUnauthorized();
-			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
-			return requireRun(scope, body.run_id);
-		},
+		launchJob: (scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> => startJob(scope, key, options, false),
+		/** The server checks a full refresh against `run.rewrite_history` and refuses it with a window. */
+		launchJobFromScratch: (scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> => startJob(scope, key, options, true),
 		async listCatalogNodes(scope: Scope): Promise<CatalogNode[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/nodes', { params: { path: { location_id: locationId, target } } });
@@ -768,6 +770,19 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		const listed = toRuns(wires, scope.locationId);
 		const index = listed.findIndex((r) => r.id === runId);
 		return index < 0 ? null : { run: listed[index], wire: wires[index], listed };
+	}
+
+	/** A window makes it a backfill; the server checks either against `run.rewrite_history` and refuses both together. */
+	async function startJob(scope: Scope, key: string, options: JobLaunchOptions | undefined, fullRefresh: boolean): Promise<Run> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const window = options?.window ? runWindowOf(options.window) : undefined;
+		const reason = fullRefresh ? 'Full refresh started from the web UI' : window ? 'Backfill started from the web UI' : 'Started from the web UI';
+		const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason, window, full_refresh: fullRefresh || undefined };
+		const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+		inFlight.clear();
+		if (response.status === 401) onUnauthorized();
+		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		return requireRun(scope, body.run_id);
 	}
 
 	async function requireRun(scope: Scope, runId: string): Promise<Run> {

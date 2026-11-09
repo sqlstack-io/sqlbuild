@@ -47,6 +47,7 @@ pub(crate) async fn queue_sensor_run(
         reason: "Sensor condition matched".into(),
         priority: 0,
         window: None,
+        full_refresh: false,
     };
     let (transaction, mut frozen) = frozen_job_request(transaction, &context, &authored).await?;
     if frozen.snapshot_id != evaluation.snapshot_id {

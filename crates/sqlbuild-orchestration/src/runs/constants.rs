@@ -17,3 +17,6 @@ pub(crate) const RERUN_AUDIT_TAG: &[u8] = b"rerun-request";
 
 /// Ad-hoc requests derive their audit event ID from the run ID so retries find the original.
 pub(crate) const ADHOC_AUDIT_TAG: &[u8] = b"adhoc-run-request";
+
+/// The build setting a full-refresh launch adds to the frozen request and each group child.
+pub(crate) const FULL_REFRESH_SETTING: &str = "full_refresh";
