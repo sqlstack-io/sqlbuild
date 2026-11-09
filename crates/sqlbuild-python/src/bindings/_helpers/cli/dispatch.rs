@@ -10,6 +10,7 @@ use crate::bindings::_helpers::clone::clone_command::run_clone_command;
 use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
 use crate::bindings::_helpers::command_runtime::warehouses::validate_cli_warehouse;
 use crate::bindings::_helpers::compile_command::reuse_attempt::run_compile;
+use crate::bindings::_helpers::compiled_project::job_catalog::with_job_scope;
 use crate::bindings::_helpers::contract_command::command::run_contract_command;
 use crate::bindings::_helpers::cost_command::command::run_cost_command;
 use crate::bindings::_helpers::dbt_command::command::run_dbt_command;
@@ -466,7 +467,10 @@ fn routed_command<'py>(
             if let Some(failure) = failure {
                 return Err(user_error(py, failure));
             }
-            call_route(&invocation, route, handler, recall)
+            let project_dir: PathBuf = invocation.value(Source::EffectiveProjectDir)?.extract()?;
+            with_job_scope(project_dir, || {
+                call_route(&invocation, route, handler, recall)
+            })
         }
     }
 }

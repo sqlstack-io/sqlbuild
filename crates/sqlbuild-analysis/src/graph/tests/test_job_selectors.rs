@@ -1,5 +1,7 @@
-use crate::graph::tests::helpers::{failure, job_selection, names};
-use crate::graph::tests::test_types::{JobSelectorErrorTestCase, JobSelectorTestCase};
+use crate::graph::tests::helpers::{failure, job_selection, names, needs_jobs};
+use crate::graph::tests::test_types::{
+    JobSelectorErrorTestCase, JobSelectorTestCase, NeedsJobsTestCase,
+};
 
 #[test]
 fn given_attached_jobs_when_resolving_then_jobs_select_their_own_nodes() {
@@ -119,6 +121,26 @@ fn given_job_selectors_when_unresolvable_then_fails_with_message() {
             ),
         },
         JobSelectorErrorTestCase {
+            description: "a job cannot end a path selector",
+            attached: true,
+            select: &["orders~nightly"],
+            expected_error: (
+                "S003",
+                "path selector endpoint 'nightly' is a job; path selectors join two nodes",
+                None,
+            ),
+        },
+        JobSelectorErrorTestCase {
+            description: "a job: prefix cannot start a path selector",
+            attached: false,
+            select: &["job:nightly~orders"],
+            expected_error: (
+                "S003",
+                "path selector endpoint 'job:nightly' is a job; path selectors join two nodes",
+                None,
+            ),
+        },
+        JobSelectorErrorTestCase {
             description: "a group with an unknown member",
             attached: true,
             select: &["job:ghost_group"],
@@ -133,6 +155,56 @@ fn given_job_selectors_when_unresolvable_then_fails_with_message() {
         assert_eq!(
             job_selection(test_case.attached, test_case.select, &[]),
             Err(failure(test_case.expected_error)),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_selectors_when_scanning_then_only_job_references_need_jobs() {
+    let test_cases = [
+        NeedsJobsTestCase {
+            description: "job prefix",
+            selectors: &["job:nightly"],
+            also_known: &[],
+            expected_needs_jobs: true,
+        },
+        NeedsJobsTestCase {
+            description: "graph name",
+            selectors: &["+orders+"],
+            also_known: &[],
+            expected_needs_jobs: false,
+        },
+        NeedsJobsTestCase {
+            description: "bare name outside the graph",
+            selectors: &["nightly"],
+            also_known: &[],
+            expected_needs_jobs: true,
+        },
+        NeedsJobsTestCase {
+            description: "job inside an intersection of a later token",
+            selectors: &["orders", "tag:daily,job:nightly"],
+            also_known: &[],
+            expected_needs_jobs: true,
+        },
+        NeedsJobsTestCase {
+            description: "name another selector knows",
+            selectors: &["load_orders"],
+            also_known: &["load_orders"],
+            expected_needs_jobs: false,
+        },
+        NeedsJobsTestCase {
+            description: "patterns, paths and folders",
+            selectors: &["night*", "orders~nightly", "path:models/mart", "tag:daily"],
+            also_known: &[],
+            expected_needs_jobs: false,
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            needs_jobs(test_case.selectors, test_case.also_known),
+            test_case.expected_needs_jobs,
             "{}",
             test_case.description
         );

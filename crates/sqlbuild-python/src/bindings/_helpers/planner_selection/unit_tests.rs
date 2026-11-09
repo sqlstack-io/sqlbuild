@@ -5,16 +5,24 @@ use std::collections::BTreeSet;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyFrozenSet, PyString, PyTuple};
+use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
+use sqlbuild_analysis::graph::models::ParsedSelector;
 use sqlbuild_analysis::planner_selection::main::split_unit_test_selectors::split_unit_test_selectors as split;
 use sqlbuild_analysis::planner_selection::models::{
     SelectorGroups, UnitTestSelectorNames, UnitTestSelectorSplit,
 };
 
+use crate::bindings::_helpers::compiled_project::job_catalog::job_names;
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::planner_selection::carrier::{Carrier, py_strings};
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::{field as native_field, path_stem};
 use crate::bindings::_helpers::records::ids::RecordId;
+
+/// A bare selector's kind.
+const NAME_SELECTOR_KIND: &str = "name";
+/// Characters that make a selector value a glob pattern.
+const PATTERN_CHARACTERS: [char; 3] = ['*', '?', '['];
 
 const RESOURCE_ENTRY_FILES: [(&str, &str); 3] = [
     ("schema_files", "model_entries"),
@@ -88,13 +96,31 @@ fn restored<'py>(carrier: &Carrier<'py>, texts: &[String]) -> PyResult<Bound<'py
     PyTuple::new(carrier.py(), texts)
 }
 
+/// Whether a bare, non-pattern name in `selectors` is neither a unit test nor a resource.
+fn names_unknown(selectors: &[String], names: &UnitTestSelectorNames) -> bool {
+    selectors
+        .iter()
+        .flat_map(|selector| selector.split(char::is_whitespace))
+        .flat_map(|token| token.split(','))
+        .filter(|part| !part.is_empty())
+        .any(|part| match parse_selector(part) {
+            Ok(ParsedSelector::Kind { kind, value, .. }) => {
+                kind == NAME_SELECTOR_KIND
+                    && !value.contains(PATTERN_CHARACTERS)
+                    && !names.tests.contains(&value)
+                    && !names.resources.contains(&value)
+            }
+            _ => false,
+        })
+}
+
 fn split_python<'py>(
     (select, exclude): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     discovered: &Bound<'py, PyAny>,
     accepts_unit_tests: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = select.py();
-    let names = UnitTestSelectorNames {
+    let mut names = UnitTestSelectorNames {
         tests: unit_test_names(discovered)?,
         resources: resource_names(discovered)?,
     };
@@ -106,6 +132,10 @@ fn split_python<'py>(
     })?;
     let (select, exclude): (Vec<String>, Vec<String>) =
         (carrier.send_all(&select)?, carrier.send_all(&exclude)?);
+    let sent: Vec<String> = select.iter().chain(&exclude).cloned().collect();
+    if accepts_unit_tests && names_unknown(&sent, &names) {
+        names.resources.extend(job_names(py)?);
+    }
     let split: UnitTestSelectorSplit = split(
         SelectorGroups {
             select: &select,

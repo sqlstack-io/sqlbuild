@@ -8975,6 +8975,7 @@ class SelectorKind(StrEnum):
     TAG = "tag"
     PATH = "path"
     TEST = "test"
+    JOB = "job"
 
 class PythonRunPhase(StrEnum):
     """Lifecycle-aware Python execution phase."""
