@@ -148,11 +148,6 @@ _SNOWFLAKE_PIVOT_BODIES: tuple[str, ...] = (
     _PIVOT_BODIES[6],
 )
 _PIVOT_AGGREGATES: tuple[str, ...] = ("MAX", "MIN", "ANY_VALUE", "SUM")
-_PIVOT_SHAPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    "duckdb": (_PIVOT_BODIES, _PIVOT_AGGREGATES),
-    "motherduck": (_PIVOT_BODIES, _PIVOT_AGGREGATES),
-    "snowflake": (_SNOWFLAKE_PIVOT_BODIES, ("MAX", "MIN", "AVG", "SUM")),
-}
 _TYPED_PIVOT: str = (
     _PIVOT_HEADER.format(pivot="status", value="amount", aggregate="MAX")
     + _PIVOT_BODIES[0].format(aggregate="MAX")
@@ -232,31 +227,71 @@ _CONTRACT_CTE_MODELS: dict[str, str] = {
 }
 
 
-def _pivot_models(rng: random.Random, dialect: str) -> dict[str, str]:
-    """A typed pivot every passthrough reads, and seeded pivot shapes proven or refused.
+type _PivotDraw = tuple[int, int, str, str]
 
-    Each dialect with PIVOT gets its own spelling of the same shapes; the draws are the same
-    for every dialect, and a dialect without PIVOT gets none.
-    """
 
-    bodies, aggregates = _PIVOT_SHAPES.get(dialect, (_PIVOT_BODIES, _PIVOT_AGGREGATES))
-    files: dict[str, str] = {
-        "models/marts/status_amounts.sql": (
-            _SNOWFLAKE_TYPED_PIVOT if bodies is _SNOWFLAKE_PIVOT_BODIES else _TYPED_PIVOT
-        ),
+def _pivot_draws(rng: random.Random) -> tuple[_PivotDraw, ...]:
+    """Four seeded pivot shapes: body, aggregate, pivot column and value column, for any dialect."""
+
+    return tuple(
+        (
+            shape,
+            rng.randrange(len(_PIVOT_AGGREGATES)),
+            rng.choice(("status", "status", "kind")),
+            rng.choice(("amount", "amount", "order_id")),
+        )
+        for shape in rng.sample(range(len(_PIVOT_BODIES)), k=4)
+    )
+
+
+def _pivot_files(
+    draws: tuple[_PivotDraw, ...],
+    *,
+    bodies: tuple[str, ...],
+    aggregates: tuple[str, ...],
+    typed_pivot: str,
+) -> dict[str, str]:
+    """A typed pivot every passthrough reads, and the drawn pivot shapes in one dialect's PIVOT."""
+
+    return {
+        "models/marts/status_amounts.sql": typed_pivot,
         "models/marts/status_passthrough.sql": _TYPED_PIVOT_PASSTHROUGH,
+        **{
+            f"models/marts/pivot_{index}.sql": (
+                _PIVOT_HEADER.format(pivot=pivot, value=value, aggregate=aggregates[aggregate])
+                + bodies[shape].format(aggregate=aggregates[aggregate])
+                + "\n"
+            )
+            for index, (shape, aggregate, pivot, value) in enumerate(draws)
+        },
     }
-    for index, shape in enumerate(rng.sample(range(len(bodies)), k=4)):
-        aggregate: str = rng.choice(aggregates)
-        header: str = _PIVOT_HEADER.format(
-            pivot=rng.choice(("status", "status", "kind")),
-            value=rng.choice(("amount", "amount", "order_id")),
-            aggregate=aggregate,
-        )
-        files[f"models/marts/pivot_{index}.sql"] = (
-            header + bodies[shape].format(aggregate=aggregate) + "\n"
-        )
-    return files if dialect in _PIVOT_SHAPES else {}
+
+
+def _no_pivots(_draws: tuple[_PivotDraw, ...]) -> dict[str, str]:
+    """No pivot models, for a dialect without PIVOT."""
+
+    return {}
+
+
+_DUCKDB_PIVOTS: Callable[[tuple[_PivotDraw, ...]], dict[str, str]] = functools.partial(
+    _pivot_files, bodies=_PIVOT_BODIES, aggregates=_PIVOT_AGGREGATES, typed_pivot=_TYPED_PIVOT
+)
+_PIVOT_FILES: dict[str, Callable[[tuple[_PivotDraw, ...]], dict[str, str]]] = {
+    "duckdb": _DUCKDB_PIVOTS,
+    "motherduck": _DUCKDB_PIVOTS,
+    "snowflake": functools.partial(
+        _pivot_files,
+        bodies=_SNOWFLAKE_PIVOT_BODIES,
+        aggregates=("MAX", "MIN", "AVG", "SUM"),
+        typed_pivot=_SNOWFLAKE_TYPED_PIVOT,
+    ),
+}
+
+
+def _pivot_models(rng: random.Random, dialect: str) -> dict[str, str]:
+    """The seeded pivot models in `dialect`'s PIVOT, drawn alike; none without PIVOT."""
+
+    return _PIVOT_FILES.get(dialect, _no_pivots)(_pivot_draws(rng))
 
 
 type _Relation = tuple[str, tuple[str, ...]]
