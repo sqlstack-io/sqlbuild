@@ -29,12 +29,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
     DeltaEditLoopMeasurements,
+    DenseWarmEditMeasurements,
     FreshProcessCompileBenchmarkResult,
     _run_fresh_process_compile_benchmark,
     analysed_model_count,
     fresh_process_compile_cache_metrics,
     measure_model_sql_bytes,
     median_cpu_seconds,
+    median_wall_seconds,
     run_dense_delta_edit_loop_benchmark,
     run_dense_warm_edit_benchmark,
 )
@@ -185,13 +187,19 @@ def test_given_dense_project_when_compiling_warm_and_after_one_edit_then_matches
     edited_model_path: Path = dense_model_path(
         project_dir=project_dir, index=test_case.edited_model_index
     )
-    measurements: dict[str, FreshProcessCompileBenchmarkResult] = run_dense_warm_edit_benchmark(
+    measurements: DenseWarmEditMeasurements = run_dense_warm_edit_benchmark(
         project_dir=project_dir,
         edited_model_path=edited_model_path,
         expected_warm_max_seconds=test_case.expected_warm_max_seconds,
         expected_edit_max_seconds=test_case.expected_edit_max_seconds,
     )
-    for label, result in measurements.items():
+    labelled: tuple[tuple[str, FreshProcessCompileBenchmarkResult], ...] = (
+        ("cold", measurements.cold),
+        *(("warm", result) for result in measurements.warm),
+        *(("edit", result) for result in measurements.edit),
+        ("oracle", measurements.oracle),
+    )
+    for label, result in labelled:
         print(
             f"dense {label} models={test_case.model_count} wall={result.elapsed_seconds:.2f}s "
             f"cpu={result.cpu_seconds:.2f}s fingerprint={result.semantic_fingerprint}",
@@ -200,30 +208,37 @@ def test_given_dense_project_when_compiling_warm_and_after_one_edit_then_matches
         assert result.payload["diagnostics"] == []
         assert result.payload["has_errors"] is False
         assert result.peak_rss_bytes < test_case.expected_max_rss_bytes
-    cold: FreshProcessCompileBenchmarkResult = measurements["cold"]
-    warm: FreshProcessCompileBenchmarkResult = measurements["warm"]
-    edit: FreshProcessCompileBenchmarkResult = measurements["edit"]
-    assert cold.semantic_fingerprint == test_case.expected_cold_fingerprint
-    assert warm.semantic_fingerprint == test_case.expected_cold_fingerprint
-    assert edit.semantic_fingerprint == test_case.expected_edit_fingerprint
-    assert measurements["oracle"].semantic_fingerprint == test_case.expected_edit_fingerprint
-    warm_timings: dict[str, int] = cast(dict[str, int], warm.payload["compile_timings"])
-    edit_timings: dict[str, int] = cast(dict[str, int], edit.payload["compile_timings"])
-    batch_hits, entry_hits, misses, bypasses = fresh_process_compile_cache_metrics(warm)
-    assert (batch_hits + entry_hits, misses, bypasses) == (test_case.model_count, 0, 0)
-    assert warm_timings["rule_cache_misses"] == 0
-    batch_hits, entry_hits, misses, bypasses = fresh_process_compile_cache_metrics(edit)
-    assert 0 < misses < test_case.model_count
-    assert batch_hits + entry_hits + misses == test_case.model_count
-    # The edited model misses once in built-in model rules and once in SQL lint; custom rules
-    # replay their recorded facts, and every other model's built-in findings stay cached.
-    assert edit_timings["rule_cache_misses"] == test_case.expected_edit_rule_cache_misses
+    assert measurements.cold.semantic_fingerprint == test_case.expected_cold_fingerprint
+    for warm in measurements.warm:
+        assert warm.semantic_fingerprint == test_case.expected_cold_fingerprint
+        warm_timings: dict[str, int] = cast(dict[str, int], warm.payload["compile_timings"])
+        batch_hits, entry_hits, misses, bypasses = fresh_process_compile_cache_metrics(warm)
+        assert (batch_hits + entry_hits, misses, bypasses) == (test_case.model_count, 0, 0)
+        assert warm_timings["rule_cache_misses"] == 0
+    for edit in measurements.edit:
+        edit_timings: dict[str, int] = cast(dict[str, int], edit.payload["compile_timings"])
+        batch_hits, entry_hits, misses, bypasses = fresh_process_compile_cache_metrics(edit)
+        assert 0 < misses < test_case.model_count
+        assert batch_hits + entry_hits + misses == test_case.model_count
+        # The edited model misses once in built-in model rules and once in SQL lint; custom
+        # rules replay their recorded facts, and every other model's built-in findings stay
+        # cached.
+        assert edit_timings["rule_cache_misses"] == test_case.expected_edit_rule_cache_misses
+    # Earlier edits write other values, so their output differs from both the cold and final edit.
+    for edit in measurements.edit[:-1]:
+        assert edit.semantic_fingerprint not in {
+            test_case.expected_cold_fingerprint,
+            test_case.expected_edit_fingerprint,
+        }
+    assert measurements.edit[-1].semantic_fingerprint == test_case.expected_edit_fingerprint
+    assert measurements.oracle.semantic_fingerprint == test_case.expected_edit_fingerprint
     oracle_timings: dict[str, int] = cast(
-        dict[str, int], measurements["oracle"].payload["compile_timings"]
+        dict[str, int], measurements.oracle.payload["compile_timings"]
     )
     assert oracle_timings["rule_cache_hits"] == 0
-    assert warm.elapsed_seconds < test_case.expected_warm_max_seconds
-    assert edit.elapsed_seconds < test_case.expected_edit_max_seconds
+    # Medians of same-job runs keep one slow runner moment from failing an unchanged compiler.
+    assert median_wall_seconds(measurements.warm) < test_case.expected_warm_max_seconds
+    assert median_wall_seconds(measurements.edit) < test_case.expected_edit_max_seconds
 
 
 if __name__ == "__main__":

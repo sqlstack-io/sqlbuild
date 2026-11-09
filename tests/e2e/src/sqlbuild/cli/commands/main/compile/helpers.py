@@ -916,49 +916,71 @@ def prepare_small_inspection_project(*, project_dir: Path, model_count: int) -> 
     )
 
 
+# Each repeated edit writes a value the cache has not seen, so every edit recompiles the edited
+# model; the last writes the value the expected edit fingerprint and the oracle describe.
+_DENSE_EDIT_AMOUNTS: tuple[str, ...] = ("1001", "1002", "1000")
+_DENSE_WARM_RUNS: int = 3
+
+
+class DenseWarmEditMeasurements(NamedTuple):
+    """Cached cold, repeated warm and one-model edit compiles, and a from-scratch oracle."""
+
+    cold: FreshProcessCompileBenchmarkResult
+    warm: tuple[FreshProcessCompileBenchmarkResult, ...]
+    edit: tuple[FreshProcessCompileBenchmarkResult, ...]
+    oracle: FreshProcessCompileBenchmarkResult
+
+
 def run_dense_warm_edit_benchmark(
     *,
     project_dir: Path,
     edited_model_path: Path,
     expected_warm_max_seconds: float,
     expected_edit_max_seconds: float,
-) -> dict[str, FreshProcessCompileBenchmarkResult]:
-    """Measure cached cold, warm, and one-model edit plus a from-scratch oracle of the edit."""
+) -> DenseWarmEditMeasurements:
+    """Measure cached cold, three warm and three one-model edit compiles, then the edit's oracle."""
 
-    measurements: dict[str, FreshProcessCompileBenchmarkResult] = {
-        "cold": _run_fresh_process_compile_benchmark(
-            project_dir=project_dir,
-            label="dense-cold",
-            expected_max_wall_seconds=4 * expected_warm_max_seconds,
-            compile_args=(),
-        ),
-        "warm": _run_fresh_process_compile_benchmark(
-            project_dir=project_dir,
-            label="dense-warm",
-            expected_max_wall_seconds=expected_warm_max_seconds,
-            compile_args=(),
-        ),
-    }
-    _replace_benchmark_text(
-        path=edited_model_path,
-        old="COALESCE(b.amount, 0) + CAST(b.id AS DOUBLE)",
-        new="COALESCE(b.amount, 1000) + CAST(b.id AS DOUBLE)",
-    )
-    measurements["edit"] = _run_fresh_process_compile_benchmark(
+    cold: FreshProcessCompileBenchmarkResult = _run_fresh_process_compile_benchmark(
         project_dir=project_dir,
-        label="dense-edit",
-        expected_max_wall_seconds=expected_edit_max_seconds,
+        label="dense-cold",
+        expected_max_wall_seconds=4 * expected_warm_max_seconds,
         compile_args=(),
     )
+    warm: tuple[FreshProcessCompileBenchmarkResult, ...] = tuple(
+        _run_fresh_process_compile_benchmark(
+            project_dir=project_dir,
+            label=f"dense-warm-{run}",
+            expected_max_wall_seconds=expected_warm_max_seconds,
+            compile_args=(),
+        )
+        for run in range(_DENSE_WARM_RUNS)
+    )
+    edits: list[FreshProcessCompileBenchmarkResult] = []
+    previous: str = "0"
+    for amount in _DENSE_EDIT_AMOUNTS:
+        _replace_benchmark_text(
+            path=edited_model_path,
+            old=f"COALESCE(b.amount, {previous}) + CAST(b.id AS DOUBLE)",
+            new=f"COALESCE(b.amount, {amount}) + CAST(b.id AS DOUBLE)",
+        )
+        edits.append(
+            _run_fresh_process_compile_benchmark(
+                project_dir=project_dir,
+                label=f"dense-edit-{len(edits)}",
+                expected_max_wall_seconds=expected_edit_max_seconds,
+                compile_args=(),
+            )
+        )
+        previous = amount
     oracle_dir: Path = project_dir.with_name(f"{project_dir.name}_oracle")
     _ = shutil.copytree(project_dir, oracle_dir, ignore=shutil.ignore_patterns("target"))
-    measurements["oracle"] = _run_fresh_process_compile_benchmark(
+    oracle: FreshProcessCompileBenchmarkResult = _run_fresh_process_compile_benchmark(
         project_dir=oracle_dir,
         label="dense-oracle",
         expected_max_wall_seconds=4 * expected_edit_max_seconds,
         compile_args=("--no-cache",),
     )
-    return measurements
+    return DenseWarmEditMeasurements(cold=cold, warm=warm, edit=tuple(edits), oracle=oracle)
 
 
 class DeltaEditLoopMeasurements(NamedTuple):
@@ -1089,6 +1111,12 @@ def median_cpu_seconds(results: tuple[FreshProcessCompileBenchmarkResult, ...]) 
     """The median CPU seconds of same-runner compiles."""
 
     return statistics.median(result.cpu_seconds for result in results)
+
+
+def median_wall_seconds(results: tuple[FreshProcessCompileBenchmarkResult, ...]) -> float:
+    """The median wall seconds of same-runner compiles."""
+
+    return statistics.median(result.elapsed_seconds for result in results)
 
 
 def _append_benchmark_edit(path: Path, label: str) -> None:
