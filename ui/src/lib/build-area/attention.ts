@@ -38,7 +38,7 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				key: `unresponsive:${item.run.id}`,
 				tone: 'warning',
 				title: `${item.run.jobKey ?? item.run.id} is unresponsive`,
-				detail: item.lastHeartbeatAt ? `Not heard from since ${formatAgo(item.lastHeartbeatAt, now)}` : 'Not heard from yet',
+				detail: item.lastHeartbeatAt ? `Not heard from since ${formatAgo(item.lastHeartbeatAt, now)}` : (item.run.statusReason ?? 'Not heard from yet'),
 				since: formatAgo(item.run.startedAt, now),
 				href: `/runs/${item.run.id}`,
 				action: 'View run'
