@@ -449,15 +449,22 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
 			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), { runs: runs?.data ? toNodeRuns(runs.data) : null, jobs });
 		},
-		async overview(scope: Scope): Promise<Overview> {
+		async overview(scope: Scope): Promise<Overview | null> {
 			// A week of publications for the models metric; the server returns at most 100.
-			const [runs, checks, nodes, changes, events] = await Promise.all([
+			const reads = Promise.all([
 				recentRuns(scope),
 				implemented.listChecks(scope),
 				implemented.listCatalogNodes(scope),
 				implemented.listSnapshotChanges(scope, { limit: 100 }),
 				implemented.listPlatformEvents()
 			]);
+			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
+			const read = await reads.catch((error: unknown) => {
+				if (error instanceof ApiError && error.status === 403) return null;
+				throw error;
+			});
+			if (!read) return null;
+			const [runs, checks, nodes, changes, events] = read;
 			return overviewOf({ runs, checks, nodes, changes, events, now: Date.now() });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
