@@ -35,6 +35,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
     analysed_model_count,
     fresh_process_compile_cache_metrics,
     measure_model_sql_bytes,
+    measure_runner_calibration,
     median_cpu_seconds,
     median_wall_seconds,
     run_dense_delta_edit_loop_benchmark,
@@ -88,6 +89,9 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
     tmp_path: Path,
 ) -> None:
     require_compile_memory_scope()
+    # Fixed work that does not depend on SQLBuild scales the budget on a slower runner class.
+    wall_budget: float = test_case.expected_max_wall_seconds * measure_runner_calibration().factor
+    print(f"dense cold models={test_case.model_count} wall_budget={wall_budget:.2f}s", flush=True)
     project_dir: Path = tmp_path / "dense_orders"
     write_dense_compile_project(project_dir=project_dir, model_count=test_case.model_count)
     config: RulesConfig = load_rules_config(project_dir=project_dir)
@@ -109,7 +113,7 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
     result: FreshProcessCompileBenchmarkResult = _run_fresh_process_compile_benchmark(
         project_dir=project_dir,
         label=f"dense-{test_case.model_count}",
-        expected_max_wall_seconds=test_case.expected_max_wall_seconds,
+        expected_max_wall_seconds=wall_budget,
         compile_args=("--no-cache",),
     )
     print(
@@ -143,7 +147,7 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
     assert timings["custom_rules_ms"] > 0
     assert timings["custom_rules_cpu_ms"] > 0
     assert result.semantic_fingerprint == test_case.expected_fingerprint
-    assert result.elapsed_seconds < test_case.expected_max_wall_seconds
+    assert result.elapsed_seconds < wall_budget
     assert result.peak_rss_bytes < test_case.expected_max_rss_bytes
 
 
@@ -182,6 +186,16 @@ def test_given_dense_project_when_compiling_warm_and_after_one_edit_then_matches
     tmp_path: Path,
 ) -> None:
     require_compile_memory_scope()
+    # Fixed work that does not depend on SQLBuild scales the budgets on a slower runner class;
+    # the same-runner ratio jobs remain what catches a slower compiler.
+    factor: float = measure_runner_calibration().factor
+    warm_budget: float = test_case.expected_warm_max_seconds * factor
+    edit_budget: float = test_case.expected_edit_max_seconds * factor
+    print(
+        f"dense models={test_case.model_count} warm_budget={warm_budget:.2f}s "
+        f"edit_budget={edit_budget:.2f}s",
+        flush=True,
+    )
     project_dir: Path = tmp_path / "dense_orders"
     write_dense_compile_project(project_dir=project_dir, model_count=test_case.model_count)
     edited_model_path: Path = dense_model_path(
@@ -190,8 +204,8 @@ def test_given_dense_project_when_compiling_warm_and_after_one_edit_then_matches
     measurements: DenseWarmEditMeasurements = run_dense_warm_edit_benchmark(
         project_dir=project_dir,
         edited_model_path=edited_model_path,
-        expected_warm_max_seconds=test_case.expected_warm_max_seconds,
-        expected_edit_max_seconds=test_case.expected_edit_max_seconds,
+        expected_warm_max_seconds=warm_budget,
+        expected_edit_max_seconds=edit_budget,
     )
     labelled: tuple[tuple[str, FreshProcessCompileBenchmarkResult], ...] = (
         ("cold", measurements.cold),
@@ -237,8 +251,8 @@ def test_given_dense_project_when_compiling_warm_and_after_one_edit_then_matches
     )
     assert oracle_timings["rule_cache_hits"] == 0
     # Medians of same-job runs keep one slow runner moment from failing an unchanged compiler.
-    assert median_wall_seconds(measurements.warm) < test_case.expected_warm_max_seconds
-    assert median_wall_seconds(measurements.edit) < test_case.expected_edit_max_seconds
+    assert median_wall_seconds(measurements.warm) < warm_budget
+    assert median_wall_seconds(measurements.edit) < edit_budget
 
 
 if __name__ == "__main__":

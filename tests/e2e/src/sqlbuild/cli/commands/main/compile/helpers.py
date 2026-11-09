@@ -18,10 +18,12 @@ import time
 import zipfile
 from bisect import bisect_left
 from collections.abc import Callable, Iterator
+from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager, redirect_stdout
 from dataclasses import replace
 from functools import partial
 from io import StringIO
+from multiprocessing import get_context
 from pathlib import Path
 from types import FrameType, ModuleType
 from typing import Any, NamedTuple, cast
@@ -41,6 +43,7 @@ from scripts.cold_compile_performance.main.read_compile_measurement import read_
 from scripts.cold_compile_performance.main.semantic_compile_fingerprint import (
     semantic_compile_fingerprint,
 )
+from scripts.compile_performance_ratio._helpers.report import cpu_model
 from scripts.compiler_differential.constants import FAILURE_BASE_FILES
 from scripts.delta_compile_series.models import DeltaCompileOutcome
 from sqlbuild._native import COMPILE_REUSE_DISABLE_ENV_VAR as REUSE_DISABLE_ENV_VAR
@@ -1117,6 +1120,73 @@ def median_wall_seconds(results: tuple[FreshProcessCompileBenchmarkResult, ...])
     """The median wall seconds of same-runner compiles."""
 
     return statistics.median(result.elapsed_seconds for result in results)
+
+
+# The calibration workload's fastest repetition on the hosted runner class the warm and edit
+# budgets were set on. A slower runner scales those budgets by its own fastest repetition over
+# this; a faster one keeps them as they are.
+_RUNNER_CALIBRATION_REFERENCE_SECONDS: float = 0.60
+_RUNNER_CALIBRATION_CHECKSUM: int = 2910182
+_RUNNER_CALIBRATION_REPETITIONS: int = 7
+_RUNNER_CALIBRATION_VALUES: int = 600_000
+
+
+class RunnerCalibration(NamedTuple):
+    """How much slower this runner is than the budgets' reference runner, from fixed work."""
+
+    cpu_model: str
+    seconds: tuple[float, ...]
+    factor: float
+
+
+def _runner_calibration_workload() -> int:
+    """Generate, count, sort and format pseudo-random integers; return a checksum of the work."""
+
+    state: int = 1
+    values: list[int] = []
+    for _ in range(_RUNNER_CALIBRATION_VALUES):
+        state = (state * 6364136223846793005 + 1442695040888963407) % 2**64
+        values.append(state >> 33)
+    counts: dict[int, int] = {}
+    for value in values:
+        counts[value & 0xFFFF] = counts.get(value & 0xFFFF, 0) + 1
+    values.sort()
+    rows: list[tuple[int, str]] = [(value, str(value)) for value in values[::2]]
+    return sum(len(text) for _, text in rows) + len(counts)
+
+
+def _time_runner_calibration() -> tuple[tuple[float, ...], int]:
+    """Each repetition's seconds and the workload checksum, which pins the work done."""
+
+    seconds: list[float] = []
+    checksum: int = 0
+    for _ in range(_RUNNER_CALIBRATION_REPETITIONS):
+        started: float = time.perf_counter()
+        checksum = _runner_calibration_workload()
+        seconds.append(time.perf_counter() - started)
+    return tuple(seconds), checksum
+
+
+def measure_runner_calibration() -> RunnerCalibration:
+    """Time the fixed calibration workload in a fresh interpreter and derive the budget factor."""
+
+    # A fresh interpreter keeps the test process's heap and collector out of the timing.
+    with ProcessPoolExecutor(max_workers=1, mp_context=get_context("spawn")) as pool:
+        seconds, checksum = pool.submit(_time_runner_calibration).result(timeout=120)
+    assert checksum == _RUNNER_CALIBRATION_CHECKSUM
+    # The fastest repetition measures the machine; a busy moment only ever adds time to it.
+    calibration: RunnerCalibration = RunnerCalibration(
+        cpu_model=cpu_model(),
+        seconds=seconds,
+        factor=max(1.0, min(seconds) / _RUNNER_CALIBRATION_REFERENCE_SECONDS),
+    )
+    print(
+        f"runner calibration cpu={calibration.cpu_model!r} "
+        f"runs={[round(run, 3) for run in seconds]} fastest={min(seconds):.3f}s "
+        f"reference={_RUNNER_CALIBRATION_REFERENCE_SECONDS:.3f}s factor={calibration.factor:.3f}",
+        flush=True,
+    )
+    return calibration
 
 
 def _append_benchmark_edit(path: Path, label: str) -> None:
