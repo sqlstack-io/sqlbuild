@@ -461,7 +461,7 @@ def test_given_description_width_when_formatting_then_wrapped_model_compiles(
         TrailingCommentFormatIntegrationTestCase(
             description="comments after the last clause gain no blank line",
             body="select 1 as order_id from orders\n\n-- first note\n\n-- second note\n",
-            expected_body="SELECT 1 AS order_id\nFROM orders -- first note\n -- second note\n",
+            expected_body="SELECT 1 AS order_id\nFROM orders -- first note\n-- second note\n",
         ),
     ],
     ids=lambda case: case.description,

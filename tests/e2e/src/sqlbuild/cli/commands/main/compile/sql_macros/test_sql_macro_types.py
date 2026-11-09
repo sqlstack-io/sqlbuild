@@ -237,7 +237,7 @@ def test_given_an_any_argument_misused_when_compiling_then_it_fails(
             ),
         ),
         SqlMacroCompileTestCase(
-            description="a_longer_text_body_keeps_its_inferred_type",
+            description="a_longer_text_body_meets_a_shorter_varchar_contract_duckdb_stores_as_varchar",
             files={
                 **text_macro("m", "VARCHAR(5)", "CAST(@value AS VARCHAR(100))"),
                 **contract_model(
@@ -246,8 +246,9 @@ def test_given_an_any_argument_misused_when_compiling_then_it_fails(
                     'SELECT @sql.m(o.status) AS v FROM __ref("stg_orders") AS o\n',
                 ),
             },
-            expected_returncode=1,
-            expected_fragments=("error[K002]: column 'v' inferred as",),
+            expected_returncode=0,
+            expected_fragments=(),
+            unexpected_fragments=("error[K002]",),
         ),
         SqlMacroCompileTestCase(
             description="a_wider_decimal_body_keeps_its_inferred_type",

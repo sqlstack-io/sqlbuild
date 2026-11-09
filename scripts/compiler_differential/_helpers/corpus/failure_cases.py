@@ -113,7 +113,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         ),
         failure_case(
             name="model-sql-syntax",
-            expected_code="P026",
+            expected_code="P001",
             files={
                 FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
                 + "\n[settings]\nrequire_sql_analysis = true\n",

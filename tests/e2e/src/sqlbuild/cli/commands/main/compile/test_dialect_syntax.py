@@ -132,7 +132,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
                 ),
             },
             expected_exit_code=0,
-            expected_codes=(),
+            expected_codes=("L007", "L007"),
             expected_column_counts={"hourly_events": 1},
         ),
         DialectSyntaxCompileE2ETestCase(

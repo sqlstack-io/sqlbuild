@@ -13,20 +13,36 @@ from tests.unit.src.sqlbuild.lint._test_types import (
 )
 from tests.unit.src.sqlbuild.lint.helpers import keyword_name_positions, reserved_keyword_pairs
 
+_DATABRICKS_KEYWORD_NAME_FOLD: pytest.MarkDecorator = pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "SQLQuack 804864d2 fingerprints Databricks identifiers named Any, Some or Order"
+        " case-insensitively, like keywords; its fix lands at the next SQLQuack pin"
+    ),
+)
+_KNOWN_FINGERPRINT_FOLDS: dict[tuple[str, str, str], pytest.MarkDecorator] = {
+    ("databricks", name, position): _DATABRICKS_KEYWORD_NAME_FOLD
+    for name in ("Any", "Some", "Order")
+    for position in ("projection", "table", "operand")
+}
+
 
 @pytest.mark.parametrize(
     "test_case",
     [
-        KeywordNamedIdentifierFormatTestCase(
-            description=f"{dialect} {name} as {position}",
-            dialect=dialect,
-            sql=template.format(name=name),
-            name=name,
-            expected_name_occurrences=1,
+        pytest.param(
+            KeywordNamedIdentifierFormatTestCase(
+                description=f"{dialect} {name} as {position}",
+                dialect=dialect,
+                sql=template.format(name=name),
+                name=name,
+                expected_name_occurrences=1,
+            ),
+            id=f"{dialect} {name} as {position}",
+            marks=_KNOWN_FINGERPRINT_FOLDS.get((dialect, name, position), ()),
         )
         for dialect, name, position, template in keyword_name_positions()
     ],
-    ids=lambda case: case.description,
 )
 def test_given_keyword_named_identifier_when_formatting_then_case_is_kept_and_fingerprinted(
     test_case: KeywordNamedIdentifierFormatTestCase,

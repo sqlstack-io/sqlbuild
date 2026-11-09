@@ -96,7 +96,7 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             ),
             command=_COMPILE,
             expected_returncode=0,
-            expected_diagnostics=(),
+            expected_diagnostics=(("L007", "models/bracketed_events.sql", 18),),
             expected_text_fragments=(),
         ),
         RequireSqlAnalysisCase(

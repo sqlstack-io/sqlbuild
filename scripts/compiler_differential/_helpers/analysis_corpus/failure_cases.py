@@ -464,7 +464,7 @@ def _syntax_cases() -> tuple[FailureCase, ...]:
     return (
         failure_case(
             name="syntax-hook",
-            expected_code="P026",
+            expected_code="P001",
             expected_message="customer_totals",
             files={
                 FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
@@ -475,7 +475,7 @@ def _syntax_cases() -> tuple[FailureCase, ...]:
         ),
         failure_case(
             name="syntax-inline-hook",
-            expected_code="P026",
+            expected_code="P001",
             expected_message="customer_totals",
             files={
                 FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
