@@ -334,14 +334,18 @@ fn share_key(
     {
         return None;
     }
+    let width: usize = names.len().to_string().len();
     let stubs: HashMap<String, String> = names
         .iter()
         .enumerate()
-        .map(|(position, name)| ((*name).to_owned(), format!("{RELATION_STUB}{position}")))
+        .map(|(position, name)| {
+            let stub: String = format!("{RELATION_STUB}{position:0width$}");
+            ((*name).to_owned(), stub)
+        })
         .collect();
     let sql: String = native_sql(dialect, model, &stubs).ok()?;
     let unstubbed: String = without_stubs(&sql.to_ascii_lowercase());
-    if names.iter().any(|name| unstubbed.contains(name)) {
+    if !stubs_stand_alone(&sql, width) || names.iter().any(|name| unstubbed.contains(name)) {
         return None;
     }
     let mut folded: HashSet<String> = HashSet::new();
@@ -375,6 +379,20 @@ fn name_order(names: &[&str], spelled: impl Fn(&str) -> String) -> Vec<usize> {
     order
 }
 
+/// Whether every relation stub in `sql`, with its `width` position digits, is a whole name: no
+/// identifier character touches it, so a reference glued into a longer name (`__ref("x")_split`)
+/// never shares.
+fn stubs_stand_alone(sql: &str, width: usize) -> bool {
+    let identifier = |c: u8| c.is_ascii_alphanumeric() || c == b'_' || c == b'$';
+    let bytes: &[u8] = sql.as_bytes();
+    sql.match_indices(RELATION_STUB).all(|(start, _)| {
+        let end: usize = start + RELATION_STUB.len() + width;
+        let before: bool = start > 0 && identifier(bytes[start - 1]);
+        let after: bool = bytes.get(end).is_some_and(|c| identifier(*c));
+        !before && !after
+    })
+}
+
 /// `folded_sql` with every relation stub blanked, leaving only text the model spells itself.
 fn without_stubs(folded_sql: &str) -> String {
     let mut text: String = String::with_capacity(folded_sql.len());
@@ -388,12 +406,13 @@ fn without_stubs(folded_sql: &str) -> String {
     text
 }
 
-/// A lower-case ASCII identifier that no SQLBuild stub begins: `[a-z_][a-z0-9_]*`.
+/// A lower-case ASCII identifier that starts with a letter: `[a-z][a-z0-9_]*`. A leading letter
+/// makes a quoted lower-case name and an unquoted upper-cased one compare the same way whatever
+/// follows, so the two name orders in the key cover a model that quotes only some references.
 fn plain_name(name: &str) -> bool {
     let mut characters = name.chars();
     characters
         .next()
-        .is_some_and(|first| first.is_ascii_lowercase() || first == '_')
+        .is_some_and(|first| first.is_ascii_lowercase())
         && characters.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-        && !name.starts_with("__sqlbuild")
 }
