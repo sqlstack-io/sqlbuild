@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 use rayon::ThreadPool;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use sha2::{Digest, Sha256};
+use sqlbuild_core::identifier_text::main::is_lowercase_identifier::is_lowercase_identifier;
 use sqlquack_semantics::lineage::models::SchemaColumn;
 
 use crate::analysis_route::main::model_outcome::{analysed_sql, native_outcome, native_sql};
@@ -328,7 +329,10 @@ fn share_key(
     let distinct: HashSet<&str> = names.iter().copied().collect();
     if names.is_empty()
         || distinct.len() != names.len()
-        || !names.iter().all(|name| plain_name(name))
+        // A leading letter makes a quoted lower-case name and an unquoted upper-cased one compare
+        // the same way whatever follows, so the two name orders in the key cover a model that
+        // quotes only some references.
+        || !names.iter().all(|name| is_lowercase_identifier(name))
         || !cleaned.is_ascii()
         || cleaned.to_ascii_lowercase().contains(RELATION_STUB)
     {
@@ -404,15 +408,4 @@ fn without_stubs(folded_sql: &str) -> String {
     }
     text.push_str(rest);
     text
-}
-
-/// A lower-case ASCII identifier that starts with a letter: `[a-z][a-z0-9_]*`. A leading letter
-/// makes a quoted lower-case name and an unquoted upper-cased one compare the same way whatever
-/// follows, so the two name orders in the key cover a model that quotes only some references.
-fn plain_name(name: &str) -> bool {
-    let mut characters = name.chars();
-    characters
-        .next()
-        .is_some_and(|first| first.is_ascii_lowercase())
-        && characters.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
