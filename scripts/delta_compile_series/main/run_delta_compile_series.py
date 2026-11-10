@@ -10,7 +10,12 @@ from typing import Any
 
 from scripts.delta_compile_series._helpers.edits import edited_file
 from scripts.delta_compile_series._helpers.evidence import cache_state, keep_comparison_failure
-from scripts.delta_compile_series._helpers.outcomes import full_compile_difference, judged
+from scripts.delta_compile_series._helpers.outcomes import (
+    full_compile_difference,
+    judged,
+    log_runs,
+    sql_test_cache_lines,
+)
 from scripts.delta_compile_series.constants import (
     DELTA_COMPILE_LINE,
     DELTA_WEIGHT,
@@ -41,6 +46,7 @@ def _compared(
     copy: Path = project_dir.with_name(project_dir.name + FULL_COPY_SUFFIX)
     shutil.rmtree(copy, ignore_errors=True)
     _ = shutil.copytree(project_dir, copy, symlinks=True)
+    earlier: tuple[frozenset[Path], frozenset[Path]] = (log_runs(project_dir), log_runs(copy))
     before: dict[str, Any] = (
         {"delta": cache_state(project_dir), "full": cache_state(copy)} if diagnostics_dir else {}
     )
@@ -68,6 +74,12 @@ def _compared(
             )
         except OSError:
             pass
+    if problem is not None:
+        problem += (
+            f"; SQL test cache: delta "
+            f"{sql_test_cache_lines(project=project_dir, earlier=earlier[0])}"
+            f"; full {sql_test_cache_lines(project=copy, earlier=earlier[1])}"
+        )
     return outcome, problem
 
 
