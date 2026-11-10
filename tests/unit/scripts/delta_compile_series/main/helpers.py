@@ -52,6 +52,14 @@ def run_comparison(
 
     def compile_full(copy: Path) -> DeltaCompileOutcome:
         _ = (copy / cache.relative_to(project)).write_text("{")
+        run: Path = copy / "logs/2026-11-10/full-run"
+        run.mkdir(parents=True)
+        _ = (run / "diagnostics.jsonl").write_text(
+            json.dumps({"message": "Delta compile fell back: disabled"})
+            + "\n"
+            + json.dumps({"message": test_case.full_cache_log})
+            + "\n"
+        )
         return DeltaCompileOutcome(
             0,
             test_case.stdout,

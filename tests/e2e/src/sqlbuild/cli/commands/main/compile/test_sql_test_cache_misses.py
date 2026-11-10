@@ -15,6 +15,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
     append_to_compiled_sql_tests,
     flip_compiled_sql_test_bytes,
     run_installed_sqb,
+    truncate_sql_test_cache,
 )
 
 _MISS_LINE: str = "SQL test artifact cache missed"
@@ -33,6 +34,11 @@ _ENV: dict[str, str] = {COMPILE_CACHE_REGION_ENV_VAR: "east"}
             description="same-size rewritten artifacts log content_changed",
             change=flip_compiled_sql_test_bytes,
             expected_debug_line=f"{_MISS_LINE}: content_changed=",
+        ),
+        SqlTestCacheMissE2ETestCase(
+            description="a cut-short cache file logs that it held no usable records",
+            change=truncate_sql_test_cache,
+            expected_debug_line="(the cache file held no usable records)",
         ),
     ],
     ids=lambda case: case.description,

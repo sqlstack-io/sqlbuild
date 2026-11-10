@@ -13,3 +13,6 @@ class ComparisonEvidenceTestCase:
     steps: int = 1
     expected_mismatches: int = 1
     cache_relative_path: str = "orders/check.sql"
+    full_cache_log: str = (
+        "SQL test artifact cache missed: not_recorded=1 (the cache file held no usable records)"
+    )
