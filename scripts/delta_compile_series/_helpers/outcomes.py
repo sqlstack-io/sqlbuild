@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import re
 from itertools import zip_longest
 from pathlib import Path
+from typing import Any
 
 from scripts.delta_compile_series.constants import (
     AFTER_FAILED_RULES,
@@ -15,7 +17,11 @@ from scripts.delta_compile_series.constants import (
     DELTA_MISMATCH_PATTERN,
     DELTA_VERIFIED_LINE,
     DURATION_PATTERN,
+    LOG_DIAGNOSTICS_FILE,
+    LOG_RUNS_GLOB,
+    MAX_CACHE_LOG_LINES,
     MISMATCH_EXIT_CODE,
+    SQL_TEST_CACHE_LOG_PREFIX,
     STALE_PROBLEMS,
 )
 from scripts.delta_compile_series.models import DeltaCompileEdit, DeltaCompileOutcome
@@ -96,3 +102,31 @@ def full_compile_difference(
             )
             return f"{stream} differs from a full compile: {first[0]!r} vs {first[1]!r}"
     return None
+
+
+def log_runs(project: Path) -> frozenset[Path]:
+    """The per-invocation log directories a project holds."""
+
+    return frozenset(path for path in project.glob(LOG_RUNS_GLOB) if path.is_dir())
+
+
+def sql_test_cache_lines(*, project: Path, earlier: frozenset[Path]) -> str:
+    """Cache-miss reasons and record keys logged since `earlier`, never SQL text or environment."""
+
+    lines: list[str] = []
+    for run in sorted(log_runs(project) - earlier):
+        try:
+            text: str = (run / LOG_DIAGNOSTICS_FILE).read_text(encoding="utf-8", errors="replace")
+            rows: list[str] = text.splitlines()
+        except OSError:
+            continue
+        for row in rows:
+            try:
+                record: Any = json.loads(row)
+            except ValueError:
+                continue
+            message: Any = record.get("message") if isinstance(record, dict) else None
+            if isinstance(message, str) and message.startswith(SQL_TEST_CACHE_LOG_PREFIX):
+                lines.append(message)
+    shown: list[str] = lines[:MAX_CACHE_LOG_LINES]
+    return " | ".join(shown) if shown else "none logged"

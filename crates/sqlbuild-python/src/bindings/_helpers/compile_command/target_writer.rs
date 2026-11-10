@@ -9,6 +9,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
 use pyo3::{IntoPyObjectExt, pyclass, pyfunction, wrap_pyfunction};
+use sqlbuild_cache::artifacts::constants::SQL_TEST_CACHE_FILE;
 use sqlbuild_cache::artifacts::main::new_sql_test_record::new_sql_test_record;
 use sqlbuild_cache::artifacts::main::reusable_sql_test_record::reusable_sql_test_record;
 use sqlbuild_cache::artifacts::models::{SqlTestArtifactRecord, SqlTestRecordMiss};
@@ -66,6 +67,10 @@ const SQL_FILE_SUFFIX: &str = ".sql";
 const SQL_TEST_CACHE_LOGGER: &str = "sqlbuild.compile.reuse";
 /// The miss reason of a SQL test the cache file holds no record for.
 const NOT_RECORDED: &str = "not_recorded";
+/// Missed records a cache-miss debug line names before summarising the rest.
+const LOGGED_MISSES: usize = 16;
+/// Leading characters of a record key that name it in a cache-miss debug line.
+const LOGGED_KEY_CHARS: usize = 12;
 /// `functions/<language>` path components that already lead a function's path.
 const LANGUAGE_DIR_DEPTH: usize = 2;
 const PUBLISHED_STAGING_CHANGED: &str = "changed";
@@ -453,18 +458,41 @@ fn test_identities<'py>(
     Ok(identities)
 }
 
-/// Log why a warm SQL test artifact cache could not keep some artifacts, by reason.
-fn log_cache_misses(py: Python<'_>, misses: &BTreeMap<&'static str, usize>) -> PyResult<()> {
+/// Log a warm SQL test cache's misses: counts by reason, then each record's key and reason.
+fn log_cache_misses(
+    py: Python<'_>,
+    misses: &BTreeMap<&'static str, usize>,
+    missed: &[String],
+    unreadable: bool,
+) -> PyResult<()> {
     let reasons: String = misses
         .iter()
         .map(|(reason, count)| format!("{reason}={count}"))
         .collect::<Vec<_>>()
         .join(",");
+    let detail: String = if unreadable {
+        "the cache file held no usable records".to_owned()
+    } else {
+        let mut shown: Vec<String> = missed.iter().take(LOGGED_MISSES).cloned().collect();
+        if missed.len() > LOGGED_MISSES {
+            shown.push(format!("{} more", missed.len() - LOGGED_MISSES));
+        }
+        format!("records {}", shown.join(","))
+    };
     host::log_debug_message(
         py,
         SQL_TEST_CACHE_LOGGER,
-        &format!("SQL test artifact cache missed: {reasons}"),
+        &format!("SQL test artifact cache missed: {reasons} ({detail})"),
     )
+}
+
+/// Whether `cache_dir` holds a SQL test cache file, so an empty read means it was unreadable.
+fn cache_file_present(cache_dir: &Bound<'_, PyAny>) -> PyResult<bool> {
+    if cache_dir.is_none() {
+        return Ok(false);
+    }
+    let directory: PathBuf = cache_dir.extract()?;
+    Ok(directory.join(SQL_TEST_CACHE_FILE).is_file())
 }
 
 /// Plan every SQL test whose cached artifact under `target_dir` cannot be reused.
@@ -503,6 +531,7 @@ pub(crate) fn plan_tests<'py>(
     let mut cached_paths: Vec<PathBuf> = Vec::new();
     let mut cached_records: Vec<(String, SqlTestArtifactRecord)> = Vec::new();
     let mut misses: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut missed: Vec<String> = Vec::new();
     for (index, (test, identity)) in tests.into_iter().zip(identities).enumerate() {
         let Some((record_key, identity)) = identity else {
             pending.push((test.unbind(), None, None));
@@ -517,6 +546,8 @@ pub(crate) fn plan_tests<'py>(
             });
         if let Err(reason) = reusable {
             *misses.entry(reason).or_default() += 1;
+            let short: &str = record_key.get(..LOGGED_KEY_CHARS).unwrap_or(&record_key);
+            missed.push(format!("{short}:{reason}"));
         }
         if let Ok(record) = reusable {
             let path = tests_root_path.join(&record.relative_path);
@@ -528,8 +559,8 @@ pub(crate) fn plan_tests<'py>(
         }
         yield_interpreter(py, index);
     }
-    if !cached.is_empty() && !misses.is_empty() {
-        log_cache_misses(py, &misses)?;
+    if !misses.is_empty() && (!cached.is_empty() || cache_file_present(&cache_dir)?) {
+        log_cache_misses(py, &misses, &missed, cached.is_empty())?;
     }
     let pending_tests: Vec<Bound<'py, PyAny>> = pending
         .iter()

@@ -5573,3 +5573,11 @@ def flip_compiled_sql_test_bytes(project_dir: Path) -> None:
 
     for artifact in sorted((project_dir / "target/compiled/tests").rglob("*.sql")):
         _ = artifact.write_text(artifact.read_text().replace("SELECT", "select", 1))
+
+
+def truncate_sql_test_cache(project_dir: Path) -> None:
+    """Cut every SQL test cache file to its first half, as a write cut short would leave it."""
+
+    for cache in sorted((project_dir / "target/cache").rglob("sql-test-artifacts.json")):
+        text: str = cache.read_text()
+        _ = cache.write_text(text[: len(text) // 2])

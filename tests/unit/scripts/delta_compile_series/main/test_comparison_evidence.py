@@ -32,6 +32,9 @@ def test_given_mismatch_when_capturing_then_keeps_private_paired_evidence(
         "stderr differs from a full compile: '' vs 'SQL test planning  START'"
         in result.unexpected[0]
     )
+    assert result.unexpected[0].endswith(
+        f"; SQL test cache: delta none logged; full {test_case.full_cache_log}"
+    )
     directory: Path = destination / "failure-00"
     manifest: dict[str, Any] = json.loads((directory / "manifest.json").read_text())
     before: dict[str, Any] = json.loads((directory / "cache-before.json").read_text())
