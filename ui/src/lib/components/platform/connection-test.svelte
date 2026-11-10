@@ -29,7 +29,7 @@
 	}
 
 	function origin(t: ConnectionTest): string {
-		return t.trigger === 'publish' ? 'after the last deploy' : `by ${t.by?.name ?? 'unknown'}`;
+		return t.trigger === 'publish' ? 'after the last deploy' : t.by ? `by ${t.by.name}` : 'manually';
 	}
 </script>
 

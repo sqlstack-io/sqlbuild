@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -207,13 +208,13 @@
 			</div>
 			{#each jobs as job (job.name)}
 				<div class="row">
-					<a class="gutter job" href="/jobs/{job.name}" title={job.name}>{job.name}</a>
+					<a class="gutter job" href={to(`/jobs/${job.name}`)} title={job.name}>{job.name}</a>
 					<div class="track">
 						{#each runsByJob.get(job.name) ?? [] as r (r.key)}
 							{@const left = Math.max(0, pct(r.startMs))}
 							<a
 								class="bar {barClass(r)}"
-								href={r.runId ? `/runs/${r.runId}` : `/jobs/${r.jobKey}`}
+								href={to(r.runId ? `/runs/${r.runId}` : `/jobs/${r.jobKey}`)}
 								style:left="{left}%"
 								style:width="{Math.min(100, pct(r.endMs)) - left}%"
 								style:--c={tone(r)}
@@ -226,7 +227,7 @@
 						{#each markersByJob.get(job.name) ?? [] as m (m.tickId)}
 							<a
 								class="marker {m.outcome}"
-								href="/triggers/{m.triggerId}"
+								href={to(`/triggers/${m.triggerId}`)}
 								style:left="{pct(m.atMs)}%"
 								onmouseenter={(e) => (markerHover = { marker: m, x: e.clientX, y: e.clientY })}
 								onmouseleave={() => (markerHover = null)}

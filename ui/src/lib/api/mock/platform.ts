@@ -46,6 +46,18 @@ import type {
 	SsoMapping,
 	WarehouseConnection
 } from '../types';
+
+/** A warehouse connection as the fixtures declare it; the client sees only what its checks and syncs report. */
+type MockWarehouse = {
+	name: string;
+	target: string;
+	adapter: string;
+	purpose: 'target' | 'catalog';
+	sourceFile: string;
+	settings: SettingField[];
+	values: Record<string, string | number | boolean>;
+	lastTest: ConnectionTest | null;
+};
 import {
 	ADMIN_ONLY,
 	baseGrantsOf,
@@ -305,7 +317,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		],
 		values: { account: 'example-account', database, warehouse: 'TRANSFORMING_WH' }
 	});
-	const warehouseByLocation: Record<string, WarehouseConnection[]> = {
+	const warehouseByLocation: Record<string, MockWarehouse[]> = {
 		[LOCATION_SHOP]: [
 			{ name: 'prod', target: 'prod', adapter: 'snowflake', purpose: 'target', sourceFile: 'sqlbuild.toml', ...snowflakeSettings('WAFFLE_SHOP'), lastTest: locationExtras[LOCATION_SHOP].connectionTest },
 			{
@@ -679,12 +691,21 @@ export class MockPlatformApi implements PlatformApi {
 
 	// ---- connections ----
 
-	async listWarehouseConnections(scope: Scope): Promise<WarehouseConnection[]> {
-		const warehouse = this.#warehouse(scope).map((c) => ({
-			...c,
-			lastTest: this.#connectionTests.get(`${scope.locationId}/${c.name}`) ?? c.lastTest
-		}));
-		return this.#ctx.reply(structuredClone(warehouse));
+	async listWarehouseConnections(): Promise<WarehouseConnection[]> {
+		const synced = new Date(Date.now() - 4 * 60_000).toISOString();
+		const connections = this.#ctx.locations.flatMap((l) =>
+			this.#warehouse({ locationId: l.id })
+				.filter((c) => c.purpose === 'target')
+				.map((c) => ({
+					id: l.id,
+					location: l.name,
+					target: c.target,
+					stateLocation: { database: typeof c.values.database === 'string' ? c.values.database : null, schema: 'sqlbuild' },
+					lastTest: this.#connectionTests.get(`${l.id}/${c.name}`) ?? c.lastTest,
+					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, lastSyncedAt: synced }))
+				}))
+		);
+		return this.#ctx.reply(structuredClone(connections));
 	}
 
 	async listProviders(scope: Scope): Promise<ProviderConnection[]> {
@@ -882,9 +903,9 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.reply({
 			serverVersion: this.#ctx.serverVersion,
 			storage: 'postgresql',
-			schemaVersion: 14,
-			latestSchemaVersion: 14,
-			schemaMigratedAt: new Date(this.#ctx.now - 5 * DAY).toISOString(),
+			installedAt: new Date(this.#ctx.now - 120 * DAY).toISOString(),
+			schemaChecksum: '6f1c2a9e4b7d0c3f8a5e2b1d9c4f7a0e3b6d8c1f5a2e9b4d7c0f3a6e1b8d5c2f',
+			schemaAppliedAt: new Date(this.#ctx.now - 5 * DAY).toISOString(),
 			authMode: 'oidc',
 			schedulerEnabled: true,
 			retention: [
@@ -913,7 +934,7 @@ export class MockPlatformApi implements PlatformApi {
 		});
 	}
 
-	#warehouse(scope: Scope): WarehouseConnection[] {
+	#warehouse(scope: Scope): MockWarehouse[] {
 		return this.#data.warehouseByLocation[scope.locationId] ?? [];
 	}
 

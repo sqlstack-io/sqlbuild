@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import { loginWithPassword } from '$lib/api/http-client';
 	import { safeNext } from '$lib/next';
+	import { to } from '$lib/paths';
 
 	let username = $state('');
 	let password = $state('');
@@ -28,7 +29,7 @@
 		const outcome = await loginWithPassword(username, password).catch(() => 'unavailable' as const);
 		busy = false;
 		if (outcome === 'ok') {
-			window.location.assign(destination());
+			window.location.assign(to(destination()));
 			return;
 		}
 		password = '';

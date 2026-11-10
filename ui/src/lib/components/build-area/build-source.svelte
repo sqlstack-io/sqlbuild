@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { NodeBuild } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
@@ -12,7 +13,7 @@
 {#if !build}
 	<span class="muted">Never built in this target</span>
 {:else if build.runId}
-	<a class="run" href="/runs/{build.runId}">{build.runId}</a>{#if time}<span class="muted" title={formatStamp(build.builtAt)}>{` · ${formatAgo(build.builtAt, app.now)}`}</span>{/if}
+	<a class="run" href={to(`/runs/${build.runId}`)}>{build.runId}</a>{#if time}<span class="muted" title={formatStamp(build.builtAt)}>{` · ${formatAgo(build.builtAt, app.now)}`}</span>{/if}
 {:else}
 	<span class="muted" title="Built by sqb outside this server, e.g. from a laptop or CI · fingerprint run {build.fingerprintRunId} · {formatStamp(build.builtAt)}">From the command line · <code>{shortRunId(build.fingerprintRunId)}</code>{#if time} · {formatAgo(build.builtAt, app.now)}{/if}</span>
 {/if}

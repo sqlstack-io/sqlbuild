@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
 use crate::platform::_helpers::connection_tests::authorize_connection_test;
-use crate::platform::main::read_location_work::read_location_work;
+use crate::platform::main::_read_target_work::read_target_work;
 use crate::platform::models::{LocationWork, LocationWorkRecord};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
@@ -21,12 +21,10 @@ pub async fn read_person_connection_test(
         (location_id, target),
     )
     .await?;
-    let (transaction, result) = read_location_work(transaction, request_id).await?;
-    let result = result.map(|stored| stored.record).filter(|record| {
-        record.request_json.location_id == location_id
-            && record.request_json.target == target
-            && matches!(record.request_json.work, LocationWork::CheckConnection {})
-    });
+    let (transaction, record) =
+        read_target_work(transaction, (location_id, target, request_id)).await?;
+    let result = record
+        .filter(|record| matches!(record.request_json.work, LocationWork::CheckConnection {}));
     commit(transaction).await?;
     Ok(result)
 }

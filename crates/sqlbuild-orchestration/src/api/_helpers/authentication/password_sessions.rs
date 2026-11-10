@@ -70,6 +70,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::administrators::people),
         )
         .route(
+            "/api/admin/server",
+            get(crate::api::_helpers::resources::administrators::server),
+        )
+        .route(
             "/api/admin/locations/{location_id}/targets/{target}/roles",
             get(crate::api::_helpers::resources::administrators::definitions),
         )
@@ -111,6 +115,14 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_location_work::result),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/plans",
+            post(crate::api::_helpers::resources::person_plans::request),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}",
+            get(crate::api::_helpers::resources::person_plans::read),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs",
             get(crate::api::_helpers::resources::person_operations::recent_runs),
         )
@@ -143,6 +155,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::trigger_changes),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/sensor",
+            get(crate::api::_helpers::resources::person_reads::sensor_state),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/snapshots",
             get(crate::api::_helpers::resources::person_reads::snapshots),
         )
@@ -153,6 +169,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/platform/problems",
             get(crate::api::_helpers::resources::person_reads::problems),
+        )
+        .route(
+            "/api/control/platform/events",
+            get(crate::api::_helpers::resources::person_reads::platform_events),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/column-lineage",

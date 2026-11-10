@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import type { RunRef } from '$lib/api';
 	import { formatAgo } from '$lib/format/time';
@@ -12,10 +13,10 @@
 <div class="box">
 	<Handle type="target" position={Position.Left} class="box-handle" />
 	<div class="head">
-		<a href="/jobs/{d.jobKey}" class="name">{d.jobKey}</a>
+		<a href={to(`/jobs/${d.jobKey}`)} class="name">{d.jobKey}</a>
 		<span class="faint">{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>
 		{#if d.lastRun}
-			<a href="/runs/{d.lastRun.id}" class="last" title="Last run of {d.jobKey}">
+			<a href={to(`/runs/${d.lastRun.id}`)} class="last" title="Last run of {d.jobKey}">
 				<i style:background={runStatusTone[d.lastRun.status]}></i>{runStatusLabel[d.lastRun.status]}{d.lastRun.startedAt ? ` · ${formatAgo(d.lastRun.startedAt, app.now)}` : ''}
 			</a>
 		{/if}

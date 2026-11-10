@@ -1,7 +1,6 @@
 //! Commit the requested phase before evaluation, so crashes count as attempts.
 
 use chrono::TimeDelta;
-use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
@@ -9,7 +8,7 @@ use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
 use crate::sensors::_helpers::attempts::{defer_sensor, last_attempt, read_sensor};
 use crate::sensors::_helpers::custom::request_evaluation_work;
-use crate::sensors::_helpers::facts::append_evaluation;
+use crate::sensors::_helpers::facts::{append_evaluation, definition_fingerprint};
 use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
 use crate::sensors::models::{SensorEvaluationOutcome, SensorEvaluationRequest};
 use crate::store::errors::ControlError;
@@ -58,10 +57,7 @@ pub async fn begin_sensor_evaluation(
             return Ok(None);
         }
     }
-    let definition_fingerprint = sha256_hex(
-        &serde_json::to_vec(&sensor.definition_json)
-            .map_err(|error| ControlError::Invalid(error.to_string()))?,
-    );
+    let definition_fingerprint = definition_fingerprint(&sensor.definition_json)?;
     let request = SensorEvaluationRequest {
         evaluation_id: Uuid::now_v7(),
         trigger_id: sensor.trigger_id,

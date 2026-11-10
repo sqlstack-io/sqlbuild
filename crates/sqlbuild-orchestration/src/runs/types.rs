@@ -1,15 +1,29 @@
 //! The command planner the server is built with; the CLI owns the grammar and the selector resolver.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::runs::models::{CommandPlan, PlannerResource};
 
-/// Parse `command` with the CLI's grammar and resolve its selectors over `resources`; pure and side-effect free.
+/// Each published job and job group's exact `kind:name` selection, by name.
+pub type PublishedJobs = BTreeMap<String, BTreeSet<String>>;
+
+/// Parse `command` with the CLI's grammar and resolve its selectors over a publication; pure and side-effect free.
 pub trait CommandPlanner: Send + Sync {
-    /// The verb, exact node keys and validated settings, or why the command is refused.
+    /// The verb, exact node keys and validated settings, or why the command is refused; `job:` selects published jobs.
     fn plan(
         &self,
         command: &[String],
-        resources: &[PlannerResource],
+        publication: (&[PlannerResource], &PublishedJobs),
     ) -> Result<CommandPlan, String>;
+}
+
+/// Which runs of one location and target to list.
+#[derive(Clone, Copy, Debug)]
+pub enum RunsListing {
+    /// Newest first: at most this many, after the queue time and ID of a previous page's last run.
+    Newest(u32, Option<(chrono::DateTime<chrono::Utc>, uuid::Uuid)>),
+    /// Queued runs in claim order, at most this many, each with its queue state.
+    Queue(u32),
 }
 
 /// What the API hands runs to workers with: their Docker images and the command planner.

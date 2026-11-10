@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -39,7 +40,7 @@
 
 <AppTopbar title="Runs">
 	{#if app.client.supports('launchAdhocRun')}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref())}>▷ New run</GatedButton>
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref()))}>▷ New run</GatedButton>
 	{/if}
 </AppTopbar>
 

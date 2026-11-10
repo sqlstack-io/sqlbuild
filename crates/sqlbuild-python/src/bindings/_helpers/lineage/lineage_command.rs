@@ -67,7 +67,7 @@ const GRAPH_VIEW_NAMES: [&str; 5] = [
     "path_index",
 ];
 /// Selector kinds that match a set of resources rather than a named anchor.
-const SET_SELECTOR_KINDS: [&str; 2] = ["tag", "path"];
+const SET_SELECTOR_KINDS: [&str; 3] = ["tag", "path", "job"];
 
 /// The relation graph lineage reads: a cached index, or a compiled graph with its adapter.
 enum LineageSource<'py> {

@@ -83,7 +83,7 @@ fn given_mixed_physical_and_parent_waiters_when_admitting_then_priority_and_queu
                 queue(store, &physical).await;
                 request_job_run(
                     store,
-                    &actor,
+                    (&actor, None),
                     &JobRunRequest {
                         run_id: Uuid::from_u128(100),
                         location_id: location,
@@ -93,6 +93,8 @@ fn given_mixed_physical_and_parent_waiters_when_admitting_then_priority_and_queu
                         priority: test_case.parent_priority,
                         window: None,
                         full_refresh: false,
+                        select: Vec::new(),
+                        exclude: Vec::new(),
                     },
                 )
                 .await
@@ -183,7 +185,7 @@ fn given_group_children_sharing_a_limit_of_one_when_claiming_then_they_run_one_a
             publish_snapshot(store, &input).await.expect("publish");
             request_job_run(
                 store,
-                &actor,
+                (&actor, None),
                 &JobRunRequest {
                     run_id: Uuid::now_v7(),
                     location_id: location,
@@ -193,6 +195,8 @@ fn given_group_children_sharing_a_limit_of_one_when_claiming_then_they_run_one_a
                     priority: 1,
                     window: None,
                     full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
                 },
             )
             .await
@@ -285,7 +289,7 @@ fn given_an_unserved_queued_group_when_dispatching_an_eligible_scope_then_unknow
                 publish_snapshot(store, &input).await.expect("publish");
                 request_job_run(
                     store,
-                    &actor,
+                    (&actor, None),
                     &JobRunRequest {
                         run_id: location,
                         location_id: location,
@@ -295,6 +299,8 @@ fn given_an_unserved_queued_group_when_dispatching_an_eligible_scope_then_unknow
                         priority: 1,
                         window: None,
                         full_refresh: false,
+                        select: Vec::new(),
+                        exclude: Vec::new(),
                     },
                 )
                 .await
@@ -522,7 +528,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                 for index in 0..test_case.parents.len() {
                     request_job_run(
                         store,
-                        &actor,
+                        (&actor, None),
                         &JobRunRequest {
                             // Higher-priority arrivals contend with groups that already hold their limits.
                             run_id: Uuid::from_u128(1000 - index as u128),
@@ -533,6 +539,8 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                             priority: index as i64 + 1,
                             window: None,
                             full_refresh: false,
+                            select: Vec::new(),
+                            exclude: Vec::new(),
                         },
                     )
                     .await
@@ -659,8 +667,10 @@ fn given_an_older_blocked_allow_group_when_an_independent_generation_is_queued_t
                 priority: 1,
                 window: None,
                 full_refresh: false,
+                select: Vec::new(),
+                exclude: Vec::new(),
             };
-            request_job_run(store, &actor, &older)
+            request_job_run(store, (&actor, None), &older)
                 .await
                 .expect("older request");
             input.generation = 2;
@@ -678,7 +688,7 @@ fn given_an_older_blocked_allow_group_when_an_independent_generation_is_queued_t
                 reason: "Independent replacement generation".into(),
                 ..older.clone()
             };
-            request_job_run(store, &actor, &newer)
+            request_job_run(store, (&actor, None), &newer)
                 .await
                 .expect("newer request");
             let mut physical = request((location, first.snapshot_id), 3000, 10, &["products"]);
@@ -825,7 +835,7 @@ fn given_a_large_healthy_project_with_blocked_groups_when_claiming_then_unrelate
             for index in 0..test_case.group_count {
                 request_job_run(
                     store,
-                    &actor,
+                    (&actor, None),
                     &JobRunRequest {
                         run_id: Uuid::from_u128(1000 + index as u128),
                         location_id: location,
@@ -835,6 +845,8 @@ fn given_a_large_healthy_project_with_blocked_groups_when_claiming_then_unrelate
                         priority: 1,
                         window: None,
                         full_refresh: false,
+                        select: Vec::new(),
+                        exclude: Vec::new(),
                     },
                 )
                 .await

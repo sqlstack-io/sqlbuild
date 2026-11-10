@@ -13,7 +13,9 @@ use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
-use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, HumanLogin};
+use sqlbuild_orchestration::api::models::{
+    ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
+};
 use sqlbuild_orchestration::credentials::models::AuditRetention;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
@@ -112,7 +114,11 @@ pub(crate) async fn run_development_roles(
         (ApiAuthentication {
             login: HumanLogin::Development(scope),
             ..ApiAuthentication::default()
-        }, (Vec::new(), adhoc_planner()), Default::default()),
+        }, (Vec::new(), adhoc_planner()), ServerFacts {
+            version: env!("CARGO_PKG_VERSION").into(),
+            scheduler,
+            ..ServerFacts::default()
+        }),
         (move || {
             drop(write_output(&[(Stream::Stderr, &format!(
                 "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",
@@ -700,7 +706,7 @@ pub(crate) async fn check_location_connection(
     )))
 }
 
-fn location_child(options: &LocationServe, script: &Path) -> Command {
+pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command {
     let mut command = Command::new(script);
     command.arg("--project-dir").arg(&options.project_dir);
     if terminal_columns().is_err() {

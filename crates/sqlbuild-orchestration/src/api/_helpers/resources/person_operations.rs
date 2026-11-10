@@ -7,7 +7,7 @@ use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
-use crate::api::models::{MutationResponse, ReadQuery};
+use crate::api::models::{MutationResponse, RunsQuery};
 use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
@@ -20,7 +20,8 @@ use crate::runs::models::{
     AdhocCheck, AdhocCheckRequest, AdhocRunRequest, CancelRunRequest, JobRunRequest,
     PersonRunRequest, RerunRequest, RunRecord,
 };
-use crate::runs::types::CommandPlanner;
+use crate::runs::types::{CommandPlanner, RunsListing};
+use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
 use crate::warehouse_metadata::main::read_person_column_lineage::read_person_column_lineage;
@@ -67,14 +68,17 @@ pub(crate) async fn statistics(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request_job(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+    (Extension(AuthenticatedPerson(principal, _)), Extension(planner)): (
+        Extension<AuthenticatedPerson>,
+        Extension<Arc<dyn CommandPlanner>>,
+    ),
     Json(request): Json<JobRunRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
         applied: request_person_run(
             &store,
             (&context, principal),
-            PersonRunRequest::Job(&request),
+            PersonRunRequest::Job(planner.as_ref(), &request),
         )
         .await?,
     }))
@@ -168,20 +172,47 @@ pub(crate) async fn change_trigger(
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs", operation_id = "listPersonRuns",
-    params(("location_id" = Uuid, Path), ("target" = String, Path), ("limit" = Option<u32>, Query)),
-    responses((status = 200, body = Vec<RunRecord>), (status = 401, description = "Session rejected"),
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("limit" = Option<u32>, Query, description = "Page size; defaults to 100, capped at 1000"),
+        ("before_queued_at" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "With before_run_id: continue after this run of the previous page"),
+        ("before_run_id" = Option<Uuid>, Query),
+        ("queued" = Option<bool>, Query, description = "List queued runs in claim order, each with its position and what it waits on")),
+    responses((status = 200, body = Vec<RunRecord>, description = "Runs newest first, or the queue in claim order"),
+        (status = 400, description = "Only one of the before_* pair was given, or a cursor with queued"),
+        (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn recent_runs(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
-    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<ReadQuery>),
+    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<RunsQuery>),
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Vec<RunRecord>>, ApiError> {
+    let limit = options.limit.unwrap_or(100);
+    let listing = match (
+        options.queued,
+        options.before_queued_at,
+        options.before_run_id,
+    ) {
+        (false, Some(queued_at), Some(run_id)) => {
+            RunsListing::Newest(limit, Some((queued_at, run_id)))
+        }
+        (false, None, None) => RunsListing::Newest(limit, None),
+        (true, None, None) => RunsListing::Queue(limit),
+        (true, ..) => {
+            return Err(ControlError::Invalid("the queue is not paged".into()).into());
+        }
+        _ => {
+            return Err(ControlError::Invalid(
+                "before_queued_at and before_run_id go together".into(),
+            )
+            .into());
+        }
+    };
     Ok(Json(
         list_person_runs(
             &store,
             (&context, principal),
-            (location_id, &target, options.limit.unwrap_or(100)),
+            (location_id, &target, listing),
             default_role,
         )
         .await?,

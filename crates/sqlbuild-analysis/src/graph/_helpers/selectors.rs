@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use crate::assembly::project::types::ObjectKey;
 use crate::graph::constants::{
     EMPTY_SELECTOR_CODE, EMPTY_VALUE_CODE, EXPANSION_MARKER, FOLDER_SEPARATOR,
-    INTERSECTION_SEPARATOR, KIND_SEPARATOR, MISPLACED_MARKER_CODE, MISSING_NAME_CODE,
+    INTERSECTION_SEPARATOR, JOB_KIND, KIND_SEPARATOR, MISPLACED_MARKER_CODE, MISSING_NAME_CODE,
     MODEL_RESOURCE, MODEL_ROOT, MODEL_ROOT_PREFIX, NAME_KIND, PATH_KIND, PATH_ROOT_CODE,
     PATH_ROOT_ERROR, PATH_SELECTOR_CODE, PATH_SEPARATOR, PATTERN_CHARACTERS, PLANNER_DEFAULT_CODE,
     SEED_RESOURCE, SOURCE_RESOURCE, SQL_FILE_SUFFIX, SUGGESTION_CUTOFF, SUGGESTION_LIMIT,
@@ -161,10 +161,41 @@ fn path(graph: &ProjectGraph, names: (&str, &str), expand: (bool, bool)) -> Reso
 }
 
 fn named(graph: &ProjectGraph, name: &str) -> Result<ObjectKey, SelectorError> {
-    graph
-        .key_named(name)
-        .cloned()
-        .ok_or_else(|| error(UNKNOWN_NAME_CODE, format!("unknown selector name '{name}'")))
+    if let Some(key) = graph.key_named(name) {
+        return Ok(key.clone());
+    }
+    let job: bool = name.starts_with(&format!("{JOB_KIND}{KIND_SEPARATOR}"))
+        || graph
+            .jobs
+            .as_ref()
+            .is_some_and(|jobs| jobs.contains_key(name));
+    Err(if job {
+        error(
+            PATH_SELECTOR_CODE,
+            format!("path selector endpoint '{name}' is a job; path selectors join two nodes"),
+        )
+    } else {
+        error(UNKNOWN_NAME_CODE, format!("unknown selector name '{name}'"))
+    })
+}
+
+/// Whether a `job:` part or an unknown bare name in `selectors` needs jobs; paths never do.
+pub(crate) fn needs_jobs(graph: &ProjectGraph, selectors: &[String], also_known: &[&str]) -> bool {
+    selectors
+        .iter()
+        .flat_map(|selector| selector.split(char::is_whitespace))
+        .flat_map(|token| token.split(INTERSECTION_SEPARATOR))
+        .filter(|part| !part.is_empty())
+        .any(|part| match parse(part) {
+            Ok(ParsedSelector::Kind { kind, value, .. }) => {
+                kind == JOB_KIND
+                    || (kind == NAME_KIND
+                        && !is_pattern(&value)
+                        && graph.key_named(&value).is_none()
+                        && !also_known.contains(&value.as_str()))
+            }
+            _ => false,
+        })
 }
 
 pub(crate) fn parse(raw: &str) -> Result<ParsedSelector, SelectorError> {
@@ -241,6 +272,7 @@ fn is_selector_kind(prefix: &str) -> bool {
         TAG_KIND,
         PATH_KIND,
         TEST_KIND,
+        JOB_KIND,
     ]
     .contains(&prefix)
         || UNMAPPED_KINDS.contains(&prefix)
@@ -260,6 +292,7 @@ pub(crate) fn matched(graph: &ProjectGraph, kind: &str, value: &str) -> Resolved
             Ok(keys)
         }
         PATH_KIND => folder(graph, value),
+        JOB_KIND => job(graph, value),
         TEST_KIND => Err(error(
             UNIT_TEST_CODE,
             format!(
@@ -273,7 +306,17 @@ pub(crate) fn matched(graph: &ProjectGraph, kind: &str, value: &str) -> Resolved
                 return Ok(keys);
             }
             let pattern: bool = is_pattern(value);
-            let names: Vec<&str> = graph.names.iter().map(|(name, _)| name.as_str()).collect();
+            let names: Vec<&str> = graph
+                .names
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .chain(
+                    graph
+                        .jobs
+                        .iter()
+                        .flat_map(|jobs| jobs.keys().map(String::as_str)),
+                )
+                .collect();
             Err(SelectorError {
                 code: UNKNOWN_NAME_CODE,
                 message: format!(
@@ -309,6 +352,12 @@ fn lookup(graph: &ProjectGraph, kind: &str, value: &str) -> Resolved {
     };
     let kind_matches = |key: &ObjectKey| resource.is_none_or(|resource| key.0 == resource);
     if !is_pattern(value) {
+        if resource.is_none()
+            && graph.key_named(value).is_none()
+            && let Some(Some(keys)) = graph.jobs.as_ref().map(|jobs| jobs.get(value))
+        {
+            return keys.clone();
+        }
         return Ok(graph
             .key_named(value)
             .filter(|key| kind_matches(key))
@@ -322,6 +371,40 @@ fn lookup(graph: &ProjectGraph, kind: &str, value: &str) -> Resolved {
         .filter(|(name, key)| kind_matches(key) && glob_matches(value, name))
         .map(|(_, key)| key.clone())
         .collect())
+}
+
+/// The nodes the jobs and job groups `value` names or matches select.
+fn job(graph: &ProjectGraph, value: &str) -> Resolved {
+    let Some(jobs) = &graph.jobs else {
+        return Err(error(
+            UNMAPPED_KIND_CODE,
+            format!(
+                "selector '{JOB_KIND}{KIND_SEPARATOR}{value}' selects a job; jobs cannot be selected here"
+            ),
+        ));
+    };
+    let pattern: bool = is_pattern(value);
+    let mut keys: Keys = Keys::new();
+    let mut found: bool = false;
+    for (name, selected) in jobs {
+        if name == value || (pattern && glob_matches(value, name)) {
+            found = true;
+            keys.extend(selected.clone()?);
+        }
+    }
+    if found {
+        return Ok(keys);
+    }
+    Err(SelectorError {
+        code: UNKNOWN_NAME_CODE,
+        message: format!(
+            "unknown job {} '{value}'",
+            if pattern { "pattern" } else { "name" }
+        ),
+        help: (!pattern)
+            .then(|| suggestion(value, jobs.keys().map(String::as_str).collect()))
+            .flatten(),
+    })
 }
 
 fn folder(graph: &ProjectGraph, value: &str) -> Resolved {

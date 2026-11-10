@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { RunNode } from '$lib/api';
 	import { shortRunId } from '$lib/operate/labels';
 	import type { RunDetailState } from './state.svelte';
@@ -54,7 +55,7 @@
 									{#if why.runId === ownRun || view.nodes.some((x) => x.nodeKey === why.nodeKey)}
 										<button class="link mono" onclick={() => view.selectNode(why.nodeKey)}>{why.nodeKey}</button>
 									{:else}
-										<a class="link mono" href="/runs/{why.runId}">{why.nodeKey}</a>
+										<a class="link mono" href={to(`/runs/${why.runId}`)}>{why.nodeKey}</a>
 									{/if}
 									failed{#if why.runId !== n.runId}&nbsp;in {why.jobKey ?? shortRunId(why.runId)}{/if}
 								</div>

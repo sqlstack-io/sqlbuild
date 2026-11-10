@@ -46,8 +46,10 @@ pub(crate) async fn trigger_scope(
         priority: 0,
         window: None,
         full_refresh: false,
+        select: Vec::new(),
+        exclude: Vec::new(),
     };
-    let (transaction, frozen) = frozen_job_request(transaction, context, &job).await?;
+    let (transaction, frozen) = frozen_job_request(transaction, (context, None), &job).await?;
     let (transaction, nodes) =
         job_write_set(transaction, frozen.snapshot_id, &frozen.selection).await?;
     Ok((

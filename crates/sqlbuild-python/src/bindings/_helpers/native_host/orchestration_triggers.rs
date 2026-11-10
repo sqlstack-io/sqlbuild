@@ -28,7 +28,7 @@ use crate::bindings::_helpers::native_host::constants::{
 };
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    AuthoredSensor, authored_setting,
+    AuthoredSensor, authored_setting, declared_at,
 };
 use crate::bindings::_helpers::native_host::orchestration_environment::{
     callback_code_hash, orchestration_code_hash,
@@ -56,6 +56,8 @@ fn compile_trigger(
             .map_err(|error| PyValueError::new_err(format!("starts_at: {error}")))?,
         default_status: serde_json::from_value(Value::String(controls.default_status))
             .map_err(|error| PyValueError::new_err(format!("default_status: {error}")))?,
+        targets: BTreeSet::new(),
+        declared_at: None,
     })
 }
 
@@ -236,6 +238,13 @@ pub(crate) fn compile_calendars(
             let schedule = calendar_times(calendar, &session, &by_name, start)?;
             let mut trigger = compile_trigger(calendar, &job_key, &description, schedule)?;
             trigger.starts_at.get_or_insert(start);
+            trigger.targets = calendar
+                .getattr("targets")?
+                .extract::<Vec<String>>()?
+                .into_iter()
+                .collect();
+            trigger.declared_at =
+                declared_at(project_dir, calendar.getattr("_declared_at")?.extract()?)?;
             definitions.triggers.insert(name, trigger);
         }
         Ok(definitions)
@@ -295,6 +304,8 @@ pub(crate) fn compile_sensors(
             "when": condition,
             "minimum_interval_seconds": sensor.minimum_interval_seconds,
             "default_status": sensor.default_status,
+            "targets": sensor.targets,
+            "declared_at": declared_at(project_dir, sensor.declared_at)?,
         }))
         .map_err(|error| PyValueError::new_err(format!("sensor {}: {error}", sensor.name)))?;
         definitions.sensors.insert(sensor.name, definition);

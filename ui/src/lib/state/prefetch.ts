@@ -1,8 +1,11 @@
 import { browser } from '$app/environment';
 import type { ApiClient, Scope } from '$lib/api';
 
-/** How long a click waits on the current page for the next page's data before switching anyway. */
-const HOLD_MS = 1500;
+/**
+ * How long a click waits on the current page for the next page's data, so a quick answer shows
+ * whole instead of empty for a moment; longer than this, the page switches and shows its own loading state.
+ */
+const HOLD_MS = 200;
 /** A prefetched read older than this, such as from a hover with no click, is read again instead. */
 const KEEP_MS = 5000;
 
@@ -37,8 +40,8 @@ export function withPrefetch(client: ApiClient): ApiClient {
 }
 
 /**
- * Starts the reads the page at `pathname` makes first and waits for them, up to a limit, so a click
- * stays on the current page until the next one has its data. Errors are left for the page to show.
+ * Starts the reads the page at `pathname` makes first and waits for them briefly, so a fast answer
+ * arrives with the page. Errors are left for the page to show.
  */
 export async function prefetch(scope: Scope | null, pathname: string, search: URLSearchParams, reads: [RegExp, Read][]): Promise<void> {
 	if (!browser || !base || !scope) return;

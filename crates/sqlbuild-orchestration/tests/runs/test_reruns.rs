@@ -72,7 +72,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             let source_id = Uuid::now_v7();
             request_job_run(
                 store,
-                &context,
+                (&context, None),
                 &JobRunRequest {
                     run_id: source_id,
                     location_id: location,
@@ -82,6 +82,8 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     priority: 1,
                     window: Some(RunWindow::Integer { start: -3, end: 11 }),
                     full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
                 },
             )
             .await
@@ -92,6 +94,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 from_failure: true,
                 reason: "Retry failed orders".into(),
                 priority: 7,
+                nodes: Vec::new(),
             };
             assert!(
                 request_rerun(store, (&context, None), &retry)
@@ -319,17 +322,22 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 advance_groups(store, &lease, (&limits, scope))
                     .await
                     .expect("finish rerun");
+                let listed = list_runs(store, scope, 20)
+                    .await
+                    .expect("list finished reruns");
+                let finished = listed
+                    .iter()
+                    .find(|run| run.run_id == request.run_id)
+                    .expect("finished rerun exists");
                 assert_eq!(
-                    list_runs(store, scope, 20)
-                        .await
-                        .expect("list finished reruns")
-                        .iter()
-                        .find(|run| run.run_id == request.run_id)
-                        .expect("finished rerun exists")
-                        .status,
-                    test_case.expected_status,
+                    finished.status, test_case.expected_status,
                     "{}",
                     test_case.description
+                );
+                assert_eq!(
+                    finished.window,
+                    Some(RunWindow::Integer { start: -3, end: 11 }),
+                    "a rerun of a backfill is listed with its window"
                 );
                 assert!(slot_counts(store).await.is_empty());
                 assert!(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toColumnLineage, toNodeRuns } from './http-catalog';
+import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toColumnLineage, toMicrobatchCoverage, toNodeRuns } from './http-catalog';
 import { toCheck } from './http-checks';
 
 type W = components['schemas'];
@@ -95,6 +95,41 @@ describe('catalog node detail', () => {
 		expect([refused.sql, refused.runs, refused.jobs, refused.history]).toEqual([null, null, null, null]);
 		const withSql = nodeDetailOf(nodes, nodes[0], null, { node_key: 'model:orders', snapshot_id: 'snap', raw_sql: 'select {{ x }}', compiled_sql: null }, []);
 		expect(withSql.sql).toEqual({ raw: 'select {{ x }}', compiled: 'select {{ x }}' });
+	});
+
+	it('builds the warehouse object from the synced relation and its newest sample, and counts coverage holes', () => {
+		const [stored] = toCatalogNodes([node('model:orders', { materialization: 'table', relation: { schema: 'main', name: 'orders' } })]);
+		const sample = (observed_at: string, row_count: number | null, byte_count: number | null): W['WarehouseStatisticsRecord'] => ({ name: 'orders', state_schema: 'main', observed_at, row_count, byte_count });
+		const statistics = [sample('2026-11-07T01:00:00Z', 10, 4096), sample('2026-11-07T02:00:00Z', null, null), sample('2026-11-07T03:00:00Z', 12, null)];
+		const gap = { start: '20', end: '30', state: 'gap' as const };
+		const coverage = toMicrobatchCoverage({
+			model: 'orders', target_name: 'development', physical_generation_id: 'g', cursor_column: 'order_id', cursor_type: 'integer', batch_size: '10',
+			earliest: '0', contiguous_frontier: '20', known_gaps: [gap, { ...gap, start: '50', end: '60' }], batches_truncated: false,
+			batches: [{ start: '0', end: '10', state: 'complete', run_id: 'r1' }, { start: '10', end: '20', state: 'complete' }, gap]
+		});
+		const baseTable: W['NodeStatus']['physical'] = {
+			status: 'observed',
+			observation: { event_id: 'o', observed_at: '2026-11-07T06:00:00Z', record: { name: 'orders', relation_type: 'BASE TABLE', state_schema: 'main', columns: [{ name: 'order_id', data_type: 'INTEGER' }] } }
+		};
+		const d = nodeDetailOf([stored], stored, status({ status: 'matched', local_hash: 'a' }, baseTable), null, [], { statistics, microbatch: coverage });
+		expect(d.warehouse).toEqual({
+			relation: { database: null, schema: 'main', name: 'orders' },
+			objectType: 'table',
+			createdAt: null,
+			lastAlteredAt: null,
+			rows: 12,
+			bytes: null,
+			columns: [{ name: 'order_id', declaredType: null, actualType: 'INTEGER', state: null }],
+			stats: [
+				{ at: '2026-11-07T01:00:00Z', rows: 10, bytes: 4096 },
+				{ at: '2026-11-07T03:00:00Z', rows: 12, bytes: null }
+			],
+			syncedAt: '2026-11-07T06:00:00Z'
+		});
+		expect(d.lastRows).toBe(12);
+		expect([d.microbatch?.knownGaps, d.microbatch?.batches.map((b) => b.runId)]).toEqual([2, ['r1', null, null]]);
+		const unsynced = nodeDetailOf([stored], stored, status({ status: 'matched', local_hash: 'a' }, { status: 'unavailable', reason: 'no catalog' }), null, [], { statistics });
+		expect([unsynced.warehouse, unsynced.microbatch]).toEqual([null, null]);
 	});
 });
 

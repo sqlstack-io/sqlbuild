@@ -1,4 +1,4 @@
-//! Whether a person may still receive a target's change notices; unaudited, rechecked before every notice.
+//! Whether a person holds an action on every node of a target, unaudited: change notices recheck view before every notice, and reads trim detail with it.
 
 use uuid::Uuid;
 
@@ -11,11 +11,11 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
-/// Whether an active person still views every node of the target, as its listings require; unaudited, for change notices.
-pub(crate) async fn person_lists_target(
+/// Whether an active person holds `action` on every current node of the target; with view, as listings require.
+pub(crate) async fn person_holds_target(
     store: &ControlStore,
     principal_id: Uuid,
-    (location_id, target): (Uuid, &str),
+    (action, location_id, target): (Action, Uuid, &str),
     default_role: DefaultRole,
 ) -> Result<bool, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
@@ -43,7 +43,7 @@ pub(crate) async fn person_lists_target(
         return Ok(false);
     };
     let scope = PermissionScope {
-        action: Action::View,
+        action,
         location_id: Some(location_id),
         target: Some(target.into()),
         nodes,

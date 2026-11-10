@@ -1,23 +1,26 @@
 import createFetch from 'openapi-fetch';
+import { shortName } from '$lib/build-area/labels';
+import { isActiveRun } from '$lib/status';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns, toColumnLineage } from './http-catalog';
+import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { manualConnectionTest, toLocationDetail, toLocationSummary, warehouseSyncOf } from './http-locations';
-import { toAccount, toRoleAssignments } from './http-people';
+import { manualConnectionTest, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { toAccount, toRoleAssignments, toServerSettings } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
-import { toPlatformEvents, toPlatformHealth } from './http-problems';
+import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
-import { RUN_WINDOW, groupRunNodes, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
+import { timelineOf } from './http-timeline';
+import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, WarehouseSync } from './types';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -32,13 +35,18 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRuns',
 	'getRun',
 	'getRunDetail',
+	'listQueue',
+	'navCounts',
+	'timeline',
 	'listRunEvents',
 	'listRunStatements',
 	'getStatementSql',
 	'listRunOutput',
 	'getRunNodeError',
 	'cancelRun',
+	'cancelMatchingRuns',
 	'rerunRun',
+	'rerunSelectedNodes',
 	'listJobs',
 	'getJob',
 	'launchJob',
@@ -66,24 +74,43 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listLocations',
 	'getLocation',
 	'listPlatformEvents',
+	'listPlatformEventHistory',
 	'platformHealth',
 	'listRoles',
 	'getRole',
 	'getWarehouseSync',
 	'maintenanceHistory',
 	'testConnection',
+	'listWarehouseConnections',
+	'serverSettings',
 	'listSnapshotNodes',
 	'checkAdhocRun',
-	'launchAdhocRun'
+	'launchAdhocRun',
+	'planBuild'
 ]);
 
 /** How often a connection test asks for the location's answer, and the longest it waits. */
 const CONNECTION_TEST_POLL_MS = 1000;
 const CONNECTION_TEST_WAIT_MS = 60_000;
 
+/** How often the plan page asks for the location's plan; the server expires a plan after ten minutes. */
+const PLAN_POLL_MS = 750;
+
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
 const AUDIT_PAGE = 100;
 const AUDIT_PAGES = 10;
+
+/** The server's largest platform event scan, and how many event history reads before it stops looking. */
+const EVENT_PAGE = 500;
+const EVENT_SCANS = 10;
+
+/** How many statistics pages of 100 a node read follows, and how many samples a relation keeps. */
+const STATISTICS_PAGES = 10;
+const STATISTICS_KEPT = 1000;
+/** How many hours back a first statistics read starts, at one sample an hour with a page to spare. */
+const STATISTICS_FIRST_HOURS = STATISTICS_PAGES * 100 - 100;
+const HOUR_MS = 3_600_000;
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
 /** A UI location is one server location and target; its id carries both. */
 export function locationKey(locationId: string, target: string): string {
@@ -239,6 +266,39 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	const outputRefused = new Set<string>();
 	// A node's error text needs view.evidence on that node alone.
 	const errorRefused = new Set<string>();
+	// Targets whose health the person may not read; each refusal is audited, so Connections asks once per page load.
+	const healthRefused = new Set<string>();
+	// Statistics samples per relation, oldest first, with the cursor after the newest; a refresh reads only newer samples.
+	const samples = new Map<string, { records: Wire['WarehouseStatisticsRecord'][]; after: Wire['WarehouseMirrorCursor'] }>();
+	async function relationStatistics(scope: Scope, relation: { database: string | null; schema: string; name: string }): Promise<Wire['WarehouseStatisticsRecord'][]> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const key = JSON.stringify([scope.locationId, relation.database, relation.schema, relation.name]);
+		const held = samples.get(key);
+		// The server pages oldest first from its retention cutoff and keeps up to one sample an hour, so a first read starts
+		// late enough that its pages reach the newest sample.
+		const since = { observed_at: new Date(Date.now() - STATISTICS_FIRST_HOURS * HOUR_MS).toISOString(), event_id: NIL_UUID };
+		let after = held?.after ?? since;
+		const fresh: Wire['StatisticsObservation'][] = [];
+		for (let page = 0; page < STATISTICS_PAGES; page++) {
+			const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/statistics', {
+				params: {
+					path: { location_id: locationId, target },
+					query: { database: relation.database ?? undefined, schema: relation.schema, name: relation.name, after_observed_at: after?.observed_at, after_event_id: after?.event_id }
+				}
+			});
+			if (response.status === 401) onUnauthorized();
+			// Statistics need the same view as the node; a refusal leaves the samples out rather than failing the page.
+			if (!data) return held?.records ?? [];
+			fresh.push(...data.records);
+			const last = data.records.at(-1);
+			if (last) after = { observed_at: last.record.observed_at, event_id: last.event_id };
+			if (!data.next_after) break;
+		}
+		if (!held && !fresh.length) return [];
+		const records = [...(held?.records ?? []), ...fresh.map((o) => o.record)].slice(-STATISTICS_KEPT);
+		samples.set(key, { records, after });
+		return records;
+	}
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -251,7 +311,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			evidenceLocations = new Set(bootstrap.locations.filter((l) => l.capabilities?.includes('view.evidence')).map((l) => l.id));
 			return bootstrap;
 		},
-		listRunRows: async (scope: Scope, query: RunRowQuery = {}): Promise<RunRowPage> => runRowPage(await listedRuns(scope), scope.locationId, query),
+		listRunRows: async (scope: Scope, query: RunRowQuery = {}): Promise<RunRowPage> =>
+			runRowPageOver(await runWindows(scope, (w) => w.length > parseRunCursor(query.cursor).older), scope.locationId, query),
+		async cancelMatchingRuns(scope: Scope, query: RunRowQuery): Promise<BulkRunResult> {
+			const { rows } = runRowPageOver([await listedRuns(scope)], scope.locationId, { ...query, cursor: null, limit: RUN_WINDOW });
+			const result: BulkRunResult = { done: [], failed: [] };
+			for (const { run } of rows.filter((row) => isActiveRun(row.run.status) && !row.cancelRequestedAt)) {
+				const body = { run_id: run.id, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
+				const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+				if (response.status === 401) onUnauthorized();
+				if (response.ok) result.done.push(run.id);
+				else result.failed.push({ runId: run.id, error: errorText(error, response) });
+			}
+			forgetPending();
+			return result;
+		},
 		runTabCounts: async (scope: Scope, query: RunRowQuery = {}): Promise<RunTabCounts> => runTabCountsOf(await listedRuns(scope), scope.locationId, query),
 		getRun: async (scope: Scope, runId: string): Promise<Run | null> => (await findRun(scope, runId))?.run ?? null,
 		async getRunDetail(scope: Scope, runId: string): Promise<RunDetail | null> {
@@ -260,7 +334,30 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const { run, wire, listed } = found;
 			const owners = [run, ...listed.filter((r) => r.parentRunId === run.id)];
 			const [own, ...children] = await Promise.all(owners.map(async (owner) => (await runNodes(scope, owner.id)).map((n) => toRunNode(n, owner))));
-			return runDetailOf(run, wire, listed, groupRunNodes(own, children.flat()));
+			const detail = runDetailOf(run, wire, listed, groupRunNodes(own, children.flat()));
+			if (run.status === 'queued') detail.waits = (await queueEntries(scope)).find((q) => q.run.id === run.id)?.waits ?? [];
+			return detail;
+		},
+		listQueue: (scope: Scope): Promise<QueueEntry[]> => queueEntries(scope),
+		async navCounts(scope: Scope): Promise<NavCounts> {
+			// The nodes listing goes first: a person who can't list the whole target gets one audited refusal, not five.
+			const nodes = await implemented.listCatalogNodes(scope);
+			const [checks, runs, triggers, events] = await Promise.all([implemented.listChecks(scope), listedRuns(scope), listedTriggers(scope), problems()]);
+			return {
+				catalogNodes: nodes.length,
+				failingChecks: checks.filter((c) => c.latest && ['fail', 'error', 'warn'].includes(c.latest.outcome)).length,
+				activeRuns: toRuns(runs, scope.locationId).filter((r) => !r.parentRunId && isActiveRun(r.status)).length,
+				pausedTriggers: triggers.filter((t) => t.status === 'paused').length,
+				activePlatformEvents: toPlatformEvents(events, Date.now()).filter((e) => e.active).length
+			};
+		},
+		async timeline(scope: Scope, window: { since: string; until: string }): Promise<Timeline> {
+			// Runs back to the window's start, at most ten windows; each schedule's recent ticks for covered markers.
+			const reached = (w: Wire['RunRecord'][][]) => w.length >= 10 || (w.at(-1)?.at(-1)?.queued_at ?? '') < window.since;
+			const [windows, jobs, triggers] = await Promise.all([runWindows(scope, reached), listedJobs(scope), listedTriggers(scope)]);
+			const schedules = triggers.filter((t) => 'schedule' in t.definition_json);
+			const ticks = (await Promise.all(schedules.map((t) => ticksOf(scope, t.trigger_id, 200)))).flat();
+			return timelineOf({ runs: windows.flat(), jobs, triggers, ticks }, scope.locationId, window, Date.now());
 		},
 		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 			const limit = query.limit ?? 1000;
@@ -312,16 +409,25 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		async cancelRun(scope: Scope, runId: string): Promise<Run> {
 			const body = { run_id: runId, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-			inFlight.clear();
+			forgetPending();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, runId);
+		},
+		async rerunSelectedNodes(scope: Scope, runId: string, nodes: string[]): Promise<Run> {
+			const source = await requireRun(scope, runId);
+			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: false, nodes, priority: source.priority, reason: 'Rerun selected nodes from the web UI' };
+			const { error, response } = await http.POST('/api/control/runs/rerun', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			forgetPending();
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			return requireRun(scope, body.run_id);
 		},
 		async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 			const source = await requireRun(scope, runId);
 			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/rerun', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-			inFlight.clear();
+			forgetPending();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
@@ -371,10 +477,35 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, command: request.command, priority: request.priority, reason: 'Started from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/adhoc', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-			inFlight.clear();
+			forgetPending();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
+		},
+		/** Queues the plan, then waits for the location's document; a plan the location could not make is a result, not a throw. */
+		async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const path = { location_id: locationId, target };
+			const requestId = crypto.randomUUID();
+			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/plans', {
+				body: { request_id: requestId, command },
+				params: { path, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (asked.response.status === 401) onUnauthorized();
+			if (asked.response.status === 400) return { plan: null, error: errorText(asked.error, asked.response) };
+			if (!asked.response.ok) throw new ApiError(errorText(asked.error, asked.response), asked.response.status);
+			for (;;) {
+				await new Promise((resolve) => setTimeout(resolve, PLAN_POLL_MS));
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}', {
+					params: { path: { ...path, request_id: requestId } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+				if (!data) throw new ApiError('The plan request disappeared', 404);
+				const outcome = data.result_json?.outcome;
+				if (outcome) return planResultOf(outcome);
+				if (Date.parse(data.expires_at) <= Date.now()) return { plan: null, error: 'The location did not plan the command in time; check that sqb location serve is running' };
+			}
 		},
 		async listSnapshotChanges(scope: Scope, query: { limit?: number } = {}): Promise<SnapshotChange[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -441,6 +572,31 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return toMaintenanceHistory(data);
 		},
 		listPlatformEvents: async (): Promise<PlatformEvent[]> => toPlatformEvents(await problems(), Date.now()),
+		async listPlatformEventHistory(query: PlatformEventQuery = {}): Promise<PlatformEventRecord[]> {
+			const limit = query.limit ?? 200;
+			const wanted = (wire: Wire['PersonPlatformEvent']) =>
+				(query.locationId === undefined || (wire.location_id && wire.target ? locationKey(wire.location_id, wire.target) : null) === query.locationId) &&
+				(!query.kinds?.length || query.kinds.includes(wire.event.kind));
+			/** Each scan skips the events the person may not see, so one can come back short; keep scanning until enough match. */
+			async function storedEvents(): Promise<Wire['PersonPlatformEvent'][]> {
+				const kept: Wire['PersonPlatformEvent'][] = [];
+				let before: number | undefined;
+				for (let scan = 0; scan < EVENT_SCANS && kept.length < limit; scan++) {
+					const { data, error, response } = await http.GET('/api/control/platform/events', { params: { query: { limit: EVENT_PAGE, before } } });
+					if (response.status === 401) onUnauthorized();
+					if (!data) throw new ApiError(errorText(error, response), response.status);
+					kept.push(...data.events.filter(wanted));
+					if (data.before === null || data.before === undefined) break;
+					before = data.before;
+				}
+				return kept.slice(0, limit);
+			}
+			const [open, stored, locations] = await Promise.all([problems().then((p) => toPlatformEvents(p, Date.now())), storedEvents(), bootstrapLocations()]);
+			const records = toPlatformEventRecords(open, stored, new Map(locations.map((l) => [l.id, l.name])));
+			return records.filter(
+				(r) => (query.locationId === undefined || r.locationId === query.locationId) && (!query.kinds?.length || query.kinds.includes(r.kind)) && (!query.activeOnly || r.active)
+			);
+		},
 		platformHealth: async (): Promise<PlatformHealth> => toPlatformHealth(await problems()),
 		/** Each location the person sees, with health only where they may list the whole target. */
 		async listLocations(): Promise<LocationSummary[]> {
@@ -453,6 +609,20 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				})
 			);
 		},
+		/** Targets whose health the person may not read are left out, as their connection checks are part of it. */
+		async listWarehouseConnections(): Promise<WarehouseConnection[]> {
+			const locations = (await bootstrapLocations()).filter((l) => !healthRefused.has(l.id));
+			const read = await Promise.all(
+				locations.map(async (location) => {
+					const { locationId, target } = parseLocationKey(location.id);
+					const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
+					if (response.status === 401) onUnauthorized();
+					if (response.status === 403) healthRefused.add(location.id);
+					return data ? [toWarehouseConnection(location, data)] : [];
+				})
+			);
+			return read.flat();
+		},
 		/** Null for a location the person can't see; a refused health read fails the page, as the target's listings do. */
 		async getLocation(locationId: string): Promise<LocationDetail | null> {
 			const location = (await bootstrapLocations()).find((l) => l.id === locationId);
@@ -462,6 +632,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return toLocationDetail(location, health.data, snapshot, Date.now());
 		},
 		listAccounts: async (): Promise<Account[]> => (await people()).map(toAccount),
+		async serverSettings(): Promise<ServerSettings> {
+			const { data, error, response } = await http.GET('/api/admin/server');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toServerSettings(data);
+		},
 		listRoles: async (locationId: string): Promise<RoleDefinition[]> => (await roleOverviews(locationId)).map(toRoleDefinition),
 		async getRole(locationId: string, name: string): Promise<RoleDetail | null> {
 			const [roles, assignments] = await Promise.all([roleOverviews(locationId), implemented.listRoleAssignments()]);
@@ -508,7 +684,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };
-			const [status, sql, checks, runs, jobs] = await Promise.all([
+			const [status, sql, checks, runs, jobs, statistics, coverage] = await Promise.all([
 				http.GET('/api/control/locations/{location_id}/targets/{target}/node-status', { params: { path, query: { node_key: node.key } } }),
 				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
@@ -517,12 +693,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				node.kind === 'source'
 					? null
 					: http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs', { params: { path: { ...path, node_key: node.key }, query: { limit: 100 } } }),
-				Promise.all([listedJobs(scope), listedTriggers(scope)]).then(([j, t]) => nodeJobsOf(node.key, j, t)).catch(() => null)
+				Promise.all([listedJobs(scope), listedTriggers(scope)]).then(([j, t]) => nodeJobsOf(node.key, j, t)).catch(() => null),
+				node.relation ? relationStatistics(scope, node.relation) : [],
+				node.materialization?.includes('microbatch')
+					? http.GET('/api/control/locations/{location_id}/targets/{target}/microbatches/{model}', { params: { path: { ...path, model: shortName(node.key) } } })
+					: null
 			]);
 			if (status.response.status === 401 || sql?.response.status === 401 || runs?.response.status === 401) onUnauthorized();
 			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
-			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), { runs: runs?.data ? toNodeRuns(runs.data) : null, jobs });
+			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), {
+				runs: runs?.data ? toNodeRuns(runs.data) : null,
+				jobs,
+				statistics,
+				microbatch: coverage?.data ? toMicrobatchCoverage(coverage.data) : null
+			});
 		},
 		async overview(scope: Scope): Promise<Overview | null> {
 			// A week of publications for the models metric; the server returns at most 100.
@@ -569,8 +754,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const [wires, runs] = await Promise.all([listedTriggers(scope), recentRuns(scope)]);
 			const wire = wires.find((t) => t.trigger_id === id);
 			if (!wire) return null;
-			const [ticks, changes] = await Promise.all([ticksOf(scope, id, 100).then((t) => t.map(toTick)), triggerChangesOf(scope, id)]);
-			return triggerDetailOf(toTrigger(wire, runs, ticks[0] ?? null), wire, ticks, changes.map(toTriggerStateEvent));
+			const [ticks, changes, sensor] = await Promise.all([
+				ticksOf(scope, id, 100).then((t) => t.map(toTick)),
+				triggerChangesOf(scope, id),
+				'when' in wire.definition_json ? sensorStateOf(scope, id) : null
+			]);
+			return triggerDetailOf(toTrigger(wire, runs, ticks[0] ?? null), wire, ticks, changes.map(toTriggerStateEvent), sensor);
 		},
 		async setTriggerStates(scope: Scope, ids: string[], state: TriggerState, reason?: string | null): Promise<Trigger[]> {
 			for (const [done, id] of ids.entries()) {
@@ -605,6 +794,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	 * instead of each asking the server again. A write clears it, so reads after a write see it.
 	 */
 	const inFlight = new Map<string, Promise<unknown>>();
+	/** Windows of runs older than the newest, by the run each starts after; a mutation here forgets them. */
+	const olderWindows = new Map<string, Promise<Wire['RunRecord'][]>>();
+	function forgetPending() {
+		inFlight.clear();
+		olderWindows.clear();
+	}
 	function shared<T>(key: string, load: () => Promise<T>): Promise<T> {
 		const pending = inFlight.get(key) as Promise<T> | undefined;
 		if (pending) return pending;
@@ -647,6 +842,16 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	async function triggerChangesOf(scope: Scope, triggerId: string) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/changes', {
+			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit: 100 } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function sensorStateOf(scope: Scope, triggerId: string) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/sensor', {
 			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit: 100 } }
 		});
 		if (response.status === 401) onUnauthorized();
@@ -757,12 +962,52 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	async function changeTrigger(triggerId: string, change: Wire['TriggerChange'], reason?: string | null) {
 		const body = { trigger_id: triggerId, event_id: crypto.randomUUID(), actor: '', reason: reason?.trim() || 'Changed from the web UI', change };
 		const { error, response } = await http.POST('/api/control/triggers', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-		inFlight.clear();
+		forgetPending();
 		if (response.status === 401) onUnauthorized();
 		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 	}
 
 	const listedRuns = (scope: Scope) => shared(`runs ${scope.locationId}`, () => fetchRuns(scope));
+
+	/** The newest window of runs, then older full windows until `enough` says so. */
+	async function runWindows(scope: Scope, enough: (windows: Wire['RunRecord'][][]) => boolean) {
+		const windows = [await listedRuns(scope)];
+		for (let last = windows[0]; !enough(windows) && last.length === RUN_WINDOW; windows.push(last)) {
+			last = await olderRuns(scope, last[last.length - 1]);
+		}
+		return windows;
+	}
+
+	function olderRuns(scope: Scope, after: Wire['RunRecord']) {
+		const key = `${scope.locationId}|${after.queued_at}|${after.run_id}`;
+		const cached = olderWindows.get(key);
+		if (cached) return cached;
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const load = http
+			.GET('/api/control/locations/{location_id}/targets/{target}/runs', {
+				params: { path: { location_id: locationId, target }, query: { limit: RUN_WINDOW, before_queued_at: after.queued_at, before_run_id: after.run_id } }
+			})
+			.then(({ data, error, response }) => {
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				return data;
+			});
+		olderWindows.set(key, load);
+		load.catch(() => olderWindows.delete(key));
+		return load;
+	}
+
+	/** Queued runs in claim order, with what each waits on. */
+	const queueEntries = (scope: Scope) =>
+		shared(`queue ${scope.locationId}`, async () => {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs', {
+				params: { path: { location_id: locationId, target }, query: { queued: true, limit: RUN_WINDOW } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return queueEntriesOf(data, scope.locationId);
+		});
 
 	/** The newest runs of the location, up to the server's cap. */
 	async function fetchRuns(scope: Scope) {
@@ -786,10 +1031,22 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	async function startJob(scope: Scope, key: string, options: JobLaunchOptions | undefined, fullRefresh: boolean): Promise<Run> {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const window = options?.window ? runWindowOf(options.window) : undefined;
-		const reason = fullRefresh ? 'Full refresh started from the web UI' : window ? 'Backfill started from the web UI' : 'Started from the web UI';
-		const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason, window, full_refresh: fullRefresh || undefined };
+		const narrowed = !!(options?.select?.length || options?.exclude?.length);
+		const reason = fullRefresh ? 'Full refresh started from the web UI' : window ? 'Backfill started from the web UI' : narrowed ? 'Part of the job started from the web UI' : 'Started from the web UI';
+		const body = {
+			run_id: crypto.randomUUID(),
+			location_id: locationId,
+			target,
+			job_key: key,
+			priority: 0,
+			reason,
+			window,
+			full_refresh: fullRefresh || undefined,
+			select: options?.select?.length ? options.select : undefined,
+			exclude: options?.exclude?.length ? options.exclude : undefined
+		};
 		const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-		inFlight.clear();
+		forgetPending();
 		if (response.status === 401) onUnauthorized();
 		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		return requireRun(scope, body.run_id);

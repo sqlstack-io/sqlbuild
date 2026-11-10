@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import HourglassIcon from '@lucide/svelte/icons/hourglass';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -14,7 +15,7 @@
 		</span>
 		<div class="text">
 			<strong>{b.title}</strong>
-			{#each b.body as part, i (i)}{#if part.href}<a href={part.href}>{part.text}</a>{:else}{part.text}{/if}{/each}
+			{#each b.body as part, i (i)}{#if part.href}<a href={to(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}
 		</div>
 		{#if b.detail}
 			<details>

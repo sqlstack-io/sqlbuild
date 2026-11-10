@@ -170,9 +170,11 @@ fn given_people_with_different_roles_when_they_bootstrap_and_subscribe_then_only
                 priority: 0,
                 window: None,
                 full_refresh: false,
+                select: Vec::new(),
+                exclude: Vec::new(),
             };
             assert!(
-                request_job_run(store, &roles.context, &request)
+                request_job_run(store, (&roles.context, None), &request)
                     .await
                     .expect("queue job")
             );

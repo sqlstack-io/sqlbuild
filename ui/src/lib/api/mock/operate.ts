@@ -776,6 +776,8 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			tickScheduledFor: tick != null ? new Date(tick).toISOString() : null,
 			runKey: seed.runKey ?? null,
 			rerunOfRunId: seed.rerunOf ?? null,
+			narrowing: null,
+			window: null,
 			requestedBy: seed.by,
 			priority: seed.priority ?? job?.priority ?? 0,
 			rewriteHistory: '--full-refresh' in flags || Object.keys(flags).some((f) => f.includes('cursor')) || '--reload' in flags,
@@ -1000,7 +1002,6 @@ export function createOperateFixtures(now: number): OperateFixtures {
 	const fingerprint = (name: string, version = 1) => `fp:${name.length.toString(16)}${version}a${(name.charCodeAt(0) * 7919).toString(16)}`;
 	const evalOf = (name: string, seq: number, at: number, outcome: SensorEvaluation['outcome'], extra: Partial<SensorEvaluation> = {}): SensorEvaluation => ({
 		id: `eval-${name.replace(/_/g, '-')}-${seq}`,
-		sequence: seq,
 		outcome,
 		requestedAt: new Date(at).toISOString(),
 		finishedAt: outcome === 'requested' ? null : new Date(at + 1400).toISOString(),

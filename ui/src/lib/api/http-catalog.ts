@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { shortName } from '$lib/build-area/labels';
 import { cardStatus } from '$lib/lineage/catalog-graph';
-import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, ColumnLens, ColumnLineage, NodeJob, NodeOutcome, NodeRunEntry, StaleReason } from './types/build';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, ColumnLens, ColumnLineage, MicrobatchCoverage, NodeJob, NodeOutcome, NodeRunEntry, StaleReason, WarehouseObject } from './types/build';
 import type { NodeKind } from './types/operate';
 
 type Wire = components['schemas'];
@@ -105,9 +105,47 @@ export function toNodeRuns(wire: Wire['NodeRunRecord'][]): NodeRunEntry[] {
 }
 
 /**
- * A listed node with its status, SQL, run history, jobs and checks. The server keeps no row
- * counts, cost or migrations per node, so those stay empty or null and the pages hide them. `sql`
- * is null when the person may not see SQL; `runs` and `jobs` are null when their reads failed.
+ * The node's relation as last synced, with its sampled row counts. The sync records neither
+ * declared types nor creation times, so columns are not compared and those times stay null.
+ * Null until a sync has observed the relation.
+ */
+export function warehouseOf(node: CatalogNode, status: Wire['NodeStatus'] | null, statistics: Wire['WarehouseStatisticsRecord'][]): WarehouseObject | null {
+	if (!node.relation || status?.physical.status !== 'observed') return null;
+	const { observed_at, record } = status.physical.observation;
+	const stats = statistics.flatMap((r) => (r.row_count === null || r.row_count === undefined ? [] : [{ at: r.observed_at, rows: r.row_count, bytes: r.byte_count ?? null }]));
+	const newest = statistics.at(-1);
+	return {
+		relation: node.relation,
+		objectType: record.relation_type.toLowerCase().replace(/^base table$/, 'table'),
+		createdAt: null,
+		lastAlteredAt: null,
+		rows: newest?.row_count ?? null,
+		bytes: newest?.byte_count ?? null,
+		columns: record.columns.map((c) => ({ name: c.name, declaredType: null, actualType: c.data_type, state: null })),
+		stats,
+		syncedAt: observed_at
+	};
+}
+
+/** Recorded coverage of a concurrent microbatch model, with its holes counted. */
+export function toMicrobatchCoverage(wire: Wire['MicrobatchCoverage']): MicrobatchCoverage {
+	return {
+		cursorColumn: wire.cursor_column,
+		cursorType: wire.cursor_type,
+		batchSize: wire.batch_size,
+		earliest: wire.earliest,
+		contiguousFrontier: wire.contiguous_frontier ?? null,
+		knownGaps: wire.known_gaps.length,
+		batches: wire.batches.map((b) => ({ start: b.start, end: b.end, state: b.state, runId: b.run_id ?? null })),
+		batchesTruncated: wire.batches_truncated
+	};
+}
+
+/**
+ * A listed node with its status, SQL, run history, jobs, checks and synced warehouse object. The
+ * server keeps no cost or migrations per node, so those stay empty or null and the pages hide
+ * them. `sql` is null when the person may not see SQL; `runs` and `jobs` are null when their
+ * reads failed.
  */
 export function nodeDetailOf(
 	nodes: CatalogNode[],
@@ -115,7 +153,7 @@ export function nodeDetailOf(
 	status: Wire['NodeStatus'] | null,
 	sql: Wire['NodeSql'] | null,
 	checks: Check[],
-	{ runs, jobs }: { runs: NodeRunEntry[] | null; jobs: NodeJob[] | null } = { runs: null, jobs: null }
+	{ runs = null, jobs = null, statistics = [], microbatch = null }: { runs?: NodeRunEntry[] | null; jobs?: NodeJob[] | null; statistics?: Wire['WarehouseStatisticsRecord'][]; microbatch?: MicrobatchCoverage | null } = {}
 ): CatalogNodeDetail {
 	// Checks name their node without its kind, so the attachment tells a source from a model of the same name.
 	const own = checks.filter((c) => c.node === node.key || `${c.attachment}:${c.node}` === node.key);
@@ -126,7 +164,7 @@ export function nodeDetailOf(
 		checks: checkCountsOf(own),
 		downstream: nodes.filter((n) => n.upstream.includes(node.key)).map((n) => n.key),
 		recentOutcomes: (runs ?? []).slice(0, 40).map((r) => r.outcome).reverse(),
-		lastRows: null,
+		lastRows: statistics.at(-1)?.row_count ?? null,
 		rowsDelta: null,
 		lastDurationMs: runs?.find((r) => r.durationMs !== null)?.durationMs ?? null,
 		cost: null,
@@ -137,8 +175,8 @@ export function nodeDetailOf(
 		jobs,
 		runs,
 		checkResults: own,
-		warehouse: null,
-		microbatch: null,
+		warehouse: warehouseOf(node, status, statistics),
+		microbatch,
 		history: null
 	};
 }

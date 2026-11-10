@@ -1377,7 +1377,7 @@ path = "src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"
 reason = "The SQL Server adapter intentionally keeps overrideable backend behavior on one class."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-orchestration/src/api/_helpers/resources/administrators.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/audit.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/location_health.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/location_work.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_checks.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_location_work.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_maintenance.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_node_sql.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_operations.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/run_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/runs.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/snapshots.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/trigger_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/warehouse_metadata.rs"]
+paths = ["crates/sqlbuild-orchestration/src/api/_helpers/resources/administrators.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/audit.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/location_health.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/location_work.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_checks.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_location_work.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_maintenance.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_node_sql.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_operations.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_plans.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/run_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/runs.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/snapshots.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/trigger_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/warehouse_metadata.rs"]
 reason = "Each function is one utoipa-annotated axum route: OpenAPI needs one annotated handler per operation, and each body only checks the caller's scope and calls one store operation. Scope checks and store work live in their shared owners."
 
 [[dupes.allowlist]]
@@ -1636,8 +1636,6 @@ allowed = [
     "sqb_password_credentials.changed_at=Audit history read through audit exports: when a password last changed.",
     "sqb_platform_sink_deliveries.delivered_at=Audit history read through audit exports: when an event reached the platform sink.",
     "sqb_security_audit_deliveries.delivered_at=Audit history read through audit exports: when an event reached a security audit sink.",
-    "sqb_run_requests.evaluation_id=Reader comes with the operations UI: a sensor's run requests show the evaluation that made them.",
-    "sqb_write_claims=Read through its primary-key conflict: an insert that conflicts means another run already holds the node.",
     "sqb_warehouse_microbatches.execution_run_id=Reader comes with the UI epic (D132), which filters on it: the run that executed the batch.",
     "sqb_warehouse_microbatches.record_type=Reader comes with the UI epic (D132), which filters on it: the batch state.",
     "sqb_warehouse_migrations.decision=Reader comes with the UI epic (D132), which filters on it.",
@@ -2951,3 +2949,7 @@ reason = "A relation's declared columns and a dbt manifest's string field are un
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-analysis/src/warehouse_types/_helpers/type_trees.rs", "crates/sqlbuild-analysis/src/assembly/analysis_session/_helpers/dict_walk.rs", "crates/sqlbuild-analysis/src/relation_names/_helpers/walk.rs"]
 reason = "Each is a short stack walk over a JSON syntax tree with its own stop and collect rule: cast_targets collects every cast's target type, branch_selects stops at each set-operation branch, and walked lists every object. A shared visitor would need a callback for each rule and save no logic."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-cli/src/native_commands/_helpers/project_facts.rs", "crates/sqlbuild-python/src/bindings/_helpers/rules/native_header_parser.rs"]
+reason = "Field lookups on unrelated value types in different crates: project configuration takes the first matching field of a built object, while rule headers take the last entry of an authored map so a repeated key overrides earlier ones."

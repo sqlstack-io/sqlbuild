@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -93,7 +94,7 @@
 					<tr>
 						<td><RelativeTime value={formatAgo(e.at, app.now)} exact={formatStamp(e.at)} /></td>
 						<td>
-							{#if e.actor.kind === 'user' && linksPeople}<a class="link" href={personHref(e.actor)}>{e.actor.name}</a>{:else}{e.actor.name}{/if}
+							{#if e.actor.kind === 'user' && linksPeople}<a class="link" href={to(personHref(e.actor))}>{e.actor.name}</a>{:else}{e.actor.name}{/if}
 							<div class="cell-desc">{e.ip}</div>
 						</td>
 						<td>
@@ -110,7 +111,7 @@
 								<div class="decision">
 									<code class="clip" title="Decision ID {e.decisionId}, as shown in the error message">{e.decisionId}</code>
 									<CopyButton value={e.decisionId} label="Copy decision ID" />
-									{#if checksDecisions}<a class="link" href={checkHref({ decision: e.decisionId })}>Check this</a>{/if}
+									{#if checksDecisions}<a class="link" href={to(checkHref({ decision: e.decisionId }))}>Check this</a>{/if}
 								</div>
 							{/if}
 						</td>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { JobDetail } from '$lib/api';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -14,6 +15,9 @@
 	let error = $state<string | null>(null);
 
 	const canRewrite = $derived(app.can('run.rewrite_history'));
+	// Only incremental models and loaders take a cursor window, so a job without one has nothing to backfill.
+	const cursorType = $derived(job.cursorType);
+	const example = $derived(cursorType === 'integer' ? ['1200', '1500'] : ['2026-10-01T00:00:00Z', '2026-10-31T00:00:00Z']);
 	const canFullRefresh = $derived(app.client.supports('launchJobFromScratch'));
 	const rewrites = $derived(fullRefresh || useWindow);
 	// The server checks the bounds against the job's cursors and reports anything it refuses.
@@ -25,10 +29,10 @@
 		busy = true;
 		error = null;
 		try {
-			const options = { window: useWindow ? { type: job.cursorType ?? 'timestamp', start, end } : undefined };
+			const options = { window: useWindow && cursorType ? { type: cursorType, start, end } : undefined };
 			const run = fullRefresh ? await app.client.launchJobFromScratch(scope, job.key, options) : await app.client.launchJob(scope, job.key, options);
 			onclose();
-			await goto(`/runs/${run.id}`);
+			await goto(to(`/runs/${run.id}`));
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -43,20 +47,20 @@
 	<div class="opts" title={canRewrite ? undefined : "You don't have permission to rebuild history (run.rewrite_history)"}>
 		{#if canFullRefresh}
 		<label class:off={!canRewrite}>
-			<input type="checkbox" class="sb-check" bind:checked={fullRefresh} disabled={!canRewrite} />
+			<input type="checkbox" class="sb-check" bind:checked={fullRefresh} disabled={!canRewrite} onchange={() => fullRefresh && (useWindow = false)} />
 			Rebuild from scratch <code title="Same as sqb --full-refresh">--full-refresh</code>
 		</label>
 		{/if}
-		{#if canRewrite}
+		{#if canRewrite && cursorType}
 			<label>
-				<input type="checkbox" class="sb-check" bind:checked={useWindow} />
+				<input type="checkbox" class="sb-check" bind:checked={useWindow} onchange={() => useWindow && (fullRefresh = false)} />
 				Backfill a range <span class="faint" title="A cursor window, as sqb build --start-cursor-ts or --start-cursor-int: incremental models and loaders process only this range">(cursor window)</span>
 			</label>
 			{#if useWindow}
 				<div class="window">
-					<input bind:value={start} placeholder="2026-10-01T00:00:00Z or 1200" aria-label="Window start" />
+					<input bind:value={start} placeholder={example[0]} inputmode={cursorType === 'integer' ? 'numeric' : 'text'} aria-label="Window start" />
 					<span class="faint">to</span>
-					<input bind:value={end} placeholder="2026-10-31T00:00:00Z or 1500" aria-label="Window end" />
+					<input bind:value={end} placeholder={example[1]} inputmode={cursorType === 'integer' ? 'numeric' : 'text'} aria-label="Window end" />
 				</div>
 				{#if windowInvalid}<p class="err pad">{windowInvalid}</p>{/if}
 			{/if}

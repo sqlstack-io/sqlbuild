@@ -73,6 +73,13 @@ pub enum LocationWork {
         #[schema(value_type = Object)]
         evaluation: Box<SensorEvaluationRequest>,
     },
+    /// `sqb plan --json` on exact node keys the server froze from a person's build command.
+    Plan {
+        command: Vec<String>,
+        selection: std::collections::BTreeSet<String>,
+        #[schema(value_type = Object)]
+        settings: std::collections::BTreeMap<String, serde_json::Value>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -83,6 +90,14 @@ pub struct LocationWorkRequest {
     pub target: String,
     pub reason: String,
     pub work: LocationWork,
+}
+
+/// A person's build command to plan on the location; the server freezes it like an ad-hoc run.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanRequest {
+    pub request_id: Uuid,
+    pub command: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
@@ -112,8 +127,17 @@ pub struct LocationWorkClaim {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LocationWorkOutcome {
-    Connection { healthy: bool },
-    SensorEvaluation { outcome: CustomSensorOutcome },
+    Connection {
+        healthy: bool,
+    },
+    SensorEvaluation {
+        outcome: CustomSensorOutcome,
+    },
+    /// The plan document `sqb plan --json` printed, or its `{"error": ...}` report.
+    Plan {
+        #[schema(value_type = Object)]
+        document: serde_json::Value,
+    },
     Superseded {},
 }
 
@@ -159,7 +183,7 @@ pub enum PlatformEventKind {
     LaunchFailed,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PlatformEvent {
     Heartbeat {
@@ -237,6 +261,33 @@ pub(crate) struct WatchdogLocation {
     pub(crate) last_seen_at: DateTime<Utc>,
 }
 
+/// A stored platform event a person may see; the location target is absent for server-wide events.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonPlatformEvent {
+    pub storage_id: i64,
+    pub event_id: Uuid,
+    pub occurred_at: DateTime<Utc>,
+    pub event: PlatformEvent,
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
+}
+
+/// One scan of stored platform events, keeping those the person may see.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonPlatformEventPage {
+    pub events: Vec<PersonPlatformEvent>,
+    /// The `before` that continues the scan, absent once no older events remain; a page can be empty and still continue.
+    pub before: Option<i64>,
+}
+
+/// The location target a trigger or run belongs to.
+#[derive(Debug, Deserialize)]
+pub(crate) struct EventScope {
+    pub(crate) id: Uuid,
+    pub(crate) location_id: Uuid,
+    pub(crate) target: String,
+}
+
 /// Stable event identity permits receiver-side deduplication after uncertain acknowledgements.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlatformEventEnvelope {
@@ -259,6 +310,34 @@ pub struct PlatformProblems {
     pub scheduler_lease_expires_at: Option<DateTime<Utc>>,
     pub broken_locations: Vec<BrokenLocation>,
     pub overdue_ticks: Vec<OverdueTick>,
+    /// Running calendar schedules whose dates run out within a day.
+    #[serde(default)]
+    pub low_calendars: Vec<LowCalendar>,
+}
+
+/// A running calendar schedule whose last date is at most a day away, or which has none left.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct LowCalendar {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// When the location next works out the calendar's dates.
+    pub refresh_at: DateTime<Utc>,
+    /// The calendar's last date; absent when none are left.
+    pub horizon_end: Option<DateTime<Utc>>,
+}
+
+/// A running schedule of a live location, with its declaration.
+#[derive(Debug, Deserialize)]
+pub(crate) struct RunningSchedule {
+    pub(crate) trigger_id: Uuid,
+    pub(crate) name: String,
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+    pub(crate) definition_json: TriggerDefinition,
 }
 
 /// Every instance of this location target has missed two check-ins.
@@ -299,4 +378,31 @@ pub(crate) struct ProblemScan {
     pub(crate) lease: Option<SchedulerLease>,
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
+    pub(crate) low_calendars: Vec<LowCalendar>,
+}
+
+/// Where the control store keeps its data.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageKind {
+    Sqlite,
+    Postgresql,
+}
+
+/// The control store's installation and schema, as recorded when it was created.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct InstallationRecord {
+    pub storage: StorageKind,
+    pub installed_at: DateTime<Utc>,
+    /// Digest of the schema; a server starts only on the exact schema it creates.
+    pub schema_checksum: String,
+    pub schema_applied_at: DateTime<Utc>,
+}
+
+/// The stored installation and schema rows.
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredInstallation {
+    pub(crate) installed_at: DateTime<Utc>,
+    pub(crate) schema_checksum: String,
+    pub(crate) schema_applied_at: DateTime<Utc>,
 }

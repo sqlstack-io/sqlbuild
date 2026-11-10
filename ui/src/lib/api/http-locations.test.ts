@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionTestOf, healthOf, instancesOf, toLocationDetail, warehouseSyncOf } from './http-locations';
+import { connectionTestOf, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -74,6 +74,21 @@ describe('warehouseSyncOf', () => {
 			sync('2026-11-08T12:00:00Z', 'statistics', 'delivery')
 		]);
 		expect(result).toEqual({ lastSyncedAt: '2026-11-08T12:02:00Z', lastError: 'catalog: failed while reading the warehouse' });
+	});
+
+	it("gives each table its newest sync, the time it last synced cleanly, and where the state tables are read from", () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const connection = toWarehouseConnection(location, [
+			sync('2026-11-08T12:03:00Z', 'statistics', 'read'),
+			sync('2026-11-08T12:02:00Z', 'catalog', null),
+			sync('2026-11-08T12:01:00Z', 'statistics', null),
+			sync('2026-11-08T12:00:00Z', 'statistics', null)
+		]);
+		expect([connection.id, connection.target, connection.stateLocation, connection.lastTest]).toEqual(['loc:development', 'development', { database: null, schema: 'main' }, null]);
+		expect(connection.tables.map((t) => [t.table, t.at, t.failure, t.lastSyncedAt])).toEqual([
+			['catalog', '2026-11-08T12:02:00Z', null, '2026-11-08T12:02:00Z'],
+			['statistics', '2026-11-08T12:03:00Z', 'Failed while reading the warehouse', '2026-11-08T12:01:00Z']
+		]);
 	});
 
 	it('clears the error once the failing table syncs again', () => {

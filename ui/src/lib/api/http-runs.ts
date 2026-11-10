@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanDocument, PlanResult, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -10,6 +10,31 @@ type Wire = components['schemas'];
 export const RUN_WINDOW = 1000;
 
 const PERSON = 'principal:';
+
+/** The location's answer to a plan request: the plan, `sqb plan`'s own error, or a superseded plan. */
+export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
+	if (outcome.kind === 'superseded') return { plan: null, error: 'The project changed on the location while it was planning; plan again' };
+	if (outcome.kind !== 'plan') return { plan: null, error: 'The location answered with something other than a plan' };
+	const document = outcome.document as Partial<PlanDocument> & { error?: { code?: string; message?: string } };
+	if (document.error) return { plan: null, error: [document.error.code, document.error.message].filter(Boolean).join(': ') };
+	const list = <T>(value: T[] | undefined): T[] => value ?? [];
+	return {
+		plan: {
+			selected_count: document.selected_count ?? 0,
+			models: list(document.models),
+			seeds: list(document.seeds),
+			source_loads: list(document.source_loads),
+			functions: list(document.functions),
+			python_nodes: list(document.python_nodes),
+			warnings: list(document.warnings),
+			migrations: list(document.migrations),
+			column_migrations: list(document.column_migrations),
+			table_type_conversions: list(document.table_type_conversions),
+			retention: list(document.retention)
+		},
+		error: null
+	};
+}
 
 /** The server's dry run of an ad-hoc command. */
 export function toAdhocCheck(wire: Wire['AdhocCheck']): AdhocRunCheck {
@@ -66,6 +91,8 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		tickScheduledFor: null,
 		runKey: null,
 		rerunOfRunId: wire.rerun_of_run_id ?? null,
+		narrowing: wire.narrowing ?? null,
+		window: wire.window ? { start: String(wire.window.start), end: String(wire.window.end) } : null,
 		requestedBy: requesterOf(wire),
 		priority: wire.priority,
 		rewriteHistory: wire.rewrite_history,
@@ -83,6 +110,34 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 }
 
 /** Runs keyed by id, each with its number of child runs in the listing. */
+/** The queue in claim order; a run the read sent without queue state (it started meanwhile) is left out. */
+export function queueEntriesOf(wires: Wire['RunRecord'][], locationId: string): QueueEntry[] {
+	const runs = toRuns(wires, locationId);
+	return wires.flatMap((wire, i) => (wire.queue ? [{ run: runs[i], position: wire.queue.position, waits: shownWaits(wire.queue.waits.map(toQueueWait)), overlap: null }] : []));
+}
+
+/** A running run of the same job also holds the job's write claims; name it once. */
+function shownWaits(waits: QueueWait[]): QueueWait[] {
+	const sameJob = new Set(waits.flatMap((w) => (w.kind === 'job_running' ? [w.runId] : [])));
+	return waits.filter((w) => w.kind !== 'write_claim' || !w.runId || !sameJob.has(w.runId));
+}
+
+function toQueueWait(wait: Wire['QueueWait']): QueueWait {
+	switch (wait.kind) {
+		case 'write_claim':
+			return { kind: wait.kind, runId: wait.run_id ?? null, nodeKey: wait.node_key, otherNodes: wait.other_nodes };
+		case 'concurrency_limit':
+			return { kind: wait.kind, limit: wait.limit, holders: wait.holders, elsewhere: wait.elsewhere };
+		case 'earlier_run':
+			return { kind: wait.kind, runId: wait.run_id ?? null, limit: wait.limit };
+		case 'upstream_job':
+			return { kind: wait.kind, runId: wait.run_id, jobKey: wait.job_key };
+		case 'job_running':
+		case 'group_parent':
+			return { kind: wait.kind, runId: wait.run_id };
+	}
+}
+
 export function toRuns(wires: Wire['RunRecord'][], locationId: string): Run[] {
 	const children = new Map<string, number>();
 	for (const w of wires) if (w.parent_run_id) children.set(w.parent_run_id, (children.get(w.parent_run_id) ?? 0) + 1);
@@ -168,6 +223,22 @@ export function runRowPage(wires: Wire['RunRecord'][], locationId: string, query
 		rows: matching.slice(offset, offset + limit),
 		nextCursor: offset + limit < matching.length ? String(offset + limit) : null
 	};
+}
+
+/** A rows cursor: the offset into the matching rows, then `+N` when N windows older than the newest are loaded. */
+export function parseRunCursor(cursor: string | null | undefined): { offset: number; older: number } {
+	const [offset, older] = (cursor ?? '0').split('+');
+	return { offset: Number(offset) || 0, older: Number(older) || 0 };
+}
+
+/** A page over the loaded windows, newest first; once they run out and the oldest was full, the next page loads one more window. */
+export function runRowPageOver(windows: Wire['RunRecord'][][], locationId: string, query: RunRowQuery): RunRowPage {
+	const { offset, older } = parseRunCursor(query.cursor);
+	const page = runRowPage(windows.flat(), locationId, { ...query, cursor: String(offset) });
+	const more = windows.at(-1)?.length === RUN_WINDOW;
+	const next = page.nextCursor ?? (more ? String(offset + page.rows.length) : null);
+	const loaded = page.nextCursor ? older : older + 1;
+	return { rows: page.rows, nextCursor: next !== null && loaded ? `${next}+${loaded}` : next };
 }
 
 export function runTabCountsOf(wires: Wire['RunRecord'][], locationId: string, query: RunRowQuery): RunTabCounts {

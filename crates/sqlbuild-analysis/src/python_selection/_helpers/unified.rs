@@ -20,10 +20,10 @@ use crate::python_selection::_helpers::validation::{
     source_loaders, terminal_loaders, validate_boundaries, validate_selected_dependencies,
 };
 use crate::python_selection::constants::{
-    ASSET_KIND, CHECK_KIND, EXPANSION_MARKER, INTERSECTION_SEPARATOR, LOADER_KIND, NAME_KIND,
-    PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PLANNER_DEFAULT_CODE, SEED_KIND, SOURCE_KIND,
-    SOURCE_RESOURCE, SQL_MODEL_PATH_ROOT, TAG_KIND, TASK_KIND, TEST_KIND, UNKNOWN_NAME_CODE,
-    UNKNOWN_TAG_CODE,
+    ASSET_KIND, CHECK_KIND, EXPANSION_MARKER, INTERSECTION_SEPARATOR, JOB_KIND, LOADER_KIND,
+    NAME_KIND, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PLANNER_DEFAULT_CODE, SEED_KIND,
+    SOURCE_KIND, SOURCE_RESOURCE, SQL_MODEL_PATH_ROOT, TAG_KIND, TASK_KIND, TEST_KIND,
+    UNKNOWN_NAME_CODE, UNKNOWN_TAG_CODE,
 };
 use crate::python_selection::models::{Atom, PythonSelectionNode, RunSelection, SelectionContext};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT as PYTHON_NODE_PATH_ROOT;
@@ -258,7 +258,7 @@ fn single_side(context: &SelectionContext<'_>, raw: &str) -> Resolved {
     let atoms: Atoms = match kind.as_str() {
         TEST_KIND => return Err(unit_test_error(raw)),
         PATH_KIND => resolve_path(context, raw, &value)?,
-        SEED_KIND | SOURCE_KIND => resolve_sql(context, raw)?,
+        SEED_KIND | SOURCE_KIND | JOB_KIND => resolve_sql(context, raw)?,
         TASK_KIND | ASSET_KIND | LOADER_KIND | CHECK_KIND => {
             return resolve_typed(context, raw, (&kind, &value));
         }
@@ -357,6 +357,15 @@ fn both_error(name: &str) -> SelectorError {
     )
 }
 
+fn is_job(context: &SelectionContext<'_>, value: &str) -> bool {
+    context
+        .sql
+        .graph
+        .jobs
+        .as_ref()
+        .is_some_and(|jobs| jobs.contains_key(value))
+}
+
 fn unknown_name(value: &str) -> SelectorError {
     error(
         UNKNOWN_NAME_CODE,
@@ -374,6 +383,7 @@ fn resolve_name(context: &SelectionContext<'_>, raw: &str, value: &str) -> Resol
             (true, true) => Err(both_error(value)),
             (true, false) => resolve_sql(context, raw),
             (false, true) => resolve_python(context, raw),
+            (false, false) if is_job(context, value) => resolve_sql(context, raw),
             (false, false) => Err(unknown_name(value)),
         };
     }

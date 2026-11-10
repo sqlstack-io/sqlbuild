@@ -8,7 +8,7 @@ use tokio::sync::watch;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::{control_address, control_api_settings, flag};
+use crate::native_commands::_helpers::decision::{control_address, control_api_settings};
 use crate::native_commands::_helpers::execution::{
     open_control_store, open_control_workers, start_platform_roles, supervise_control_roles,
 };
@@ -27,7 +27,7 @@ pub(crate) async fn run_control(
     standalone: bool,
 ) -> Result<(), ControlError> {
     let address = control_address(namespace, standalone)?;
-    let (authentication, (statistics, audit, snapshots)) = control_api_settings(namespace)?;
+    let (authentication, facts) = control_api_settings(namespace, standalone)?;
     let store = open_control_store(namespace).await?;
     let (workers, handoff) = open_control_workers(namespace)?;
     let (stop, shutdown) = watch::channel(false);
@@ -42,7 +42,7 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
-            (authentication, handoff, statistics),
+            (authentication, handoff, facts.clone()),
             (
                 move || {
                     drop(write_output(&[(
@@ -56,10 +56,10 @@ pub(crate) async fn run_control(
         start_platform_roles(
             &mut tasks,
             (&store, &shutdown),
-            (audit, statistics, snapshots),
+            (facts.audit, facts.statistics, facts.snapshots),
         )?;
     }
-    if standalone || !flag(namespace, "control_no_scheduler") {
+    if facts.scheduler {
         drop(write_output(&[(Stream::Stderr, "Starting scheduler...\n")]));
         let scheduler_store = store.clone();
         tasks.spawn(async move {

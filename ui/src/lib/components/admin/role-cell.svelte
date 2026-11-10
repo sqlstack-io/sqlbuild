@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import * as Popover from '$lib/components/ui/popover';
 	import type { RoleAssignment, RoleDefinition } from '$lib/api';
 	import { assignmentsAt, rankAssignments, roleHref, scopeWords } from '$lib/platform/access';
@@ -30,7 +31,7 @@
 					<ul class="list">
 						{#each shown as a (a.id)}
 							<li class:stale={a.stale}>
-								<a href={roleHref(a.role)} onclick={(e) => e.stopPropagation()}>{a.role}</a>
+								<a href={to(roleHref(a.role))} onclick={(e) => e.stopPropagation()}>{a.role}</a>
 								<span class="where">{scopeWords(a.scope.locationId, locations)}</span>
 								<SourceChip assignment={a} />
 								{#if a.stale}<span class="where">gives nothing</span>{/if}

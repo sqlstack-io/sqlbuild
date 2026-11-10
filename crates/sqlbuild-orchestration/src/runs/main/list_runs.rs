@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::runs::_helpers::lifecycle::reads::list_runs_in;
 use crate::runs::models::RunRecord;
+use crate::runs::types::RunsListing;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -16,7 +17,12 @@ pub async fn list_runs(
     limit: u32,
 ) -> Result<Vec<RunRecord>, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, runs) = list_runs_in(transaction, (location_id, target), limit).await?;
+    let (transaction, runs) = list_runs_in(
+        transaction,
+        (location_id, target),
+        RunsListing::Newest(limit, None),
+    )
+    .await?;
     commit(transaction).await?;
     Ok(runs)
 }

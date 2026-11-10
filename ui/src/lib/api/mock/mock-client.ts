@@ -3,6 +3,7 @@ import { ApiError } from '../client';
 import { LocalChangeBus, type ConnectionState } from '../signals';
 import type {
 	AdhocRunCheck,
+	PlanResult,
 	AdhocRunRequest,
 	Bootstrap,
 	BuiltInRole,
@@ -266,6 +267,11 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.launchAdhocRun(scope, request);
 	}
 
+	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+		this.#location(scope);
+		return this.#operate.planBuild(scope, command);
+	}
+
 	async listJobs(scope: Scope): Promise<Job[]> {
 		this.#location(scope);
 		return this.#operate.listJobs(scope);
@@ -352,8 +358,8 @@ export class MockApiClient implements ApiClient {
 	revokeLocationToken(...args: Parameters<PlatformApi['revokeLocationToken']>) {
 		return this.#platform.revokeLocationToken(...args);
 	}
-	listWarehouseConnections(...args: Parameters<PlatformApi['listWarehouseConnections']>) {
-		return this.#platform.listWarehouseConnections(...args);
+	listWarehouseConnections() {
+		return this.#platform.listWarehouseConnections();
 	}
 	listProviders(...args: Parameters<PlatformApi['listProviders']>) {
 		return this.#platform.listProviders(...args);

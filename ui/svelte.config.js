@@ -10,6 +10,9 @@ const config = {
 		// Wire types come from the client generated from the server's OpenAPI document. The logos
 		// and favicon are the website's approved files, so the two cannot drift apart.
 		alias: { $control: '../clients/typescript/src', $website: '../website' },
+		// `sqb server` serves the UI at the root; a build for another path, such as the static
+		// demo at `/demo`, sets SQB_UI_BASE and links through `$lib/paths`.
+		paths: { base: process.env.SQB_UI_BASE ?? '' },
 		// SPA mode: static build with client-side routing. There is no Node
 		// server in production; the SQLBuild server serves the built assets.
 		// The served page carries this policy as a meta tag with the hash of SvelteKit's start
