@@ -194,8 +194,7 @@ pub(crate) fn normalize_analysis_sql(
     normalize(sql, dialect, (&stubs, &placeholders), UDF_NAME_PREFIX).map(|mapped| mapped.sql)
 }
 
-/// Analysis SQL as a native parser reads it, with every stub spelled under `stub_prefix`.
-/// Each reference `relations` names is spelled as its value instead.
+/// Analysis SQL as a native parser reads it, stubs under `stub_prefix` and `relations` renamed.
 pub(crate) fn normalize_native_sql(
     sql: &str,
     dialect: &str,

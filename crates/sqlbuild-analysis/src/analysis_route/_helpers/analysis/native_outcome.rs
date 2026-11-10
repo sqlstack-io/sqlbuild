@@ -1,4 +1,4 @@
-//! One model's outcome from its dialect's native analysis module, in the session's facts.
+//! One model's native analysis SQL, analysis and outcome in the session's facts.
 
 use std::collections::HashMap;
 
@@ -10,7 +10,7 @@ use crate::assembly::analysis_session::models::{
     LineageFacts, ModelAnalysis, ModelOutcome, ModelRequest, SessionSchema,
 };
 use crate::assembly::analysis_session::types::Shapes;
-use crate::semantic_validation::_helpers::normalization::normalize_native_sql;
+use crate::semantic_validation::main::normalize_native_renamed::normalize_native_renamed;
 
 /// The model's analysis SQL as its native parser reads it, each reference in `relations` renamed.
 pub(crate) fn native_sql(
@@ -18,7 +18,7 @@ pub(crate) fn native_sql(
     model: &ModelRequest,
     relations: &HashMap<String, String>,
 ) -> Result<String, String> {
-    normalize_native_sql(
+    normalize_native_renamed(
         &model.query_sql,
         dialect.name(),
         dialect.stub_prefix(),

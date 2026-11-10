@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
-use crate::analysis_route::main::model_outcome::{analysed_sql, native_outcome, native_sql};
+use crate::analysis_route::_helpers::analysis::native_outcome::{
+    analysed_sql, native_outcome, native_sql,
+};
 use crate::analysis_route::main::schema_column::schema_column as stored_column;
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, StandInSchema};
 use crate::analysis_route::types::NativeDialect;
@@ -156,14 +158,13 @@ pub(crate) fn model_outcome(
     settings: (&[String], bool),
 ) -> (ModelOutcome, Option<String>) {
     let cleaned: Result<String, String> = native_sql(dialect, model, &HashMap::new());
-    let analysed: Result<NativeAnalysis, String> = match &cleaned {
-        Ok(sql) => analysed_sql(
+    let analysed: Result<NativeAnalysis, String> = cleaned.clone().and_then(|sql| {
+        analysed_sql(
             dialect,
-            sql,
+            &sql,
             (relations, &model.lineage_references),
             settings,
-        ),
-        Err(reason) => Err(reason.clone()),
-    };
+        )
+    });
     native_outcome(model, schema, cleaned.unwrap_or_default(), analysed)
 }

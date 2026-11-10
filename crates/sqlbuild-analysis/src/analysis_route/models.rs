@@ -206,3 +206,10 @@ pub struct TypeSpelling {
 /// SQL Server, whose SQL SQLQuack's T-SQL parser reads.
 #[derive(Clone, Copy, Debug)]
 pub struct TsqlDialect;
+
+/// How many models took a shared analysis, and how many were analysed.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct ShareCounts {
+    pub(crate) shared: usize,
+    pub(crate) unshared: usize,
+}

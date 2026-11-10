@@ -246,3 +246,11 @@ pub(crate) struct DeepPivotTestCase {
     pub(crate) terms: usize,
     pub(crate) expected_outcome: PivotOutcome,
 }
+
+pub(crate) struct NativeSharingTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) relations: &'static [(&'static str, &'static [(&'static str, &'static str)])],
+    pub(crate) models: &'static [(&'static str, &'static str, &'static [&'static str])],
+    pub(crate) expected_lines: &'static [&'static [&'static str]],
+    pub(crate) expected_shares: [(&'static str, u64); 2],
+}
