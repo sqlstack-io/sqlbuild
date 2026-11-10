@@ -577,12 +577,12 @@ def test_given_unparseable_file_when_formatting_then_file_is_untouched_and_fault
         ),
         FormatterDeclineIntegrationTestCase(
             description="a dialect SQLClean does not format yet is left as written with a warning",
-            adapter="databricks",
+            adapter="clickhouse",
             authored_body="select   order_id from raw_orders\n",
             expected_exit_code=0,
             expected_code="format-unavailable",
             expected_message=(
-                "File left as written: SQL formatting is unavailable for the databricks dialect"
+                "File left as written: SQL formatting is unavailable for the clickhouse dialect"
             ),
         ),
     ],
@@ -1120,7 +1120,7 @@ def test_given_leading_cte_comment_when_formatting_then_comment_rule_still_passe
         BacktickDialectFormatIntegrationTestCase(
             description="databricks apostrophe inside a backtick identifier keeps the macro",
             adapter="databricks",
-            expected_literal='@py.label("order_id") as order_id',
+            expected_literal='@py.label("order_id") AS order_id',
         ),
         BacktickDialectFormatIntegrationTestCase(
             description="bigquery apostrophe inside a backtick identifier keeps the macro",
@@ -1154,11 +1154,14 @@ def test_given_backtick_identifier_apostrophe_when_formatting_then_macro_call_st
     )
 
     format_exit: int = main(["--project-dir", str(tmp_path), "--no-color", "format"])
+    formatted_once: str = model_path.read_text(encoding="utf-8")
+    second_format_exit: int = main(["--project-dir", str(tmp_path), "--no-color", "format"])
     compile_exit: int = main(["--project-dir", str(tmp_path), "--no-color", "compile"])
     output: CaptureResult[str] = capsys.readouterr()
 
-    assert (format_exit, compile_exit) == (0, 0), output.out + output.err
-    assert test_case.expected_literal in model_path.read_text(encoding="utf-8")
+    assert (format_exit, second_format_exit, compile_exit) == (0, 0, 0), output.out + output.err
+    assert test_case.expected_literal in formatted_once
+    assert model_path.read_text(encoding="utf-8") == formatted_once
 
 
 @pytest.mark.parametrize(
@@ -1222,11 +1225,7 @@ def test_given_dollar_quoted_apostrophe_when_formatting_then_reference_survives_
             ("snowflake", _LAYOUT_ONLY_BODY),
             ("postgres", _LAYOUT_ONLY_BODY.replace("  amount,\n", "  amount\n")),
             ("bigquery", _LAYOUT_ONLY_BODY),
-            (
-                "databricks",
-                " ".join(_LAYOUT_ONLY_BODY.replace("  amount,\n", "  amount\n").lower().split())
-                + "\n",
-            ),
+            ("databricks", _LAYOUT_ONLY_BODY.replace("  amount,\n", "  amount\n")),
             ("sqlserver", _LAYOUT_ONLY_BODY.replace("  amount,\n", "  amount\n")),
         )
     ],
