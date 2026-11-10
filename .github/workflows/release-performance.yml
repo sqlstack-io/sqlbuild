@@ -18,6 +18,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/release-performance.yml
+      - .github/actions/dist-build-memory/**
       - scripts/compare_release_performance.py
       - scripts/release_performance/**
       - scripts/compile_performance_ratio/_helpers/edit.py
