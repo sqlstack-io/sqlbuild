@@ -15,9 +15,23 @@ from collections.abc import Callable
 
 _UNQUOTED = "TRIM(CAST(x AS VARCHAR), '\"')"
 _SNOWFLAKE_DATE_PARTS = (
-    "replace(replace(replace(replace(replace(replace(f, 'YYYY', '%Y'), 'MM', '%m'), 'DD', '%d'), "
-    "'HH24', '%H'), 'MI', '%M'), 'SS', '%S')"
+    "replace(replace(replace(replace(replace(replace(replace(replace(f, 'TZH:TZM', '%z'), "
+    "'TZHTZM', '%z'), 'YYYY', '%Y'), 'MM', '%m'), 'DD', '%d'), 'HH24', '%H'), 'MI', '%M'), "
+    "'SS', '%S')"
 )
+# Snowflake's regular expression flags as RE2 inline flags; `e` (extract a group) is handled by
+# the callers.
+_REGEX_FLAGS = (
+    "CASE WHEN contains(f, 'i') THEN '(?i)' ELSE '' END || "
+    "CASE WHEN contains(f, 's') THEN '(?s)' ELSE '' END || "
+    "CASE WHEN contains(f, 'm') THEN '(?m)' ELSE '' END || p"
+)
+
+
+def _parse(function: str, cast: str) -> str:
+    """Parses `x` with the Snowflake format `f`."""
+    return f"CAST({function}({_UNQUOTED}, {_SNOWFLAKE_DATE_PARTS}) AS {cast})"
+
 
 # Each shim's overloads as (parameters, body). A shim with one overload keeps its own name; others
 # get the argument count as a suffix, such as sf_to_number_3.
@@ -32,7 +46,7 @@ SHIMS: dict[str, list[tuple[str, str]]] = {
     "sf_to_timestamp_ntz": [("x", f"TRY_CAST({_UNQUOTED} AS TIMESTAMP)")],
     "sf_try_to_timestamp_tz": [
         ("x", f"TRY_CAST({_UNQUOTED} AS TIMESTAMPTZ)"),
-        ("x, f", f"TRY_CAST({_UNQUOTED} AS TIMESTAMPTZ)"),
+        ("x, f", _parse("try_strptime", "TIMESTAMPTZ")),
     ],
     "sf_object_keys": [("j", "json_keys(CAST(j AS JSON))")],
     "sf_is_object": [("j", "json_type(CAST(j AS JSON)) = 'OBJECT'")],
@@ -48,8 +62,12 @@ SHIMS: dict[str, list[tuple[str, str]]] = {
         ("s, p", "NULLIF(regexp_extract(s, p), '')"),
         ("s, p, pos", "NULLIF(regexp_extract(s, p), '')"),
         ("s, p, pos, occ", "NULLIF(regexp_extract(s, p), '')"),
-        ("s, p, pos, occ, flags", "NULLIF(regexp_extract(s, p), '')"),
-        ("s, p, pos, occ, flags, grp", "NULLIF(regexp_extract(s, p, grp), '')"),
+        (
+            "s, p, pos, occ, f",
+            f"NULLIF(CASE WHEN contains(f, 'e') THEN regexp_extract(s, {_REGEX_FLAGS}, 1) "
+            f"ELSE regexp_extract(s, {_REGEX_FLAGS}) END, '')",
+        ),
+        ("s, p, pos, occ, f, grp", f"NULLIF(regexp_extract(s, {_REGEX_FLAGS}, grp), '')"),
     ],
     "sf_to_varchar": [
         ("x", _UNQUOTED),
@@ -87,13 +105,16 @@ SHIMS: dict[str, list[tuple[str, str]]] = {
     "sf_array_flatten": [("x", "flatten(CAST(to_json(x) AS JSON[][]))")],
     "sf_try_to_timestamp_ntz": [
         ("x", f"TRY_CAST({_UNQUOTED} AS TIMESTAMP)"),
-        ("x, f", f"TRY_CAST({_UNQUOTED} AS TIMESTAMP)"),
+        ("x, f", _parse("try_strptime", "TIMESTAMP")),
     ],
     "sf_to_timestamp_tz": [
         ("x", f"CAST({_UNQUOTED} AS TIMESTAMPTZ)"),
-        ("x, f", f"CAST({_UNQUOTED} AS TIMESTAMPTZ)"),
+        ("x, f", _parse("strptime", "TIMESTAMPTZ")),
     ],
-    "sf_regexp_like": [("s, p", "regexp_full_match(s, p)"), ("s, p, f", "regexp_full_match(s, p)")],
+    "sf_regexp_like": [
+        ("s, p", "regexp_full_match(s, p)"),
+        ("s, p, f", f"regexp_full_match(s, {_REGEX_FLAGS})"),
+    ],
     "sf_array_distinct": [("x", "list_distinct(CAST(to_json(x) AS JSON[]))")],
     "sf_sha2": [("x", "sha256(CAST(x AS VARCHAR))"), ("x, n", "sha256(CAST(x AS VARCHAR))")],
     "sf_dateadd": [("u, n, d", "d + CAST(CAST(n AS VARCHAR) || ' ' || u AS INTERVAL)")],
