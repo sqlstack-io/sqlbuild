@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.207.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.206.0...v0.207.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **orchestration:** publication refuses an orchestration declaration whose name matches a model, source or another declaration with D007. Rename the declaration before upgrading.
+
+### Features
+
+* **orchestration:** job, job group, sensor and calendar schedule names join the project's global unique-name check ([cfd29ca](https://github.com/sqlstack-io/sqlbuild/commit/cfd29cad5ba3286b4b4172e0aa9fdff96a8f1b4c))
+
 ## [0.206.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.205.1...v0.206.0) (2026-11-09)
 
 
