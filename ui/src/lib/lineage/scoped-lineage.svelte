@@ -192,7 +192,7 @@
 	</div>
 
 	<!-- graph -->
-	<div class="sb-flow relative min-h-0 flex-1" class:unfitted={!fitted} style="background: var(--sb-inset)">
+	<div class="sb-flow relative min-h-0 flex-1" class:unfitted={!fitted && nodes.length > 0} style="background: var(--sb-inset)">
 		<SvelteFlow
 			bind:nodes
 			bind:edges
