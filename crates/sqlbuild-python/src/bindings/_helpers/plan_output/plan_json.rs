@@ -10,6 +10,7 @@ use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
 use crate::bindings::_helpers::plan_output::cursor_details::{
     CursorDetails, cursor_details, owner,
 };
+use crate::bindings::_helpers::plan_output::plan_text::{model_config_diff, model_query_diff};
 use crate::bindings::_helpers::plan_output::python_identity::{
     definition_source_text, dependency_source_text,
 };
@@ -230,6 +231,31 @@ fn model_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
         native_field(&native_field(entry, "destination")?, "qualified_name")?;
     if !qualified.is_none() {
         model.set_item("qualified_name", qualified)?;
+    }
+    let reason: String = text(&native_field(&native_field(entry, "reason")?, "value")?)?;
+    if let Some(diff) = model_query_diff(entry, &reason)? {
+        model.set_item("query_diff", diff)?;
+    }
+    if let Some(diff) = model_config_diff(entry, &reason)? {
+        model.set_item("config_diff", diff)?;
+    }
+    let findings: Bound<'py, PyAny> = native_field(entry, "schema_findings")?;
+    if findings.is_truthy()? {
+        model.set_item(
+            "schema_findings",
+            mapped(&findings, |finding| {
+                Ok(dict(
+                    py,
+                    vec![
+                        ("kind", enum_value(finding, "kind")?),
+                        ("column", native_field(finding, "column_name")?),
+                        ("expected_type", native_field(finding, "expected_type")?),
+                        ("actual_type", native_field(finding, "actual_type")?),
+                    ],
+                )?
+                .into_any())
+            })?,
+        )?;
     }
     let hints: Bound<'py, PyAny> = native_field(entry, "column_rename_hints")?;
     if hints.is_truthy()? {

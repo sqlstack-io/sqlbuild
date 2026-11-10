@@ -151,7 +151,11 @@ fn config_json<'py>(metadata_json: &Bound<'py, PyAny>) -> PyResult<Bound<'py, Py
     native_field(&json, "dumps")?.call((config,), Some(&keywords))
 }
 
-fn config_diff(entry: &Bound<'_, PyAny>, reason: &str) -> PyResult<Option<Vec<String>>> {
+/// The plain unified diff of a model's config since its last build, when its config changed.
+pub(crate) fn model_config_diff(
+    entry: &Bound<'_, PyAny>,
+    reason: &str,
+) -> PyResult<Option<Vec<String>>> {
     if !native_field(entry, "config_changed")?.is_truthy()? && reason != CONFIG_CHANGED {
         return Ok(None);
     }
@@ -166,7 +170,35 @@ fn config_diff(entry: &Bound<'_, PyAny>, reason: &str) -> PyResult<Option<Vec<St
     if previous.eq(&current)? {
         return Ok(None);
     }
-    query_diff(&previous, &current).map(Some)
+    unified_diff(
+        entry.py(),
+        &previous.extract::<String>()?,
+        &current.extract::<String>()?,
+    )
+    .map(Some)
+}
+
+/// The plain unified diff of a changed model's query since its last build, when that query is known.
+pub(crate) fn model_query_diff(
+    entry: &Bound<'_, PyAny>,
+    reason: &str,
+) -> PyResult<Option<Vec<String>>> {
+    let previous: Bound<'_, PyAny> = native_field(entry, "previous_query_sql")?;
+    if previous.is_none()
+        || (!native_field(entry, "query_changed")?.is_truthy()? && reason != QUERY_CHANGED)
+    {
+        return Ok(None);
+    }
+    unified_diff(
+        entry.py(),
+        &previous.extract::<String>()?,
+        &native_field(entry, "fingerprint_query_sql")?.extract::<String>()?,
+    )
+    .map(Some)
+}
+
+fn coloured(diff: Option<Vec<String>>) -> Option<Vec<String>> {
+    diff.map(|lines| format_query_diff(&lines, CliStyle { use_color: true }))
 }
 
 fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
@@ -198,17 +230,6 @@ fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
             message: text(&native_field(&hint, "message")?)?,
         });
     }
-    let previous_query: Bound<'_, PyAny> = native_field(entry, "previous_query_sql")?;
-    let query_diff_lines: Option<Vec<String>> = if previous_query.is_none()
-        || (!native_field(entry, "query_changed")?.is_truthy()? && reason != QUERY_CHANGED)
-    {
-        None
-    } else {
-        Some(query_diff(
-            &previous_query,
-            &native_field(entry, "fingerprint_query_sql")?,
-        )?)
-    };
     Ok(ModelPlanText {
         materialization_label: model_materialization_label(entry)?,
         custom_materialization_name: optional_text(&native_field(
@@ -223,8 +244,8 @@ fn model_text(entry: &Bound<'_, PyAny>) -> PyResult<ModelPlanText> {
         changed_functions: texts(&native_field(entry, "changed_functions")?)?,
         schema_findings,
         rename_hints,
-        config_diff: config_diff(entry, &reason)?,
-        query_diff: query_diff_lines,
+        config_diff: coloured(model_config_diff(entry, &reason)?),
+        query_diff: coloured(model_query_diff(entry, &reason)?),
         name,
         action,
         reason,

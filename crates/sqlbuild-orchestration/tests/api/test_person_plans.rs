@@ -304,7 +304,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 );
             }
             let document = json!({
-                "models": [{"name": "orders", "action": "create_table", "reason": "first_run"}],
+                "models": [{"name": "orders", "action": "create_table", "reason": "first_run", "query_diff": ["-SELECT 1", "+SELECT 2"], "config_diff": ["-a", "+b"]}],
                 "warnings": [{"severity": "warning", "message": "connect failed: db_password=orders-pass"}],
                 "python_nodes": [{"name": "orders_export", "identity_diff": {"source_diff": ["-a", "+b"]}}],
             });
@@ -356,7 +356,9 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 description = test_case.description
             );
             assert!(
-                document["python_nodes"][0].get("identity_diff").is_none(),
+                document["python_nodes"][0].get("identity_diff").is_none()
+                    && document["models"][0].get("query_diff").is_none()
+                    && document["models"][0].get("config_diff").is_none(),
                 "{description}: viewers lack view.sql",
                 description = test_case.description
             );

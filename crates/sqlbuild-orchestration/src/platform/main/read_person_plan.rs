@@ -11,7 +11,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 
-/// Python source and dependency diffs stay out of the plan unless the reader may also read SQL on every current node.
+/// SQL, config, Python source and dependency diffs stay out unless the reader may read SQL on every current node.
 pub async fn read_person_plan(
     store: &ControlStore,
     (context, principal_id): (&AuditContext, Uuid),
@@ -41,12 +41,12 @@ pub async fn read_person_plan(
     .await?;
     commit(transaction).await?;
     if !sql {
-        without_identity_diffs(&mut record);
+        without_code_diffs(&mut record);
     }
     Ok(Some(record))
 }
 
-fn without_identity_diffs(record: &mut LocationWorkRecord) {
+fn without_code_diffs(record: &mut LocationWorkRecord) {
     let Some(LocationWorkOutcome::Plan { document }) = record
         .result_json
         .as_mut()
@@ -54,12 +54,19 @@ fn without_identity_diffs(record: &mut LocationWorkRecord) {
     else {
         return;
     };
-    let nodes = document
-        .get_mut("python_nodes")
-        .and_then(serde_json::Value::as_array_mut);
-    for node in nodes.into_iter().flatten() {
-        if let Some(node) = node.as_object_mut() {
-            node.remove("identity_diff");
+    for (section, keys) in [
+        ("python_nodes", &["identity_diff"][..]),
+        ("models", &["query_diff", "config_diff"][..]),
+    ] {
+        let entries = document
+            .get_mut(section)
+            .and_then(serde_json::Value::as_array_mut);
+        for entry in entries.into_iter().flatten() {
+            if let Some(entry) = entry.as_object_mut() {
+                for key in keys {
+                    entry.remove(*key);
+                }
+            }
         }
     }
 }

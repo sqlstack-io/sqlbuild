@@ -6,6 +6,8 @@ mod decision;
 mod helpers;
 #[path = "tests/test_init.rs"]
 mod init;
+#[path = "tests/test_location_plan.rs"]
+mod location_plan;
 #[path = "tests/test_paths.rs"]
 mod paths;
 #[path = "tests/test_project_facts.rs"]
