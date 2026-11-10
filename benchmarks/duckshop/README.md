@@ -155,6 +155,12 @@ Benchmarks and core measurements leave the area out:
   with `--exclude edge_cases`;
 - the construct census counts the core project unless given `--area edge` or `--area all`.
 
+`uv run --script benchmarks/duckshop/scripts/duckdb_project.py <destination>` writes a DuckDB copy
+of the core project for demonstrations: it compiles the core copy, translates each compiled model
+with Polyglot and the rewrites in `duckdb_rewrites.py`, and leaves out tests, scenarios, custom
+Rules and Snowflake-only hooks. `sqb build` in the copy loads the synthetic data and builds every
+model on DuckDB, which an E2E test checks. It is not a benchmark workload.
+
 Changes to the core project's compiled SQL, after which benchmark results are not comparable with
 earlier ones:
 
