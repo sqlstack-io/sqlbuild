@@ -22,6 +22,7 @@
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
 	let fit = $state<((opts?: { duration?: number }) => void) | undefined>();
+	let fitted = $state(false);
 	let shape = '';
 	let laidOut = '';
 
@@ -56,7 +57,7 @@
 	});
 </script>
 
-<div class="graph sb-flow">
+<div class="graph sb-flow" class:unfitted={!fitted}>
 	<SvelteFlow
 		bind:nodes
 		bind:edges
@@ -67,7 +68,7 @@
 		proOptions={{ hideAttribution: true }}
 		onselectionchange={({ nodes: picked }) => onselect(picked.filter((n) => n.type === 'asset').map((n) => n.id))}
 	>
-		<FlowController bind:fitView={fit} />
+		<FlowController bind:fitView={fit} bind:fitted />
 		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 		<Controls showLock={false} />
 	</SvelteFlow>
@@ -81,6 +82,11 @@
 		border: 1px solid var(--border);
 		border-radius: 2px;
 		background: var(--sb-inset);
+	}
+	.unfitted :global(.svelte-flow__viewport),
+	.unfitted :global(.svelte-flow__controls) {
+		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
+		opacity: 0;
 	}
 	.graph :global(.svelte-flow__node-asset) {
 		cursor: pointer;
