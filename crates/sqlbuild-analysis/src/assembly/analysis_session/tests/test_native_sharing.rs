@@ -178,3 +178,34 @@ fn given_references_whose_names_sort_differently_when_analysing_then_each_keeps_
         "only the model whose names sort like the first one's shares"
     );
 }
+
+#[test]
+fn given_a_reference_glued_into_a_longer_name_when_analysing_then_no_model_shares() {
+    let relations: Shapes = shapes(&[
+        ("string", &[("note", "VARCHAR")]),
+        ("events", &[("note", "VARCHAR")]),
+    ]);
+    let glued = |source: &str| {
+        format!(
+            "SELECT __source(\"{source}\")_split(note, ',') AS parts FROM __source(\"{source}\")"
+        )
+    };
+    let request: SessionRequest = sources_request(
+        &relations,
+        &[
+            ("from_string", glued("string"), &["string"]),
+            ("from_events", glued("events"), &["events"]),
+        ],
+    );
+
+    let (_, metrics) = analysed(request);
+
+    assert_eq!(
+        metrics,
+        [
+            ("native_analysis_shared", 0),
+            ("native_analysis_unshared", 2)
+        ],
+        "string_split and events_split name different functions, so the two never share"
+    );
+}
