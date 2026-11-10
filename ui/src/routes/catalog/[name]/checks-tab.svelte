@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { CatalogNodeDetail } from '$lib/api';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -17,8 +18,8 @@
 	<tbody>
 		{#each node.checkResults as c (c.id)}
 			{@const o = c.latest?.outcome ?? 'skipped'}
-			<tr onclick={() => goto(`/checks/${c.id}`)}>
-				<td><a class="mono" href="/checks/{c.id}">{c.name}</a>{#if c.column}<div class="cell-desc">column {c.column}</div>{/if}</td>
+			<tr onclick={() => goto(to(`/checks/${c.id}`))}>
+				<td><a class="mono" href={to(`/checks/${c.id}`)}>{c.name}</a>{#if c.column}<div class="cell-desc">column {c.column}</div>{/if}</td>
 				<td><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /></td>
 				<td class="muted capitalize">{c.severity}</td>
 				<td class="muted">{runScopePhaseLabel[c.runScopePhase]}</td>

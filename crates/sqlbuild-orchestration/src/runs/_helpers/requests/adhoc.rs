@@ -8,17 +8,18 @@ use uuid::Uuid;
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::decide_person_scopes::decide_person_scopes;
 use crate::credentials::main::audit::append_audit::append_audit;
-use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::credentials::models::{Action, AuditContext, DefaultRole};
+use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::_helpers::requests::permissions::{authorize_execution, execution_scopes};
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
 use crate::runs::constants::ADHOC_AUDIT_TAG;
 use crate::runs::models::{
-    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, PlannerResource, RunCommand, RunKind,
-    RunOrigin, RunRequest,
+    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, CommandPlan, PlannerResource, RunCommand,
+    RunKind, RunOrigin, RunRequest,
 };
-use crate::runs::types::CommandPlanner;
+use crate::runs::types::{CommandPlanner, PublishedJobs};
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::snapshots::main::read_current_record::read_current_record;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
@@ -44,8 +45,13 @@ pub(crate) async fn frozen_adhoc_request(
             Err("this target has no publication yet".into()),
         ));
     };
-    let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot.snapshot_id, None).await?;
-    let plan = match planner.plan(&request.command, &planner_resources(&nodes)) {
+    let (transaction, plan) = publication_plan(
+        transaction,
+        (planner, snapshot.snapshot_id),
+        &request.command,
+    )
+    .await?;
+    let plan = match plan {
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
@@ -99,8 +105,34 @@ pub(crate) async fn frozen_adhoc_request(
                 settings: plan.settings,
                 window: None,
                 concurrency_groups: BTreeSet::new(),
+                narrowing: None,
             },
         )),
+    ))
+}
+
+/// `command` planned over one publication's nodes and its jobs, or why the planner refuses it.
+pub(crate) async fn publication_plan(
+    transaction: ControlTransaction,
+    (planner, snapshot_id): (&dyn CommandPlanner, Uuid),
+    command: &[String],
+) -> Result<(ControlTransaction, Result<CommandPlan, String>), ControlError> {
+    let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot_id, None).await?;
+    let (transaction, definitions) = frozen_definitions(transaction, snapshot_id).await?;
+    let jobs: PublishedJobs = definitions
+        .jobs
+        .into_iter()
+        .map(|(name, job)| (name, job.selection))
+        .chain(
+            definitions
+                .groups
+                .into_iter()
+                .map(|(name, group)| (name, group.job.selection)),
+        )
+        .collect();
+    Ok((
+        transaction,
+        planner.plan(command, (&planner_resources(&nodes), &jobs)),
     ))
 }
 
@@ -152,30 +184,6 @@ fn texts(value: Option<&Value>) -> Vec<String> {
         .flatten()
         .filter_map(|item| item.as_str().map(str::to_owned))
         .collect()
-}
-
-/// Whether the person may view every current node, decided without recording a denial.
-pub(in crate::runs) async fn may_view_target(
-    transaction: ControlTransaction,
-    principal_id: Uuid,
-    request: &AdhocCheckRequest,
-) -> Result<(ControlTransaction, bool), ControlError> {
-    let (transaction, current) = query(transaction,
-        "SELECT n.node_key FROM sqb_snapshot_nodes n JOIN sqb_current_snapshots c ON c.snapshot_id=n.snapshot_id \
-         WHERE c.location_id=$1 AND c.target=$2",
-        vec![Parameter::Id(request.location_id), Parameter::Text(request.target.clone())]).await?;
-    let view = PermissionScope {
-        action: Action::View,
-        location_id: Some(request.location_id),
-        target: Some(request.target.clone()),
-        nodes: current
-            .iter()
-            .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
-            .collect(),
-    };
-    let (transaction, refusals) =
-        decide_person_scopes(transaction, principal_id, (&request.target, &[view])).await?;
-    Ok((transaction, refusals.as_deref() == Some(&[None])))
 }
 
 /// Every permission launching `frozen` needs, decided as the launch would but without recording a denial.

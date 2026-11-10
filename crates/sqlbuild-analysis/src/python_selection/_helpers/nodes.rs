@@ -11,10 +11,11 @@ use crate::graph::errors::SelectorError;
 use crate::graph::main::parse_selector::parse_selector;
 use crate::graph::models::{EdgeDirection, ParsedSelector, ProjectGraph};
 use crate::python_selection::constants::{
-    ASSET_KIND, CHECK_KIND, INTERSECTION_SEPARATOR, LOADER_KIND, NAME_KIND, PATH_BETWEEN_CODE,
-    PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PATTERN_CHARACTERS, SQL_MODEL_PATH_ROOT, TAG_KIND,
-    TASK_KIND, TEST_KIND, UNIT_TEST_CODE, UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_NAME_CODE,
-    UNKNOWN_PATH_CODE, UNKNOWN_TAG_CODE, UNMAPPED_KIND_CODE,
+    ASSET_KIND, CHECK_KIND, INTERSECTION_SEPARATOR, JOB_KIND, LOADER_KIND, NAME_KIND,
+    PATH_BETWEEN_CODE, PATH_KIND, PATH_ROOT_CODE, PATH_ROOT_ERROR, PATTERN_CHARACTERS,
+    SQL_MODEL_PATH_ROOT, TAG_KIND, TASK_KIND, TEST_KIND, UNIT_TEST_CODE,
+    UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE, UNKNOWN_TAG_CODE,
+    UNMAPPED_KIND_CODE,
 };
 use crate::python_selection::models::{NodeIndex, PythonSelectionGraph, PythonSelectionNode};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT as PYTHON_NODE_PATH_ROOT;
@@ -281,4 +282,11 @@ pub(crate) fn sql_names(graph: &ProjectGraph) -> HashMap<&str, &ObjectKey> {
         .iter()
         .map(|(name, key)| (name.as_str(), key))
         .collect()
+}
+
+/// Whether a part of `token` is a `job:` selector; jobs select only SQL resources.
+pub(crate) fn names_job(token: &str) -> bool {
+    token.split(INTERSECTION_SEPARATOR).any(|part| {
+        matches!(parse_selector(part), Ok(ParsedSelector::Kind { kind, .. }) if kind == JOB_KIND)
+    })
 }

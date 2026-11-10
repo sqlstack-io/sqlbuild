@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::platform::models::{PlatformEvent, PlatformEventEnvelope};
+use crate::platform::models::{PlatformEvent, PlatformEventEnvelope, StorageKind};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
@@ -57,4 +57,10 @@ pub(crate) struct ProblemsTestCase {
     pub(crate) backend: Backend,
     pub(crate) leaders: usize,
     pub(crate) expected_leader: bool,
+}
+
+pub(crate) struct InstallationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_storage: StorageKind,
 }

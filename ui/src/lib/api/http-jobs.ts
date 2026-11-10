@@ -1,6 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { ApiError } from './client';
-import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind, TriggerStateEvent, TriggerStateEventKind } from './types/operate';
+import type { Iso } from './types';
+import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, SensorEvaluation, SensorEvaluationOutcome, Tick, Trigger, TriggerDetail, TriggerKind, TriggerStateEvent, TriggerStateEventKind } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -73,25 +74,10 @@ export function toTrigger(wire: Wire['TriggerRecord'], runs: Run[], lastTick: Ti
 		lastTick,
 		// Group children copy the group's trigger, so only top-level runs are the trigger's own.
 		lastRun: newest(runs, (r) => r.triggerId === wire.trigger_id && !r.parentRunId),
-		sourceFile: null,
+		sourceFile: d.declared_at ? `${d.declared_at.path}:${d.declared_at.line}` : null,
 		definitionChanged: false,
 		warning: null
 	};
-}
-
-/** How many upcoming due times a calendar schedule lists. */
-const UPCOMING_LIMIT = 5;
-
-/**
- * The server's next due time, and for calendars the stored times from it on, which the scheduler
- * takes in order. Later cron times would need cron evaluation, which stays on the server.
- */
-function upcomingOf(d: Wire['TriggerDeclaration'], nextDueAt: string | null): string[] | null {
-	if (!isSchedule(d)) return null;
-	if (d.schedule.kind === 'cron') return nextDueAt ? [nextDueAt] : [];
-	if (!nextDueAt) return [];
-	const next = Date.parse(nextDueAt);
-	return d.schedule.times.filter((t) => Date.parse(t) >= next).sort((a, b) => Date.parse(a) - Date.parse(b)).slice(0, UPCOMING_LIMIT);
 }
 
 /** A trigger's detail; parts with no server source are null and their widgets stay hidden. */
@@ -116,16 +102,53 @@ export function toTriggerStateEvent(wire: Wire['PersonTriggerChange']): TriggerS
 	};
 }
 
-export function triggerDetailOf(trigger: Trigger, wire: Wire['TriggerRecord'], ticks: Tick[], history: TriggerStateEvent[]): TriggerDetail {
+/** A built-in sensor's cursor is a control event position; a custom sensor's is its own value. */
+const shownCursor = (cursor: Wire['PersonSensorCursor']): string | null => cursor.custom ?? (cursor.event_storage_id > 0 ? `event ${cursor.event_storage_id}` : null);
+
+function toEvaluation(wire: Wire['PersonSensorEvaluation']): SensorEvaluation {
+	return {
+		id: wire.evaluation_id,
+		outcome: wire.phase as SensorEvaluationOutcome,
+		requestedAt: wire.requested_at,
+		finishedAt: wire.finished_at ?? null,
+		cursorBefore: shownCursor(wire.cursor_before),
+		cursorAfter: wire.cursor_after ? shownCursor(wire.cursor_after) : null,
+		runRequests: wire.run_count,
+		skipReason: null,
+		error: wire.failure_code ?? null,
+		definitionFingerprint: wire.definition_fingerprint
+	};
+}
+
+/** The cursor last moved when a check completed or an operator set or reset it, whichever is newer. */
+function cursorMovedAt(state: Wire['PersonSensorState'], history: TriggerStateEvent[]): Iso | null {
+	const times = [
+		...state.evaluations.filter((e) => e.phase === 'completed' && e.finished_at).map((e) => e.finished_at as string),
+		...history.filter((h) => h.kind === 'cursor_set' || h.kind === 'cursor_reset').map((h) => h.at)
+	];
+	return times.length ? times.reduce((a, b) => (Date.parse(a) >= Date.parse(b) ? a : b)) : null;
+}
+
+export function triggerDetailOf(
+	trigger: Trigger,
+	wire: Wire['PersonTriggerRecord'],
+	ticks: Tick[],
+	history: TriggerStateEvent[],
+	state: Wire['PersonSensorState'] | null = null
+): TriggerDetail {
 	const d = wire.definition_json;
+	const evaluations = state?.evaluations.map(toEvaluation) ?? null;
+	const lastEvaluatedFingerprint = state?.evaluations[0]?.definition_fingerprint ?? null;
 	const calendar = isSchedule(d) && d.schedule.kind === 'calendar' ? d.schedule : null;
 	const stored = calendar ? calendar.times.map(Date.parse) : [];
 	return {
 		...trigger,
+		definitionChanged: !!state && lastEvaluatedFingerprint !== null && lastEvaluatedFingerprint !== state.definition_fingerprint,
 		declaration: null,
-		targets: null,
-		catchUp: null,
-		upcoming: upcomingOf(d, wire.next_due_at ?? null),
+		targets: d.targets?.length ? d.targets : null,
+		// The scheduler ticks only the latest missed time after downtime, and a run still waiting covers it.
+		catchUp: isSchedule(d) ? { mode: 'latest', max: 1 } : null,
+		upcoming: isSchedule(d) ? wire.upcoming : null,
 		calendar: calendar && {
 			horizon: null,
 			storedUntil: stored.length ? new Date(Math.max(...stored)).toISOString() : null,
@@ -141,15 +164,16 @@ export function triggerDetailOf(trigger: Trigger, wire: Wire['TriggerRecord'], t
 					nodeConditions: [],
 					minimumIntervalSeconds: d.minimum_interval_seconds,
 					timeoutSeconds: null,
-					cursor: null,
-					cursorUpdatedAt: null,
-					cursorKnown: false,
-					currentFingerprint: null,
-					lastEvaluatedFingerprint: null
+					cursor: state?.cursor ? shownCursor(state.cursor) : null,
+					cursorUpdatedAt: state ? cursorMovedAt(state, history) : null,
+					cursorKnown: !!state,
+					currentFingerprint: state?.definition_fingerprint ?? null,
+					lastEvaluatedFingerprint
 				},
 		ticks,
-		evaluations: null,
-		runRequests: null,
+		evaluations,
+		runRequests:
+			state?.run_requests.map((r) => ({ runKey: r.run_key, runId: r.run_id, evaluationId: r.evaluation_id, requestedAt: r.queued_at, runStatus: r.status })) ?? null,
 		stateHistory: history
 	};
 }
@@ -159,8 +183,7 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		key: wire.job_key,
 		kind: wire.kind === 'group' ? 'group' : 'job',
 		description: wire.description,
-		// The server stores the resolved node list, not the selector text.
-		select: null,
+		select: wire.select ?? null,
 		members: null,
 		nodeCount: wire.selection.length,
 		overlap: null,
@@ -168,7 +191,7 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		concurrencyGroups: wire.concurrency_groups,
 		priority: null,
 		owner: null,
-		sourceFile: null,
+		sourceFile: wire.declared_at ? `${wire.declared_at.path}:${wire.declared_at.line}` : null,
 		triggerIds: triggers.filter((t) => t.jobKey === wire.job_key).map((t) => t.id),
 		lastRun: newest(runs, (r) => r.jobKey === wire.job_key)
 	};
@@ -192,16 +215,17 @@ export function jobDetailOf(job: Job, wire: Wire['JobDetailRecord']): JobDetail 
 	return {
 		...job,
 		members: wire.kind === 'group' ? wire.members.map((m) => m.job_key) : null,
+		// Published snapshots record where a job is declared but not its code.
 		declaration: null,
-		exclude: [],
+		exclude: wire.exclude?.split(/\s+/).filter(Boolean) ?? [],
 		settings: Object.fromEntries(Object.entries(wire.settings).map(([name, value]) => [name, shownSetting(value)])),
 		resolvedNodes: wire.selection,
 		concurrency: null,
-		targets: null,
+		targets: wire.targets.length ? wire.targets : null,
 		groupMembers: wire.kind === 'group' ? groupMembersOf(wire.members) : null,
 		criticalNodes: wire.critical_nodes,
 		memberOf: wire.member_of,
-		cursorType: null
+		cursorType: wire.cursor_type === 'integer' || wire.cursor_type === 'timestamp' ? wire.cursor_type : null
 	};
 }
 

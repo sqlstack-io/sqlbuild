@@ -17,11 +17,12 @@ use crate::api::_helpers::authentication::password_transport::session_credential
 use crate::api::errors::ApiError;
 use crate::api::models::{ChangeFeed, ChangeNotice, ChangeStream, ChangeSubscriber};
 use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::authorization::main::person_lists_target::person_lists_target;
+use crate::authorization::main::person_holds_target::person_holds_target;
 use crate::credentials::main::sessions::authenticate_session::authenticate_session;
 use crate::credentials::main::tokens::authenticate_token::authenticate_token;
 use crate::credentials::models::{
-    AuditContext, AuthenticatedPerson, CredentialScope, DefaultRole, SessionAccess, TokenIdentity,
+    Action, AuditContext, AuthenticatedPerson, CredentialScope, DefaultRole, SessionAccess,
+    TokenIdentity,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::listen_changes::listen_changes;
@@ -156,10 +157,10 @@ async fn still_authorized(state: &ChangeStream) -> Result<bool, ControlError> {
                     return Ok(false);
                 }
             }
-            person_lists_target(
+            person_holds_target(
                 &state.store,
                 *principal_id,
-                (state.location_id, &state.target),
+                (Action::View, state.location_id, &state.target),
                 *default_role,
             )
             .await

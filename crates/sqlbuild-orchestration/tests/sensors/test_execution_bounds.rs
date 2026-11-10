@@ -96,7 +96,7 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                 };
                 request_job_run(
                     store,
-                    &context,
+                    (&context, None),
                     &JobRunRequest {
                         run_id: parent,
                         location_id: location,
@@ -106,6 +106,8 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                         priority: 10,
                         window: None,
                         full_refresh: false,
+                        select: Vec::new(),
+                        exclude: Vec::new(),
                     },
                 )
                 .await

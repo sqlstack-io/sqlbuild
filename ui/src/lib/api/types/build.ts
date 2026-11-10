@@ -116,14 +116,17 @@ export type WarehouseColumnState = 'match' | 'type_differs' | 'missing' | 'undec
 /** The synced information-schema object and its sampled statistics. */
 export type WarehouseObject = {
 	relation: RelationName;
-	objectType: 'table' | 'view';
-	createdAt: Iso;
-	lastAlteredAt: Iso;
+	/** As the warehouse names it, such as `table` or `view`. */
+	objectType: string;
+	/** Null where the sync does not record creation or alteration times. */
+	createdAt: Iso | null;
+	lastAlteredAt: Iso | null;
 	rows: number | null;
 	bytes: number | null;
-	columns: { name: string; declaredType: string | null; actualType: string | null; state: WarehouseColumnState }[];
+	/** `state` is null when declared types are not known, so nothing is compared. */
+	columns: { name: string; declaredType: string | null; actualType: string | null; state: WarehouseColumnState | null }[];
 	/** Sampled series, oldest first. */
-	stats: { at: Iso; rows: number; bytes: number }[];
+	stats: { at: Iso; rows: number; bytes: number | null }[];
 	syncedAt: Iso;
 };
 
@@ -136,7 +139,7 @@ export type MicrobatchState = 'complete' | 'gap' | 'replay_required';
 export type MicrobatchCoverage = {
 	cursorColumn: string;
 	/** Bounds are timestamp text for `timestamp` cursors and integer text for `integer` cursors. */
-	cursorType: 'timestamp' | 'integer';
+	cursorType: string;
 	batchSize: string;
 	/** Start of the earliest completed partition. */
 	earliest: string;

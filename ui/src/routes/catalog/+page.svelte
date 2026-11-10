@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import type { CatalogNode, NodeKind } from '$lib/api';
@@ -81,7 +82,7 @@
 
 <AppTopbar title="Catalog">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
-	{#if canRun}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(narrowed ? filteredRunnable : []))}>▷ Execute{narrowed ? ` ${filteredRunnable.length}` : ''}</GatedButton>{/if}
+	{#if canRun}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(narrowed ? filteredRunnable : [])))}>▷ Execute{narrowed ? ` ${filteredRunnable.length}` : ''}</GatedButton>{/if}
 </AppTopbar>
 
 
@@ -123,12 +124,12 @@
 		<tbody>
 			{#each filtered as n (n.key)}
 				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
-				<tr onclick={() => linksNodes && goto(`/catalog/${n.key}`)}>
+				<tr onclick={() => linksNodes && goto(to(`/catalog/${n.key}`))}>
 					<td>
 						<div class="cell-name">
 							<Glyph size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								{#if linksNodes}<a href="/catalog/{n.key}" title={n.key} onclick={(e) => e.stopPropagation()}>{shortName(n.key)}</a>{:else}<span class="mono" title={n.key}>{shortName(n.key)}</span>{/if}
+								{#if linksNodes}<a href={to(`/catalog/${n.key}`)} title={n.key} onclick={(e) => e.stopPropagation()}>{shortName(n.key)}</a>{:else}<span class="mono" title={n.key}>{shortName(n.key)}</span>{/if}
 								<div class="cell-desc">{n.description}</div>
 							</div>
 						</div>

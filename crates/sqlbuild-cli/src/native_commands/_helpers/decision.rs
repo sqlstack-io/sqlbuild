@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde_json::json;
-use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin};
+use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin, ServerFacts};
 use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
@@ -122,6 +122,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                         from_failure: flag(namespace, "admin_from_failure"),
                         reason,
                         priority,
+                        nodes: Vec::new(),
                     }));
                 }
                 let target = text(namespace, "admin_target").unwrap_or_default();
@@ -184,6 +185,8 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     priority,
                     window,
                     full_refresh: false,
+                    select: texts(namespace, "admin_select").unwrap_or_default(),
+                    exclude: texts(namespace, "admin_exclude").unwrap_or_default(),
                 }));
             }
             if action.as_deref() == Some("cancel-run") {
@@ -260,16 +263,11 @@ pub(crate) fn control_address(
     Ok(Some(SocketAddr::new(host, port)))
 }
 
-/// API settings are validated together before any store is opened.
+/// API settings are validated together before any store is opened; `standalone` always runs the scheduler.
 pub(crate) fn control_api_settings(
     namespace: &Namespace,
-) -> Result<
-    (
-        ApiAuthentication,
-        (StatisticsRetention, AuditRetention, SnapshotRetention),
-    ),
-    ControlError,
-> {
+    standalone: bool,
+) -> Result<(ApiAuthentication, ServerFacts), ControlError> {
     let statistics = match retention_setting(namespace, "statistics-retention-days")? {
         Some(days) => StatisticsRetention::days(days)?,
         None => StatisticsRetention::default(),
@@ -284,7 +282,13 @@ pub(crate) fn control_api_settings(
     };
     Ok((
         control_authentication(namespace)?,
-        (statistics, audit, snapshots),
+        ServerFacts {
+            version: env!("CARGO_PKG_VERSION").into(),
+            scheduler: standalone || !flag(namespace, "control_no_scheduler"),
+            audit,
+            statistics,
+            snapshots,
+        },
     ))
 }
 

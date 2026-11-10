@@ -1,5 +1,6 @@
 import type {
 	AdhocRunCheck,
+	PlanResult,
 	AdhocRunRequest,
 	Bootstrap,
 	BulkRunResult,
@@ -112,6 +113,8 @@ export interface ApiClient extends PlatformApi {
 	/** The server's pre-launch check: resolution, write set and authorization. */
 	checkAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<AdhocRunCheck>;
 	launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run>;
+	/** Asks the location to run `sqb plan` on a build command against the warehouse, and waits for it. */
+	planBuild(scope: Scope, command: string[]): Promise<PlanResult>;
 
 	listJobs(scope: Scope): Promise<Job[]>;
 	getJob(scope: Scope, key: string): Promise<JobDetail | null>;

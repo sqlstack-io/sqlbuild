@@ -1,6 +1,6 @@
 [package]
 name = "sqlbuild-python"
-version = "0.207.0"
+version = "0.208.0"
 description = "The sqlbuild._native Python extension module."
 edition.workspace = true
 license.workspace = true

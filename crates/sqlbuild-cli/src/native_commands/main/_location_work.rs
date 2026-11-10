@@ -16,6 +16,7 @@ use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::check_location_connection;
 use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
 use crate::native_commands::models::{LocationServe, LocationWatch};
 
@@ -51,6 +52,7 @@ pub(super) async fn run_location_work(
         let message = match &claim.request.work {
             LocationWork::CheckConnection {} => "Checking requested location connection...\n",
             LocationWork::EvaluateSensor { .. } => "Evaluating requested custom sensor...\n",
+            LocationWork::Plan { .. } => "Planning requested command...\n",
         };
         drop(write_output(&[(Stream::Stderr, message)]));
         let mut shutting_down = false;
@@ -74,6 +76,13 @@ pub(super) async fn run_location_work(
                         )
                     })
             }
+            LocationWork::Plan {
+                selection,
+                settings,
+                ..
+            } => plan_location((options, script), (&selection, &settings), expires)
+                .await?
+                .map(|document| (LocationWorkOutcome::Plan { document }, Vec::new())),
         };
         let Some((outcome, local_files)) = checked else {
             drop(write_output(&[(

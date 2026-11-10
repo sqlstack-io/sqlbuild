@@ -1,6 +1,7 @@
 pub(super) mod _publish_snapshot;
 pub mod current_snapshot;
 pub mod current_snapshot_record;
+pub(crate) mod holds_on_current_nodes;
 pub(crate) mod job_write_set;
 pub mod list_person_snapshots;
 pub mod next_remote_generation;

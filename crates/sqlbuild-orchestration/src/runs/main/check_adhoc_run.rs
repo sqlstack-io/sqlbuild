@@ -2,12 +2,11 @@
 
 use uuid::Uuid;
 
-use crate::credentials::models::AuditContext;
-use crate::runs::_helpers::requests::adhoc::{
-    frozen_adhoc_request, may_view_target, permission_decisions,
-};
+use crate::credentials::models::{Action, AuditContext};
+use crate::runs::_helpers::requests::adhoc::{frozen_adhoc_request, permission_decisions};
 use crate::runs::models::{AdhocCheck, AdhocCheckRequest};
 use crate::runs::types::CommandPlanner;
+use crate::snapshots::main::holds_on_current_nodes::holds_on_current_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
@@ -20,7 +19,12 @@ pub async fn check_adhoc_run(
     request: &AdhocCheckRequest,
 ) -> Result<AdhocCheck, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, viewing) = may_view_target(transaction, principal_id, request).await?;
+    let (transaction, viewing) = holds_on_current_nodes(
+        transaction,
+        principal_id,
+        (Action::View, request.location_id, &request.target),
+    )
+    .await?;
     let (transaction, frozen) = if viewing {
         frozen_adhoc_request(transaction, (context, planner), (request, Uuid::nil())).await?
     } else {

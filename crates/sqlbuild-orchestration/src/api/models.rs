@@ -7,7 +7,7 @@ use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changes, location_health, location_work, person_bootstrap,
     person_checks, person_location_work, person_maintenance, person_node_sql, person_operations,
-    person_reads, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
+    person_plans, person_reads, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -17,6 +17,7 @@ use crate::api::_helpers::resources::{
     administrators::people,
     administrators::holdings,
     administrators::definitions,
+    administrators::server,
     audit::read,
     person_operations::request_job,
     person_operations::request_adhoc,
@@ -38,9 +39,11 @@ use crate::api::_helpers::resources::{
     person_reads::triggers,
     person_reads::ticks,
     person_reads::trigger_changes,
+    person_reads::sensor_state,
     person_reads::snapshots,
     person_reads::health,
     person_reads::problems,
+    person_reads::platform_events,
     person_operations::catalog,
     person_operations::statistics,
     person_operations::fingerprint,
@@ -55,6 +58,8 @@ use crate::api::_helpers::resources::{
     person_maintenance::coverage,
     person_location_work::request,
     person_location_work::result,
+    person_plans::request,
+    person_plans::read,
     person_node_sql::read,
     password_sessions::login,
     password_sessions::current,
@@ -92,6 +97,25 @@ use crate::api::_helpers::resources::{
     warehouse_metadata::watermark
 ))]
 pub(crate) struct ControlApi;
+
+/// A page of runs, newest first; the `before_*` pair names the last run of the previous page. `queued` lists the queue instead.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RunsQuery {
+    pub(crate) limit: Option<u32>,
+    #[serde(default)]
+    pub(crate) queued: bool,
+    pub(crate) before_queued_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub(crate) before_run_id: Option<uuid::Uuid>,
+}
+
+/// A page of platform events, newest first; `before` is the last storage ID of the previous page.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PlatformEventsQuery {
+    pub(crate) before: Option<i64>,
+    pub(crate) limit: Option<u32>,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -476,4 +500,39 @@ pub(crate) struct BoundedReader<R> {
     pub(crate) inner: R,
     pub(crate) remaining: usize,
     pub(crate) exceeded: bool,
+}
+
+/// What the server was started with, reported by the settings read.
+#[derive(Clone, Debug, Default)]
+pub struct ServerFacts {
+    pub version: String,
+    /// Whether this process runs the scheduler loop.
+    pub scheduler: bool,
+    pub audit: crate::credentials::models::AuditRetention,
+    pub statistics: crate::warehouse_metadata::models::StatisticsRetention,
+    pub snapshots: crate::snapshots::models::SnapshotRetention,
+}
+
+/// The server's version, storage, sign-in and retention, for administrators.
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
+pub struct ServerSettings {
+    pub version: String,
+    pub login_mode: LoginMode,
+    /// Whether this server runs the scheduler; another server may hold the lease.
+    pub scheduler: bool,
+    pub installation: crate::platform::models::InstallationRecord,
+    pub retention: ServerRetention,
+}
+
+/// How long the server keeps each kind of record.
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
+pub struct ServerRetention {
+    pub audit_days: i64,
+    pub statistics_days: i64,
+    /// Publications kept per location target.
+    pub snapshots_kept: i64,
+    pub platform_alert_days: i64,
+    pub heartbeat_days: i64,
+    pub location_health_days: i64,
+    pub sensor_evaluation_days: i64,
 }

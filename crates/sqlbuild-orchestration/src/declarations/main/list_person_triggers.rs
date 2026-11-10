@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::_helpers::reads::{latest_ticks_in, triggers_in};
+use crate::declarations::_helpers::trigger_state::upcoming_times;
 use crate::declarations::models::PersonTriggerRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
@@ -32,11 +33,14 @@ pub async fn list_person_triggers(
         .into_iter()
         .map(|tick| (tick.trigger_id, tick))
         .collect();
-    Ok(triggers
+    triggers
         .into_iter()
-        .map(|trigger| PersonTriggerRecord {
-            latest_tick: latest.remove(&trigger.trigger_id),
-            trigger,
+        .map(|trigger| {
+            Ok(PersonTriggerRecord {
+                latest_tick: latest.remove(&trigger.trigger_id),
+                upcoming: upcoming_times(&trigger.definition_json, trigger.next_due_at)?,
+                trigger,
+            })
         })
-        .collect())
+        .collect()
 }

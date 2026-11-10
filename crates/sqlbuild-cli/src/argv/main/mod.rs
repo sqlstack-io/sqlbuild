@@ -1,3 +1,4 @@
+pub mod accepted_settings_arguments;
 pub mod cli_namespace_defaults;
 pub mod command_settings_arguments;
 pub mod job_settings_arguments;

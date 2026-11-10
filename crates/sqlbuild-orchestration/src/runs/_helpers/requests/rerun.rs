@@ -1,10 +1,11 @@
-//! Retry immutable execution inputs, narrowing only to durable failed and skipped outcomes.
+//! Retry immutable execution inputs, narrowing only to durable failed and skipped outcomes or to named nodes of the source run.
 
 use std::collections::BTreeSet;
 
 use serde_json::from_value;
 use uuid::Uuid;
 
+use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
@@ -40,6 +41,27 @@ pub(crate) async fn frozen_rerun(
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let mut frozen: RunRequest = from_value(source["request_json"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
+    let named: BTreeSet<&str> = request.nodes.iter().map(String::as_str).collect();
+    if !named.is_empty() {
+        if request.from_failure {
+            return Err(ControlError::Invalid(
+                "rerun either named nodes or from failure".into(),
+            ));
+        }
+        if let Some(credentials) = credentials {
+            (transaction, _) = authorize_listing(
+                transaction,
+                (context, credentials),
+                (frozen.location_id, &frozen.target),
+                DefaultRole::None,
+            )
+            .await?;
+        }
+        frozen.selection.retain(|key| named.contains(key.as_str()));
+        frozen
+            .write_set
+            .retain(|key| frozen.selection.contains(key));
+    }
     if request.from_failure {
         let rows;
         (transaction, rows) = query(
@@ -84,6 +106,11 @@ pub(crate) async fn frozen_rerun(
     if request.from_failure && frozen.selection.is_empty() {
         return Err(ControlError::Invalid(
             "source run has no failed or skipped nodes".into(),
+        ));
+    }
+    if frozen.selection.len() != named.len() && !named.is_empty() {
+        return Err(ControlError::Invalid(
+            "rerun nodes must be in the source run's selection".into(),
         ));
     }
     Ok((transaction, (context, frozen)))

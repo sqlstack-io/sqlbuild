@@ -3,9 +3,14 @@ use crate::authorization::main::{
 };
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, BuiltinRole, DefaultRole, RoleAssignmentRequest};
+use crate::platform::_helpers::observations::observe;
+use crate::platform::main::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::read_person_problems::read_person_problems;
 use crate::platform::main::report_location_health::report_location_health;
-use crate::platform::models::{LocationHealth, LocationHealthReport};
+use crate::platform::models::{
+    LocationHealth, LocationHealthReport, PersonPlatformEvent, PersonPlatformEventPage,
+    PlatformEvent, PlatformEventKind,
+};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::begin::begin;
@@ -138,6 +143,22 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                 200,
                 "each listed target keeps its own 100 late ticks"
             );
+            assert_eq!(
+                everything
+                    .low_calendars
+                    .iter()
+                    .map(|calendar| (
+                        calendar.location_name.as_str(),
+                        calendar.name.as_str(),
+                        calendar.horizon_end.is_some()
+                    ))
+                    .collect::<Vec<_>>(),
+                vec![
+                    ("inventory", "expired_orders", true),
+                    ("orders", "expired_orders", true)
+                ],
+                "only running calendars whose dates run out within a day, not paused or ten-day ones"
+            );
             let scoped = read(developer).await.expect("developer problems");
             assert_eq!(scoped.scheduler_leader, everything.scheduler_leader);
             assert_eq!(
@@ -150,6 +171,15 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                 "only the listed location is reported broken"
             );
             assert_eq!(scoped.overdue_ticks.len(), 100);
+            assert_eq!(
+                scoped
+                    .low_calendars
+                    .iter()
+                    .map(|calendar| calendar.location_id)
+                    .collect::<Vec<_>>(),
+                vec![locations[1]],
+                "another location's low calendar stays hidden"
+            );
             assert!(
                 scoped
                     .overdue_ticks
@@ -160,7 +190,134 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
             );
             let hidden = read(outsider).await.expect("outsider problems");
             assert_eq!(hidden.scheduler_leader, everything.scheduler_leader);
-            assert!(hidden.broken_locations.is_empty() && hidden.overdue_ticks.is_empty());
+            assert!(
+                hidden.broken_locations.is_empty()
+                    && hidden.overdue_ticks.is_empty()
+                    && hidden.low_calendars.is_empty()
+            );
+            let transaction = begin(store, TransactionMode::Write)
+                .await
+                .expect("observe events");
+            let (mut transaction, rows) = query(
+                transaction,
+                "SELECT trigger_id FROM sqb_triggers WHERE location_id=$1 LIMIT 1",
+                vec![Parameter::Id(locations[0])],
+            )
+            .await
+            .expect("orders trigger");
+            let trigger_id: Uuid =
+                serde_json::from_value(rows[0]["trigger_id"].clone()).expect("trigger ID");
+            let now = transaction.now;
+            for event in [
+                PlatformEvent::SchedulerNoLeader,
+                PlatformEvent::Heartbeat {
+                    replica_id: Uuid::now_v7(),
+                },
+                PlatformEvent::LocationBroken {
+                    location_id: locations[1],
+                    target: "development".into(),
+                    last_seen_at: now,
+                },
+                PlatformEvent::TickOverdue {
+                    trigger_id,
+                    scheduled_for: now,
+                },
+            ] {
+                transaction = observe(transaction, Uuid::nil(), (event, Some(now)))
+                    .await
+                    .expect("observe");
+            }
+            commit(transaction).await.expect("observed");
+            let history = |principal: Uuid, page: (Option<i64>, u32)| {
+                list_person_platform_events(store, principal, page, DefaultRole::None)
+            };
+            let kinds = |events: &[PersonPlatformEvent]| {
+                events
+                    .iter()
+                    .map(|event| event.event.kind())
+                    .collect::<Vec<_>>()
+            };
+            let all = history(admin, (None, 100))
+                .await
+                .expect("administrator events")
+                .events;
+            assert_eq!(
+                kinds(&all),
+                [
+                    PlatformEventKind::TickOverdue,
+                    PlatformEventKind::LocationBroken,
+                    PlatformEventKind::SchedulerNoLeader
+                ],
+                "{}: newest first, without heartbeats",
+                test_case.description
+            );
+            assert_eq!(
+                (all[0].location_id, all[0].target.as_deref()),
+                (Some(locations[0]), Some("development")),
+                "a tick's event names its trigger's location target"
+            );
+            let first = history(admin, (None, 1)).await.expect("first page");
+            let second = history(admin, (first.before, 1))
+                .await
+                .expect("second page");
+            assert_eq!(kinds(&second.events), [PlatformEventKind::LocationBroken]);
+            assert_eq!(
+                history(developer, (None, 1))
+                    .await
+                    .expect("developer's first page"),
+                PersonPlatformEventPage {
+                    events: Vec::new(),
+                    before: Some(all[0].storage_id)
+                },
+                "a page whose events are all hidden still continues the scan"
+            );
+            let hidden = history(developer, (None, 1))
+                .await
+                .expect("developer's first page");
+            let broken = history(developer, (hidden.before, 1))
+                .await
+                .expect("developer's second page");
+            let no_leader = history(developer, (broken.before, 1))
+                .await
+                .expect("developer's third page");
+            let end = history(developer, (no_leader.before, 1))
+                .await
+                .expect("developer's last page");
+            assert_eq!(
+                (kinds(&broken.events), kinds(&no_leader.events), end),
+                (
+                    vec![PlatformEventKind::LocationBroken],
+                    vec![PlatformEventKind::SchedulerNoLeader],
+                    PersonPlatformEventPage {
+                        events: Vec::new(),
+                        before: None
+                    }
+                ),
+                "paging through hidden events reaches older visible ones and then ends"
+            );
+            assert_eq!(
+                kinds(
+                    &history(developer, (None, 100))
+                        .await
+                        .expect("developer events")
+                        .events
+                ),
+                [
+                    PlatformEventKind::LocationBroken,
+                    PlatformEventKind::SchedulerNoLeader
+                ],
+                "another location's tick stays hidden"
+            );
+            assert_eq!(
+                kinds(
+                    &history(outsider, (None, 100))
+                        .await
+                        .expect("outsider events")
+                        .events
+                ),
+                [PlatformEventKind::SchedulerNoLeader],
+                "only server-wide events without a listed target"
+            );
             close_test_store(fixture).await;
         });
     }

@@ -18,6 +18,7 @@ pub(crate) const SQL_FILE_SUFFIX: &str = ".sql";
 pub(crate) const TAG_KIND: &str = "tag";
 pub(crate) const PATH_KIND: &str = "path";
 pub(crate) const TEST_KIND: &str = "test";
+pub(crate) const JOB_KIND: &str = "job";
 /// Selector kinds Python parses but `sqb compile` cannot map to a compiled resource.
 pub(crate) const UNMAPPED_KINDS: [&str; 4] = ["task", "asset", "loader", "check"];
 pub(crate) const SUGGESTION_CUTOFF: f64 = 0.8;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { TICK_OUTCOMES, type Tick, type TickOutcome } from '$lib/api';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import { formatStamp } from '$lib/format/time';
@@ -38,8 +39,8 @@
 				<td class="nowrap faint">{t.evaluatedAt ? formatStamp(t.evaluatedAt) : 'not yet'}</td>
 				<td title={tickOutcomeHelp[t.outcome]}><span class="outcome" style:--c={tickOutcomeTone[t.outcome]}>{tickOutcomeText[t.outcome]}</span>{#if t.catchUp}<span class="tag" title="Made up after the scheduler was down (catch-up)">made up</span>{/if}</td>
 				<td class="mono">
-					{#if t.runId}<a href="/runs/{t.runId}" title={t.runId}>{shortRunId(t.runId)}</a>
-					{:else if t.coveredByRunId}<span class="sans">Merged into run <a href="/runs/{t.coveredByRunId}" title={t.coveredByRunId}>{shortRunId(t.coveredByRunId)}</a> (already waiting)</span>
+					{#if t.runId}<a href={to(`/runs/${t.runId}`)} title={t.runId}>{shortRunId(t.runId)}</a>
+					{:else if t.coveredByRunId}<span class="sans">Merged into run <a href={to(`/runs/${t.coveredByRunId}`)} title={t.coveredByRunId}>{shortRunId(t.coveredByRunId)}</a> (already waiting)</span>
 					{:else}<span class="faint">—</span>{/if}
 				</td>
 				<td class="faint nowrap">{t.lateBySeconds > LATE_AFTER_SECONDS ? formatSeconds(t.lateBySeconds) : '—'}</td>
@@ -84,8 +85,17 @@
 		vertical-align: top;
 	}
 	.outcome {
-		color: var(--c);
-		font-weight: 500;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+	/* Only the dot carries the outcome's colour; a column of the usual outcome stays calm. */
+	.outcome::before {
+		content: '';
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--c);
 	}
 	.tag {
 		margin-left: 6px;

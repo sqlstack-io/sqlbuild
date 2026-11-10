@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { groupRunNodes, runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -44,6 +44,11 @@ describe('run mapping', () => {
 		expect(person.requestedBy).toEqual({ kind: 'user', name: PERSON_ID, displayName: 'Ada Admin' });
 		expect(sensor.requestedBy).toEqual({ kind: 'sensor', name: 'new_inventory_file', displayName: 'new_inventory_file' });
 		expect(scheduler.requestedBy).toEqual({ kind: 'scheduler', name: 'system:scheduler', displayName: 'system:scheduler' });
+	});
+
+	it('keeps how a run of part of a job was narrowed, and nothing for a whole-job run', () => {
+		const [part, whole] = toRuns([wire('p', { narrowing: { select: [], exclude: ['customers'] } }), wire('w')], LOCATION);
+		expect([part.narrowing, whole.narrowing]).toEqual([{ select: [], exclude: ['customers'] }, null]);
 	});
 
 	it('counts cancelled nodes as failed and counts each run’s direct children', () => {
@@ -97,6 +102,95 @@ describe('runs list', () => {
 		expect(runTabCountsOf(listing, LOCATION, { includeChildren: true })).toEqual({ active: 3, queued: 2 });
 		expect(runTabCountsOf(listing, LOCATION, { filter: { requestedBy: ['ada admin'] }, includeChildren: true })).toEqual({ active: 3, queued: 2 });
 		expect(runTabCountsOf(listing, LOCATION, { filter: { requestedBy: ['someone else'] } })).toEqual({ active: 0, queued: 0 });
+	});
+});
+
+describe('backfill window', () => {
+	it('shows both ends of an integer or timestamp window as typed, and none for other runs', () => {
+		const [integer, timestamp, plain] = toRuns(
+			[
+				wire('i', { origin: 'backfill', window: { kind: 'integer', start: -3, end: 11 } }),
+				wire('t', { window: { kind: 'timestamp', start: '2026-10-01T00:00:00Z', end: '2026-10-31T00:00:00Z' } }),
+				wire('p')
+			],
+			LOCATION
+		);
+		expect(integer.window).toEqual({ start: '-3', end: '11' });
+		expect(timestamp.window).toEqual({ start: '2026-10-01T00:00:00Z', end: '2026-10-31T00:00:00Z' });
+		expect(plain.window).toBeNull();
+	});
+});
+
+describe('run queue', () => {
+	it('keeps claim order, drops runs that started meanwhile and never names a run elsewhere', () => {
+		const entries = queueEntriesOf(
+			[
+				wire('urgent', { status: 'queued', queue: { position: 1, waits: [{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'], elsewhere: 2 }] } }),
+				wire('started', { status: 'queued' }),
+				wire('blocked', {
+					status: 'queued',
+					queue: {
+						position: 2,
+						waits: [
+							{ kind: 'write_claim', run_id: null, node_key: 'model.orders', other_nodes: 3 },
+							{ kind: 'earlier_run', run_id: 'urgent', limit: 'warehouse' },
+							{ kind: 'upstream_job', run_id: 'stage', job_key: 'staging' },
+							{ kind: 'job_running', run_id: 'same' },
+							{ kind: 'write_claim', run_id: 'same', node_key: 'model.customers', other_nodes: 0 }
+						]
+					}
+				})
+			],
+			LOCATION
+		);
+		expect(entries.map((q) => [q.run.id, q.position])).toEqual([
+			['urgent', 1],
+			['blocked', 2]
+		]);
+		expect(entries[0].waits).toEqual([{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'], elsewhere: 2 }]);
+		expect(entries[1].waits).toEqual([
+			{ kind: 'write_claim', runId: null, nodeKey: 'model.orders', otherNodes: 3 },
+			{ kind: 'earlier_run', runId: 'urgent', limit: 'warehouse' },
+			{ kind: 'upstream_job', runId: 'stage', jobKey: 'staging' },
+			{ kind: 'job_running', runId: 'same' }
+		]);
+	});
+});
+
+describe('runs past the newest window', () => {
+	const runWindow = (prefix: string, size: number) => Array.from({ length: size }, (_, i) => wire(`${prefix}${i}`));
+	const ids = (page: { rows: { run: { id: string } }[] }) => page.rows.map((r) => r.run.id);
+
+	it('reads the window count after the offset', () => {
+		expect(parseRunCursor(null)).toEqual({ offset: 0, older: 0 });
+		expect(parseRunCursor('7')).toEqual({ offset: 7, older: 0 });
+		expect(parseRunCursor('1000+2')).toEqual({ offset: 1000, older: 2 });
+	});
+
+	it('stops at the end of a window shorter than a full one', () => {
+		const page = runRowPageOver([runWindow('n', 30)], LOCATION, { tab: 'all', limit: 20, cursor: '20' });
+		expect(ids(page)).toEqual(Array.from({ length: 10 }, (_, i) => `n${i + 20}`));
+		expect(page.nextCursor).toBeNull();
+	});
+
+	it('asks for one more window once a full window runs out', () => {
+		const newest = runWindow('n', 1000);
+		const first = runRowPageOver([newest], LOCATION, { tab: 'all', limit: 600 });
+		expect(first.nextCursor).toBe('600');
+		const second = runRowPageOver([newest], LOCATION, { tab: 'all', limit: 600, cursor: first.nextCursor });
+		expect(second.rows).toHaveLength(400);
+		expect(second.nextCursor).toBe('1000+1');
+	});
+
+	it('pages into the older window and keeps its count on the cursor', () => {
+		const windows = [runWindow('n', 1000), runWindow('o', 1000)];
+		const page = runRowPageOver(windows, LOCATION, { tab: 'all', limit: 600, cursor: '1000+1' });
+		expect(ids(page)[0]).toBe('o0');
+		expect(ids(page)).toHaveLength(600);
+		expect(page.nextCursor).toBe('1600+1');
+		const last = runRowPageOver([runWindow('n', 1000), runWindow('o', 3)], LOCATION, { tab: 'all', limit: 600, cursor: '1000+1' });
+		expect(ids(last)).toEqual(['o0', 'o1', 'o2']);
+		expect(last.nextCursor).toBeNull();
 	});
 });
 
@@ -187,5 +281,18 @@ describe('group run nodes', () => {
 			['model:report', 'g', 'pending'],
 			['model:raw', 's', 'failed']
 		]);
+	});
+});
+
+describe('planResultOf', () => {
+	it.each([
+		{ description: 'a plan keeps its models and fills missing sections', outcome: { kind: 'plan', document: { selected_count: 1, models: [{ name: 'orders', reason: 'first_run' }] } }, expected: { plan: 'orders', error: null } },
+		{ description: "sqb plan's own error is the result", outcome: { kind: 'plan', document: { error: { code: 'S007', message: "unknown selector name 'ordrs'" } } }, expected: { plan: null, error: "S007: unknown selector name 'ordrs'" } },
+		{ description: 'a superseded plan asks to plan again', outcome: { kind: 'superseded' }, expected: { plan: null, error: 'The project changed on the location while it was planning; plan again' } }
+	])('$description', ({ outcome, expected }) => {
+		const result = planResultOf(outcome as never);
+		expect(result.error).toBe(expected.error);
+		expect(result.plan?.models[0]?.name ?? null).toBe(expected.plan);
+		if (result.plan) expect(result.plan.warnings).toEqual([]);
 	});
 });

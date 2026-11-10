@@ -35,6 +35,24 @@ pub struct JobDefinition {
     pub settings: BTreeMap<String, serde_json::Value>,
     #[serde(default)]
     pub concurrency_groups: BTreeSet<String>,
+    /// The selectors as written, for display; `selection` is what runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub select: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exclude: Option<String>,
+    /// The targets the declaration is limited to; empty for every target.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub targets: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_at: Option<DeclaredAt>,
+}
+
+/// Where a declaration was written, relative to the project root.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DeclaredAt {
+    pub path: String,
+    pub line: u32,
 }
 
 /// A virtual parent shares run controls, but only its physical children claim node writers.
@@ -68,6 +86,11 @@ pub struct TriggerDefinition {
     pub starts_at: Option<DateTime<Utc>>,
     #[serde(default)]
     pub default_status: TriggerStatus,
+    /// The targets the declaration is limited to; empty for every target.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub targets: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_at: Option<DeclaredAt>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -97,6 +120,9 @@ pub struct JobRecord {
     pub selection: BTreeSet<String>,
     pub concurrency_groups: BTreeSet<String>,
     pub snapshot_id: uuid::Uuid,
+    /// A job's selectors as written; absent for a group and for snapshots published before they were recorded.
+    pub select: Option<String>,
+    pub declared_at: Option<DeclaredAt>,
 }
 
 /// A `sqb_jobs` row as stored.
@@ -125,6 +151,13 @@ pub struct JobDetailRecord {
     pub member_of: BTreeSet<String>,
     /// Selected nodes whose failure stops a group.
     pub critical_nodes: BTreeSet<String>,
+    pub select: Option<String>,
+    pub exclude: Option<String>,
+    /// Empty when the declaration applies to every target.
+    pub targets: BTreeSet<String>,
+    pub declared_at: Option<DeclaredAt>,
+    /// The cursor type every selected cursor node shares; absent when none has a cursor or types differ.
+    pub cursor_type: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -151,6 +184,8 @@ pub struct PersonTriggerRecord {
     #[serde(flatten)]
     pub trigger: TriggerRecord,
     pub latest_tick: Option<crate::scheduler::models::TickRecord>,
+    /// A running schedule's next due times from `next_due_at` on, at most five; empty otherwise.
+    pub upcoming: Vec<DateTime<Utc>>,
 }
 
 /// One operator change of a trigger, as a person reads it: what changed, who changed it, when and why.

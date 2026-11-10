@@ -1,6 +1,7 @@
 import type { ApiClient, Scope } from '$lib/api';
 import { app } from '$lib/state/app.svelte';
 import { prefetch } from '$lib/state/prefetch';
+import { appPath } from '$lib/paths';
 import { readParams, toQuery } from './runs/utils';
 import type { LayoutLoad } from './$types';
 
@@ -38,12 +39,12 @@ const PAGE_READS: [RegExp, Read][] = [
 	[/^\/maintenance$/, (c, s) => [c.maintenanceHistory(s)]],
 	[/^\/locations$/, (c) => [c.listLocations(), c.platformHealth()]],
 	[/^\/locations\/([^/]+)$/, (c, _, m) => [c.getLocation(part(m))]],
-	[/^\/connections(\/[^/]+)?$/, (c, s) => [c.listWarehouseConnections(s)]],
+	[/^\/connections$/, (c) => [c.listWarehouseConnections()]],
 	[/^\/providers(\/[^/]+)?$/, (c, s) => [c.listProviders(s)]]
 ];
 
 // Reads only the path, so filter changes within a page don't wait on this.
 export const load: LayoutLoad = async ({ url, untrack }) => {
 	const search = untrack(() => url.searchParams);
-	await prefetch(app.scope, url.pathname, search, PAGE_READS);
+	await prefetch(app.scope, appPath(url.pathname), search, PAGE_READS);
 };

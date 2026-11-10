@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -53,13 +54,13 @@
 	{#if location.error}
 		<div class="text-[var(--sb-error)] px-6 py-4 text-[13px]">Couldn't load this location: {location.error}</div>
 	{:else if location.data === null}
-		<div class="text-muted-foreground px-6 py-4 text-[13px]"><a href="/locations" class="back">← Locations</a> No location with ID <code>{id}</code>.</div>
+		<div class="text-muted-foreground px-6 py-4 text-[13px]"><a href={to(`/locations`)} class="back">← Locations</a> No location with ID <code>{id}</code>.</div>
 	{:else if !detail}
 		<div class="text-muted-foreground px-6 py-4 text-[13px]">Loading…</div>
 	{:else}
 		<header class="head">
 			<div class="line title-line">
-				<a href="/locations" class="back">← Locations</a>
+				<a href={to(`/locations`)} class="back">← Locations</a>
 				<span class="font-display text-[17px] font-semibold">{detail.name}</span>
 				<span class="muted">· {targetWords(detail.target)}</span>
 				<span class="right">

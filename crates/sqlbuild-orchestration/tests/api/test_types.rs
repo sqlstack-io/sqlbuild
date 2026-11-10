@@ -213,3 +213,17 @@ pub(crate) struct OlderNodeFinished {
     error_code: Option<String>,
     skipped_because_of: Option<String>,
 }
+
+pub(crate) struct PlanTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_selection: &'static [&'static str],
+    pub(crate) expected_warning: &'static str,
+}
+
+pub(crate) struct UpcomingTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_hourly: [&'static str; 5],
+    pub(crate) expected_calendar: [&'static str; 3],
+}

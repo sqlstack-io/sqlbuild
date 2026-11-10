@@ -93,6 +93,7 @@ pub(crate) fn request(
         settings: BTreeMap::new(),
         window: None,
         concurrency_groups: BTreeSet::new(),
+        narrowing: None,
     }
 }
 

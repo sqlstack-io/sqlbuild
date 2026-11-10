@@ -1,5 +1,6 @@
 //! Direct database ownership authorizes bootstrap, not an untrusted HTTP request or supplied role.
 
+use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use serde_json::{Value, json};
 use sqlbuild_orchestration::authorization::main::bootstrap_user::bootstrap_user;
 use sqlbuild_orchestration::authorization::main::grant_admin::grant_admin;
@@ -17,8 +18,10 @@ use sqlbuild_orchestration::platform::main::request_location_work::request_locat
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::request_job_run::request_job_run;
 use sqlbuild_orchestration::runs::main::request_rerun::request_rerun;
+use sqlbuild_orchestration::runs::models::JobRunRequest;
 use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
 use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
@@ -73,10 +76,7 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
             grant_admin(&store, &context, principal_id).await?;
             Ok(json!({"principal_id": principal_id, "role": "admin"}))
         }
-        ControlAdmin::RequestJobRun(request) => {
-            let applied = request_job_run(&store, &context, &request).await?;
-            Ok(json!({"run_id": request.run_id, "applied": applied}))
-        }
+        ControlAdmin::RequestJobRun(request) => queue_job_run(&store, &context, &request).await,
         ControlAdmin::Rerun(request) => {
             let applied = request_rerun(&store, (&context, None), &request).await?;
             Ok(json!({"run_id": request.run_id, "applied": applied}))
@@ -130,4 +130,15 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
             Ok(json!({"event_id": event_id, "trigger_id": trigger_id, "applied": applied}))
         }
     }
+}
+
+/// A trusted job run, narrowed with the same planner the server resolves ad-hoc commands with.
+async fn queue_job_run(
+    store: &ControlStore,
+    context: &AuditContext,
+    request: &JobRunRequest,
+) -> Result<Value, ControlError> {
+    let planner = adhoc_planner();
+    let applied = request_job_run(store, (context, Some(planner.as_ref())), request).await?;
+    Ok(json!({"run_id": request.run_id, "applied": applied}))
 }

@@ -3,7 +3,9 @@
 use chrono::{DateTime, TimeDelta, Utc};
 use uuid::Uuid;
 
-use crate::platform::models::{LateTarget, OverdueTick, ProblemScan};
+use crate::declarations::models::Schedule;
+use crate::platform::constants::LOCATION_SILENCE_SECONDS;
+use crate::platform::models::{LateTarget, LowCalendar, OverdueTick, ProblemScan, RunningSchedule};
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
@@ -25,7 +27,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
          FROM sqb_location_instances i JOIN sqb_locations l ON l.location_id=i.location_id \
          WHERE l.archived_at IS NULL GROUP BY i.location_id,l.name,i.target \
          HAVING MAX(i.last_seen_at)<$1 ORDER BY i.location_id,i.target",
-        vec![Parameter::Time(now - TimeDelta::seconds(90))],
+        vec![Parameter::Time(now - TimeDelta::seconds(LOCATION_SILENCE_SECONDS))],
     )
     .await?;
     let (transaction, late_targets) = query(
@@ -38,8 +40,38 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         vec![Parameter::Time(overdue_before(now))],
     )
     .await?;
+    let (transaction, schedules) = query(
+        transaction,
+        "SELECT t.trigger_id, t.name, t.location_id, l.name AS location_name, t.target, t.definition_json \
+         FROM sqb_triggers t JOIN sqb_trigger_state s ON s.trigger_id=t.trigger_id \
+         JOIN sqb_locations l ON l.location_id=t.location_id \
+         WHERE t.kind='schedule' AND s.status='running' AND t.removed_in_snapshot_id IS NULL \
+         AND l.archived_at IS NULL ORDER BY l.name, t.target, t.name",
+        vec![],
+    )
+    .await?;
     commit(transaction).await?;
+    let schedules: Vec<RunningSchedule> = schedules
+        .into_iter()
+        .map(decode_row)
+        .collect::<Result<_, _>>()?;
+    let low_calendars: Vec<LowCalendar> = schedules
+        .into_iter()
+        .filter_map(|schedule| {
+            let (refresh_at, horizon_end) = calendar_low(&schedule.definition_json.schedule, now)?;
+            Some(LowCalendar {
+                trigger_id: schedule.trigger_id,
+                name: schedule.name,
+                location_id: schedule.location_id,
+                location_name: schedule.location_name,
+                target: schedule.target,
+                refresh_at,
+                horizon_end,
+            })
+        })
+        .collect();
     Ok(ProblemScan {
+        low_calendars,
         now,
         lease: leases.into_iter().next().map(decode_row).transpose()?,
         broken: locations
@@ -94,4 +126,17 @@ pub(crate) async fn late_ticks(
 
 fn overdue_before(now: DateTime<Utc>) -> DateTime<Utc> {
     now - TimeDelta::seconds(30)
+}
+
+/// A calendar is low when its last date is at most a day away; gives when it refreshes and its last date.
+pub(crate) fn calendar_low(
+    schedule: &Schedule,
+    now: DateTime<Utc>,
+) -> Option<(DateTime<Utc>, Option<DateTime<Utc>>)> {
+    let Schedule::Calendar { times, refresh_at } = schedule else {
+        return None;
+    };
+    let last: Option<DateTime<Utc>> = times.last().copied();
+    last.is_none_or(|last| last <= now + TimeDelta::days(1))
+        .then_some((*refresh_at, last))
 }

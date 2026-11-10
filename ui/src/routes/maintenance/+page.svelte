@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
@@ -107,7 +108,7 @@
 							<div class="cell-desc"><code>{formatRelation(m.origin)}</code></div>
 						</td>
 						<td>
-							<a class="model link" href="/catalog/{m.destinationModel}">{m.destinationModel}</a>
+							<a class="model link" href={to(`/catalog/${m.destinationModel}`)}>{m.destinationModel}</a>
 							<div class="cell-desc"><code>{formatRelation(m.destination)}</code></div>
 						</td>
 						<td class="muted" title="decision = {m.decision}">{decisionLabel[m.decision]}</td>
@@ -139,7 +140,7 @@
 							<div class="cell-desc" title="retention = {v.retention}">{v.retention === 'false' ? 'Not kept' : `Kept for ${v.retention}`}</div>
 						</td>
 						<td>
-							<a class="model link" href="/catalog/{v.destinationModel}">{v.destinationModel}</a>
+							<a class="model link" href={to(`/catalog/${v.destinationModel}`)}>{v.destinationModel}</a>
 							<div class="cell-desc"><code>{formatRelation(v.new)}</code></div>
 						</td>
 						<td>

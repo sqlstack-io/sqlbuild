@@ -160,7 +160,7 @@ pub(crate) async fn finish_run(
     };
     request_job_run(
         store,
-        &context,
+        (&context, None),
         &JobRunRequest {
             run_id,
             location_id: scope.0,
@@ -170,6 +170,8 @@ pub(crate) async fn finish_run(
             priority: 10,
             window: None,
             full_refresh: false,
+            select: Vec::new(),
+            exclude: Vec::new(),
         },
     )
     .await

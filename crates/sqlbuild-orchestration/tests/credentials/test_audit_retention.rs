@@ -80,9 +80,11 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_rows_survive_and_retrie
                 priority: 1,
                 window: None,
                 full_refresh: false,
+                select: Vec::new(),
+                exclude: Vec::new(),
             };
             assert!(
-                request_job_run(store, &context, &request)
+                request_job_run(store, (&context, None), &request)
                     .await
                     .expect("request")
             );
@@ -136,7 +138,7 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_rows_survive_and_retrie
             assert_eq!(ids, [undelivered, newest]);
             assert_eq!(deliveries, 0, "deliveries of pruned rows go with them");
             assert!(
-                !request_job_run(store, &context, &request)
+                !request_job_run(store, (&context, None), &request)
                     .await
                     .expect("retry still finds its original request after the audit is pruned")
             );

@@ -1,4 +1,5 @@
 pub(crate) mod connection_tests;
+pub(crate) mod event_history;
 pub(crate) mod liveness;
 pub(crate) mod location_heartbeat;
 pub(crate) mod observations;

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.208.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.207.0...v0.208.0) (2026-11-10)
+
+
+### Features
+
+* **analysis:** analyse models with SQLQuack's native parsers and semantics ([#1397](https://github.com/sqlstack-io/sqlbuild/issues/1397)) ([c642221](https://github.com/sqlstack-io/sqlbuild/commit/c6422211de5b66bb42b67059873bf781ee41cda2))
+
 ## [0.207.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.206.0...v0.207.0) (2026-11-10)
 
 

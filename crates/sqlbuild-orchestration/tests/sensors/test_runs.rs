@@ -327,6 +327,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 reason: "Retry only failed orders without borrowing earlier customer success"
                     .into(),
                 priority: 10,
+                nodes: Vec::new(),
             };
             let context = AuditContext {
                 actor: "test-admin".into(),

@@ -160,6 +160,9 @@ pub struct RunRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<RunWindow>,
     pub concurrency_groups: BTreeSet<String>,
+    /// The selectors a person narrowed a job run with; reruns copy it with the rest of the request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub narrowing: Option<RunNarrowing>,
 }
 
 /// A trusted operator names a published job; execution inputs are never supplied by the caller.
@@ -177,6 +180,12 @@ pub struct JobRunRequest {
     /// Rebuild every selected model from scratch; it rewrites history, as a window does.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub full_refresh: bool,
+    /// Narrow the job with `sqb build` selectors; only nodes already in the job can remain.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub select: Vec<String>,
+    /// Leave nodes out of the job with `sqb build` selectors.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
 }
 
 /// A retry derives its execution scope from a terminal run, never from caller selectors.
@@ -188,6 +197,9 @@ pub struct RerunRequest {
     pub from_failure: bool,
     pub reason: String,
     pub priority: i64,
+    /// Rerun only these nodes of the source run; each must be in its selection.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<String>,
 }
 
 /// Browser cancellation cannot supply an actor, claim or lifecycle transition.
@@ -230,6 +242,65 @@ pub struct RunRecord {
     pub selection_json: BTreeSet<String>,
     pub node_counts_json: BTreeMap<String, i64>,
     pub last_event_storage_id: i64,
+    /// How a person narrowed this run of a job, or the run it reruns, as typed; `None` when it runs the whole job.
+    #[serde(
+        default,
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_narrowing"
+    )]
+    pub narrowing: Option<RunNarrowing>,
+    /// The cursor window a backfill processes; `None` for every other run.
+    #[serde(
+        default,
+        alias = "backfill_window",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_window"
+    )]
+    pub window: Option<RunWindow>,
+    /// Set only when listing the queue: where the run stands and what it waits on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue: Option<RunQueueState>,
+}
+
+/// A queued run's place in claim order within its location and target, and what holds it back.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunQueueState {
+    /// 1-based, in the order the scheduler claims: priority, then queue time.
+    pub position: u32,
+    /// Empty when nothing holds the run back and it starts on a free worker.
+    pub waits: Vec<QueueWait>,
+}
+
+/// Why the scheduler cannot claim a queued run yet. Runs outside the listed location and target are counted, never named.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum QueueWait {
+    /// Its group run has not started yet, or is stopping.
+    GroupParent { run_id: Uuid },
+    /// A job this one runs after in the same group has not finished.
+    UpstreamJob { run_id: Uuid, job_key: String },
+    /// Another run of the same job is running.
+    JobRunning { run_id: Uuid },
+    /// Another run holds write claims on nodes this run writes.
+    WriteClaim {
+        run_id: Option<Uuid>,
+        node_key: String,
+        other_nodes: u32,
+    },
+    /// Running runs hold slots of a concurrency limit this run takes.
+    ConcurrencyLimit {
+        limit: String,
+        holders: Vec<Uuid>,
+        elsewhere: u32,
+    },
+    /// An earlier queued run takes the same concurrency limit, so it goes first.
+    EarlierRun { run_id: Option<Uuid>, limit: String },
+}
+
+/// The `sqb build` selectors one run of a job was narrowed with.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunNarrowing {
+    pub select: Vec<String>,
+    pub exclude: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -517,6 +588,22 @@ pub enum RunAuthority<'a> {
     Operator(&'a crate::credentials::models::AuditContext),
 }
 
+/// A running run's hold on a write-claimed node or a concurrency slot, with where the run is.
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct QueueHolder {
+    pub(crate) held: String,
+    pub(crate) run_id: Uuid,
+    pub(crate) location_id: Uuid,
+    pub(crate) target: String,
+}
+
+/// A run of a job that holds the job while it runs.
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct RunningJob {
+    pub(crate) run_id: Uuid,
+    pub(crate) job_key: String,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct QueueCandidate {
     pub(crate) request_json: RunRequest,
@@ -681,7 +768,12 @@ pub struct AdhocCheck {
 
 /// A person's change to the run queue: a published job, a command the planner resolves on the server, or a cancellation.
 pub enum PersonRunRequest<'a> {
-    Job(&'a JobRunRequest),
+    Job(&'a dyn CommandPlanner, &'a JobRunRequest),
     Adhoc(&'a dyn CommandPlanner, &'a AdhocRunRequest),
     Cancel(&'a CancelRunRequest),
+    /// A build command planned on the location for `(location_id, target)`; it never becomes a run.
+    Plan(
+        &'a dyn CommandPlanner,
+        (Uuid, &'a str, &'a crate::platform::models::PlanRequest),
+    ),
 }

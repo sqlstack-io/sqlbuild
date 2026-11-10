@@ -12,12 +12,18 @@ use crate::store::tests::helpers::read_recall_events;
 use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::_helpers::lifecycle::reads::list_runs_in;
+use crate::runs::models::{QueueWait, RunQueueState};
 use crate::runs::tests::claim_helpers::succeed;
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::runs::tests::terminal_helpers::finish;
 use crate::runs::tests::test_types::{
-    BacklogClaimTestCase, GroupLimitTestCase, PriorityClaimsTestCase, ScopedClaimTestCase,
+    BacklogClaimTestCase, GroupLimitTestCase, PriorityClaimsTestCase, QueueStateTestCase,
+    ScopedClaimTestCase,
 };
+use crate::runs::types::RunsListing;
+use crate::store::main::{begin::begin, commit::commit};
+use crate::store::models::TransactionMode;
 use crate::store::tests::lease_helpers::extend_lease_through_test;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
@@ -523,6 +529,133 @@ fn given_a_blocked_multi_limit_waiter_when_younger_work_arrives_then_shared_limi
             assert_eq!(younger.request.run_id, Uuid::from_u128(3));
             succeed(store, &younger).await;
             succeed(store, &unrelated).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_claimed_work_here_and_elsewhere_when_listing_the_queue_then_each_run_shows_its_place_and_what_holds_it_back_without_naming_other_scopes()
+ {
+    let test_cases = [
+        QueueStateTestCase {
+            description: "SQLite queue read mirrors admission",
+            backend: Backend::Sqlite,
+            expected_claim_order: [4, 3, 5],
+        },
+        QueueStateTestCase {
+            description: "PostgreSQL queue read mirrors admission",
+            backend: Backend::Postgres,
+            expected_claim_order: [4, 3, 5],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let other = create_location(store, "returns", "test-admin")
+                .await
+                .expect("other location");
+            let here = publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("snapshot");
+            let there = publish_snapshot(store, &snapshot(other))
+                .await
+                .expect("other snapshot");
+            let limits =
+                BTreeMap::from([("warehouse".to_owned(), NonZeroU32::new(2).expect("limit"))]);
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let mut running = request((location, here.snapshot_id), 1, 0, &["orders"]);
+            running.concurrency_groups.insert("warehouse".into());
+            let mut elsewhere = request((other, there.snapshot_id), 2, 0, &["products"]);
+            elsewhere.concurrency_groups.insert("warehouse".into());
+            for input in [&running, &elsewhere] {
+                queue(store, input).await;
+                claim_next_run(store, &lease, &limits, None)
+                    .await
+                    .expect("claim")
+                    .expect("claimable");
+            }
+            let mut blocked = request((location, here.snapshot_id), 3, 0, &["customers", "orders"]);
+            blocked.concurrency_groups.insert("warehouse".into());
+            let mut urgent = request((location, here.snapshot_id), 4, 5, &["inventory"]);
+            urgent.concurrency_groups.insert("warehouse".into());
+            let free = request((location, here.snapshot_id), 5, 0, &["products"]);
+            for input in [&blocked, &urgent, &free] {
+                queue(store, input).await;
+            }
+            let transaction = begin(store, TransactionMode::Read).await.expect("read");
+            let (transaction, listed) = list_runs_in(
+                transaction,
+                (location, "development"),
+                RunsListing::Queue(100),
+            )
+            .await
+            .expect("queue");
+            commit(transaction).await.expect("commit");
+            let slot = QueueWait::ConcurrencyLimit {
+                limit: "warehouse".into(),
+                holders: vec![running.run_id],
+                elsewhere: 1,
+            };
+            let expected = [
+                (
+                    urgent.run_id,
+                    RunQueueState {
+                        position: 1,
+                        waits: vec![slot.clone()],
+                    },
+                ),
+                (
+                    blocked.run_id,
+                    RunQueueState {
+                        position: 2,
+                        waits: vec![
+                            QueueWait::WriteClaim {
+                                run_id: Some(running.run_id),
+                                node_key: "orders".into(),
+                                other_nodes: 0,
+                            },
+                            slot,
+                            QueueWait::EarlierRun {
+                                run_id: Some(urgent.run_id),
+                                limit: "warehouse".into(),
+                            },
+                        ],
+                    },
+                ),
+                (
+                    free.run_id,
+                    RunQueueState {
+                        position: 3,
+                        waits: vec![QueueWait::WriteClaim {
+                            run_id: None,
+                            node_key: "products".into(),
+                            other_nodes: 0,
+                        }],
+                    },
+                ),
+            ];
+            assert_eq!(
+                listed.iter().map(|run| run.run_id).collect::<Vec<_>>(),
+                test_case.expected_claim_order.map(Uuid::from_u128),
+                "{}",
+                test_case.description
+            );
+            let actual: Vec<_> = listed
+                .into_iter()
+                .map(|run| (run.run_id, run.queue.expect("queue state")))
+                .collect();
+            assert_eq!(actual, expected, "{}", test_case.description);
             close_test_store(fixture).await;
         });
     }

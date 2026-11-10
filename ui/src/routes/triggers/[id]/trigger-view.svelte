@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import type { TriggerState } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -60,7 +61,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
-		<a href="/triggers" class="back">← Schedules and sensors</a>
+		<a href={to(`/triggers`)} class="back">← Schedules and sensors</a>
 		<span class="font-display text-[17px] font-semibold">{t?.name ?? id}</span>
 		{#if t}
 			<span class="sb-status" style:--tone={t.state === 'running' ? 'var(--sb-success)' : 'var(--sb-text-faint)'}><span></span>{t.state === 'running' ? 'on' : 'paused'}</span>
@@ -97,11 +98,11 @@
 				<h3>How it works</h3>
 				<dl>
 					<div><dt>Kind</dt><dd title={triggerKindHelp[t.kind]}>{triggerKindLabel[t.kind]}</dd></div>
-					<div><dt>Runs</dt><dd>{#if t.jobKey}<a href="/jobs/{t.jobKey}">{t.jobKey}</a>{:else}its own code only{/if}</dd></div>
+					<div><dt>Runs</dt><dd>{#if t.jobKey}<a href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}its own code only{/if}</dd></div>
 					{#if t.cron}<div><dt>Cron</dt><dd><code>{t.cron}</code></dd></div>{/if}
 					{#if t.timezone}<div><dt>Time zone</dt><dd>{t.timezone}</dd></div>{/if}
-					{#if t.catchUp}<div><dt>After downtime</dt><dd title="Catch-up policy: {t.catchUp.mode}">{t.catchUp.mode === 'latest' ? 'runs once for the latest missed time' : `runs for each missed time, up to ${t.catchUp.max}`}</dd></div>{/if}
-					{#if t.declaration}<div><dt>Targets</dt><dd>{t.targets?.join(', ') ?? 'all targets'}</dd></div>{/if}
+					{#if t.catchUp}<div><dt>After downtime</dt><dd title="Catch-up policy: {t.catchUp.mode}">{t.catchUp.mode === 'latest' ? 'at most one run, for the latest missed time' : `runs for each missed time, up to ${t.catchUp.max}`}</dd></div>{/if}
+					{#if t.targets}<div><dt>Targets</dt><dd>{t.targets.join(', ')}</dd></div>{/if}
 					<div><dt>In the code</dt><dd>{t.defaultState === 'running' ? 'on' : 'paused'}</dd></div>
 					{#if t.sourceFile}<div><dt>Defined in</dt><dd><code>{t.sourceFile}</code></dd></div>{/if}
 				</dl>
@@ -132,7 +133,7 @@
 
 				<h3>Last run</h3>
 				{#if t.lastRun}
-					<p><i class="dot" style:background={runStatusTone[t.lastRun.status]}></i><a class="mono" href="/runs/{t.lastRun.id}" title={t.lastRun.id}>{shortRunId(t.lastRun.id)}</a> <span class="faint">{runStatusLabel[t.lastRun.status]}{t.lastRun.startedAt ? ` · ${formatAgo(t.lastRun.startedAt, app.now)}` : ''}</span></p>
+					<p><i class="dot" style:background={runStatusTone[t.lastRun.status]}></i><a class="mono" href={to(`/runs/${t.lastRun.id}`)} title={t.lastRun.id}>{shortRunId(t.lastRun.id)}</a> <span class="faint">{runStatusLabel[t.lastRun.status]}{t.lastRun.startedAt ? ` · ${formatAgo(t.lastRun.startedAt, app.now)}` : ''}</span></p>
 				{:else}
 					<p class="faint">No runs yet.</p>
 				{/if}
