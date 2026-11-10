@@ -25,11 +25,12 @@
 			void flow.fitView({ duration: 300, padding: 0.08, maxZoom: 1, ...opts });
 			return;
 		}
-		// Until the graph has been shown, fit without animating, so it appears already in place. A fit fails
-		// while cards are still being measured, so it is retried, and the graph shows only after a fit has painted.
+		// Until the graph has been shown, fit without animating, so it appears already in place. A fit waits
+		// until the flow can run it, so each try is bounded by a frame; after 20 the graph shows regardless.
 		void (async () => {
 			for (let attempt = 0; attempt < 20 && !fitted; attempt++) {
-				if (await flow.fitView({ padding: 0.08, maxZoom: 1, ...opts, duration: 0 })) {
+				const fit = flow.fitView({ padding: 0.08, maxZoom: 1, ...opts, duration: 0 });
+				if (await Promise.race([fit, frame().then(() => false)])) {
 					await frame();
 					await frame();
 					fitted = true;
