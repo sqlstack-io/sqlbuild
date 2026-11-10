@@ -1,6 +1,8 @@
 import json
 import os
+import statistics
 import subprocess
+from functools import partial
 from pathlib import Path
 
 import jsonschema
@@ -564,19 +566,39 @@ def test_given_a_locked_store_when_building_then_start_and_exit_each_add_at_most
     project_dir: Path = prepared_project(
         tmp_path / "locked", budget, builds=test_case.builds_before_lock
     )
-    _, baseline_first, baseline_total = timed_build(baseline_dir)
-
-    locked, locked_first, locked_total = build_while_store_locked(project_dir)
+    baseline_build: partial[tuple[subprocess.CompletedProcess[bytes], float, float]] = partial(
+        timed_build, baseline_dir
+    )
+    locked_build: partial[tuple[subprocess.CompletedProcess[bytes], float, float]] = partial(
+        build_while_store_locked, project_dir
+    )
+    first_delays: list[float] = []
+    total_delays: list[float] = []
+    # Baseline and locked builds alternate, each pair in the opposite order to the last, so both
+    # sides of every difference run under the same load; the medians drop one noisy pair.
+    for first_build, second_build in (
+        (baseline_build, locked_build),
+        (locked_build, baseline_build),
+        (baseline_build, locked_build),
+    ):
+        builds: dict[
+            partial[tuple[subprocess.CompletedProcess[bytes], float, float]],
+            tuple[subprocess.CompletedProcess[bytes], float, float],
+        ] = {first_build: first_build(), second_build: second_build()}
+        _, baseline_first, baseline_total = builds[baseline_build]
+        locked, locked_first, locked_total = builds[locked_build]
+        assert locked.returncode == test_case.expected_exit_code
+        assert (
+            locked.stderr.decode(errors="replace")
+            .rstrip()
+            .endswith("completed successfully; only its Recall history is affected.")
+        )
+        first_delays.append(locked_first - baseline_first)
+        total_delays.append(locked_total - baseline_total)
 
     slack: float = 0.75
-    assert locked.returncode == test_case.expected_exit_code
-    assert locked_first <= baseline_first + slack
-    assert locked_total <= baseline_total + test_case.shutdown_seconds + slack
-    assert (
-        locked.stderr.decode(errors="replace")
-        .rstrip()
-        .endswith("completed successfully; only its Recall history is affected.")
-    )
+    assert statistics.median(first_delays) <= slack
+    assert statistics.median(total_delays) <= test_case.shutdown_seconds + slack
 
 
 @pytest.mark.parametrize(
