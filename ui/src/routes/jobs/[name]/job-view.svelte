@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import type { Trigger } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
@@ -13,7 +14,7 @@
 	import { planHref } from '$lib/run/command';
 	import { formatCost, narrowingText, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
-	import LaunchForm from './launch-form.svelte';
+	import RunPanel from './run-panel.svelte';
 
 	let { name }: { name: string } = $props();
 
@@ -41,7 +42,13 @@
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
 		const showCost = $derived(runs.some((r) => r.cost !== null));
 	const canToggle = $derived(app.can('trigger.toggle'));
-	let launchOpen = $state(false);
+	// Two ways to start a run, side by side while one is chosen: the plan page (default) or a panel here (?flow=panel).
+	const flow = $derived(page.url.searchParams.get('flow') === 'panel' ? 'panel' : 'review');
+	let panelOpen = $state(false);
+	function run(keys: string[]) {
+		if (flow === 'panel') panelOpen = true;
+		else void goto(to(planHref(keys, 'build', { job: name })));
+	}
 	let tab = $state<'overview' | 'runs' | 'code'>('overview');
 	// Nodes picked in the graph, by catalog key. A job runs with or without them; a group's pick runs as an ad-hoc command.
 	let picked = $state<string[]>([]);
@@ -76,23 +83,22 @@
 	{#if picked.length && def?.kind === 'job'}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
 		<GatedButton requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}>▷ Run all but {picked.length}</GatedButton>
-		<GatedButton requires="job.run" variant="default" onclick={() => goto(to(planHref(picked, 'build', { job: name })))}>▷ Run {picked.length} selected</GatedButton>
+		<GatedButton requires="job.run" variant="default" onclick={() => run(picked)}>▷ Run {picked.length} selected</GatedButton>
 	{:else if picked.length && canRunPicked}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
 		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}>▷ Run {picked.length} selected</GatedButton>
 	{:else}
-		<div class="relative">
-			<GatedButton
-				requires="job.run"
-				variant="default"
-				disabled={!def || targetBlocked}
-				reason={targetBlocked ? `This job only runs on ${def?.targets?.join(', ')}` : undefined}
-				onclick={() => (launchOpen = !launchOpen)}
-			>▷ Run now</GatedButton>
-			{#if launchOpen && def}<LaunchForm job={def} onclose={() => (launchOpen = false)} />{/if}
-		</div>
+		<GatedButton
+			requires="job.run"
+			variant="default"
+			disabled={!def || targetBlocked}
+			reason={targetBlocked ? `This job only runs on ${def?.targets?.join(', ')}` : undefined}
+			onclick={() => run([])}
+		>▷ Run</GatedButton>
 	{/if}
 </AppTopbar>
+
+{#if panelOpen && def}<RunPanel job={def} picked={def.kind === 'job' ? picked : []} onclose={() => (panelOpen = false)} />{/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
