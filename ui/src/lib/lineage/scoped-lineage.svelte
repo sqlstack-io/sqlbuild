@@ -89,6 +89,7 @@
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
 	let fitFn = $state<((opts?: { duration?: number }) => void) | undefined>();
+	let fitted = $state(false);
 
 	// (1) Rebuild the node/edge set ONLY when the visible neighbourhood changes
 	// (depth steppers / focal). New nodes start at 0,0; dagre places them in (2).
@@ -191,7 +192,7 @@
 	</div>
 
 	<!-- graph -->
-	<div class="sb-flow relative min-h-0 flex-1" style="background: var(--sb-inset)">
+	<div class="sb-flow relative min-h-0 flex-1" class:unfitted={!fitted} style="background: var(--sb-inset)">
 		<SvelteFlow
 			bind:nodes
 			bind:edges
@@ -203,7 +204,7 @@
 			selectionKey="Shift"
 			proOptions={{ hideAttribution: true }}
 		>
-			<FlowController bind:fitView={fitFn} />
+			<FlowController bind:fitView={fitFn} bind:fitted />
 			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 			<Controls />
 		</SvelteFlow>
@@ -211,6 +212,11 @@
 </div>
 
 <style>
+	.unfitted :global(.svelte-flow__viewport),
+	.unfitted :global(.svelte-flow__controls) {
+		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
+		opacity: 0;
+	}
 	.sb-flow :global(.svelte-flow__controls-button) {
 		background: var(--card);
 		border-bottom: 1px solid var(--border);
