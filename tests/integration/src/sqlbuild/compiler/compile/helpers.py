@@ -245,6 +245,7 @@ def render_compile_inputs(*, project_dir: Path) -> CompileInputsView:
                     adapter.python_functions_inherit_default_namespace()
                 ),
                 sql_lexical_syntax=adapter.sql_lexical_syntax,
+                sql_analysis_dialect=adapter.sql_analysis_dialect_name,
             ),
             resolved_connection={},
             defer_model_sql_validation=True,

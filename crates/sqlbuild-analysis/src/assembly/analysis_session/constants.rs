@@ -199,7 +199,7 @@ pub(crate) const PYTHON_RULE: &str = "python";
 pub(crate) const NON_NULL_NULLABILITY: &str = "non_null";
 pub(crate) const NULLABLE_NULLABILITY: &str = "nullable";
 /// Bumped whenever the stored outcome or a key's fields change; older entries never match.
-pub(crate) const ANALYSIS_CACHE_FORMAT: &str = "native-model-analysis-v3";
+pub(crate) const ANALYSIS_CACHE_FORMAT: &str = "native-model-analysis-v4";
 /// A stored varint byte at or above this value continues into the next byte.
 pub(crate) const VARINT_CONTINUATION: u64 = 0x80;
 /// The value bits each stored varint byte carries.
@@ -252,3 +252,7 @@ pub(crate) const LINEAGE_RESOURCE_TYPES: [(&str, &str); 4] = [
     ("seed", "seed"),
     ("table_fn", "table_fn"),
 ];
+/// Compile metric: native models that took another model's analysis of the same shape.
+pub(crate) const NATIVE_ANALYSIS_SHARED: &str = "native_analysis_shared";
+/// Compile metric: native models analysed on their own.
+pub(crate) const NATIVE_ANALYSIS_UNSHARED: &str = "native_analysis_unshared";

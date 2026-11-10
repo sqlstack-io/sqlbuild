@@ -98,9 +98,9 @@ def test_given_unicode_before_intrinsics_when_preparing_then_lint_preserves_sema
             expected_original_texts=("@py.outer(@py.inner(x), y)",),
         ),
         NeutralizeInterpolationTestCase(
-            description="quoted audit parameter becomes a sentinel",
+            description="quoted audit parameter becomes a string sentinel",
             body="SELECT @'column_name' AS c",
-            expected_neutralized="SELECT __sqlclean_interpolation_0__ AS c",
+            expected_neutralized="SELECT '__sqlclean_interpolation_0__' AS c",
             expected_original_texts=("@'column_name'",),
         ),
         NeutralizeInterpolationTestCase(

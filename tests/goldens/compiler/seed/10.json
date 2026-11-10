@@ -213,8 +213,8 @@
        "resource_name": "cte_facts_stg_sales_0",
        "column_name": "amount"
       },
-      "transform": "direct",
-      "confidence": "medium"
+      "transform": "cast",
+      "confidence": "high"
      },
      {
       "source": {

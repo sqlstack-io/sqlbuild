@@ -451,7 +451,11 @@ fn function_nodes(
 ) -> PyResult<Vec<(String, NodeDefinition)>> {
     let mut nodes: Vec<(String, NodeDefinition)> = Vec::new();
     let functions: Bound<'_, PyAny> = project_reads::functions(project)?;
-    let hashes: Bound<'_, PyDict> = function_local_hashes(&functions, None)?;
+    let hashes: Bound<'_, PyDict> = function_local_hashes(
+        &functions,
+        None,
+        &functions.py().None().into_bound(functions.py()),
+    )?;
     for function in functions.try_iter()? {
         let function: Bound<'_, PyAny> = function?;
         let key: Bound<'_, PyAny> = function_reads::key(&function)?;

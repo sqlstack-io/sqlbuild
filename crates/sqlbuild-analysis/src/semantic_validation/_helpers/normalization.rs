@@ -1,7 +1,10 @@
 //! Analysis normalization with a character-offset provenance map.
 
+use crate::relation_markers::main::lateral_start::lateral_start;
 use crate::semantic_checks::constants::UDF_NAME_PREFIX;
 use regex::Regex;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
+use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::main::matching_paren::matching_paren;
 use sqlbuild_sqltext::sql_scan::main::non_code_end::non_code_end;
 use sqlbuild_sqltext::sql_scan::models::QuotePolicy;
@@ -117,6 +120,8 @@ pub(super) fn normalize(
     result = result.edits(edits);
     let mut edits: Vec<Edit> = Vec::new();
     let mut consumed_until = 0;
+    let non_code: Vec<(usize, usize)> =
+        dialect_non_code_ranges(&result.sql, &dialect_lexical_syntax(dialect));
     for captures in FUNCTIONS
         .as_ref()
         .map_err(Clone::clone)?
@@ -130,6 +135,7 @@ pub(super) fn normalize(
             continue;
         }
         let name = captures.get(2).ok_or("missing function name")?;
+        let mut start = whole.start();
         let mut end = whole.end();
         let stub = if &captures[1] == UDF {
             format!("{udf_prefix}{}", name.as_str())
@@ -137,16 +143,20 @@ pub(super) fn normalize(
             end = matching_paren(result.sql.as_bytes(), whole.end(), QuotePolicy::COMPILER)
                 .map_err(|error| format!("invalid table-function analysis input: {error:?}"))?
                 + 1;
+            start = lateral_start(&result.sql, start, |index| {
+                !non_code
+                    .iter()
+                    .any(|&(range_start, range_end)| range_start <= index && index < range_end)
+            })
+            .filter(|lateral| *lateral >= consumed_until)
+            .unwrap_or(start);
             let default = format!("__sqlbuild_table_function_{}", name.as_str());
             stubs.get(&default).cloned().unwrap_or(default)
         };
         edits.push((
-            whole.start(),
+            start,
             end,
-            MappedSql::generated(
-                stub,
-                result.offsets[result.sql[..whole.start()].chars().count()],
-            ),
+            MappedSql::generated(stub, result.offsets[result.sql[..start].chars().count()]),
         ));
         consumed_until = end;
     }
@@ -184,27 +194,48 @@ pub(crate) fn normalize_analysis_sql(
     normalize(sql, dialect, (&stubs, &placeholders), UDF_NAME_PREFIX).map(|mapped| mapped.sql)
 }
 
-/// Analysis SQL as a native parser reads it, with every stub spelled under `stub_prefix`.
+/// Analysis SQL as a native parser reads it, stubs under `stub_prefix` and `relations` renamed.
 pub(crate) fn normalize_native_sql(
     sql: &str,
     dialect: &str,
     stub_prefix: &str,
+    relations: &HashMap<String, String>,
 ) -> Result<String, String> {
     let none: HashMap<String, String> = HashMap::new();
     let udf_prefix: String = format!("{stub_prefix}udf_");
-    let normalized: String = normalize(sql, dialect, (&none, &none), &udf_prefix)?.sql;
+    let normalized: String = normalize(sql, dialect, (relations, &none), &udf_prefix)?.sql;
     let stubs: &Regex = NATIVE_STUBS.as_ref()?;
-    Ok(stubs
-        .replace_all(&normalized, |captures: &regex::Captures<'_>| {
-            match (captures.get(1), captures.get(2)) {
-                (Some(bound), _) => format!("{stub_prefix}cursor_{}()", bound.as_str()),
-                (None, Some(parameter)) => {
-                    format!("'{HOOK_PARAMETER_PREFIX}{}'", parameter.as_str())
-                }
-                (None, None) => captures[0].to_owned(),
+    let non_code: Vec<(usize, usize)> =
+        dialect_non_code_ranges(&normalized, &dialect_lexical_syntax(dialect));
+    let mut native: String = String::with_capacity(normalized.len());
+    let mut copied_until: usize = 0;
+    for captures in stubs.captures_iter(&normalized) {
+        let whole = captures.get(0).ok_or("missing stub match")?;
+        let quoted: bool = non_code
+            .iter()
+            .any(|&(start, end)| start <= whole.start() && whole.start() < end);
+        let glued: bool = captures.get(1).is_some()
+            && normalized[..whole.start()]
+                .chars()
+                .next_back()
+                .is_some_and(|character| character.is_alphanumeric() || character == '_');
+        if quoted || glued {
+            continue;
+        }
+        native.push_str(&normalized[copied_until..whole.start()]);
+        match (captures.get(1), captures.get(2)) {
+            (Some(bound), _) => {
+                native.push_str(&format!("{stub_prefix}cursor_{}()", bound.as_str()));
             }
-        })
-        .into_owned())
+            (None, Some(parameter)) => {
+                native.push_str(&format!("'{HOOK_PARAMETER_PREFIX}{}'", parameter.as_str()));
+            }
+            (None, None) => native.push_str(whole.as_str()),
+        }
+        copied_until = whole.end();
+    }
+    native.push_str(&normalized[copied_until..]);
+    Ok(native)
 }
 
 pub(crate) fn normalize_dialect_sql_mapped(

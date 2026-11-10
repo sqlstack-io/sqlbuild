@@ -20,14 +20,22 @@ sqlbuild-attachments.workspace = true
 sqlbuild-cache.workspace = true
 sqlbuild-core.workspace = true
 sqlbuild-discovery.workspace = true
+sqlbuild-host.workspace = true
 sqlbuild-model-config.workspace = true
 sqlbuild-render.workspace = true
 sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
-sqlclean.workspace = true
+sqlquack-fingerprint.workspace = true
+sqlquack-parse.workspace = true
+sqlquack-semantics.workspace = true
 sqlquack-syntax.workspace = true
 sqlquack-syntax-bigquery.workspace = true
+sqlquack-syntax-clickhouse.workspace = true
+sqlquack-syntax-databricks.workspace = true
+sqlquack-syntax-duckdb.workspace = true
 sqlquack-syntax-postgres.workspace = true
+sqlquack-syntax-sqlite.workspace = true
+sqlquack-syntax-sqlserver.workspace = true
 stacker.workspace = true
 
 [lints]

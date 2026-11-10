@@ -100,6 +100,8 @@ def test_given_waffle_shop_when_running_compile_json_then_it_reports_offline_que
         "sql_test_scan_cache_misses",
         "early_rules_hits",
         "early_rules_misses",
+        "native_analysis_shared",
+        "native_analysis_unshared",
         "project_reuse_hits",
         "project_reuse_misses",
         "project_reuse_bypasses",

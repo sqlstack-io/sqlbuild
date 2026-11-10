@@ -7,6 +7,8 @@ pub struct ContractRequest {
     pub dialect: String,
     /// Whether `settings.column_contract_mode` is `implicit`.
     pub implicit_column_contracts: bool,
+    /// Whether the effective table promotion mode is `staged`.
+    pub staged_promotion: bool,
     pub models: Vec<ContractModel>,
 }
 
@@ -16,6 +18,10 @@ pub struct ContractModel {
     pub name: String,
     /// The `contract` config value when it is a string.
     pub contract: Option<String>,
+    /// The `materialized` config value (default `table`) when it is a string.
+    pub materialized: Option<String>,
+    /// The `incremental_mode` config value when it is a string.
+    pub incremental_mode: Option<String>,
     /// The model's schema entry, when it has one.
     pub schema: Option<ContractSchema>,
     /// Inferred output columns, or None when static analysis inferred none.

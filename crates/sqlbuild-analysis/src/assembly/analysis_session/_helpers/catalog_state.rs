@@ -2,6 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use sqlquack_semantics::lineage::models::SchemaColumn;
+
 use crate::assembly::analysis_session::_helpers::compact_batch::{MemoKey, SharedResult};
 use crate::assembly::analysis_session::_helpers::mappings::{
     ShapeTable, catalog_columns, catalog_relations, same_mapping, with_pair,
@@ -223,4 +225,20 @@ fn has_exact_input(inputs: &Shapes) -> bool {
         .iter()
         .flat_map(|(_, shape)| shape.iter())
         .any(|(name, _)| name.contains(QUOTED_IDENTIFIER_DELIMITER))
+}
+
+/// A relation's columns by exact name, else by the first name equal to it without case.
+pub(crate) fn relation_columns<'a>(
+    shapes: &'a HashMap<String, Vec<SchemaColumn>>,
+    relation: &str,
+) -> Option<&'a [SchemaColumn]> {
+    shapes
+        .get(relation)
+        .or_else(|| {
+            shapes
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case(relation))
+                .map(|(_, columns)| columns)
+        })
+        .map(Vec::as_slice)
 }

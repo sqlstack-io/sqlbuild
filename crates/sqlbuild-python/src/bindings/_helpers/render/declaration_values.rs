@@ -452,6 +452,11 @@ impl ConstantRendering {
             .unwrap_or_default()
     }
 
+    /// The SQL analysis dialect of the adapter the value renderer renders for, if it has one.
+    pub(crate) fn analysis_dialect(&self, py: Python<'_>) -> PyResult<Option<String>> {
+        native_field(self.value_renderer.bind(py), "sql_analysis_dialect_name")?.extract()
+    }
+
     /// One visible constant as SQL, its failures located at `file_path`.
     pub(crate) fn render(
         &self,

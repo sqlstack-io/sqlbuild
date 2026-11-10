@@ -29,7 +29,7 @@ fn parse_query(sql: &str, dialect_name: &str) -> Result<(Expression, Dialect), S
         }),
     };
     let mut statements =
-        sqlquack_syntax::parse_statements_with(sql, dialect, &options, CallMode::FaithfulLocated)
+        sqlquack_parse::parse_statements_with(sql, dialect, &options, CallMode::FaithfulLocated)
             .map_err(|error| error.to_string())?;
     if statements.len() != 1 {
         return Err("expected one statement".to_owned());
@@ -48,7 +48,7 @@ fn parse_query(sql: &str, dialect_name: &str) -> Result<(Expression, Dialect), S
 }
 
 fn code_tokens(sql: &str, dialect: Dialect) -> Result<QueryTokens<'_>, String> {
-    let tokens = sqlquack_syntax::tokenize(sql, dialect).map_err(|error| error.to_string())?;
+    let tokens = sqlquack_parse::tokenize(sql, dialect).map_err(|error| error.to_string())?;
     Ok(QueryTokens::new(tokens, sql))
 }
 

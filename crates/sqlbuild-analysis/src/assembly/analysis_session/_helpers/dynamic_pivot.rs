@@ -131,7 +131,7 @@ fn parsed(sql: &str, dialect: &str) -> Result<Result<Value, String>, String> {
         (DUCKDB_DIALECT, Dialect::DuckDB)
     };
     let (named, calls) = markers_as_names(sql, &dialect_lexical_syntax(lexical_dialect))?;
-    let parsed = sqlquack_syntax::parse_statements_with(
+    let parsed = sqlquack_parse::parse_statements_with(
         &named,
         dialect,
         &ParseOptions::default(),

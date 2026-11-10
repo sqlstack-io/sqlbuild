@@ -62,3 +62,20 @@ class DeepChainIdentityTestCase:
     description: str
     depth: int
     expected_hash_count: int
+
+
+@dataclass(frozen=True)
+class RecordedFingerprintGraphTestCase:
+    description: str
+    orders_sql: str
+    summary_sql: str
+    recorded_definitions: dict[str, str]
+    expected_kept: frozenset[str]
+
+
+@dataclass(frozen=True)
+class RecordedFunctionHashTestCase:
+    description: str
+    body_sql: str
+    recorded_body_sql: str
+    expected_recorded_local_hash: bool

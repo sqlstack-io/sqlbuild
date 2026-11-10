@@ -231,10 +231,26 @@ pub(crate) struct TypedMarkerCacheTestCase {
     pub(crate) expected_hits: &'static [bool],
 }
 
+/// A model calling a function by its bare name, with the project functions the compile declares.
+pub(crate) struct BareFunctionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) known_functions: &'static [&'static str],
+    pub(crate) sql: &'static str,
+    pub(crate) expected_last_line: &'static str,
+}
+
 /// A pivot over a CTE whose projection is a left-nested sum of `terms` ones.
 pub(crate) struct DeepPivotTestCase {
     pub(crate) description: &'static str,
     pub(crate) dialect: &'static str,
     pub(crate) terms: usize,
     pub(crate) expected_outcome: PivotOutcome,
+}
+
+pub(crate) struct NativeSharingTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) relations: &'static [(&'static str, &'static [(&'static str, &'static str)])],
+    pub(crate) models: &'static [(&'static str, &'static str, &'static [&'static str])],
+    pub(crate) expected_lines: &'static [&'static [&'static str]],
+    pub(crate) expected_shares: [(&'static str, u64); 2],
 }

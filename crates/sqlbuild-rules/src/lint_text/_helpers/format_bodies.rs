@@ -10,6 +10,7 @@ use sqlbuild_core::text::main::python_isspace::python_isspace;
 use sqlbuild_core::text::main::python_splitlines::python_splitlines;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
+use crate::dsl_headers::main::declares_table_returns::declares_table_returns;
 use crate::dsl_headers::main::measurement_body_ranges::measurement_body_ranges;
 use crate::dsl_headers::main::scan_headers::scan_headers;
 use crate::dsl_headers::main::sql_body_ranges::sql_body_ranges;
@@ -17,9 +18,10 @@ use crate::dsl_headers::models::HeaderSpan;
 use crate::lint_text::_helpers::sites::compiled;
 use crate::lint_text::constants::{
     DECLARATION_GROUP_DIRECTORY, DECLINED_WITHOUT_REASON, EXPRESSION_SELECT_PREFIX,
-    FIXTURE_HEADER_KINDS, FORMAT_API_VERSION, GLOBAL_NAMED_ROOTS, GROUPED_NAMED_ROLES,
-    LINE_COMMENT_PREFIX, MACRO_HEADER_KIND, MAX_FUNCTION_CALL_DEPTH, MOVED_OMITTED_SELECT,
-    OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN, STRING_QUOTES,
+    FIXTURE_HEADER_KINDS, FORMAT_API_VERSION, FUNCTION_HEADER_KIND, GLOBAL_NAMED_ROOTS,
+    GROUPED_NAMED_ROLES, LINE_COMMENT_PREFIX, MACRO_HEADER_KIND, MAX_FUNCTION_CALL_DEPTH,
+    MOVED_OMITTED_SELECT, OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN,
+    STRING_QUOTES,
 };
 use crate::lint_text::errors::LintTextError;
 use crate::lint_text::main::neutralize_interpolation::neutralize_interpolation;
@@ -120,6 +122,10 @@ pub(crate) fn prepare_file(
     let sql_macro: bool = headers
         .iter()
         .any(|header| header.kind == MACRO_HEADER_KIND);
+    let scalar_function: bool = headers.iter().any(|header| {
+        header.kind == FUNCTION_HEADER_KIND
+            && !declares_table_returns(&text[header.start..header.end])
+    });
     let syntax: LexicalSyntax = LexicalSyntax {
         line_comment_prefixes: vec![LINE_COMMENT_PREFIX.to_string()],
         ..LexicalSyntax::default()
@@ -133,13 +139,11 @@ pub(crate) fn prepare_file(
             .map_or(0, |index| index + 1);
         let mut core: String = body[..core_end].iter().collect();
         let mut trailing: String = body[core_end..].iter().collect();
-        let form: Option<MacroBodyForm> = sql_macro.then(|| macro_body_form(&core));
+        let form: Option<MacroBodyForm> =
+            (sql_macro || scalar_function).then(|| macro_body_form(&core));
         let wraps_expression: bool = matches!(form, Some(MacroBodyForm::Expression));
-        let omitted: Option<usize> = if let Some(form) = &form {
-            match form {
-                MacroBodyForm::CteList => Some(core.chars().count()),
-                MacroBodyForm::ColumnList | MacroBodyForm::Expression => None,
-            }
+        let omitted: Option<usize> = if sql_macro {
+            matches!(form, Some(MacroBodyForm::CteList)).then(|| core.chars().count())
         } else if omits {
             match omitted_select_offset(&core, &syntax) {
                 OmittedSelect::At(offset) => Some(offset),
@@ -177,7 +181,7 @@ pub(crate) fn prepare_file(
     Ok(prepared)
 }
 
-/// How a SQL macro body starts, which decides how it is formatted.
+/// How a SQL macro or function body starts, which decides how it is formatted.
 enum MacroBodyForm {
     /// A `WITH` list, formatted with a final query added and removed again.
     CteList,
@@ -187,7 +191,7 @@ enum MacroBodyForm {
     Expression,
 }
 
-/// The form of a SQL macro body, read from its first word after comments.
+/// The form of a SQL macro or function body, read from its first word after comments.
 fn macro_body_form(body: &str) -> MacroBodyForm {
     let mut rest: &str = body;
     loop {
@@ -246,8 +250,9 @@ pub(crate) fn formatted_body(
 ) -> Result<Option<String>, String> {
     if !response.formatted {
         return Err(response
-            .reason
+            .unavailable
             .clone()
+            .or_else(|| response.reason.clone())
             .filter(|reason| !reason.is_empty())
             .unwrap_or_else(|| DECLINED_WITHOUT_REASON.to_string()));
     }
@@ -299,6 +304,7 @@ pub(crate) fn splice_file(
                     .count()
                     + 1,
                 reason,
+                unavailable: responses[body.request].unavailable.is_some(),
             }),
         }
     }
@@ -324,7 +330,11 @@ pub(crate) fn unwrapped_expression(formatted: &str) -> Option<String> {
     } else {
         (first, lines.get(1..).unwrap_or_default())
     };
-    let indent: usize = first.len() - first.trim_start().len();
+    let code: &str = std::iter::once(first)
+        .chain(rest_lines.iter().copied())
+        .find(|line| !line.trim_start().starts_with(LINE_COMMENT_PREFIX))
+        .unwrap_or(first);
+    let indent: usize = code.len() - code.trim_start().len();
     let mut dedented: Vec<&str> = vec![first.trim_start()];
     let mut quote: Option<char> = open_quote(None, first);
     for line in rest_lines {

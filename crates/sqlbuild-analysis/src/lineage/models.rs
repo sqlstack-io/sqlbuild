@@ -106,6 +106,8 @@ pub enum FastLineageModel {
     Parse {
         query_sql: String,
         inferred_columns: Vec<String>,
+        /// `@@@name` defaults a native parser reads in place of each placeholder.
+        placeholders: Vec<(String, String)>,
     },
 }
 

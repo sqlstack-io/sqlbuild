@@ -5,14 +5,15 @@ use std::convert::Infallible;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::Instant;
 
-use polyglot_sql::{Dialect, Expression};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use regex::Regex;
 #[cfg(test)]
 use serde::Serialize;
 use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::graph_walk::main::depth_first_postorder::depth_first_postorder;
+use sqlquack_syntax::{Expression, Parsed};
 
+use crate::analysis_route::types::NativeDialect;
 use crate::compiler::_helpers::sql_tests::cte_rename::defined_cte_keys;
 use crate::compiler::_helpers::sql_tests::cte_slices::{SliceDialect, strip_statement_terminators};
 use crate::compiler::_helpers::sql_tests::cte_sql::{
@@ -34,10 +35,11 @@ use crate::compiler::_helpers::sql_tests::reader_references::{
 use crate::compiler::_helpers::sql_tests::real_model_limit::{
     RealModelChain, real_model_limit_message,
 };
-use crate::compiler::_helpers::sql_tests::relation_markers::relation_marker_calls;
+use crate::compiler::_helpers::sql_tests::relation_markers::named_marker_calls;
 use crate::compiler::_helpers::sql_tests::rendering::{
-    RenderRequest, render_comparison_sql, render_dialect, rendered_chain_steps,
+    RenderRequest, render_comparison_sql, rendered_chain_steps, sql_test_parser,
 };
+use crate::compiler::_helpers::sql_tests::simple_template::simple_analysis_template;
 use crate::compiler::models::{
     SqlTestAssertionStep, SqlTestChainBatch, SqlTestChainStep, SqlTestCte, SqlTestPlan,
     SqlTestPlanBatch, SqlTestPlanBatchOutcome, SqlTestPlanFunction, SqlTestPlanPayload,
@@ -47,6 +49,7 @@ use crate::constants::{
     SQL_TEST_ACTUAL_CTE, SQL_TEST_ACTUAL_CTE_PREFIX, SQL_TEST_EXPECTED_CTE,
     TABLE_FUNCTION_TEST_MODE, UDF_TEST_MODE,
 };
+use crate::relation_markers::main::markers_as_names::markers_as_names;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 const MAX_WORKERS: usize = 4;
@@ -95,7 +98,7 @@ struct ProjectContext {
     requires_derived_table_aliases: bool,
     analysis_templates: Arc<AnalysisTemplateCache>,
     patterns: SqlTestPatterns,
-    render_dialect: Arc<Dialect>,
+    parser: &'static dyn NativeDialect,
     rejects_nested_with: bool,
     max_real_models: Option<usize>,
     /// Each model query's reserved CTE name, since every test reading the model checks it.
@@ -319,7 +322,7 @@ struct AnalysisResolutionRequest<'a> {
     resolved_chain: &'a HashMap<String, AnalysisResolvedSql>,
     functions: &'a HashMap<String, SqlTestPlanFunction>,
     file_label: &'a str,
-    dialect_name: &'a str,
+    parser: &'a dyn NativeDialect,
     templates: &'a AnalysisTemplateCache,
     patterns: &'a SqlTestPatterns,
 }
@@ -509,7 +512,18 @@ pub(crate) fn plan_and_render_json(request_json: &str) -> Result<String, String>
 pub(crate) fn plan_batch(request: SqlTestPlanBatch) -> Result<SqlTestPlanBatchOutcome, String> {
     let render_sql = request.render_sql;
     let include_plan = request.include_plan;
-    let render_dialect = Arc::new(render_dialect(request.sql_analysis_dialect.as_deref()));
+    let Some(parser) = sql_test_parser(request.sql_analysis_dialect.as_deref()) else {
+        if request.tests.is_empty() {
+            return Ok(SqlTestPlanBatchOutcome {
+                plans: Vec::new(),
+                planning_ns: 0,
+                rendering_ns: 0,
+            });
+        }
+        return Err(unavailable_sql_tests(
+            request.sql_analysis_dialect.as_deref(),
+        ));
+    };
     let rejects_nested_with =
         SliceDialect::new(request.sql_analysis_dialect.as_deref()).rejects_nested_with();
     let context = ProjectContext {
@@ -539,7 +553,7 @@ pub(crate) fn plan_batch(request: SqlTestPlanBatch) -> Result<SqlTestPlanBatchOu
         requires_derived_table_aliases: request.requires_derived_table_aliases,
         analysis_templates: Arc::new(Mutex::new(HashMap::new())),
         patterns: SqlTestPatterns::new(request.lexical_syntax)?,
-        render_dialect,
+        parser,
         rejects_nested_with,
         max_real_models: request.max_unit_test_real_models,
         reserved_ctes: Arc::new(Mutex::new(HashMap::new())),
@@ -751,7 +765,7 @@ fn plan_model_test(
         patterns: &context.patterns,
         file_label: &plan.file_label,
         rename_dialect: (context.sql_analysis_enabled || context.rejects_nested_with)
-            .then_some(context.render_dialect.as_ref()),
+            .then_some(context.parser),
         flat_dialect: context.rejects_nested_with,
         slice_dialect: SliceDialect::new(Some(&context.dialect)),
         read_helper_names: &plan.reads.read_helper_names,
@@ -848,7 +862,7 @@ fn plan_model_test(
                 resolved_chain: &analysis_resolved,
                 functions: &context.functions,
                 file_label: &plan.file_label,
-                dialect_name: &context.dialect,
+                parser: context.parser,
                 templates: &context.analysis_templates,
                 patterns: &context.patterns,
             })?
@@ -895,7 +909,7 @@ fn plan_model_test(
             model_name: model_name.clone(),
             resolved_sql,
             expected_columns: authored_expected
-                .and_then(|sql| expected_columns(sql, &context.render_dialect)),
+                .and_then(|sql| expected_columns(sql, context.parser)),
             expected_cte_sql: authored_expected
                 .map(|sql| fixtures.scope.reader_sql(sql, &context.patterns)),
             expected_lifted_ctes,
@@ -1125,7 +1139,7 @@ impl ReaderContext<'_> {
                 resolved_chain: self.analysis_resolved,
                 functions: &context.functions,
                 file_label: self.file_label,
-                dialect_name: &context.dialect,
+                parser: context.parser,
                 templates: &context.analysis_templates,
                 patterns: &context.patterns,
             })?
@@ -1378,8 +1392,11 @@ fn real_model_inputs(request: &TopoSortRequest<'_>, name: &str) -> Vec<String> {
 fn analyze_and_resolve_sql(
     request: AnalysisResolutionRequest<'_>,
 ) -> Result<Option<AnalysisResolvedSql>, String> {
-    let Some(template) =
-        analysis_template(request.query_sql, request.dialect_name, request.templates)?
+    let Some(template) = analysis_template(
+        request.query_sql,
+        (request.parser, request.patterns),
+        request.templates,
+    )?
     else {
         return Ok(None);
     };
@@ -1470,7 +1487,7 @@ fn analyze_and_resolve_sql(
     )?;
     let cte_body_sql = strip_statement_terminators(
         &functions_resolved,
-        SliceDialect::new(Some(request.dialect_name)),
+        SliceDialect::new(Some(request.parser.name())),
     )
     .to_string();
     let resolved_sql = with_leading_ctes(&generated_state.generated, &cte_body_sql);
@@ -1482,43 +1499,28 @@ fn analyze_and_resolve_sql(
     }))
 }
 
-#[cfg(test)]
-thread_local! {
-    static TEMPLATE_AST_PARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
-#[cfg(test)]
-pub(crate) fn take_template_ast_parse_count() -> usize {
-    TEMPLATE_AST_PARSES.with(|count| count.replace(0))
-}
-
 pub(crate) fn analysis_template(
     query_sql: &str,
-    dialect_name: &str,
+    reader: (&dyn NativeDialect, &SqlTestPatterns),
     templates: &AnalysisTemplateCache,
 ) -> Result<Option<AnalysisTemplate>, String> {
     cached_analysis_template(query_sql, templates, || {
-        Dialect::get_by_name(dialect_name).and_then(|dialect| {
-            if let Some(template) =
-                super::simple_template::simple_analysis_template(query_sql, dialect_name, &dialect)
-            {
-                return Some(template);
-            }
-            parsed_analysis_template(query_sql, &dialect)
-        })
+        simple_analysis_template(query_sql, reader.0.name(), reader.1)
+            .or_else(|| parsed_analysis_template(query_sql, reader))
     })
 }
 
-/// The full-parser path also serves as the differential oracle for the bounded recognizer.
+/// The template the parser reads whole from `query_sql`, its relation markers read as names.
 pub(crate) fn parsed_analysis_template(
     query_sql: &str,
-    dialect: &Dialect,
+    (parser, patterns): (&dyn NativeDialect, &SqlTestPatterns),
 ) -> Option<AnalysisTemplate> {
-    #[cfg(test)]
-    TEMPLATE_AST_PARSES.with(|count| count.set(count.get() + 1));
-    let mut statements = match dialect.parse(query_sql) {
-        Ok(statements) => statements,
-        Err(_) => return None,
+    let Ok((named_sql, named)) = markers_as_names(query_sql, &patterns.lexical) else {
+        return None;
+    };
+    let mut statements = match parser.parse(&named_sql) {
+        Ok(Parsed { statements, gaps }) if gaps.is_empty() => statements,
+        _ => return None,
     };
     if statements.len() != 1 {
         return None;
@@ -1526,8 +1528,18 @@ pub(crate) fn parsed_analysis_template(
     let expression = statements.remove(0);
     Some(AnalysisTemplate {
         existing_cte_names: top_level_cte_names(&expression),
-        marker_calls: relation_marker_calls(&expression).into(),
+        marker_calls: named_marker_calls(&expression, &named).into(),
     })
+}
+
+/// Why SQL tests cannot be planned for a project whose SQL analysis dialect has no native parser.
+fn unavailable_sql_tests(dialect: Option<&str>) -> String {
+    match dialect {
+        Some(dialect) => format!(
+            "SQL tests are unavailable for SQL analysis dialect '{dialect}', which SQLBuild has no native parser for"
+        ),
+        None => "SQL tests are unavailable without a SQL analysis dialect".to_owned(),
+    }
 }
 
 pub(crate) fn cached_analysis_template<F>(
@@ -1683,7 +1695,7 @@ fn resolve_table_function_fixtures<'a>(
     }
     let (replaced, reached) = replace_callable_markers(
         sql,
-        &patterns.table_function,
+        (&patterns.table_function, true),
         &patterns.lexical,
         |name, _call_suffix| {
             fixtures
@@ -1722,8 +1734,11 @@ fn resolve_function_calls(
     } else {
         &patterns.udf
     };
-    let (result, _) =
-        replace_callable_markers(sql, pattern, &patterns.lexical, |name, call_suffix| {
+    let (result, _) = replace_callable_markers(
+        sql,
+        (pattern, false),
+        &patterns.lexical,
+        |name, call_suffix| {
             let function = functions.get(name)?;
             let (prefix, suffix) = if table_function {
                 (
@@ -1737,7 +1752,8 @@ fn resolve_function_calls(
                 )
             };
             Some((format!("{prefix}{call_suffix}{suffix}"), false))
-        })?;
+        },
+    )?;
     Ok(result)
 }
 

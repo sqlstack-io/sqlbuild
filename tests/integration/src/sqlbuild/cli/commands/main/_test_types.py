@@ -411,8 +411,11 @@ class FormatterDeclineIntegrationTestCase:
     """One expected native formatter decline through the real CLI."""
 
     description: str
+    adapter: str
     authored_body: str
     expected_exit_code: int
+    expected_code: str
+    expected_message: str
 
 
 @dataclass(frozen=True)

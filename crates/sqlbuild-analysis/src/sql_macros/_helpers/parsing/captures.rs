@@ -1,7 +1,9 @@
 //! Plain `COLUMNS` slot reads inside a subquery, and the subquery relations their bare names meet.
 
-use polyglot_sql::expressions::Select;
-use polyglot_sql::{Expression, ExpressionWalk};
+use sqlquack_syntax::expressions::queries::models::Select;
+use sqlquack_syntax::{Expression, ExpressionWalk};
+
+use crate::analysis_route::types::NativeDialect;
 
 use crate::sql_macros::_helpers::parsing::body::{
     ParsedBody, marked_text, parsed, slot_placeholder, slot_placeholder_name,
@@ -154,7 +156,7 @@ impl Captures {
 
 /// Each plain group read of `body` inside a subquery, with the relations that subquery reads.
 pub(crate) fn slot_captures(
-    definition: &SqlMacroDefinition,
+    (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
     (body, references, reads): (&str, &[ParameterReference], &[SlotRead]),
     arguments: &[RenderedArgument],
 ) -> Vec<SlotCapture> {
@@ -178,7 +180,7 @@ pub(crate) fn slot_captures(
         return Vec::new();
     }
     let text: String = marked_text((body, references), &marked);
-    let Ok(ParsedBody { select }) = parsed(definition.form, &text) else {
+    let Ok(ParsedBody { select }) = parsed(parser, definition.form, &text) else {
         return Vec::new();
     };
     let root: Expression = Expression::Select(select);

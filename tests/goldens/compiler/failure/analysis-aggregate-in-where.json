@@ -13,13 +13,13 @@
      "resource_name": "customer_totals",
      "path": "models/marts/customer_totals.sql",
      "line": 7,
-     "column": 11,
+     "column": 7,
      "location": {
       "path": "models/marts/customer_totals.sql",
       "line": 7,
-      "column": 11,
+      "column": 7,
       "end_line": 7,
-      "end_column": 17
+      "end_column": 18
      },
      "help": "move this aggregate to SELECT or HAVING, or compute it in an input CTE"
     }

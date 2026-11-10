@@ -99,7 +99,9 @@ pub(crate) struct ModelRow {
 pub(crate) struct RequestRow {
     pub(crate) dialect: String,
     pub(crate) case_sensitive_shapes: bool,
+    pub(crate) quoted_ignore_case: bool,
     pub(crate) function_return_types: Pairs,
+    pub(crate) known_functions: Vec<String>,
     pub(crate) nullability_rules: Option<Pairs>,
     pub(crate) rich_type_inference: bool,
     pub(crate) column_types: Shapes,
@@ -213,6 +215,11 @@ impl NativeModelAnalysisSession {
     /// The finished session later compile stages read, once `finish` has succeeded.
     pub(crate) fn finished_session(&self) -> Option<&FinishedSession> {
         self.finished.as_ref()
+    }
+
+    /// Each requested model's finished outcome and dynamic pivot proof, in request order.
+    pub(crate) fn outcomes(&self) -> &[(ModelOutcome, PivotOutcome)] {
+        &self.outcomes
     }
 
     /// The finished outcome and dynamic pivot proof of the model requested at `index`.
@@ -451,7 +458,9 @@ fn session_request(request: RequestRow) -> SessionRequest {
     let RequestRow {
         dialect,
         case_sensitive_shapes,
+        quoted_ignore_case,
         function_return_types,
+        known_functions,
         nullability_rules,
         rich_type_inference,
         column_types,
@@ -464,7 +473,9 @@ fn session_request(request: RequestRow) -> SessionRequest {
     SessionRequest {
         dialect,
         case_sensitive_shapes,
+        quoted_ignore_case,
         function_return_types,
+        known_functions,
         nullability_rules,
         nullability_callback: None,
         rich_type_inference,

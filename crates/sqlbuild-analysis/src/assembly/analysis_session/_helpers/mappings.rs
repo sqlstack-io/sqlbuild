@@ -4,9 +4,16 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
 
 use sha2::{Digest, Sha256};
+use sqlquack_semantics::lineage::models::{Nullability, NullabilityRule, SchemaColumn};
 
-use crate::assembly::analysis_session::constants::DIALECT_ALIASES;
-use crate::assembly::analysis_session::models::ModelRequest;
+use crate::analysis_route::main::schema_column::schema_column;
+use crate::analysis_route::types::NativeDialect;
+use crate::assembly::analysis_session::constants::{
+    CONDITIONAL_RESULT_RULE, DIALECT_ALIASES, FIRST_ARG_RULE, SAFE_CAST_RULE, UNKNOWN_TYPE,
+};
+use crate::assembly::analysis_session::models::{
+    ModelRequest, SessionFunctions, SessionRequest, SessionSchema,
+};
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
 use crate::semantic_validation::models::Columns;
 use crate::semantic_validation::types::Relations;
@@ -237,4 +244,103 @@ pub(crate) fn waves(producers: &[Vec<usize>]) -> Option<Vec<Vec<usize>>> {
         waves.push(std::mem::replace(&mut ready, next));
     }
     (scheduled == producers.len()).then_some(waves)
+}
+
+/// The adapter's typed functions and the project's declared functions, which are not unknown names.
+pub(crate) fn declared_functions(request: &SessionRequest) -> Vec<String> {
+    request
+        .function_return_types
+        .iter()
+        .map(|(name, _)| name.clone())
+        .chain(request.known_functions.iter().cloned())
+        .collect()
+}
+
+/// The request's function return types, and its built-in nullability rules; adapter callbacks are not.
+pub(crate) fn session_functions(request: &SessionRequest) -> SessionFunctions {
+    SessionFunctions {
+        return_types: request.function_return_types.clone(),
+        nullability: request
+            .nullability_rules
+            .iter()
+            .flatten()
+            .filter_map(|(function, id)| {
+                let rule: NullabilityRule = match id.as_str() {
+                    FIRST_ARG_RULE => NullabilityRule::FirstArgument,
+                    CONDITIONAL_RESULT_RULE => NullabilityRule::ConditionalResult,
+                    SAFE_CAST_RULE => NullabilityRule::SafeCast,
+                    _ => return None,
+                };
+                Some((function.clone(), rule))
+            })
+            .collect(),
+    }
+}
+
+/// Each relation's known shape, or else its declared columns, typed, with the session's functions.
+pub(crate) fn session_schema(
+    dialect: &dyn NativeDialect,
+    schema: &Shapes,
+    (types, nullability): (&ShapeTable, &ShapeTable),
+    functions: &SessionFunctions,
+) -> SessionSchema {
+    let mut relations: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
+    let mut open: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
+    for (relation, columns) in schema {
+        let (table, columns) = if columns.is_empty() {
+            match types.get(relation) {
+                Some(declared) if !declared.is_empty() => (&mut open, declared),
+                _ => continue,
+            }
+        } else {
+            (&mut relations, columns)
+        };
+        let typed: Vec<SchemaColumn> = typed_columns(dialect, columns, nullability.get(relation));
+        let _ = table.insert(relation.clone(), typed);
+    }
+    SessionSchema {
+        relations,
+        open,
+        functions: SessionFunctions {
+            return_types: functions
+                .return_types
+                .iter()
+                .map(|(function, data_type)| (function.clone(), dialect.session_type(data_type)))
+                .collect(),
+            nullability: functions.nullability.clone(),
+        },
+    }
+}
+
+/// Each column with its known type as `dialect` reads it, and the nullability `known` spells.
+fn typed_columns(
+    dialect: &dyn NativeDialect,
+    columns: &Pairs,
+    known: Option<&Pairs>,
+) -> Vec<SchemaColumn> {
+    columns
+        .iter()
+        .map(|(name, data_type)| {
+            schema_column(
+                name,
+                (!data_type.is_empty() && data_type != UNKNOWN_TYPE)
+                    .then(|| dialect.session_type(data_type)),
+                column_nullability(known, name),
+            )
+        })
+        .collect()
+}
+
+fn column_nullability(known: Option<&Pairs>, column: &str) -> Nullability {
+    let spelled: Option<&str> = known.and_then(|pairs| {
+        pairs
+            .iter()
+            .find(|(name, _)| name == column)
+            .map(|(_, value)| value.as_str())
+    });
+    match spelled {
+        Some("non_null") => Nullability::NonNull,
+        Some("nullable") => Nullability::Nullable,
+        _ => Nullability::Unknown,
+    }
 }

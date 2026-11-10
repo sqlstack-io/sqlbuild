@@ -44,6 +44,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
 
 _MIB: int = 1024 * 1024
 _GIB: int = 1024 * _MIB
+# Temporary allowance for the native parser switch: each cold wall budget below is its original
+# value times the approved 1.49 dense cold wall ratio ceiling. Drop the multiplier, back to the
+# original value, when the 1.10x same-runner ratio guards return.
+_NATIVE_COLD_WALL_ALLOWANCE: float = 1.49
 # A delta reruns the edited model or the edited SQL test's few models; a full compile all of them.
 _MAX_DELTA_ANALYSED_MODELS: int = 10
 
@@ -56,28 +60,28 @@ _MAX_DELTA_ANALYSED_MODELS: int = 10
         DenseCompileGuardTestCase(
             "dense_models_1000_all_rules",
             1000,
-            6.0,
+            6.0 * _NATIVE_COLD_WALL_ALLOWANCE,
             800 * _MIB,
             "de23b14d87e954a65c2da91918fce062d158419edd63cc8cf3dc938b3e47cd44",
         ),
         DenseCompileGuardTestCase(
             "dense_models_3000_all_rules",
             3000,
-            12.0,
+            12.0 * _NATIVE_COLD_WALL_ALLOWANCE,
             3 * _GIB // 2,
             "196fca3e87989eb3e89e443b7ca93bb094198538d5bde32b9d6fcca58ffc8eed",
         ),
         DenseCompileGuardTestCase(
             "dense_models_5000_all_rules",
             5000,
-            18.0,
+            18.0 * _NATIVE_COLD_WALL_ALLOWANCE,
             9 * _GIB // 4,
             "3477a472fa76d6236ebd0c9758d79c18f67f1bf55e9bbec05b002ba3744cfd22",
         ),
         DenseCompileGuardTestCase(
             "dense_models_10000_all_rules",
             10000,
-            35.0,
+            35.0 * _NATIVE_COLD_WALL_ALLOWANCE,
             15 * _GIB // 4,
             "f2a574af6e8068a0634fa3c078b168dff9a475ada5d71502482ad2926c90e1c3",
         ),

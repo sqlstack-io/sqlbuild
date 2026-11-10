@@ -22,5 +22,7 @@ pub(crate) const DESCRIPTION_KEY: &str = "description";
 pub(crate) const HEADER_INDENT: &str = "  ";
 pub(crate) const HEADER_TERMINATOR: &str = ";";
 pub(crate) const AUDITS_KEYWORD: &str = "audits";
+pub(crate) const RETURNS_KEYWORD: &str = "returns";
+pub(crate) const TABLE_RETURNS_KEYWORD: &str = "table";
 pub(crate) const AUDIT_WRAP_MAX_PASSES: usize = 64;
 pub(crate) const QUOTES: [char; 2] = ['\'', '"'];

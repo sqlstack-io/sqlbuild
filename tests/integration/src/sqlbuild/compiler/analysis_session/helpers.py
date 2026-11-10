@@ -95,12 +95,6 @@ _INITIAL_RELATIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ('__source("raw_customers")', ("customer_id", "Customer_Name", "region")),
     ('__source("raw_events")', ("event_id", "order_id", "kind")),
 )
-_ADAPTER_CONTEXT: CompileAdapterContext = CompileAdapterContext(
-    value_renderer=DuckDbAdapter(),
-    collection_rendering=CollectionRendering.VALUE_LIST,
-    python_functions_inherit_default_namespace=True,
-    sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
-)
 _DUCKDB_PROFILE: ExpressionInferenceProfile = ExpressionInferenceProfile(
     sql_analysis_dialect="duckdb"
 )
@@ -125,7 +119,7 @@ _PIVOT_BODIES: tuple[str, ...] = (
     'PIVOT __source("raw_orders")\nON status\nUSING {aggregate}(CAST(amount AS DECIMAL(12, 2)))',
     "WITH base AS (\n  SELECT customer_id, status, CAST(amount AS DOUBLE) AS amount\n"
     '  FROM __source("raw_orders")\n)\nSELECT * FROM base\n'
-    "PIVOT ({aggregate}(amount) FOR status IN (ANY ORDER BY status))",
+    "PIVOT ({aggregate}(amount) FOR status IN ('placed', 'shipped'))",
     'WITH base AS (\n  SELECT * FROM __source("raw_orders")\n),\npivoted AS (\n'
     "  PIVOT base ON status USING {aggregate}(amount) GROUP BY customer_id\n)\n"
     "SELECT * FROM pivoted",
@@ -134,10 +128,34 @@ _PIVOT_BODIES: tuple[str, ...] = (
     'PIVOT __source("raw_events")\nON kind\nUSING {aggregate}(order_id)\nGROUP BY event_id',
     'SELECT * FROM __source("raw_orders") o\nJOIN __source("raw_customers") c USING (customer_id)',
 )
+_SNOWFLAKE_PIVOT_BODIES: tuple[str, ...] = (
+    'SELECT * FROM (SELECT customer_id, status, amount FROM __source("raw_orders"))\n'
+    "PIVOT ({aggregate}(amount) FOR status IN (ANY ORDER BY status))",
+    "SELECT * FROM (\n  SELECT status, CAST(amount AS DECIMAL(12, 2)) AS amount\n"
+    '  FROM __source("raw_orders")\n)\n'
+    "PIVOT ({aggregate}(amount) FOR status IN (ANY))",
+    "WITH base AS (\n  SELECT customer_id, status, CAST(amount AS DOUBLE) AS amount\n"
+    '  FROM __source("raw_orders")\n)\nSELECT * FROM base\n'
+    "PIVOT ({aggregate}(amount) FOR status IN (ANY ORDER BY status))",
+    'WITH base AS (\n  SELECT customer_id, status, amount FROM __source("raw_orders")\n),\n'
+    "pivoted AS (\n  SELECT * FROM base\n"
+    "  PIVOT ({aggregate}(amount) FOR status IN (ANY ORDER BY status))\n)\n"
+    "SELECT * FROM pivoted",
+    'SELECT * FROM (SELECT customer_id, status, amount FROM __source("raw_orders"))\n'
+    "PIVOT ({aggregate}(amount) FOR status IN ('placed', 'shipped'))",
+    'SELECT * FROM (SELECT event_id, kind, order_id FROM __source("raw_events"))\n'
+    "PIVOT ({aggregate}(order_id) FOR kind IN (ANY ORDER BY kind))",
+    _PIVOT_BODIES[6],
+)
 _PIVOT_AGGREGATES: tuple[str, ...] = ("MAX", "MIN", "ANY_VALUE", "SUM")
 _TYPED_PIVOT: str = (
     _PIVOT_HEADER.format(pivot="status", value="amount", aggregate="MAX")
     + _PIVOT_BODIES[0].format(aggregate="MAX")
+    + "\n"
+)
+_SNOWFLAKE_TYPED_PIVOT: str = (
+    _PIVOT_HEADER.format(pivot="status", value="amount", aggregate="MAX")
+    + _SNOWFLAKE_PIVOT_BODIES[0].format(aggregate="MAX")
     + "\n"
 )
 _TYPED_PIVOT_PASSTHROUGH: str = (
@@ -209,22 +227,71 @@ _CONTRACT_CTE_MODELS: dict[str, str] = {
 }
 
 
-def _pivot_models(rng: random.Random) -> dict[str, str]:
-    """A typed pivot every passthrough reads, and seeded pivot shapes proven or refused."""
+type _PivotDraw = tuple[int, int, str, str]
 
-    files: dict[str, str] = {
-        "models/marts/status_amounts.sql": _TYPED_PIVOT,
-        "models/marts/status_passthrough.sql": _TYPED_PIVOT_PASSTHROUGH,
-    }
-    for index, body in enumerate(rng.sample(_PIVOT_BODIES, k=4)):
-        aggregate: str = rng.choice(_PIVOT_AGGREGATES)
-        header: str = _PIVOT_HEADER.format(
-            pivot=rng.choice(("status", "status", "kind")),
-            value=rng.choice(("amount", "amount", "order_id")),
-            aggregate=aggregate,
+
+def _pivot_draws(rng: random.Random) -> tuple[_PivotDraw, ...]:
+    """Four seeded pivot shapes: body, aggregate, pivot column and value column, for any dialect."""
+
+    return tuple(
+        (
+            shape,
+            rng.randrange(len(_PIVOT_AGGREGATES)),
+            rng.choice(("status", "status", "kind")),
+            rng.choice(("amount", "amount", "order_id")),
         )
-        files[f"models/marts/pivot_{index}.sql"] = header + body.format(aggregate=aggregate) + "\n"
-    return files
+        for shape in rng.sample(range(len(_PIVOT_BODIES)), k=4)
+    )
+
+
+def _pivot_files(
+    draws: tuple[_PivotDraw, ...],
+    *,
+    bodies: tuple[str, ...],
+    aggregates: tuple[str, ...],
+    typed_pivot: str,
+) -> dict[str, str]:
+    """A typed pivot every passthrough reads, and the drawn pivot shapes in one dialect's PIVOT."""
+
+    return {
+        "models/marts/status_amounts.sql": typed_pivot,
+        "models/marts/status_passthrough.sql": _TYPED_PIVOT_PASSTHROUGH,
+        **{
+            f"models/marts/pivot_{index}.sql": (
+                _PIVOT_HEADER.format(pivot=pivot, value=value, aggregate=aggregates[aggregate])
+                + bodies[shape].format(aggregate=aggregates[aggregate])
+                + "\n"
+            )
+            for index, (shape, aggregate, pivot, value) in enumerate(draws)
+        },
+    }
+
+
+def _no_pivots(_draws: tuple[_PivotDraw, ...]) -> dict[str, str]:
+    """No pivot models, for a dialect without PIVOT."""
+
+    return {}
+
+
+_DUCKDB_PIVOTS: Callable[[tuple[_PivotDraw, ...]], dict[str, str]] = functools.partial(
+    _pivot_files, bodies=_PIVOT_BODIES, aggregates=_PIVOT_AGGREGATES, typed_pivot=_TYPED_PIVOT
+)
+_PIVOT_FILES: dict[str, Callable[[tuple[_PivotDraw, ...]], dict[str, str]]] = {
+    "duckdb": _DUCKDB_PIVOTS,
+    "motherduck": _DUCKDB_PIVOTS,
+    "snowflake": functools.partial(
+        _pivot_files,
+        bodies=_SNOWFLAKE_PIVOT_BODIES,
+        aggregates=("MAX", "MIN", "AVG", "SUM"),
+        typed_pivot=_SNOWFLAKE_TYPED_PIVOT,
+    ),
+}
+
+
+def _pivot_models(rng: random.Random, dialect: str) -> dict[str, str]:
+    """The seeded pivot models in `dialect`'s PIVOT, drawn alike; none without PIVOT."""
+
+    return _PIVOT_FILES.get(dialect, _no_pivots)(_pivot_draws(rng))
 
 
 type _Relation = tuple[str, tuple[str, ...]]
@@ -259,9 +326,13 @@ def _nested_ctes(rng: random.Random, inputs: list[_Relation]) -> tuple[str, str,
     return "", sql, ("key_value", "row_count")
 
 
-def _set_operation(rng: random.Random, inputs: list[_Relation]) -> tuple[str, str, tuple[str, ...]]:
+def _set_operation(
+    rng: random.Random, inputs: list[_Relation], distinct: str = ""
+) -> tuple[str, str, tuple[str, ...]]:
     (left, left_columns), (right, right_columns) = inputs[0], inputs[-1]
-    operator: str = rng.choice(("UNION ALL", "UNION", "EXCEPT", "INTERSECT"))
+    operator: str = rng.choice(
+        ("UNION ALL", f"UNION{distinct}", f"EXCEPT{distinct}", f"INTERSECT{distinct}")
+    )
     sql: str = (
         f"SELECT {left_columns[0]} AS shared_key, 'left' AS side FROM {left}\n"
         f"{operator}\nSELECT {right_columns[0]}, 'right' FROM {right}"
@@ -291,11 +362,14 @@ def _aggregate(rng: random.Random, inputs: list[_Relation]) -> tuple[str, str, t
     return "", sql, ("group_key", "row_count", "latest")
 
 
-def _quoted(rng: random.Random, inputs: list[_Relation]) -> tuple[str, str, tuple[str, ...]]:
+def _quoted(
+    rng: random.Random, inputs: list[_Relation], quote: str = '"'
+) -> tuple[str, str, tuple[str, ...]]:
     relation, columns = inputs[0]
     column: str = rng.choice(columns)
     sql: str = (
-        f'SELECT "{column}" AS "Mixed_Case", UPPER(CAST(Src.{column.upper()} AS VARCHAR)) AS Up\n'
+        f"SELECT {quote}{column}{quote} AS {quote}Mixed_Case{quote}, "
+        f"UPPER(CAST(Src.{column.upper()} AS VARCHAR)) AS Up\n"
         f"FROM {relation} AS Src"
     )
     return "", sql, ("Mixed_Case", "Up")
@@ -325,7 +399,7 @@ _CTE_CONTRACT_BODIES: tuple[str, ...] = (
     "  FROM {left}\n)\nSELECT state, upper_b, joined FROM base",
     "WITH unioned AS (\n  SELECT {a} AS shared FROM {left}\n  UNION ALL\n"
     "  SELECT {c} FROM {right}\n)\nSELECT shared FROM unioned",
-    "WITH base AS (\n  SELECT * EXCLUDE ({a}) FROM {left}\n)\nSELECT {b} FROM base",
+    "WITH base AS (\n  SELECT {star_except} FROM {left}\n)\nSELECT {b} FROM base",
     "WITH lhs AS (\n  SELECT {a}, {b} FROM {left}\n),\nrhs AS (\n  SELECT {c} FROM {right}\n)\n"
     "SELECT l.{a}, r.{c}\nFROM lhs l\nLEFT JOIN rhs r ON l.{a} = r.{c}",
     "WITH outer_cte AS (\n  WITH inner_cte AS (SELECT {a}, {b} FROM {left})\n"
@@ -335,11 +409,20 @@ _CTE_CONTRACT_BODIES: tuple[str, ...] = (
 )
 
 
-def _cte_contract(rng: random.Random, inputs: list[_Relation]) -> tuple[str, str, tuple[str, ...]]:
+def _cte_contract(
+    rng: random.Random, inputs: list[_Relation], star_except: str = "* EXCLUDE ({a})"
+) -> tuple[str, str, tuple[str, ...]]:
     (left, left_columns), (right, right_columns) = inputs[0], inputs[-1]
     first, second = rng.sample(list(left_columns), k=2)
     body: str = rng.choice(_CTE_CONTRACT_BODIES)
-    sql: str = body.format(a=first, b=second, c=right_columns[0], left=left, right=right)
+    sql: str = body.format(
+        a=first,
+        b=second,
+        c=right_columns[0],
+        left=left,
+        right=right,
+        star_except=star_except.format(a=first, b=second),
+    )
     return "  contract enforced,\n", sql, (first, second)
 
 
@@ -379,6 +462,14 @@ _TEMPLATES: tuple[_Template, ...] = (
     _subquery,
     _cast_constant,
 )
+_DIALECT_SPELLINGS: dict[str, dict[_Template, dict[str, str]]] = {
+    "bigquery": {
+        _quoted: {"quote": "`"},
+        _set_operation: {"distinct": " DISTINCT"},
+        _cte_contract: {"star_except": "* EXCEPT ({a})"},
+    },
+    "postgres": {_cte_contract: {"star_except": "{b}"}},
+}
 
 
 def pivot_project_files() -> dict[str, str]:
@@ -412,18 +503,29 @@ def native_pivot_proofs() -> NativePivotProofs:
     )
 
 
-def generated_analysis_files(*, rng: random.Random, model_count: int) -> dict[str, str]:
-    """Sources (typed, inferred and untyped), a pivot and models drawing on every template."""
+def generated_analysis_files(
+    *, rng: random.Random, model_count: int, dialect: str | None = "duckdb"
+) -> dict[str, str]:
+    """Sources (typed, inferred and untyped), a pivot and models drawing on every template.
 
+    The SQL is written for `dialect`: its identifier quotes, set operators and star exclusion,
+    and pivots only where it has PIVOT.
+    """
+
+    named: str = dialect or ""
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_TOML,
         "sources/raw.yml": _SOURCES,
-        **_pivot_models(rng),
+        **_pivot_models(rng, named),
         **_CONTRACT_CTE_MODELS,
     }
+    spellings: dict[_Template, dict[str, str]] = _DIALECT_SPELLINGS.get(named, {})
+    templates: tuple[_Template, ...] = tuple(
+        functools.partial(template, **spellings.get(template, {})) for template in _TEMPLATES
+    )
     relations: list[_Relation] = list(_INITIAL_RELATIONS)
     for index in range(model_count):
-        template: _Template = _TEMPLATES[index % len(_TEMPLATES)]
+        template: _Template = templates[index % len(templates)]
         header, sql, columns = template(rng, rng.sample(relations, k=2))
         name: str = f"orders_model_{index}"
         files[f"models/layer_{index % 3}/{name}.sql"] = (
@@ -473,8 +575,10 @@ def shared_analysis_files(
     }
 
 
-def compile_inputs(*, project_dir: Path, files: dict[str, str]) -> CompileInputsView:
-    """Write a project and attach its compile inputs with the DuckDB compile context."""
+def compile_inputs(
+    *, project_dir: Path, files: dict[str, str], dialect: str | None = "duckdb"
+) -> CompileInputsView:
+    """Write a project and attach its compile inputs, compiled under `dialect`."""
 
     for relative_path, contents in files.items():
         path: Path = project_dir / relative_path
@@ -482,7 +586,13 @@ def compile_inputs(*, project_dir: Path, files: dict[str, str]) -> CompileInputs
         _ = path.write_text(contents, encoding="utf-8")
     return build_compile_inputs(
         discovered_inputs=discover_project_inputs(project_dir=project_dir),
-        adapter_context=_ADAPTER_CONTEXT,
+        adapter_context=CompileAdapterContext(
+            value_renderer=DuckDbAdapter(),
+            collection_rendering=CollectionRendering.VALUE_LIST,
+            python_functions_inherit_default_namespace=True,
+            sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+            sql_analysis_dialect=dialect,
+        ),
         run_id="integration_run",
     )
 
@@ -656,6 +766,32 @@ def _record_analyses(
     runs.sessions.append(session)
 
 
+def first_model_types(
+    *,
+    files: dict[str, str],
+    lineage_mode: ColumnLineageMode,
+    tmp_path: Path,
+    dialect: str = "duckdb",
+) -> tuple[tuple[str, str | None], ...]:
+    """The first analysed model's output names and types, analysed natively under `dialect`."""
+
+    inputs: CompileInputsView = compile_inputs(
+        project_dir=tmp_path / "project", files=files, dialect=dialect
+    )
+    runs: NativeAnalysisRuns = NativeAnalysisRuns()
+    analyse_natively(
+        inputs=inputs,
+        inference_profile=ExpressionInferenceProfile(sql_analysis_dialect=dialect),
+        lineage_mode=lineage_mode,
+        runs=runs,
+        cache_root=tmp_path / "cache",
+    )
+    analysis: ModelSqlAnalysis = session_outcome_analysis(
+        session=runs.sessions[0], position=0, placeholders=None
+    )
+    return tuple((column.name, column.type) for column in analysis.polyglot_analysis.columns or ())
+
+
 def custom_nullability_rule(arguments: tuple[InferredNullability, ...]) -> InferredNullability:
     """An adapter rule SQLBuild does not ship, so native analysis calls it back."""
 
@@ -757,7 +893,10 @@ class RecordingNullabilityRule:
 def adapter_rule_project(
     *, test_case: AdapterRuleCallbackTestCase, rule: RecordingNullabilityRule, tmp_path: Path
 ) -> tuple[CompileInputsView, ExpressionInferenceProfile]:
-    """A generated project with the adapter-rule models, and a profile calling `rule`."""
+    """A generated project with the adapter-rule models, and a DuckDB profile naming `rule`.
+
+    A native route does not call an adapter's own rules; compile warns instead.
+    """
 
     return (
         compile_inputs(

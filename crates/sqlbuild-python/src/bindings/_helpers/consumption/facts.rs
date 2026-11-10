@@ -13,12 +13,13 @@ use crate::bindings::_helpers::compiled_views::{
 use crate::bindings::_helpers::consumption::relation_reads::{
     Locations, relation, sql_reads_undeclared,
 };
-use crate::bindings::_helpers::planner_identity::hashing::{graph_key, model_query_hash};
+use crate::bindings::_helpers::planner_identity::hashing::{baselined_model_query_hash, graph_key};
 use crate::bindings::_helpers::planner_identity::identities::hook_version_hashes;
 use crate::bindings::_helpers::planner_identity::metadata::{
     function_local_hashes, model_version_identity_metadata_json, seed_identity,
 };
 use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::records::fields::mapping_get;
 
 pub(crate) const MODEL: &str = "model";
 pub(crate) const SEED: &str = "seed";
@@ -275,7 +276,14 @@ pub(crate) fn build_facts(
         .map(|name| name?.extract())
         .collect::<PyResult<_>>()?;
     let dialect: Option<String> = native_field(project, "sql_analysis_dialect")?.extract()?;
-    let function_hashes: Bound<'_, PyDict> = function_local_hashes(&functions, dialect.as_deref())?;
+    let recorded: Bound<'_, PyAny> = native_field(plan, "recorded_fingerprints")?;
+    let recorded_models: Bound<'_, PyAny> = if recorded.is_none() {
+        PyDict::new(py).into_any()
+    } else {
+        native_field(&recorded, "models")?
+    };
+    let function_hashes: Bound<'_, PyDict> =
+        function_local_hashes(&functions, dialect.as_deref(), &recorded)?;
     let hooks: Bound<'_, PyAny> = native_field(project, "hook_functions")?;
     let hook_hashes: Bound<'_, PyDict> = hook_version_hashes(&hooks)?;
     let locations: Option<Locations> = if changed {
@@ -310,13 +318,14 @@ pub(crate) fn build_facts(
             Compiled::Model(model) => (
                 model_reads::dep_rows(model)?,
                 model_local_identity_hash(
-                    &model_query_hash(
+                    &baselined_model_query_hash(
                         py,
                         &key.name,
                         (
                             &model_reads::query_sql(model)?.extract::<String>()?,
                             dialect.as_deref(),
                         ),
+                        &mapping_get(&recorded_models, &key.name)?,
                     )?,
                     &model_version_identity_metadata_json(
                         model,

@@ -36,7 +36,7 @@ pub(crate) fn deep_union_outcome_lines(
     stack_bytes: usize,
 ) -> Vec<(&'static str, Vec<String>, bool, Option<String>)> {
     let sql: String =
-        vec!["SELECT order_id, amount FROM __ref('orders')"; branches].join(" UNION ALL ");
+        vec!["SELECT order_id, amount FROM __ref(\"orders\")"; branches].join(" UNION ALL ");
     let worker = std::thread::Builder::new()
         .stack_size(stack_bytes)
         .spawn(move || {
@@ -45,6 +45,7 @@ pub(crate) fn deep_union_outcome_lines(
                 FastLineageModel::Parse {
                     query_sql: sql,
                     inferred_columns: Vec::new(),
+                    placeholders: Vec::new(),
                 },
             )
         })

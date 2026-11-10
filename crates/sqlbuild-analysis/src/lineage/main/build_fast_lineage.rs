@@ -8,6 +8,9 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::main::fast_lineage::fast_lineage;
+use crate::analysis_route::models::AnalysisRoute;
 use crate::lineage::_helpers::parsed_lineage::{
     ParsedModel, parsed_model_lineage, proxy_parse_options,
 };
@@ -52,23 +55,49 @@ fn model_outcomes(request: &FastLineageRequest) -> Vec<Result<FastLineageOutcome
         .filter(|name| !name.is_empty())
         .unwrap_or("generic");
     let dialect = parser_dialect(Some(name));
+    let route: AnalysisRoute = analysis_route(Some(name));
     let options: Result<ParseOptions, serde_json::Error> = proxy_parse_options();
     request
         .models
         .par_iter()
-        .map(|model| match model {
-            FastLineageModel::StarExpansion {
-                query_sql,
-                existing_columns,
-            } => Ok(FastLineageOutcome::StarColumns(star_lineage(
+        .map(|model| match (model, route) {
+            (
+                FastLineageModel::StarExpansion {
+                    query_sql,
+                    existing_columns,
+                },
+                _,
+            ) => Ok(FastLineageOutcome::StarColumns(star_lineage(
                 &schema,
                 &physical_resources(query_sql),
                 existing_columns.iter().map(String::as_str),
             ))),
-            FastLineageModel::Parse {
-                query_sql,
-                inferred_columns,
-            } => {
+            (
+                FastLineageModel::Parse {
+                    query_sql,
+                    placeholders,
+                    inferred_columns,
+                },
+                AnalysisRoute::Native(module),
+            ) => catch_compiler_panic(|| {
+                Ok(fast_lineage(
+                    module,
+                    (query_sql, placeholders),
+                    &request.schema,
+                    inferred_columns,
+                ))
+            }),
+            (FastLineageModel::Parse { .. }, AnalysisRoute::Unavailable) => {
+                Ok(FastLineageOutcome::Omitted)
+            }
+            (
+                FastLineageModel::Parse {
+                    query_sql,
+                    inferred_columns,
+                    ..
+                },
+                AnalysisRoute::Legacy,
+            ) => {
                 let model = ParsedModel {
                     query_sql,
                     inferred_names: inferred_columns,

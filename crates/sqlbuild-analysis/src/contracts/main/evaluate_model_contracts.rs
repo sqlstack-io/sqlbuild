@@ -22,7 +22,10 @@ pub fn evaluate_model_contracts(
             }
             model_contract_diagnostics(
                 model,
-                declared_shape_validation_is_active(model, implicit),
+                (
+                    declared_shape_validation_is_active(model, implicit),
+                    request.staged_promotion,
+                ),
                 &types,
             )
         })

@@ -1,4 +1,8 @@
-use crate::compiler::tests::helpers::{
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
+
+use crate::compiler::_helpers::sql_tests::planning::{SqlTestPatterns, parsed_analysis_template};
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
+use crate::compiler::tests::relation_markers_helpers::{
     owned_marker_calls, relation_marker_oracle_mismatches, relation_markers_and_json_oracle,
 };
 use crate::compiler::tests::test_types::{RelationMarkerOracleTestCase, RelationMarkersTestCase};
@@ -26,7 +30,7 @@ fn given_parsed_statements_when_collecting_relation_markers_then_json_walk_order
         },
         RelationMarkersTestCase {
             description: "aliased joins keep from before joins",
-            dialect: "snowflake",
+            dialect: "duckdb",
             sql: "SELECT o.id FROM __ref(\"orders\") AS o JOIN __source(\"raw_customers\") AS c ON o.id = c.id LEFT JOIN __seed(\"regions\") r ON c.region = r.id",
             expected_calls: &[
                 ("__ref", "orders"),
@@ -82,7 +86,10 @@ fn given_parsed_statements_when_collecting_relation_markers_then_json_walk_order
             expected_calls: &[("__ref", "orders"), ("__ref", "archived_orders")],
         },
     ];
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| sql_test_parser(Some(test_case.dialect)).is_some())
+    {
         let (collected, oracle) =
             relation_markers_and_json_oracle(test_case.dialect, test_case.sql);
         assert_eq!(
@@ -134,10 +141,60 @@ fn given_generated_relation_shapes_when_collecting_markers_then_json_oracle_matc
             expected_mismatches: &[],
         },
     ];
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| sql_test_parser(Some(test_case.dialect)).is_some())
+    {
         assert_eq!(
             relation_marker_oracle_mismatches(test_case.dialect),
             test_case.expected_mismatches,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_marked_model_sql_when_reading_the_planning_template_then_every_parser_sees_the_markers() {
+    let sql: &str = "SELECT o.id, '__ref(\"quoted\")' AS q FROM __ref(\"orders\") AS o -- __ref(\"commented\")\nJOIN __source(\"raw_customers\") AS c ON o.id = c.id LEFT JOIN __seed(\"regions\") r ON c.region = r.id JOIN __dbt_ref(\"shop\", \"customers\") d ON TRUE WHERE o.id IN (SELECT id FROM __REF(\"Products\"))";
+    let test_cases = [
+        RelationMarkersTestCase {
+            description: "Snowflake, which takes a table function only inside TABLE( )",
+            dialect: "snowflake",
+            sql,
+            expected_calls: &[
+                ("__ref", "orders"),
+                ("__source", "raw_customers"),
+                ("__seed", "regions"),
+                ("__dbt_ref", "shop__customers"),
+                ("__ref", "Products"),
+            ],
+        },
+        RelationMarkersTestCase {
+            description: "DuckDB, the same calls in the same order",
+            dialect: "duckdb",
+            sql,
+            expected_calls: &[
+                ("__ref", "orders"),
+                ("__source", "raw_customers"),
+                ("__seed", "regions"),
+                ("__dbt_ref", "shop__customers"),
+                ("__ref", "Products"),
+            ],
+        },
+    ];
+    let patterns: SqlTestPatterns = SqlTestPatterns::new(LexicalSyntax {
+        line_comment_prefixes: vec!["--".to_owned()],
+        ..LexicalSyntax::default()
+    })
+    .expect("the SQL-test patterns compile");
+    for test_case in test_cases {
+        let parser = sql_test_parser(Some(test_case.dialect)).expect(test_case.description);
+        let template = parsed_analysis_template(test_case.sql, (parser, &patterns))
+            .expect(test_case.description);
+        assert_eq!(
+            Some(template.marker_calls.to_vec()),
+            owned_marker_calls(test_case.expected_calls),
             "{}",
             test_case.description
         );

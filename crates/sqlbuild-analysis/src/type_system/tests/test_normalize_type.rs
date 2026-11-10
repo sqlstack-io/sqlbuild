@@ -1,7 +1,11 @@
 use crate::type_system::errors::TypeNormalizationError;
+use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::main::normalize_type::normalize_type;
+use crate::type_system::models::TypeFamily;
 use crate::type_system::tests::helpers::normalization_text;
-use crate::type_system::tests::test_types::{BracketDepthTestCase, NormalizeTypeTestCase};
+use crate::type_system::tests::test_types::{
+    BracketDepthTestCase, NormalizeTypeTestCase, TextFamilyTestCase,
+};
 
 #[test]
 fn given_type_strings_when_normalizing_then_python_normalization_is_returned() {
@@ -256,6 +260,55 @@ fn given_array_suffixes_when_normalizing_on_a_worker_stack_then_python_supported
             .expect("normalization does not overflow the stack");
         assert_eq!(
             answered, test_case.expected_native,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_complex_types_holding_a_timestamp_when_normalizing_text_then_the_top_level_type_decides() {
+    let test_cases = [
+        TextFamilyTestCase {
+            description: "an array of timestamps is an array",
+            type_sql: "ARRAY<TIMESTAMP>",
+            expected_family: TypeFamily::Other,
+        },
+        TextFamilyTestCase {
+            description: "a map of structs holding a timestamp is a map",
+            type_sql: "MAP<STRING,STRUCT<a:INT,b:TIMESTAMP_NTZ>>",
+            expected_family: TypeFamily::Other,
+        },
+        TextFamilyTestCase {
+            description: "a struct holding a timestamp is a struct",
+            type_sql: "STRUCT<t TIMESTAMP>",
+            expected_family: TypeFamily::Other,
+        },
+        TextFamilyTestCase {
+            description: "a bare timestamp is a timestamp",
+            type_sql: "TIMESTAMP",
+            expected_family: TypeFamily::Timestamp,
+        },
+        TextFamilyTestCase {
+            description: "a timestamp with precision is a timestamp",
+            type_sql: "TIMESTAMP(3)",
+            expected_family: TypeFamily::Timestamp,
+        },
+        TextFamilyTestCase {
+            description: "a zoned timestamp is a timestamp",
+            type_sql: "TIMESTAMP WITH TIME ZONE",
+            expected_family: TypeFamily::Timestamp,
+        },
+        TextFamilyTestCase {
+            description: "Snowflake's NTZ alias is a timestamp",
+            type_sql: "TIMESTAMP_NTZ",
+            expected_family: TypeFamily::Timestamp,
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            normalize_text_type(test_case.type_sql, None).family,
+            test_case.expected_family,
             "{}",
             test_case.description
         );

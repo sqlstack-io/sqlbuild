@@ -2,31 +2,46 @@
 
 use std::collections::HashSet;
 
-use polyglot_sql::Dialect;
-use polyglot_sql::parser::NO_PAREN_FUNCTION_NAMES;
-use polyglot_sql::tokens::{Token, TokenType};
+use sqlquack_parse::dialect_tokens;
+use sqlquack_syntax::Dialect;
+use sqlquack_syntax::tokens::models::{Token, TokenType};
 
-use crate::compiler::_helpers::sql_tests::constants::{
-    MAX_TEMPLATE_DEPTH, SIMPLE_TEMPLATE_DIALECTS,
-};
-use crate::compiler::_helpers::sql_tests::planning::{AnalysisTemplate, DBT_REF_FUNCTION};
-use crate::compiler::_helpers::sql_tests::relation_markers::MarkerCall;
+use crate::compiler::_helpers::sql_tests::planning::{AnalysisTemplate, SqlTestPatterns};
+use crate::relation_markers::constants::MARKER_NAME_PREFIX;
+use crate::relation_markers::main::markers_as_names::markers_as_names;
+use crate::relation_markers::types::MarkerCall;
 
-/// Recognize bounded DuckDB/Snowflake productions; other syntax retains the existing parser.
+/// Deepest query or scalar nesting the recognizer reads before it leaves the template to the parser.
+const MAX_TEMPLATE_DEPTH: usize = 32;
+
+/// Recognize bounded DuckDB/Snowflake productions; other syntax retains the full parser.
 pub(crate) fn simple_analysis_template(
-    sql: &str,
+    query_sql: &str,
     dialect_name: &str,
-    dialect: &Dialect,
+    patterns: &SqlTestPatterns,
 ) -> Option<AnalysisTemplate> {
-    if !SIMPLE_TEMPLATE_DIALECTS.contains(&dialect_name) || sql.contains("/*") {
+    let dialect: Dialect = match dialect_name {
+        "duckdb" => Dialect::DuckDB,
+        "snowflake" => Dialect::Snowflake,
+        _ => return None,
+    };
+    if !query_sql.is_ascii() {
         return None;
     }
-    let tokens = match dialect.tokenize(sql) {
-        Ok(tokens) => tokens,
-        Err(_) => return None,
+    let (sql, named) = match markers_as_names(query_sql, &patterns.lexical) {
+        Ok(renamed) => renamed,
+        Err(_unscannable) => return None,
     };
+    let tokens: Vec<Token> = match dialect_tokens(&sql, dialect) {
+        Ok(tokens) => tokens,
+        Err(_untokenizable) => return None,
+    };
+    if !covers_all_but_whitespace(&sql, &tokens) {
+        return None;
+    }
     let mut reader = TemplateReader {
         tokens: &tokens,
+        named: &named,
         position: 0,
     };
     let facts = reader.query(0)?;
@@ -40,6 +55,26 @@ pub(crate) fn simple_analysis_template(
     })
 }
 
+/// Whether only whitespace lies outside the tokens, so no comment or skipped text needs the parser.
+fn covers_all_but_whitespace(sql: &str, tokens: &[Token]) -> bool {
+    let bytes: &[u8] = sql.as_bytes();
+    let mut cursor: usize = 0;
+    for token in tokens {
+        if !token.comments.is_empty()
+            || !token.trailing_comments.is_empty()
+            || token.span.start < cursor
+            || token.span.end > bytes.len()
+            || !bytes[cursor..token.span.start]
+                .iter()
+                .all(u8::is_ascii_whitespace)
+        {
+            return false;
+        }
+        cursor = token.span.end;
+    }
+    bytes[cursor..].iter().all(u8::is_ascii_whitespace)
+}
+
 struct QueryFacts {
     names: HashSet<String>,
     calls: Vec<MarkerCall>,
@@ -47,6 +82,7 @@ struct QueryFacts {
 
 struct TemplateReader<'a> {
     tokens: &'a [Token],
+    named: &'a [MarkerCall],
     position: usize,
 }
 
@@ -151,41 +187,19 @@ impl<'a> TemplateReader<'a> {
         Some(calls)
     }
 
+    /// A relation name and optional alias; a name `markers_as_names` gave a marker call reads back as it.
     fn relation(&mut self) -> Option<Option<MarkerCall>> {
         let name = self.identifier()?;
-        let call = if self.take(TokenType::LParen) {
-            let function = name.to_ascii_lowercase();
-            if !matches!(
-                function.as_str(),
-                "__ref" | "__source" | "__seed" | "__dbt_ref"
-            ) {
-                return None;
-            }
-            let mut target = self.marker_argument()?.to_owned();
-            if function == DBT_REF_FUNCTION && self.take(TokenType::Comma) {
-                target.push_str("__");
-                target.push_str(self.marker_argument()?);
-            }
-            self.require(TokenType::RParen)?;
-            Some((function, target))
-        } else {
-            None
-        };
+        let call =
+            name.strip_prefix(MARKER_NAME_PREFIX)
+                .and_then(|index| match index.parse::<usize>() {
+                    Ok(index) => self.named.get(index).cloned(),
+                    Err(_not_a_marker) => None,
+                });
         if self.take(TokenType::As) {
             self.identifier()?;
         }
         Some(call)
-    }
-
-    /// Require quoted Columns; unquoted arguments can invoke private dialect-specific function rules.
-    fn marker_argument(&mut self) -> Option<&'a str> {
-        let token = self.tokens.get(self.position)?;
-        if token.token_type != TokenType::QuotedIdentifier
-            || NO_PAREN_FUNCTION_NAMES.contains(token.text.to_ascii_uppercase().as_str())
-        {
-            return None;
-        }
-        self.identifier()
     }
 
     fn condition(&mut self, depth: usize) -> Option<()> {

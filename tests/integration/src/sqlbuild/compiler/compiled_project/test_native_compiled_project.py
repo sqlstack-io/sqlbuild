@@ -537,7 +537,7 @@ def test_given_invalid_model_when_running_native_model_loop_then_attachment_erro
             model_sql="MODEL ();\nSELECT FROM WHERE (\n",
             expected_message=(
                 "SQL syntax error in model 'orders' ({model_path}): "
-                "Expected table name or subquery, got Where"
+                "the duckdb parser cannot read Syntax error at or near 'WHERE' at line 2, column 13"
             ),
             expected_help_fragment="skip SQL analysis for this model",
         ),
@@ -549,7 +549,8 @@ def test_given_invalid_model_when_running_native_model_loop_then_attachment_erro
                 "SELECT 1 AS order_id FROM t WHERE order_id >= __cursor_start() AND (\n"
             ),
             expected_message=(
-                "SQL syntax error in model 'orders' ({model_path}): Unexpected token: LParen"
+                "SQL syntax error in model 'orders' ({model_path}): "
+                "the duckdb parser cannot read Syntax error at or near 'AND' at line 2, column 64"
             ),
             expected_help_fragment="skip SQL analysis for this model",
         ),
@@ -576,6 +577,7 @@ def test_given_unparseable_model_when_validating_immediately_then_syntax_error_i
     assert raised.value.message == test_case.expected_message.format(
         model_path=project_dir / "models" / "orders.sql"
     )
+    assert raised.value.code == "P001"
     assert test_case.expected_help_fragment in (raised.value.help or "")
 
 

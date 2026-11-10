@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use polyglot_sql::Dialect;
-
 use crate::compiler::_helpers::sql_tests::helper_names::rename_helper_references;
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::tests::helpers::{helper_names_are_isolated, plan_shape_refusal};
 use crate::compiler::tests::test_types::{
     HelperRenameTestCase, NameRefusalTestCase, PlanShape, SharedNameTestCase,
@@ -60,10 +59,10 @@ fn given_helper_references_when_renaming_then_only_relation_references_change() 
         "expected_rows".to_string(),
         "__helper__expected_rows".to_string(),
     )]);
-    let dialect = Dialect::get_by_name("duckdb").expect("DuckDB dialect");
+    let dialect = sql_test_parser(Some("duckdb")).expect("DuckDB parser");
     for test_case in test_cases {
         assert_eq!(
-            rename_helper_references(test_case.sql, &helpers, &dialect).as_deref(),
+            rename_helper_references(test_case.sql, &helpers, dialect).as_deref(),
             test_case.expected_sql,
             "{}",
             test_case.description

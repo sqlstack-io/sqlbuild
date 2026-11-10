@@ -13,18 +13,25 @@ class GeneratedLineageParityTestCase:
     dialects: tuple[str | None, ...]
     expected_minimum_native: int
     expected_minimum_parsed: int
-    expected_minimum_star_expansions: int
+
+
+@dataclass(frozen=True)
+class RootStarLineageTestCase:
+    """A root star over a model without SQL analysis, whose facts leave the star to fast lineage."""
+
+    description: str
+    dialect: str | None
+    expected_star_expansions: int
 
 
 @dataclass(frozen=True)
 class FormerlyDeferredLineageTestCase:
-    """Parsed models Python once built, now answered natively or raising Python's error."""
+    """Parsed models Python once built: answered natively, or not at all without a native parser."""
 
     description: str
     dialect: str
     keeps_catalog: bool
     expected_models_with_lineage: int
-    expected_error: str | None
 
 
 @dataclass(frozen=True)

@@ -7,5 +7,7 @@ pub(crate) const RELATION_MARKER_PATTERN: &str =
     r#"(?i)\b(__[a-z_]+)\(\s*"([^"]+)"\s*(?:,\s*"([^"]+)"\s*)?\)"#;
 /// The marker whose two names read as one, joined by `__`.
 pub(crate) const DBT_REF_FUNCTION: &str = "__dbt_ref";
+/// The keyword that lets a FROM item read earlier FROM items, which a bare relation cannot take.
+pub(crate) const LATERAL_KEYWORD: &str = "LATERAL";
 /// The marker of a table function call, which Snowflake reads only inside `TABLE( )`.
 pub(crate) const TABLE_FUNCTION_MARKER: &str = "__table_fn";

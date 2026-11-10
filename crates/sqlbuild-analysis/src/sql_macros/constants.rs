@@ -119,10 +119,10 @@ pub(crate) const FROM_KEYWORD: &str = "FROM";
 pub(crate) const ITEM_ENDS: [&str; 4] = ["FROM", "WHERE", "UNION", "ORDER"];
 /// The relation whose columns stand in for a macro's arguments while its body is typed.
 pub(crate) const STAND_IN_RELATION: &str = "__sqlbuild_macro_arguments";
-/// The polyglot validation error codes, by number, of operands and arguments of a wrong type.
-pub(crate) const TYPE_ERROR_CODES: (usize, usize) = (210, 219);
-/// The polyglot validation warning codes, by number, of implicit conversions.
-pub(crate) const TYPE_WARNING_CODES: (usize, usize) = (210, 216);
+/// The SQLBuild codes, by number, of operands, arguments and implicit conversions of a wrong type.
+pub(crate) const TYPE_CODES: (usize, usize) = (210, 219);
+/// The prefix of the blocking SQLBuild codes analysis findings arrive as.
+pub(crate) const TYPE_CODE_PREFIX: char = 'B';
 pub(crate) const STAR_PROJECTION: &str = "*";
 /// The type hint analysis reports for a column whose type it does not know.
 pub(crate) const UNKNOWN_TYPE_HINT: &str = "UNKNOWN";
@@ -131,15 +131,12 @@ pub(crate) const ALIAS_PRECEDING_KEYWORDS: [&str; 13] = [
     "FROM", "JOIN", "ON", "AND", "OR", "NOT", "WHERE", "USING", "LATERAL", "IN", "IS", "BY",
     "SELECT",
 ];
-/// Dialects tried in turn to judge whether typed markers keep a query parseable.
-pub(crate) const MARKER_PARSE_DIALECTS: [polyglot_sql::DialectType; 4] = [
-    polyglot_sql::DialectType::Generic,
-    polyglot_sql::DialectType::DuckDB,
-    polyglot_sql::DialectType::Snowflake,
-    polyglot_sql::DialectType::BigQuery,
-];
 /// The literal a typed marker still types, though it is one bare word.
 pub(crate) const NULL_KEYWORD: &str = "NULL";
+/// The largest DECIMAL precision each dialect that bounds it holds, by analysis dialect name.
+pub(crate) const DECIMAL_PRECISION_LIMITS: [(&str, u64); 2] = [("duckdb", 38), ("postgres", 1000)];
+/// The analysis dialect whose `NUMERIC` and `BIGNUMERIC` limits a `returns` type is checked against.
+pub(crate) const BIGQUERY_DIALECT: &str = "bigquery";
 /// BigQuery's most integer digits and scale of a `NUMERIC`.
 pub(crate) const BIGQUERY_NUMERIC_LIMITS: (u32, u32) = (29, 9);
 /// BigQuery's most integer digits and scale of a `BIGNUMERIC`.

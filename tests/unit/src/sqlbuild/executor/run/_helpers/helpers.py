@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
 from sqlbuild._native import (
     AuditPlanEntry,
@@ -10,6 +11,7 @@ from sqlbuild._native import (
     DiscoveredHookFunction,
     MaterializationType,
     ModelPlanEntry,
+    OnSchemaChange,
     PlanAction,
     PlanReason,
     PythonHookEntry,
@@ -32,10 +34,12 @@ from sqlbuild.compiler.auditing.types import (
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.auditing.models import AuditExecutionResult
 from sqlbuild.executor.run._helpers.execution.hooks import execute_hooks
+from sqlbuild.executor.run._helpers.materializations.incremental import _apply_schema_change
 from sqlbuild.executor.run._helpers.validation.configured_columns import require_quoted_spelling
 from sqlbuild.executor.run.models import HookContext, HookRelationLookup, HookRunContext
 from sqlbuild.executor.run.types import HookPhase
 from sqlbuild.python_nodes.models import SqlResourceRef
+from tests.unit.src.sqlbuild.executor.run._helpers._test_types import UntypedSchemaChangeTestCase
 
 
 def insert_snapshot_hook_log(ctx: HookContext, phase: str) -> None:
@@ -386,3 +390,21 @@ def quoted_spelling_rejection(*, configured: str, listed_names: tuple[str, ...])
     except ExecutorInputError as error:
         return str(error)
     return None
+
+
+def applied_untyped_schema_change(test_case: UntypedSchemaChangeTestCase) -> tuple[str, ...]:
+    """Statements a SQLite append_new_columns schema change issues for one column pair."""
+    adapter: Mock = Mock()
+    adapter.sql_analysis_dialect_name = "sqlite"
+    adapter.untyped_column_type = test_case.untyped_column_type
+    statements: tuple[str, ...] = _apply_schema_change(
+        adapter=adapter,
+        connection=object(),
+        target_qualified="analytics.daily_revenue",
+        target_columns=(ColumnInfo(name="order_day", type=test_case.target_type),),
+        delta_columns=(ColumnInfo(name="order_day", type=test_case.delta_type),),
+        on_schema_change=OnSchemaChange.APPEND_NEW_COLUMNS,
+        statement_recorder=StatementRecorder(),
+    )
+    adapter.add_columns.assert_not_called()
+    return statements

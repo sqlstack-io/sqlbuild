@@ -7,8 +7,12 @@ use std::sync::Arc;
 use rayon::ThreadPool;
 use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::models::NativeStore;
+use sqlquack_semantics::lineage::models::{NullabilityRule, SchemaColumn};
+use sqlquack_semantics::lineage::types::LineageSchema;
 
-use crate::assembly::analysis_session::_helpers::catalog_state::SessionCatalog;
+use crate::assembly::analysis_session::_helpers::catalog_state::{
+    SessionCatalog, relation_columns,
+};
 use crate::assembly::analysis_session::_helpers::mappings::ShapeTable;
 use crate::assembly::analysis_session::types::{NullabilityRuleFn, OutputSources, Pairs, Shapes};
 use crate::semantic_validation::models::DiagnosticRow;
@@ -112,6 +116,14 @@ pub struct FinishedSession {
     pub(crate) dynamic_proofs: HashMap<String, ContractProof>,
     /// The relation facts the session ended with, when the request asked to keep them.
     pub(crate) relations: Option<RelationTables>,
+    /// Each requested model's name, in request order, as the session's outcomes are.
+    pub(crate) model_names: Vec<String>,
+    /// The adapter's and the project's declared functions, which the native analysis knew.
+    pub(crate) declared_functions: Vec<String>,
+    /// The adapter's function return types and nullability rules the native analysis read.
+    pub(crate) functions: SessionFunctions,
+    /// Whether quoted identifiers compared without case in the session's analysis.
+    pub(crate) quoted_ignore_case: bool,
 }
 
 /// The session's typed result for one compiled model, borrowed from the finished session.
@@ -170,7 +182,11 @@ pub struct SessionRequest {
     pub dialect: String,
     /// Whether published shapes keep authored quoting, Python's `inferred_binding_shape` test.
     pub case_sensitive_shapes: bool,
+    /// Whether quoted identifiers compare without case, as Snowflake's session parameter sets.
+    pub quoted_ignore_case: bool,
     pub function_return_types: Pairs,
+    /// The project's declared function names and their stub spellings, never unknown functions.
+    pub known_functions: Vec<String>,
     /// Adapter nullability rules as `(function name, rule id)`.
     pub nullability_rules: Option<Pairs>,
     /// Runs the adapter's own rules, those with the `python` rule id.
@@ -334,6 +350,51 @@ pub struct AnalysisCache {
     /// The whole-table digest each legacy analysis read; its entry also requires it.
     pub(crate) legacy_tables: Vec<Option<ContentDigest>>,
     pub(crate) stats: AnalysisCacheStats,
+}
+
+/// The adapter's function facts a native route gives SQLQuack: return types and nullability rules.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SessionFunctions {
+    /// `(function name, type)` of each function whose return type the adapter declares.
+    pub(crate) return_types: Vec<(String, String)>,
+    /// `(function name, rule)` of each built-in nullability rule the adapter names.
+    pub(crate) nullability: Vec<(String, NullabilityRule)>,
+}
+
+/// The relations one model reads, as the session knows them, for a native route's analysis.
+#[derive(Debug, Default)]
+pub(crate) struct SessionSchema {
+    /// Columns of each relation with a known shape, by the analysis name the query reads.
+    pub(crate) relations: HashMap<String, Vec<SchemaColumn>>,
+    /// Declared columns of each relation whose full shape is not known, which type the ones read.
+    pub(crate) open: HashMap<String, Vec<SchemaColumn>>,
+    pub(crate) functions: SessionFunctions,
+}
+
+impl LineageSchema for SessionSchema {
+    fn columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
+        relation_columns(&self.relations, relation)
+    }
+
+    fn open_columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
+        relation_columns(&self.open, relation)
+    }
+
+    fn function_type(&self, name: &str) -> Option<&str> {
+        self.functions
+            .return_types
+            .iter()
+            .find(|(function, _)| function.eq_ignore_ascii_case(name))
+            .map(|(_, data_type)| data_type.as_str())
+    }
+
+    fn function_nullability(&self, name: &str) -> Option<NullabilityRule> {
+        self.functions
+            .nullability
+            .iter()
+            .find(|(function, _)| function.eq_ignore_ascii_case(name))
+            .map(|(_, rule)| *rule)
+    }
 }
 
 /// One compile's model analysis, advanced phase by phase.

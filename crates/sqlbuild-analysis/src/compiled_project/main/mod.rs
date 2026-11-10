@@ -13,5 +13,6 @@ pub mod plain_model_facts;
 pub mod project_models;
 pub mod record_model;
 pub mod record_model_analysis;
+pub mod record_skipped_analysis;
 pub mod splice_declarations;
 pub mod text_position;

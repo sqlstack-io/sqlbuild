@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -66,6 +67,17 @@ _FROM_QUERY_MODELS: tuple[SetOperationModel, ...] = (
             f"UNION ALL\n{_RETURNS_QUERY}"
         ),
     ),
+)
+
+# BigQuery requires DISTINCT or ALL after EXCEPT and INTERSECT.
+_BIGQUERY_FROM_QUERY_MODELS: tuple[SetOperationModel, ...] = tuple(
+    replace(
+        model,
+        query_sql=model.query_sql.replace("\nEXCEPT\n", "\nEXCEPT DISTINCT\n").replace(
+            "\nINTERSECT\n", "\nINTERSECT DISTINCT\n"
+        ),
+    )
+    for model in _FROM_QUERY_MODELS
 )
 
 
@@ -233,7 +245,7 @@ def test_given_set_operation_after_subquery_operand_when_compiling_building_and_
         FromQuerySetOperationTestCase(
             description=f"{adapter} FROM query before a set operation",
             adapter=adapter,
-            models=_FROM_QUERY_MODELS,
+            models=_BIGQUERY_FROM_QUERY_MODELS if adapter == "bigquery" else _FROM_QUERY_MODELS,
             expected_column_counts=(
                 ("union_all_orders", 2),
                 ("except_orders", 2),

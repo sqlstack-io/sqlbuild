@@ -31,6 +31,11 @@ A SQL macro is one of three forms, decided by how its body starts:
 | `WITH` | CTE list | between the CTEs of a `WITH` list |
 | `SELECT` | column list | as an item of a select list |
 
+Bodies are read by SQLBuild's native parser for the adapter's SQL analysis dialect. On an adapter
+whose dialect has no native parser, including a custom adapter without
+`sql_analysis_dialect_name`, every call fails with `P015`, which says SQL macros are unavailable for
+that dialect.
+
 ## Create a SQL macro
 
 Put each SQL macro in its own `.sql` file under `macros/sql/`. The file name is the macro name.
@@ -472,9 +477,8 @@ MACRO (description "Status bar", arguments (value VARCHAR), returns VARCHAR);
 bar(LENGTH(@value), 0, 10)
 ```
 
-- The declared type applies only where the expanded SQL's type is unknown. A partly unknown type,
-  such as `[]`, an array of unknown elements, takes `returns` only when `returns` has its shape,
-  such as `BIGINT[]`. A known type stands, even a close one such as `VARCHAR(100)` for
+- The declared type applies only where the expanded SQL's type is unknown, including a list
+  literal such as `[]`, whose type analysis doesn't infer. A known type stands, even a close one such as `VARCHAR(100)` for
   `returns VARCHAR(5)`, and contract checks report a mismatch with `K002`.
 - The type flows on as an inferred type would: through CTEs, `SELECT *`, subqueries, joins and each
   branch of a set operation, through operators and functions around the call, to contract checks
@@ -495,12 +499,11 @@ bar(LENGTH(@value), 0, 10)
   macro (`P015`).
 - A fixed `returns` is checked against the body at the macro file. The body is typed from the
   declared argument types; a known type of another family, such as `UPPER(@value)` with
-  `returns BIGINT`, fails with `P024`, as does a partly unknown body of another shape, such as `[]`
-  with `returns BIGINT`. A body whose type cannot be inferred, for example because it reads `ANY`
-  arguments or calls a function whose type is unknown or only guessed, trusts `returns`.
+  `returns BIGINT`, fails with `P024`. A body whose type cannot be inferred, for example because it
+  reads `ANY` arguments, is a list literal, or calls a function whose type is unknown or only
+  guessed, trusts `returns`.
 - `returns` and every argument type must be a type the adapter's SQL dialect accepts, including a
-  decimal precision and scale it can hold, such as at most `DECIMAL(38, s)` on DuckDB or
-  `NUMERIC(38, 9)` on BigQuery (`P015`).
+  decimal precision and scale it can hold, such as at most `DECIMAL(38, s)` on DuckDB (`P015`).
 - A call where only a keyword can stand, such as the date part of `EXTRACT`, is typed by inference
   alone.
 - A call inside a Python macro argument, as in `@py.bracket(@sql.status_bar(o.status))`, is typed

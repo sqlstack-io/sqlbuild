@@ -3,6 +3,8 @@
 /// Sentinel standing in for one interpolation site in lint and format SQL.
 pub const LINT_SENTINEL_PREFIX: &str = sqlclean::constants::INTERPOLATION_PLACEHOLDER_PREFIX;
 pub(crate) const SENTINEL_SUFFIX: &str = "__";
+/// The keyword before a table function call that the parser reads only as a call.
+pub(crate) const LATERAL_KEYWORD: &str = "LATERAL";
 /// An audit's relation parameter, which a `SELECT *` may read alone.
 pub(crate) const AUDIT_PARAMETER_SENTINEL_PREFIX: &str =
     sqlclean::constants::RELATION_PARAMETER_PLACEHOLDER_PREFIX;
@@ -71,6 +73,8 @@ pub(crate) const OMITTED_SELECT_SUFFIX_PATTERN: &str = r"(?i)\s*\bSELECT\s+1\s*\
 pub(crate) const FIXTURE_HEADER_KINDS: [&str; 2] = ["TEST", "SCENARIO"];
 /// The header of a SQL macro file, whose body is an expression, a CTE list or a column list.
 pub(crate) const MACRO_HEADER_KIND: &str = "MACRO";
+/// The header of a SQL function file, whose body is an expression or, for a table function, a query.
+pub(crate) const FUNCTION_HEADER_KIND: &str = "FUNCTION";
 pub(crate) const LINE_COMMENT_PREFIX: &str = "--";
 pub(crate) const DECLINED_WITHOUT_REASON: &str = "native formatter declined without a reason";
 pub(crate) const MOVED_OMITTED_SELECT: &str =

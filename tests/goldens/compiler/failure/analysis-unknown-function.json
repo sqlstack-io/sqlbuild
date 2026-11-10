@@ -13,13 +13,13 @@
      "resource_name": "customer_totals",
      "path": "models/marts/customer_totals.sql",
      "line": 5,
-     "column": 36,
+     "column": 21,
      "location": {
       "path": "models/marts/customer_totals.sql",
       "line": 5,
-      "column": 36,
+      "column": 21,
       "end_line": 5,
-      "end_column": 42
+      "end_column": 43
      },
      "help": "check the function spelling or declare the project function before using it"
     }

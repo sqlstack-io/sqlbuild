@@ -29,6 +29,11 @@ use crate::bindings::types::CompilerDetach;
 
 const FORMAT_UNSAFE_CODE: &str = "format-unsafe";
 const FORMAT_UNSAFE_REMEDIATION: &str = "Rewrite the unsupported SQL shape or report a minimal formatter reproduction. No header, SQL body, or fixture changes were written to this file.";
+const FORMAT_UNAVAILABLE_CODE: &str = "format-unavailable";
+const FORMAT_UNAVAILABLE_REMEDIATION: &str = "No change is needed. The file was left as written and is formatted once SQLClean formats this dialect.";
+const FORMAT_UNSAFE_PREFIX: &str =
+    "File left unchanged because its SQL body could not be formatted";
+const FORMAT_UNAVAILABLE_PREFIX: &str = "File left as written";
 
 fn site_tuples(neutralized: Neutralized) -> (String, Vec<Positional<InterpolationSite>>) {
     (neutralized.text, Positional::wrap_all(neutralized.sites))
@@ -130,13 +135,28 @@ pub(crate) fn relative_parts(
     }
 }
 
-/// The `format-unsafe` fault of a body the formatter declined in the file at `file_path`.
+/// A declined body's `format-unsafe` fault, or a `format-unavailable` warning for an unformatted dialect.
 pub(crate) fn unsafe_fault<'py>(
     file_path: &Bound<'py, PyAny>,
     fault: &FormatFault,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = file_path.py();
-    let severity: Bound<'py, PyAny> = enum_member(py, RecordId::LintSeverity, "FAULT")?;
+    let (severity, code, prefix): (&str, &str, &str) = if fault.unavailable {
+        (
+            "WARNING",
+            FORMAT_UNAVAILABLE_CODE,
+            FORMAT_UNAVAILABLE_PREFIX,
+        )
+    } else {
+        ("FAULT", FORMAT_UNSAFE_CODE, FORMAT_UNSAFE_PREFIX)
+    };
+    let remediation: &str = if fault.unavailable {
+        FORMAT_UNAVAILABLE_REMEDIATION
+    } else {
+        FORMAT_UNSAFE_REMEDIATION
+    };
+    let message: String = format!("{prefix}: {}", fault.reason);
+    let severity: Bound<'py, PyAny> = enum_member(py, RecordId::LintSeverity, severity)?;
     new_record_with(
         py,
         RecordId::LintViolation,
@@ -144,24 +164,11 @@ pub(crate) fn unsafe_fault<'py>(
             ("file_path", file_path.clone()),
             ("line", fault.line.into_pyobject(py)?.into_any()),
             ("column", 1_usize.into_pyobject(py)?.into_any()),
-            ("code", PyString::new(py, FORMAT_UNSAFE_CODE).into_any()),
-            (
-                "message",
-                PyString::new(
-                    py,
-                    &format!(
-                        "File left unchanged because its SQL body could not be formatted: {}",
-                        fault.reason
-                    ),
-                )
-                .into_any(),
-            ),
+            ("code", PyString::new(py, code).into_any()),
+            ("message", PyString::new(py, &message).into_any()),
             ("severity", severity),
             ("engine", PyString::new(py, NATIVE_ENGINE).into_any()),
-            (
-                "remediation",
-                PyString::new(py, FORMAT_UNSAFE_REMEDIATION).into_any(),
-            ),
+            ("remediation", PyString::new(py, remediation).into_any()),
         ],
     )
 }

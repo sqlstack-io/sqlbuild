@@ -4,14 +4,14 @@ use crate::assembly::analysis_session::main::run_analysis_session::run_analysis_
 use crate::assembly::analysis_session::main::start_analysis_session::start_analysis_session;
 use crate::assembly::analysis_session::models::PivotOutcome;
 use crate::assembly::analysis_session::tests::helpers::{
-    catalog, expected_facts, fact_lines, failed, finished_session, kept_model_analyses,
-    legacy_lines, lines, model_requests, orders_request, pivot_request, proven, recovered_facts,
-    session_lines, session_steps,
+    catalog, completed, described, expected_facts, fact_lines, failed, finished_session,
+    kept_model_analyses, legacy_lines, lines, model, model_requests, orders_request, pivot_request,
+    proven, recovered_facts, session_lines, session_steps, started,
 };
 use crate::assembly::analysis_session::tests::test_types::{
-    CteRecoveryTestCase, DeepPivotTestCase, KeptAnalysisTestCase, LegacyAnalysisTestCase,
-    ModelSpec, PivotTestCase, SessionFactsTestCase, SessionFailureTestCase, SessionTestCase,
-    StarExpansionTestCase, UnscheduledTestCase,
+    BareFunctionTestCase, CteRecoveryTestCase, DeepPivotTestCase, KeptAnalysisTestCase,
+    LegacyAnalysisTestCase, ModelSpec, PivotTestCase, SessionFactsTestCase, SessionFailureTestCase,
+    SessionTestCase, StarExpansionTestCase, UnscheduledTestCase,
 };
 
 /// A model whose missing column stays untyped over a known input, so completion re-analyses it.
@@ -52,8 +52,8 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             ],
             expected_steps: &[&[
                 "publish stg_orders order_id:INTEGER doubled:DOUBLE",
-                "publish orders_mart doubled:DOUBLE next_id:INT",
-                "publish orders_star order_id:INT doubled:DOUBLE",
+                "publish orders_mart doubled:DOUBLE next_id:INTEGER",
+                "publish orders_star order_id:INTEGER doubled:DOUBLE",
             ]],
             expected_outcomes: &[
                 &[
@@ -63,11 +63,11 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
                 ],
                 &[
                     "doubled DOUBLE unknown",
-                    "next_id INT unknown",
+                    "next_id INTEGER unknown",
                     "succeeded=true star=false/true diagnostics=[]",
                 ],
                 &[
-                    "order_id INT unknown",
+                    "order_id INTEGER unknown",
                     "doubled DOUBLE unknown",
                     "succeeded=true star=true/true diagnostics=[]",
                 ],
@@ -84,7 +84,7 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             expected_steps: &[&[]],
             expected_outcomes: &[&[
                 "missing_column - unknown",
-                "succeeded=true star=false/false diagnostics=[\"B002\"]",
+                "succeeded=true star=false/true diagnostics=[\"B002\"]",
             ]],
         },
         SessionTestCase {
@@ -105,17 +105,17 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             ],
             expected_steps: &[&[
                 "publish events event_id:UNKNOWN",
-                "publish events_mart event_id:UNKNOWN one:INT",
+                "publish events_mart event_id:UNKNOWN one:INTEGER",
             ]],
             expected_outcomes: &[
                 &[
                     "event_id - unknown",
-                    "succeeded=true star=false/false diagnostics=[]",
+                    "succeeded=true star=false/true diagnostics=[]",
                 ],
                 &[
                     "event_id - unknown",
-                    "one INT non_null",
-                    "succeeded=true star=false/false diagnostics=[]",
+                    "one INTEGER non_null",
+                    "succeeded=true star=false/true diagnostics=[]",
                 ],
             ],
         },
@@ -143,11 +143,11 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             expected_outcomes: &[
                 &[
                     "gr\u{f6}\u{df}e - unknown",
-                    "succeeded=true star=false/false diagnostics=[]",
+                    "succeeded=true star=false/true diagnostics=[]",
                 ],
                 &[
                     "gr\u{f6}\u{df}e - non_null",
-                    "succeeded=true star=false/false diagnostics=[]",
+                    "succeeded=true star=false/true diagnostics=[]",
                 ],
             ],
         },
@@ -162,7 +162,7 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             expected_steps: &[&["publish orders_union order_id:UNKNOWN"]],
             expected_outcomes: &[&[
                 "order_id - unknown",
-                "succeeded=true star=false/false diagnostics=[]",
+                "succeeded=true star=false/true diagnostics=[]",
             ]],
         },
     ];
@@ -194,8 +194,8 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
                 ),
             ],
             expected_steps: &[&[
-                "publish stg_orders order_id:UNKNOWN amount:UNKNOWN",
-                "publish orders_flagged order_id:UNKNOWN amount:UNKNOWN flag:INT",
+                "publish stg_orders order_id:INTEGER amount:INTEGER",
+                "publish orders_flagged order_id:INTEGER amount:INTEGER flag:INTEGER",
             ]],
         },
         StarExpansionTestCase {
@@ -212,8 +212,8 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
                 ),
             ],
             expected_steps: &[&[
-                "publish stg_orders order_id:UNKNOWN amount:UNKNOWN",
-                "publish orders_flagged order_id:UNKNOWN amount:UNKNOWN flag:INT",
+                "publish stg_orders order_id:INTEGER amount:INTEGER",
+                "publish orders_flagged order_id:INTEGER amount:INTEGER flag:INTEGER",
             ]],
         },
         StarExpansionTestCase {
@@ -229,8 +229,8 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
                 ),
             ],
             expected_steps: &[&[
-                "publish stg_orders order_id:INT amount:INT",
-                "publish orders_flagged order_id:INT amount:INT flag:INT",
+                "publish stg_orders order_id:INTEGER amount:INTEGER",
+                "publish orders_flagged order_id:INTEGER amount:INTEGER flag:INTEGER",
             ]],
         },
     ];
@@ -284,7 +284,7 @@ fn given_finished_sessions_when_reading_model_facts_then_keeps_only_native_succe
             ],
             expected_facts: &[
                 "Some([\"event_id - unknown\"]) event_id<-[(\"raw_events\", \"event_id\")]",
-                "Some([\"event_id - unknown\", \"one INT non_null\"]) event_id<-[(\"events\", \"event_id\")] one<-[]",
+                "Some([\"event_id - unknown\", \"one INTEGER non_null\"]) event_id<-[(\"events\", \"event_id\")] one<-[]",
             ],
         },
         SessionFactsTestCase {
@@ -375,13 +375,10 @@ fn given_enrichment_dialect_when_running_then_answers_natively_or_fails_internal
             expected_error: None,
         },
         SessionFailureTestCase {
-            description: "an adapter alias compile maps before analysis never reaches the session",
+            description: "the postgres analysis dialect answers natively",
             dialect: "postgres",
             models: &[UNTYPED_ORDERS],
-            expected_error: Some(
-                "NativeCompilerError: native model analysis of model 'orders_untyped' enrichment: \
-                 query analysis options: unknown variant `postgres`",
-            ),
+            expected_error: None,
         },
     ];
     for test_case in test_cases {
@@ -756,7 +753,7 @@ fn given_a_finished_session_when_reading_model_analyses_then_keeps_typed_columns
             "raw_orders",
             true,
         ),
-        expected_columns: [&["customer_id INTEGER non_null"], &["1 - non_null"]],
+        expected_columns: [&["customer_id INTEGER non_null"], &["1 INTEGER non_null"]],
     }];
     for test_case in test_cases {
         let kept = kept_model_analyses(test_case.dialect, test_case.sql, test_case.family);
@@ -773,6 +770,55 @@ fn given_a_finished_session_when_reading_model_analyses_then_keeps_typed_columns
                     Some(lines(test_case.expected_columns[1]))
                 ),
             ],
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_project_function_called_by_its_bare_name_when_running_the_session_then_it_is_known() {
+    let test_cases = [
+        BareFunctionTestCase {
+            description: "a declared project function is not an unknown function",
+            known_functions: &["is_large_order", "__sqlbuild_udf_is_large_order"],
+            sql: "SELECT order_id, is_large_order(amount) AS is_large FROM __source(\"raw_orders\")",
+            expected_last_line: "succeeded=true star=false/true diagnostics=[]",
+        },
+        BareFunctionTestCase {
+            description: "the same call without the declaration is an unknown function",
+            known_functions: &[],
+            sql: "SELECT order_id, is_large_order(amount) AS is_large FROM __source(\"raw_orders\")",
+            expected_last_line: "succeeded=true star=false/true diagnostics=[\"B101\"]",
+        },
+        BareFunctionTestCase {
+            description: "a misspelt built-in stays an unknown function beside a declared one",
+            known_functions: &["is_large_order"],
+            sql: "SELECT order_id, lenght('x') AS n FROM __source(\"raw_orders\")",
+            expected_last_line: "succeeded=true star=false/true diagnostics=[\"B101\"]",
+        },
+    ];
+    for test_case in test_cases {
+        let mut request =
+            orders_request(vec![model("orders", test_case.sql, &["raw_orders"], &[])]);
+        request.known_functions = test_case
+            .known_functions
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
+        let (_, outcomes, finished) = completed(started(request));
+        let undeclared: Vec<&str> = test_case
+            .known_functions
+            .iter()
+            .copied()
+            .filter(|name| !finished.declared_functions.contains(&(*name).to_owned()))
+            .collect();
+        assert_eq!(
+            (
+                described(&outcomes[0]).last().map(String::as_str),
+                undeclared
+            ),
+            (Some(test_case.expected_last_line), Vec::new()),
             "{}",
             test_case.description
         );

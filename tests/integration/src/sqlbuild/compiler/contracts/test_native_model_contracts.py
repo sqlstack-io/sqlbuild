@@ -11,7 +11,6 @@ from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.contracts._test_types import (
     FormerlyDeferredContractTestCase,
     GeneratedContractTestCase,
-    UnknownDialectContractTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.contracts.helpers import (
     ContractView,
@@ -128,16 +127,10 @@ def test_given_generated_contracts_when_validating_then_every_contract_family_is
             ),
         ),
         FormerlyDeferredContractTestCase(
-            description="a shipped dialect without a native type parser",
+            description="a dialect without a native parser compares names only",
             declared_type="INTEGER",
-            dialect="tsql",
+            dialect="mysql",
             expected_diagnostics=(
-                (
-                    "K002",
-                    "customer_totals",
-                    "total_amount",
-                    "column 'total_amount' inferred as DOUBLE but declared type is DECIMAL(18,2)",
-                ),
                 (
                     "K005",
                     "stg_orders",
@@ -150,11 +143,24 @@ def test_given_generated_contracts_when_validating_then_every_contract_family_is
                     "status",
                     "column 'status' is not declared in enforced contract for model 'stg_orders'",
                 ),
+            ),
+        ),
+        FormerlyDeferredContractTestCase(
+            description="a dialect name no parser knows compares names only",
+            declared_type="INTEGER",
+            dialect="nonsense",
+            expected_diagnostics=(
                 (
-                    "K002",
+                    "K005",
                     "stg_orders",
-                    "amount",
-                    "column 'amount' inferred as DOUBLE but declared type is INTEGER",
+                    "customer_id",
+                    "column 'customer_id' is not declared in enforced contract for model 'stg_orders'",
+                ),
+                (
+                    "K005",
+                    "stg_orders",
+                    "status",
+                    "column 'status' is not declared in enforced contract for model 'stg_orders'",
                 ),
             ),
         ),
@@ -178,26 +184,6 @@ def test_given_input_python_once_answered_when_validating_then_native_diagnostic
         )
         == test_case.expected_diagnostics
     ), test_case.description
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        UnknownDialectContractTestCase(
-            description="a dialect no adapter ships raises the wheel's error",
-            dialect="mysql",
-            expected_error="Unknown dialect: mysql",
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_unknown_dialect_when_validating_typed_contracts_then_python_error_is_raised(
-    test_case: UnknownDialectContractTestCase, tmp_path: Path
-) -> None:
-    project: CompiledProjectView = compiled_contract_project(project_dir=tmp_path / "project")
-
-    with pytest.raises(ValueError, match=test_case.expected_error):
-        _ = contract_diagnostics(project=project, dialect=test_case.dialect)
 
 
 if __name__ == "__main__":

@@ -22,31 +22,44 @@ from tests.integration.src.sqlbuild.compiler.helpers import (
     read_golden,
 )
 from tests.integration.src.sqlbuild.compiler.semantic_checks._test_types import (
+    DialectFindingTestCase,
     FormerlyDeferredSemanticTestCase,
     GeneratedSemanticParityTestCase,
     MissingCatalogTestCase,
+    ModelFindingsTestCase,
     SessionCompletionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
     SemanticInputs,
     captured_semantic_inputs,
+    captured_under_dialect,
     completed_natively,
     completion_view,
     files_with_non_ascii,
     generated_semantic_files,
     has_blocking_binding,
+    model_findings,
     native_completion,
     note_kinds,
+    one_model_completion,
     outcome_label,
+    payload_completion_view,
     proven_output_count,
     semantic_outcome,
     session_corpus_files,
     session_fact_models,
     with_dialect,
-    without_session,
 )
 
 _NOTE_KINDS: tuple[str, ...] = ("downstream output uses", "downstream uses of", " has: ")
+
+_FAILED_UPSTREAM_MODELS: dict[str, str] = {
+    "upstream": 'SELECT orde_rid, sattus FROM __source("raw_orders")',
+    "downstream": (
+        'WITH base AS (\n  SELECT order_id, sattus FROM __ref("upstream")\n)\n'
+        "SELECT order_id, MAX(status) AS status\nFROM base\nGROUP BY 1"
+    ),
+}
 
 
 @pytest.mark.parametrize(
@@ -84,15 +97,15 @@ def test_given_generated_failing_projects_when_completing_natively_then_matches_
     golden: list[GoldenEntry] = []
     for index in range(test_case.count):
         project_dir: Path = tmp_path / f"project_{index}"
-        captured: SemanticInputs = captured_semantic_inputs(
-            project_dir=project_dir,
-            files=generated_semantic_files(
-                rng=rng, model_count=test_case.model_count, require_analysis=index % 2 == 0
-            ),
+        files: dict[str, str] = generated_semantic_files(
+            rng=rng, model_count=test_case.model_count, require_analysis=index % 2 == 0
         )
         views: dict[str, object] = {}
         for dialect in test_case.dialects:
-            native: CompiledProjectView = completed_natively(with_dialect(captured, dialect))
+            captured: SemanticInputs = captured_under_dialect(
+                project_dir=project_dir, files=files, dialect=dialect
+            )
+            native: CompiledProjectView = completed_natively(captured)
             statuses["completion_native"] += 1
             statuses["diagnostics_native"] += len(native.diagnostics)
             statuses["type_recovery_planned"] += has_blocking_binding(captured.project)
@@ -189,6 +202,137 @@ def test_given_formerly_deferred_projects_when_completing_natively_then_matches_
 @pytest.mark.parametrize(
     "test_case",
     [
+        DialectFindingTestCase(
+            description="DuckDB refuses a text literal compared with a number",
+            dialect="duckdb",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INTEGER"),),
+        ),
+        DialectFindingTestCase(
+            description="PostgreSQL refuses a text literal compared with a number",
+            dialect="postgres",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INTEGER"),),
+        ),
+        DialectFindingTestCase(
+            description="DuckDB types a date plus whole days as a date",
+            dialect="duckdb",
+            sql='SELECT order_date + order_id AS due FROM __source("raw_orders")',
+            expected_codes=(),
+            expected_types=(("due", "DATE"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_one_model_under_its_dialect_when_completing_natively_then_has_expected_findings(
+    test_case: DialectFindingTestCase,
+    tmp_path: Path,
+) -> None:
+    assert one_model_completion(
+        project_dir=tmp_path / "project", dialect=test_case.dialect, sql=test_case.sql
+    ) == (test_case.expected_codes, test_case.expected_types)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="SQLQuack's Snowflake and BigQuery profiles do not yet check or type these",
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DialectFindingTestCase(
+            description="BigQuery refuses a text literal compared with a timestamp",
+            dialect="bigquery",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.ordered_at > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INTEGER"),),
+        ),
+        DialectFindingTestCase(
+            description="Snowflake refuses a text literal compared with a number",
+            dialect="snowflake",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INTEGER"),),
+        ),
+        DialectFindingTestCase(
+            description="Snowflake types a date plus whole days as a date",
+            dialect="snowflake",
+            sql='SELECT order_date + order_id AS due FROM __source("raw_orders")',
+            expected_codes=(),
+            expected_types=(("due", "DATE"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pending_dialect_semantics_when_completing_natively_then_has_expected_findings(
+    test_case: DialectFindingTestCase,
+    tmp_path: Path,
+) -> None:
+    assert one_model_completion(
+        project_dir=tmp_path / "project", dialect=test_case.dialect, sql=test_case.sql
+    ) == (test_case.expected_codes, test_case.expected_types)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ModelFindingsTestCase(
+            description="DuckDB reports a column its CTE lacks over a failed upstream model",
+            dialect="duckdb",
+            models=_FAILED_UPSTREAM_MODELS,
+            expected_findings=(("downstream", "B002"), ("upstream", "B002"), ("upstream", "B002")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_cte_over_failed_upstream_when_completing_natively_then_model_keeps_a_finding(
+    test_case: ModelFindingsTestCase,
+    tmp_path: Path,
+) -> None:
+    assert (
+        model_findings(
+            project_dir=tmp_path / "project", dialect=test_case.dialect, models=test_case.models
+        )
+        == test_case.expected_findings
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "SQLQuack drops PostgreSQL's follow-on finding of a CTE whose own finding type "
+        "recovery then drops as poisoned, so the model is left with none"
+    ),
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ModelFindingsTestCase(
+            description="PostgreSQL reports a column its CTE lacks over a failed upstream model",
+            dialect="postgres",
+            models=_FAILED_UPSTREAM_MODELS,
+            expected_findings=(("downstream", "B002"), ("upstream", "B002"), ("upstream", "B002")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pending_postgres_cte_over_failed_upstream_when_completing_then_keeps_a_finding(
+    test_case: ModelFindingsTestCase,
+    tmp_path: Path,
+) -> None:
+    assert (
+        model_findings(
+            project_dir=tmp_path / "project", dialect=test_case.dialect, models=test_case.models
+        )
+        == test_case.expected_findings
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         MissingCatalogTestCase(
             description="a project without an analysis catalog is an internal failure",
             expected_message=(
@@ -236,9 +380,9 @@ def test_given_project_without_catalog_when_completing_then_raises_native_compil
             seed=20261011,
             count=4,
             model_count=16,
-            expected_session_models=78,
-            expected_payload_models=18,
-            expected_proven_outputs=10,
+            expected_session_models=87,
+            expected_payload_models=9,
+            expected_proven_outputs=9,
             expected_minimum_codes={"B002": 1},
         ),
     ],
@@ -261,14 +405,14 @@ def test_given_compiles_when_completing_from_the_session_then_matches_payload_an
     selections: list[frozenset[str]] = [session_fact_models(inputs) for inputs in captured]
     codes: Counter[str] = Counter()
     golden: list[GoldenEntry] = []
-    payload_views: list[tuple[object, ...]] = []
+    payload_views: list[tuple[object, ...] | None] = []
     session_views: list[tuple[object, ...]] = []
     for index, inputs in enumerate(captured):
         completed: CompiledProjectView = completed_natively(inputs)
         codes.update(item.code for item in completed.diagnostics)
         codes.update(note_kinds(completed, _NOTE_KINDS))
         session_views.append(completion_view(completed))
-        payload_views.append(completion_view(completed_natively(without_session(inputs))))
+        payload_views.append(payload_completion_view(inputs))
         golden.append(
             golden_entry(
                 "completion", session_views[-1], masked=(str(tmp_path / f"project_{index}"),)
@@ -284,7 +428,11 @@ def test_given_compiles_when_completing_from_the_session_then_matches_payload_an
         )
         == []
     )
-    assert payload_views == session_views
+    assert {payload is None for payload in payload_views} == {True, False}
+    assert all(
+        payload in (None, session)
+        for payload, session in zip(payload_views, session_views, strict=True)
+    )
     assert (
         session_models,
         model_count - session_models,

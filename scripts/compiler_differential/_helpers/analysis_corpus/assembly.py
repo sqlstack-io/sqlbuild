@@ -32,12 +32,13 @@ def assembly_failure_cases() -> tuple[FailureCase, ...]:
     return (
         failure_case(
             name="assembly-hook-syntax-unbuilt-dialect",
-            expected_code="P001",
-            expected_message="post_hooks",
+            expected_code="P026",
+            expected_message="trino",
             files={
                 FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG.replace(
                     'adapter = "duckdb"', 'adapter = "duckdb_trino"'
-                ),
+                )
+                + "\n[settings]\nrequire_sql_analysis = true\n",
                 _TRINO_ADAPTER_PATH: _TRINO_ADAPTER,
                 FAILURE_MART_PATH: _QUALIFY_HOOK_MART,
             },

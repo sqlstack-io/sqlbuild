@@ -172,80 +172,6 @@ _ROUNDED: dict[str, str] = {
             expected_fragments=("0 errors, 0 warnings",),
         ),
         SqlMacroCompileTestCase(
-            description="a_guessed_date_trunc_type_on_databricks_is_not_checked_against_returns",
-            files={
-                **adapter_project("databricks"),
-                **text_macro("m", "TIMESTAMP", "DATE_TRUNC('DAY', @value)", argument="TIMESTAMP"),
-                **orders_model('SELECT @sql.m(o.created_at) AS v FROM __ref("stg_orders") AS o\n'),
-            },
-            expected_returncode=0,
-            expected_fragments=("0 errors, 0 warnings",),
-        ),
-        SqlMacroCompileTestCase(
-            description="a_guessed_regexp_contains_type_on_bigquery_is_not_checked_against_returns",
-            files={
-                **adapter_project("bigquery"),
-                **text_macro("m", "BOOL", "REGEXP_CONTAINS(@value, 'a')", argument="VARCHAR"),
-                **orders_model('SELECT @sql.m(o.status) AS v FROM __ref("stg_orders") AS o\n'),
-            },
-            expected_returncode=0,
-            expected_fragments=("0 errors, 0 warnings",),
-        ),
-        SqlMacroCompileTestCase(
-            description="a_user_defined_function_on_bigquery_is_not_checked_against_returns",
-            files={
-                **adapter_project("bigquery"),
-                **text_macro("m", "STRING", "my_udf(@value)", argument="BIGINT"),
-                **orders_model(
-                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
-                ),
-            },
-            expected_returncode=0,
-            expected_fragments=("0 errors, 0 warnings",),
-        ),
-        SqlMacroCompileTestCase(
-            description="a_partly_unknown_body_of_another_shape_is_reported",
-            files={
-                **text_macro("m", "BIGINT", "[]", argument="BIGINT"),
-                **orders_model(
-                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
-                ),
-            },
-            expected_returncode=1,
-            expected_fragments=(
-                "error[P024]: macro m() declares returns BIGINT, but its body is UNKNOWN[]",
-            ),
-        ),
-        SqlMacroCompileTestCase(
-            description="a_returns_of_the_body_shape_fills_its_unknown_parts",
-            files={
-                **text_macro("m", "BIGINT[]", "[]", argument="BIGINT"),
-                **contract_model(
-                    "orders",
-                    'v (type "BIGINT[]")',
-                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n',
-                ),
-            },
-            expected_returncode=0,
-            expected_fragments=("0 errors, 0 warnings",),
-        ),
-        SqlMacroCompileTestCase(
-            description="an_invalid_returns_is_reported_on_postgres",
-            files={
-                **adapter_project("postgres"),
-                **text_macro("m", "FOO BAR", "@value", argument="ANY"),
-                **orders_model(
-                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
-                ),
-            },
-            expected_returncode=1,
-            expected_fragments=(
-                "error[P015]: returns of macro m() type 'FOO BAR' is not valid for adapter "
-                "'postgres' SQL analysis dialect 'postgres'",
-            ),
-            unexpected_fragments=("__polyglot",),
-        ),
-        SqlMacroCompileTestCase(
             description="an_invalid_returns_is_reported_on_motherduck",
             files={
                 **adapter_project("motherduck"),
@@ -277,21 +203,6 @@ _ROUNDED: dict[str, str] = {
             ),
         ),
         SqlMacroCompileTestCase(
-            description="an_invalid_argument_type_is_reported_on_postgres",
-            files={
-                **adapter_project("postgres"),
-                **text_macro("m", "BIGINT", "@value", argument="FOO BAR"),
-                **orders_model(
-                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
-                ),
-            },
-            expected_returncode=1,
-            expected_fragments=(
-                "error[P015]: argument value of macro m() type 'FOO BAR' is not valid for adapter "
-                "'postgres' SQL analysis dialect 'postgres'",
-            ),
-        ),
-        SqlMacroCompileTestCase(
             description="an_argument_decimal_wider_than_the_dialect_holds_is_reported",
             files={
                 **text_macro("m", "BIGINT", "@value", argument="DECIMAL(50, 2)"),
@@ -303,22 +214,6 @@ _ROUNDED: dict[str, str] = {
             expected_fragments=(
                 "error[P015]: argument value of macro m() type 'DECIMAL(50, 2)' is not valid for "
                 "adapter 'duckdb' SQL analysis dialect 'duckdb'",
-            ),
-        ),
-        SqlMacroCompileTestCase(
-            description="a_returns_numeric_wider_than_bigquery_holds_is_reported",
-            files={
-                **adapter_project("bigquery"),
-                **text_macro("m", "NUMERIC(40, 2)", "@value", argument="ANY"),
-                **orders_model(
-                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
-                ),
-            },
-            expected_returncode=1,
-            expected_fragments=(
-                "error[P015]: returns of macro m() type 'NUMERIC(40, 2)' is not valid for adapter "
-                "'bigquery' SQL analysis dialect 'bigquery': precision 40 and scale 2 exceed "
-                "BigQuery's limits of 29 integer digits and scale 9",
             ),
         ),
         SqlMacroCompileTestCase(
@@ -380,6 +275,78 @@ _ROUNDED: dict[str, str] = {
     ids=lambda case: case.description,
 )
 def test_given_optional_returns_when_compiling_then_calls_are_typed_and_checked(
+    test_case: SqlMacroCompileTestCase, tmp_path: Path
+) -> None:
+    _, result = run_project(
+        tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
+    )
+
+    assert result.returncode == test_case.expected_returncode, output(result)
+    for fragment in test_case.expected_fragments:
+        assert fragment in output(result), output(result)
+    for fragment in test_case.unexpected_fragments:
+        assert fragment not in output(result), output(result)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="native DuckDB analysis does not type list literals yet",
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlMacroCompileTestCase(
+            description="a_returns_of_the_body_shape_fills_its_unknown_parts",
+            files={
+                **text_macro("m", "BIGINT[]", "[]", argument="BIGINT"),
+                **contract_model(
+                    "orders",
+                    'v (type "BIGINT[]")',
+                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n',
+                ),
+            },
+            expected_returncode=0,
+            expected_fragments=("0 errors, 0 warnings",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_returns_of_a_list_body_shape_when_compiling_then_its_unknown_parts_are_filled(
+    test_case: SqlMacroCompileTestCase, tmp_path: Path
+) -> None:
+    _, result = run_project(
+        tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
+    )
+
+    assert result.returncode == test_case.expected_returncode, output(result)
+    for fragment in test_case.expected_fragments:
+        assert fragment in output(result), output(result)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="native DuckDB analysis does not type list literals yet",
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlMacroCompileTestCase(
+            description="a_partly_unknown_body_of_another_shape_is_reported",
+            files={
+                **text_macro("m", "BIGINT", "[]", argument="BIGINT"),
+                **orders_model(
+                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
+                ),
+            },
+            expected_returncode=1,
+            expected_fragments=(
+                "error[P024]: macro m() declares returns BIGINT, but its body is UNKNOWN[]",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_partly_unknown_list_body_when_compiling_then_the_mismatch_is_reported(
     test_case: SqlMacroCompileTestCase, tmp_path: Path
 ) -> None:
     _, result = run_project(
@@ -658,3 +625,100 @@ def test_given_a_changed_returns_form_when_compiling_warm_then_the_cache_is_not_
 
     assert test_case.expected_cold_fragment in output(cold), output(cold)
     assert test_case.expected_warm_fragment in output(warm), output(warm)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlMacroCompileTestCase(
+            description="a_guessed_date_trunc_type_on_databricks_is_not_checked_against_returns",
+            files={
+                **adapter_project("databricks"),
+                **text_macro("m", "TIMESTAMP", "DATE_TRUNC('DAY', @value)", argument="TIMESTAMP"),
+                **orders_model('SELECT @sql.m(o.created_at) AS v FROM __ref("stg_orders") AS o\n'),
+            },
+            expected_returncode=0,
+            expected_fragments=("0 errors, 0 warnings",),
+        ),
+        SqlMacroCompileTestCase(
+            description="a_guessed_regexp_contains_type_on_bigquery_is_not_checked_against_returns",
+            files={
+                **adapter_project("bigquery"),
+                **text_macro("m", "BOOL", "REGEXP_CONTAINS(@value, 'a')", argument="STRING"),
+                **orders_model('SELECT @sql.m(o.status) AS v FROM __ref("stg_orders") AS o\n'),
+            },
+            expected_returncode=0,
+            expected_fragments=("0 errors, 0 warnings",),
+        ),
+        SqlMacroCompileTestCase(
+            description="a_user_defined_function_on_bigquery_is_not_checked_against_returns",
+            files={
+                **adapter_project("bigquery"),
+                **text_macro("m", "STRING", "my_udf(@value)", argument="BIGINT"),
+                **orders_model(
+                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
+                ),
+            },
+            expected_returncode=0,
+            expected_fragments=("0 errors, 0 warnings",),
+        ),
+        SqlMacroCompileTestCase(
+            description="an_invalid_returns_is_reported_on_postgres",
+            files={
+                **adapter_project("postgres"),
+                **text_macro("m", "FOO BAR", "@value", argument="ANY"),
+                **orders_model(
+                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
+                ),
+            },
+            expected_returncode=1,
+            expected_fragments=(
+                "error[P015]: returns of macro m() type 'FOO BAR' is not valid for adapter "
+                "'postgres' SQL analysis dialect 'postgres'",
+            ),
+            unexpected_fragments=("__polyglot",),
+        ),
+        SqlMacroCompileTestCase(
+            description="an_invalid_argument_type_is_reported_on_postgres",
+            files={
+                **adapter_project("postgres"),
+                **text_macro("m", "BIGINT", "@value", argument="FOO BAR"),
+                **orders_model(
+                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
+                ),
+            },
+            expected_returncode=1,
+            expected_fragments=(
+                "error[P015]: argument value of macro m() type 'FOO BAR' is not valid for adapter "
+                "'postgres' SQL analysis dialect 'postgres'",
+            ),
+        ),
+        SqlMacroCompileTestCase(
+            description="a_returns_numeric_wider_than_bigquery_holds_is_reported",
+            files={
+                **adapter_project("bigquery"),
+                **text_macro("m", "NUMERIC(40, 2)", "@value", argument="ANY"),
+                **orders_model(
+                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n'
+                ),
+            },
+            expected_returncode=1,
+            expected_fragments=(
+                "error[P015]: returns of macro m() type 'NUMERIC(40, 2)' is not valid for adapter "
+                "'bigquery' SQL analysis dialect 'bigquery': precision 40 and scale 2 exceed "
+                "BigQuery's limits of 29 integer digits and scale 9",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_returns_on_an_adapter_without_a_native_parser_when_compiling_then_it_fails_until_the_arm_lands(
+    test_case: SqlMacroCompileTestCase, tmp_path: Path
+) -> None:
+    _, result = run_project(
+        tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
+    )
+
+    assert result.returncode == test_case.expected_returncode, output(result)
+    for fragment in test_case.expected_fragments:
+        assert fragment in output(result), output(result)

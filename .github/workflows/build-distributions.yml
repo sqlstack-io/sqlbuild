@@ -141,6 +141,29 @@ jobs:
         run: |
           npm ci
           npm run build
+      # In a Linux dist build the largest single-unit crates compile at the same time and can use
+      # more memory than the hosted runner has; the runner is then lost without a build error.
+      # Swap on the host, which the manylinux container shares, absorbs that peak, the builds below
+      # compile at most three crates at a time, and the sampled memory use is reported afterwards.
+      - name: Add swap for the Linux dist build
+        if: inputs.prebuilt-run-id == '' && runner.os == 'Linux' && inputs.cargo-profile == 'dist'
+        run: |
+          free -m
+          avail="$(df -BG --output=avail /mnt 2>/dev/null | tail -n 1 | tr -dc '0-9')"
+          swap_dir=/mnt
+          if [[ -z "${avail}" || "${avail}" -lt 24 ]]; then
+            swap_dir=""
+          fi
+          swapfile="${swap_dir}/sqlbuild-dist.swap"
+          sudo fallocate -l 16G "${swapfile}"
+          sudo chmod 600 "${swapfile}"
+          sudo mkswap "${swapfile}" > /dev/null
+          sudo swapon "${swapfile}"
+          free -m
+          ( while :; do
+              free -m | awk '/^Mem:/ { ram = $3 } /^Swap:/ { swap = $3 } END { print ram, swap }'
+              sleep 5
+            done ) > "${RUNNER_TEMP}/dist-memory.log" 2>&1 &
       # maturin-action downloads maturin from GitHub releases, which can fail on its own. Each
       # build retries once; macOS and Windows then fall back to the same maturin from PyPI. Linux
       # builds need the action's manylinux container, so they have no fallback.
@@ -154,6 +177,7 @@ jobs:
           args: >-
             --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
+            ${{ runner.os == 'Linux' && inputs.cargo-profile == 'dist' && '--jobs 3' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
       - id: extension-retry
@@ -167,6 +191,7 @@ jobs:
           args: >-
             --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
+            ${{ runner.os == 'Linux' && inputs.cargo-profile == 'dist' && '--jobs 3' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
       - name: Build the extension with maturin from PyPI
@@ -197,6 +222,7 @@ jobs:
           args: >-
             --profile ${{ inputs.cargo-profile }} --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml --features ui
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
+            ${{ runner.os == 'Linux' && inputs.cargo-profile == 'dist' && '--jobs 3' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
       - id: cli-retry
@@ -214,6 +240,7 @@ jobs:
           args: >-
             --profile ${{ inputs.cargo-profile }} --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml --features ui
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
+            ${{ runner.os == 'Linux' && inputs.cargo-profile == 'dist' && '--jobs 3' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
       - name: Build sqb with maturin from PyPI
@@ -230,6 +257,16 @@ jobs:
             --profile ${{ inputs.cargo-profile }} --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml --features ui
           TARGET: ${{ matrix.platform.target }}
         run: scripts/maturin_from_pypi.sh build ${MATURIN_ARGS}
+      - name: Report memory use of the Linux dist build
+        if: >-
+          always() && inputs.prebuilt-run-id == '' && runner.os == 'Linux'
+          && inputs.cargo-profile == 'dist'
+        run: |
+          free -m
+          grep -E '^pswp(in|out) ' /proc/vmstat
+          awk '{ if ($1 > ram) ram = $1; if ($2 > swap) swap = $2; if ($1 + $2 > both) both = $1 + $2 }
+            END { printf "Peak used memory: RAM %d MiB, swap %d MiB, together %d MiB\n", ram, swap, both }' \
+            "${RUNNER_TEMP}/dist-memory.log" | tee -a "${GITHUB_STEP_SUMMARY}"
       - name: Upload the cargo build timing reports
         if: inputs.prebuilt-run-id == '' && matrix.platform.name == 'linux-x86_64'
         uses: actions/upload-artifact@v4

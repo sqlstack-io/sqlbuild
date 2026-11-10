@@ -2,24 +2,24 @@
 [
 "contracts",
 {
-"None": "946a3061a7e72843e29b93c8",
-"bigquery": "946a3061a7e72843e29b93c8",
-"databricks": "946a3061a7e72843e29b93c8",
+"None": "9f697d91a5bd8293d4c78868",
 "duckdb": "946a3061a7e72843e29b93c8",
 "postgres": "946a3061a7e72843e29b93c8",
 "snowflake": "946a3061a7e72843e29b93c8",
-"tsql": "946a3061a7e72843e29b93c8"
+"bigquery": "9f697d91a5bd8293d4c78868",
+"databricks": "9f697d91a5bd8293d4c78868",
+"tsql": "9f697d91a5bd8293d4c78868"
 }
 ],
 [
 "contracts",
 {
 "None": "e298b23cdc712b436ba9140b",
-"bigquery": "e298b23cdc712b436ba9140b",
-"databricks": "e298b23cdc712b436ba9140b",
 "duckdb": "e298b23cdc712b436ba9140b",
 "postgres": "e298b23cdc712b436ba9140b",
 "snowflake": "e298b23cdc712b436ba9140b",
+"bigquery": "e298b23cdc712b436ba9140b",
+"databricks": "e298b23cdc712b436ba9140b",
 "tsql": "e298b23cdc712b436ba9140b"
 }
 ],
@@ -27,11 +27,11 @@
 "contracts",
 {
 "None": "b3283bf184bb082f364b8537",
-"bigquery": "b3283bf184bb082f364b8537",
-"databricks": "b3283bf184bb082f364b8537",
 "duckdb": "b3283bf184bb082f364b8537",
 "postgres": "b3283bf184bb082f364b8537",
 "snowflake": "b3283bf184bb082f364b8537",
+"bigquery": "b3283bf184bb082f364b8537",
+"databricks": "b3283bf184bb082f364b8537",
 "tsql": "b3283bf184bb082f364b8537"
 }
 ],
@@ -39,11 +39,11 @@
 "contracts",
 {
 "None": "b1e12cf6dc9584935dabf76a",
-"bigquery": "b1e12cf6dc9584935dabf76a",
-"databricks": "b1e12cf6dc9584935dabf76a",
 "duckdb": "b1e12cf6dc9584935dabf76a",
 "postgres": "b1e12cf6dc9584935dabf76a",
 "snowflake": "b1e12cf6dc9584935dabf76a",
+"bigquery": "b1e12cf6dc9584935dabf76a",
+"databricks": "b1e12cf6dc9584935dabf76a",
 "tsql": "b1e12cf6dc9584935dabf76a"
 }
 ],
@@ -51,11 +51,11 @@
 "contracts",
 {
 "None": "e44260e0d2411c3cce8781cc",
-"bigquery": "e44260e0d2411c3cce8781cc",
-"databricks": "e44260e0d2411c3cce8781cc",
 "duckdb": "e44260e0d2411c3cce8781cc",
 "postgres": "e44260e0d2411c3cce8781cc",
 "snowflake": "e44260e0d2411c3cce8781cc",
+"bigquery": "e44260e0d2411c3cce8781cc",
+"databricks": "e44260e0d2411c3cce8781cc",
 "tsql": "e44260e0d2411c3cce8781cc"
 }
 ],
@@ -63,35 +63,35 @@
 "contracts",
 {
 "None": "2ea2c17632881c11f524f96c",
-"bigquery": "2ea2c17632881c11f524f96c",
-"databricks": "2ea2c17632881c11f524f96c",
 "duckdb": "2ea2c17632881c11f524f96c",
 "postgres": "2ea2c17632881c11f524f96c",
 "snowflake": "2ea2c17632881c11f524f96c",
+"bigquery": "2ea2c17632881c11f524f96c",
+"databricks": "2ea2c17632881c11f524f96c",
 "tsql": "2ea2c17632881c11f524f96c"
 }
 ],
 [
 "contracts",
 {
-"None": "0b6e350a4f4afde493cb8626",
-"bigquery": "0b6e350a4f4afde493cb8626",
-"databricks": "0b6e350a4f4afde493cb8626",
+"None": "15c4bcdde1ae6d0d695d8fd6",
 "duckdb": "0b6e350a4f4afde493cb8626",
 "postgres": "0b6e350a4f4afde493cb8626",
 "snowflake": "0b6e350a4f4afde493cb8626",
-"tsql": "0b6e350a4f4afde493cb8626"
+"bigquery": "15c4bcdde1ae6d0d695d8fd6",
+"databricks": "6a937f42b20fa1400d4c5fe7",
+"tsql": "6a937f42b20fa1400d4c5fe7"
 }
 ],
 [
 "contracts",
 {
-"None": "ec97cc8e40b7631612395b21",
-"bigquery": "ec97cc8e40b7631612395b21",
-"databricks": "ec97cc8e40b7631612395b21",
+"None": "055df6be920a595cb3395d9f",
 "duckdb": "ec97cc8e40b7631612395b21",
 "postgres": "ec97cc8e40b7631612395b21",
 "snowflake": "ec97cc8e40b7631612395b21",
+"bigquery": "ec97cc8e40b7631612395b21",
+"databricks": "055df6be920a595cb3395d9f",
 "tsql": "ec97cc8e40b7631612395b21"
 }
 ],
@@ -99,131 +99,131 @@
 "contracts",
 {
 "None": "a428eb672c78b30d5702cafd",
-"bigquery": "a428eb672c78b30d5702cafd",
-"databricks": "a428eb672c78b30d5702cafd",
 "duckdb": "a428eb672c78b30d5702cafd",
 "postgres": "a428eb672c78b30d5702cafd",
 "snowflake": "a428eb672c78b30d5702cafd",
+"bigquery": "a428eb672c78b30d5702cafd",
+"databricks": "a428eb672c78b30d5702cafd",
 "tsql": "a428eb672c78b30d5702cafd"
 }
 ],
 [
 "contracts",
 {
-"None": "839434d5b73abdf9499ad59e",
-"bigquery": "839434d5b73abdf9499ad59e",
-"databricks": "839434d5b73abdf9499ad59e",
+"None": "ea50942f07e35c23101a6e90",
 "duckdb": "839434d5b73abdf9499ad59e",
 "postgres": "839434d5b73abdf9499ad59e",
-"snowflake": "839434d5b73abdf9499ad59e",
-"tsql": "839434d5b73abdf9499ad59e"
+"snowflake": "013b57a3487bfc47b4ea1985",
+"bigquery": "93171de36b7cdbf8cb98f4f9",
+"databricks": "93171de36b7cdbf8cb98f4f9",
+"tsql": "93171de36b7cdbf8cb98f4f9"
 }
 ],
 [
 "contracts",
 {
-"None": "ab9b0c5c3dd6f54aea71a5f1",
-"bigquery": "ab9b0c5c3dd6f54aea71a5f1",
-"databricks": "ab9b0c5c3dd6f54aea71a5f1",
+"None": "05d66700d24bbf96856e543f",
 "duckdb": "ab9b0c5c3dd6f54aea71a5f1",
 "postgres": "ab9b0c5c3dd6f54aea71a5f1",
 "snowflake": "ab9b0c5c3dd6f54aea71a5f1",
-"tsql": "ab9b0c5c3dd6f54aea71a5f1"
+"bigquery": "304a4034b8020f8712de3185",
+"databricks": "05d66700d24bbf96856e543f",
+"tsql": "304a4034b8020f8712de3185"
 }
 ],
 [
 "contracts",
 {
 "None": "d9c54c1a8d6089f971147bfc",
-"bigquery": "d9c54c1a8d6089f971147bfc",
-"databricks": "d9c54c1a8d6089f971147bfc",
 "duckdb": "d9c54c1a8d6089f971147bfc",
 "postgres": "d9c54c1a8d6089f971147bfc",
 "snowflake": "d9c54c1a8d6089f971147bfc",
+"bigquery": "d9c54c1a8d6089f971147bfc",
+"databricks": "d9c54c1a8d6089f971147bfc",
 "tsql": "d9c54c1a8d6089f971147bfc"
 }
 ],
 [
 "contracts",
 {
-"None": "48ff6f452c064d9c0d6f68ed",
-"bigquery": "48ff6f452c064d9c0d6f68ed",
-"databricks": "48ff6f452c064d9c0d6f68ed",
-"duckdb": "48ff6f452c064d9c0d6f68ed",
-"postgres": "48ff6f452c064d9c0d6f68ed",
-"snowflake": "48ff6f452c064d9c0d6f68ed",
-"tsql": "78d512867db744527fe3982b"
+"None": "8bcca84f9b1f7524d977d096",
+"duckdb": "f5caf46b08c258cc0379d7f0",
+"postgres": "f5caf46b08c258cc0379d7f0",
+"snowflake": "f5caf46b08c258cc0379d7f0",
+"bigquery": "a932012ddaf72dbb7a5600e1",
+"databricks": "3fbfd492b77ec7500f792854",
+"tsql": "a932012ddaf72dbb7a5600e1"
 }
 ],
 [
 "contracts",
 {
-"None": "17c278499d9aad7922d610d5",
-"bigquery": "17c278499d9aad7922d610d5",
-"databricks": "17c278499d9aad7922d610d5",
-"duckdb": "17c278499d9aad7922d610d5",
-"postgres": "17c278499d9aad7922d610d5",
-"snowflake": "17c278499d9aad7922d610d5",
-"tsql": "17c278499d9aad7922d610d5"
+"None": "4488a1489430ab1c4db97e43",
+"duckdb": "9a8e3bcf9632a8cf5e072c2c",
+"postgres": "9a8e3bcf9632a8cf5e072c2c",
+"snowflake": "9a8e3bcf9632a8cf5e072c2c",
+"bigquery": "4488a1489430ab1c4db97e43",
+"databricks": "4488a1489430ab1c4db97e43",
+"tsql": "08c3cbe345575b9a053f2bf4"
 }
 ],
 [
 "contracts",
 {
-"None": "c332cbe9d45bff687e91f93b",
-"bigquery": "c332cbe9d45bff687e91f93b",
-"databricks": "c332cbe9d45bff687e91f93b",
+"None": "b079fa87ec3327c35e724edc",
 "duckdb": "c332cbe9d45bff687e91f93b",
 "postgres": "c332cbe9d45bff687e91f93b",
 "snowflake": "c332cbe9d45bff687e91f93b",
-"tsql": "c332cbe9d45bff687e91f93b"
+"bigquery": "c332cbe9d45bff687e91f93b",
+"databricks": "b079fa87ec3327c35e724edc",
+"tsql": "b079fa87ec3327c35e724edc"
 }
 ],
 [
 "contracts",
 {
-"None": "23893ae7f9f05f0777697eba",
-"bigquery": "23893ae7f9f05f0777697eba",
-"databricks": "23893ae7f9f05f0777697eba",
+"None": "64f58724212d29d25c0e3f1d",
 "duckdb": "23893ae7f9f05f0777697eba",
 "postgres": "23893ae7f9f05f0777697eba",
 "snowflake": "23893ae7f9f05f0777697eba",
+"bigquery": "64f58724212d29d25c0e3f1d",
+"databricks": "23893ae7f9f05f0777697eba",
 "tsql": "23893ae7f9f05f0777697eba"
 }
 ],
 [
 "contracts",
 {
-"None": "bcc0d54db4ee9d237ef10dd4",
-"bigquery": "bcc0d54db4ee9d237ef10dd4",
-"databricks": "bcc0d54db4ee9d237ef10dd4",
-"duckdb": "bcc0d54db4ee9d237ef10dd4",
-"postgres": "bcc0d54db4ee9d237ef10dd4",
-"snowflake": "bcc0d54db4ee9d237ef10dd4",
-"tsql": "bcc0d54db4ee9d237ef10dd4"
+"None": "fcab746844cd91fb6013c212",
+"duckdb": "c977930632cd22e603ff63c5",
+"postgres": "c977930632cd22e603ff63c5",
+"snowflake": "c977930632cd22e603ff63c5",
+"bigquery": "c977930632cd22e603ff63c5",
+"databricks": "688b71a51fef751ef9030e7f",
+"tsql": "c977930632cd22e603ff63c5"
 }
 ],
 [
 "contracts",
 {
-"None": "0d0a771fb0ff7b39fb021d4d",
-"bigquery": "0d0a771fb0ff7b39fb021d4d",
-"databricks": "0d0a771fb0ff7b39fb021d4d",
-"duckdb": "0d0a771fb0ff7b39fb021d4d",
-"postgres": "0d0a771fb0ff7b39fb021d4d",
-"snowflake": "0d0a771fb0ff7b39fb021d4d",
-"tsql": "0d0a771fb0ff7b39fb021d4d"
+"None": "413e569c6194a415092ae35d",
+"duckdb": "a2cbcbd14fe4ea1524c2a97a",
+"postgres": "a2cbcbd14fe4ea1524c2a97a",
+"snowflake": "a2cbcbd14fe4ea1524c2a97a",
+"bigquery": "aaea819afff0f389c94a3eb8",
+"databricks": "aaea819afff0f389c94a3eb8",
+"tsql": "aaea819afff0f389c94a3eb8"
 }
 ],
 [
 "contracts",
 {
-"None": "98b119ddd61340fcdf4830fb",
-"bigquery": "98b119ddd61340fcdf4830fb",
-"databricks": "98b119ddd61340fcdf4830fb",
+"None": "346a296ad1a69553ae2e11a1",
 "duckdb": "98b119ddd61340fcdf4830fb",
 "postgres": "98b119ddd61340fcdf4830fb",
 "snowflake": "98b119ddd61340fcdf4830fb",
+"bigquery": "98b119ddd61340fcdf4830fb",
+"databricks": "346a296ad1a69553ae2e11a1",
 "tsql": "98b119ddd61340fcdf4830fb"
 }
 ],
@@ -231,143 +231,143 @@
 "contracts",
 {
 "None": "f100476682030d396856d58d",
-"bigquery": "f100476682030d396856d58d",
-"databricks": "f100476682030d396856d58d",
 "duckdb": "f100476682030d396856d58d",
 "postgres": "f100476682030d396856d58d",
 "snowflake": "f100476682030d396856d58d",
+"bigquery": "f100476682030d396856d58d",
+"databricks": "f100476682030d396856d58d",
 "tsql": "f100476682030d396856d58d"
 }
 ],
 [
 "contracts",
 {
-"None": "d03a2acd92b5e17c753a9272",
-"bigquery": "d03a2acd92b5e17c753a9272",
-"databricks": "d03a2acd92b5e17c753a9272",
+"None": "fc85f9a45d4598f1c6786a3f",
 "duckdb": "d03a2acd92b5e17c753a9272",
 "postgres": "d03a2acd92b5e17c753a9272",
 "snowflake": "d03a2acd92b5e17c753a9272",
+"bigquery": "fc85f9a45d4598f1c6786a3f",
+"databricks": "d03a2acd92b5e17c753a9272",
 "tsql": "d03a2acd92b5e17c753a9272"
 }
 ],
 [
 "contracts",
 {
-"None": "2d4b87c5b06ff335bd6c741b",
-"bigquery": "2d4b87c5b06ff335bd6c741b",
-"databricks": "2d4b87c5b06ff335bd6c741b",
-"duckdb": "2d4b87c5b06ff335bd6c741b",
-"postgres": "2d4b87c5b06ff335bd6c741b",
-"snowflake": "2d4b87c5b06ff335bd6c741b",
-"tsql": "2d4b87c5b06ff335bd6c741b"
-}
-],
-[
-"contracts",
-{
-"None": "a2dffd29b4f083e47c096d79",
-"bigquery": "a2dffd29b4f083e47c096d79",
-"databricks": "a2dffd29b4f083e47c096d79",
-"duckdb": "a2dffd29b4f083e47c096d79",
-"postgres": "a2dffd29b4f083e47c096d79",
-"snowflake": "a2dffd29b4f083e47c096d79",
-"tsql": "a2dffd29b4f083e47c096d79"
-}
-],
-[
-"contracts",
-{
-"None": "de4c230e461e81a5ec9457cf",
-"bigquery": "de4c230e461e81a5ec9457cf",
-"databricks": "de4c230e461e81a5ec9457cf",
-"duckdb": "de4c230e461e81a5ec9457cf",
-"postgres": "de4c230e461e81a5ec9457cf",
-"snowflake": "de4c230e461e81a5ec9457cf",
-"tsql": "de4c230e461e81a5ec9457cf"
-}
-],
-[
-"contracts",
-{
-"None": "ffd2f2034ea38a1c665386fe",
-"bigquery": "ffd2f2034ea38a1c665386fe",
-"databricks": "ffd2f2034ea38a1c665386fe",
-"duckdb": "ffd2f2034ea38a1c665386fe",
-"postgres": "ffd2f2034ea38a1c665386fe",
-"snowflake": "ffd2f2034ea38a1c665386fe",
-"tsql": "ffd2f2034ea38a1c665386fe"
+"None": "905364c274a12a2c2babf099",
+"duckdb": "869e1c4232a27a6852792cc2",
+"postgres": "869e1c4232a27a6852792cc2",
+"snowflake": "869e1c4232a27a6852792cc2",
+"bigquery": "a0c38fc940179b1197e2d11d",
+"databricks": "905364c274a12a2c2babf099",
+"tsql": "1f41fb19621270965d677570"
 }
 ],
 [
 "contracts",
 {
 "None": "b3283bf184bb082f364b8537",
-"bigquery": "b3283bf184bb082f364b8537",
-"databricks": "b3283bf184bb082f364b8537",
 "duckdb": "b3283bf184bb082f364b8537",
 "postgres": "b3283bf184bb082f364b8537",
 "snowflake": "b3283bf184bb082f364b8537",
+"bigquery": "b3283bf184bb082f364b8537",
+"databricks": "a2dffd29b4f083e47c096d79",
 "tsql": "b3283bf184bb082f364b8537"
 }
 ],
 [
 "contracts",
 {
-"None": "c11f8c29184eeda19979e5d2",
-"bigquery": "c11f8c29184eeda19979e5d2",
-"databricks": "c11f8c29184eeda19979e5d2",
-"duckdb": "c11f8c29184eeda19979e5d2",
-"postgres": "c11f8c29184eeda19979e5d2",
-"snowflake": "c11f8c29184eeda19979e5d2",
-"tsql": "c11f8c29184eeda19979e5d2"
+"None": "de4c230e461e81a5ec9457cf",
+"duckdb": "de4c230e461e81a5ec9457cf",
+"postgres": "de4c230e461e81a5ec9457cf",
+"snowflake": "de4c230e461e81a5ec9457cf",
+"bigquery": "de4c230e461e81a5ec9457cf",
+"databricks": "de4c230e461e81a5ec9457cf",
+"tsql": "de4c230e461e81a5ec9457cf"
 }
 ],
 [
 "contracts",
 {
-"None": "6a14752b404ff8337dbb4c51",
-"bigquery": "6a14752b404ff8337dbb4c51",
-"databricks": "6a14752b404ff8337dbb4c51",
-"duckdb": "6a14752b404ff8337dbb4c51",
+"None": "45c3e0e78fb2aa30c8e5ae49",
+"duckdb": "4f2e740fcc73cbe30799945e",
+"postgres": "4f2e740fcc73cbe30799945e",
+"snowflake": "4f2e740fcc73cbe30799945e",
+"bigquery": "4f2e740fcc73cbe30799945e",
+"databricks": "4f2e740fcc73cbe30799945e",
+"tsql": "4f2e740fcc73cbe30799945e"
+}
+],
+[
+"contracts",
+{
+"None": "b3283bf184bb082f364b8537",
+"duckdb": "b3283bf184bb082f364b8537",
+"postgres": "b3283bf184bb082f364b8537",
+"snowflake": "b3283bf184bb082f364b8537",
+"bigquery": "b3283bf184bb082f364b8537",
+"databricks": "b3283bf184bb082f364b8537",
+"tsql": "b3283bf184bb082f364b8537"
+}
+],
+[
+"contracts",
+{
+"None": "693ade4356c6087b9c1d8b19",
+"duckdb": "693ade4356c6087b9c1d8b19",
+"postgres": "693ade4356c6087b9c1d8b19",
+"snowflake": "693ade4356c6087b9c1d8b19",
+"bigquery": "693ade4356c6087b9c1d8b19",
+"databricks": "693ade4356c6087b9c1d8b19",
+"tsql": "693ade4356c6087b9c1d8b19"
+}
+],
+[
+"contracts",
+{
+"None": "2d6a82bfe80342be2bb552ef",
+"duckdb": "8ff067c990a41011273611c2",
 "postgres": "6a14752b404ff8337dbb4c51",
-"snowflake": "6a14752b404ff8337dbb4c51",
-"tsql": "6a14752b404ff8337dbb4c51"
+"snowflake": "b1eba4d04aa9dfe0a2d0865b",
+"bigquery": "2d6a82bfe80342be2bb552ef",
+"databricks": "2d6a82bfe80342be2bb552ef",
+"tsql": "2d6a82bfe80342be2bb552ef"
 }
 ],
 [
 "contracts",
 {
 "None": "67cc42e5fd32018ec01cf44c",
-"bigquery": "67cc42e5fd32018ec01cf44c",
-"databricks": "67cc42e5fd32018ec01cf44c",
 "duckdb": "67cc42e5fd32018ec01cf44c",
 "postgres": "67cc42e5fd32018ec01cf44c",
 "snowflake": "67cc42e5fd32018ec01cf44c",
+"bigquery": "67cc42e5fd32018ec01cf44c",
+"databricks": "67cc42e5fd32018ec01cf44c",
 "tsql": "67cc42e5fd32018ec01cf44c"
 }
 ],
 [
 "contracts",
 {
-"None": "d766e542b46b503b1d64b5ec",
-"bigquery": "d766e542b46b503b1d64b5ec",
-"databricks": "d766e542b46b503b1d64b5ec",
-"duckdb": "d766e542b46b503b1d64b5ec",
-"postgres": "d766e542b46b503b1d64b5ec",
-"snowflake": "d766e542b46b503b1d64b5ec",
-"tsql": "d766e542b46b503b1d64b5ec"
+"None": "795e8287da2b98c9c22de3dc",
+"duckdb": "6f3824fb29e0dde7383108c6",
+"postgres": "21635e15f68b0683f29535b2",
+"snowflake": "21635e15f68b0683f29535b2",
+"bigquery": "6f3824fb29e0dde7383108c6",
+"databricks": "6f3824fb29e0dde7383108c6",
+"tsql": "21635e15f68b0683f29535b2"
 }
 ],
 [
 "contracts",
 {
 "None": "f55edb3192180fa6df21c085",
-"bigquery": "f55edb3192180fa6df21c085",
-"databricks": "f55edb3192180fa6df21c085",
 "duckdb": "f55edb3192180fa6df21c085",
 "postgres": "f55edb3192180fa6df21c085",
 "snowflake": "f55edb3192180fa6df21c085",
+"bigquery": "f55edb3192180fa6df21c085",
+"databricks": "f55edb3192180fa6df21c085",
 "tsql": "f55edb3192180fa6df21c085"
 }
 ],
@@ -375,11 +375,11 @@
 "contracts",
 {
 "None": "b3283bf184bb082f364b8537",
-"bigquery": "b3283bf184bb082f364b8537",
-"databricks": "b3283bf184bb082f364b8537",
 "duckdb": "b3283bf184bb082f364b8537",
 "postgres": "b3283bf184bb082f364b8537",
 "snowflake": "b3283bf184bb082f364b8537",
+"bigquery": "b3283bf184bb082f364b8537",
+"databricks": "b3283bf184bb082f364b8537",
 "tsql": "b3283bf184bb082f364b8537"
 }
 ],
@@ -387,11 +387,11 @@
 "contracts",
 {
 "None": "36ccf7779e90a958c5dcad96",
-"bigquery": "36ccf7779e90a958c5dcad96",
-"databricks": "36ccf7779e90a958c5dcad96",
 "duckdb": "36ccf7779e90a958c5dcad96",
 "postgres": "36ccf7779e90a958c5dcad96",
 "snowflake": "36ccf7779e90a958c5dcad96",
+"bigquery": "36ccf7779e90a958c5dcad96",
+"databricks": "36ccf7779e90a958c5dcad96",
 "tsql": "36ccf7779e90a958c5dcad96"
 }
 ],
@@ -399,251 +399,251 @@
 "contracts",
 {
 "None": "e44260e0d2411c3cce8781cc",
-"bigquery": "e44260e0d2411c3cce8781cc",
-"databricks": "e44260e0d2411c3cce8781cc",
 "duckdb": "e44260e0d2411c3cce8781cc",
 "postgres": "e44260e0d2411c3cce8781cc",
 "snowflake": "e44260e0d2411c3cce8781cc",
+"bigquery": "e44260e0d2411c3cce8781cc",
+"databricks": "e44260e0d2411c3cce8781cc",
 "tsql": "e44260e0d2411c3cce8781cc"
 }
 ],
 [
 "contracts",
 {
-"None": "cd5296ac257b6e4f10c3000d",
-"bigquery": "cd5296ac257b6e4f10c3000d",
-"databricks": "cd5296ac257b6e4f10c3000d",
+"None": "48415c26019755009787f14c",
 "duckdb": "cd5296ac257b6e4f10c3000d",
 "postgres": "cd5296ac257b6e4f10c3000d",
 "snowflake": "cd5296ac257b6e4f10c3000d",
+"bigquery": "48415c26019755009787f14c",
+"databricks": "48415c26019755009787f14c",
 "tsql": "cd5296ac257b6e4f10c3000d"
 }
 ],
 [
 "contracts",
 {
-"None": "0fb1be349cccda275d77113d",
-"bigquery": "0fb1be349cccda275d77113d",
-"databricks": "0fb1be349cccda275d77113d",
-"duckdb": "0fb1be349cccda275d77113d",
-"postgres": "a281bca2dfa9d33402e687f3",
-"snowflake": "0fb1be349cccda275d77113d",
-"tsql": "0fb1be349cccda275d77113d"
+"None": "103d29f4aef0090a36226ef7",
+"duckdb": "dc82b458627503ca4311361b",
+"postgres": "dc82b458627503ca4311361b",
+"snowflake": "dfe34264a6edca41378b9402",
+"bigquery": "b0c0b670609049fee2ff6f77",
+"databricks": "103d29f4aef0090a36226ef7",
+"tsql": "dc82b458627503ca4311361b"
 }
 ],
 [
 "contracts",
 {
-"None": "d9843bd5f2e76b8d875badaf",
-"bigquery": "d9843bd5f2e76b8d875badaf",
-"databricks": "d9843bd5f2e76b8d875badaf",
-"duckdb": "d9843bd5f2e76b8d875badaf",
-"postgres": "d9843bd5f2e76b8d875badaf",
-"snowflake": "d9843bd5f2e76b8d875badaf",
-"tsql": "d9843bd5f2e76b8d875badaf"
+"None": "876a438e514952d77fd02fbb",
+"duckdb": "876a438e514952d77fd02fbb",
+"postgres": "876a438e514952d77fd02fbb",
+"snowflake": "876a438e514952d77fd02fbb",
+"bigquery": "876a438e514952d77fd02fbb",
+"databricks": "876a438e514952d77fd02fbb",
+"tsql": "876a438e514952d77fd02fbb"
 }
 ],
 [
 "contracts",
 {
-"None": "afb26acda81b184518d6d6f5",
-"bigquery": "f6dafe38c2aa2436ad17d2e6",
-"databricks": "f6dafe38c2aa2436ad17d2e6",
+"None": "f6dafe38c2aa2436ad17d2e6",
 "duckdb": "f6dafe38c2aa2436ad17d2e6",
 "postgres": "afb26acda81b184518d6d6f5",
 "snowflake": "f6dafe38c2aa2436ad17d2e6",
+"bigquery": "f6dafe38c2aa2436ad17d2e6",
+"databricks": "f6dafe38c2aa2436ad17d2e6",
 "tsql": "afb26acda81b184518d6d6f5"
 }
 ],
 [
 "contracts",
 {
-"None": "2a167c9cb4bdcef7cfbcd99a",
-"bigquery": "2a167c9cb4bdcef7cfbcd99a",
-"databricks": "2a167c9cb4bdcef7cfbcd99a",
-"duckdb": "2a167c9cb4bdcef7cfbcd99a",
+"None": "4d049c17ef65d5f879915793",
+"duckdb": "5fcd211d1b9c6dd59fb52d91",
 "postgres": "2a167c9cb4bdcef7cfbcd99a",
 "snowflake": "2a167c9cb4bdcef7cfbcd99a",
-"tsql": "2a167c9cb4bdcef7cfbcd99a"
+"bigquery": "d270f17ca2b64c571cb98bbd",
+"databricks": "1ab94ef2126776626e8e801d",
+"tsql": "4d049c17ef65d5f879915793"
 }
 ],
 [
 "contracts",
 {
-"None": "ea9fe2e44b57cc7f6a5654aa",
-"bigquery": "ea9fe2e44b57cc7f6a5654aa",
-"databricks": "ea9fe2e44b57cc7f6a5654aa",
-"duckdb": "ea9fe2e44b57cc7f6a5654aa",
-"postgres": "ea9fe2e44b57cc7f6a5654aa",
-"snowflake": "ea9fe2e44b57cc7f6a5654aa",
-"tsql": "ea9fe2e44b57cc7f6a5654aa"
-}
-],
-[
-"contracts",
-{
-"None": "fe017b6cb02eef5219322f7c",
-"bigquery": "fe017b6cb02eef5219322f7c",
-"databricks": "fe017b6cb02eef5219322f7c",
-"duckdb": "fe017b6cb02eef5219322f7c",
-"postgres": "fe017b6cb02eef5219322f7c",
-"snowflake": "34168d14eef2cb971b3882fb",
-"tsql": "fe017b6cb02eef5219322f7c"
-}
-],
-[
-"contracts",
-{
-"None": "7d8609a5dcd3a0f32d347465",
-"bigquery": "7d8609a5dcd3a0f32d347465",
-"databricks": "7d8609a5dcd3a0f32d347465",
-"duckdb": "7d8609a5dcd3a0f32d347465",
-"postgres": "7d8609a5dcd3a0f32d347465",
-"snowflake": "7d8609a5dcd3a0f32d347465",
-"tsql": "7d8609a5dcd3a0f32d347465"
-}
-],
-[
-"contracts",
-{
-"None": "8dd6f78d1bbd41f3f2f556fb",
-"bigquery": "8dd6f78d1bbd41f3f2f556fb",
-"databricks": "8dd6f78d1bbd41f3f2f556fb",
-"duckdb": "8dd6f78d1bbd41f3f2f556fb",
-"postgres": "8dd6f78d1bbd41f3f2f556fb",
-"snowflake": "8dd6f78d1bbd41f3f2f556fb",
-"tsql": "8dd6f78d1bbd41f3f2f556fb"
-}
-],
-[
-"contracts",
-{
-"None": "891f3d8b2c293698577c7813",
-"bigquery": "891f3d8b2c293698577c7813",
-"databricks": "891f3d8b2c293698577c7813",
-"duckdb": "891f3d8b2c293698577c7813",
-"postgres": "891f3d8b2c293698577c7813",
-"snowflake": "891f3d8b2c293698577c7813",
-"tsql": "891f3d8b2c293698577c7813"
-}
-],
-[
-"contracts",
-{
-"None": "cbbf749b3fdb1008cd35c8ee",
-"bigquery": "cbbf749b3fdb1008cd35c8ee",
-"databricks": "cbbf749b3fdb1008cd35c8ee",
-"duckdb": "cbbf749b3fdb1008cd35c8ee",
-"postgres": "cbbf749b3fdb1008cd35c8ee",
-"snowflake": "cbbf749b3fdb1008cd35c8ee",
-"tsql": "cbbf749b3fdb1008cd35c8ee"
-}
-],
-[
-"contracts",
-{
-"None": "6f1634dc604b82f58c1d760f",
-"bigquery": "6f1634dc604b82f58c1d760f",
-"databricks": "6f1634dc604b82f58c1d760f",
-"duckdb": "6f1634dc604b82f58c1d760f",
-"postgres": "6f1634dc604b82f58c1d760f",
-"snowflake": "6f1634dc604b82f58c1d760f",
-"tsql": "6f1634dc604b82f58c1d760f"
-}
-],
-[
-"contracts",
-{
-"None": "2fb2d4657d6af84c32083288",
-"bigquery": "2fb2d4657d6af84c32083288",
-"databricks": "2fb2d4657d6af84c32083288",
-"duckdb": "2fb2d4657d6af84c32083288",
-"postgres": "2fb2d4657d6af84c32083288",
-"snowflake": "2fb2d4657d6af84c32083288",
-"tsql": "2fb2d4657d6af84c32083288"
-}
-],
-[
-"contracts",
-{
-"None": "a9bdcb7ee2642092b9c2e2ae",
-"bigquery": "a9bdcb7ee2642092b9c2e2ae",
-"databricks": "a9bdcb7ee2642092b9c2e2ae",
-"duckdb": "a9bdcb7ee2642092b9c2e2ae",
-"postgres": "a9bdcb7ee2642092b9c2e2ae",
-"snowflake": "a9bdcb7ee2642092b9c2e2ae",
-"tsql": "a9bdcb7ee2642092b9c2e2ae"
-}
-],
-[
-"contracts",
-{
-"None": "a8bc34d679ed5c1bd41c17ba",
-"bigquery": "0f72c2e3063cc166300becea",
-"databricks": "a8bc34d679ed5c1bd41c17ba",
-"duckdb": "a8bc34d679ed5c1bd41c17ba",
-"postgres": "a8bc34d679ed5c1bd41c17ba",
-"snowflake": "0f72c2e3063cc166300becea",
-"tsql": "a8bc34d679ed5c1bd41c17ba"
-}
-],
-[
-"contracts",
-{
-"None": "6e5f3057275c88687658bb88",
-"bigquery": "6e5f3057275c88687658bb88",
-"databricks": "6e5f3057275c88687658bb88",
-"duckdb": "6e5f3057275c88687658bb88",
-"postgres": "2a42e291118d5fa419ada6b8",
-"snowflake": "6e5f3057275c88687658bb88",
-"tsql": "6e5f3057275c88687658bb88"
+"None": "896ce437f811f03b69f82839",
+"duckdb": "d7722781d12891e5bd225237",
+"postgres": "d7722781d12891e5bd225237",
+"snowflake": "d7722781d12891e5bd225237",
+"bigquery": "896ce437f811f03b69f82839",
+"databricks": "896ce437f811f03b69f82839",
+"tsql": "896ce437f811f03b69f82839"
 }
 ],
 [
 "contracts",
 {
 "None": "b3283bf184bb082f364b8537",
+"duckdb": "f64c5f87267975253d4269d5",
+"postgres": "f64c5f87267975253d4269d5",
+"snowflake": "b3283bf184bb082f364b8537",
 "bigquery": "b3283bf184bb082f364b8537",
 "databricks": "b3283bf184bb082f364b8537",
-"duckdb": "b3283bf184bb082f364b8537",
-"postgres": "b3283bf184bb082f364b8537",
-"snowflake": "b3283bf184bb082f364b8537",
 "tsql": "b3283bf184bb082f364b8537"
 }
 ],
 [
 "contracts",
 {
-"None": "6581612a11662f5afd928e61",
-"bigquery": "6581612a11662f5afd928e61",
-"databricks": "6581612a11662f5afd928e61",
-"duckdb": "6581612a11662f5afd928e61",
-"postgres": "6581612a11662f5afd928e61",
-"snowflake": "6581612a11662f5afd928e61",
-"tsql": "6581612a11662f5afd928e61"
+"None": "6242d56d5832fdeefd826de9",
+"duckdb": "6242d56d5832fdeefd826de9",
+"postgres": "7d8609a5dcd3a0f32d347465",
+"snowflake": "7d8609a5dcd3a0f32d347465",
+"bigquery": "6242d56d5832fdeefd826de9",
+"databricks": "6242d56d5832fdeefd826de9",
+"tsql": "6242d56d5832fdeefd826de9"
 }
 ],
 [
 "contracts",
 {
-"None": "3405db15b2687320907ae528",
-"bigquery": "3405db15b2687320907ae528",
-"databricks": "3405db15b2687320907ae528",
-"duckdb": "3405db15b2687320907ae528",
+"None": "8dd6f78d1bbd41f3f2f556fb",
+"duckdb": "8dd6f78d1bbd41f3f2f556fb",
+"postgres": "8dd6f78d1bbd41f3f2f556fb",
+"snowflake": "8dd6f78d1bbd41f3f2f556fb",
+"bigquery": "8dd6f78d1bbd41f3f2f556fb",
+"databricks": "8dd6f78d1bbd41f3f2f556fb",
+"tsql": "8dd6f78d1bbd41f3f2f556fb"
+}
+],
+[
+"contracts",
+{
+"None": "12a74be4926070cf6793cb4d",
+"duckdb": "12a74be4926070cf6793cb4d",
+"postgres": "12a74be4926070cf6793cb4d",
+"snowflake": "12a74be4926070cf6793cb4d",
+"bigquery": "891f3d8b2c293698577c7813",
+"databricks": "12a74be4926070cf6793cb4d",
+"tsql": "12a74be4926070cf6793cb4d"
+}
+],
+[
+"contracts",
+{
+"None": "cbbf749b3fdb1008cd35c8ee",
+"duckdb": "cbbf749b3fdb1008cd35c8ee",
+"postgres": "cbbf749b3fdb1008cd35c8ee",
+"snowflake": "cbbf749b3fdb1008cd35c8ee",
+"bigquery": "cbbf749b3fdb1008cd35c8ee",
+"databricks": "cbbf749b3fdb1008cd35c8ee",
+"tsql": "cbbf749b3fdb1008cd35c8ee"
+}
+],
+[
+"contracts",
+{
+"None": "c969edb8ec7bbec85e3606d2",
+"duckdb": "6f1634dc604b82f58c1d760f",
+"postgres": "6f1634dc604b82f58c1d760f",
+"snowflake": "6f1634dc604b82f58c1d760f",
+"bigquery": "c969edb8ec7bbec85e3606d2",
+"databricks": "c969edb8ec7bbec85e3606d2",
+"tsql": "fbf2dae89852040b6ad88287"
+}
+],
+[
+"contracts",
+{
+"None": "3c9b74c5b22f656137431938",
+"duckdb": "3c9b74c5b22f656137431938",
+"postgres": "3c9b74c5b22f656137431938",
+"snowflake": "3c9b74c5b22f656137431938",
+"bigquery": "3c9b74c5b22f656137431938",
+"databricks": "3c9b74c5b22f656137431938",
+"tsql": "3c9b74c5b22f656137431938"
+}
+],
+[
+"contracts",
+{
+"None": "54f2b01fc9a9c16112ec1383",
+"duckdb": "f7a56e3326d02b7968c8ffe8",
+"postgres": "a9bdcb7ee2642092b9c2e2ae",
+"snowflake": "a9bdcb7ee2642092b9c2e2ae",
+"bigquery": "667b5495d0a7267e742cdf83",
+"databricks": "ac04ad46924f4659fa3494b0",
+"tsql": "ac04ad46924f4659fa3494b0"
+}
+],
+[
+"contracts",
+{
+"None": "66a6ebf5f8418cf0d816c167",
+"duckdb": "cc37eb626963366490c09c21",
+"postgres": "a8bc34d679ed5c1bd41c17ba",
+"snowflake": "0f72c2e3063cc166300becea",
+"bigquery": "be7b04ec20ebcdd8742b4180",
+"databricks": "cc37eb626963366490c09c21",
+"tsql": "cc58014488337d803da83131"
+}
+],
+[
+"contracts",
+{
+"None": "bb67625de7198e2dc8e3b23b",
+"duckdb": "2a42e291118d5fa419ada6b8",
+"postgres": "2a42e291118d5fa419ada6b8",
+"snowflake": "6e5f3057275c88687658bb88",
+"bigquery": "bb67625de7198e2dc8e3b23b",
+"databricks": "2a42e291118d5fa419ada6b8",
+"tsql": "2a42e291118d5fa419ada6b8"
+}
+],
+[
+"contracts",
+{
+"None": "b3283bf184bb082f364b8537",
+"duckdb": "b3283bf184bb082f364b8537",
+"postgres": "b3283bf184bb082f364b8537",
+"snowflake": "b3283bf184bb082f364b8537",
+"bigquery": "b3283bf184bb082f364b8537",
+"databricks": "b3283bf184bb082f364b8537",
+"tsql": "b3283bf184bb082f364b8537"
+}
+],
+[
+"contracts",
+{
+"None": "bdca9fd6b5122e6999d67907",
+"duckdb": "a39ffda7852644471dc4cd01",
+"postgres": "a39ffda7852644471dc4cd01",
+"snowflake": "a39ffda7852644471dc4cd01",
+"bigquery": "81109ce0b75717f432eec784",
+"databricks": "81109ce0b75717f432eec784",
+"tsql": "bdca9fd6b5122e6999d67907"
+}
+],
+[
+"contracts",
+{
+"None": "257b09b04f10f75c5c4e4c2e",
+"duckdb": "257b09b04f10f75c5c4e4c2e",
 "postgres": "3405db15b2687320907ae528",
 "snowflake": "3405db15b2687320907ae528",
-"tsql": "3405db15b2687320907ae528"
+"bigquery": "257b09b04f10f75c5c4e4c2e",
+"databricks": "3405db15b2687320907ae528",
+"tsql": "257b09b04f10f75c5c4e4c2e"
 }
 ],
 [
 "contracts",
 {
 "None": "1bd8641f841c3847419d163b",
-"bigquery": "1bd8641f841c3847419d163b",
-"databricks": "1bd8641f841c3847419d163b",
 "duckdb": "1bd8641f841c3847419d163b",
 "postgres": "1bd8641f841c3847419d163b",
 "snowflake": "1bd8641f841c3847419d163b",
+"bigquery": "1bd8641f841c3847419d163b",
+"databricks": "1bd8641f841c3847419d163b",
 "tsql": "1bd8641f841c3847419d163b"
 }
 ],
@@ -651,35 +651,35 @@
 "contracts",
 {
 "None": "b3283bf184bb082f364b8537",
-"bigquery": "b3283bf184bb082f364b8537",
-"databricks": "b3283bf184bb082f364b8537",
 "duckdb": "b3283bf184bb082f364b8537",
 "postgres": "b3283bf184bb082f364b8537",
 "snowflake": "b3283bf184bb082f364b8537",
+"bigquery": "b3283bf184bb082f364b8537",
+"databricks": "b3283bf184bb082f364b8537",
 "tsql": "b3283bf184bb082f364b8537"
 }
 ],
 [
 "contracts",
 {
-"None": "70130ae9c4f7aa6a50756c6b",
-"bigquery": "70130ae9c4f7aa6a50756c6b",
-"databricks": "70130ae9c4f7aa6a50756c6b",
+"None": "197e3351cf8e73647dafe210",
 "duckdb": "70130ae9c4f7aa6a50756c6b",
 "postgres": "70130ae9c4f7aa6a50756c6b",
 "snowflake": "70130ae9c4f7aa6a50756c6b",
-"tsql": "70130ae9c4f7aa6a50756c6b"
+"bigquery": "197e3351cf8e73647dafe210",
+"databricks": "2eb73b6d0fe25a8e439c0023",
+"tsql": "af787848beb1bd413e6f9348"
 }
 ],
 [
 "contracts",
 {
 "None": "cbbf749b3fdb1008cd35c8ee",
-"bigquery": "cbbf749b3fdb1008cd35c8ee",
-"databricks": "cbbf749b3fdb1008cd35c8ee",
 "duckdb": "cbbf749b3fdb1008cd35c8ee",
 "postgres": "cbbf749b3fdb1008cd35c8ee",
 "snowflake": "cbbf749b3fdb1008cd35c8ee",
+"bigquery": "cbbf749b3fdb1008cd35c8ee",
+"databricks": "cbbf749b3fdb1008cd35c8ee",
 "tsql": "cbbf749b3fdb1008cd35c8ee"
 }
 ],
@@ -687,11 +687,11 @@
 "contracts",
 {
 "None": "0e98df1b9bfd713dda177188",
-"bigquery": "0e98df1b9bfd713dda177188",
-"databricks": "0e98df1b9bfd713dda177188",
 "duckdb": "0e98df1b9bfd713dda177188",
 "postgres": "0e98df1b9bfd713dda177188",
 "snowflake": "0e98df1b9bfd713dda177188",
+"bigquery": "0e98df1b9bfd713dda177188",
+"databricks": "0e98df1b9bfd713dda177188",
 "tsql": "0e98df1b9bfd713dda177188"
 }
 ],
@@ -699,24 +699,24 @@
 "contracts",
 {
 "None": "b69ef1eaba1124a7e710d482",
-"bigquery": "b69ef1eaba1124a7e710d482",
-"databricks": "b69ef1eaba1124a7e710d482",
 "duckdb": "b69ef1eaba1124a7e710d482",
 "postgres": "b69ef1eaba1124a7e710d482",
 "snowflake": "b69ef1eaba1124a7e710d482",
+"bigquery": "b69ef1eaba1124a7e710d482",
+"databricks": "b69ef1eaba1124a7e710d482",
 "tsql": "b69ef1eaba1124a7e710d482"
 }
 ],
 [
 "contracts",
 {
-"None": "866ae81507c3a535c0225de2",
-"bigquery": "866ae81507c3a535c0225de2",
-"databricks": "866ae81507c3a535c0225de2",
-"duckdb": "866ae81507c3a535c0225de2",
-"postgres": "866ae81507c3a535c0225de2",
-"snowflake": "866ae81507c3a535c0225de2",
-"tsql": "866ae81507c3a535c0225de2"
+"None": "20e5bc9de6e4d1de2bf5a08f",
+"duckdb": "20e5bc9de6e4d1de2bf5a08f",
+"postgres": "20e5bc9de6e4d1de2bf5a08f",
+"snowflake": "20e5bc9de6e4d1de2bf5a08f",
+"bigquery": "20e5bc9de6e4d1de2bf5a08f",
+"databricks": "20e5bc9de6e4d1de2bf5a08f",
+"tsql": "20e5bc9de6e4d1de2bf5a08f"
 }
 ]
 ]

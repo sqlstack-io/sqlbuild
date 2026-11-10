@@ -179,8 +179,9 @@ def test_given_inferred_output_when_binding_downstream_then_preserves_dialect_id
             'MODEL (description "Test model.", materialized view, columns (customer_id (audits [relationships (to __ref("customers"), field customer_id)]))); SELECT 1 AS customer_id',
         ),
         NativeCatalogCase(
-            "relationship coercion",
+            "relationship from a string key to an integer key, which DuckDB refuses",
             "MODEL (description 'Test model.', materialized view, columns (customer_id (audits [relationships (to __ref(\"customers\"), field customer_id)]))); SELECT '1' AS customer_id",
+            ("B301", "B217"),
         ),
     ],
     ids=lambda case: case.description,
@@ -198,9 +199,10 @@ def test_given_metadata_predicates_when_compiling_then_allows_dialect_coercion_a
     (tmp_path / "models/customers.sql").write_text(
         "MODEL (description 'Test model customers.', materialized view); SELECT 1 AS CUSTOMER_ID"
     )
-    assert main(["--project-dir", str(tmp_path), "compile", "--no-cache", "--json"]) == 0
+    result: int = main(["--project-dir", str(tmp_path), "compile", "--no-cache", "--json"])
     payload: dict[str, Any] = json.loads(capsys.readouterr().out)
     assert tuple(item["code"] for item in payload["diagnostics"]) == test_case.expected_codes
+    assert result == int(bool(test_case.expected_codes))
 
 
 if __name__ == "__main__":

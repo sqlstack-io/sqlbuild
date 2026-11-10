@@ -87,7 +87,7 @@ _FILE_PROJECT_TOML: str = (
                 ),
             },
             expected_column_name="amount",
-            expected_column_type="INT",
+            expected_column_type="INTEGER",
         )
     ],
     ids=lambda case: case.description,

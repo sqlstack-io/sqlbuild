@@ -20,7 +20,7 @@ use crate::bindings::_helpers::sqltext::model_headers::header_failure;
 /// The path header rules report header syntax errors at.
 const SENTINEL_PATH: &str = "<lint>";
 const DESCRIPTION_KEY: &str = "description";
-const FUNCTION_KIND: &str = "FUNCTION";
+pub(crate) const FUNCTION_KIND: &str = "FUNCTION";
 const ARGUMENTS_KEY: &str = "arguments";
 const NEGATIVE_ZERO: &str = "-0";
 const ZERO: &str = "0";

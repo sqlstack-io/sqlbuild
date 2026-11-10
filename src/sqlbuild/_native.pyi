@@ -864,6 +864,7 @@ class ChangeDetectionResult(NativeRecord):
     previous_metadata_json: str | None
     fingerprint_version_hash: str | None
     previous_version_hash: str | None
+    fingerprint_definition_hash: str | None
     schema_findings: tuple[SchemaFinding, ...]
     backfill: BackfillResult
     recorded_build_relation_missing: bool
@@ -878,6 +879,7 @@ class ChangeDetectionResult(NativeRecord):
         previous_metadata_json: str | None = ...,
         fingerprint_version_hash: str | None = ...,
         previous_version_hash: str | None = ...,
+        fingerprint_definition_hash: str | None = ...,
         schema_findings: tuple[SchemaFinding, ...] = ...,
         backfill: BackfillResult = ...,
         recorded_build_relation_missing: bool = ...,
@@ -4805,7 +4807,10 @@ def edit_contract_model(
     *, model: CompiledModelView, physical_columns: tuple[ColumnInfo, ...], overwrite: bool
 ) -> tuple[str | None, str | None]: ...
 def evaluate_model_contracts(
-    *, project: CompiledProjectView, dialect: TypeDialect | str | None = None
+    *,
+    project: CompiledProjectView,
+    dialect: TypeDialect | str | None = None,
+    adapter_default: TablePromotionMode | None = None,
 ) -> ContractValidationResult: ...
 def promotion_conflict_diagnostics(
     *, project: CompiledProjectView, adapter_default: TablePromotionMode, settings_file: str
@@ -5258,7 +5263,7 @@ def render_janitor_completion(
 
 # Native analysis: SQL test planning glue.
 def assemble_native_sql_tests(
-    *, inputs: CompileInputsView
+    *, inputs: CompileInputsView, sql_analysis_dialect: str | None = None
 ) -> tuple[NativeSqlTestAssembly, ...]: ...
 
 # Native analysis: compiled project assembly.
@@ -6151,6 +6156,7 @@ def build_direct_model_version_identities(
     seeds: Iterable[CompiledSeedView] = (),
     source_version_hashes: Mapping[str, str] | None = None,
     hook_functions: Iterable[DiscoveredHookFunction] = (),
+    recorded_fingerprints: WarehouseFingerprints | None = None,
 ) -> DirectModelVersionIdentities: ...
 def merge_recomputed_model_changes(
     *, resolved_actions: PlannerResolvedActions, changes: PlannerChangeResults
@@ -13936,6 +13942,7 @@ class ModelPlanEntry(NativeRecord):
     previous_metadata_json: str | None
     fingerprint_version_hash: str | None
     previous_version_hash: str | None
+    fingerprint_definition_hash: str | None
     query_changed: bool
     config_changed: bool
     schema_actions: tuple[SchemaAction, ...]
@@ -14023,6 +14030,7 @@ class ModelPlanEntry(NativeRecord):
         previous_metadata_json: str | None = ...,
         fingerprint_version_hash: str | None = ...,
         previous_version_hash: str | None = ...,
+        fingerprint_definition_hash: str | None = ...,
         query_changed: bool = ...,
         config_changed: bool = ...,
         schema_actions: tuple[SchemaAction, ...] = ...,
@@ -14425,6 +14433,7 @@ class PlanOutput(NativeRecord):
     provider_usages: tuple[PlanProviderUsage, ...]
     source_freshness: DirectSourceFreshnessPlanningResult | None
     python_identity_fingerprints: dict[tuple[str, str], Fingerprint]
+    recorded_fingerprints: WarehouseFingerprints | None
     metadata: dict[str, object]
     cursor_overrides: CursorOverrides | None
     existing_model_names: frozenset[str]
@@ -14460,6 +14469,7 @@ class PlanOutput(NativeRecord):
         provider_usages: tuple[PlanProviderUsage, ...] = ...,
         source_freshness: DirectSourceFreshnessPlanningResult | None = ...,
         python_identity_fingerprints: dict[tuple[str, str], Fingerprint] = ...,
+        recorded_fingerprints: WarehouseFingerprints | None = ...,
         metadata: dict[str, object] = ...,
         cursor_overrides: CursorOverrides | None = ...,
         existing_model_names: frozenset[str] = ...,

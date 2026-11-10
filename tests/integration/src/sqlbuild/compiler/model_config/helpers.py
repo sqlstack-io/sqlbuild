@@ -207,6 +207,7 @@ def model_config_outcome(
                 adapter.python_functions_inherit_default_namespace()
             ),
             sql_lexical_syntax=adapter.sql_lexical_syntax,
+            sql_analysis_dialect=adapter.sql_analysis_dialect_name,
         ),
         run_id="20261007T000000Z_orders",
         resolved_connection={},
@@ -307,6 +308,7 @@ def _loop_shape(
                 ),
                 python_functions_inherit_default_namespace=True,
                 sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+                sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name,
             ),
             no_sql_validation=True,
             defer_model_sql_validation=True,
@@ -526,6 +528,7 @@ def column_metadata_outcome(*, project_dir: Path, header_column: str) -> tuple[o
                 ),
                 python_functions_inherit_default_namespace=True,
                 sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+                sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name,
             ),
             no_sql_validation=True,
             defer_model_sql_validation=True,
@@ -608,6 +611,7 @@ def config_value_inputs(
                 adapter.python_functions_inherit_default_namespace()
             ),
             sql_lexical_syntax=adapter.sql_lexical_syntax,
+            sql_analysis_dialect=adapter.sql_analysis_dialect_name,
         ),
         cli_vars=cli_vars,
         run_id="20261007T000000Z_orders",
@@ -671,6 +675,7 @@ def header_column_paths(*, project_dir: Path, headers: tuple[str, ...]) -> tuple
                 adapter.python_functions_inherit_default_namespace()
             ),
             sql_lexical_syntax=adapter.sql_lexical_syntax,
+            sql_analysis_dialect=adapter.sql_analysis_dialect_name,
         ),
         run_id="20261007T000000Z_orders",
         resolved_connection={},

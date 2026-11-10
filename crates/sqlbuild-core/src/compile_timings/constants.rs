@@ -20,7 +20,7 @@ pub const COMPILE_TIMING_PHASES: [&str; 15] = [
 ];
 
 /// Counters reported as recorded.
-pub const COMPILE_METRICS: [&str; 8] = [
+pub const COMPILE_METRICS: [&str; 10] = [
     "analysis_batch_cache_hits",
     "analysis_entry_cache_hits",
     "analysis_cache_misses",
@@ -29,4 +29,6 @@ pub const COMPILE_METRICS: [&str; 8] = [
     "sql_test_scan_cache_misses",
     "early_rules_hits",
     "early_rules_misses",
+    "native_analysis_shared",
+    "native_analysis_unshared",
 ];

@@ -268,7 +268,7 @@ def _build_fingerprints(test_case: DetectModelChangesTestCase) -> dict[str, Fing
             run_id="run_001",
             definition_hash=test_case.fingerprint_query_hash or "",
             schema_fingerprint="schema_a",
-            definition="SELECT 1",
+            definition=test_case.fingerprint_definition,
             metadata_json=json.dumps(
                 {
                     **json.loads(

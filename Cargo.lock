@@ -1319,7 +1319,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2174,7 +2174,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde48f36530cbd91b65f050101e6c056d6eb743cea2a8f0f19beef69c6742ff8"
 dependencies = [
  "scopeguard",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3199,7 +3199,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3637,7 +3637,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4136,14 +4136,22 @@ dependencies = [
  "sqlbuild-cache",
  "sqlbuild-core",
  "sqlbuild-discovery",
+ "sqlbuild-host",
  "sqlbuild-model-config",
  "sqlbuild-render",
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
- "sqlclean",
+ "sqlquack-fingerprint",
+ "sqlquack-parse",
+ "sqlquack-semantics",
  "sqlquack-syntax",
  "sqlquack-syntax-bigquery",
+ "sqlquack-syntax-clickhouse",
+ "sqlquack-syntax-databricks",
+ "sqlquack-syntax-duckdb",
  "sqlquack-syntax-postgres",
+ "sqlquack-syntax-sqlite",
+ "sqlquack-syntax-sqlserver",
  "stacker",
 ]
 
@@ -4187,7 +4195,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.207.0"
+version = "0.208.0"
 dependencies = [
  "blake3",
  "chrono",
@@ -4343,7 +4351,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.207.0"
+version = "0.208.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -4446,6 +4454,7 @@ dependencies = [
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlclean",
+ "sqlquack-parse",
  "sqlquack-syntax",
  "stacker",
  "tempfile",
@@ -4486,26 +4495,112 @@ dependencies = [
 
 [[package]]
 name = "sqlclean"
-version = "0.4.3"
-source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=cf79656d247277a30bc81ef39b6dee420e721221#cf79656d247277a30bc81ef39b6dee420e721221"
+version = "0.8.0"
+source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=a4a006bd9e5849af6bf477814646ce921299a8a1#a4a006bd9e5849af6bf477814646ce921299a8a1"
 dependencies = [
- "polyglot-sql",
- "polyglot-sql-function-catalogs",
  "rayon",
  "rustc-hash",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "sqlquack-fingerprint",
+ "sqlquack-format",
+ "sqlquack-lint",
+ "sqlquack-parse",
+ "sqlquack-syntax",
+ "sqlquack-syntax-sqlserver",
+]
+
+[[package]]
+name = "sqlquack-derive"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "sqlquack-diagnostics"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-fingerprint"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "sha2 0.10.9",
+ "sqlquack-parse",
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-format"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "serde_json",
+ "sqlquack-parse",
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-lint"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "rayon",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "sqlquack-parse",
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-parse"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "sqlquack-syntax",
+ "sqlquack-syntax-bigquery",
+ "sqlquack-syntax-databricks",
+ "sqlquack-syntax-postgres",
+ "sqlquack-syntax-snowflake",
+ "sqlquack-syntax-sqlserver",
+]
+
+[[package]]
+name = "sqlquack-semantics"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "regex",
+ "rustc-hash",
+ "saphyr-parser",
+ "serde",
+ "serde_json",
+ "sqlquack-diagnostics",
+ "sqlquack-parse",
+ "sqlquack-syntax",
+ "stacker",
 ]
 
 [[package]]
 name = "sqlquack-syntax"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=edfa30b26a0bab86661f96490b86a4f24b92db0a#edfa30b26a0bab86661f96490b86a4f24b92db0a"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
 dependencies = [
  "serde",
  "serde_json",
- "sqlquack-syntax-derive",
+ "sqlquack-derive",
  "stacker",
  "thiserror 1.0.69",
  "unicode-segmentation",
@@ -4514,26 +4609,74 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-bigquery"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=edfa30b26a0bab86661f96490b86a4f24b92db0a#edfa30b26a0bab86661f96490b86a4f24b92db0a"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
 dependencies = [
  "sqlquack-syntax",
  "stacker",
 ]
 
 [[package]]
-name = "sqlquack-syntax-derive"
+name = "sqlquack-syntax-clickhouse"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=edfa30b26a0bab86661f96490b86a4f24b92db0a#edfa30b26a0bab86661f96490b86a4f24b92db0a"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
 dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "sqlquack-syntax",
+ "stacker",
+]
+
+[[package]]
+name = "sqlquack-syntax-databricks"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "sqlquack-syntax",
+ "stacker",
+]
+
+[[package]]
+name = "sqlquack-syntax-duckdb"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "sqlquack-syntax",
+ "stacker",
 ]
 
 [[package]]
 name = "sqlquack-syntax-postgres"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=edfa30b26a0bab86661f96490b86a4f24b92db0a#edfa30b26a0bab86661f96490b86a4f24b92db0a"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "sqlquack-syntax",
+ "stacker",
+]
+
+[[package]]
+name = "sqlquack-syntax-snowflake"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sqlquack-syntax",
+ "stacker",
+ "thiserror 1.0.69",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "sqlquack-syntax-sqlite"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
+dependencies = [
+ "sqlquack-syntax",
+ "stacker",
+]
+
+[[package]]
+name = "sqlquack-syntax-sqlserver"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=56c7c15ecafe61ea6650159469234db670dea8da#56c7c15ecafe61ea6650159469234db670dea8da"
 dependencies = [
  "sqlquack-syntax",
  "stacker",
@@ -5399,7 +5542,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

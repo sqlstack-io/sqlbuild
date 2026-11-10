@@ -6,6 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
@@ -13,11 +14,54 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     QueryChangeTrackingBuildE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    execute_duckdb,
     prepare_inline_project,
     query_duckdb,
     run_sqb,
     table_exists,
 )
+
+_OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": dedent(
+        """
+        name = "older_scheme_project"
+        adapter = "duckdb"
+
+        [connection]
+        database = "regression.duckdb"
+
+        [defaults]
+        materialized = "table"
+        """
+    ).strip()
+    + "\n",
+    "sources/raw.yml": dedent(
+        """
+        sources:
+          - name: raw_orders
+            description: Test source raw_orders.
+            schema: main
+            table: raw_orders
+        """
+    ).strip()
+    + "\n",
+    "models/stg_orders.sql": dedent(
+        """
+        MODEL (description "Test model stg_orders.");
+
+        SELECT id AS order_id, amount_cents FROM __source("raw_orders")
+        """
+    ).strip()
+    + "\n",
+    "models/fact_orders.sql": dedent(
+        """
+        MODEL (description "Test model fact_orders.");
+
+        SELECT order_id, amount_cents AS line_total_cents FROM __ref("stg_orders")
+        """
+    ).strip()
+    + "\n",
+}
 
 
 @pytest.mark.parametrize(
@@ -191,3 +235,82 @@ def test_given_unchanged_project_when_planning_after_build_then_models_are_not_q
     model_name: str
     for model_name in test_case.expected_unchanged_models:
         assert reasons_by_name[model_name] != "query_changed"
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        QueryChangeTrackingBuildE2ETestCase(
+            description="hashes recorded under an older fingerprint scheme change only for edited models",
+            repo_files=_OLDER_SCHEME_PROJECT_FILES,
+            build_command=("--no-color", "build"),
+            plan_command=("plan", "--json"),
+            expected_exit_code=0,
+            expected_fingerprint_models=("fact_orders", "stg_orders"),
+            expected_unchanged_models=("stg_orders",),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_hashes_from_older_fingerprint_scheme_when_rebuilding_then_only_edited_models_change(
+    test_case: QueryChangeTrackingBuildE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="older_scheme_project",
+        repo_files=test_case.repo_files,
+    )
+    db_path: Path = project_dir / "regression.duckdb"
+    execute_duckdb(
+        db_path=db_path,
+        sql="CREATE TABLE raw_orders AS SELECT 1 AS id, 100 AS amount_cents",
+    )
+    first_build: subprocess.CompletedProcess[str] = run_sqb(
+        command=test_case.build_command, project_dir=project_dir
+    )
+    assert first_build.returncode == test_case.expected_exit_code, (
+        first_build.stdout + first_build.stderr
+    )
+    execute_duckdb(
+        db_path=db_path,
+        sql="UPDATE main._sqlbuild_fingerprints SET definition_hash = 'older-scheme-' || node_name",
+    )
+    edited_model: Path = project_dir / "models" / "fact_orders.sql"
+    edited_model.write_text(
+        edited_model.read_text(encoding="utf-8").replace("line_total_cents", "total_cents"),
+        encoding="utf-8",
+    )
+
+    plan_result: subprocess.CompletedProcess[str] = run_sqb(
+        command=test_case.plan_command, project_dir=project_dir
+    )
+    second_build: subprocess.CompletedProcess[str] = run_sqb(
+        command=test_case.build_command, project_dir=project_dir
+    )
+
+    assert plan_result.returncode == test_case.expected_exit_code, (
+        plan_result.stdout + plan_result.stderr
+    )
+    reasons: dict[str, str] = {
+        str(entry["name"]): str(entry["reason"])
+        for entry in json.loads(plan_result.stdout)["models"]
+    }
+    assert reasons["fact_orders"] == "query_changed"
+    for model_name in test_case.expected_unchanged_models:
+        assert reasons[model_name] != "query_changed"
+    assert second_build.returncode == test_case.expected_exit_code, (
+        second_build.stdout + second_build.stderr
+    )
+    latest_hashes: list[tuple[Any, ...]] = query_duckdb(
+        db_path=db_path,
+        sql=(
+            "SELECT node_name, arg_max(definition_hash, ts) FROM main._sqlbuild_fingerprints "
+            "GROUP BY node_name ORDER BY node_name"
+        ),
+    )
+    assert tuple(name for name, _ in latest_hashes) == test_case.expected_fingerprint_models
+    latest: dict[str, str] = dict(latest_hashes)
+    for model_name in test_case.expected_unchanged_models:
+        assert latest[model_name] == f"older-scheme-{model_name}"
+    assert latest["fact_orders"] != "older-scheme-fact_orders"

@@ -3,6 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::contracts::_helpers::dynamic::dynamic_column_diagnostics;
+use crate::contracts::_helpers::promotion::builds_through_staging;
 use crate::contracts::_helpers::type_comparison::{TypeComparer, TypeComparison};
 use crate::contracts::constants::{
     CONTRACT_ENFORCED, CONTRACT_NONE, DYNAMIC_OUTPUT_NOT_PROVEN_CODE, EXTRA_COLUMN_CODE,
@@ -46,10 +47,15 @@ pub(crate) fn declared_shape_validation_is_active(model: &ContractModel, implici
 /// One model's contract diagnostics, or the reason Python must evaluate it.
 pub(crate) fn model_contract_diagnostics(
     model: &ContractModel,
-    validate_declared_shape: bool,
+    (validate_declared_shape, staged_promotion): (bool, bool),
     types: &TypeComparer<'_>,
 ) -> Result<Vec<ContractDiagnostic>, TypeNormalizationError> {
     let contract_enforced: bool = model.contract.as_deref() == Some(CONTRACT_ENFORCED);
+    let casts_to_declared: bool = staged_promotion
+        && builds_through_staging(
+            model.materialized.as_deref(),
+            model.incremental_mode.as_deref(),
+        );
     let Some(schema) = model
         .schema
         .as_ref()
@@ -123,6 +129,7 @@ pub(crate) fn model_contract_diagnostics(
         let check = TypeCheck {
             type_enforcement: schema.type_enforcement,
             contract_enforced,
+            casts_to_declared: casts_to_declared && schema.type_enforcement,
             unchecked: &unchecked,
             types,
             untyped_calls: &model.untyped_call_outputs,
@@ -135,6 +142,8 @@ pub(crate) fn model_contract_diagnostics(
 struct TypeCheck<'a> {
     type_enforcement: bool,
     contract_enforced: bool,
+    /// Whether every build casts the output to its declared types before storing it.
+    casts_to_declared: bool,
     unchecked: &'a HashSet<&'a str>,
     types: &'a TypeComparer<'a>,
     /// Output columns that are one call to a SQL macro without `returns`, and the macro.
@@ -310,7 +319,9 @@ fn column_type(
             },
         }));
     };
-    if check.types.types_equal(declared_type, inferred_type)? == TypeComparison::Equal {
+    if check.types.types_equal(declared_type, inferred_type)? != TypeComparison::Different
+        || (check.casts_to_declared && check.types.casts_losslessly(declared_type, inferred_type))
+    {
         return Ok(None);
     }
     Ok(Some(ContractDiagnostic {

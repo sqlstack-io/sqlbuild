@@ -177,7 +177,8 @@ impl SqlTestScanCache {
     }
 }
 
-fn debug(py: Python<'_>, message: &str, error: &str) -> PyResult<()> {
+/// `message` with `error` at debug level on the compile logger, as the compile caches report.
+pub(crate) fn debug(py: Python<'_>, message: &str, error: &str) -> PyResult<()> {
     imported(py, "logging", "getLogger")?
         .call1((SCAN_CACHE_LOGGER,))?
         .call_method1("debug", (message, error))?;

@@ -4,5 +4,6 @@ pub fn normalize_native_sql(sql: &str, dialect: &str, stub_prefix: &str) -> Resu
         sql,
         dialect,
         stub_prefix,
+        &std::collections::HashMap::new(),
     )
 }

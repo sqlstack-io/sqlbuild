@@ -208,8 +208,7 @@ HEADER_CONTRACT_FILES: dict[str, str] = {
         "MODEL (\n  columns (customer_id (type INTEGER)),\n"
         "  dynamic_columns (category_amounts (pivot_column category, value_column amount,"
         ' aggregate max, type INTEGER, name_pattern "^[a-z]+$")),\n);\n'
-        'SELECT * FROM __ref("order_amounts")\n'
-        "PIVOT(MAX(amount) FOR category IN (ANY ORDER BY category))\n"
+        'PIVOT __ref("order_amounts") ON category USING MAX(amount)\n'
     ),
     "models/order_statuses.sql": (
         "MODEL (\n  contract enforced,\n"
@@ -298,7 +297,8 @@ SQL_HOOK_FILES: dict[str, str] = {
     "macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
     "hooks/sql/grant_read.sql": (
         "HOOK (description 'Grant read access.');\n\n"
-        "GRANT SELECT ON @@CTX:destination.qualified TO @'role'\n"
+        "INSERT INTO audit.read_grants SELECT '@@CTX:destination.qualified', grantee\n"
+        "FROM unnest([@'role']) AS granted(grantee)\n"
     ),
     "hooks/sql/log_load.sql": (
         "HOOK (description 'Log a load.');\n\n"
@@ -337,6 +337,7 @@ def build_inputs_with_native_loop(
             collection_rendering=CollectionRendering.VALUE_LIST,
             python_functions_inherit_default_namespace=True,
             sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+            sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name,
         ),
         defer_model_sql_validation=defer_validation,
         no_cache=True,

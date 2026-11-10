@@ -36,6 +36,8 @@ class DetectModelChangesTestCase:
     renamed_by_migration: bool = False
     schema_type_enforcement: bool | None = None
     fingerprint_extra_metadata: dict[str, object] = field(default_factory=dict)
+    fingerprint_definition: str = "SELECT 1"
+    expected_definition_hash: str | None = None
 
 
 @dataclass(frozen=True)

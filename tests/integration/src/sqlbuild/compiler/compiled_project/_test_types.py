@@ -74,7 +74,7 @@ class ModelPathScopeErrorTestCase:
 
 @dataclass(frozen=True)
 class ImmediateSyntaxErrorTestCase:
-    """A model the native loop rejects while validating its SQL syntax immediately."""
+    """A model the native parser cannot read while the loop validates its SQL immediately."""
 
     description: str
     model_sql: str

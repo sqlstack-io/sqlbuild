@@ -87,6 +87,13 @@ fn given_authored_sql_when_neutralizing_then_sites_use_character_offsets()
             expected_sites: vec![("@@CTX:run.id", 17, 29)],
         },
         NeutralizeTestCase {
+            description: "a quoted argument stands as a string, a raw one as a name",
+            body: "comment on table @relation is @'comment'",
+            formatting: false,
+            expected_text: "comment on table __sqlclean_interpolation_0__ is '__sqlclean_interpolation_1__'",
+            expected_sites: vec![("@relation", 17, 26), ("@'comment'", 30, 40)],
+        },
+        NeutralizeTestCase {
             description: "comments and strings hide sites",
             body: "-- @x\nselect '@y', \"__ref(z)\" /* ${w} */",
             formatting: false,
@@ -399,6 +406,7 @@ fn given_sql_files_when_formatting_bodies_then_sites_and_fixture_ceremony_surviv
     let test_cases = [
         FormatBodiesTestCase {
             description: "a model body with a reference and a macro",
+            dialect: "duckdb",
             relative_parts: Some(vec!["models".to_string(), "orders.sql".to_string()]),
             contents: "MODEL (description \"d\");\nselect a, @py.m('x') as m from __ref('o')\n",
             expected_formatted: vec![(
@@ -410,6 +418,7 @@ fn given_sql_files_when_formatting_bodies_then_sites_and_fixture_ceremony_surviv
         },
         FormatBodiesTestCase {
             description: "a fixture body keeps its omitted ceremonial select",
+            dialect: "duckdb",
             relative_parts: Some(vec![
                 "tests".to_string(),
                 "unit".to_string(),
@@ -423,7 +432,86 @@ fn given_sql_files_when_formatting_bodies_then_sites_and_fixture_ceremony_surviv
             expected_fault_lines: vec![],
         },
         FormatBodiesTestCase {
+            description: "a scalar function's expression body parses as a SELECT item",
+            dialect: "snowflake",
+            relative_parts: Some(vec![
+                "functions".to_string(),
+                "sql".to_string(),
+                "next_quantity.sql".to_string(),
+            ]),
+            contents: "FUNCTION (arguments (quantity INTEGER), returns INTEGER);\n\nquantity + 1\n",
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a table function's query body formats as written",
+            dialect: "snowflake",
+            relative_parts: Some(vec![
+                "functions".to_string(),
+                "sql".to_string(),
+                "open_orders.sql".to_string(),
+            ]),
+            contents: "FUNCTION (returns table (a INTEGER));\n\nselect a from t\n",
+            expected_formatted: vec![(
+                0,
+                "FUNCTION (returns table (a INTEGER));\n\nSELECT a\nFROM t\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a table function's VALUES body stays a query",
+            dialect: "duckdb",
+            relative_parts: Some(vec![
+                "functions".to_string(),
+                "sql".to_string(),
+                "pairs.sql".to_string(),
+            ]),
+            contents: "FUNCTION (returns table (a INTEGER));\n\nVALUES (1), (2)\n",
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a table function's parenthesized query keeps its layout",
+            dialect: "snowflake",
+            relative_parts: Some(vec![
+                "functions".to_string(),
+                "sql".to_string(),
+                "nested_orders.sql".to_string(),
+            ]),
+            contents: "FUNCTION (returns table (a INTEGER));\n\n(\n  SELECT a\n  FROM t\n)\n",
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a scalar function body after a comment keeps its column",
+            dialect: "duckdb",
+            relative_parts: Some(vec![
+                "functions".to_string(),
+                "sql".to_string(),
+                "bounded_quantity.sql".to_string(),
+            ]),
+            contents: "FUNCTION (arguments (q INTEGER), returns INTEGER);\n\n-- note\nCASE WHEN q > 1 THEN q ELSE 0 END\n",
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a quoted hook argument stands as a string",
+            dialect: "snowflake",
+            relative_parts: Some(vec![
+                "hooks".to_string(),
+                "sql".to_string(),
+                "comment.sql".to_string(),
+            ]),
+            contents: "HOOK ();\n\ncomment on table @relation is @'comment'\n",
+            expected_formatted: vec![(
+                0,
+                "HOOK ();\n\nCOMMENT ON TABLE @relation IS @'comment'\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
             description: "an unparseable body is a fault on its first line",
+            dialect: "duckdb",
             relative_parts: None,
             contents: "MODEL ();\n\nSELECT FROM WHERE (((\n",
             expected_formatted: vec![],
@@ -437,7 +525,7 @@ fn given_sql_files_when_formatting_bodies_then_sites_and_fixture_ceremony_surviv
             contents: test_case.contents.to_string(),
         }];
 
-        let result = format_sql_bodies(&files, "duckdb", 100)?;
+        let result = format_sql_bodies(&files, test_case.dialect, 100)?;
         let fault_lines: Vec<usize> = result.faults.iter().map(|fault| fault.line).collect();
 
         assert_eq!(
@@ -669,6 +757,77 @@ fn given_sql_macro_bodies_when_linting_then_frames_and_generated_comments_are_no
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_snowflake_table_function_calls_when_formatting_then_each_call_is_kept_whole()
+-> Result<(), LintTextError> {
+    let test_cases = [
+        FormatBodiesTestCase {
+            description: "a call outside TABLE( ) stands as one relation",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MODEL ();\nselect l.a from __table_fn(\"f\")('B-1', 2) as l\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT l.a\nFROM __table_fn(\"f\")('B-1', 2) AS l\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a call the author wrapped in TABLE( ) keeps its arguments",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MODEL ();\nselect a from table(__table_fn(\"f\")( 42 ))\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT a\nFROM TABLE(__table_fn(\"f\")(42))\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a call after a comma LATERAL keeps its arguments",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MODEL ();\nselect t.a, l.value from t, lateral __table_fn(\"f\")(t.x) as l\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT\n  t.a,\n  l.value\nFROM t, LATERAL __table_fn(\"f\")(t.x) AS l\n"
+                    .to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a call after JOIN LATERAL keeps its arguments",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MODEL ();\nselect t.a from t join lateral __table_fn(\"f\")(t.x) as l on true\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT t.a\nFROM t\nJOIN LATERAL __table_fn(\"f\")(t.x) AS l\n  ON TRUE\n"
+                    .to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+    ];
+
+    for test_case in test_cases {
+        let files = [FormatFile {
+            relative_parts: test_case.relative_parts.clone(),
+            contents: test_case.contents.to_string(),
+        }];
+
+        let result = format_sql_bodies(&files, test_case.dialect, 100)?;
+        let fault_lines: Vec<usize> = result.faults.iter().map(|fault| fault.line).collect();
+
+        assert_eq!(
+            (result.formatted, fault_lines),
+            (test_case.expected_formatted, test_case.expected_fault_lines),
+            "{}",
+            test_case.description
+        );
+    }
+    Ok(())
 }
 
 #[test]

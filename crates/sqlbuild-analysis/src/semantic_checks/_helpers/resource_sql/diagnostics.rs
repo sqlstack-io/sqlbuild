@@ -6,6 +6,8 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
 use crate::semantic_checks::_helpers::explanation::opt_outs::unneeded_opt_out;
 use crate::semantic_checks::_helpers::metadata_checks::positions::{text_position, word_start};
 use crate::semantic_checks::_helpers::resource_sql::help::{HelpContext, resource_sql_help};
@@ -97,12 +99,14 @@ fn binding_request(
     (sql.to_owned(), references, overrides)
 }
 
-/// Python's `_reported_diagnostic`: drop open-relation lookups, make parser rejections P001.
-fn reported(resource: &ResourceSql, finding: &Finding) -> Option<Finding> {
+/// `_reported_diagnostic`: drop open-relation lookups; parser rejections are P001, natively P026's.
+fn reported(resource: &ResourceSql, finding: &Finding, native_hooks: bool) -> Option<Finding> {
     if finding.code != UNKNOWN_TABLE_CODE {
         return Some(finding.clone());
     }
-    if finding.message.starts_with(UNKNOWN_TABLE_PREFIX) {
+    if finding.message.starts_with(UNKNOWN_TABLE_PREFIX)
+        || (native_hooks && resource.kind == ResourceSqlKind::Model)
+    {
         return None;
     }
     Some(Finding {
@@ -134,8 +138,12 @@ fn resource_diagnostics(
     checking: &Checking<'_>,
 ) -> Result<Vec<(Key, ResourceSqlDiagnostic)>, ResourceSqlFailure> {
     let mut found: Vec<(Key, ResourceSqlDiagnostic)> = Vec::new();
+    let native_hooks: bool = matches!(
+        analysis_route(checking.request.dialect.as_deref()),
+        AnalysisRoute::Native(_)
+    );
     for (index, native) in findings.iter().enumerate() {
-        let Some(finding) = reported(resource, native) else {
+        let Some(finding) = reported(resource, native, native_hooks) else {
             continue;
         };
         let span = location(resource, checking.cleaned_sql, &finding)?;
@@ -258,7 +266,7 @@ pub(crate) fn missing_column_diagnostic(
     })
 }
 
-/// Every audit, SQL test and SQL hook finding, in Python's first-seen order.
+/// Audit, SQL test and hook findings in first-seen order; only column audits where no parser reads SQL.
 pub(crate) fn resource_sql_findings(
     request: &ResourceSqlRequest,
     catalog: &ProjectCatalog,
@@ -267,6 +275,12 @@ pub(crate) fn resource_sql_findings(
         .iter()
         .map(missing_column_diagnostic)
         .collect::<Result<_, _>>()?;
+    if matches!(
+        analysis_route(request.dialect.as_deref()),
+        AnalysisRoute::Unavailable
+    ) {
+        return Ok(diagnostics);
+    }
     let pool = || catalog.analysis_pool();
     let checked = resources(request, &pool).map_err(ResourceSqlFailure::Internal)?;
     if checked.is_empty() {

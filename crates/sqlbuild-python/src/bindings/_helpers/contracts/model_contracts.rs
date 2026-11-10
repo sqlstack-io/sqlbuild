@@ -37,14 +37,15 @@ pub(crate) struct DiagnosticRow {
 /// Evaluate the column contract of every model the compile's owner recorded, in its order.
 pub(crate) fn evaluate_project_model_contracts(
     py: Python<'_>,
-    settings: (String, bool),
+    settings: (String, bool, bool),
     project: &NativeCompiledProject,
 ) -> PyResult<Vec<(String, Vec<DiagnosticRow>)>> {
-    let (dialect, implicit_column_contracts) = settings;
+    let (dialect, implicit_column_contracts, staged_promotion) = settings;
     let models: &[CompiledModelFacts] = project_models(project.facts());
     let request = ContractRequest {
         dialect,
         implicit_column_contracts,
+        staged_promotion,
         models: models.iter().map(fact_contract_model).collect(),
     };
     let outcomes: Result<Vec<Vec<ContractDiagnostic>>, TypeNormalizationError> = py
@@ -70,6 +71,8 @@ fn fact_contract_model(model: &CompiledModelFacts) -> ContractModel {
     ContractModel {
         name: model.name.clone(),
         contract: model.config.contract.clone(),
+        materialized: model.config.materialized.clone(),
+        incremental_mode: model.config.incremental_mode.clone(),
         schema: model.schema.as_ref().map(fact_contract_schema),
         inferred_columns: analysis
             .filter(|analysis| analysis.inferred)
