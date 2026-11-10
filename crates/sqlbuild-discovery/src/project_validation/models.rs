@@ -178,6 +178,26 @@ pub struct ProjectFacts {
     pub project_model_paths: Option<Vec<String>>,
     /// Python's `csv.field_size_limit()`, or `None` for its default.
     pub csv_field_limit: Option<usize>,
+    /// Jobs, job groups, sensors and calendar schedules, known only when a location publishes.
+    pub orchestration: Vec<OrchestrationNameFact>,
+}
+
+/// One name in the project's resource namespace, as a name conflict reports it.
+#[derive(Debug)]
+pub(crate) struct DeclaredName<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) kind: &'a str,
+    pub(crate) path: &'a str,
+    /// A job, job group, sensor or calendar schedule, whose conflicts say how it is named.
+    pub(crate) orchestration: bool,
+}
+
+/// A named orchestration declaration: its name, its kind as conflicts word it, and its module.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OrchestrationNameFact {
+    pub name: String,
+    pub kind: &'static str,
+    pub path: String,
 }
 
 /// Why discovered inputs are rejected: a discovery error, or a seed CSV Python cannot read.

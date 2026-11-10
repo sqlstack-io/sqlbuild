@@ -11,3 +11,11 @@ pub(crate) const SOURCE_STALE_CONDITION: &str = "source_stale";
 
 /// The sensor context is supplied by the host, not a provider.
 pub(crate) const SENSOR_CONTEXT_PARAMETER: &str = "ctx";
+
+pub(crate) const AUTHORING_MODULE: &str = "sqlbuild.orchestration_declarations.models.authoring";
+
+/// Kinds named in the global unique-name check.
+pub(crate) const JOB_LABEL: &str = "job";
+pub(crate) const GROUP_LABEL: &str = "job group";
+pub(crate) const SENSOR_LABEL: &str = "sensor";
+pub(crate) const CALENDAR_LABEL: &str = "calendar schedule";

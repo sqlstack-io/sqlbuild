@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
-from sqlbuild._native import NativeOrchestrationSnapshot, build_orchestration_snapshot
+from sqlbuild._native import (
+    DiscoveredProjectInputs,
+    NativeOrchestrationSnapshot,
+    build_orchestration_snapshot,
+)
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from sqlbuild.orchestration_declarations.models.authoring import (
     CalendarSchedule,
@@ -20,9 +24,14 @@ def compile_snapshot(
     project: CompiledProjectView,
     metadata_json: str,
     project_dir: Path,
+    discovered_inputs: DiscoveredProjectInputs,
     declarations: Sequence[Job | JobGroup | CalendarSchedule | Sensor] | None = None,
 ) -> NativeOrchestrationSnapshot:
     """Compile authoring records and retained project facts into a data-only snapshot."""
     return build_orchestration_snapshot(
-        project, metadata_json, project_dir, declarations=declarations
+        project,
+        metadata_json,
+        project_dir,
+        discovered_inputs=discovered_inputs,
+        declarations=declarations,
     )

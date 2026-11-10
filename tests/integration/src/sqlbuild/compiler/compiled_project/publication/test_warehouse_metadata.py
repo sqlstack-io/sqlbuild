@@ -18,6 +18,7 @@ from uuid import uuid4
 import pytest
 
 from sqlbuild._native import (
+    DiscoveredProjectInputs,
     Fingerprint,
     SourceFreshnessRecord,
     SourceFreshnessRenderers,
@@ -670,8 +671,9 @@ def test_given_external_warehouse_retention_when_a_complete_scan_arrives_then_mi
     adapter.close(connection)
     declarations: Path = tmp_path / "declarations"
     write_files(project_dir=declarations, files=TYPE_PROOF_FILES)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=declarations)
     compiled: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=declarations),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
@@ -680,6 +682,7 @@ def test_given_external_warehouse_retention_when_a_complete_scan_arrives_then_mi
             compiled,
             json.dumps(METADATA | {"location_id": api.location_id, "target": "development"}),
             declarations,
+            discovered_inputs=discovered,
         ).publish(api.url, api.bearer)
         session_id: str = str(uuid4())
         heartbeat: Request = Request(

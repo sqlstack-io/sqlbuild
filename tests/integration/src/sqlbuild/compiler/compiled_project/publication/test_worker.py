@@ -16,6 +16,7 @@ import duckdb
 import pytest
 
 from sqlbuild._native import (
+    DiscoveredProjectInputs,
     NativeOrchestrationSnapshot,
     build_compiled_project,
     build_orchestration_snapshot,
@@ -286,15 +287,16 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
 ) -> None:
     project_dir: Path = tmp_path / "project"
     write_files(project_dir=project_dir, files=TYPE_PROOF_FILES)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=project_dir)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=project_dir),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
     with snapshot_api(tmp_path / "control") as api:
         metadata: dict[str, Any] = METADATA | {"location_id": api.location_id}
         baseline: NativeOrchestrationSnapshot = build_orchestration_snapshot(
-            project, json.dumps(metadata), project_dir
+            project, json.dumps(metadata), project_dir, discovered_inputs=discovered
         )
         publication: dict[str, Any] = json.loads(baseline.publish(api.url, api.bearer))
         claim: ClaimedWorker = claimed_worker(tmp_path / "control", api, publication)
@@ -305,13 +307,14 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             )
         }
         write_files(project_dir=project_dir, files=changed)
+        discovered = discover_project_inputs(project_dir=project_dir)
         drifted: CompiledProjectView = build_compiled_project(
-            discovered_inputs=discover_project_inputs(project_dir=project_dir),
+            discovered_inputs=discovered,
             adapter=DuckDbAdapter(),
             resolved_connection={"database": "warehouse", "schema": "main"},
         )
         wrong: NativeOrchestrationSnapshot = build_orchestration_snapshot(
-            drifted, json.dumps(metadata), project_dir
+            drifted, json.dumps(metadata), project_dir, discovered_inputs=discovered
         )
         with pytest.raises(RuntimeError, match=test_case.expected_error):
             _ = wrong.start_worker(api.url, claim.bearer, identity)
@@ -846,8 +849,8 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
                 ),
                 "orchestration/orders.py": (
                     "from sqlbuild.orchestration import job, job_group, schedule\n"
-                    "orders = job('orders', description='Long query.', select='orders')\n"
-                    "totals = job('totals', description='Waiting query.', select='totals')\n"
+                    "orders = job('long_orders', description='Long query.', select='orders')\n"
+                    "totals = job('waiting_totals', description='Waiting query.', select='totals')\n"
                     "annual_orders = job_group('annual_orders', description='Cancellable group.', "
                     "jobs=[totals, orders], schedule=schedule(cron='0 0 * * *', timezone='UTC', "
                     "starts_at='2000-01-01T00:00:00Z'))\n"
@@ -869,7 +872,7 @@ def test_given_an_executing_group_when_parent_cancelled_then_all_children_stop_b
             job_key="annual_orders",
         )
         assert parent["status"] == "running", worker.log.read_text()
-        cancel_running_statement(worker, job_key="orders", run_id=parent["run_id"])
+        cancel_running_statement(worker, job_key="long_orders", run_id=parent["run_id"])
         completed: dict[str, Any] = wait_for_run(
             worker.api, worker.process, worker.log, job_key="annual_orders"
         )
@@ -879,8 +882,8 @@ def test_given_an_executing_group_when_parent_cancelled_then_all_children_stop_b
                 "SELECT job_key, status FROM sqb_runs ORDER BY job_key"
             ).fetchall() == [
                 ("annual_orders", "cancelled"),
-                ("orders", "cancelled"),
-                ("totals", "cancelled"),
+                ("long_orders", "cancelled"),
+                ("waiting_totals", "cancelled"),
             ]
             assert control.execute(
                 "SELECT count(*) FROM sqb_runs WHERE parent_run_id=? AND ended_at>?",

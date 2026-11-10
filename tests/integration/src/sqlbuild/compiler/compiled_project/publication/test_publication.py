@@ -13,6 +13,7 @@ import pytest
 from _pytest.capture import CaptureResult
 
 from sqlbuild._native import (
+    DiscoveredProjectInputs,
     NativeOrchestrationSnapshot,
     build_compiled_project,
     build_orchestration_snapshot,
@@ -67,8 +68,9 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         ),
     }
     write_files(project_dir=project_dir, files=files)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=project_dir)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=project_dir),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
@@ -79,7 +81,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
             "target": test_case.target,
         }
         first: NativeOrchestrationSnapshot = build_orchestration_snapshot(
-            project, json.dumps(metadata), project_dir
+            project, json.dumps(metadata), project_dir, discovered_inputs=discovered
         )
         record: dict[str, Any] = json.loads(first.publish(api.url, api.bearer))
         assert record["generation"] == 1
@@ -93,13 +95,17 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
             )
         }
         write_files(project_dir=project_dir, files=edited)
+        discovered = discover_project_inputs(project_dir=project_dir)
         changed: CompiledProjectView = build_compiled_project(
-            discovered_inputs=discover_project_inputs(project_dir=project_dir),
+            discovered_inputs=discovered,
             adapter=DuckDbAdapter(),
             resolved_connection={"database": "warehouse", "schema": "main"},
         )
         next_snapshot: NativeOrchestrationSnapshot = build_orchestration_snapshot(
-            changed, json.dumps(metadata | {"generation": 2}), project_dir
+            changed,
+            json.dumps(metadata | {"generation": 2}),
+            project_dir,
+            discovered_inputs=discovered,
         )
         updated: dict[str, Any] = json.loads(next_snapshot.publish(api.url, api.bearer))
         assert updated["generation"] == test_case.expected_generation

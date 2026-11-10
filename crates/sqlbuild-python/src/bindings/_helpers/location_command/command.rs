@@ -22,7 +22,9 @@ use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSn
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
-use crate::bindings::_helpers::location_command::snapshot::build_orchestration_snapshot;
+use crate::bindings::_helpers::location_command::snapshot::{
+    build_orchestration_snapshot, orchestration_snapshot,
+};
 use crate::bindings::_helpers::location_command::worker::execute_worker;
 use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
@@ -136,15 +138,18 @@ fn compile_location<'py>(
     )?;
     let project = field(&compiled, "project")?;
     let view = project.cast::<NativeProjectView>()?.borrow();
-    let snapshot = build_orchestration_snapshot(
+    let snapshot = orchestration_snapshot(
         view,
         &serde_json::to_string(input).map_err(|error| PyValueError::new_err(error.to_string()))?,
         project_dir.extract()?,
-        arguments
-            .value("action")?
-            .extract::<Option<String>>()?
-            .is_some_and(|action| action == EXECUTE_ACTION)
-            .then(Vec::new),
+        (
+            discovered.clone(),
+            arguments
+                .value("action")?
+                .extract::<Option<String>>()?
+                .is_some_and(|action| action == EXECUTE_ACTION)
+                .then(Vec::new),
+        ),
     )?;
     status(py, "Location snapshot compiled.")?;
     Ok((snapshot, discovered))

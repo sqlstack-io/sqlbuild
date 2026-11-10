@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,8 @@ from typing import Any
 import pytest
 
 from sqlbuild._native import (
+    DiscoveredProjectInputs,
+    DiscoveryConflictError,
     NativeOrchestrationSnapshot,
     PythonNodeDiscoveryError,
     build_compiled_project,
@@ -46,6 +49,13 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     TYPE_PROOF_FILES,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+
+ORCHESTRATION_NAME_CONFLICT: str = (
+    "; model, source, seed, function, loader, task, asset, check, provider, hook, unit test, "
+    "scenario, job, job group, sensor, and calendar schedule names must be globally unique; "
+    "rename one of them (a job, job group or sensor takes its name from its first argument, and "
+    "a calendar schedule from the function it decorates)"
+)
 
 
 @pytest.mark.parametrize(
@@ -172,14 +182,15 @@ def test_given_real_projects_when_building_snapshots_then_catalogs_are_stable_an
     metadata: str = json.dumps(METADATA)
     for directory in (tmp_path / "original", tmp_path / "relocated"):
         write_files(project_dir=directory, files=test_case.files)
+        discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=directory)
         project: CompiledProjectView = build_compiled_project(
-            discovered_inputs=discover_project_inputs(project_dir=directory),
+            discovered_inputs=discovered,
             adapter=DuckDbAdapter(),
             resolved_connection={"database": "warehouse", "schema": "main"},
         )
         assert not any(item.severity == "error" for item in project.diagnostics)
         snapshot: NativeOrchestrationSnapshot = build_orchestration_snapshot(
-            project, metadata, directory
+            project, metadata, directory, discovered_inputs=discovered
         )
         publication: dict[str, Any] = json.loads(snapshot.to_json())
         publications.append(publication)
@@ -251,14 +262,17 @@ def test_given_semantic_edits_when_publishing_then_local_identities_keep_planner
     for label, inputs in (("original", files), ("changed", changed)):
         directory: Path = tmp_path / label
         write_files(project_dir=directory, files=inputs)
+        discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=directory)
         project: CompiledProjectView = build_compiled_project(
-            discovered_inputs=discover_project_inputs(project_dir=directory),
+            discovered_inputs=discovered,
             adapter=DuckDbAdapter(),
             resolved_connection={"database": "warehouse", "schema": "main"},
         )
         assert not any(item.severity == "error" for item in project.diagnostics)
         snapshot: dict[str, Any] = json.loads(
-            build_orchestration_snapshot(project, json.dumps(METADATA), directory).to_json()
+            build_orchestration_snapshot(
+                project, json.dumps(METADATA), directory, discovered_inputs=discovered
+            ).to_json()
         )
         hashes: dict[str, str] = {}
         for key in (
@@ -310,8 +324,9 @@ def test_given_invalid_compilation_or_forged_nodes_when_publishing_then_no_snaps
     tmp_path: Path,
 ) -> None:
     write_files(project_dir=tmp_path, files=test_case.files)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
@@ -324,6 +339,7 @@ def test_given_invalid_compilation_or_forged_nodes_when_publishing_then_no_snaps
             project,
             json.dumps(METADATA | {"nodes": test_case.nodes}),
             tmp_path,
+            discovered_inputs=discovered,
         )
 
 
@@ -365,13 +381,16 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
     tmp_path: Path,
 ) -> None:
     write_files(project_dir=tmp_path, files=test_case.files)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
     publication: dict[str, Any] = json.loads(
-        build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
+        build_orchestration_snapshot(
+            project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
+        ).to_json()
     )
     edges: list[list[str]] = publication["documents"]["lineage"]["edges"]
     assert sorted(edges) == test_case.expected_edges
@@ -397,21 +416,28 @@ def test_given_a_dependency_lock_when_it_changes_then_environment_identity_chang
     tmp_path: Path,
 ) -> None:
     write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
     installed: dict[str, Any] = json.loads(
-        build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
+        build_orchestration_snapshot(
+            project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
+        ).to_json()
     )
     (tmp_path / "uv.lock").write_text(test_case.first_lockfile)
     locked: dict[str, Any] = json.loads(
-        build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
+        build_orchestration_snapshot(
+            project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
+        ).to_json()
     )
     (tmp_path / "uv.lock").write_text(test_case.second_lockfile)
     changed: dict[str, Any] = json.loads(
-        build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
+        build_orchestration_snapshot(
+            project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
+        ).to_json()
     )
     assert (
         len(
@@ -421,7 +447,9 @@ def test_given_a_dependency_lock_when_it_changes_then_environment_identity_chang
     )
     assert installed["nodes"] == locked["nodes"] == changed["nodes"]
     assert changed == json.loads(
-        build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
+        build_orchestration_snapshot(
+            project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
+        ).to_json()
     )
 
 
@@ -459,8 +487,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
     tmp_path: Path, test_case: SnapshotScheduleTestCase
 ) -> None:
     write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
@@ -482,6 +511,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             metadata_json=json.dumps(METADATA),
             project_dir=tmp_path,
             declarations=[nightly, excluded],
+            discovered_inputs=discovered,
         ).to_json()
     )
     assert first["documents"]["jobs"] == {
@@ -512,6 +542,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             metadata_json=json.dumps(METADATA),
             project_dir=tmp_path,
             declarations=[edited],
+            discovered_inputs=discovered,
         ).to_json()
     )
     assert second["documents"]["triggers"].keys() == first["documents"]["triggers"].keys()
@@ -547,7 +578,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             expected_message="starts_at",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="duplicate names", copies=2, expected_message="duplicate job orders"
+            description="duplicate names", copies=2, expected_message="duplicate job daily_build"
         ),
         SnapshotDeclarationRejectionTestCase(
             description="unknown setting",
@@ -607,14 +638,15 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
     tmp_path: Path, test_case: SnapshotDeclarationRejectionTestCase
 ) -> None:
     write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
     declarations: list[Job] = [
         job(
-            "orders",
+            "daily_build",
             description=test_case.job_description,
             select=test_case.select,
             settings=test_case.settings,
@@ -629,6 +661,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             metadata_json=json.dumps(METADATA),
             project_dir=tmp_path,
             declarations=declarations,
+            discovered_inputs=discovered,
         )
 
 
@@ -921,8 +954,9 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
     tmp_path: Path, test_case: SnapshotDiscoveryTestCase
 ) -> None:
     write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES | test_case.files)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
@@ -932,6 +966,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             metadata_json=json.dumps(METADATA),
             project_dir=tmp_path,
             declarations=test_case.declarations,
+            discovered_inputs=discovered,
         ).to_json()
     )
     assert tuple(publication["documents"].get("jobs", {})) == test_case.expected_jobs
@@ -967,7 +1002,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             files={
                 "orchestration/orders.py": (
                     "from sqlbuild.orchestration import job, sensor\n"
-                    "orders = job('orders', description='Build orders.', select='orders')\n"
+                    "orders = job('refresh_orders', description='Build orders.', select='orders')\n"
                     "poll = sensor('poll', description='Poll orders.', run=orders)\n"
                 ),
             },
@@ -979,7 +1014,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             files={
                 "orchestration/orders.py": (
                     "from sqlbuild.orchestration import job, sensor, platform_event, PlatformEventKind\n"
-                    "orders = job('orders', description='Build orders.', select='orders')\n"
+                    "orders = job('refresh_orders', description='Build orders.', select='orders')\n"
                     "@sensor('poll', description='Poll orders.', run=orders, "
                     "when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]))\n"
                     "def poll(ctx):\n    return []\n"
@@ -1024,8 +1059,39 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                     "jobs = [job('daily', description='Orders.', select='orders') for _ in range(2)]\n"
                 ),
             },
-            expected_error=ValueError,
-            expected_message="duplicate job daily",
+            expected_error=DiscoveryConflictError,
+            expected_message=re.escape(
+                "Project resource name 'daily' is declared as both job in orchestration/jobs.py "
+                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="DuckShop jobs cannot reuse a model name",
+            files={
+                "orchestration/jobs.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/name_collision.py"
+                ).read_text()
+            },
+            expected_error=DiscoveryConflictError,
+            expected_message=re.escape(
+                "Project resource name 'orders' is declared as both model in models/orders.sql "
+                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a sensor cannot reuse its job's name",
+            files={
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job, sensor\n"
+                    "daily = job('daily', description='Orders.', select='orders')\n"
+                    "poll = sensor('daily', description='Poll orders.', run=daily)\n"
+                ),
+            },
+            expected_error=DiscoveryConflictError,
+            expected_message=re.escape(
+                "Project resource name 'daily' is declared as both sensor in orchestration/jobs.py "
+                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
+            ),
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="broken imports fail on every retry",
@@ -1289,13 +1355,17 @@ def test_given_broken_declaration_modules_when_compiling_then_no_partial_snapsho
     tmp_path: Path, test_case: SnapshotDiscoveryRejectionTestCase
 ) -> None:
     write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES | test_case.files)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
     for _ in range(2):
         with pytest.raises(test_case.expected_error, match=test_case.expected_message):
             compile_snapshot(
-                project=project, metadata_json=json.dumps(METADATA), project_dir=tmp_path
+                project=project,
+                metadata_json=json.dumps(METADATA),
+                project_dir=tmp_path,
+                discovered_inputs=discovered,
             )
