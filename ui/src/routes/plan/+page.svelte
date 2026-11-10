@@ -256,6 +256,10 @@
 	const allowed = $derived(job ? jobPermissions.every((p) => p.allowed) : !!check?.launchable);
 	const canLaunch = $derived(fresh && !check?.error && !jobProblem && allowed && planned);
 	const problem = $derived(jobProblem ?? checkError ?? (fresh ? check?.error : null) ?? (planError?.key === requestKey ? planError.message : null));
+	/** One loading state over the whole result, from the first check until the plan arrives, so the page doesn't rebuild itself in steps. */
+	const waiting = $derived<'check' | 'plan' | null>(
+		problem ? null : !shown ? 'check' : shown.verb === 'build' && (planning || (wantsPlan && !planCurrent && !planError)) ? 'plan' : null
+	);
 	const blockedReason = $derived(
 		!mayRun
 			? job
@@ -336,6 +340,7 @@
 	{#if problem}<p class="problem-bar" data-testid="adhoc-error">{problem}</p>{/if}
 
 	<div class="body">
+		<div class="stage">
 		<div class="main sb-scroll" class:stale={!!shown && (!!problem || !fresh || (planning && !!plan))}>
 			{#if shown?.verb === 'build'}
 				{#if plan}
@@ -352,19 +357,9 @@
 							{/each}
 						</ul>
 					{/if}
-				{:else if planning || (wantsPlan && !planError)}
-					<div class="planning" role="status" data-testid="plan-loading">
-						<RotateCwIcon size={13} class="animate-spin" />
-						<div>
-							<div>Planning on the location…</div>
-							<div class="faint">Reading the current warehouse state</div>
-						</div>
-					</div>
 				{/if}
 			{:else if shown?.verb}
 				<div class="summary"><b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}</div>
-			{:else if checking && !problem}
-				<p class="msg faint">Checking the command…</p>
 			{/if}
 			{#if shown?.verb === 'build' && plan}
 				<table class="nodes">
@@ -405,13 +400,27 @@
 					</tbody>
 				</table>
 			{/if}
-			{#if shown?.verb && picked.length && catalog.data}
+			{#if shown?.verb && picked.length && catalog.data && (shown.verb !== 'build' || plan)}
 				<div class="graph" class:below={!!plan || shown?.verb !== 'build'} style:height="{graphHeight}px"><ScopeGraph keys={picked} catalog={catalog.data} onselect={() => {}} /></div>
 			{/if}
 		</div>
 
-		{#if shown?.verb}
+		{#if waiting}
+			<div class="overlay" role="status" data-testid="plan-loading">
+				<div class="spinner-card">
+					<RotateCwIcon size={16} class="animate-spin" />
+					<div>
+						<div>{waiting === 'plan' ? 'Planning on the location…' : 'Checking the command…'}</div>
+						<div class="faint">{waiting === 'plan' ? 'Reading the current warehouse state' : 'Resolving what it selects'}</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+		</div>
+
+		<!-- Always present, so the result never changes width when the check returns. -->
 		<aside class="rail sb-scroll" class:stale={!fresh || !!problem}>
+		{#if shown?.verb}
 				<h3>Permissions</h3>
 				{#each job ? jobPermissions : shown.permissions as p (p.action)}
 					<p class="decision" data-testid="adhoc-permission">
@@ -426,8 +435,8 @@
 						{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code">{value === true ? name : `${name}=${value}`}</span>{/each}
 					</div>
 				{/if}
-		</aside>
 		{/if}
+		</aside>
 	</div>
 
 	<div class="foot">
@@ -560,6 +569,12 @@
 		min-height: 0;
 		flex: 1;
 	}
+	.stage {
+		position: relative;
+		display: flex;
+		min-width: 0;
+		flex: 1;
+	}
 	.main {
 		min-width: 0;
 		flex: 1;
@@ -571,9 +586,6 @@
 	.rail.stale {
 		opacity: 0.55;
 	}
-	.msg {
-		font-size: 13px;
-	}
 	.problem-bar {
 		margin: 0;
 		padding: 7px 24px;
@@ -583,15 +595,23 @@
 		font-family: var(--font-mono);
 		font-size: 12px;
 	}
-	.planning {
+	.overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 5;
+		display: grid;
+		place-items: center;
+		background: color-mix(in srgb, var(--background) 72%, transparent);
+	}
+	.spinner-card {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		margin-bottom: 12px;
-		padding: 12px 14px;
+		gap: 12px;
+		padding: 14px 18px;
 		border: 1px solid var(--border);
 		border-radius: 2px;
-		background: var(--sb-inset);
+		background: var(--card);
+		box-shadow: var(--sb-elev);
 		font-size: 12.5px;
 	}
 	.replan {
