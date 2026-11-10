@@ -1,10 +1,4 @@
-//! One native analysis shared by the models of a wave whose analyses differ only in relation names.
-//!
-//! Models share when their analysis SQL is the same text once each referenced relation is renamed
-//! to its position, the relations they read have the same shapes under that renaming, and their
-//! reference names sort in the same order, since lineage lists sources by relation name. The
-//! dialect, declared functions, session functions and quoted-name setting are the wave's own, so
-//! every member shares them. A model whose key cannot be built exactly is analysed on its own.
+//! One native analysis shared by the models of a wave whose analyses differ only in names.
 
 use std::collections::{HashMap, HashSet};
 
@@ -14,10 +8,15 @@ use sha2::{Digest, Sha256};
 use sqlbuild_core::identifier_text::main::is_lowercase_identifier::is_lowercase_identifier;
 use sqlquack_semantics::lineage::models::SchemaColumn;
 
-use crate::analysis_route::main::model_outcome::{analysed_sql, native_outcome, native_sql};
-use crate::analysis_route::models::NativeAnalysis;
+use crate::analysis_route::_helpers::analysis::native_outcome::{
+    analysed_sql, native_outcome, native_sql,
+};
+use crate::analysis_route::models::{NativeAnalysis, ShareCounts};
 use crate::analysis_route::types::NativeDialect;
-use crate::assembly::analysis_session::models::{ModelOutcome, ModelRequest, SessionSchema};
+use crate::analysis_route::types::RelationsOf;
+use crate::assembly::analysis_session::models::{
+    LineageRow, ModelOutcome, ModelRequest, SessionSchema,
+};
 use crate::assembly::analysis_session::types::Shapes;
 
 /// Spelling of a referenced relation in a share key's SQL, followed by its position; never parsed.
@@ -27,13 +26,8 @@ const REFERENCE_TOKEN: char = '\u{0}';
 /// Letter the name probe spells its same-length stand-in with.
 const PROBE_LETTER: char = 'q';
 
-/// Digest of what decides a model's native analysis besides the wave's settings: its analysis SQL
-/// with each reference spelled as its position's stub, the relations it reads under that renaming,
-/// and the order its reference names sort in.
+/// Digest of a model's stubbed analysis SQL, renamed relation shapes and reference name orders.
 type ShareKey = [u8; 32];
-
-/// The relations a model's analysis reads, built from its binding schema when needed.
-pub(crate) type RelationsOf<'a> = &'a (dyn Fn(&Shapes) -> SessionSchema + Sync);
 
 /// One model of a native wave, prepared for analysis.
 pub(crate) struct NativeMember<'a> {
@@ -41,13 +35,6 @@ pub(crate) struct NativeMember<'a> {
     pub(crate) schema: Shapes,
     pub(crate) cleaned: Result<String, String>,
     pub(crate) key: Option<ShareKey>,
-}
-
-/// How many models took a shared analysis, and how many were analysed.
-#[derive(Debug, Default, PartialEq, Eq)]
-pub(crate) struct ShareCounts {
-    pub(crate) shared: usize,
-    pub(crate) unshared: usize,
 }
 
 /// `model` prepared over `schema`, with its share key when one can be built exactly.
@@ -58,10 +45,10 @@ pub(crate) fn native_member<'a>(
     relations_of: RelationsOf<'_>,
 ) -> NativeMember<'a> {
     let cleaned: Result<String, String> = native_sql(dialect, model, &HashMap::new());
-    let key: Option<ShareKey> = cleaned
-        .as_ref()
-        .ok()
-        .and_then(|sql| share_key(dialect, model, sql, &relations_of(&schema)));
+    let key: Option<ShareKey> = match &cleaned {
+        Ok(sql) => share_key(dialect, model, sql, &relations_of(&schema)),
+        Err(_) => None,
+    };
     NativeMember {
         model,
         schema,
@@ -106,7 +93,7 @@ pub(crate) fn analysed_members(
         }
         let own: Result<NativeAnalysis, String> =
             mapped(&analysed, &members[index].model.lineage_references);
-        if own.is_err() && analysed.is_ok() {
+        if matches!((&own, &analysed), (Err(_), Ok(_))) {
             alone.push(index);
         } else {
             analyses[index] = Some(own);
@@ -197,10 +184,7 @@ fn shared_analysis(
     analysed_sql(dialect, sql, (&relations, &positional), settings)
 }
 
-/// `template`'s analysis with each positional resource renamed to `references`' resource there.
-///
-/// A failed analysis stays failed; a source no position names leaves the result unmapped (`Err`
-/// with an empty reason), which sends the model to its own analysis.
+/// `template` with positional resources renamed to `references`; empty `Err` when one is unnamed.
 fn mapped(
     template: &Result<NativeAnalysis, String>,
     references: &[(String, String, String)],
@@ -210,10 +194,7 @@ fn mapped(
     for row in &mut analysis.lineage {
         let mut sources: Vec<(String, String, String)> = Vec::with_capacity(row.sources.len());
         for (_, token, column) in &row.sources {
-            let reference: Option<&(String, String, String)> = token
-                .strip_prefix(REFERENCE_TOKEN)
-                .and_then(|position| position.parse::<usize>().ok())
-                .and_then(|position| references.get(position));
+            let reference: Option<&(String, String, String)> = reference_at(token, references);
             let Some((_, resource_type, resource_name)) = reference else {
                 return Err(String::new());
             };
@@ -227,8 +208,7 @@ fn mapped(
     Ok(analysis)
 }
 
-/// Whether `template`, the analysis of `leader`'s own SQL, holds for every model sharing its key:
-/// it succeeded, found nothing (findings carry positions and names), and spells no relation name.
+/// Whether `leader`'s `template` succeeded, found nothing and spells none of its relation names.
 fn exact_for_others(template: &Result<NativeAnalysis, String>, leader: &ModelRequest) -> bool {
     let Ok(analysis) = template else {
         return false;
@@ -238,18 +218,43 @@ fn exact_for_others(template: &Result<NativeAnalysis, String>, leader: &ModelReq
         .iter()
         .map(|(name, _, _)| name.as_str())
         .collect();
-    let spells = |text: &str| {
-        let folded: String = text.to_ascii_lowercase();
-        names.iter().any(|name| folded.contains(name))
-    };
+    let spells = |text: &str| spells_any(&names, text);
     analysis.diagnostics.is_empty()
         && !analysis
             .columns
             .iter()
             .any(|column| spells(&column.name) || column.data_type.as_deref().is_some_and(spells))
-        && !analysis.lineage.iter().any(|row| {
-            spells(&row.output_column) || row.sources.iter().any(|(_, _, column)| spells(column))
-        })
+        && !analysis
+            .lineage
+            .iter()
+            .any(|row| row_spells_any(&names, row))
+}
+
+/// Whether `text`, case-folded, contains any of `names`.
+fn spells_any(names: &[&str], text: &str) -> bool {
+    let folded: String = text.to_ascii_lowercase();
+    names.iter().any(|name| folded.contains(name))
+}
+
+/// Whether `row`'s output column or any of its source columns contains any of `names`.
+fn row_spells_any(names: &[&str], row: &LineageRow) -> bool {
+    spells_any(names, &row.output_column)
+        || row
+            .sources
+            .iter()
+            .any(|(_, _, column)| spells_any(names, column))
+}
+
+/// The reference a positional resource `token` names, when it names one.
+fn reference_at<'a>(
+    token: &str,
+    references: &'a [(String, String, String)],
+) -> Option<&'a (String, String, String)> {
+    let position: &str = token.strip_prefix(REFERENCE_TOKEN)?;
+    match position.parse::<usize>() {
+        Ok(position) => references.get(position),
+        Err(_) => None,
+    }
 }
 
 /// Each member's leader: the first earlier member with its key, when another member holds it.
@@ -266,8 +271,7 @@ fn share_leaders(members: &[NativeMember<'_>]) -> Vec<Option<usize>> {
         .collect()
 }
 
-/// Forget the key of each member referencing a relation whose name the parser does not read as an
-/// ordinary table name.
+/// Forget the key of each member referencing a relation the parser does not read as a plain table.
 fn drop_unprobed_keys(
     dialect: &dyn NativeDialect,
     pool: &ThreadPool,
@@ -298,8 +302,7 @@ fn drop_unprobed_keys(
     }
 }
 
-/// Whether the parser reads `FROM name` as it reads `FROM` a same-length plain stand-in, so no
-/// keyword or special form hides behind the name.
+/// Whether the parser reads `FROM name` as it reads `FROM` a same-length plain stand-in.
 fn ordinary_name(dialect: &dyn NativeDialect, name: &str) -> bool {
     let stand_in: String = PROBE_LETTER.to_string().repeat(name.len());
     let probe = |relation: &str| {
@@ -313,8 +316,7 @@ fn ordinary_name(dialect: &dyn NativeDialect, name: &str) -> bool {
     }
 }
 
-/// The key of `model`, whose cleaned SQL is `cleaned`, or `None` where renaming its references
-/// could change its analysis.
+/// The key of `model` with cleaned SQL `cleaned`, or `None` where renaming could change its analysis.
 fn share_key(
     dialect: &dyn NativeDialect,
     model: &ModelRequest,
@@ -329,9 +331,6 @@ fn share_key(
     let distinct: HashSet<&str> = names.iter().copied().collect();
     if names.is_empty()
         || distinct.len() != names.len()
-        // A leading letter makes a quoted lower-case name and an unquoted upper-cased one compare
-        // the same way whatever follows, so the two name orders in the key cover a model that
-        // quotes only some references.
         || !names.iter().all(|name| is_lowercase_identifier(name))
         || !cleaned.is_ascii()
         || cleaned.to_ascii_lowercase().contains(RELATION_STUB)
@@ -347,7 +346,9 @@ fn share_key(
             ((*name).to_owned(), stub)
         })
         .collect();
-    let sql: String = native_sql(dialect, model, &stubs).ok()?;
+    let Ok(sql) = native_sql(dialect, model, &stubs) else {
+        return None;
+    };
     let unstubbed: String = without_stubs(&sql.to_ascii_lowercase());
     if !stubs_stand_alone(&sql, width) || names.iter().any(|name| unstubbed.contains(name)) {
         return None;
@@ -383,9 +384,7 @@ fn name_order(names: &[&str], spelled: impl Fn(&str) -> String) -> Vec<usize> {
     order
 }
 
-/// Whether every relation stub in `sql`, with its `width` position digits, is a whole name: no
-/// identifier character touches it, so a reference glued into a longer name (`__ref("x")_split`)
-/// never shares.
+/// Whether no identifier character touches any relation stub in `sql` with its `width` digits.
 fn stubs_stand_alone(sql: &str, width: usize) -> bool {
     let identifier = |c: u8| c.is_ascii_alphanumeric() || c == b'_' || c == b'$';
     let bytes: &[u8] = sql.as_bytes();

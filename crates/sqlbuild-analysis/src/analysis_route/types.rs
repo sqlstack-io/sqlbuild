@@ -10,6 +10,8 @@ use crate::analysis_route::constants::{
     UNPARSED_STATEMENT,
 };
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap, TypeMatch};
+use crate::assembly::analysis_session::models::SessionSchema;
+use crate::assembly::analysis_session::types::Shapes;
 use crate::type_system::models::NormalizedType;
 
 /// A dialect whose SQL SQLQuack analyses in place of Polyglot.
@@ -118,3 +120,6 @@ pub trait NativeDialect: Sync {
         false
     }
 }
+
+/// The relations a model's analysis reads, built from its binding schema when needed.
+pub(crate) type RelationsOf<'a> = &'a (dyn Fn(&Shapes) -> SessionSchema + Sync);

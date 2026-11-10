@@ -8,6 +8,8 @@ use crate::assembly::analysis_session::_helpers::cte_facts::{
 use crate::assembly::analysis_session::_helpers::mappings::{ShapeTable, catalog_relations};
 use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::models::NativeStore;
+use sqlbuild_host::compile_context::main::collect_compile_timings::collect_compile_timings;
+use sqlbuild_host::compile_context::main::timing_milliseconds::timing_milliseconds;
 
 use crate::assembly::analysis_session::main::attach_analysis_cache::attach_analysis_cache;
 use crate::assembly::analysis_session::main::finish_analysis_session::finish_analysis_session;
@@ -18,9 +20,9 @@ use crate::assembly::analysis_session::main::start_analysis_session::start_analy
 use crate::assembly::analysis_session::main::take_analysis_cache::take_analysis_cache;
 use crate::assembly::analysis_session::models::{
     AnalysisCacheStats, AnalysisSession, ColumnFact, ContractProof, DynamicFamily, FinishedSession,
-    LineageRow, ModelColumns, ModelOutcome, ModelReference, ModelRequest, PivotBatchRequest,
-    PivotModel, PivotOutcome, PivotTables, SessionFunctions, SessionModelAnalysis,
-    SessionModelFacts, SessionOutcome, SessionRequest, SessionStep,
+    LineageFacts, LineageRow, ModelColumns, ModelOutcome, ModelReference, ModelRequest,
+    PivotBatchRequest, PivotModel, PivotOutcome, PivotTables, SessionFunctions,
+    SessionModelAnalysis, SessionModelFacts, SessionOutcome, SessionRequest, SessionStep,
 };
 use crate::assembly::analysis_session::tests::test_types::{
     CachedRun, ColumnView, ModelSpec, RecoveredFacts,
@@ -729,4 +731,87 @@ pub(crate) fn described_column_v(lines: &[Vec<String>]) -> String {
         .find(|line| line.starts_with("v "))
         .cloned()
         .unwrap_or_else(|| format!("no v in {:?}", lines[0]))
+}
+
+/// `request`'s analysis under a compile metric collector: each model's lines, and the sharing counts.
+pub(crate) fn analysed(request: SessionRequest) -> (Vec<Vec<String>>, Vec<(&'static str, u64)>) {
+    collect_compile_timings(|collector| {
+        let (_, outcomes, _) = completed(started(request));
+        let metrics: Vec<(&str, u64)> = timing_milliseconds(collector)
+            .into_iter()
+            .filter(|(name, _)| name.starts_with("native_analysis_"))
+            .collect();
+        Ok::<_, ()>((outcomes.iter().map(outcome_lines).collect(), metrics))
+    })
+    .expect("the session completes")
+}
+
+/// Each model's output columns, then each output's lineage sources.
+pub(crate) fn outcome_lines(outcome: &ModelOutcome) -> Vec<String> {
+    let analysis = &outcome.analysis;
+    let mut lines: Vec<String> = analysis
+        .columns
+        .iter()
+        .flatten()
+        .map(|column| {
+            let data_type: &str = column.data_type.as_deref().unwrap_or("-");
+            format!("{} {data_type}", column.name)
+        })
+        .collect();
+    let (LineageFacts::Native(rows) | LineageFacts::NativeFacts(rows)) = &analysis.lineage;
+    for row in rows {
+        let sources: Vec<String> = row
+            .sources
+            .iter()
+            .map(|(kind, name, column)| format!("{kind}:{name}.{column}"))
+            .collect();
+        lines.push(format!("{} <- {}", row.output_column, sources.join(" ")));
+    }
+    lines
+}
+
+/// A DuckDB request over the sources `relations`, with each model's name, SQL and sources.
+pub(crate) fn sources_request(
+    relations: &Shapes,
+    models: &[(&str, &str, &[&str])],
+) -> SessionRequest {
+    let nullability: Shapes = relations
+        .iter()
+        .map(|(name, columns)| {
+            let unknown = columns
+                .iter()
+                .map(|(column, _)| (column.clone(), "unknown".to_owned()))
+                .collect();
+            (name.clone(), unknown)
+        })
+        .collect();
+    SessionRequest {
+        dialect: "duckdb".to_owned(),
+        case_sensitive_shapes: false,
+        quoted_ignore_case: false,
+        function_return_types: Vec::new(),
+        known_functions: Vec::new(),
+        nullability_rules: Some(Vec::new()),
+        nullability_callback: None,
+        rich_type_inference: true,
+        forced_order: None,
+        retain_relations: false,
+        column_types: relations.clone(),
+        column_nullability: nullability,
+        complete_schemas: relations.clone(),
+        catalog_schemas: relations.clone(),
+        dynamic_families_by_table: Vec::new(),
+        models: models
+            .iter()
+            .map(|(name, sql, sources)| model(name, sql, sources, &[]))
+            .collect(),
+    }
+}
+
+/// Each model's lines and the sharing counts of a DuckDB wave over `relations` and `models`.
+pub(crate) fn sharing_lines(
+    relations: &[(&str, &[(&str, &str)])],
+    models: &[(&str, &str, &[&str])],
+) -> (Vec<Vec<String>>, Vec<(&'static str, u64)>) {
+    analysed(sources_request(&shapes(relations), models))
 }

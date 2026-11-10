@@ -13,7 +13,8 @@ use sqlbuild_host::compile_context::main::record_compile_metric::record_compile_
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
 use crate::analysis_route::main::analysis_route::analysis_route;
-use crate::analysis_route::models::AnalysisRoute;
+use crate::analysis_route::main::native_outcomes::native_outcomes;
+use crate::analysis_route::models::{AnalysisRoute, ShareCounts};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::_helpers::analysis_cache::{
     CachedOutcome, decode_outcome, encode_outcome,
@@ -35,9 +36,6 @@ use crate::assembly::analysis_session::_helpers::mappings::{
     session_schema,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
-use crate::assembly::analysis_session::_helpers::native_sharing::{
-    NativeMember, ShareCounts, analysed_members, native_member,
-};
 use crate::assembly::analysis_session::constants::{
     NATIVE_ANALYSIS_SHARED, NATIVE_ANALYSIS_UNSHARED, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
 };
@@ -339,18 +337,13 @@ impl AnalysisSession {
         let relations_of = |schema: &Shapes| -> SessionSchema {
             session_schema(dialect, schema, tables, &functions)
         };
-        let members: Vec<NativeMember<'_>> = pool.install(|| {
-            misses
-                .par_iter()
-                .map(|position| {
-                    let model: &ModelRequest = &request.models[models[*position]];
-                    native_member(dialect, model, schemas[*position].clone(), &relations_of)
-                })
-                .collect()
-        });
+        let wave: Vec<(&ModelRequest, &Shapes)> = misses
+            .iter()
+            .map(|position| (&request.models[models[*position]], &schemas[*position]))
+            .collect();
         let settings = (declared.as_slice(), request.quoted_ignore_case);
         let (outcomes, counts): (Vec<(ModelOutcome, Option<String>)>, ShareCounts) =
-            analysed_members(dialect, &pool, members, (&relations_of, settings));
+            native_outcomes(dialect, &pool, wave, (&relations_of, settings));
         for (metric, value) in [
             (NATIVE_ANALYSIS_SHARED, counts.shared),
             (NATIVE_ANALYSIS_UNSHARED, counts.unshared),

@@ -1,8 +1,8 @@
 pub mod aligned_offset;
 pub mod analysis_route;
 pub mod fast_lineage;
-pub(crate) mod model_outcome;
 pub mod native_gap;
+pub(crate) mod native_outcomes;
 pub mod native_revalidation;
 pub mod schema_column;
 pub mod skipped_analysis;
