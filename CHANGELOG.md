@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.209.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.208.0...v0.209.0) (2026-11-10)
+
+
+### Features
+
+* **orchestration:** job pages show selectors, targets and declaring file and line ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **orchestration:** sensor pages show the cursor, recent checks and runs started ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **platform:** platform events, server settings, low calendars and connections ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **runs:** rerun selected nodes, cancel matching runs, page past 1,000 ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **runs:** run part of a published job; reruns keep the narrowing ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **selectors:** select jobs and job groups with `job:<name>` or a bare name ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **triggers:** show each trigger's declaration site, targets and next due times ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **ui:** queue, runs timeline and backfill windows ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **ui:** sidebar counts, catalog warehouse objects and microbatch coverage ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+* **ui:** the plan page shows the location's real sqb plan ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+
+
+### Bug Fixes
+
+* **ui:** tick outcomes show as a coloured dot; relative times no longer shift the layout ([3256a05](https://github.com/sqlstack-io/sqlbuild/commit/3256a056442b9553bb327378cc023646627d4056))
+
 ## [0.208.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.207.0...v0.208.0) (2026-11-10)
 
 
