@@ -59,6 +59,7 @@ from sqlbuild.compiler.compile.types import CompiledProjectView
 from sqlbuild.compiler.macro_bridge.constants import MACRO_CALL_STORE_FILE_NAME
 from sqlbuild.observability import EventDispatcher, LifecycleEvent
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
+    DialectSyntaxCompileE2ETestCase,
     FreshProcessCompileCachePerformanceGuardTestCase,
     IncrementalEditStep,
     SemanticCorpusCase,
@@ -84,6 +85,20 @@ NATIVE_REUSE_DIRECTORY_NAME: str = "project-reuse-v3"
 NATIVE_REUSE_SUFFIX: str = ".store"
 NATIVE_REUSE_OUTPUT_SUFFIX: str = ".output"
 RETIRED_REUSE_DIRECTORY_NAME: str = "project-reuse-v1"
+DIALECT_SYNTAX_CONNECTIONS: dict[str, str] = {
+    "duckdb": '[connection]\ndatabase = "shop.duckdb"\n',
+    "snowflake": (
+        '[connection]\naccount = "example"\nuser = "builder"\n\n'
+        '[defaults]\ndatabase = "ANALYTICS"\nschema = "MARTS"\n'
+    ),
+    "clickhouse": (
+        '[connection]\nhost = "localhost"\ndatabase = "default"\n\n[defaults]\nschema = "default"\n'
+    ),
+    "bigquery": (
+        '[connection]\nproject = "example"\ndataset = "marts"\n\n'
+        '[defaults]\ndatabase = "example"\nschema = "marts"\n'
+    ),
+}
 REUSE_LOGGER_NAME: str = "sqlbuild.compile.reuse"
 _DBT_SHAPED_SQL_SIZE_PROFILE: tuple[tuple[float, int], ...] = (
     (0.50, 1_800),
@@ -2946,6 +2961,27 @@ REQUIRE_SQL_ANALYSIS_PROJECT: str = (
     'name = "orders"\nadapter = "duckdb"\n\n[settings]\nrequire_sql_analysis = true\n'
 )
 OPTIONAL_SQL_ANALYSIS_PROJECT: str = 'name = "orders"\nadapter = "duckdb"\n'
+SQLSERVER_REQUIRE_SQL_ANALYSIS_PROJECT: str = (
+    'name = "orders"\nadapter = "sqlserver"\ndefault_target = "dev"\n\n'
+    '[targets.dev]\ndatabase = "warehouse"\nschema = "analytics"\n\n'
+    "[settings]\nrequire_sql_analysis = true\n"
+)
+SQLSERVER_EVENTS_SOURCE: str = (
+    "sources:\n  - name: raw_events\n    description: Event feed.\n    columns:\n"
+    "      - name: id\n        type: INTEGER\n      - name: amount\n        type: INTEGER\n"
+    "      - name: created_at\n        type: TIMESTAMP\n"
+)
+SQLSERVER_BRACKETED_CURSOR_MODEL: str = (
+    'MODEL (\n  description "Events whose bracket name holds a comment opener",\n'
+    "  materialized incremental,\n  incremental_strategy delete_insert,\n  unique_key [id],\n"
+    "  cursor created_at,\n  cursor_type timestamp,\n  cursor_grain day,\n"
+    "  incremental_mode microbatch,\n  microbatch_strategy rolling_window,\n  lookback 1d,\n"
+    "  batch_size 1d,\n  cursor_inputs (\n    raw_events created_at,\n  ),\n);\n\n"
+    "SELECT id, amount AS [x--y], "
+    "CASE WHEN created_at >= __cursor_start() THEN 1 END AS in_window, created_at\n"
+    'FROM __source("raw_events")\n'
+    "WHERE created_at >= __cursor_start() AND created_at < __cursor_end()\n"
+)
 PARSEABLE_OPT_OUT_MODEL: str = (
     'MODEL (\n  description "Order flags",\n  sql_analysis false\n);\n'
     "SELECT 1 = 'pending' AS is_pending, 2 = 'shipped' AS is_shipped\n"
@@ -5489,6 +5525,40 @@ def dialect_ignored_rules_entry(codes: tuple[str, ...]) -> str:
         f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["models/**"]\n'
         'reason = "The case covers parsing this SQL shape."\n'
     )
+
+
+def compile_dialect_syntax_project(
+    test_case: DialectSyntaxCompileE2ETestCase, tmp_path: Path
+) -> tuple[subprocess.CompletedProcess[str], tuple[str, ...], dict[str, int]]:
+    """Compile a dialect-syntax case's project; return the run, its codes and column counts."""
+
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="shop",
+        repo_files={
+            "sqlbuild_project.toml": (
+                f'name = "shop"\nadapter = "{test_case.adapter}"\n\n'
+                f"{DIALECT_SYNTAX_CONNECTIONS[test_case.adapter]}\n"
+                "[scopes]\nenforce_placement = false\n"
+                + {True: dialect_ignored_rules_entry(test_case.ignored_rules), False: ""}[
+                    bool(test_case.ignored_rules)
+                ]
+            ),
+            **{f"models/{name}.sql": sql for name, sql in test_case.models.items()},
+        },
+    )
+
+    compiled: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "compile", "--json"), project_dir=project_dir
+    )
+
+    report: dict[str, Any] = json.loads(compiled.stdout)
+    column_counts: dict[str, int] = {
+        model["name"]: model["column_count"]
+        for model in report.get("resources", {}).get("models", [])
+    }
+    codes: tuple[str, ...] = tuple(item["code"] for item in report["diagnostics"])
+    return compiled, codes, column_counts
 
 
 def append_to_compiled_sql_tests(project_dir: Path) -> None:

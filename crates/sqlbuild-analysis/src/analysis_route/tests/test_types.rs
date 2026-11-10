@@ -1,5 +1,14 @@
-use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
+use sqlquack_parse::parse_strict;
+use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES, SNOWFLAKE};
+use sqlquack_semantics::dialects::types::DialectProfile;
+use sqlquack_semantics::lineage::models::{Nullability, NullabilityRule};
+use sqlquack_syntax::expressions::statements::models::Command;
+use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed};
+
+use crate::analysis_route::models::{AnalysisRoute, GapSite, LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::main::normalize_text_type::normalize_text_type;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -11,7 +20,8 @@ pub(super) struct NativeGapTestCase {
 pub(super) struct RouteTestCase {
     pub(super) description: &'static str,
     pub(super) dialect: Option<&'static str>,
-    pub(super) expected_legacy: bool,
+    /// The name of the native module that analyses the dialect, or `None` when none does.
+    pub(super) expected_module: Option<&'static str>,
 }
 
 pub(super) struct SkippedAnalysisTestCase {
@@ -19,11 +29,12 @@ pub(super) struct SkippedAnalysisTestCase {
     pub(super) model: &'static str,
     pub(super) dialect: &'static str,
     pub(super) gap: LocatedGap,
+    pub(super) site: GapSite<'static>,
     pub(super) expected_code: &'static str,
     pub(super) expected_message: &'static str,
 }
 
-/// A test dialect whose parser refuses PIVOT, unfilled placeholders and one-part stubs.
+/// The PostgreSQL parser, refusing PIVOT, placeholders, one-part stubs and the type `NOT_A_TYPE`.
 pub(super) struct PivotlessDialect;
 
 impl NativeDialect for PivotlessDialect {
@@ -31,29 +42,314 @@ impl NativeDialect for PivotlessDialect {
         "postgres"
     }
 
-    fn read_whole(&self, sql: &str) -> Result<(), ParserGap> {
+    fn stub_prefix(&self) -> &'static str {
+        "__sqlbuild."
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
         let refused = ["PIVOT", "@@@", "__sqlbuild_udf_", "__cursor_", "@'"]
             .iter()
             .filter_map(|word| sql.find(word).map(|offset| (offset, *word)))
             .min();
-        match refused {
-            Some((offset, word)) => Err(ParserGap {
-                construct: word.to_owned(),
-                offset,
-            }),
-            None => Ok(()),
+        if let Some(text) = sql.strip_prefix("RAW ") {
+            return Ok(Parsed {
+                statements: vec![Expression::Command(Box::new(Command {
+                    this: text.to_owned(),
+                }))],
+                gaps: Vec::new(),
+            });
         }
+        if let Some((offset, word)) = refused {
+            return Err(ParserGap {
+                construct: word.to_owned(),
+                message: word.to_owned(),
+                offset,
+                syntax: false,
+            });
+        }
+        sqlquack_syntax_postgres::parse(sql).map_err(|error| ParserGap {
+            construct: error.message.clone(),
+            message: error.message,
+            offset: error.position,
+            syntax: error.syntax,
+        })
+    }
+
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &POSTGRES
+    }
+
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
+        (!spelling.eq_ignore_ascii_case("NOT_A_TYPE")).then(|| normalize_text_type(spelling, None))
+    }
+}
+
+/// DuckDB's shared parser under the DuckDB profile, as MotherDuck projects are analysed.
+pub(super) struct CataloguedDialect;
+
+impl NativeDialect for CataloguedDialect {
+    fn name(&self) -> &'static str {
+        "duckdb"
     }
 
     fn stub_prefix(&self) -> &'static str {
-        "__sqlbuild."
+        "__sqlbuild_"
     }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
+        parse_strict(sql, Dialect::DuckDB, &ParseOptions::default())
+            .map(|statements| Parsed {
+                statements,
+                gaps: Vec::new(),
+            })
+            .map_err(|failure| ParserGap {
+                construct: failure.to_string(),
+                message: failure.to_string(),
+                offset: 0,
+                syntax: false,
+            })
+    }
+
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &DUCKDB
+    }
+
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
+        PivotlessDialect.normalize_type(spelling)
+    }
+}
+
+/// Snowflake's shared parser under the Snowflake profile, which folds unquoted names to upper case.
+pub(super) struct FoldingDialect;
+
+impl NativeDialect for FoldingDialect {
+    fn name(&self) -> &'static str {
+        "snowflake"
+    }
+
+    fn stub_prefix(&self) -> &'static str {
+        "__sqlbuild_"
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
+        parse_strict(sql, Dialect::Snowflake, &ParseOptions::default())
+            .map(|statements| Parsed {
+                statements,
+                gaps: Vec::new(),
+            })
+            .map_err(|failure| ParserGap {
+                construct: failure.to_string(),
+                message: failure.to_string(),
+                offset: 0,
+                syntax: false,
+            })
+    }
+
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &SNOWFLAKE
+    }
+
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
+        PivotlessDialect.normalize_type(spelling)
+    }
+}
+
+pub(super) struct MarkerLineageTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) expected_lines: &'static [&'static str],
+}
+
+pub(super) struct RevalidationTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) poisoned: &'static [(&'static str, &'static str)],
+    pub(super) expected_rows: &'static [(&'static str, Option<i64>, Option<i64>)],
+}
+
+pub(super) struct ReadWholeTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_gap: Option<&'static str>,
+}
+
+pub(super) struct NativeTypeMatchTestCase {
+    pub(super) description: &'static str,
+    pub(super) declared: &'static str,
+    pub(super) inferred: Option<&'static str>,
+    pub(super) expected_match: TypeMatch,
+}
+
+/// One engine type spelling compared with a declared contract type, nullability aside.
+pub(super) struct EngineTypeMatchTestCase {
+    pub(super) description: &'static str,
+    pub(super) declared: &'static str,
+    pub(super) inferred: &'static str,
+    pub(super) expected_same_type: bool,
 }
 
 pub(super) struct TypeMatchTestCase {
     pub(super) description: &'static str,
     pub(super) declared: &'static str,
-    pub(super) inferred: &'static str,
+    pub(super) inferred: Option<&'static str>,
     pub(super) inferred_nullable: bool,
     pub(super) expected_match: TypeMatch,
+}
+
+pub(super) struct FindingTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) sql: &'static str,
+    pub(super) extension_functions: &'static [&'static str],
+    /// The code of each finding in order, with its line and column when the parse placed it.
+    pub(super) expected_findings: &'static [(&'static str, Option<(usize, usize)>)],
+}
+
+pub(super) struct MacroBodyTestCase {
+    pub(super) description: &'static str,
+    pub(super) body: &'static str,
+    /// `(construct, offset in the body)` of the gap, when the body is not read.
+    pub(super) expected_gap: Option<(&'static str, usize)>,
+}
+
+pub(super) struct UnavailableAnalysisTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: Option<&'static str>,
+    pub(super) expected_message: &'static str,
+}
+
+pub(super) struct FindingMessageTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_messages: &'static [(&'static str, &'static str)],
+}
+
+pub(super) struct UnappliedRulesTestCase {
+    pub(super) description: &'static str,
+    pub(super) route: AnalysisRoute,
+    pub(super) functions: &'static [&'static str],
+    pub(super) expected_warning: Option<&'static str>,
+}
+
+/// Each output's name, transform code, confidence code and the columns it reads.
+type ExpectedLineage = &'static [(&'static str, u8, u8, &'static [&'static str])];
+
+pub(super) struct LineageTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_lineage: ExpectedLineage,
+    pub(super) expected_row_sources: &'static [(&'static str, &'static str)],
+}
+
+pub(super) struct ColumnTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// Each output's name, type and nullability.
+    pub(super) expected_columns: &'static [(&'static str, Option<&'static str>, &'static str)],
+}
+
+pub(super) struct StarTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// Whether it projects a star, whether every star column is known, and the column count.
+    pub(super) expected_star: (bool, bool, usize),
+}
+
+pub(super) struct ArmGapTestCase {
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) placeholders: &'static [(&'static str, &'static str)],
+    pub(super) expected_gap: Option<LocatedGap>,
+}
+
+pub(super) struct TypeSpellingTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static str,
+    pub(super) normalize: fn(&str) -> Option<NormalizedType>,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
+}
+
+pub(super) struct NativeOutcomeTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// `raw_orders`' columns, types and nullability as the session knows them; empty when unknown.
+    pub(super) shape: &'static [(&'static str, &'static str, Nullability)],
+    /// The adapter's declared functions as `(name, return type)`.
+    pub(super) declared_functions: &'static [(&'static str, &'static str)],
+    /// The adapter's built-in nullability rules as `(function name, rule)`.
+    pub(super) nullability_rules: &'static [(&'static str, NullabilityRule)],
+    /// Each output column as `name type nullability`, then success, star flags and finding codes.
+    pub(super) expected_lines: &'static [&'static str],
+}
+
+pub(super) struct OpenRelationTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// `raw_orders`' declared columns and types; its full shape is never known.
+    pub(super) declared: &'static [(&'static str, &'static str)],
+    /// Each output column as `name type`, then the finding codes.
+    pub(super) expected_lines: &'static [&'static str],
+}
+
+pub(super) struct NativeLineageTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) placeholders: &'static [(&'static str, &'static str)],
+    pub(super) expected_lines: &'static [&'static str],
+}
+
+pub(super) struct DatabricksTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    /// The type's name and family, or `None` for a spelling Databricks' parser refuses.
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
+    /// Whether the whole type is the one Polyglot gives the spelling.
+    pub(super) expected_as_polyglot: bool,
+}
+
+pub(super) struct TypeSpellingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) spellings: &'static [&'static str],
+    pub(super) expected_mismatches: &'static [&'static str],
+}
+
+pub(super) struct NormalizeTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_name: Option<&'static str>,
+}
+
+pub(super) struct NormalizedTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: (&'static str, TypeFamily, [Option<i64>; 3]),
+}
+
+pub(super) struct ParseFailureTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: String,
+    pub(super) expected_syntax: bool,
+    /// The byte offset of a syntax error; a limit has none worth comparing.
+    pub(super) expected_offset: Option<usize>,
+}
+
+pub(super) struct SessionTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: &'static str,
+}
+
+pub(super) struct TsqlParseTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// `Ok((statements, gaps))` when the parser reads the SQL, `Err((syntax, offset))` when it refuses it.
+    pub(super) expected_parse: Result<(usize, usize), (bool, usize)>,
+}
+
+pub(super) struct TsqlTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
 }

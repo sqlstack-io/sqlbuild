@@ -1,5 +1,7 @@
 //! Every discovered model file attached as a model input by the native model loop.
 
+use std::path::PathBuf;
+
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
@@ -167,6 +169,7 @@ pub(crate) fn build_model_inputs<'py>(
                 "no_sql_validation",
                 "defer_model_sql_validation",
                 "external_sql_reference_resolver",
+                "compile_cache_dir",
             ],
         ),
     )?;
@@ -176,6 +179,7 @@ pub(crate) fn build_model_inputs<'py>(
     let no_sql_validation: bool = arguments.flag("no_sql_validation")?;
     let defer_model_sql_validation: bool = arguments.flag("defer_model_sql_validation")?;
     let external: Bound<'py, PyAny> = arguments.value("external_sql_reference_resolver")?;
+    let cache_dir: Option<PathBuf> = arguments.value("compile_cache_dir")?.extract()?;
     let settings: Bound<'py, PyAny> = native_field(context, "effective_settings")?;
     let validator: Bound<'py, PyAny> = Bound::new(
         py,
@@ -295,7 +299,7 @@ pub(crate) fn build_model_inputs<'py>(
         native_loop.cast::<NativeModelLoop>()?,
         native_project.cast::<NativeCompiledProject>()?.clone(),
         constant_rendering(context)?,
-        files,
+        (files, cache_dir),
     )?;
     PyTuple::new(py, inputs)
 }

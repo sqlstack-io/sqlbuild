@@ -1,48 +1,28 @@
-use polyglot_sql::Dialect;
-use polyglot_sql::parser::NO_PAREN_FUNCTION_NAMES;
-use std::collections::HashMap;
-use std::sync::Mutex;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
+use sqlquack_parse::dialect_tokens;
+use sqlquack_syntax::Dialect;
 
 use crate::compiler::_helpers::sql_tests::planning::{
-    AnalysisTemplate, analysis_template, parsed_analysis_template,
+    AnalysisTemplate, SqlTestPatterns, parsed_analysis_template,
 };
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::_helpers::sql_tests::simple_template::simple_analysis_template;
 use crate::compiler::tests::test_types::SimpleTemplateCorpusOutcome;
 
-pub(crate) fn no_paren_marker_mismatches(dialect_name: &str) -> Vec<String> {
-    let dialect = Dialect::get_by_name(dialect_name).expect("supported test dialect");
-    let cache = Mutex::new(HashMap::new());
-    NO_PAREN_FUNCTION_NAMES
-        .iter()
-        .flat_map(|name| [name.to_string(), name.to_ascii_lowercase()])
-        .flat_map(|name| [name.clone(), format!("\"{name}\"")])
-        .flat_map(|argument| {
-            [
-                format!("__ref({argument})"),
-                format!("__source({argument})"),
-                format!("__seed({argument})"),
-                format!("__dbt_ref({argument})"),
-                format!("__dbt_ref({argument}, \"orders\")"),
-                format!("__dbt_ref(\"orders\", {argument})"),
-            ]
-        })
-        .filter_map(|relation| {
-            let sql = format!("SELECT id FROM {relation}");
-            let fast = simple_analysis_template(&sql, dialect_name, &dialect);
-            let expected = parsed_analysis_template(&sql, &dialect);
-            let actual = analysis_template(&sql, dialect_name, &cache).expect("template cache");
-            (fast.is_some()
-                || actual != expected
-                || expected
-                    .as_ref()
-                    .is_some_and(|facts| !facts.marker_calls.is_empty()))
-            .then(|| format!("{sql}: fast={fast:?}, actual={actual:?}, expected={expected:?}"))
-        })
-        .collect()
+pub(crate) fn template_patterns() -> SqlTestPatterns {
+    SqlTestPatterns::new(LexicalSyntax {
+        line_comment_prefixes: vec!["--".to_owned()],
+        ..LexicalSyntax::default()
+    })
+    .expect("the SQL-test patterns compile")
 }
 
-pub(crate) fn simple_template_corpus_outcome(dialect_name: &str) -> SimpleTemplateCorpusOutcome {
-    let dialect = Dialect::get_by_name(dialect_name).expect("supported test dialect");
+/// Generated templates and their one-token mutations, where the recognizer differs from the parser.
+pub(crate) fn simple_template_corpus_outcome(
+    (dialect_name, dialect): (&str, Dialect),
+) -> SimpleTemplateCorpusOutcome {
+    let parser = sql_test_parser(Some(dialect_name)).expect("a native test dialect");
+    let patterns = template_patterns();
     let mut queries: Vec<String> = Vec::new();
     for projection in [
         "id",
@@ -53,6 +33,7 @@ pub(crate) fn simple_template_corpus_outcome(dialect_name: &str) -> SimpleTempla
         "1.5 AS id",
         "\"__ref(ignored)\" AS id",
         "\"a\"\"b\" AS id",
+        "final.id AS \"Final\"",
     ] {
         for relation in [
             "__ref(\"orders\")",
@@ -61,28 +42,31 @@ pub(crate) fn simple_template_corpus_outcome(dialect_name: &str) -> SimpleTempla
             "__dbt_ref(\"shop\", \"orders\")",
             "\"__ref\"(\"orders\")",
             "__REF(orders)",
-            "\"__REF\"(\"orders\")",
+            "__ref(\"now\")",
             "__ref(final)",
             "__ref(\"a.b\")",
             "__ref(\"a\"\"b\")",
+            "\"__sqb_0\"",
+            "final",
         ] {
             let body = format!("SELECT {projection} FROM {relation}");
             for sql in [
                 body.clone(),
+                format!("{body};"),
                 format!("WITH recent AS ({body}) SELECT id FROM recent"),
                 format!("{body} UNION ALL BY NAME {body}"),
                 format!(
-                    "WITH recent AS ({body}) SELECT id FROM __ref(\"customers\") AS c JOIN recent AS r ON c.id = r.id"
+                    "WITH recent AS ({body}) SELECT id FROM __ref(\"customers\") AS c LEFT JOIN recent AS r ON c.id = r.id WHERE r.id = 0"
                 ),
             ] {
-                let tokens = dialect.tokenize(&sql).expect("generated SQL tokenizes");
+                let tokens = dialect_tokens(&sql, dialect).expect("generated SQL tokenizes");
                 for token in &tokens {
                     queries.push(format!(
                         "{} {}",
                         &sql[..token.span.start],
                         &sql[token.span.end..]
                     ));
-                    for inserted in [".", ")", "(", "FROM", "'__ref(\"ignored\")'"] {
+                    for inserted in [".", ")", "(", "FROM", "'__ref(\"ignored\")'", "--"] {
                         queries.push(format!(
                             "{} {inserted} {}",
                             &sql[..token.span.start],
@@ -97,7 +81,7 @@ pub(crate) fn simple_template_corpus_outcome(dialect_name: &str) -> SimpleTempla
     let recognized: Vec<(String, AnalysisTemplate)> = queries
         .into_iter()
         .filter_map(|sql| {
-            simple_analysis_template(&sql, dialect_name, &dialect).map(|facts| (sql, facts))
+            simple_analysis_template(&sql, dialect_name, &patterns).map(|facts| (sql, facts))
         })
         .collect();
     SimpleTemplateCorpusOutcome {
@@ -105,7 +89,7 @@ pub(crate) fn simple_template_corpus_outcome(dialect_name: &str) -> SimpleTempla
         mismatches: recognized
             .into_iter()
             .filter_map(|(sql, fast)| {
-                let parsed = parsed_analysis_template(&sql, &dialect);
+                let parsed = parsed_analysis_template(&sql, (parser, &patterns));
                 (Some(&fast) != parsed.as_ref())
                     .then(|| format!("{sql}: fast={fast:?}, parsed={parsed:?}"))
             })

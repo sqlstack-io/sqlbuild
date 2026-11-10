@@ -23,7 +23,7 @@
      },
      "help": "use a Boolean predicate in this condition",
      "notes": [
-      "status is TEXT"
+      "status is VARCHAR"
      ]
     }
    ]

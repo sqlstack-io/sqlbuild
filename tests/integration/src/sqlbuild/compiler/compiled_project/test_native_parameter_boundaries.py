@@ -81,6 +81,7 @@ def test_given_adapter_parameter_when_attaching_native_test_then_actual_sql_uses
             collection_rendering=CollectionRendering.VALUE_LIST,
             python_functions_inherit_default_namespace=True,
             sql_lexical_syntax=adapter.sql_lexical_syntax,
+            sql_analysis_dialect=adapter.sql_analysis_dialect_name,
         ),
         run_id="test_run",
     )
@@ -119,6 +120,7 @@ def test_given_quoted_hook_argument_when_attaching_then_inserted_marker_is_not_r
             collection_rendering=CollectionRendering.VALUE_LIST,
             python_functions_inherit_default_namespace=True,
             sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+            sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name,
         ),
         run_id="test_run",
     )

@@ -308,6 +308,7 @@ def test_given_compiled_project_when_building_fast_column_lineage_then_infers_ex
 
     result: ProjectColumnLineage | None = project_column_lineage(
         project=project,
+        dialect="duckdb",
         mode=ColumnLineageMode.FAST,
     )
 
@@ -456,6 +457,7 @@ def test_given_compact_analysis_facts_when_building_fast_lineage_then_preserves_
 
     result: ProjectColumnLineage | None = project_column_lineage(
         project=make_compiled_project(models=(upstream, target)),
+        dialect="duckdb",
         mode=ColumnLineageMode.FAST,
     )
 

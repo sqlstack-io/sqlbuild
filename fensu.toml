@@ -1981,7 +1981,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/compute_logs/storage.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/contract_command/command.rs=18",
     "crates/sqlbuild-python/src/bindings/_helpers/contract_command/write.rs=5",
-    "crates/sqlbuild-python/src/bindings/_helpers/contracts/contract_diagnostics.rs=8",
+    "crates/sqlbuild-python/src/bindings/_helpers/contracts/contract_diagnostics.rs=6",
     "crates/sqlbuild-python/src/bindings/_helpers/contracts/effective_config.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/contracts/resource_identities.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/contracts/spec_resolution.rs=9",
@@ -2150,7 +2150,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/lifecycle_events/validation.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/column_lineage_graph.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_cache.rs=28",
-    "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_command.rs=13",
+    "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_command.rs=12",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_facts.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_index.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_objects.rs=17",
@@ -2931,6 +2931,22 @@ reason = "The override keeps queue.Queue.put's positional protocol, which every 
 rule = "FFS201"
 path = "src/sqlbuild/orchestration_declarations/models/sensor_context.py"
 reason = "Only SensorContext lives here: invocation-local ctx.cursor assignment proposes progress, committed solely by native fenced completion. The package regression guards this declaration-only scope; class-symbol exceptions are unsupported."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/bigquery_dialect.rs", "crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/databricks_dialect.rs", "crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/duckdb_dialect.rs", "crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/postgres_dialect.rs", "crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/sqlite_dialect.rs"]
+reason = "Each native module maps its own parser crate's StrictFailure, a distinct type per dialect, into a ParserGap, and decides per dialect whether an uncovered construct counts as syntax."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/bigquery_dialect.rs", "crates/sqlbuild-rules/src/lint_text/_helpers/sql_requests.rs"]
+reason = "BigQuery STRUCT fields split at angle brackets and backquoted names; lint arguments split at square brackets and string quotes. Different grammars in different crates."
+
+[[dupes.allowlist]]
+paths = ["scripts/compiler_differential/classes/analysis_features.py", "scripts/compiler_differential/classes/render_features.py"]
+reason = "Each differential feature writes its own model fixture; what remains alike is the call that adds a model."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/analysis_route/_helpers/analysis/revalidation.rs", "crates/sqlbuild-config/src/dbt_manifest/_helpers/fields.rs"]
+reason = "A relation's declared columns and a dbt manifest's string field are unrelated lookups in different crates; only the find-non-empty shape is alike."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-analysis/src/warehouse_types/_helpers/type_trees.rs", "crates/sqlbuild-analysis/src/assembly/analysis_session/_helpers/dict_walk.rs", "crates/sqlbuild-analysis/src/relation_names/_helpers/walk.rs"]

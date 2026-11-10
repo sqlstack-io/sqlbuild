@@ -284,7 +284,13 @@ fn project_fields<'py>(
     ] {
         fields.set_item(name, compiled_resources(inputs, resources, kind)?)?;
     }
-    fields.set_item("sql_tests", assembled_sql_tests(inputs)?)?;
+    fields.set_item(
+        "sql_tests",
+        assembled_sql_tests(
+            inputs,
+            native_field(&context.profile, "sql_analysis_dialect")?.extract()?,
+        )?,
+    )?;
     fields.set_item("sql_scenarios", compiled_sql_scenarios(inputs)?)?;
     for name in ["loader_functions", "hook_functions"] {
         fields.set_item(name, native_field(&discovered, name)?)?;

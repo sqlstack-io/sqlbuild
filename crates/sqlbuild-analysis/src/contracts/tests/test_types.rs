@@ -25,7 +25,8 @@ pub(crate) struct PromotionTestCase {
 pub(crate) struct UnknownDialectTestCase {
     pub(crate) description: &'static str,
     pub(crate) dialect: &'static str,
-    pub(crate) expected_error: &'static str,
+    /// Whether the declared and inferred types are compared, so their mismatch is reported.
+    pub(crate) expected_compared: bool,
 }
 
 pub(crate) struct EnumLiteralTestCase {
@@ -49,4 +50,15 @@ pub(crate) struct EnumLiteralDialectTestCase {
     pub(crate) description: &'static str,
     pub(crate) dialect: &'static str,
     pub(crate) expected_count: usize,
+}
+
+pub(crate) struct CastingBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) declared_type: &'static str,
+    pub(crate) inferred_type: &'static str,
+    pub(crate) materialized: &'static str,
+    pub(crate) incremental_mode: Option<&'static str>,
+    pub(crate) staged_promotion: bool,
+    /// Whether the column's type is reported as a K002 mismatch.
+    pub(crate) expected_mismatch: bool,
 }

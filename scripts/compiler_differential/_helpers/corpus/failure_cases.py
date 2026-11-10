@@ -114,9 +114,13 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="model-sql-syntax",
             expected_code="P001",
-            files=staging_files(
-                FAILURE_BASE_STAGING.replace("SELECT order_id,", "SELECT order_id,, ")
-            ),
+            files={
+                FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
+                + "\n[settings]\nrequire_sql_analysis = true\n",
+                **staging_files(
+                    FAILURE_BASE_STAGING.replace("SELECT order_id,", "SELECT order_id,, ")
+                ),
+            },
         ),
         failure_case(
             name="test-parse",

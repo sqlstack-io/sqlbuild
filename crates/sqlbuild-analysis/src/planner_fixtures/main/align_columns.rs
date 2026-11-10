@@ -43,7 +43,7 @@ pub fn align_columns(label: &str, input: AlignmentInput<'_>) -> Alignment {
             completed: None,
         };
     }
-    if input.star && !supplied_in_schema_order(&input) {
+    if input.star && !completed.is_empty() && !supplied_in_schema_order(&input) {
         return Alignment {
             diagnostics: vec![format!(
                 "{label} supplies columns out of authoritative order for a SELECT * closure; provide the leading relation columns in schema order"

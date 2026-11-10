@@ -40,6 +40,26 @@ class CyclicAnalysisTestCase:
 
 
 @dataclass(frozen=True)
+class SourceTypesTestCase:
+    """A model reading a source with declared types, with or without the source's expression."""
+
+    description: str
+    files: dict[str, str]
+    lineage_mode: ColumnLineageMode
+    expected_types: tuple[tuple[str, str | None], ...]
+    dialect: str = "duckdb"
+
+
+@dataclass(frozen=True)
+class AdapterWaveTestCase:
+    """A shipped adapter's own profile, whose session must analyse each model natively."""
+
+    description: str
+    profile: ExpressionInferenceProfile
+    expected_shared: int
+
+
+@dataclass(frozen=True)
 class CyclicCompileTestCase:
     """A project whose models `ref` each other, compiled through the CLI."""
 
@@ -62,7 +82,7 @@ class StandalonePivotProofTestCase:
 
 @dataclass(frozen=True)
 class SharedAnalysisTestCase:
-    """Models whose equal queries share one analysis, some inexact and so re-analysed alone."""
+    """Models with equal queries, some inexact, and how many analyses the session shares."""
 
     description: str
     regions: tuple[str, ...]
@@ -88,13 +108,13 @@ class CteFactRecoveryParityTestCase:
 
 @dataclass(frozen=True)
 class AdapterRuleCallbackTestCase:
-    """A project-local adapter rule the native session calls back into, and what it raises."""
+    """An adapter's own nullability rule, what it raises if called, and the native warning."""
 
     description: str
     seed: int
     model_count: int
     raised: type[Exception] | None
-    expected_minimum_calls: int
+    expected_warning: str
 
 
 @dataclass(frozen=True)

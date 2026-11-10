@@ -14,6 +14,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
     PARSEABLE_OPT_OUT_MODEL,
     PATH_DEFAULT_MODEL,
     REQUIRE_SQL_ANALYSIS_PROJECT,
+    SQLSERVER_BRACKETED_CURSOR_MODEL,
+    SQLSERVER_EVENTS_SOURCE,
+    SQLSERVER_REQUIRE_SQL_ANALYSIS_PROJECT,
     UNPARSEABLE_OPT_OUT_MODEL,
     require_sql_analysis_output,
 )
@@ -82,6 +85,18 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             command=_COMPILE,
             expected_returncode=0,
             expected_diagnostics=(),
+            expected_text_fragments=(),
+        ),
+        RequireSqlAnalysisCase(
+            description="a T-SQL cursor stub after a bracket name holding -- is analysed, not skipped",
+            repo_files=(
+                ("sqlbuild_project.toml", SQLSERVER_REQUIRE_SQL_ANALYSIS_PROJECT),
+                ("sources/raw.yml", SQLSERVER_EVENTS_SOURCE),
+                ("models/bracketed_events.sql", SQLSERVER_BRACKETED_CURSOR_MODEL),
+            ),
+            command=_COMPILE,
+            expected_returncode=0,
+            expected_diagnostics=(("L007", "models/bracketed_events.sql", 18),),
             expected_text_fragments=(),
         ),
         RequireSqlAnalysisCase(

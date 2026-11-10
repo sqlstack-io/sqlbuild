@@ -13,23 +13,23 @@ fn given_typed_markers_when_analysing_then_each_call_has_its_asserted_or_inferre
         TypedMarkerTestCase {
             description: "an unknown body takes the asserted type",
             sql: "SELECT __polyglot_typed(bar(amount, 0, 10), 'VARCHAR') AS v FROM __ref(\"staged\")",
-            expected_column: "v TEXT",
+            expected_column: "v VARCHAR",
         },
         TypedMarkerTestCase {
             description: "a known body keeps its inferred type",
             sql: "SELECT __polyglot_typed(order_id, 'VARCHAR') AS v FROM __ref(\"staged\")",
-            expected_column: "v INT ",
+            expected_column: "v INTEGER ",
         },
         TypedMarkerTestCase {
             description: "a known aliased column keeps its inferred type",
             sql: "SELECT __polyglot_typed(o.order_id, 'VARCHAR') AS v FROM __ref(\"staged\") AS o",
-            expected_column: "v INT ",
+            expected_column: "v INTEGER ",
         },
         TypedMarkerTestCase {
             description: "a later set-operation branch types the union",
             sql: "SELECT CAST(NULL AS VARCHAR) AS v FROM __ref(\"staged\") UNION ALL \
                   SELECT __polyglot_typed(bar(amount, 0, 10), 'VARCHAR') AS v FROM __ref(\"staged\")",
-            expected_column: "v TEXT",
+            expected_column: "v VARCHAR",
         },
         TypedMarkerTestCase {
             description: "a NULL body takes the asserted type in a union",
@@ -41,13 +41,13 @@ fn given_typed_markers_when_analysing_then_each_call_has_its_asserted_or_inferre
             description: "a CTE read by name",
             sql: "WITH c AS (SELECT __polyglot_typed(bar(amount, 0, 10), 'VARCHAR') AS v \
                   FROM __ref(\"staged\")) SELECT v FROM c",
-            expected_column: "v TEXT",
+            expected_column: "v VARCHAR",
         },
         TypedMarkerTestCase {
             description: "an operand of a larger expression",
             sql: "SELECT COALESCE(__polyglot_typed(bar(amount, 0, 10), 'VARCHAR'), 'x') AS v \
                   FROM __ref(\"staged\")",
-            expected_column: "v TEXT",
+            expected_column: "v VARCHAR",
         },
     ];
 

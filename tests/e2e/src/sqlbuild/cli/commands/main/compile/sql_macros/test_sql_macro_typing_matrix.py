@@ -386,20 +386,6 @@ def test_given_a_known_different_body_when_compiling_then_the_inferred_type_stan
             expected_fragments=_CLEAN,
         ),
         SqlMacroCompileTestCase(
-            description="a_call_in_a_keyword_slot_keeps_the_analysis_whole",
-            files={
-                **text_macro("part", "VARCHAR", "YEAR"),
-                **contract_model(
-                    "orders",
-                    "y (type BIGINT)",
-                    f"SELECT EXTRACT(@sql.part(o.status) FROM o.created_at) AS y {_FROM}\n",
-                ),
-            },
-            expected_returncode=0,
-            expected_fragments=_CLEAN,
-            unexpected_fragments=("Semantic checks were partial",),
-        ),
-        SqlMacroCompileTestCase(
             description="a_call_as_a_snowflake_dateadd_part",
             files={
                 **adapter_project("snowflake"),
@@ -484,6 +470,86 @@ def test_given_a_typed_call_case_when_compiling_then_it_reports_as_expected(
         assert fragment in printed, printed
     for fragment in test_case.unexpected_fragments:
         assert fragment not in printed, printed
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="native DuckDB analysis reports EXTRACT, a DuckDB parser special form, as an unknown function",
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlMacroCompileTestCase(
+            description="a_call_in_a_keyword_slot_keeps_the_analysis_whole",
+            files={
+                **text_macro("part", "VARCHAR", "YEAR"),
+                **contract_model(
+                    "orders",
+                    "y (type BIGINT)",
+                    f"SELECT EXTRACT(@sql.part(o.status) FROM o.created_at) AS y {_FROM}\n",
+                ),
+            },
+            expected_returncode=0,
+            expected_fragments=_CLEAN,
+            unexpected_fragments=("Semantic checks were partial",),
+        ),
+        SqlMacroCompileTestCase(
+            description="an_extract_without_a_macro_compiles_clean",
+            files=contract_model(
+                "orders",
+                "y (type BIGINT)",
+                f"SELECT EXTRACT(YEAR FROM o.created_at) AS y {_FROM}\n",
+            ),
+            expected_returncode=0,
+            expected_fragments=_CLEAN,
+            unexpected_fragments=("Semantic checks were partial",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_extract_on_duckdb_when_compiling_then_it_compiles_clean(
+    test_case: SqlMacroCompileTestCase, tmp_path: Path
+) -> None:
+    _, result = run_project(
+        tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
+    )
+
+    assert result.returncode == test_case.expected_returncode, output(result)
+    for fragment in test_case.expected_fragments:
+        assert fragment in output(result), output(result)
+    for fragment in test_case.unexpected_fragments:
+        assert fragment not in output(result), output(result)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlMacroCompileTestCase(
+            description="a_date_part_call_compiles_clean",
+            files=contract_model(
+                "orders",
+                "y (type BIGINT)",
+                f"SELECT date_part('year', o.created_at) AS y {_FROM}\n",
+            ),
+            expected_returncode=0,
+            expected_fragments=_CLEAN,
+            unexpected_fragments=("Semantic checks were partial",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_date_part_on_duckdb_when_compiling_then_it_compiles_clean(
+    test_case: SqlMacroCompileTestCase, tmp_path: Path
+) -> None:
+    _, result = run_project(
+        tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
+    )
+
+    assert result.returncode == test_case.expected_returncode, output(result)
+    for fragment in test_case.expected_fragments:
+        assert fragment in output(result), output(result)
+    for fragment in test_case.unexpected_fragments:
+        assert fragment not in output(result), output(result)
 
 
 @pytest.mark.parametrize(

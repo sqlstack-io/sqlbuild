@@ -2,14 +2,17 @@
 
 use std::collections::HashSet;
 
-use polyglot_sql::expressions::{Identifier, Select};
-use polyglot_sql::{Dialect, Expression};
+use sqlquack_syntax::expressions::names::models::Identifier;
+use sqlquack_syntax::expressions::queries::models::Select;
+use sqlquack_syntax::{Expression, Parsed};
+
+use crate::analysis_route::types::NativeDialect;
 
 /// Return the authored output column identifiers of `sql`, or `None` when they are not explicit.
-pub(crate) fn expected_columns(sql: &str, dialect: &Dialect) -> Option<Vec<String>> {
-    let mut statements = match dialect.parse(sql) {
-        Ok(statements) => statements,
-        Err(_) => return None,
+pub(crate) fn expected_columns(sql: &str, parser: &dyn NativeDialect) -> Option<Vec<String>> {
+    let mut statements = match parser.parse(sql) {
+        Ok(Parsed { statements, gaps }) if gaps.is_empty() => statements,
+        _ => return None,
     };
     if statements.len() != 1 {
         return None;

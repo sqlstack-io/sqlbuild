@@ -2,7 +2,7 @@ use sqlbuild_render::macro_arguments::main::parse_macro_arguments::parse_macro_a
 use sqlbuild_render::macro_arguments::models::ArgumentValue;
 use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_sites;
 
-use crate::sql_macros::tests::helpers::expanded_for;
+use crate::sql_macros::tests::helpers::{adapter_parses, expanded_for};
 use crate::sql_macros::tests::test_types::{
     AsciiArguments, ExpansionErrorTestCase, ExpansionTestCase, PythonArgumentTestCase,
 };
@@ -61,6 +61,10 @@ const PLUS_ONE: (&str, &str) = (
     "plus_one",
     "MACRO (description \"Plus one\", arguments (v BIGINT), returns BIGINT);\n\n@v + 1\n",
 );
+const MONEY_TYPE: (&str, &str) = (
+    "money_type",
+    "MACRO (description \"Money type\", returns VARCHAR);\n\nDECIMAL(18, 2)\n",
+);
 const ROUND_TO: (&str, &str) = (
     "round_to",
     "MACRO (description \"Rounded\", arguments (v DECIMAL(18, 4), places INT), returns DECIMAL(18, 2));\n\nROUND(@v, @places)\n",
@@ -117,6 +121,14 @@ const SPACED_DECLARATIONS: (&str, &str) = (
     "spaced",
     "MACRO (description \"Spaced\", arguments (status VARCHAR, places INT), returns BOOLEAN);\n\n@status <> @enum (\"order_status\").CLOSED AND @places = @const (\"price_places\")\n",
 );
+const ENUM_DECLARATION: (&str, &str) = (
+    "with_closed",
+    "MACRO (description \"With closed\", arguments (status VARCHAR));\n\nCONCAT(@status, @enum (\"order_status\").CLOSED)\n",
+);
+const CONST_DECLARATION: (&str, &str) = (
+    "plus_places",
+    "MACRO (description \"Plus places\", arguments (places INT));\n\n@places + @const (\"price_places\")\n",
+);
 const ORDER_KEY: (&str, &str) = (
     "order_key",
     "MACRO (description \"Order key\", arguments (store_code VARCHAR, order_number ANY), returns VARCHAR);\n\n@store_code || '::' || CAST(@order_number AS VARCHAR)\n",
@@ -168,14 +180,14 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
     let test_cases = [
         ExpansionTestCase {
             description: "expression with a named constant argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CENTS_TO_DOLLARS],
             sql: "SELECT @sql.cents_to_dollars(o.fee_cents + o.tax_cents, places := 0) AS fees FROM orders AS o",
             expected_sql: "SELECT CAST(ROUND((o.fee_cents + o.tax_cents) / 100, 0) AS DECIMAL(18, 2)) AS fees FROM orders AS o",
         },
         ExpansionTestCase {
             description: "expression stacking another expression macro",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CENTS_TO_DOLLARS, NET_AMOUNT],
             sql: "SELECT @sql.net_amount(o.gross_cents, o.refund_cents) AS net FROM orders AS o",
             expected_sql: "SELECT CAST(ROUND((o.gross_cents - COALESCE(o.refund_cents, 0)) / 100, 2) AS DECIMAL(18, 2)) AS net FROM orders AS o",
@@ -188,155 +200,169 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
             expected_sql: "SELECT 'it\\'s @sql.x(' AS note, CAST(ROUND((o.a - COALESCE(o.b, 0)) / 100, 2) AS DECIMAL(18, 2)) AS net FROM orders AS o",
         },
         ExpansionTestCase {
+            description: "a body that only reads as a type fills a cast's type",
+            adapter: "duckdb",
+            macros: &[MONEY_TYPE],
+            sql: "SELECT CAST(o.v AS @sql.money_type()) AS m FROM orders AS o",
+            expected_sql: "SELECT CAST(o.v AS DECIMAL(18, 2)) AS m FROM orders AS o",
+        },
+        ExpansionTestCase {
             description: "an expression call before AT TIME ZONE is parenthesised",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[PLUS_ONE],
             sql: "SELECT @sql.plus_one(o.v) AT TIME ZONE 'UTC' AS t FROM orders AS o",
             expected_sql: "SELECT (o.v + 1) AT TIME ZONE 'UTC' AS t FROM orders AS o",
         },
         ExpansionTestCase {
             description: "an expression call before FILTER is parenthesised",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[PLUS_ONE],
             sql: "SELECT @sql.plus_one(o.v) FILTER (WHERE o.v > 0) AS t FROM orders AS o",
             expected_sql: "SELECT (o.v + 1) FILTER (WHERE o.v > 0) AS t FROM orders AS o",
         },
         ExpansionTestCase {
             description: "two different CTE-list calls without commas",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS, ALIASED_COLUMNS],
             sql: "WITH r AS (SELECT 1 AS id) @sql.clean_orders(r) @sql.aliased_ids(latest) final AS (SELECT 1) SELECT * FROM final",
             expected_sql: "WITH r AS (SELECT 1 AS id) , live AS (SELECT * FROM r WHERE NOT is_deleted),\nranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS row_num\n  FROM live\n),\nlatest AS (SELECT * EXCLUDE (row_num) FROM ranked WHERE row_num = 1), picked_ids AS (SELECT s.id FROM latest AS s), final AS (SELECT 1) SELECT * FROM final",
         },
         ExpansionTestCase {
             description: "a comma after the last CTE-list call before the final query",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[ALIASED_COLUMNS],
             sql: "WITH r AS (SELECT 1 AS id), @sql.aliased_ids(r), SELECT * FROM picked_ids",
             expected_sql: "WITH r AS (SELECT 1 AS id), picked_ids AS (SELECT s.id FROM r AS s) SELECT * FROM picked_ids",
         },
         ExpansionTestCase {
             description: "a column-list call without a comma before it",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[AUDIT_COLUMNS],
             sql: "SELECT o.order_id @sql.audit_columns(o) FROM orders AS o",
             expected_sql: "SELECT o.order_id , o.created_at, o.updated_at, o.updated_at > o.created_at AS was_updated FROM orders AS o",
         },
         ExpansionTestCase {
             description: "CTE list inserted flat with its own names",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH orders_raw AS (SELECT * FROM __ref(\"stg_orders\")),\n@sql.clean_orders(orders_raw)\nfinal AS (SELECT order_id, amount FROM latest)\nSELECT * FROM final",
             expected_sql: "WITH orders_raw AS (SELECT * FROM __ref(\"stg_orders\")),\nlive AS (SELECT * FROM orders_raw WHERE NOT is_deleted),\nranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS row_num\n  FROM live\n),\nlatest AS (SELECT * EXCLUDE (row_num) FROM ranked WHERE row_num = 1),\nfinal AS (SELECT order_id, amount FROM latest)\nSELECT * FROM final",
         },
         ExpansionTestCase {
             description: "CTE list called twice, each call naming its CTEs with __cte",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH eu_raw AS (SELECT 1 AS order_id), us_raw AS (SELECT 2 AS order_id),\n@sql.clean_orders(eu_raw, __cte := eu_orders)\n@sql.clean_orders(us_raw, __CTE := us_orders)\nfinal AS (SELECT * FROM eu_orders UNION ALL SELECT * FROM us_orders)\nSELECT * FROM final",
             expected_sql: "WITH eu_raw AS (SELECT 1 AS order_id), us_raw AS (SELECT 2 AS order_id),\neu_orders__live AS (SELECT * FROM eu_raw WHERE NOT is_deleted),\neu_orders__ranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS row_num\n  FROM eu_orders__live\n),\neu_orders AS (SELECT * EXCLUDE (row_num) FROM eu_orders__ranked WHERE row_num = 1),\nus_orders__live AS (SELECT * FROM us_raw WHERE NOT is_deleted),\nus_orders__ranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS row_num\n  FROM us_orders__live\n),\nus_orders AS (SELECT * EXCLUDE (row_num) FROM us_orders__ranked WHERE row_num = 1),\nfinal AS (SELECT * FROM eu_orders UNION ALL SELECT * FROM us_orders)\nSELECT * FROM final",
         },
         ExpansionTestCase {
             description: "__cte renames the macro's CTEs but never an argument of the same name",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH live AS (SELECT 1 AS order_id), @sql.clean_orders(live, __cte := picked) SELECT * FROM picked",
             expected_sql: "WITH live AS (SELECT 1 AS order_id), picked__live AS (SELECT * FROM live WHERE NOT is_deleted),\npicked__ranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS row_num\n  FROM picked__live\n),\npicked AS (SELECT * EXCLUDE (row_num) FROM picked__ranked WHERE row_num = 1) SELECT * FROM picked",
         },
         ExpansionTestCase {
             description: "__cte renames qualified references to a renamed CTE",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[LATEST_PER_KEY],
             sql: "WITH r AS (SELECT 1 AS id, 2 AS updated_at), @sql.latest_per_key(r, src.keys := (id), __cte := l) SELECT * FROM l",
             expected_sql: "WITH r AS (SELECT 1 AS id, 2 AS updated_at), l__latest_ranked AS (\n  SELECT r.*, ROW_NUMBER() OVER (PARTITION BY id ORDER BY updated_at DESC) AS row_num FROM r\n),\nl AS (SELECT * EXCLUDE (row_num) FROM l__latest_ranked WHERE row_num = 1) SELECT * FROM l",
         },
         ExpansionTestCase {
             description: "CTE list extracted from a model compiles to the original",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[LATEST_LIVE_ORDERS],
             sql: "WITH c1 AS (SELECT * FROM __ref(\"stg_orders\")),\n@sql.latest_live_orders(c1)\nc5 AS (SELECT order_id, amount FROM c4)\nSELECT * FROM c5",
             expected_sql: "WITH c1 AS (SELECT * FROM __ref(\"stg_orders\")),\nc2 AS (SELECT * FROM c1 WHERE NOT is_deleted),\nc3 AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS row_num FROM c2),\nc4 AS (SELECT * EXCLUDE (row_num) FROM c3 WHERE row_num = 1),\nc5 AS (SELECT order_id, amount FROM c4)\nSELECT * FROM c5",
         },
         ExpansionTestCase {
             description: "CTE list last before the final query, comma after the call optional",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH orders_raw AS (SELECT 1 AS order_id), @sql.clean_orders(orders_raw), final AS (SELECT * FROM latest) SELECT * FROM final",
             expected_sql: "WITH orders_raw AS (SELECT 1 AS order_id), live AS (SELECT * FROM orders_raw WHERE NOT is_deleted),\nranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS row_num\n  FROM live\n),\nlatest AS (SELECT * EXCLUDE (row_num) FROM ranked WHERE row_num = 1), final AS (SELECT * FROM latest) SELECT * FROM final",
         },
         ExpansionTestCase {
             description: "CTE list reading a reference relation keeps the parameter as its alias",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH @sql.clean_orders(__ref(\"stg_orders\")) SELECT * FROM latest",
             expected_sql: "WITH live AS (SELECT * FROM __ref(\"stg_orders\") AS src WHERE NOT is_deleted),\nranked AS (\n  SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS row_num\n  FROM live\n),\nlatest AS (SELECT * EXCLUDE (row_num) FROM ranked WHERE row_num = 1) SELECT * FROM latest",
         },
         ExpansionTestCase {
             description: "column list inserted into the select list",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[AUDIT_COLUMNS],
             sql: "SELECT o.order_id, @sql.audit_columns(o) FROM orders AS o",
             expected_sql: "SELECT o.order_id, o.created_at, o.updated_at, o.updated_at > o.created_at AS was_updated FROM orders AS o",
         },
         ExpansionTestCase {
             description: "column list followed by another column without a comma",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[AUDIT_COLUMNS],
             sql: "SELECT @sql.audit_columns(o) o.order_id FROM orders AS o",
             expected_sql: "SELECT o.created_at, o.updated_at, o.updated_at > o.created_at AS was_updated, o.order_id FROM orders AS o",
         },
         ExpansionTestCase {
             description: "enum default resolved in the macro's scope",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[IS_OPEN_STATUS],
             sql: "SELECT * FROM orders AS o WHERE @sql.is_open_status(o.status)",
             expected_sql: "SELECT * FROM orders AS o WHERE o.status <> 'closed'",
         },
         ExpansionTestCase {
             description: "expression parenthesised between operators",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[IS_OPEN_STATUS],
             sql: "SELECT * FROM orders AS o WHERE o.id > 1 AND @sql.is_open_status(o.status)",
             expected_sql: "SELECT * FROM orders AS o WHERE o.id > 1 AND (o.status <> 'closed')",
         },
         ExpansionTestCase {
             description: "list constant passed by name",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[IN_SUPPORTED_COUNTRY],
             sql: "SELECT * FROM orders AS o WHERE @sql.in_supported_country(o.country_code, countries := @const(\"supported_countries\"))",
             expected_sql: "SELECT * FROM orders AS o WHERE o.country_code IN ('GB', 'FR', 'HK')",
         },
         ExpansionTestCase {
             description: "inline list default renders like a constant",
-            adapter: "",
+            adapter: "duckdb",
+            macros: &[IN_SUPPORTED_COUNTRY],
+            sql: "SELECT @sql.in_supported_country(o.country_code) AS supported FROM orders AS o",
+            expected_sql: "SELECT o.country_code IN ('GB', 'FR') AS supported FROM orders AS o",
+        },
+        ExpansionTestCase {
+            description: "a list after IN is a list, not SQLite's IN table-name",
+            adapter: "sqlite",
             macros: &[IN_SUPPORTED_COUNTRY],
             sql: "SELECT @sql.in_supported_country(o.country_code) AS supported FROM orders AS o",
             expected_sql: "SELECT o.country_code IN ('GB', 'FR') AS supported FROM orders AS o",
         },
         ExpansionTestCase {
             description: "a COLUMNS slot of a relation",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[LATEST_PER_KEY],
             sql: "WITH customers_raw AS (SELECT 1 AS customer_id), @sql.latest_per_key(customers_raw, src.keys := (customer_id)) SELECT * FROM latest_rows",
             expected_sql: "WITH customers_raw AS (SELECT 1 AS customer_id), latest_ranked AS (\n  SELECT customers_raw.*, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY updated_at DESC) AS row_num FROM customers_raw\n),\nlatest_rows AS (SELECT * EXCLUDE (row_num) FROM latest_ranked WHERE row_num = 1) SELECT * FROM latest_rows",
         },
         ExpansionTestCase {
             description: "a bare name is the column and @name the parameter of the same name",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[STATUS_MATCHES],
             sql: "SELECT * FROM orders AS o WHERE @sql.status_matches('open')",
             expected_sql: "SELECT * FROM orders AS o WHERE status = 'open'",
         },
         ExpansionTestCase {
             description: "an aliased reference relation keeps its alias",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[ALIASED_COLUMNS],
             sql: "WITH @sql.aliased_ids(__ref(\"orders\")) SELECT * FROM picked_ids",
             expected_sql: "WITH picked_ids AS (SELECT s.id FROM __ref(\"orders\") AS s) SELECT * FROM picked_ids",
         },
         ExpansionTestCase {
             description: "SQL macro result passed to a Python macro as a string",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CENTS_TO_DOLLARS],
             sql: "SELECT @py.label(@sql.cents_to_dollars(o.fee)) AS fee FROM orders AS o",
             expected_sql: "SELECT @py.label(\"CAST(ROUND(o.fee / 100, 2) AS DECIMAL(18, 2))\") AS fee FROM orders AS o",
@@ -357,14 +383,14 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
         },
         ExpansionTestCase {
             description: "enum value for a CONST argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[STATUS_LABEL],
             sql: "SELECT @sql.status_label(@enum(\"order_status\").OPEN) AS label",
             expected_sql: "SELECT 'status: ' || 'open' AS label",
         },
         ExpansionTestCase {
             description: "CONST parameter forwarded to a CONST argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[SCALED, SCALED_BY_CONST],
             sql: "SELECT @sql.scaled_by_const(o.amount, 3) AS v FROM orders AS o",
             expected_sql: "SELECT o.amount * 3 AS v FROM orders AS o",
@@ -378,35 +404,35 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
         },
         ExpansionTestCase {
             description: "a parameter followed by words and a parenthesis is a parameter",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[IS_BLANK],
             sql: "SELECT @sql.is_blank(o.email) AS b FROM orders AS o",
             expected_sql: "SELECT o.email IS NULL OR TRIM(o.email) = '' AS b FROM orders AS o",
         },
         ExpansionTestCase {
             description: "parenthesised parameters in a body opening with two parentheses",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[IS_BLANK_PARENTHESISED],
             sql: "SELECT @sql.is_blank(o.email) AS b FROM orders AS o",
             expected_sql: "SELECT ((o.email) IS NULL AND (o.email) IS NULL) OR TRIM(o.email) = '' AS b FROM orders AS o",
         },
         ExpansionTestCase {
             description: "a parameter before AND and a parenthesised predicate",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[BOTH_MISSING],
             sql: "SELECT @sql.both_missing(o.a, o.b) AS m FROM orders AS o",
             expected_sql: "SELECT o.a IS NULL AND (o.b IS NULL) AS m FROM orders AS o",
         },
         ExpansionTestCase {
             description: "a parameter before IN inside a CASE",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[IS_LETTER],
             sql: "SELECT @sql.is_letter(o.a) AS l FROM orders AS o",
             expected_sql: "SELECT CASE WHEN o.a IN ('a', 'b') THEN TRUE ELSE FALSE END AS l FROM orders AS o",
         },
         ExpansionTestCase {
             description: "a body ending in a line comment ends its line, so the call's alias stays code",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[TRAILING_COMMENT],
             sql: "SELECT @sql.has_x(o.a) AS l FROM orders AS o",
             expected_sql: "SELECT CONTAINS(o.a, 'x') -- why x\n AS l FROM orders AS o",
@@ -420,31 +446,38 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
         },
         ExpansionTestCase {
             description: "a body ending in a line comment, called last on its line, adds no line",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[TRAILING_COMMENT],
             sql: "SELECT @sql.has_x(o.a)\nFROM orders AS o",
             expected_sql: "SELECT CONTAINS(o.a, 'x') -- why x\nFROM orders AS o",
         },
         ExpansionTestCase {
             description: "a body ending in a line comment, followed by an operator, closes its line",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[TRAILING_COMMENT],
             sql: "SELECT @sql.has_x(o.a) = TRUE\nFROM orders AS o",
             expected_sql: "SELECT CONTAINS(o.a, 'x') -- why x\n = TRUE\nFROM orders AS o",
         },
         ExpansionTestCase {
             description: "spaced enum and constant references in a body are declarations",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[SPACED_DECLARATIONS],
             sql: "SELECT @sql.spaced(o.status, o.places) AS s FROM orders AS o",
             expected_sql: "SELECT o.status <> @enum (\"order_status\").CLOSED AND o.places = @const (\"price_places\") AS s FROM orders AS o",
         },
         ExpansionTestCase {
-            description: "generic SQL checks no adapter types",
-            adapter: "",
-            macros: &[ODD],
-            sql: "SELECT @sql.odd(1) AS a",
-            expected_sql: "SELECT 1 + 1 AS a",
+            description: "a spaced enum declaration reaches a parser that reads @ as a variable",
+            adapter: "tsql",
+            macros: &[ENUM_DECLARATION],
+            sql: "SELECT @sql.with_closed(o.status) AS s FROM orders AS o",
+            expected_sql: "SELECT CONCAT(o.status, @enum (\"order_status\").CLOSED) AS s FROM orders AS o",
+        },
+        ExpansionTestCase {
+            description: "a spaced constant declaration reaches a parser that reads @ as a variable",
+            adapter: "tsql",
+            macros: &[CONST_DECLARATION],
+            sql: "SELECT @sql.plus_places(o.places) AS s FROM orders AS o",
+            expected_sql: "SELECT o.places + @const (\"price_places\") AS s FROM orders AS o",
         },
         ExpansionTestCase {
             description: "an ANY family argument of its family",
@@ -469,7 +502,10 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
         },
     ];
 
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| adapter_parses(test_case.adapter))
+    {
         let result = expanded_for(test_case.adapter, test_case.macros, test_case.sql);
 
         assert_eq!(
@@ -486,7 +522,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
     let test_cases = [
         ExpansionErrorTestCase {
             description: "CTE name clash with the caller",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH latest AS (SELECT 1 AS x), orders_raw AS (SELECT 1 AS order_id), @sql.clean_orders(orders_raw) SELECT * FROM latest",
             expected_code: "P018",
@@ -494,7 +530,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "the same CTE macro called twice",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH a AS (SELECT 1), @sql.clean_orders(a) @sql.clean_orders(a) SELECT 1",
             expected_code: "P018",
@@ -502,7 +538,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "__cte on an expression macro",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[PLUS_ONE],
             sql: "SELECT @sql.plus_one(1, __cte := x)",
             expected_code: "P017",
@@ -510,7 +546,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "__cte that is not a bare name",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH a AS (SELECT 1), @sql.clean_orders(a, __cte := 'x') SELECT 1",
             expected_code: "P017",
@@ -518,7 +554,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "the same __cte name twice",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH a AS (SELECT 1), @sql.clean_orders(a, __cte := x) @sql.clean_orders(a, __cte := x) SELECT 1",
             expected_code: "P018",
@@ -526,7 +562,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "a __cte name the caller already defines",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH a AS (SELECT 1), x AS (SELECT 2), @sql.clean_orders(a, __cte := x) SELECT 1",
             expected_code: "P018",
@@ -534,27 +570,11 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "column clash with the caller",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[AUDIT_COLUMNS],
             sql: "SELECT o.created_at, @sql.audit_columns(o) FROM orders AS o",
             expected_code: "P018",
             expected_message: "column \"created_at\" from macro audit_columns() clashes with a column already defined in model:orders_clean",
-        },
-        ExpansionErrorTestCase {
-            description: "a body whose known type is not returns",
-            adapter: "duckdb",
-            macros: &[SHOUTED_WRONG],
-            sql: "SELECT @sql.shouted(o.status) FROM orders AS o",
-            expected_code: "P024",
-            expected_message: "macro shouted() declares returns BIGINT, but its body is VARCHAR",
-        },
-        ExpansionErrorTestCase {
-            description: "a body typed through a nested call",
-            adapter: "duckdb",
-            macros: &[SHOUTED_NESTED, PLUS_ONE],
-            sql: "SELECT @sql.shouted_twice(o.status) FROM orders AS o",
-            expected_code: "P024",
-            expected_message: "macro shouted_twice() declares returns BIGINT, but its body is VARCHAR",
         },
         ExpansionErrorTestCase {
             description: "a literal outside an ANY family",
@@ -565,16 +585,8 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
             expected_message: "argument v of macro round_any() expects a number; 'ten' is a string",
         },
         ExpansionErrorTestCase {
-            description: "a body that misuses an ANY family argument",
-            adapter: "duckdb",
-            macros: &[SHOUT_NUMBER],
-            sql: "SELECT @sql.shout_number(o.amount) FROM orders AS o",
-            expected_code: "P025",
-            expected_message: "body of macro shout_number() does not accept every value of v ANY NUMERIC",
-        },
-        ExpansionErrorTestCase {
             description: "cycle",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[PING, PONG],
             sql: "SELECT @sql.ping(1)",
             expected_code: "P019",
@@ -582,7 +594,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "CTE list called in a select list",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "SELECT @sql.clean_orders(o) FROM orders AS o",
             expected_code: "P021",
@@ -590,7 +602,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "column list called in an expression",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[AUDIT_COLUMNS],
             sql: "SELECT 1 + @sql.audit_columns(o) FROM orders AS o",
             expected_code: "P021",
@@ -598,7 +610,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "string literal for a BIGINT argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CENTS_TO_DOLLARS],
             sql: "SELECT @sql.cents_to_dollars('ten')",
             expected_code: "P017",
@@ -606,7 +618,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "column for a CONST argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CENTS_TO_DOLLARS],
             sql: "SELECT @sql.cents_to_dollars(o.fee, o.places) FROM orders AS o",
             expected_code: "P017",
@@ -614,7 +626,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "wrong enum",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[IS_OPEN_STATUS],
             sql: "SELECT @sql.is_open_status(o.status, @enum(\"other\").CLOSED) FROM orders AS o",
             expected_code: "P017",
@@ -622,7 +634,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "unknown named argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CENTS_TO_DOLLARS],
             sql: "SELECT @sql.cents_to_dollars(o.fee, digits := 2) FROM orders AS o",
             expected_code: "P017",
@@ -630,7 +642,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "missing argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CENTS_TO_DOLLARS],
             sql: "SELECT @sql.cents_to_dollars()",
             expected_code: "P017",
@@ -638,7 +650,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "expression for a RELATION argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[CLEAN_ORDERS],
             sql: "WITH @sql.clean_orders(1 + 2) SELECT 1",
             expected_code: "P017",
@@ -670,7 +682,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "runtime parameter forwarded to a CONST argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[SCALED, SCALED_BY_RUNTIME],
             sql: "SELECT @sql.scaled_by_runtime(o.amount, 3) AS v FROM orders AS o",
             expected_code: "P017",
@@ -678,7 +690,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "a list passed to an ANY argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[ORDER_KEY],
             sql: "SELECT @sql.order_key(o.store, [1, 2]) AS k FROM orders AS o",
             expected_code: "P017",
@@ -686,7 +698,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "a list constant passed to an ANY argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[ORDER_KEY],
             sql: "SELECT @sql.order_key(o.store, @const(\"supported_countries\")) AS k FROM orders AS o",
             expected_code: "P017",
@@ -694,7 +706,7 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
         ExpansionErrorTestCase {
             description: "a relation passed to an ANY argument",
-            adapter: "",
+            adapter: "duckdb",
             macros: &[ORDER_KEY],
             sql: "SELECT @sql.order_key(o.store, __ref(\"orders\")) AS k FROM orders AS o",
             expected_code: "P017",
@@ -742,7 +754,10 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
     ];
 
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| adapter_parses(test_case.adapter))
+    {
         let error = expanded_for(test_case.adapter, test_case.macros, test_case.sql)
             .expect_err(test_case.description);
 
@@ -753,6 +768,52 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         );
         assert!(
             error.message.starts_with(test_case.expected_message),
+            "{}: {}",
+            test_case.description,
+            error.message
+        );
+    }
+}
+
+#[test]
+fn given_a_body_whose_type_breaks_its_declaration_when_expanding_then_the_error_names_it() {
+    let test_cases = [
+        ExpansionErrorTestCase {
+            description: "a body whose known type is not returns",
+            adapter: "duckdb",
+            macros: &[SHOUTED_WRONG],
+            sql: "SELECT @sql.shouted(o.status) FROM orders AS o",
+            expected_code: "P024",
+            expected_message: "macro shouted() declares returns BIGINT, but its body is VARCHAR",
+        },
+        ExpansionErrorTestCase {
+            description: "a body typed through a nested call",
+            adapter: "duckdb",
+            macros: &[SHOUTED_NESTED, PLUS_ONE],
+            sql: "SELECT @sql.shouted_twice(o.status) FROM orders AS o",
+            expected_code: "P024",
+            expected_message: "macro shouted_twice() declares returns BIGINT, but its body is VARCHAR",
+        },
+        ExpansionErrorTestCase {
+            description: "a body that misuses an ANY family argument",
+            adapter: "duckdb",
+            macros: &[SHOUT_NUMBER],
+            sql: "SELECT @sql.shout_number(o.amount) FROM orders AS o",
+            expected_code: "P025",
+            expected_message: "body of macro shout_number() does not accept every value of v ANY NUMERIC",
+        },
+    ];
+
+    for test_case in test_cases {
+        let error = expanded_for(test_case.adapter, test_case.macros, test_case.sql)
+            .expect_err(test_case.description);
+
+        assert_eq!(
+            (
+                error.code,
+                error.message.starts_with(test_case.expected_message)
+            ),
+            (test_case.expected_code, true),
             "{}: {}",
             test_case.description,
             error.message

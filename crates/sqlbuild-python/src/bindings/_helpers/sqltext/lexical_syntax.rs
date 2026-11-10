@@ -30,6 +30,7 @@ impl From<LexicalSyntaxInput> for LexicalSyntax {
             triple_quoted_strings: input.triple_quoted_strings,
             nested_block_comments: input.nested_block_comments,
             line_comment_prefixes: input.line_comment_prefixes,
+            bracket_identifiers: false,
         }
     }
 }
@@ -54,6 +55,7 @@ pub(crate) fn record_syntax(instance: &Bound<'_, PyAny>) -> PyResult<LexicalSynt
         triple_quoted_strings: flag("triple_quoted_strings")?,
         nested_block_comments: flag("nested_block_comments")?,
         line_comment_prefixes: sorted_texts(&native_field(instance, "line_comment_prefixes")?)?,
+        bracket_identifiers: false,
     })
 }
 

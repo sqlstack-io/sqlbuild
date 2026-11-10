@@ -390,3 +390,13 @@ type CompileOutcome = tuple[int, dict[str, object], dict[str, bytes]]
 type PreparedCompile = tuple[
     CompileOutcome, tuple[str, ...], dict[str, object | None], tuple[bytes, ...]
 ]
+
+
+@dataclass(frozen=True)
+class AdapterRecoveryCase:
+    description: str
+    adapter: str
+    expected_findings: tuple[tuple[str, str], ...] = (
+        ("B002", "downstream"),
+        ("B212", "upstream"),
+    )

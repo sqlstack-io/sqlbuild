@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, cast
 import sqlbuild._native as native_module
 from sqlbuild._native import (
     CompilerDiagnostic,
+    NativeCompilerError,
     project_with,
 )
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
@@ -26,6 +27,7 @@ from tests.integration.src.sqlbuild.compiler.analysis_session.helpers import (
 if TYPE_CHECKING:
     from sqlbuild._native import DiagnosticRow
 
+_NATIVE_SESSION_REQUIRED: str = "revalidating a native route without its session"
 _RELATIONS: dict[str, tuple[str, ...]] = {
     '__source("raw_orders")': (
         "order_id",
@@ -197,6 +199,59 @@ def captured_semantic_inputs(
     return SemanticInputs(**stage)
 
 
+def captured_under_dialect(
+    *,
+    project_dir: Path,
+    files: dict[str, str],
+    dialect: str,
+) -> SemanticInputs:
+    """Compile under `dialect`, with DuckDB's function rules, and keep the stage's inputs."""
+
+    stage: dict[str, Any] | None = native_module.assembly_stage_inputs(
+        "semantic_completion",
+        inputs=compile_inputs(project_dir=project_dir, files=files, dialect=dialect),
+        inference_profile=replace(
+            DuckDbAdapter().expression_inference_profile(), sql_analysis_dialect=dialect
+        ),
+    )
+    assert stage is not None
+    return SemanticInputs(**stage)
+
+
+def one_model_completion(
+    *, project_dir: Path, dialect: str, sql: str
+) -> tuple[tuple[str, ...], tuple[tuple[str, str | None], ...]]:
+    """One model over the generated sources, completed under `dialect`: codes and output types."""
+
+    files: dict[str, str] = generated_semantic_files(
+        rng=random.Random(0), model_count=0, require_analysis=True
+    )
+    files["models/probe.sql"] = f'MODEL (description "Probe");\n\n{sql}\n'
+    native: CompiledProjectView = completed_natively(
+        captured_under_dialect(project_dir=project_dir, files=files, dialect=dialect)
+    )
+    return (
+        tuple(diagnostic.code for diagnostic in native.diagnostics),
+        tuple((column.name, column.type) for column in native.models[0].inferred_columns or ()),
+    )
+
+
+def model_findings(
+    *, project_dir: Path, dialect: str, models: dict[str, str]
+) -> tuple[tuple[str, str], ...]:
+    """`models` over the generated sources under `dialect`: each finding's model and code."""
+
+    files: dict[str, str] = generated_semantic_files(
+        rng=random.Random(0), model_count=0, require_analysis=True
+    )
+    for name, sql in models.items():
+        files[f"models/{name}.sql"] = f'MODEL (description "{name}");\n\n{sql}\n'
+    native: CompiledProjectView = completed_natively(
+        captured_under_dialect(project_dir=project_dir, files=files, dialect=dialect)
+    )
+    return tuple(sorted((str(item.resource_name), item.code) for item in native.diagnostics))
+
+
 def with_dialect(inputs: SemanticInputs, dialect: str | None) -> SemanticInputs:
     """The same stage inputs read under another SQL dialect."""
 
@@ -260,6 +315,17 @@ def without_session(inputs: SemanticInputs) -> SemanticInputs:
     """The same stage inputs with every model's output names and lineage in the payload."""
 
     return replace(inputs, session=None)
+
+
+def payload_completion_view(inputs: SemanticInputs) -> tuple[object, ...] | None:
+    """The completion from payload facts alone; `None` where a native route requires the session."""
+
+    try:
+        completed: CompiledProjectView = completed_natively(without_session(inputs))
+    except NativeCompilerError as error:
+        assert _NATIVE_SESSION_REQUIRED in str(error)
+        return None
+    return completion_view(completed)
 
 
 def session_fact_models(inputs: SemanticInputs) -> frozenset[str]:

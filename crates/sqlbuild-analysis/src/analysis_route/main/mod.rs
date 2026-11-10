@@ -1,4 +1,10 @@
+pub mod aligned_offset;
 pub mod analysis_route;
-pub mod clickhouse_type_match;
+pub mod fast_lineage;
 pub mod native_gap;
+pub(crate) mod native_outcomes;
+pub mod native_revalidation;
+pub mod schema_column;
 pub mod skipped_analysis;
+pub mod unapplied_nullability_rules;
+pub mod unavailable_analysis;

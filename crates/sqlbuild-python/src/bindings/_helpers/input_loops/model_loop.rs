@@ -1,6 +1,7 @@
 //! The compile-input model loop: each model's steps run in the attachment's order, natively.
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -30,6 +31,7 @@ use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::boundary::panics::compiler_error;
+use crate::bindings::_helpers::cache::native_parse_store::NativeParseStore;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AttachedSqlTests;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditSettings;
@@ -73,7 +75,8 @@ use crate::bindings::_helpers::input_loops::model_loop_macros::{
 };
 use crate::bindings::_helpers::input_loops::model_loop_named::{SCHEMA_DECLARATION, named_usages};
 use crate::bindings::_helpers::input_loops::model_loop_opt_out::{
-    OptOut, OptOutModel, reject_unparseable_query, rejected_opt_out, skip_unreadable,
+    AuthoredQuery, GapQueue, OptOut, OptOutModel, gap_job, reject_unparseable_query,
+    rejected_opt_out, skip_unavailable,
 };
 use crate::bindings::_helpers::input_loops::model_loop_prepass::{
     NativeHeader, all_header_facts, native_header,
@@ -204,6 +207,8 @@ pub(crate) struct NativeModelLoop {
     pub(crate) project_config_path: String,
     /// Whether the dialect's SQL is analysed by Polyglot or by its native module.
     pub(crate) route: AnalysisRoute,
+    /// The adapter's analysis dialect name, which P026 names when no native parser reads it.
+    pub(crate) dialect: Option<String>,
     contract_classes: Py<PyDict>,
     loop_classes: Py<PyDict>,
 }
@@ -265,6 +270,7 @@ impl NativeModelLoop {
             },
             project_config_path,
             route: analysis_route(dialect.as_deref()),
+            dialect,
             contract_classes,
             loop_classes,
         })
@@ -363,7 +369,7 @@ impl NativeModelLoop {
         py: Python<'py>,
         project: Bound<'py, NativeCompiledProject>,
         host: Bound<'py, ConstantRendering>,
-        models: Vec<ModelLoopRow>,
+        (models, cache_dir): (Vec<ModelLoopRow>, Option<PathBuf>),
     ) -> PyResult<Vec<Bound<'py, NativeModelInput>>> {
         let contracts: ContractClasses<'py> = self.contract_classes.bind(py).extract()?;
         let classes: LoopClasses<'py> = self.loop_classes.bind(py).extract()?;
@@ -380,47 +386,65 @@ impl NativeModelLoop {
         let configs: ModelConfigs<'py> = ModelConfigs::default();
         let visibility: ModelVisibility<'py> = ModelVisibility::default();
         let signatures: HookSignatures = HookSignatures::default();
-        for row in models {
-            let ModelFileTexts {
-                name,
-                relative_path,
-                file_path,
-                ..
-            } = &row.paths;
-            let record: &NativeModelFile = row.model_file.get();
-            let (enums, constants) = record.declaration_tuples(py);
-            let visible: VisibleDeclarations<'py> = visibility.for_model(
-                &context,
-                &VisibilityModel {
+        let parsed: Option<NativeParseStore> = match (self.route, cache_dir) {
+            (AnalysisRoute::Native(_), Some(cache_dir)) => {
+                NativeParseStore::open_in(py, &cache_dir)?
+            }
+            _ => None,
+        };
+        let mut gaps: GapQueue = GapQueue::new(parsed);
+        let attached: PyResult<()> = (|| -> PyResult<()> {
+            for row in models {
+                let ModelFileTexts {
                     name,
+                    relative_path,
                     file_path,
-                    local: (enums.as_any(), constants.as_any()),
-                },
-            )?;
-            let config: Bound<'py, PyAny> =
-                configs.effective(&context, record, (name, relative_path), row.header.as_ref())?;
-            let model: LoopModel<'_, 'py> = LoopModel {
-                row: &row,
-                config,
-                visible: &visible,
-                signatures: &signatures,
-                visibility: &visibility,
-            };
-            let finished: FinishedModel<'py> = self.finish(py, &context, model)?;
-            let record_inputs: RecordInputs<'_, 'py> = RecordInputs {
-                classes: &classes.record,
-                visible: &visible.declarations,
-            };
-            let (record, facts) = finished_record(&record_inputs, row, finished)?;
-            let mut owner = project.borrow_mut();
-            owner.retain(facts);
-            let index: usize = owner.retain_input(record);
-            drop(owner);
-            inputs.push(Bound::new(
-                py,
-                NativeModelInput::new(project.clone().unbind(), index),
-            )?);
-        }
+                    ..
+                } = &row.paths;
+                let record: &NativeModelFile = row.model_file.get();
+                let (enums, constants) = record.declaration_tuples(py);
+                let visible: VisibleDeclarations<'py> = visibility.for_model(
+                    &context,
+                    &VisibilityModel {
+                        name,
+                        file_path,
+                        local: (enums.as_any(), constants.as_any()),
+                    },
+                )?;
+                let config: Bound<'py, PyAny> = configs.effective(
+                    &context,
+                    record,
+                    (name, relative_path),
+                    row.header.as_ref(),
+                )?;
+                let model: LoopModel<'_, 'py> = LoopModel {
+                    row: &row,
+                    config,
+                    visible: &visible,
+                    signatures: &signatures,
+                    visibility: &visibility,
+                };
+                gaps.expect_record(project.borrow().inputs().len());
+                let finished: FinishedModel<'py> = self.finish(py, &context, model, &mut gaps)?;
+                let record_inputs: RecordInputs<'_, 'py> = RecordInputs {
+                    classes: &classes.record,
+                    visible: &visible.declarations,
+                };
+                let (record, facts) = finished_record(&record_inputs, row, finished)?;
+                let mut owner = project.borrow_mut();
+                owner.retain(facts);
+                let index: usize = owner.retain_input(record);
+                drop(owner);
+                inputs.push(Bound::new(
+                    py,
+                    NativeModelInput::new(project.clone().unbind(), index),
+                )?);
+            }
+            Ok(())
+        })();
+        let settled: PyResult<()> = gaps.settle(self.settings, &context, &project);
+        settled?;
+        attached?;
         Ok(inputs)
     }
 }
@@ -431,7 +455,7 @@ impl NativeModelLoop {
         slf: &Bound<'py, Self>,
         project: Bound<'py, NativeCompiledProject>,
         host: Bound<'py, ConstantRendering>,
-        model_files: Vec<Py<NativeModelFile>>,
+        (model_files, cache_dir): (Vec<Py<NativeModelFile>>, Option<PathBuf>),
     ) -> PyResult<Vec<Bound<'py, NativeModelInput>>> {
         let py: Python<'py> = slf.py();
         let classes: LoopClasses<'py> = slf.get().loop_classes.bind(py).extract()?;
@@ -447,7 +471,7 @@ impl NativeModelLoop {
         project
             .borrow_mut()
             .keep_attachment_loop(slf.clone().unbind().into_any(), host.clone().unbind());
-        slf.get().run_models(py, project, host, models)
+        slf.get().run_models(py, project, host, (models, cache_dir))
     }
 
     /// Attach every discovered source in order into `project`; return each source's view.
@@ -587,6 +611,7 @@ impl NativeModelLoop {
         py: Python<'py>,
         context: &LoopContext<'_, 'py>,
         model: LoopModel<'_, 'py>,
+        gaps: &mut GapQueue,
     ) -> PyResult<FinishedModel<'py>> {
         let LoopModel {
             row,
@@ -704,6 +729,16 @@ impl NativeModelLoop {
             (&declarations.spliced.sql, &macro_sql, &query_sql),
             &macro_spans,
         );
+        let authored_passes: Vec<Vec<SplicedSpan>> = vec![
+            declarations.spliced.spans.clone(),
+            spliced_spans(&macro_spans),
+        ];
+        let authored_body: Option<AuthoredQuery<'_>> = (interpolated.as_str() == &**authored_query)
+            .then_some(AuthoredQuery {
+                query: authored_query,
+                macro_sql: &macro_sql,
+                passes: &authored_passes,
+            });
         let opt_out_model: OptOutModel<'_, 'py> = OptOutModel {
             name,
             file_path,
@@ -712,9 +747,12 @@ impl NativeModelLoop {
             query_sql: &query_sql,
             relative_path,
             contents,
+            authored: authored_body,
         };
-        let (analysed, rejected_opt_out, analysis_skipped) =
-            self.analysis(context, &opt_out_model)?;
+        let legacy_gate = match self.route {
+            AnalysisRoute::Legacy => Some(self.analysis(context, &opt_out_model, true, gaps)?),
+            AnalysisRoute::Native(_) | AnalysisRoute::Unavailable => None,
+        };
         let scanned = match extract_sql_references(&query_sql, &self.syntax) {
             ReferenceExtraction::Extracted(scanned) => scanned,
             ReferenceExtraction::Failed(failure) => {
@@ -747,10 +785,6 @@ impl NativeModelLoop {
                 contents,
             },
         )?;
-        let analysis: (bool, Option<Bound<'py, PyAny>>) = (
-            analysed && scanned.invalid_calls.is_empty(),
-            rejected_opt_out,
-        );
         let references: Vec<ReferenceRow> = merge_call_site_references(
             scanned.references.iter().map(reference_row).collect(),
             argument_references,
@@ -784,6 +818,27 @@ impl NativeModelLoop {
         } else {
             (values, Vec::new())
         };
+        let (analysed, rejected_opt_out, analysis_skipped) = match legacy_gate {
+            Some(gate) => gate,
+            None => {
+                let expanded_model: OptOutModel<'_, 'py> = OptOutModel {
+                    name,
+                    file_path,
+                    config: &config,
+                    values: &values,
+                    query_sql: &query_sql,
+                    relative_path,
+                    contents,
+                    authored: authored_body,
+                };
+                let calls_valid: bool = scanned.invalid_calls.is_empty();
+                self.analysis(context, &expanded_model, calls_valid, gaps)?
+            }
+        };
+        let analysis: (bool, Option<Bound<'py, PyAny>>) = (
+            analysed && scanned.invalid_calls.is_empty(),
+            rejected_opt_out,
+        );
         let source: HeaderSource<'_, 'py> = HeaderSource {
             name,
             values: &values,
@@ -814,11 +869,13 @@ impl NativeModelLoop {
         })
     }
 
-    /// Whether the model's SQL is analysed, its rejected opt-out, and whether its parser skipped it.
+    /// Analysed, rejected opt-out, skipped; a native parse queued on `gaps` unmarks it on a gap.
     fn analysis<'py>(
         &self,
         context: &LoopContext<'_, 'py>,
         model: &OptOutModel<'_, 'py>,
+        calls_valid: bool,
+        gaps: &mut GapQueue,
     ) -> PyResult<(bool, Option<Bound<'py, PyAny>>, bool)> {
         let mut skipped: bool = false;
         let (analysed, rejected) =
@@ -832,10 +889,17 @@ impl NativeModelLoop {
                 }
                 AnalysisGate::Enabled => match self.route {
                     AnalysisRoute::Legacy => (true, None),
+                    AnalysisRoute::Native(_) | AnalysisRoute::Unavailable if !calls_valid => {
+                        (false, None)
+                    }
                     AnalysisRoute::Native(dialect) => {
-                        let read: bool = skip_unreadable(self.settings, dialect, context, model)?;
-                        skipped = !read;
-                        (read, None)
+                        gaps.queue(gap_job(dialect, context, model)?);
+                        (true, None)
+                    }
+                    AnalysisRoute::Unavailable => {
+                        skip_unavailable(self.settings, self.dialect.as_deref(), context, model)?;
+                        skipped = true;
+                        (false, None)
                     }
                 },
                 AnalysisGate::Disabled => match rejected_opt_out(self, context, model)? {

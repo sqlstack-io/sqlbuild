@@ -42,11 +42,20 @@ pub(crate) fn promotion_conflicts(request: &PromotionRequest) -> Vec<PromotionCo
 
 fn uses_staged_table_lifecycle(model: &PromotionModel) -> bool {
     model.contract.as_deref() == Some(CONTRACT_ENFORCED)
-        && model
-            .materialized
-            .as_deref()
-            .is_some_and(|materialized| STAGED_LIFECYCLE_MATERIALIZATIONS.contains(&materialized))
-        && model.incremental_mode.as_deref() != Some(MICROBATCH_INCREMENTAL_MODE)
+        && builds_through_staging(
+            model.materialized.as_deref(),
+            model.incremental_mode.as_deref(),
+        )
+}
+
+/// Whether a model builds through a staging table: a table or a non-microbatch incremental.
+pub(crate) fn builds_through_staging(
+    materialized: Option<&str>,
+    incremental_mode: Option<&str>,
+) -> bool {
+    materialized
+        .is_some_and(|materialized| STAGED_LIFECYCLE_MATERIALIZATIONS.contains(&materialized))
+        && incremental_mode != Some(MICROBATCH_INCREMENTAL_MODE)
 }
 
 fn conflict_help(request: &PromotionRequest) -> String {

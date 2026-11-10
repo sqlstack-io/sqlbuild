@@ -6,10 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from sqlbuild._native import COMPILE_REUSE_DISABLE_ENV_VAR as REUSE_DISABLE_ENV_VAR
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.fast_lineage._test_types import (
     NativeFastLineageCliTestCase,
     NativeRichLineageCliTestCase,
     NativeRichLineageFailureCliTestCase,
+    WarmFastLineageCliTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.fast_lineage.helpers import (
     FailedLineageRun,
@@ -51,6 +53,12 @@ _PROJECT_FILES: dict[str, str] = {
         'JOIN __ref("customer_totals") c ON u.customer_id = c.customer_id\n'
     ),
 }
+
+_WARM_TARGETS: tuple[str, ...] = (
+    "customer_totals.Total_Amount",
+    "order_copies.rounded",
+    "stg_orders.amount",
+)
 
 _DEEP_UNION_BRANCHES: int = 480
 _DEEP_UNION_FILES: dict[str, str] = {
@@ -178,6 +186,42 @@ def test_given_project_when_compiling_then_fast_lineage_is_traced(
     assert sum('"source"' in stdout for _, stdout, _ in native.traces) >= (
         test_case.expected_minimum_traced_edges
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WarmFastLineageCliTestCase(
+            description="the analysis cache a cold compile filled",
+            reuse_disabled="1",
+            expected_minimum_cache_hits=1,
+        ),
+        WarmFastLineageCliTestCase(
+            description="the compiled project a cold compile stored for reuse",
+            reuse_disabled="0",
+            expected_minimum_cache_hits=0,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_warm_store_when_tracing_fast_lineage_then_it_matches_the_uncached_run(
+    test_case: WarmFastLineageCliTestCase, tmp_path: Path
+) -> None:
+    uncached: LineageRun = lineage_run(
+        project_dir=tmp_path / "uncached", files=_PROJECT_FILES, targets=_WARM_TARGETS
+    )
+    restored: LineageRun = lineage_run(
+        project_dir=tmp_path / "warm",
+        files=_PROJECT_FILES,
+        targets=_WARM_TARGETS,
+        cache_args=(),
+        environment=((REUSE_DISABLE_ENV_VAR, test_case.reuse_disabled),),
+        cold_compiles=1,
+    )
+
+    assert restored.compile_returncode == 0, restored.compile_report
+    assert (restored.compile_report, restored.traces) == (uncached.compile_report, uncached.traces)
+    assert restored.analysis_cache_hits >= test_case.expected_minimum_cache_hits
 
 
 @pytest.mark.parametrize(

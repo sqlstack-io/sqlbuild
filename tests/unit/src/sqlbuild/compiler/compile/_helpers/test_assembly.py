@@ -30,6 +30,7 @@ from tests.unit.src.sqlbuild.compiler.compile._helpers._test_types import (
 )
 from tests.unit.src.sqlbuild.compiler.compile._helpers.helpers import (
     DUCKDB_COMPILE_ADAPTER_CONTEXT,
+    SQLSERVER_COMPILE_ADAPTER_CONTEXT,
     compiled_sql_test_expected_model_names,
     compiled_sql_test_tested_resource_names,
 )
@@ -850,7 +851,7 @@ def test_given_sql_hooks_when_assembling_then_applies_adapter_aware_validation(
     write_repo_files(
         tmp_path,
         {
-            "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
+            "sqlbuild_project.toml": 'name = "demo"\nadapter = "sqlserver"\n',
             "models/orders.sql": test_case.model_sql,
             "hooks/sql/vendor_hook.sql": test_case.named_hook_sql,
         },
@@ -858,7 +859,7 @@ def test_given_sql_hooks_when_assembling_then_applies_adapter_aware_validation(
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     compile_inputs: CompileInputsView = build_compile_inputs(
         discovered_inputs=discovered,
-        adapter_context=DUCKDB_COMPILE_ADAPTER_CONTEXT,
+        adapter_context=SQLSERVER_COMPILE_ADAPTER_CONTEXT,
         run_id="test_run_id",
     )
 

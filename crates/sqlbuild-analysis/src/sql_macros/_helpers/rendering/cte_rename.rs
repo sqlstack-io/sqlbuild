@@ -1,8 +1,12 @@
 //! A CTE-list macro body's CTEs renamed for one call's `__cte` name, located by parsing.
 
-use polyglot_sql::expressions::Identifier;
-use polyglot_sql::{DialectType, Expression, ExpressionWalk};
+use sqlquack_syntax::expressions::names::models::{Identifier, TableRef};
+use sqlquack_syntax::expressions::queries::models::With;
+use sqlquack_syntax::{Expression, ExpressionWalk};
 
+use crate::analysis_route::types::NativeDialect;
+
+use crate::sql_macros::_helpers::parsing::body::parsed_statement;
 use crate::sql_macros::_helpers::parsing::lexing::{Token, tokens};
 use crate::sql_macros::_helpers::parsing::parameters::{
     ParameterReference, parameter_references, placeholder, with_placeholders,
@@ -14,13 +18,6 @@ use crate::sql_macros::models::{
     CallArgument, ExpandedText, SqlMacroDefinition, SqlMacroForm, TextSplice,
 };
 
-/// Dialects tried in turn to parse a body for its CTE names.
-const PARSE_DIALECTS: [DialectType; 4] = [
-    DialectType::Generic,
-    DialectType::DuckDB,
-    DialectType::Snowflake,
-    DialectType::BigQuery,
-];
 /// The query a CTE list is completed with to parse it.
 const CTE_SUFFIX: &str = "\nSELECT 1";
 
@@ -103,13 +100,17 @@ fn renamed(ctes: &[String], name: &str, cte: &str) -> Option<String> {
 }
 
 /// `body` with every CTE it defines, and every reference to one, renamed for `name`.
-pub(crate) fn renamed_ctes(body: &ExpandedText, name: &str) -> Result<ExpandedText, String> {
+pub(crate) fn renamed_ctes(
+    parser: &dyn NativeDialect,
+    body: &ExpandedText,
+    name: &str,
+) -> Result<ExpandedText, String> {
     let sql: &str = &body.sql;
     let scanned: Vec<Token> =
         tokens(sql).map_err(|_| "it has an unclosed quote or comment".to_owned())?;
     let references: Vec<ParameterReference> = parameter_references(sql, &scanned);
     let parsed_text: String = format!("{}{CTE_SUFFIX}", with_placeholders(sql, &references));
-    let statement: Expression = parsed(&parsed_text)?;
+    let statement: Expression = parsed_statement(parser, &parsed_text)?;
     let Expression::Select(select) = &statement else {
         return Err("it is not a WITH list".to_owned());
     };
@@ -132,7 +133,11 @@ pub(crate) fn renamed_ctes(body: &ExpandedText, name: &str) -> Result<ExpandedTe
             continue;
         };
         let Some(span) = identifier.span else {
-            continue;
+            return Err(format!(
+                "the {} parser gives no position for CTE name {}, so it cannot be renamed",
+                parser.name(),
+                identifier.name
+            ));
         };
         let start: usize = original_offset(offsets.byte(span.start), sql, &references);
         let end: usize = original_offset(offsets.byte(span.end), sql, &references);
@@ -237,7 +242,7 @@ impl<'a> CteReferences<'a> {
     }
 
     /// Whether `table` is an unqualified name whose innermost binding is one of the body's CTEs.
-    fn is_body_cte(&self, table: &polyglot_sql::expressions::TableRef) -> bool {
+    fn is_body_cte(&self, table: &TableRef) -> bool {
         if table.schema.is_some() || table.catalog.is_some() {
             return false;
         }
@@ -295,7 +300,7 @@ impl<'a> CteReferences<'a> {
 }
 
 /// Whether `child` is the body of one of `with`'s CTEs, which are visited in their own frames.
-fn is_cte_body(with: Option<&polyglot_sql::expressions::With>, child: &Expression) -> bool {
+fn is_cte_body(with: Option<&With>, child: &Expression) -> bool {
     let Some(with) = with else {
         return false;
     };
@@ -319,27 +324,6 @@ fn source_named<'s>(sources: &'s [ScopeSource], name: &str) -> Option<&'s ScopeS
     sources
         .iter()
         .find(|source| source.name.eq_ignore_ascii_case(name))
-}
-
-/// The one statement `text` parses to, in the first dialect that parses it.
-fn parsed(text: &str) -> Result<Expression, String> {
-    let mut first_error: Option<String> = None;
-    for dialect in PARSE_DIALECTS {
-        match polyglot_sql::parse(text, dialect) {
-            Ok(mut statements) if statements.len() == 1 => {
-                if let Some(statement) = statements.pop() {
-                    return Ok(statement);
-                }
-            }
-            Ok(_) => {
-                first_error.get_or_insert_with(|| "it holds more than one statement".to_owned());
-            }
-            Err(error) => {
-                first_error.get_or_insert_with(|| error.to_string());
-            }
-        }
-    }
-    Err(first_error.unwrap_or_default())
 }
 
 /// The byte offset in `sql` of byte `offset` of `sql` with its references as placeholders.

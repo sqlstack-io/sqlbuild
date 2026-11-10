@@ -162,7 +162,7 @@ _UNKNOWN_COLUMN_MESSAGE: str = (
             repo_files=build_partial_ref_fixture_project_files(),
             expected_stdout_fragment="PASS=1",
             expected_artifact_fragments=(
-                'CAST(NULL AS TEXT) AS "status"',
+                'CAST(NULL AS VARCHAR) AS "status"',
                 "__sqlbuild_partial_fixture",
             ),
         ),

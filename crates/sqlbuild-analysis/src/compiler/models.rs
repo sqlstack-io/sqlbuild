@@ -191,6 +191,8 @@ pub struct SqlTestAssemblyBatch {
     pub models: Vec<SqlTestAssemblyModel>,
     pub tests: Vec<SqlTestAssemblyTest>,
     pub lexical_syntax: LexicalSyntax,
+    /// The project's SQL analysis dialect, whose native parser reads helper references.
+    pub sql_analysis_dialect: Option<String>,
 }
 
 /// What assembly reads of one model: its name, macro dependencies and references.

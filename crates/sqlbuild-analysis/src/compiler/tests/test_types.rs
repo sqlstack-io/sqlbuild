@@ -1,4 +1,5 @@
 use sqlbuild_sqltext::sql_scan::models::Unclosed;
+use sqlquack_syntax::Dialect;
 
 pub(crate) struct SqlTestExtractionTestCase {
     pub(crate) description: &'static str,
@@ -60,6 +61,14 @@ pub(crate) struct MarkerNamesTestCase {
     pub(crate) sql: &'static str,
     pub(crate) expected_names: &'static [&'static str],
     pub(crate) expected_replaced_sql: &'static str,
+}
+
+/// A table function call replaced by a name, with or without dropping a `LATERAL` before it.
+pub(crate) struct CallableMarkerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) drop_lateral: bool,
+    pub(crate) expected_sql: &'static str,
 }
 
 pub(crate) struct ProtectedRangeTestCase {
@@ -186,25 +195,6 @@ pub(crate) struct SqlTestAssemblyTestCase {
     pub(crate) batch: crate::compiler::models::SqlTestAssemblyBatch,
     pub(crate) expected_outcomes: Vec<crate::compiler::models::SqlTestAssemblyOutcome>,
 }
-pub(crate) struct SimpleTemplateTestCase {
-    pub description: &'static str,
-    pub dialect: &'static str,
-    pub sql: &'static str,
-    pub expected_ast_parses: usize,
-}
-
-pub(crate) struct SimpleTemplateCorpusTestCase {
-    pub description: &'static str,
-    pub dialect: &'static str,
-    pub expected_min_recognized: usize,
-    pub expected_mismatches: &'static [&'static str],
-}
-
-pub(crate) struct SimpleTemplateCorpusOutcome {
-    pub recognized: usize,
-    pub mismatches: Vec<String>,
-}
-
 #[derive(Debug)]
 pub(crate) struct ScenarioExpectedColumnsTestCase {
     pub(crate) description: &'static str,
@@ -232,4 +222,23 @@ pub(super) struct ProjectedUdfTestCase {
     pub(super) description: &'static str,
     pub(super) dialect: &'static str,
     pub(super) expected_call: &'static str,
+}
+
+pub(crate) struct SimpleTemplateTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_recognized: bool,
+}
+
+pub(crate) struct SimpleTemplateCorpusTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: (&'static str, Dialect),
+    pub(crate) expected_min_recognized: usize,
+    pub(crate) expected_mismatches: &'static [&'static str],
+}
+
+pub(crate) struct SimpleTemplateCorpusOutcome {
+    pub(crate) recognized: usize,
+    pub(crate) mismatches: Vec<String>,
 }

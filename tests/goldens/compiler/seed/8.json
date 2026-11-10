@@ -148,9 +148,9 @@
    ""
   ],
   "models/analysis/unanalysed_stg_support_0.sql": [
-   "SELECT id, amount",
-   "FROM __ref(\"stg_support_0\")",
-   "WHERE id = ANY [1, 2]",
+   "SELECT a.id, a.amount",
+   "FROM __ref(\"stg_support_0\") AS a",
+   "JOIN __ref(\"stg_support_0\") AS b NEAREST 1 BY DISTANCE abs(a.amount - b.amount)",
    ""
   ],
   "models/features/append_stg_support_0.sql": [

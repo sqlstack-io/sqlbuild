@@ -6,7 +6,6 @@ use sqlbuild_core::constants::TIMESTAMP_TYPE;
 
 use polyglot_sql::{Dialect, DialectType, ValidationError};
 use regex::Regex;
-use sqlclean::sql_tokens::main::projection_spans::projection_spans;
 use std::sync::LazyLock;
 
 const INVALID_CAST: &str = "E218";
@@ -35,6 +34,21 @@ const COMPARISON_OPERATORS: [TokenType; 7] = [
     TokenType::NullsafeEq,
 ];
 const SET_OPERATION_ARITY: &str = "Set-operation operands return different column counts";
+const PROJECTION_ENDS: [TokenType; 13] = [
+    TokenType::From,
+    TokenType::Where,
+    TokenType::Group,
+    TokenType::GroupBy,
+    TokenType::Having,
+    TokenType::Qualify,
+    TokenType::Order,
+    TokenType::OrderBy,
+    TokenType::Limit,
+    TokenType::Window,
+    TokenType::Union,
+    TokenType::Except,
+    TokenType::Intersect,
+];
 
 struct CastSite {
     start: usize,
@@ -382,6 +396,42 @@ fn set_operation_sites(tokens: &[Token]) -> Vec<SetOperationSite> {
         });
     }
     sites
+}
+
+/// Spans of each top-level projection item of the select starting at token `select`.
+fn projection_spans(tokens: &[Token], select: usize) -> Vec<(usize, usize)> {
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+    let mut depth: usize = 0;
+    let mut start: Option<usize> = None;
+    let mut end: usize = 0;
+    for token in tokens.iter().skip(select + 1) {
+        if matches!(
+            token.token_type,
+            TokenType::Space | TokenType::Break | TokenType::LineComment | TokenType::BlockComment
+        ) {
+            continue;
+        }
+        match token.token_type {
+            TokenType::LParen => depth += 1,
+            TokenType::RParen if depth == 0 => break,
+            TokenType::RParen => depth -= 1,
+            TokenType::Comma if depth == 0 => {
+                if let Some(first) = start.take() {
+                    spans.push((first, end));
+                }
+                continue;
+            }
+            kind if depth == 0 && PROJECTION_ENDS.contains(&kind) => break,
+            TokenType::Distinct | TokenType::All if depth == 0 && start.is_none() => continue,
+            _ => {}
+        }
+        start.get_or_insert(token.span.start);
+        end = token.span.end;
+    }
+    if let Some(first) = start {
+        spans.push((first, end));
+    }
+    spans
 }
 
 fn matching_paren(tokens: &[Token], open: usize) -> Option<usize> {

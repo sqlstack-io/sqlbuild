@@ -57,6 +57,15 @@ fn given_partial_fixtures_when_aligning_then_preserves_schema_and_diagnostic_ord
             expected_diagnostics: &[],
         },
         AlignmentTestCase {
+            description: "a typed null fixture appends nothing, so its own column order stands",
+            supplied: &["status", "order_id", "details"],
+            required: &["status"],
+            star: true,
+            typed_nulls: true,
+            expected_completed: Some(vec![]),
+            expected_diagnostics: &[],
+        },
+        AlignmentTestCase {
             description: "typed null fixture",
             supplied: &["order_id", "status", "details"],
             required: &["status"],

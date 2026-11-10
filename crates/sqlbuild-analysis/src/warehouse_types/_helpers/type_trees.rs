@@ -1,8 +1,9 @@
 //! Type trees from SQLQuack's parsers: Postgres's type grammar, or a cast target's type.
 
 use serde_json::Value;
+use sqlquack_parse::parse_strict;
 use sqlquack_syntax::tokens::models::Dialect;
-use sqlquack_syntax::{Expression, ParseOptions, parse_strict};
+use sqlquack_syntax::{Expression, ParseOptions};
 
 use crate::warehouse_types::constants::{CAST_KEY, CAST_TARGET_KEY};
 

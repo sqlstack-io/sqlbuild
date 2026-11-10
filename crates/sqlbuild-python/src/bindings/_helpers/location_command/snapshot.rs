@@ -153,6 +153,7 @@ fn identity_nodes(
             &py.None().into_bound(py),
             &field(project, "hook_functions")?,
         ),
+        &py.None().into_bound(py),
     )?;
     for node in nodes.values_mut() {
         let hashes = match node.kind.as_str() {

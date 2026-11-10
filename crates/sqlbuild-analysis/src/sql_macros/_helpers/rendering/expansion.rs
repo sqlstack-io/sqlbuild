@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use crate::sql_macros::_helpers::parsing::body::{expand_body, with_line_comment_closed};
+use crate::analysis_route::types::NativeDialect;
+use crate::sql_macros::_helpers::parsing::body::{
+    expand_body, macro_parser, with_line_comment_closed,
+};
 use crate::sql_macros::_helpers::parsing::lexing::{AtConstruct, at_constructs, outer_sql_calls};
 use crate::sql_macros::_helpers::parsing::lexing::{Token, line_column, tokens, tokens_with};
 use crate::sql_macros::_helpers::parsing::literal_positions::{
@@ -166,6 +169,16 @@ pub(crate) fn expand_text<H: SqlMacroHost>(
     })
 }
 
+/// Why `definition` cannot be expanded where its project's dialect has no native parser.
+fn unavailable(definition: &SqlMacroDefinition, reason: &str) -> SqlMacroError {
+    SqlMacroError::new(
+        INVALID_DEFINITION_CODE,
+        format!("macro {}() cannot be expanded: {reason}", definition.name),
+    )
+    .at(body_location(definition))
+    .helped("SQL macros are read by the SQL analysis dialect's native parser; set the adapter's SQL analysis dialect to one SQLBuild parses, or inline the macro")
+}
+
 /// One call's expansion as it replaces the call text in `context.text`.
 pub(crate) fn expand_call<H: SqlMacroHost>(
     host: &H,
@@ -192,7 +205,9 @@ pub(crate) fn expand_call<H: SqlMacroHost>(
         .helped("SQL macros may call other SQL macros, but not back into themselves")
         .into());
     }
-    check_adapter_rules(&definition, host.adapter())?;
+    let parser: &dyn NativeDialect = macro_parser(host.analysis_dialect())
+        .map_err(|reason| unavailable(&definition, &reason))?;
+    check_adapter_rules(&definition, (host.adapter(), parser))?;
     let arguments_text: &str = &context.text[call.arguments.0..call.arguments.1];
     let (cte_name, arguments): (Option<String>, Vec<CallArgument>) =
         split_arguments(arguments_text)
@@ -228,7 +243,7 @@ pub(crate) fn expand_call<H: SqlMacroHost>(
     )
     .map_err(|failure| located(failure, &body_location(&definition)))?;
     let body: ExpandedText = match &cte_name {
-        Some(name) => renamed_ctes(&body, name).map_err(|reason| {
+        Some(name) => renamed_ctes(parser, &body, name).map_err(|reason| {
             SqlMacroError::new(
                 INVALID_DEFINITION_CODE,
                 format!(
@@ -241,20 +256,16 @@ pub(crate) fn expand_call<H: SqlMacroHost>(
         None => body,
     };
     check_body_returns(
-        &definition,
+        (parser, &definition),
         &body,
         (host.adapter(), body_location(&definition)),
     )?;
-    check_body_types(
-        &definition,
-        &body,
-        (host.adapter(), body_location(&definition)),
-    )?;
+    check_body_types((parser, &definition), &body, body_location(&definition))?;
     let outer: Option<&SqlMacroDefinition> = match context.scope {
         SqlMacroScope::Macro(outer) => Some(outer.as_ref()),
         SqlMacroScope::Caller => None,
     };
-    let mut expansion: BodyExpansion = expand_body((&definition, outer), &body, &rendered)
+    let mut expansion: BodyExpansion = expand_body(parser, (&definition, outer), &body, &rendered)
         .map_err(|error| error.at(body_location(&definition)))?;
     expansion.like = definition.returns_like.as_deref().and_then(|name| {
         rendered
@@ -605,9 +616,9 @@ fn check_clashes(
 /// Rejects types the adapter cannot parse and runtime parameters where it needs a literal.
 fn check_adapter_rules(
     definition: &SqlMacroDefinition,
-    adapter: &str,
+    (adapter, parser): (&str, &dyn NativeDialect),
 ) -> Result<(), SqlMacroError> {
-    check_adapter_types(definition, adapter)?;
+    check_adapter_types(definition, (adapter, parser))?;
     let upper: String = definition.body.to_ascii_uppercase();
     if !upper.contains("ROUND") && !upper.contains("_TRUNC") {
         return Ok(());
@@ -630,13 +641,13 @@ fn check_adapter_rules(
 
 fn check_adapter_types(
     definition: &SqlMacroDefinition,
-    adapter: &str,
+    (adapter, parser): (&str, &dyn NativeDialect),
 ) -> Result<(), SqlMacroError> {
     let invalid = |data_type: &str, context: String| -> Option<SqlMacroError> {
         if adapter.is_empty() {
             return None;
         }
-        returns_type_error(data_type, adapter, &context).map(|message| {
+        returns_type_error(data_type, (adapter, parser), &context).map(|message| {
             SqlMacroError::new(INVALID_DEFINITION_CODE, message)
                 .helped("use a SQL type the warehouse accepts, as in schema declarations")
         })
@@ -664,7 +675,7 @@ fn check_adapter_types(
     if let Some(returns) = &definition.returns
         && let Some(message) = returns_type_error(
             returns,
-            adapter,
+            (adapter, parser),
             &format!("returns of macro {}()", definition.name),
         )
     {

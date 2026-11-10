@@ -15,6 +15,7 @@ use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::text::main::python_isspace::python_isspace;
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 use sqlbuild_core::text::main::python_strip::python_strip;
+use sqlbuild_rules::dsl_headers::main::declares_table_returns::declares_table_returns;
 use sqlbuild_rules::dsl_headers::main::measurement_body_ranges::measurement_body_ranges;
 use sqlbuild_rules::dsl_headers::main::scan_headers::scan_headers;
 use sqlbuild_rules::dsl_headers::main::sql_body_ranges::sql_body_ranges;
@@ -54,7 +55,7 @@ use crate::bindings::_helpers::render::authored_sql::{AuthoredExpansion, expand_
 use crate::bindings::_helpers::render::macro_call_rows::SpanRow;
 use crate::bindings::_helpers::rules::dsl_headers::header_violations;
 use crate::bindings::_helpers::rules::native_header_parser::{
-    HeaderFailure, NativeHeaderParser, external_identifiers,
+    FUNCTION_KIND, HeaderFailure, NativeHeaderParser, external_identifiers,
 };
 use crate::bindings::types::CompilerDetach;
 
@@ -519,7 +520,7 @@ struct PlannedBody {
     input: String,
     sites: Vec<InterpolationSite>,
     source: BodySource,
-    /// The form of a SQL macro file's body, which decides the statement lint parses it as.
+    /// The form of a SQL macro file's body, or `Expression` for a scalar function's, which decides the statement lint parses it as.
     macro_form: Option<SqlMacroForm>,
 }
 
@@ -788,6 +789,14 @@ fn plan_bodies(
             ceremonial = ceremonial || form == SqlMacroForm::CteList;
             body.macro_form = Some(form);
         }
+    } else if headers.iter().any(|header| {
+        header.kind == FUNCTION_KIND && !declares_table_returns(&text[header.start..header.end])
+    }) {
+        for body in &mut bodies {
+            if sql_macro_body_form(&body.input) == SqlMacroForm::Expression {
+                body.macro_form = Some(SqlMacroForm::Expression);
+            }
+        }
     }
     Ok((
         BodyTraits {
@@ -1029,7 +1038,7 @@ fn expand_bodies(
     })
 }
 
-/// One expanded body, an expression macro body framed as the `SELECT` lint parses it as.
+/// One expanded body, an expression macro or function body framed as the `SELECT` lint parses it as.
 fn framed_body(
     body: PlannedBody,
     (expanded, mut passes): (String, Vec<Vec<ExpansionSpan>>),

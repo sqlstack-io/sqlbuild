@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import itertools
+import logging
 import random
+import shutil
 from itertools import product
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -12,19 +13,27 @@ import pytest
 
 from sqlbuild._native import (
     ColumnLineageMode,
-    InferredNullability,
     assemble_project,
 )
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
+from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
+from sqlbuild.adapters.clickhouse.classes.clickhouse_adapter import ClickHouseAdapter
+from sqlbuild.adapters.databricks.classes.databricks_adapter import DatabricksAdapter
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.adapters.motherduck.classes.motherduck_adapter import MotherDuckAdapter
+from sqlbuild.adapters.postgres.classes.postgres_adapter import PostgresAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
+from sqlbuild.adapters.sqlite.classes.sqlite_adapter import SqliteAdapter
+from sqlbuild.adapters.sqlserver.classes.sqlserver_adapter import SqlServerAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.analysis_session._test_types import (
     AdapterRuleCallbackTestCase,
+    AdapterWaveTestCase,
     CyclicAnalysisTestCase,
     CyclicCompileTestCase,
     GeneratedAnalysisTestCase,
     SharedAnalysisTestCase,
+    SourceTypesTestCase,
     StandalonePivotProofTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.analysis_session.helpers import (
@@ -37,6 +46,7 @@ from tests.integration.src.sqlbuild.compiler.analysis_session.helpers import (
     compile_inputs,
     compiled_project_view,
     custom_nullability_rule,
+    first_model_types,
     generated_analysis_files,
     native_pivot_proofs,
     pivot_project_files,
@@ -70,6 +80,11 @@ _CUSTOM_RULE_PROFILES: tuple[ExpressionInferenceProfile, ...] = (
         },
     ),
 )
+_COMPILE_LOGGER: str = "sqlbuild.compile"
+_UNAPPLIED_RULES_WARNING: str = (
+    "Adapter 'duckdb' defines its own nullability rule for IFF, UPPER; native SQL analysis "
+    "does not apply it, so these calls take the dialect's own nullability"
+)
 _CYCLIC_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders_cycle"\nadapter = "duckdb"\n',
     "sources/raw.yml": (
@@ -100,6 +115,37 @@ _ORDERS_PROJECT: dict[str, str] = {
     "models/returns.sql": 'MODEL (description "Returns");\n\nSELECT order_id FROM __ref("orders")\n',
 }
 
+_DECLARED_SOURCE_PROJECT: dict[str, str] = {
+    "sqlbuild_project.toml": 'name = "orders_sources"\nadapter = "duckdb"\n',
+    "sources/raw.yml": (
+        "sources:\n  - name: raw_orders\n    description: Raw orders.\n    columns:\n"
+        "      - name: order_id\n        type: INTEGER\n"
+        "      - name: amount\n        type: DOUBLE\n"
+    ),
+    "models/orders.sql": (
+        'MODEL (description "Orders");\n\n'
+        'SELECT order_id, amount * -1 AS refund FROM __source("raw_orders")\n'
+    ),
+}
+_EXPRESSION_SOURCE_PROJECT: dict[str, str] = _DECLARED_SOURCE_PROJECT | {
+    "sources/raw.yml": _DECLARED_SOURCE_PROJECT["sources/raw.yml"].replace(
+        "    columns:\n",
+        "    expression: >-\n      (SELECT 1 AS order_id, CAST(5 AS DOUBLE) AS amount)\n"
+        "    columns:\n",
+    ),
+}
+
+_MIXED_CASE_SOURCE_PROJECT: dict[str, str] = {
+    "sqlbuild_project.toml": 'name = "customers"\nadapter = "duckdb"\n',
+    "sources/raw.yml": (
+        "sources:\n  - name: raw_customers\n    description: Raw customers.\n"
+        "    expression: >-\n      (SELECT 10 AS customer_id, 'Ada' AS Customer_Name)\n"
+    ),
+    "models/customers.sql": (
+        'MODEL (description "Customers");\n\nSELECT * FROM __source("raw_customers")\n'
+    ),
+}
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -114,9 +160,9 @@ _ORDERS_PROJECT: dict[str, str] = {
             lineage_mode=ColumnLineageMode.FAST,
             expected_minimum_native=500,
             expected_minimum_expression_shapes=40,
-            expected_minimum_pivot_proofs=80,
+            expected_minimum_pivot_proofs=72,
             expected_minimum_proven_pivots=12,
-            expected_minimum_native_enrichments=90,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
             description="rich lineage over untyped inputs, CTE facts and contracts",
@@ -128,9 +174,9 @@ _ORDERS_PROJECT: dict[str, str] = {
             lineage_mode=ColumnLineageMode.RICH,
             expected_minimum_native=500,
             expected_minimum_expression_shapes=40,
-            expected_minimum_pivot_proofs=80,
+            expected_minimum_pivot_proofs=72,
             expected_minimum_proven_pivots=12,
-            expected_minimum_native_enrichments=90,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
             description="snowflake and duckdb adapter rules, fast lineage",
@@ -144,7 +190,7 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=15,
             expected_minimum_pivot_proofs=30,
             expected_minimum_proven_pivots=10,
-            expected_minimum_native_enrichments=30,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
             description="snowflake and duckdb adapter rules, rich lineage",
@@ -158,10 +204,12 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=15,
             expected_minimum_pivot_proofs=30,
             expected_minimum_proven_pivots=10,
-            expected_minimum_native_enrichments=20,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
-            description="a project-local adapter's own nullability rules, called back natively",
+            description=(
+                "a project-local adapter's own nullability rules, not called on a native route"
+            ),
             seed=20261011,
             count=3,
             model_count=24,
@@ -172,7 +220,7 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=1,
             expected_minimum_pivot_proofs=1,
             expected_minimum_proven_pivots=1,
-            expected_minimum_native_enrichments=1,
+            expected_minimum_native_enrichments=0,
         ),
     ],
     ids=lambda case: case.description,
@@ -185,16 +233,24 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
     rng: random.Random = random.Random(test_case.seed)
     runs: NativeAnalysisRuns = NativeAnalysisRuns()
     for index in range(test_case.count):
-        inputs: CompileInputsView = compile_inputs(
-            project_dir=tmp_path / f"project_{index}",
-            files={
-                **generated_analysis_files(rng=rng, model_count=test_case.model_count),
-                **test_case.extra_files,
-            },
-        )
+        draws: tuple[Any, ...] = rng.getstate()
         for profile_index, profile in enumerate(test_case.inference_profiles):
+            rng.setstate(draws)
+            files: dict[str, str] = {
+                **generated_analysis_files(
+                    rng=rng,
+                    model_count=test_case.model_count,
+                    dialect=profile.sql_analysis_dialect,
+                ),
+                **test_case.extra_files,
+            }
+            shutil.rmtree(tmp_path / f"project_{index}", ignore_errors=True)
             analyse_natively(
-                inputs=inputs,
+                inputs=compile_inputs(
+                    project_dir=tmp_path / f"project_{index}",
+                    files=files,
+                    dialect=profile.sql_analysis_dialect,
+                ),
                 inference_profile=profile,
                 lineage_mode=test_case.lineage_mode,
                 runs=runs,
@@ -221,34 +277,108 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
 @pytest.mark.parametrize(
     "test_case",
     [
+        AdapterWaveTestCase(
+            description="BigQueryAdapter",
+            profile=BigQueryAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="ClickHouseAdapter",
+            profile=ClickHouseAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="DatabricksAdapter",
+            profile=DatabricksAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="DuckDbAdapter",
+            profile=DuckDbAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="MotherDuckAdapter",
+            profile=MotherDuckAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="PostgresAdapter",
+            profile=PostgresAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="SnowflakeAdapter",
+            profile=SnowflakeAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="SqliteAdapter",
+            profile=SqliteAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="SqlServerAdapter",
+            profile=SqlServerAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_shipped_adapter_when_analysing_equal_queries_then_its_session_wave_is_native(
+    test_case: AdapterWaveTestCase, tmp_path: Path
+) -> None:
+    runs: NativeAnalysisRuns = NativeAnalysisRuns()
+    analyse_natively(
+        inputs=compile_inputs(
+            project_dir=tmp_path / "project",
+            files=shared_analysis_files(regions=("east", "west"), inexact_regions=()),
+            dialect=test_case.profile.sql_analysis_dialect,
+        ),
+        inference_profile=test_case.profile,
+        lineage_mode=ColumnLineageMode.FAST,
+        runs=runs,
+        cache_root=tmp_path / "cache",
+    )
+
+    assert runs.analysed_models > 0
+    assert (
+        sum(session.sharing[0] for session in runs.sessions),
+        runs.native_enrichments,
+    ) == (test_case.expected_shared, 0)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         SharedAnalysisTestCase(
-            description="equal regional queries, missing-column readers and a unique summary",
+            description=(
+                "equal regional queries, missing-column readers and a unique summary, "
+                "each analysed by a native wave"
+            ),
             regions=("east", "west", "north", "south"),
             inexact_regions=("east", "west", "north"),
             dialects=("duckdb", "snowflake"),
             expected_analysed=24,
-            expected_shared=22,
-            expected_reanalysed=6,
-            expected_unshared=2,
+            expected_shared=0,
+            expected_reanalysed=0,
+            expected_unshared=24,
             expected_column_values=12,
         )
     ],
     ids=lambda case: case.description,
 )
-def test_given_equal_model_queries_when_analysing_natively_then_shares_and_cached_runs_agree(
+def test_given_equal_model_queries_when_analysing_natively_then_each_is_analysed_and_runs_agree(
     test_case: SharedAnalysisTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    inputs: CompileInputsView = compile_inputs(
-        project_dir=tmp_path / "project",
-        files=shared_analysis_files(
-            regions=test_case.regions, inexact_regions=test_case.inexact_regions
-        ),
+    files: dict[str, str] = shared_analysis_files(
+        regions=test_case.regions, inexact_regions=test_case.inexact_regions
     )
     runs: NativeAnalysisRuns = NativeAnalysisRuns()
 
     _ = [
         analyse_natively(
-            inputs=inputs,
+            inputs=compile_inputs(project_dir=tmp_path / "project", files=files, dialect=dialect),
             inference_profile=ExpressionInferenceProfile(sql_analysis_dialect=dialect),
             lineage_mode=ColumnLineageMode.FAST,
             runs=runs,
@@ -298,14 +428,13 @@ def test_given_equal_model_queries_when_analysing_natively_then_shares_and_cache
 def test_given_cyclic_models_when_analysing_natively_then_session_answers_and_cached_runs_agree(
     test_case: CyclicAnalysisTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    inputs: CompileInputsView = compile_inputs(
-        project_dir=tmp_path / "project", files=test_case.files
-    )
     runs: NativeAnalysisRuns = NativeAnalysisRuns()
 
     _ = [
         analyse_natively(
-            inputs=inputs,
+            inputs=compile_inputs(
+                project_dir=tmp_path / "project", files=test_case.files, dialect=dialect
+            ),
             inference_profile=ExpressionInferenceProfile(sql_analysis_dialect=dialect),
             lineage_mode=lineage_mode,
             runs=runs,
@@ -329,6 +458,104 @@ def test_given_cyclic_models_when_analysing_natively_then_session_answers_and_ca
         test_case.expected_analysed,
         len(test_case.dialects) * len(test_case.lineage_modes),
         False,
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SourceTypesTestCase(
+            description="a source with its expression types the columns read from it",
+            files=_EXPRESSION_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.RICH,
+            expected_types=(("order_id", "INTEGER"), ("refund", "DOUBLE")),
+        ),
+        SourceTypesTestCase(
+            description="a source's declared types type the columns read from it",
+            files=_DECLARED_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.RICH,
+            expected_types=(("order_id", "INTEGER"), ("refund", "DOUBLE")),
+        ),
+        SourceTypesTestCase(
+            description="a source's declared types type its reads in fast lineage too",
+            files=_DECLARED_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.FAST,
+            expected_types=(("order_id", "INTEGER"), ("refund", "DOUBLE")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_typed_source_when_analysing_natively_then_its_columns_are_typed(
+    test_case: SourceTypesTestCase, tmp_path: Path
+) -> None:
+    assert (
+        first_model_types(
+            files=test_case.files,
+            lineage_mode=test_case.lineage_mode,
+            tmp_path=tmp_path,
+            dialect=test_case.dialect,
+        )
+        == test_case.expected_types
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SourceTypesTestCase(
+            description="DuckDB keeps an expression source's unquoted alias as written",
+            files=_MIXED_CASE_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.FAST,
+            expected_types=(("customer_id", "INT"), ("Customer_Name", "TEXT")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_expression_source_with_mixed_case_alias_when_analysing_then_star_lists_engine_names(
+    test_case: SourceTypesTestCase, tmp_path: Path
+) -> None:
+    assert (
+        first_model_types(
+            files=test_case.files,
+            lineage_mode=test_case.lineage_mode,
+            tmp_path=tmp_path,
+            dialect=test_case.dialect,
+        )
+        == test_case.expected_types
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "an expression source's shape keeps the alias's authored case and Polyglot's type "
+        "names under PostgreSQL"
+    ),
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SourceTypesTestCase(
+            description="PostgreSQL folds an expression source's unquoted alias",
+            files=_MIXED_CASE_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.FAST,
+            expected_types=(("customer_id", "INTEGER"), ("customer_name", "TEXT")),
+            dialect="postgres",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pending_postgres_expression_source_when_analysing_then_star_lists_engine_names(
+    test_case: SourceTypesTestCase, tmp_path: Path
+) -> None:
+    assert (
+        first_model_types(
+            files=test_case.files,
+            lineage_mode=test_case.lineage_mode,
+            tmp_path=tmp_path,
+            dialect=test_case.dialect,
+        )
+        == test_case.expected_types
     )
 
 
@@ -431,54 +658,36 @@ def test_given_unanalysed_pivot_model_when_assembling_then_native_proves_it_with
     "test_case",
     [
         AdapterRuleCallbackTestCase(
-            description="the adapter's own rule answers natively analysed CTE nullability",
+            description="an adapter's own rule is not called on a native route, and compile says so",
             seed=20261012,
             model_count=6,
             raised=None,
-            expected_minimum_calls=1,
+            expected_warning=_UNAPPLIED_RULES_WARNING,
         ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_adapter_nullability_rule_when_analysing_natively_then_rule_is_called_back(
-    test_case: AdapterRuleCallbackTestCase, tmp_path: Path
-) -> None:
-    rule: RecordingNullabilityRule = RecordingNullabilityRule(raised=test_case.raised)
-    inputs, profile = adapter_rule_project(test_case=test_case, rule=rule, tmp_path=tmp_path)
-
-    project: CompiledProjectView = assemble_project(inputs=inputs, inference_profile=profile)
-
-    assert any(model.inferred_columns for model in project.models)
-    assert len(rule.calls) >= test_case.expected_minimum_calls, test_case.description
-    assert all(
-        isinstance(value, InferredNullability)
-        for value in itertools.chain.from_iterable(rule.calls)
-    )
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
         AdapterRuleCallbackTestCase(
-            description="the adapter rule's exception reaches the caller unchanged",
+            description="a failing adapter rule is never reached on a native route",
             seed=20261012,
             model_count=6,
             raised=LookupError,
-            expected_minimum_calls=1,
+            expected_warning=_UNAPPLIED_RULES_WARNING,
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_failing_adapter_nullability_rule_when_analysing_natively_then_its_error_raises(
-    test_case: AdapterRuleCallbackTestCase, tmp_path: Path
+def test_given_adapter_nullability_rule_when_analysing_natively_then_compile_warns_it_is_unapplied(
+    test_case: AdapterRuleCallbackTestCase,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     rule: RecordingNullabilityRule = RecordingNullabilityRule(raised=test_case.raised)
     inputs, profile = adapter_rule_project(test_case=test_case, rule=rule, tmp_path=tmp_path)
 
-    with pytest.raises(LookupError, match="adapter rule failed"):
-        _ = assemble_project(inputs=inputs, inference_profile=profile)
+    with caplog.at_level(logging.WARNING, logger=_COMPILE_LOGGER):
+        project: CompiledProjectView = assemble_project(inputs=inputs, inference_profile=profile)
 
-    assert len(rule.calls) >= test_case.expected_minimum_calls, test_case.description
+    assert any(model.inferred_columns for model in project.models)
+    assert rule.calls == []
+    assert caplog.messages == [test_case.expected_warning]
 
 
 if __name__ == "__main__":

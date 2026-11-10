@@ -78,12 +78,21 @@ DUCKDB_COMPILE_ADAPTER_CONTEXT: CompileAdapterContext = CompileAdapterContext(
     collection_rendering=CollectionRendering.VALUE_LIST,
     python_functions_inherit_default_namespace=True,
     sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+    sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name,
 )
 DUCKDB_ARRAY_COMPILE_ADAPTER_CONTEXT: CompileAdapterContext = CompileAdapterContext(
     value_renderer=DUCKDB_COMPILE_ADAPTER_CONTEXT.value_renderer,
     collection_rendering=CollectionRendering.ARRAY,
     python_functions_inherit_default_namespace=True,
     sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+    sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name,
+)
+SQLSERVER_COMPILE_ADAPTER_CONTEXT: CompileAdapterContext = CompileAdapterContext(
+    value_renderer=SqlServerAdapter(),
+    collection_rendering=CollectionRendering.VALUE_LIST,
+    python_functions_inherit_default_namespace=True,
+    sql_lexical_syntax=SqlServerAdapter.sql_lexical_syntax,
+    sql_analysis_dialect=SqlServerAdapter.sql_analysis_dialect_name,
 )
 DUCKDB_DECLARATION_EXPANSION_CONTEXT: DeclarationExpansionContext = DeclarationExpansionContext(
     declarations=DeclarationResolutionContext(),

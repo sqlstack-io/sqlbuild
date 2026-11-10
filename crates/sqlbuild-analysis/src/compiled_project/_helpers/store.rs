@@ -28,6 +28,17 @@ impl CompiledProjectFacts {
         }
     }
 
+    /// Mark a recorded model as skipped by its native parser; `false` when it was never recorded.
+    pub(crate) fn record_skipped(&mut self, name: &str) -> bool {
+        match self.model_index.get(name) {
+            Some(&position) => {
+                self.models[position].sql_analysis_skipped = true;
+                true
+            }
+            None => false,
+        }
+    }
+
     pub(crate) fn model(&self, name: &str) -> Option<&CompiledModelFacts> {
         self.model_index
             .get(name)

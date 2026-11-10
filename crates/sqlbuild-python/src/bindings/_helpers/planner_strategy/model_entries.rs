@@ -70,11 +70,12 @@ const STRING_FIELDS: [(&str, &str); 15] = [
 /// Model config keys copied as optional strings that complete the snapshot settings.
 const SNAPSHOT_POLICY_FIELDS: [&str; 2] = ["snapshot_full_refresh", "snapshot_schema_change"];
 /// Change-detection facts copied to the entry.
-const CHANGE_FIELDS: [&str; 8] = [
+const CHANGE_FIELDS: [&str; 9] = [
     "fingerprint_metadata_json",
     "previous_metadata_json",
     "fingerprint_version_hash",
     "previous_version_hash",
+    "fingerprint_definition_hash",
     "query_changed",
     "config_changed",
     "schema_findings",

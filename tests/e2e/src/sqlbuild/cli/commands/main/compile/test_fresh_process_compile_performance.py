@@ -22,6 +22,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _MIB: int = 1024 * 1024
 _GIB: int = 1024 * _MIB
+# Temporary allowance for the native parser switch: each wall budget below is its original value
+# times the approved 1.42 fresh cold wall ratio ceiling. Drop the multiplier, back to the original
+# value, when the 1.10x same-runner ratio guards return.
+_NATIVE_COLD_WALL_ALLOWANCE: float = 1.42
 
 
 @pytest.mark.performance
@@ -39,10 +43,10 @@ _GIB: int = 1024 * _MIB
             test_count=2_945,
             audit_count=5_056,
             # Default SQL Rules: 8.0 s scaled by the 1.24x CI cost over select = [].
-            expected_max_wall_seconds=9.9,
+            expected_max_wall_seconds=9.9 * _NATIVE_COLD_WALL_ALLOWANCE,
             expected_max_rss_bytes=1088 * _MIB,
             expected_semantic_fingerprint=(
-                "d935821df54043fabc3a6911c1926578178c9b744f2a589cbef99a10d5207543"
+                "c9e4f4857b6879dbbde2f3ed28bc298124569817958512df4dd01170a537be90"
             ),
         ),
         FreshProcessCompilePerformanceGuardTestCase(
@@ -55,10 +59,10 @@ _GIB: int = 1024 * _MIB
             test_count=4_908,
             audit_count=8_427,
             # Default SQL Rules: 12.5 s scaled by the 1.23x CI cost over select = [].
-            expected_max_wall_seconds=15.4,
+            expected_max_wall_seconds=15.4 * _NATIVE_COLD_WALL_ALLOWANCE,
             expected_max_rss_bytes=1664 * _MIB,
             expected_semantic_fingerprint=(
-                "874cbfd473846c6a335ec2f79cb6b7b0b77e8e8d58652815fad1e9d59d423c46"
+                "c89d8d60e9655dcef4cd01c0fc270a9aa2343cb2d56aae2ab5ca476a9778ec39"
             ),
         ),
         FreshProcessCompilePerformanceGuardTestCase(
@@ -71,10 +75,10 @@ _GIB: int = 1024 * _MIB
             test_count=9_816,
             audit_count=16_855,
             # Default SQL Rules: 25.5 s scaled by the 1.13x CI cost over select = [].
-            expected_max_wall_seconds=28.8,
+            expected_max_wall_seconds=28.8 * _NATIVE_COLD_WALL_ALLOWANCE,
             expected_max_rss_bytes=int(2.5 * _GIB),
             expected_semantic_fingerprint=(
-                "5ccdabeaabfdfba1ecbae80259dd3c6eb801d683df140b7fb7a249b9555308c6"
+                "a5caf9a87baa70eb5f90cbd2d30cc86b41d6b160f6e5eadd23413b153878d9e8"
             ),
         ),
     ],

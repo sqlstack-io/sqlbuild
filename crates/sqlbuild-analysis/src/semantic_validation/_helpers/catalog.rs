@@ -642,7 +642,7 @@ fn messaged_row(error: ValidationError) -> DiagnosticRow {
     row
 }
 
-pub(super) fn diagnostic_row(error: ValidationError) -> DiagnosticRow {
+pub(crate) fn diagnostic_row(error: ValidationError) -> DiagnosticRow {
     let severity = match error.severity {
         polyglot_sql::ValidationSeverity::Error => "error",
         _ => "warning",

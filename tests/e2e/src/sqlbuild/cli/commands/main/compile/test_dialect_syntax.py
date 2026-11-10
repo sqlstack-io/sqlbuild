@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import json
-import subprocess
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -13,25 +10,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     DialectSyntaxCompileE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
-    dialect_ignored_rules_entry,
+    compile_dialect_syntax_project,
     dialect_syntax_model,
 )
-from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
-
-_CONNECTIONS: dict[str, str] = {
-    "duckdb": '[connection]\ndatabase = "shop.duckdb"\n',
-    "snowflake": (
-        '[connection]\naccount = "example"\nuser = "builder"\n\n'
-        '[defaults]\ndatabase = "ANALYTICS"\nschema = "MARTS"\n'
-    ),
-    "clickhouse": (
-        '[connection]\nhost = "localhost"\ndatabase = "default"\n\n[defaults]\nschema = "default"\n'
-    ),
-    "bigquery": (
-        '[connection]\nproject = "example"\ndataset = "marts"\n\n'
-        '[defaults]\ndatabase = "example"\nschema = "marts"\n'
-    ),
-}
 
 
 @pytest.mark.parametrize(
@@ -124,18 +105,6 @@ _CONNECTIONS: dict[str, str] = {
             expected_column_counts={},
         ),
         DialectSyntaxCompileE2ETestCase(
-            description="Snowflake rejects a CTE whose body is a bare VALUES list",
-            adapter="snowflake",
-            models={
-                "codes": dialect_syntax_model(
-                    "Codes.", "WITH v AS (VALUES (1), (2)) SELECT v.column1 AS code FROM v"
-                ),
-            },
-            expected_exit_code=1,
-            expected_codes=("P001",),
-            expected_column_counts={},
-        ),
-        DialectSyntaxCompileE2ETestCase(
             description="Snowflake accepts VALUES in FROM inside a CTE",
             adapter="snowflake",
             models={
@@ -163,7 +132,7 @@ _CONNECTIONS: dict[str, str] = {
                 ),
             },
             expected_exit_code=0,
-            expected_codes=(),
+            expected_codes=("L007", "L007"),
             expected_column_counts={"hourly_events": 1},
         ),
         DialectSyntaxCompileE2ETestCase(
@@ -173,7 +142,7 @@ _CONNECTIONS: dict[str, str] = {
                 "periods": dialect_syntax_model(
                     "Periods.",
                     "SELECT CAST(NULL AS RANGE<DATE>) AS period, "
-                    "CAST(NULL AS RANGE<TIMESTAMP>) AS window",
+                    "CAST(NULL AS RANGE<TIMESTAMP>) AS active_window",
                 ),
             },
             expected_exit_code=0,
@@ -186,32 +155,67 @@ _CONNECTIONS: dict[str, str] = {
 def test_given_dialect_syntax_when_compiling_then_analysis_parses_and_types_it(
     test_case: DialectSyntaxCompileE2ETestCase, tmp_path: Path
 ) -> None:
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="shop",
-        repo_files={
-            "sqlbuild_project.toml": (
-                f'name = "shop"\nadapter = "{test_case.adapter}"\n\n'
-                f"{_CONNECTIONS[test_case.adapter]}\n[scopes]\nenforce_placement = false\n"
-                + {True: dialect_ignored_rules_entry(test_case.ignored_rules), False: ""}[
-                    bool(test_case.ignored_rules)
-                ]
-            ),
-            **{f"models/{name}.sql": sql for name, sql in test_case.models.items()},
-        },
-    )
+    compiled, codes, column_counts = compile_dialect_syntax_project(test_case, tmp_path)
 
-    compiled: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "compile", "--json"), project_dir=project_dir
-    )
-
-    report: dict[str, Any] = json.loads(compiled.stdout)
-    column_counts: dict[str, int] = {
-        model["name"]: model["column_count"]
-        for model in report.get("resources", {}).get("models", [])
-    }
     assert compiled.returncode == test_case.expected_exit_code, compiled.stdout + compiled.stderr
-    assert tuple(item["code"] for item in report["diagnostics"]) == test_case.expected_codes
+    assert codes == test_case.expected_codes
     assert {
         name: column_counts[name] for name in test_case.expected_column_counts
     } == test_case.expected_column_counts, test_case.description
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DialectSyntaxCompileE2ETestCase(
+            description="Snowflake rejects a CTE whose body is a bare VALUES list",
+            adapter="snowflake",
+            models={
+                "codes": dialect_syntax_model(
+                    "Codes.", "WITH v AS (VALUES (1), (2)) SELECT v.column1 AS code FROM v"
+                ),
+            },
+            expected_exit_code=1,
+            expected_codes=("P001",),
+            expected_column_counts={},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_syntax_error_when_compiling_then_compile_fails_with_an_error(
+    test_case: DialectSyntaxCompileE2ETestCase, tmp_path: Path
+) -> None:
+    compiled, codes, _ = compile_dialect_syntax_project(test_case, tmp_path)
+
+    assert compiled.returncode == test_case.expected_exit_code, compiled.stdout + compiled.stderr
+    assert codes, compiled.stdout + compiled.stderr
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Native Snowflake parse errors carry no syntax flag, so a bare VALUES CTE reports P026",
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DialectSyntaxCompileE2ETestCase(
+            description="Snowflake rejects a CTE whose body is a bare VALUES list",
+            adapter="snowflake",
+            models={
+                "codes": dialect_syntax_model(
+                    "Codes.", "WITH v AS (VALUES (1), (2)) SELECT v.column1 AS code FROM v"
+                ),
+            },
+            expected_exit_code=1,
+            expected_codes=("P001",),
+            expected_column_counts={},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_syntax_error_when_compiling_then_it_is_reported_as_p001(
+    test_case: DialectSyntaxCompileE2ETestCase, tmp_path: Path
+) -> None:
+    _, codes, _ = compile_dialect_syntax_project(test_case, tmp_path)
+
+    assert codes == test_case.expected_codes

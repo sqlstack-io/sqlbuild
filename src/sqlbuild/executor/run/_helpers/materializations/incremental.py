@@ -718,6 +718,11 @@ def _widenable_columns(
     return ()
 
 
+def untyped_side(*, adapter: BaseAdapter, types: tuple[str, str]) -> bool:
+    """Whether either type is the adapter's marker for a column with no type evidence."""
+    return adapter.untyped_column_type is not None and adapter.untyped_column_type in types
+
+
 def _apply_schema_change(
     *,
     adapter: BaseAdapter,
@@ -745,7 +750,9 @@ def _apply_schema_change(
         col_lower: str = column_name_key(col.name)
         if col_lower not in target_map:
             added.append(col)
-        elif not types_equal(
+        elif not untyped_side(
+            adapter=adapter, types=(target_map[col_lower], col.type)
+        ) and not types_equal(
             left=target_map[col_lower], right=col.type, dialect=adapter.sql_analysis_dialect_name
         ):
             type_changed.append(col)

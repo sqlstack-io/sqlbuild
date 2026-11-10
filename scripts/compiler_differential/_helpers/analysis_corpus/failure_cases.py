@@ -465,8 +465,10 @@ def _syntax_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="syntax-hook",
             expected_code="P001",
-            expected_message="record_refresh",
+            expected_message="customer_totals",
             files={
+                FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
+                + "\n[settings]\nrequire_sql_analysis = true\n",
                 _HOOK_PATH: ('HOOK (\n  description "Record a refresh"\n);\n\nSELECT FROM WHERE\n'),
                 **_mart_header(extra='  post_hooks [sql("record_refresh")],'),
             },
@@ -474,8 +476,12 @@ def _syntax_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="syntax-inline-hook",
             expected_code="P001",
-            expected_message="hook",
-            files=_mart_header(extra='  post_hooks [inline_sql("SELECT FROM WHERE")],'),
+            expected_message="customer_totals",
+            files={
+                FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
+                + "\n[settings]\nrequire_sql_analysis = true\n",
+                **_mart_header(extra='  post_hooks [inline_sql("SELECT FROM WHERE")],'),
+            },
         ),
         failure_case(
             name="syntax-function",

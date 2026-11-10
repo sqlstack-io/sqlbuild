@@ -4,6 +4,7 @@ use sqlbuild_scopes::relationship_names::main::top_level_ctes::scan_top_level_ct
 use sqlbuild_scopes::relationship_names::models::{RelationshipSource, TopLevelCtes};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
+use crate::analysis_route::types::NativeDialect;
 use crate::compiler::_helpers::sql_tests::check_independence::{
     IndependenceCheck, independence_error,
 };
@@ -24,7 +25,7 @@ const SCENARIO_CONTEXT: &str = "SQL scenario";
 pub(crate) fn extract_scenario(
     sql: &str,
     file: &str,
-    syntax: &LexicalSyntax,
+    (syntax, parser): (&LexicalSyntax, Option<&dyn NativeDialect>),
 ) -> Result<SqlScenarioCtes, String> {
     let ctes = match scan_top_level_ctes(sql, file, RelationshipSource::Scenario, syntax) {
         TopLevelCtes::Failed(message) => return Err(message),
@@ -37,6 +38,7 @@ pub(crate) fn extract_scenario(
             assertion_prefix: ASSERT_PREFIX,
             file_label: file,
             context_label: SCENARIO_CONTEXT,
+            parser,
         },
         syntax,
     ) {

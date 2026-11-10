@@ -461,7 +461,7 @@ def test_given_description_width_when_formatting_then_wrapped_model_compiles(
         TrailingCommentFormatIntegrationTestCase(
             description="comments after the last clause gain no blank line",
             body="select 1 as order_id from orders\n\n-- first note\n\n-- second note\n",
-            expected_body="SELECT 1 AS order_id\nFROM orders -- first note\n -- second note\n",
+            expected_body="SELECT 1 AS order_id\nFROM orders -- first note\n-- second note\n",
         ),
     ],
     ids=lambda case: case.description,
@@ -569,8 +569,21 @@ def test_given_unparseable_file_when_formatting_then_file_is_untouched_and_fault
     [
         FormatterDeclineIntegrationTestCase(
             description="unsupported SQL body leaves the whole file unchanged",
+            adapter="duckdb",
             authored_body="select from\n",
             expected_exit_code=1,
+            expected_code="format-unsafe",
+            expected_message="File left unchanged",
+        ),
+        FormatterDeclineIntegrationTestCase(
+            description="a dialect SQLClean does not format yet is left as written with a warning",
+            adapter="clickhouse",
+            authored_body="select   order_id from raw_orders\n",
+            expected_exit_code=0,
+            expected_code="format-unavailable",
+            expected_message=(
+                "File left as written: SQL formatting is unavailable for the clickhouse dialect"
+            ),
         ),
     ],
     ids=lambda case: case.description,
@@ -581,7 +594,7 @@ def test_given_native_formatter_decline_when_formatting_then_whole_file_is_uncha
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
+        f'name = "orders"\nadapter = "{test_case.adapter}"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "models" / "orders.sql"
     model.parent.mkdir()
@@ -605,15 +618,15 @@ def test_given_native_formatter_decline_when_formatting_then_whole_file_is_uncha
     assert second_exit == test_case.expected_exit_code
     assert formatted_once == original
     assert test_case.authored_body in formatted_once
-    assert "format-unsafe" in first_output
-    assert "format-unsafe" in second_output
-    assert "File left unchanged" in first_output
+    assert test_case.expected_code in first_output
+    assert test_case.expected_code in second_output
+    assert test_case.expected_message in first_output
     assert "orders.sql" in second_output
     json_exit: int = main(["--project-dir", str(tmp_path), "format", "--check", "--json"])
     json_output: str = capsys.readouterr().out
-    assert json_exit == 1
-    assert "format-unsafe" in json_output
-    assert "File left unchanged" in json_output
+    assert json_exit == test_case.expected_exit_code
+    assert test_case.expected_code in json_output
+    assert test_case.expected_message in json_output
     assert json.loads(json_output)
     assert formatted_once == model.read_text(encoding="utf-8")
 
@@ -1141,11 +1154,14 @@ def test_given_backtick_identifier_apostrophe_when_formatting_then_macro_call_st
     )
 
     format_exit: int = main(["--project-dir", str(tmp_path), "--no-color", "format"])
+    formatted_once: str = model_path.read_text(encoding="utf-8")
+    second_format_exit: int = main(["--project-dir", str(tmp_path), "--no-color", "format"])
     compile_exit: int = main(["--project-dir", str(tmp_path), "--no-color", "compile"])
     output: CaptureResult[str] = capsys.readouterr()
 
-    assert (format_exit, compile_exit) == (0, 0), output.out + output.err
-    assert test_case.expected_literal in model_path.read_text(encoding="utf-8")
+    assert (format_exit, second_format_exit, compile_exit) == (0, 0, 0), output.out + output.err
+    assert test_case.expected_literal in formatted_once
+    assert model_path.read_text(encoding="utf-8") == formatted_once
 
 
 @pytest.mark.parametrize(
@@ -1209,10 +1225,7 @@ def test_given_dollar_quoted_apostrophe_when_formatting_then_reference_survives_
             ("snowflake", _LAYOUT_ONLY_BODY),
             ("postgres", _LAYOUT_ONLY_BODY.replace("  amount,\n", "  amount\n")),
             ("bigquery", _LAYOUT_ONLY_BODY),
-            (
-                "databricks",
-                _LAYOUT_ONLY_BODY.replace("  amount,\n", "  amount\n").replace("ALL", "all"),
-            ),
+            ("databricks", _LAYOUT_ONLY_BODY.replace("  amount,\n", "  amount\n")),
             ("sqlserver", _LAYOUT_ONLY_BODY.replace("  amount,\n", "  amount\n")),
         )
     ],

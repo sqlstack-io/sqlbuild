@@ -15,6 +15,15 @@ class NativeFastLineageCliTestCase:
 
 
 @dataclass(frozen=True)
+class WarmFastLineageCliTestCase:
+    """Fast lineage traced after a cold compile filled the compile's stores."""
+
+    description: str
+    reuse_disabled: str
+    expected_minimum_cache_hits: int
+
+
+@dataclass(frozen=True)
 class NativeRichLineageFailureCliTestCase:
     """A native rich lineage failure injected at the binding, compiled through the CLI."""
 

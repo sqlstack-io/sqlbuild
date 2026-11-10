@@ -431,8 +431,8 @@ def test_given_valid_audits_tests_and_hooks_when_building_then_checks_pass(
                     "B215",
                     "SQL test 'test_orders': Set-operation column 2 may fail during runtime "
                     "conversion: accumulated type TIMESTAMP_NTZ, next type VARCHAR",
-                    "Cast set-operation column 2 to the tested model's type TIMESTAMP in the "
-                    "expected or fixture rows, for example `CAST('2026-04-01' AS TIMESTAMP)`",
+                    "Cast set-operation column 2 to the tested model's type TIMESTAMP_NTZ in the "
+                    "expected or fixture rows, for example `CAST('2026-04-01' AS TIMESTAMP_NTZ)`",
                 ),
             ),
         ),
@@ -532,7 +532,7 @@ def test_given_typed_resource_mismatch_when_compiling_then_message_names_owner_a
             files=(
                 _REQUIRED_ANALYSIS_TOML,
                 resource_sql_orders_model(
-                    ', sql_analysis false, post_hooks [inline_sql("CHECKPOINT")]'
+                    ', sql_analysis false, post_hooks [inline_sql("CHECKPOINT x y z")]'
                 ),
             ),
             flags=(),

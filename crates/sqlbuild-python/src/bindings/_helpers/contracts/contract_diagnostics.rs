@@ -15,6 +15,7 @@ use sqlbuild_analysis::contracts::main::enum_literal_violations::enum_literal_vi
 use sqlbuild_analysis::contracts::models::{
     EnumColumn, EnumLiteralModel, EnumLiteralViolation, LiteralLocation,
 };
+use sqlbuild_core::constants::STAGED_PROMOTION_MODE;
 use sqlbuild_sqltext::compiler::main::model_output_columns::model_output_columns;
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
@@ -284,18 +285,27 @@ fn model_resource_type(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     enum_from_value(py, RecordId::CompiledResourceType, MODEL_RESOURCE)
 }
 
-/// Every model's column contract diagnostics, in model order.
+/// Every model's column contract diagnostics in model order; no build is staged without `adapter_default`.
 #[pyfunction]
-#[pyo3(signature = (*, project, dialect = None))]
+#[pyo3(signature = (*, project, dialect = None, adapter_default = None))]
 pub(crate) fn evaluate_model_contracts<'py>(
     py: Python<'py>,
     project: &Bound<'py, PyAny>,
     dialect: Option<&Bound<'py, PyAny>>,
+    adapter_default: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let mode: String = native_field(project, "settings")?
-        .getattr("column_contract_mode")?
+    let settings: Bound<'py, PyAny> = native_field(project, "settings")?;
+    let mode: String = native_field(&settings, "column_contract_mode")?
         .str()?
         .extract()?;
+    let explicit_promotion: Option<String> =
+        native_field(&settings, "table_promotion_mode")?.extract()?;
+    let promotion: Option<String> = match explicit_promotion {
+        Some(explicit) => Some(explicit),
+        None => adapter_default
+            .map(|default| default.str()?.extract())
+            .transpose()?,
+    };
     let mut dialect_name: String = GENERIC_DIALECT.to_owned();
     if let Some(dialect) = dialect
         && dialect.is_truthy()?
@@ -306,7 +316,11 @@ pub(crate) fn evaluate_model_contracts<'py>(
     let native: PyRef<'py, NativeCompiledProject> = native.extract()?;
     let outcomes: Vec<(String, Vec<DiagnosticRow>)> = evaluate_project_model_contracts(
         py,
-        (dialect_name.clone(), mode == IMPLICIT_COLUMN_CONTRACTS),
+        (
+            dialect_name.clone(),
+            mode == IMPLICIT_COLUMN_CONTRACTS,
+            promotion.as_deref() == Some(STAGED_PROMOTION_MODE),
+        ),
         &native,
     )?;
     let facts: HashMap<&str, &CompiledModelFacts> = project_models(native.facts())
@@ -344,9 +358,8 @@ pub(crate) fn promotion_conflict_diagnostics<'py>(
     adapter_default: &Bound<'py, PyAny>,
     settings_file: String,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let explicit_mode: Option<String> = native_field(project, "settings")?
-        .getattr("table_promotion_mode")?
-        .extract()?;
+    let explicit_mode: Option<String> =
+        native_field(&native_field(project, "settings")?, "table_promotion_mode")?.extract()?;
     let native: Bound<'py, PyAny> = native_project(project)?;
     let native: PyRef<'py, NativeCompiledProject> = native.extract()?;
     let conflicts: Vec<ConflictRow> = project_promotion_conflicts(

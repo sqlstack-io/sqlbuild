@@ -2,12 +2,17 @@
 
 use std::borrow::Cow;
 
-use polyglot_sql::expressions::{TYPED_EXPRESSION_FUNCTION, TYPED_LIKE_EXPRESSION_FUNCTION};
-use polyglot_sql::{DialectType, Expression, ExpressionWalk};
+use sqlquack_syntax::expressions::tree::constants::{
+    TYPED_EXPRESSION_FUNCTION, TYPED_LIKE_EXPRESSION_FUNCTION,
+};
+use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
+use crate::analysis_route::types::NativeDialect;
 use crate::compiled_project::models::SplicedSpan;
 use crate::sql_macros::_helpers::parsing::body::with_line_comment_closed;
-use crate::sql_macros::constants::{MARKER_PARSE_DIALECTS, NULL_KEYWORD};
+use crate::sql_macros::constants::NULL_KEYWORD;
 use crate::sql_macros::models::{TextSplice, TypedCall};
 
 /// `calls` moved `offset` bytes later.
@@ -158,7 +163,7 @@ pub(crate) fn typed_sql(sql: &str, calls: &[TypedCall]) -> (String, Vec<TextSpli
     (typed, insertions)
 }
 
-/// `calls` without any whose marker would change how `sql` parses in `dialect`.
+/// `calls` without any whose marker changes how `sql` parses; none where `dialect` has no parser.
 pub(crate) fn markable_calls<'c>(
     sql: &str,
     calls: &'c [TypedCall],
@@ -168,13 +173,7 @@ pub(crate) fn markable_calls<'c>(
     if marked == 0 {
         return Cow::Borrowed(calls);
     }
-    let parsed_dialect: Option<DialectType> = match dialect.parse::<DialectType>() {
-        Ok(parsed) => Some(parsed),
-        Err(_) => MARKER_PARSE_DIALECTS
-            .into_iter()
-            .find(|candidate| lowered_markers(sql, *candidate).is_some()),
-    };
-    let Some(parse_dialect) = parsed_dialect else {
+    let AnalysisRoute::Native(parse_dialect) = analysis_route(Some(dialect)) else {
         return Cow::Owned(Vec::new());
     };
     if lowered_markers(&typed_sql(sql, calls).0, parse_dialect) == Some(marked) {
@@ -218,11 +217,11 @@ fn is_bare_word(text: &str) -> bool {
         && characters.all(|character| character.is_alphanumeric() || character == '_')
 }
 
-/// How many typed markers `sql` lowers to expression nodes in `dialect`, if it parses.
-fn lowered_markers(sql: &str, dialect: DialectType) -> Option<usize> {
-    let statements: Vec<Expression> = match polyglot_sql::parse(sql, dialect) {
-        Ok(statements) => statements,
-        Err(_) => return None,
+/// How many typed markers `sql` lowers to expression nodes in `parser`, if it reads `sql` whole.
+fn lowered_markers(sql: &str, parser: &dyn NativeDialect) -> Option<usize> {
+    let statements: Vec<Expression> = match parser.parse(sql) {
+        Ok(Parsed { statements, gaps }) if gaps.is_empty() => statements,
+        _ => return None,
     };
     let mut lowered: usize = 0;
     for statement in &statements {

@@ -173,7 +173,7 @@ pub(crate) fn map_diagnostics(
     Ok(ValidationResult { valid, errors })
 }
 
-fn sqlbuild_code(code: &str) -> Option<String> {
+pub(crate) fn sqlbuild_code(code: &str) -> Option<String> {
     let direct = match code {
         "E001" | "E002" | "E003" | "E004" | "E200" => Some("B000"),
         "E201" => Some("B002"),

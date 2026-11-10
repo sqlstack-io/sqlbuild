@@ -11,6 +11,7 @@ rust-version.workspace = true
 blake3.workspace = true
 fensu-policy.workspace = true
 globset.workspace = true
+sqlquack-parse.workspace = true
 sqlquack-syntax.workspace = true
 rayon.workspace = true
 regex.workspace = true

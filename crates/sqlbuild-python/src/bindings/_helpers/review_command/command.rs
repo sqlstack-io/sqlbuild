@@ -406,7 +406,10 @@ fn validate(
             .map(|node| node.name.clone())
             .collect();
         let affected: BTreeMap<String, Vec<String>> = affected_columns(
-            &native_field(graph, "project")?,
+            (
+                &native_field(graph, "project")?,
+                &native_field(adapter, "sql_analysis_dialect_name")?,
+            ),
             (&changed, &affected_set),
             &comparisons.by_node,
         )?;

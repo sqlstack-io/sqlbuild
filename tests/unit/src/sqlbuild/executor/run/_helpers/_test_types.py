@@ -494,3 +494,15 @@ class QuotedSpellingTestCase:
     configured: str
     listed_names: tuple[str, ...]
     expected_error: str | None = None
+
+
+@dataclass(frozen=True)
+class UntypedSchemaChangeTestCase:
+    """A target and a delta column type under append_new_columns, and the error it raises."""
+
+    description: str
+    untyped_column_type: str | None
+    target_type: str
+    delta_type: str
+    expected_error: str | None
+    expected_statements: tuple[str, ...] = ()

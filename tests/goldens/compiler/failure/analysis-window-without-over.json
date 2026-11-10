@@ -13,11 +13,13 @@
      "resource_name": "customer_totals",
      "path": "models/marts/customer_totals.sql",
      "line": 5,
-     "column": 1,
+     "column": 21,
      "location": {
       "path": "models/marts/customer_totals.sql",
       "line": 5,
-      "column": 1
+      "column": 21,
+      "end_line": 5,
+      "end_column": 33
      },
      "help": "use this window function with a valid OVER clause and window context"
     }

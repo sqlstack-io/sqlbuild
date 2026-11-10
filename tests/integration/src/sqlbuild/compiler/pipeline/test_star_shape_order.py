@@ -25,7 +25,7 @@ from tests.integration.src.sqlbuild.compiler.pipeline.helpers import postgres_se
                 ),
             },
             star_model="a_orders_wide",
-            expected_shape={"status": "UNKNOWN", '"OrderId"': "UNKNOWN"},
+            expected_shape={"status": "TEXT", '"OrderId"': "INT"},
         ),
     ],
     ids=lambda case: case.description,

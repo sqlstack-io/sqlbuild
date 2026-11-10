@@ -29,12 +29,6 @@ if TYPE_CHECKING:
     from sqlbuild._native import CompileInputsView
 
 _PYTHON_RESOURCE_FUNCTIONS: tuple[str, ...] = ("validate_sql_syntax", "validate_hook_sql_syntax")
-_ADAPTER_CONTEXT: CompileAdapterContext = CompileAdapterContext(
-    value_renderer=DuckDbAdapter(),
-    collection_rendering=CollectionRendering.VALUE_LIST,
-    python_functions_inherit_default_namespace=True,
-    sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
-)
 _DEFAULTS: tuple[str, ...] = (
     "",
     'seed_schema = "raw"\n',
@@ -141,7 +135,12 @@ def seed_yml(schema: str) -> str:
     )
 
 
-def project_inputs(*, project_dir: Path, files: dict[str, str]) -> CompileInputsView:
+def project_inputs(
+    *,
+    project_dir: Path,
+    files: dict[str, str],
+    sql_analysis_dialect: str | None = DuckDbAdapter.sql_analysis_dialect_name,
+) -> CompileInputsView:
     """Write `files` and attach their compile inputs as the compile pipeline does."""
 
     _ = [
@@ -150,7 +149,13 @@ def project_inputs(*, project_dir: Path, files: dict[str, str]) -> CompileInputs
     ]
     return build_compile_inputs(
         discovered_inputs=discover_project_inputs(project_dir=project_dir),
-        adapter_context=_ADAPTER_CONTEXT,
+        adapter_context=CompileAdapterContext(
+            value_renderer=DuckDbAdapter(),
+            collection_rendering=CollectionRendering.VALUE_LIST,
+            python_functions_inherit_default_namespace=True,
+            sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+            sql_analysis_dialect=sql_analysis_dialect,
+        ),
         run_id="integration_run",
         defer_model_sql_validation=True,
     )
@@ -430,7 +435,7 @@ EDGE_ASSEMBLY_PROJECTS: tuple[tuple[str, dict[str, str], dict[str, object] | Non
         None,
     ),
     (
-        "model syntax error before seed error",
+        "model SQL the parser cannot read, then a seed error",
         {
             "sqlbuild_project.toml": _edge_target('schema = "dev"\n'),
             **_edge_seed_files('    schema: "${ENV:SQB_EDGE_UNSET}"\n'),

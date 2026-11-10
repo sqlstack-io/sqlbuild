@@ -5,4 +5,5 @@ FUNCTION (
   returns INTEGER,
 );
 
+-- One more than the quantity it is given.
 quantity + 1

@@ -148,6 +148,7 @@ from sqlbuild.adapters.sqlite.constants import (
     SQLITE_TABLE_TYPE,
     TEMPORAL_TYPE_PATTERN,
     UNSUPPORTED_FEATURE_CODE,
+    UNTYPED_COLUMN_TYPE,
     VERSION_TOO_OLD_CODE,
 )
 from sqlbuild.compiler.compile.types import FunctionLanguage
@@ -171,6 +172,7 @@ class SqliteAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAda
     adapter_name: ClassVar[str] = BuiltinAdapter.SQLITE.value
     execution_duration_limit_seconds: ClassVar[int | None] = CANCELLABLE_DURATION_LIMIT_SECONDS
     sql_analysis_dialect_name: ClassVar[str | None] = "sqlite"
+    untyped_column_type: ClassVar[str | None] = UNTYPED_COLUMN_TYPE
     max_identifier_length: ClassVar[int] = 1024
     relation_grants_supported: ClassVar[bool] = False
     allows_implicit_managed_write_schema: ClassVar[bool] = True

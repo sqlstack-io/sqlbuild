@@ -12,6 +12,7 @@ use pyo3::{FromPyObject, pyclass, pymethods};
 use serde_json::Value;
 use sqlbuild_analysis::compiled_project::main::project_models::project_models;
 use sqlbuild_analysis::compiled_project::main::record_model_analysis::record_model_analysis;
+use sqlbuild_analysis::compiled_project::main::record_skipped_analysis::record_skipped_analysis;
 use sqlbuild_analysis::compiled_project::models::{
     CompiledModelFacts, CompiledProjectFacts, DeclarationFact, DynamicProofFact, ModelAnalysisFact,
     ModelConfigFacts, ModelReferenceFact, ModelSchemaFact,
@@ -262,6 +263,15 @@ impl NativeCompiledProject {
             .inputs
             .get_mut(index)
             .ok_or_else(|| PyIndexError::new_err(index))
+    }
+
+    /// Record that the native parser skipped the model at `index`: it is not analysed.
+    pub(crate) fn mark_analysis_skipped(&mut self, index: usize) -> PyResult<()> {
+        let record: &mut ModelInputRecord = self.input_mut(index)?;
+        record.sql_validation_enabled = false;
+        let name: String = record.name.clone();
+        record_skipped_analysis(&mut self.project.facts, &name);
+        Ok(())
     }
 
     /// The classes model input views project their attributes with.

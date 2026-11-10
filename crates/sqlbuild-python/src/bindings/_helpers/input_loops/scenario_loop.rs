@@ -2,6 +2,8 @@
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use sqlbuild_analysis::analysis_route::models::AnalysisRoute;
+use sqlbuild_analysis::analysis_route::types::NativeDialect;
 use sqlbuild_analysis::compiler::main::scenario_helper_scope::scenario_helper_scope;
 use sqlbuild_analysis::compiler::main::scenario_reader_ctes::scenario_reader_ctes;
 use sqlbuild_analysis::compiler::main::sql_scenario_classification::extract_scenario;
@@ -59,8 +61,13 @@ impl<'py> TestScope<'_, 'py> {
             &expansion.sql,
             &format!("SQL scenario '{stem}'"),
         )?;
-        let ctes: SqlScenarioCtes = extract_scenario(&sql, relative_path, &self.model_loop.syntax)
-            .map_err(|message| compile_error(self.context.classes, &message, None))?;
+        let parser: Option<&dyn NativeDialect> = match self.model_loop.route {
+            AnalysisRoute::Native(parser) => Some(parser),
+            _ => None,
+        };
+        let ctes: SqlScenarioCtes =
+            extract_scenario(&sql, relative_path, (&self.model_loop.syntax, parser))
+                .map_err(|message| compile_error(self.context.classes, &message, None))?;
         let origin: FileOrigin<'_> = (file_path, relative_path, contents);
         self.checked_scenario_sources(&ctes, origin)?;
         let assertions: Vec<SqlTestCteText> = self.assertion_reads(&ctes, relative_path)?;

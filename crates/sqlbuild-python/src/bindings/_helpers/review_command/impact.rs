@@ -38,7 +38,7 @@ fn changed_columns(comparison: Option<&NodeComparison>) -> Option<Vec<String>> {
 
 /// Affected columns of each downstream node of `changed`, within `affected`.
 pub(crate) fn affected_columns(
-    project: &Bound<'_, PyAny>,
+    (project, dialect): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     (changed, affected): (&[String], &BTreeSet<String>),
     comparisons: &BTreeMap<String, NodeComparison>,
 ) -> PyResult<BTreeMap<String, Vec<String>>> {
@@ -54,7 +54,7 @@ pub(crate) fn affected_columns(
     let names: Vec<&String> = models.keys().collect();
     let lineage = build_project_column_lineage(
         project,
-        None,
+        Some(dialect),
         &enum_member(py, RecordId::ColumnLineageMode, "FAST")?,
         Some(PyFrozenSet::new(py, &names)?.as_any()),
     );

@@ -72,6 +72,8 @@ pub struct FormatFault {
     pub file: usize,
     pub line: usize,
     pub reason: String,
+    /// The dialect has no formatter yet: the file is left as written with a warning, not a fault.
+    pub unavailable: bool,
 }
 
 /// Formatted file texts by file index, and the bodies left unchanged.
@@ -90,7 +92,7 @@ pub(crate) struct PreparedBody {
     pub(crate) request: usize,
     pub(crate) sites: Vec<InterpolationSite>,
     pub(crate) omits_select: bool,
-    /// The body is a SQL macro expression, formatted as the one item of a `SELECT`.
+    /// The body is a SQL macro or function expression, formatted as the one item of a `SELECT`.
     pub(crate) wraps_expression: bool,
 }
 

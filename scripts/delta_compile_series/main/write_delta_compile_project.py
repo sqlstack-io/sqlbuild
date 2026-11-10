@@ -5,7 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.cold_compile_performance._helpers.dense_project import write_dense_compile_project
-from scripts.delta_compile_series.constants import PROJECT_CONFIG
+from scripts.delta_compile_series.constants import (
+    PROJECT_CONFIG,
+    SQL_GLOB,
+    TSQL_ADAPTER,
+    TSQL_SPELLINGS,
+)
 
 
 def write_delta_compile_project(
@@ -21,3 +26,10 @@ def write_delta_compile_project(
         ),
         encoding="utf-8",
     )
+    if adapter != TSQL_ADAPTER:
+        return
+    for path in project_dir.rglob(SQL_GLOB):
+        text: str = path.read_text(encoding="utf-8")
+        for spelling, tsql_spelling in TSQL_SPELLINGS:
+            text = text.replace(spelling, tsql_spelling)
+        path.write_text(text, encoding="utf-8")
