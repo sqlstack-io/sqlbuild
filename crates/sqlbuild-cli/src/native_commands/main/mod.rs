@@ -4,6 +4,7 @@ pub(super) mod _location_metadata;
 pub(super) mod _location_plan;
 pub(super) mod _location_sensor;
 pub(super) mod _location_work;
+pub(super) mod _plan_document;
 pub(super) mod _run_admin;
 pub(super) mod _run_control;
 pub(super) mod _run_cost;

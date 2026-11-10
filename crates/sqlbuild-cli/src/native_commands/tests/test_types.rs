@@ -81,3 +81,11 @@ pub(super) struct InitFailureTestCase {
     pub(super) expected_stderr_start: &'static str,
     pub(super) expected_exit_code: i32,
 }
+
+/// One `sqb plan --json` output, whether it exited as a plan, and the first model the server receives.
+pub(super) struct PlanDocumentTestCase {
+    pub(super) description: &'static str,
+    pub(super) output: Vec<u8>,
+    pub(super) planned: bool,
+    pub(super) expected_first_model: serde_json::Value,
+}
