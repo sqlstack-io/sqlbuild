@@ -505,6 +505,13 @@ export type PlanModel = {
 	backfill: { action: string; duration: string | null };
 	qualified_name?: string;
 	changed_functions?: string[];
+	cursor_type?: string;
+	cursor?: { requested_bounds: { start: string | null; end: string | null }; resolved_bounds: { start: string | null; end: string | null } | null } | null;
+	/** Unified diff lines of the query since the model's last build, as `sqb plan` prints them. */
+	query_diff?: string[];
+	/** Unified diff lines of the model's config since its last build. */
+	config_diff?: string[];
+	schema_findings?: { kind: string; column: string; expected_type: string | null; actual_type: string | null }[];
 };
 
 export type PlanWarning = { severity: string; message: string; model_name?: string; code?: string };

@@ -64,7 +64,7 @@
 		{nodeTypes}
 		nodesDraggable={false}
 		multiSelectionKey={['Meta', 'Control', 'Shift']}
-		minZoom={0.3}
+		minZoom={0.1}
 		proOptions={{ hideAttribution: true }}
 		onselectionchange={({ nodes: picked }) => onselect(picked.filter((n) => n.type === 'asset').map((n) => n.id))}
 	>
