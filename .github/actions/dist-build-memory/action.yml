@@ -1,0 +1,48 @@
+name: Memory for a Linux dist build
+description: >-
+  A Linux build with the dist cargo profile compiles its largest single-unit crates at the same
+  time and can use more memory than the hosted runner has; the runner is then lost without a build
+  error. `start` adds host swap (which a manylinux container shares), limits cargo to three crates
+  at a time for the rest of the job, and samples used memory; `report` stops sampling and prints
+  the peak.
+inputs:
+  step:
+    description: "`start` before the dist build, `report` after it (run it with always())"
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Add swap and limit cargo jobs
+      if: inputs.step == 'start'
+      shell: bash
+      run: |
+        free -m
+        avail="$(df -BG --output=avail /mnt 2>/dev/null | tail -n 1 | tr -dc '0-9')"
+        swap_dir=/mnt
+        if [[ -z "${avail}" || "${avail}" -lt 24 ]]; then
+          swap_dir=""
+        fi
+        swapfile="${swap_dir}/sqlbuild-dist.swap"
+        sudo fallocate -l 16G "${swapfile}"
+        sudo chmod 600 "${swapfile}"
+        sudo mkswap "${swapfile}" > /dev/null
+        sudo swapon "${swapfile}"
+        free -m
+        # maturin-action passes CARGO_* variables into its manylinux container.
+        echo "CARGO_BUILD_JOBS=3" >> "${GITHUB_ENV}"
+        ( while :; do
+            free -m | awk '/^Mem:/ { ram = $3 } /^Swap:/ { swap = $3 } END { print ram, swap }'
+            sleep 5
+          done ) > "${RUNNER_TEMP}/dist-memory.log" 2>&1 &
+        echo $! > "${RUNNER_TEMP}/dist-memory.pid"
+    - name: Report memory use
+      if: inputs.step == 'report'
+      shell: bash
+      run: |
+        # Stop sampling, so later steps such as timing measurements run without it.
+        kill "$(cat "${RUNNER_TEMP}/dist-memory.pid")" 2>/dev/null || true
+        free -m
+        grep -E '^pswp(in|out) ' /proc/vmstat
+        awk '{ if ($1 > ram) ram = $1; if ($2 > swap) swap = $2; if ($1 + $2 > both) both = $1 + $2 }
+          END { printf "Peak used memory: RAM %d MiB, swap %d MiB, together %d MiB\n", ram, swap, both }' \
+          "${RUNNER_TEMP}/dist-memory.log" | tee -a "${GITHUB_STEP_SUMMARY}"

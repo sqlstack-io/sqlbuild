@@ -67,12 +67,22 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --all-groups --all-extras
       # The candidate uses the released wheels' cargo profile, so both sides of the comparison match.
+      # That build can need more memory than the hosted runner has; see the action.
+      - name: Add swap and limit cargo jobs for the candidate build
+        uses: ./.github/actions/dist-build-memory
+        with:
+          step: start
       - name: Build candidate wheel
         env:
           MATURIN_PEP517_ARGS: --profile dist
         run: |
           uv build --wheel --out-dir "${RUNNER_TEMP}/candidate"
           uv build --wheel crates/sqlbuild-cli --out-dir "${RUNNER_TEMP}/candidate"
+      - name: Report memory use of the candidate build
+        if: always()
+        uses: ./.github/actions/dist-build-memory
+        with:
+          step: report
       # A release tag created while the candidate built names the baseline's benchmark generator.
       - name: Fetch release tags
         run: git fetch --tags --force --quiet origin
