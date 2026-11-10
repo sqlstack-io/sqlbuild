@@ -63,7 +63,7 @@ def test_given_a_partial_group_when_retrying_from_failure_then_successful_nodes_
                 "from sqlbuild.orchestration import job, job_group, schedule\n"
                 "staging = job('staging', description='Stage orders.', select='orders broken_orders')\n"
                 "marts = job('marts', description='Build totals.', select='totals')\n"
-                "inventory = job('inventory', description='Build inventory.', select='inventory')\n"
+                "inventory = job('stock', description='Build inventory.', select='inventory')\n"
                 "annual_orders = job_group('annual_orders', description='Retry boundaries.', "
                 "jobs=[inventory, marts, staging], schedule=schedule(cron='0 0 * * *', "
                 "timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"

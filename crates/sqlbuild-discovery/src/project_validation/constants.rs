@@ -12,3 +12,7 @@ pub(crate) const RESERVED_MODEL_NAMES: [&str; 1] = ["_chain_"];
 pub(crate) const INITIAL_SEED_READ_BYTES: u64 = 64 * 1024;
 /// A header and two data rows: enough to know a seed holds more than one data row.
 pub(crate) const RECORDS_FOR_MANY_ROWS: usize = 3;
+
+/// How a colliding orchestration declaration is renamed, added to its name conflict.
+pub(crate) const ORCHESTRATION_RENAME_ADVICE: &str = " (a job, job group or sensor takes its name \
+     from its first argument, and a calendar schedule from the function it decorates)";

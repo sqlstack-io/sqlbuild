@@ -17,6 +17,13 @@ use sqlbuild_discovery::project_validation::models::{
 const CSV_MODULE: &str = "csv";
 /// `DeclarationKind.AUDIT`: a generic audit file.
 const GENERIC_AUDIT_KIND: &str = "audit";
+/// Each Python node kind and the discovered inputs field that lists it, in discovery order.
+const PYTHON_NODE_FIELDS: [(&str, &str); 4] = [
+    ("loader", "loader_functions"),
+    ("task", "task_functions"),
+    ("asset", "asset_functions"),
+    ("check", "check_functions"),
+];
 /// `ScopeKind.PRIVATE`.
 const PRIVATE_SCOPE: &str = "private";
 
@@ -72,7 +79,25 @@ pub(crate) fn project_facts(
             .collect::<PyResult<_>>()?,
         project_model_paths: injection().map(|injection| injection.project_model_paths.clone()),
         csv_field_limit: Some(csv_field_limit(py)?),
+        orchestration: Vec::new(),
     })
+}
+
+/// The discovered Python nodes by kind, name and path only, as the resource-name check reads them.
+pub(crate) fn named_node_rows(inputs: &Bound<'_, PyAny>) -> PyResult<Vec<NodeRow>> {
+    let mut rows: Vec<NodeRow> = Vec::new();
+    for (kind, name) in PYTHON_NODE_FIELDS {
+        rows.extend(each(inputs, name, |node| {
+            Ok(NodeRow {
+                kind: kind.to_owned(),
+                name: native_field(node, "name")?.extract()?,
+                path: text(node, "relative_path")?,
+                decorator_config: false,
+                depends_on: Vec::new(),
+            })
+        })?);
+    }
+    Ok(rows)
 }
 
 /// `read` applied to each item of the iterable attribute `name` of `owner`.

@@ -1770,6 +1770,7 @@ def build_orchestration_snapshot(
     metadata_json: str,
     project_dir: Path,
     *,
+    discovered_inputs: DiscoveredProjectInputs,
     declarations: Sequence[object] | None = None,
 ) -> NativeOrchestrationSnapshot: ...
 def run_location_command(

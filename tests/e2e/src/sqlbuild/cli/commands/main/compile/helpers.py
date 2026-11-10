@@ -1137,10 +1137,11 @@ def median_wall_seconds(results: tuple[FreshProcessCompileBenchmarkResult, ...])
     return statistics.median(result.elapsed_seconds for result in results)
 
 
-# The slowest fastest-repetition seen on the hosted runner classes the dense budgets fit as they
-# are. A measurably slower runner scales the budgets by its own fastest repetition over this; a
+# Near the top of the hosted runner classes the dense budgets fit as they are, and below every
+# reading of the slower EPYC 7763 class, so that class's run-to-run noise never leaves it without
+# a larger budget. A slower runner scales the budgets by its own fastest repetition over this; a
 # faster one keeps them unchanged.
-_RUNNER_CALIBRATION_REFERENCE_SECONDS: float = 0.55
+_RUNNER_CALIBRATION_REFERENCE_SECONDS: float = 0.50
 _RUNNER_CALIBRATION_CHECKSUM: int = 2910182
 _RUNNER_CALIBRATION_REPETITIONS: int = 7
 _RUNNER_CALIBRATION_VALUES: int = 600_000

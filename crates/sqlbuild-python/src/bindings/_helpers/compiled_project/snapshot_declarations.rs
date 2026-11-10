@@ -31,7 +31,7 @@ use crate::bindings::_helpers::native_host::orchestration_triggers::{
 pub(crate) fn discover_declarations<'py>(
     py: Python<'py>,
     project_dir: &Path,
-) -> PyResult<Vec<Bound<'py, PyAny>>> {
+) -> PyResult<Vec<(Bound<'py, PyAny>, String)>> {
     let tree = ProjectTree::new(project_dir);
     let files = py
         .detach(|| {
@@ -44,12 +44,12 @@ pub(crate) fn discover_declarations<'py>(
         .map_err(|error| {
             PyValueError::new_err(format!("orchestration discovery failed: {error:?}"))
         })?;
-    let mut declarations: Vec<Bound<'py, PyAny>> = Vec::new();
+    let mut declarations: Vec<(Bound<'py, PyAny>, String)> = Vec::new();
     let mut seen: BTreeSet<usize> = BTreeSet::new();
     for file in files {
         for job in module_jobs(py, &tree.absolute(&file), project_dir)? {
             if seen.insert(job.as_ptr() as usize) {
-                declarations.push(job);
+                declarations.push((job, file.clone()));
             }
         }
     }
@@ -87,11 +87,7 @@ pub(crate) fn compile_declarations(
         }
     }
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();
-    let mut names: BTreeSet<String> = BTreeSet::new();
     for job in authored_jobs {
-        if !names.insert(job.name.clone()) {
-            return Err(PyValueError::new_err(format!("duplicate job {}", job.name)));
-        }
         if !job.targets.is_empty() && !job.targets.contains(&input.target) {
             continue;
         }
@@ -140,12 +136,6 @@ pub(crate) fn compile_declarations(
     }
     let mut groups: BTreeMap<String, GroupDefinition> = BTreeMap::new();
     for group in authored_groups {
-        if !names.insert(group.name.clone()) {
-            return Err(PyValueError::new_err(format!(
-                "duplicate job or group {}",
-                group.name
-            )));
-        }
         if !group.targets.is_empty() && !group.targets.contains(&input.target) {
             continue;
         }

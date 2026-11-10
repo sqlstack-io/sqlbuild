@@ -2,7 +2,7 @@
 
 from sqlbuild.orchestration import calendar_schedule, job
 
-orders = job("orders", description="Build order reporting.", select="orders")
+orders = job("order_reporting", description="Build order reporting.", select="orders")
 
 
 @calendar_schedule(
