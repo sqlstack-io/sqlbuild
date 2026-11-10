@@ -6,3 +6,6 @@ pub(crate) const VARS_SETTING: &str = "vars";
 pub(crate) const WITHHELD_SETTING: &str = "[REDACTED]";
 /// Settings that name another target; a value that isn't a target name, such as a state path, is withheld.
 pub(crate) const DEFER_SETTING_PREFIX: &str = "defer_";
+
+/// How many due times a person's trigger listing gives for each running schedule.
+pub(crate) const UPCOMING_TIMES: usize = 5;

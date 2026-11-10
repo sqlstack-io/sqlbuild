@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { Trigger } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -10,7 +11,7 @@
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { formatCost, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
+	import { formatCost, narrowingText, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import LaunchForm from './launch-form.svelte';
 
@@ -42,7 +43,7 @@
 	const canToggle = $derived(app.can('trigger.toggle'));
 	let launchOpen = $state(false);
 	let tab = $state<'overview' | 'runs' | 'code'>('overview');
-	// Nodes picked in the graph, by catalog key; running them starts an ad-hoc run of just those.
+	// Nodes picked in the graph, by catalog key. A job runs with or without them; a group's pick runs as an ad-hoc command.
 	let picked = $state<string[]>([]);
 	let graph = $state<{ clear: () => void }>();
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
@@ -72,9 +73,13 @@
 </script>
 
 <AppTopbar title="Jobs">
-	{#if picked.length && canRunPicked}
+	{#if picked.length && def?.kind === 'job'}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(pickedNodes.map((n) => n.key)))}>▷ Run {picked.length} selected</GatedButton>
+		<GatedButton requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}>▷ Run all but {picked.length}</GatedButton>
+		<GatedButton requires="job.run" variant="default" onclick={() => goto(to(planHref(picked, 'build', { job: name })))}>▷ Run {picked.length} selected</GatedButton>
+	{:else if picked.length && canRunPicked}
+		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}>▷ Run {picked.length} selected</GatedButton>
 	{:else}
 		<div class="relative">
 			<GatedButton
@@ -91,26 +96,26 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
-		<a href="/jobs" class="back">← Jobs</a>
+		<a href={to(`/jobs`)} class="back">← Jobs</a>
 		<span class="font-display text-[17px] font-semibold">{name}</span>
 		{#if def}
 			<span class="chip">{def.kind === 'group' ? `Group${def.members ? ` · ${def.members.length} jobs` : ''}` : 'Job'} · {def.nodeCount} nodes</span>
 			{#each jobTriggers as t (t.id)}
 				<span class="chip" class:off={t.state === 'paused'}>
-					<a href="/triggers/{t.id}" title={t.name}>{t.cadence}</a>
+					<a href={to(`/triggers/${t.id}`)} title={t.name}>{t.cadence}</a>
 					<span title={canToggle ? (t.state === 'running' ? 'Pause' : 'Turn on') : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
 						<button class="sb-toggle small" class:on={t.state === 'running'} disabled={!canToggle} onclick={() => toggleTrigger(t)} aria-label="{t.state === 'running' ? 'Pause' : 'Turn on'} {t.name}"></button>
 					</span>
 				</span>
 			{/each}
 			{#if latest}
-				<a class="chip" href="/runs/{latest.id}" title={formatStamp(latest.queuedAt)}>
+				<a class="chip" href={to(`/runs/${latest.id}`)} title={formatStamp(latest.queuedAt)}>
 					<i style:background={runStatusTone[latest.status]}></i>Latest run: {runStatusLabel[latest.status]} · {formatAgo(latest.startedAt ?? latest.queuedAt, app.now)}
 				</a>
 			{/if}
 			{#if def.criticalNodes.length}
 				<span class="chip" title="If one of these fails, the whole group stops">
-					Critical: {#each def.criticalNodes as n, i (n)}{i ? ', ' : ''}<a href="/catalog/{n}" class="mono">{n}</a>{/each}
+					Critical: {#each def.criticalNodes as n, i (n)}{i ? ', ' : ''}<a href={to(`/catalog/${n}`)} class="mono">{n}</a>{/each}
 				</span>
 			{/if}
 		{/if}
@@ -144,7 +149,7 @@
 						{@const n = pickedNodes[0]}
 						<p class="label">{kindLine(n)}</p>
 						<h2 class="mono">{n.key}</h2>
-						<a class="open" href="/catalog/{n.key}">Open in Catalog ↗</a>
+						<a class="open" href={to(`/catalog/${n.key}`)}>Open in Catalog ↗</a>
 						{#if n.description}<p class="desc">{n.description}</p>{/if}
 						<dl>
 							{#if n.lastOutcome || n.lastBuild}<div><dt>Last build</dt><dd><i style:background={nodeOutcomeTone[n.lastOutcome ?? 'success']}></i>{n.lastOutcome ? nodeOutcomeLabel[n.lastOutcome] : 'Built'}{n.lastBuild ? ` · ${formatAgo(n.lastBuild.builtAt, app.now)}` : ''}</dd></div>{/if}
@@ -155,7 +160,7 @@
 					{:else if pickedNodes.length > 1}
 						<h2>{pickedNodes.length} nodes selected</h2>
 						<ul class="picked">
-							{#each pickedNodes as n (n.key)}<li><a href="/catalog/{n.key}" class="mono">{n.key}</a></li>{/each}
+							{#each pickedNodes as n (n.key)}<li><a href={to(`/catalog/${n.key}`)} class="mono">{n.key}</a></li>{/each}
 						</ul>
 					{:else}
 						{#if def.description}<h3 class="first">Description</h3><p class="desc">{def.description}</p>{/if}
@@ -165,11 +170,11 @@
 							{#if def.overlap}<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>{/if}
 							{#if def.onFailure}<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>{/if}
 							{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
-							{#if def.declaration}<div><dt>Targets</dt><dd>{def.targets?.join(', ') ?? 'all'}</dd></div>{/if}
+							{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
 							{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
 							{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
 							{#if def.memberOf?.length}
-								<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href="/jobs/{g}">{g}</a>{/each}</dd></div>
+								<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href={to(`/jobs/${g}`)}>{g}</a>{/each}</dd></div>
 							{/if}
 						</dl>
 						{#if def.settings && Object.keys(def.settings).length}
@@ -183,7 +188,7 @@
 							{#each def.concurrency as g (g.key)}
 								<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
 									<span>{g.holders.length} of {g.limit} {slotLabel(g.key)} in use</span>
-									{#each g.holders as h (h)}<a class="mono" href="/runs/{h}" title={h}>{shortRunId(h)}</a>{/each}
+									{#each g.holders as h (h)}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}
 								</p>
 							{/each}
 						{:else if def.concurrency === null && def.concurrencyGroups.length}
@@ -202,9 +207,9 @@
 						</thead>
 						<tbody>
 							{#each runs as r (r.id)}
-								<tr onclick={() => goto(`/runs/${r.id}`)}>
+								<tr onclick={() => goto(to(`/runs/${r.id}`))}>
 									<td><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
-									<td><a href="/runs/{r.id}" class="mono" title={r.id}>{shortRunId(r.id)}</a></td>
+									<td><a href={to(`/runs/${r.id}`)} class="mono" title={r.id}>{shortRunId(r.id)}</a>{#if r.narrowing}<span class="part" title="Ran part of the job: sqb build {narrowingText(r.narrowing)}">part</span>{/if}</td>
 									<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>
 									<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
 									<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
@@ -263,6 +268,11 @@
 	}
 	.chip i,
 	dd i,
+	.runs td .part {
+		margin-left: 8px;
+		color: var(--muted-foreground);
+		font-size: 11.5px;
+	}
 	.runs td i {
 		display: inline-block;
 		width: 7px;

@@ -1,3 +1,4 @@
+import { to } from '$lib/paths';
 import { goto } from '$app/navigation';
 import type { RerunMode } from '$lib/api';
 import { app } from '$lib/state/app.svelte';
@@ -95,7 +96,7 @@ export function createRunDetailState(runId: string) {
 		actionError = null;
 		try {
 			const next = mode === 'selected' ? await app.client.rerunSelectedNodes(scope, run.id, selected) : await app.client.rerunRun(scope, run.id, mode);
-			await goto(`/runs/${next.id}`);
+			await goto(to(`/runs/${next.id}`));
 		} catch (e) {
 			actionError = message(e);
 		} finally {

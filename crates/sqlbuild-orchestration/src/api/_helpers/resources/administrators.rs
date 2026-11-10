@@ -5,7 +5,9 @@ use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
-use crate::api::models::MutationResponse;
+use crate::api::models::{
+    LoginMode, MutationResponse, ServerFacts, ServerRetention, ServerSettings,
+};
 use crate::authorization::main::assign_builtin_role::assign_builtin_role;
 use crate::authorization::main::change_administrator::change_administrator;
 use crate::authorization::main::list_role_definitions::list_role_definitions;
@@ -16,6 +18,11 @@ use crate::credentials::models::{
     AdministratorChange, AuditContext, PersonSummary, RoleAssignmentRequest, RoleHoldings,
     RoleOverview,
 };
+use crate::platform::constants::{
+    HEARTBEAT_RETENTION_DAYS, LOCATION_RETENTION_DAYS, PLATFORM_ALERT_RETENTION_DAYS,
+    SENSOR_EVALUATION_RETENTION_DAYS,
+};
+use crate::platform::main::read_installation::read_installation;
 use crate::store::models::ControlStore;
 
 #[utoipa::path(post, path = "/api/admin/people/{principal_id}", operation_id = "changeAdministrator",
@@ -86,4 +93,30 @@ pub(crate) async fn definitions(
     Ok(Json(
         list_role_definitions(&store, (&context, principal), (location_id, &target)).await?,
     ))
+}
+
+#[utoipa::path(get, path = "/api/admin/server", operation_id = "readServerSettings",
+    responses((status = 200, body = ServerSettings), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn server(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Extension(facts), Extension(login_mode)): (Extension<ServerFacts>, Extension<LoginMode>),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<ServerSettings>, ApiError> {
+    let installation = read_installation(&store, (&context, principal)).await?;
+    Ok(Json(ServerSettings {
+        version: facts.version,
+        login_mode,
+        scheduler: facts.scheduler,
+        installation,
+        retention: ServerRetention {
+            audit_days: i64::from(facts.audit.kept_days()),
+            statistics_days: i64::from(facts.statistics.kept_days()),
+            snapshots_kept: i64::from(facts.snapshots.kept_count()),
+            platform_alert_days: PLATFORM_ALERT_RETENTION_DAYS,
+            heartbeat_days: HEARTBEAT_RETENTION_DAYS,
+            location_health_days: LOCATION_RETENTION_DAYS,
+            sensor_evaluation_days: SENSOR_EVALUATION_RETENTION_DAYS,
+        },
+    }))
 }

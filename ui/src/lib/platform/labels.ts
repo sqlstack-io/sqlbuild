@@ -43,6 +43,7 @@ export function healthWords(location: Pick<LocationSummary, 'health' | 'failedDe
 
 export const eventKindLabel: Record<PlatformEventKind, string> = {
 	tick_overdue: 'Schedule overdue',
+	calendar_horizon_low: 'Calendar running out of dates',
 	scheduler_no_leader: 'Scheduler stopped',
 	location_broken: 'Location not checking in',
 	launch_failed: 'Couldn’t start runs',

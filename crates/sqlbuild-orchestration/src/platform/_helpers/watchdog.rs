@@ -4,9 +4,9 @@ use chrono::TimeDelta;
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::declarations::models::Schedule;
 use crate::platform::_helpers::liveness::scan_location_page;
 use crate::platform::_helpers::observations::observe;
+use crate::platform::_helpers::problems::calendar_low;
 use crate::platform::models::{InstallationHealth, PlatformEvent, WatchdogTrigger};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -113,10 +113,8 @@ async fn scan_trigger_page(
             )
             .await?;
         }
-        if let Schedule::Calendar { times, refresh_at } = trigger.definition_json.schedule
-            && times
-                .last()
-                .is_none_or(|last| *last <= now + TimeDelta::days(1))
+        if let Some((refresh_at, horizon_end)) =
+            calendar_low(&trigger.definition_json.schedule, now)
         {
             transaction = observe(
                 transaction,
@@ -125,7 +123,7 @@ async fn scan_trigger_page(
                     PlatformEvent::CalendarHorizonLow {
                         trigger_id: trigger.trigger_id,
                         refresh_at,
-                        horizon_end: times.last().copied(),
+                        horizon_end,
                     },
                     None,
                 ),

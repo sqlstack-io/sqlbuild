@@ -213,6 +213,8 @@
 	}
 	body {
 		@apply bg-background text-foreground;
+		/* Equal-width digits, so ticking times and counts don't shift what follows them. */
+		font-variant-numeric: tabular-nums;
 	}
 	html {
 		@apply font-sans;

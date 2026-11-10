@@ -113,6 +113,10 @@ impl SnapshotRetention {
     pub(crate) fn kept(self) -> i64 {
         i64::from(self.count)
     }
+
+    pub(crate) fn kept_count(self) -> u16 {
+        self.count
+    }
 }
 
 impl Default for SnapshotRetention {

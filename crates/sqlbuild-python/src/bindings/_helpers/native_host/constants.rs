@@ -13,6 +13,8 @@ pub(crate) const SOURCE_STALE_CONDITION: &str = "source_stale";
 pub(crate) const SENSOR_CONTEXT_PARAMETER: &str = "ctx";
 
 pub(crate) const AUTHORING_MODULE: &str = "sqlbuild.orchestration_declarations.models.authoring";
+/// Frames of these modules construct declarations on the author's behalf.
+pub(crate) const CONSTRUCTING_MODULES: [&str; 2] = [AUTHORING_MODULE, "dataclasses"];
 
 /// Kinds named in the global unique-name check.
 pub(crate) const JOB_LABEL: &str = "job";

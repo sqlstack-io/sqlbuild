@@ -701,3 +701,128 @@ describe('node error text', () => {
 		expect(paths.filter((p) => p.endsWith('/error'))).toHaveLength(0);
 	});
 });
+
+describe('listPlatformEventHistory', () => {
+	const event = (storage_id: number, target: string) => ({
+		storage_id,
+		event_id: `e-${storage_id}`,
+		occurred_at: '2026-11-09T09:00:00Z',
+		location_id: '0191f0aa-orders',
+		target,
+		event: { kind: 'location_broken', location_id: '0191f0aa-orders', target, last_seen_at: '2026-11-09T08:00:00Z' }
+	});
+
+	/** The newest scan holds only another target's event, and the next scan holds the one asked for. */
+	function server() {
+		const scans: (string | null)[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const url = new URL(request.url);
+				if (url.pathname.endsWith('/bootstrap')) return Response.json({ login_mode: 'password', access: { name: 'ada', principal_id: 'p', actions: [], locations: [] } });
+				if (url.pathname.endsWith('/platform/problems')) return Response.json({ scheduler_leader: true, scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] });
+				if (url.pathname.endsWith('/platform/events')) {
+					const before = url.searchParams.get('before');
+					scans.push(before);
+					return Response.json(before === null ? { events: [event(9, 'preview')], before: 9 } : { events: [event(4, 'development')], before: null });
+				}
+				return Response.json([]);
+			})
+		);
+		return { scans, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it("keeps scanning past a scan without the location's events until the server says none are older", async () => {
+		const { scans, client } = server();
+		const history = await client.listPlatformEventHistory({ locationId: '0191f0aa-orders:development' });
+		expect(history.map((r) => r.id)).toEqual(['e-4']);
+		expect(scans).toEqual([null, '9']);
+	});
+});
+
+describe('getCatalogNode statistics', () => {
+	const HOUR = 3_600_000;
+	const now = Date.parse('2026-11-09T12:00:00Z');
+	/** One sample an hour for 1,500 hours up to now, served oldest first in pages of 100 after a cursor, as the server does. */
+	const stored = Array.from({ length: 1500 }, (_, i) => ({
+		event_id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, '0')}`,
+		record: { name: 'orders', state_schema: 'main', observed_at: new Date(now - (1499 - i) * HOUR).toISOString(), row_count: i + 1 }
+	}));
+
+	function server(samples: typeof stored) {
+		const reads: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const url = new URL(request.url);
+				if (url.pathname.endsWith('/nodes'))
+					return Response.json([{ node_key: 'model:orders', kind: 'model', name: 'orders', materialization: 'table', tags: [], dependencies: [], snapshot_id: 's', relation: { schema: 'main', name: 'orders' } }]);
+				if (url.pathname.endsWith('/statistics')) {
+					const at = url.searchParams.get('after_observed_at') ?? '';
+					const id = url.searchParams.get('after_event_id') ?? '';
+					reads.push(`${url.searchParams.get('schema')}.${url.searchParams.get('name')}`);
+					const page = samples.filter((s) => s.record.observed_at > at || (s.record.observed_at === at && s.event_id > id)).slice(0, 100);
+					const last = page.at(-1);
+					return Response.json({ records: page, next_after: page.length === 100 && last ? { observed_at: last.record.observed_at, event_id: last.event_id } : null });
+				}
+				if (url.pathname.endsWith('/node-status')) return Response.json(null);
+				return Response.json([]);
+			})
+		);
+		return { reads, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	beforeEach(() => vi.useFakeTimers({ now, toFake: ['Date'] }));
+	afterEach(() => vi.useRealTimers());
+
+	it('shows the newest sample on the first open, however much older history the server keeps', async () => {
+		const { reads, client } = server(stored);
+		expect((await client.getCatalogNode({ locationId: '0191f0aa-orders:development' }, 'orders'))?.lastRows).toBe(1500);
+		expect(reads.every((r) => r === 'main.orders')).toBe(true);
+		expect(reads.length).toBeLessThanOrEqual(11);
+	});
+
+	it('reads only the samples after the newest one it holds on a refresh, and keeps the earlier ones', async () => {
+		const samples = stored.slice(0, 1499);
+		const { reads, client } = server(samples);
+		const scope = { locationId: '0191f0aa-orders:development' };
+		expect((await client.getCatalogNode(scope, 'orders'))?.lastRows).toBe(1499);
+		const first = reads.length;
+		samples.push(stored[1499]);
+		const refreshed = await client.getCatalogNode(scope, 'orders');
+		expect([refreshed?.lastRows, refreshed?.warehouse, reads.length - first]).toEqual([1500, null, 1]);
+	});
+});
+
+describe('listWarehouseConnections', () => {
+	const access = (target: string) => ({ location_id: '0191f0aa-orders', name: 'Orders', target, actions: [] });
+
+	/** Development's health is readable; preview's is refused, as for a partial viewer. */
+	function server() {
+		const health: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (path.endsWith('/bootstrap')) return Response.json({ login_mode: 'password', access: { name: 'ada', principal_id: 'p', actions: [], locations: [access('development'), access('preview')] } });
+				if (path.endsWith('/health')) {
+					health.push(path);
+					return path.includes('/targets/preview/') ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json([]);
+				}
+				return Response.json([]);
+			})
+		);
+		return { health, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('asks for a refused target once per page load, since each refusal is audited', async () => {
+		const { health, client } = server();
+		expect((await client.listWarehouseConnections()).map((c) => c.target)).toEqual(['development']);
+		expect((await client.listWarehouseConnections()).map((c) => c.target)).toEqual(['development']);
+		expect(health.filter((p) => p.includes('/preview/'))).toHaveLength(1);
+		expect(health.filter((p) => p.includes('/development/'))).toHaveLength(2);
+	});
+});

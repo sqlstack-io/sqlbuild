@@ -55,7 +55,7 @@
 					aria-busy={list.busy === 'cancel_all'}
 					onclick={() => list.cancelAll()}
 				>
-					{list.armed === 'cancel_all' ? `Confirm: cancel all ${matchingActive}` : `Cancel all ${matchingActive} matching`}
+					{list.busy === 'cancel_all' ? 'Cancelling…' : list.armed === 'cancel_all' ? `Confirm: cancel all ${matchingActive}` : `Cancel all ${matchingActive} matching`}
 				</Button>
 			</span>
 		{/if}

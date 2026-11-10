@@ -35,6 +35,8 @@ fn calendar(seconds: impl Iterator<Item = i64>) -> TriggerDefinition {
         job_key: "orders".into(),
         starts_at: Some(time(0)),
         default_status: TriggerStatus::Running,
+        targets: BTreeSet::new(),
+        declared_at: None,
         schedule: Schedule::Calendar {
             times: seconds.map(time).collect(),
             refresh_at: time(2000),
@@ -203,6 +205,8 @@ pub(super) fn simulate_cron(expression: &str, wall_times: &[(u32, u32)]) -> Resu
         },
         starts_at: Some(start),
         default_status: TriggerStatus::default(),
+        targets: BTreeSet::new(),
+        declared_at: None,
     };
     let strategy = proptest::collection::vec((-1_440_i64..5_760, any::<bool>()), 0..256);
     let mut property_runner = TestRunner::new(Config {

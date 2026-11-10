@@ -80,6 +80,26 @@ sqb build --select seed:waffle_types
 sqb build --select source:raw__orders
 ```
 
+### Job
+
+Select the nodes a job or job group declared under `orchestration/` builds. Job names are globally
+unique, so a bare name works; `job:` is the explicit form and accepts glob patterns:
+
+```bash
+sqb build nightly_orders
+sqb build --select job:nightly_orders --exclude order_totals
+sqb build --select "job:nightly_orders,tag:finance"
+```
+
+A job selects its own `select` minus its own `exclude`. A job group selects the union of its jobs.
+A job or job group declared with `targets` is selectable only when the command's target is one of
+them, as on the server.
+Job selectors compose with `+`, `,` and `--exclude` like any other selector. A job's own selection
+cannot name another job, and path-between selectors cannot start or end at a job.
+
+SQLBuild imports the modules under `orchestration/` only when a selector names a job or a name no
+model, source, seed or function has.
+
 ### Unit test
 
 `sqb test` and `sqb build` select SQL unit tests by name. Test names are globally unique, so a bare

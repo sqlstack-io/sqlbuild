@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import { logout } from '$lib/api/http-client';
 import { MockApiClient } from '$lib/api/mock/mock-client';
 import { bootFailure, type BootFailure } from '$lib/boot-failure';
+import { appPath, to } from '$lib/paths';
 import { withPrefetch } from './prefetch';
 import {
 	ApiError,
@@ -59,9 +60,10 @@ class AppState {
 
 	/** Sends the browser to the login page, which returns here after sign-in. */
 	#signIn() {
-		if (!browser || window.location.pathname === '/login') return;
-		const back = window.location.pathname + window.location.search;
-		window.location.assign(`/login?next=${encodeURIComponent(back)}`);
+		if (!browser) return;
+		const path = appPath(window.location.pathname);
+		if (path === '/login') return;
+		window.location.assign(to(`/login?next=${encodeURIComponent(path + window.location.search)}`));
 	}
 
 	/** Ends the session; only the server client has one. */

@@ -9,6 +9,7 @@ import type { LocalChangeBus } from '../signals';
 import type {
 	AdhocPermission,
 	AdhocRunCheck,
+	PlanResult,
 	AdhocRunRequest,
 	BuiltInRole,
 	BulkRunResult,
@@ -482,6 +483,7 @@ export class MockOperate {
 		const user = this.#ctx.user();
 		const id = this.#newId();
 		if (job.kind === 'group') {
+			if (options.select?.length || options.exclude?.length) throw new ApiError('invalid control-plane data: a job group cannot be narrowed; narrow one of its jobs', 400);
 			const parent = this.#create({ id, origin: 'manual', jobKey: key, by: user, select: [], exclude: [], flags, nodes: [], priority: job.priority });
 			job.members.forEach((m, i) => {
 				const member = jobDef(m)!;
@@ -491,7 +493,13 @@ export class MockOperate {
 			this.#ctx.changes.emit('runs');
 			return this.#ctx.reply(this.#view(parent, scope));
 		}
-		const rec = this.#create({ id, origin: 'manual', jobKey: key, by: user, select: selectorTerms(job), exclude: job.exclude, flags, nodes: jobNodes(key), priority: job.priority });
+		const named = (names: string[] | undefined, node: string) => !!names?.includes(node.slice(node.indexOf(':') + 1));
+		const narrowed = !!(options.select?.length || options.exclude?.length);
+		if (narrowed) this.#need('view');
+		const nodes = jobNodes(key).filter((n) => (!options.select?.length || named(options.select, n)) && !named(options.exclude, n));
+		if (narrowed && !nodes.length) throw new ApiError("invalid control-plane data: the selectors leave none of the job's nodes", 400);
+		const narrowing = narrowed ? { select: options.select ?? [], exclude: options.exclude ?? [] } : null;
+		const rec = this.#create({ id, origin: 'manual', jobKey: key, narrowing, by: user, select: selectorTerms(job), exclude: job.exclude, flags, nodes, priority: job.priority });
 		this.#ctx.changes.emit('runs');
 		return this.#ctx.reply(this.#view(rec, scope));
 	}
@@ -520,6 +528,27 @@ export class MockOperate {
 		});
 		this.#ctx.changes.emit('runs');
 		return this.#ctx.reply(this.#view(rec, scope));
+	}
+
+	/** Every selected model is planned as unchanged unless the command asks for a full refresh. */
+	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+		const check = this.#check(scope, { command, priority: 0 });
+		await new Promise((resolve) => setTimeout(resolve, 1200));
+		if (check.error) return this.#ctx.reply({ plan: null, error: check.error });
+		if (check.verb !== 'build') return this.#ctx.reply({ plan: null, error: `sqb plan previews builds; sqb ${check.verb} cannot be planned` });
+		const reason = command.includes('--full-refresh') ? 'full_refresh' : 'no_change';
+		const models = check.selection.filter((key) => key.startsWith('model:')).map((key) => ({
+			name: key.slice('model:'.length),
+			materialization_type: 'table',
+			action: 'create_table',
+			reason,
+			backfill: { action: reason === 'full_refresh' ? 'full' : 'forward', duration: null },
+			qualified_name: `main.${key.slice('model:'.length)}`
+		}));
+		return this.#ctx.reply({
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [] },
+			error: null
+		});
 	}
 
 	// ---- jobs ----
@@ -749,7 +778,7 @@ export class MockOperate {
 		}
 		const waits = this.#queue();
 		for (const rec of this.#ordered()) {
-			if ((waits.get(rec.run.id) ?? []).some((w) => w.kind !== 'priority')) continue;
+			if ((waits.get(rec.run.id) ?? []).some((w) => w.kind !== 'earlier_run')) continue;
 			rec.run.status = 'launched';
 			rec.run.launchedAt = new Date(now).toISOString();
 			if (!rec.script.nodes.length) {
@@ -796,20 +825,22 @@ export class MockOperate {
 			for (const h of holders) {
 				const overlap = h.script.nodes.filter((n) => mine.has(n));
 				if (overlap.length)
-					waits.push({ kind: 'write_claim', runId: h.run.id, jobKey: h.run.jobKey, nodeKey: overlap[0], otherNodes: overlap.length - 1 });
+					waits.push({ kind: 'write_claim', runId: h.run.id, nodeKey: overlap[0], otherNodes: overlap.length - 1 });
 			}
 			const fullGroups: string[] = [];
 			for (const group of rec.script.concurrencyGroups) {
 				const inGroup = holders.filter((h) => h.script.concurrencyGroups.includes(group)).map((h) => h.run.id);
 				const limit = CONCURRENCY_LIMITS[group] ?? 1;
 				if (inGroup.length >= limit) {
-					waits.push({ kind: 'concurrency_group', group, limit, holders: inGroup });
+					waits.push({ kind: 'concurrency_limit', limit: group, holders: inGroup, elsewhere: 0 });
 					fullGroups.push(group);
 				}
 			}
 			if (fullGroups.length) {
-				const before = ahead.filter((a) => a.script.concurrencyGroups.some((g) => fullGroups.includes(g))).map((a) => a.run.id);
-				if (before.length) waits.push({ kind: 'priority', aheadRunIds: before });
+				for (const group of fullGroups) {
+					const first = ahead.find((a) => a.script.concurrencyGroups.includes(group));
+					if (first) waits.push({ kind: 'earlier_run', runId: first.run.id, limit: group });
+				}
 			}
 			if (rec.run.parentRunId) {
 				const parent = this.#byId(rec.run.parentRunId);
@@ -822,7 +853,7 @@ export class MockOperate {
 						if (sibling && isActive(sibling.run.status)) waits.push({ kind: 'upstream_job', runId: sibling.run.id, jobKey: up.jobKey });
 					}
 				}
-				if (parent && parent.run.status === 'queued') waits.push({ kind: 'group_parent', runId: parent.run.id, jobKey: parent.run.jobKey ?? '' });
+				if (parent && parent.run.status === 'queued') waits.push({ kind: 'group_parent', runId: parent.run.id });
 			}
 			out.set(rec.run.id, waits);
 			ahead.push(rec);
@@ -858,6 +889,7 @@ export class MockOperate {
 		id: string;
 		origin: Run['origin'];
 		jobKey: string | null;
+		narrowing?: Run['narrowing'];
 		by: Principal;
 		select: string[];
 		exclude: string[];
@@ -887,6 +919,8 @@ export class MockOperate {
 				tickScheduledFor: null,
 				runKey: null,
 				rerunOfRunId: spec.rerunOf ?? null,
+				narrowing: spec.narrowing ?? null,
+				window: null,
 				requestedBy: spec.by,
 				priority: spec.priority,
 				rewriteHistory: Object.keys(spec.flags).some((f) => flagSpec(spec.verb ?? 'build', f)?.requires === 'run.rewrite_history'),

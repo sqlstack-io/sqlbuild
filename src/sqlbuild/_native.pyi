@@ -1765,6 +1765,7 @@ class NativeOrchestrationWorker:
         traceback: TracebackType | None,
     ) -> None: ...
 
+def declaration_site() -> tuple[str, int] | None: ...
 def build_orchestration_snapshot(
     project: CompiledProjectView,
     metadata_json: str,
@@ -8981,6 +8982,7 @@ class SelectorKind(StrEnum):
     TAG = "tag"
     PATH = "path"
     TEST = "test"
+    JOB = "job"
 
 class PythonRunPhase(StrEnum):
     """Lifecycle-aware Python execution phase."""

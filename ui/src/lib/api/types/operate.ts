@@ -67,6 +67,10 @@ export type Run = {
 	/** Sensor run requests are de-duplicated by run key. */
 	runKey: string | null;
 	rerunOfRunId: string | null;
+	/** How a person narrowed this run of a job, as typed; null when it runs the whole job. */
+	narrowing: { select: string[]; exclude: string[] } | null;
+	/** The cursor window a backfill processes, inclusive; null for every other run. */
+	window: { start: string; end: string } | null;
 	requestedBy: Principal;
 	priority: number;
 	/** Full refresh or an explicit cursor window was requested. */
@@ -387,13 +391,17 @@ export type RunDetail = {
 
 // ---- queue ----
 
+/** Why the scheduler can't claim a queued run yet; a run in another location or target is never named (`runId` null). */
 export type QueueWait =
-	| { kind: 'write_claim'; runId: string; jobKey: string | null; nodeKey: string; otherNodes: number }
-	| { kind: 'concurrency_group'; group: string; limit: number; holders: string[] }
-	| { kind: 'priority'; aheadRunIds: string[] }
+	| { kind: 'write_claim'; runId: string | null; nodeKey: string; otherNodes: number }
+	/** Running runs hold slots of a concurrency limit this run takes; `elsewhere` counts holders in other locations or targets. */
+	| { kind: 'concurrency_limit'; limit: string; holders: string[]; elsewhere: number }
+	/** An earlier queued run takes the same limit, so it goes first. */
+	| { kind: 'earlier_run'; runId: string | null; limit: string }
+	| { kind: 'job_running'; runId: string }
 	| { kind: 'upstream_job'; runId: string; jobKey: string }
-	/** A child run waits for its group run to be claimed. */
-	| { kind: 'group_parent'; runId: string; jobKey: string };
+	/** A child run waits for its group run to start. */
+	| { kind: 'group_parent'; runId: string };
 
 export type OverlapOutcome = {
 	policy: OverlapPolicy;
@@ -485,6 +493,40 @@ export type AdhocRunCheck = {
 	launchable: boolean;
 };
 
+/** One model in `sqb plan --json`: what the build would do to it and why. */
+export type PlanModel = {
+	name: string;
+	materialization_type: string;
+	action: string;
+	reason: string;
+	incremental_strategy?: string;
+	cursor_column?: string;
+	cursor_bounds?: { start: string | null; end: string | null } | null;
+	backfill: { action: string; duration: string | null };
+	qualified_name?: string;
+	changed_functions?: string[];
+};
+
+export type PlanWarning = { severity: string; message: string; model_name?: string; code?: string };
+
+/** `sqb plan --json` as the location printed it; sections the page doesn't show are kept as they are. */
+export type PlanDocument = {
+	selected_count: number;
+	models: PlanModel[];
+	seeds: { name: string; reason: string; qualified_name?: string }[];
+	source_loads: { name: string; kind: string; write_strategy?: string; cursor_column?: string; is_reload: boolean }[];
+	functions: { name: string; language: string; reason?: string }[];
+	python_nodes: { name: string; kind: string; phase: string; identity_status: string }[];
+	warnings: PlanWarning[];
+	migrations: { model: string; origin_model?: string; decision: string; completed_at: string | null }[];
+	column_migrations: { model: string; origin_column: string; destination_column: string; decision: string }[];
+	table_type_conversions: { model: string; actual_type?: string; desired_type?: string }[];
+	retention: { model: string; action?: string }[];
+};
+
+/** The location's plan of a build command, or why it could not plan it. */
+export type PlanResult = { plan: PlanDocument; error: null } | { plan: null; error: string };
+
 /** Cursor window for a launch, typed from the selected nodes' cursor type. */
 export type CursorWindow = {
 	type: 'timestamp' | 'integer';
@@ -494,6 +536,10 @@ export type CursorWindow = {
 
 export type JobLaunchOptions = {
 	window?: CursorWindow;
+	/** Runs only the job's nodes these `sqb build` selectors also select; the run stays a run of the job. */
+	select?: string[];
+	/** Leaves the job's nodes these selectors select out of the run. */
+	exclude?: string[];
 };
 
 /** `selected` reruns exactly the nodes passed with the request. */
@@ -635,7 +681,6 @@ export type SensorEvaluationOutcome = 'requested' | 'completed' | 'failed' | 'ti
 
 export type SensorEvaluation = {
 	id: string;
-	sequence: number;
 	/** The latest phase recorded; `requested` alone means in flight. */
 	outcome: SensorEvaluationOutcome;
 	requestedAt: Iso;

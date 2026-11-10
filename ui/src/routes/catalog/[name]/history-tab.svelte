@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { CatalogNodeDetail, NodeHistory } from '$lib/api';
 	import Panel from '$lib/components/platform/panel.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -29,7 +30,7 @@
 							<td>{#if m.originModel}<code>{m.originModel}</code><div class="cell-desc">{formatRelation(m.origin)}</div>{:else}<code>{formatRelation(m.origin)}</code><div class="cell-desc">found in the warehouse</div>{/if}</td>
 							<td><code>{m.destinationModel}</code><div class="cell-desc">{formatRelation(m.destination)}</div></td>
 							<td>{decisionLabel[m.decision]}</td>
-							<td><a class="mono link" href="/runs/{m.runId}">{m.runId}</a></td>
+							<td><a class="mono link" href={to(`/runs/${m.runId}`)}>{m.runId}</a></td>
 						</tr>
 					{/each}
 				</tbody>
@@ -62,7 +63,7 @@
 			</table>
 		</Panel>
 	{/if}
-	<p class="muted">All renames, moves and archived relations are on the <a class="link" href="/maintenance">Maintenance</a> page.</p>
+	<p class="muted">All renames, moves and archived relations are on the <a class="link" href={to(`/maintenance`)}>Maintenance</a> page.</p>
 </div>
 
 <style>

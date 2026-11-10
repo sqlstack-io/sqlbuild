@@ -3,12 +3,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value as Json, json};
+use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::build_project_graph::build_project_graph;
 use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
-use sqlbuild_analysis::graph::models::GraphResource;
+use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
+use sqlbuild_analysis::graph::models::{GraphResource, JobSelection};
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource};
-use sqlbuild_orchestration::runs::types::CommandPlanner;
+use sqlbuild_orchestration::runs::types::{CommandPlanner, PublishedJobs};
 
 use crate::adhoc::constants::{
     ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, COMMAND_DEST, FRESHNESS_VERB, INTEGER_CONVERTERS,
@@ -27,7 +29,7 @@ impl CommandPlanner for CliPlanner {
     fn plan(
         &self,
         command: &[String],
-        resources: &[PlannerResource],
+        publication: (&[PlannerResource], &PublishedJobs),
     ) -> Result<CommandPlan, String> {
         let verb = command
             .first()
@@ -61,7 +63,7 @@ impl CommandPlanner for CliPlanner {
         let exclude: Vec<String> = selectors.remove("exclude").unwrap_or_default();
         let selection: BTreeSet<String> = match verb.as_str() {
             SEED_VERB => {
-                let seeds: BTreeSet<String> = resolve(resources, &select, &exclude)?
+                let seeds: BTreeSet<String> = resolve(publication, &select, &exclude)?
                     .into_iter()
                     .filter(|key| key.starts_with("seed:"))
                     .collect();
@@ -70,8 +72,8 @@ impl CommandPlanner for CliPlanner {
                 }
                 seeds
             }
-            FRESHNESS_VERB => freshness_sources(resources, &select, &exclude)?,
-            _ => resolve(resources, &select, &exclude)?,
+            FRESHNESS_VERB => freshness_sources(publication, &select, &exclude)?,
+            _ => resolve(publication, &select, &exclude)?,
         };
         Ok(CommandPlan {
             verb: verb.clone(),
@@ -177,11 +179,11 @@ fn flag_of(dest: &str) -> String {
 
 /// Exact `kind:name` keys, as `sqb build` would select them from this publication.
 fn resolve(
-    resources: &[PlannerResource],
+    publication: (&[PlannerResource], &PublishedJobs),
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let selected: BTreeSet<String> = resolved(resources, select, exclude)?;
+    let selected: BTreeSet<String> = resolved(publication, select, exclude)?;
     if selected.is_empty() {
         return Err("the selectors match no nodes in the current publication".into());
     }
@@ -189,12 +191,16 @@ fn resolve(
 }
 
 fn resolved(
-    resources: &[PlannerResource],
+    (resources, jobs): (&[PlannerResource], &PublishedJobs),
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
     let graph_resources: Vec<GraphResource> = resources.iter().filter_map(graph_resource).collect();
-    let graph = build_project_graph(&graph_resources);
+    let mut graph = build_project_graph(&graph_resources);
+    let selectors: Vec<String> = select.iter().chain(exclude).cloned().collect();
+    if selectors_need_jobs(&graph, &selectors, &[]) {
+        graph = attach_jobs(graph, published_jobs(jobs));
+    }
     Ok(resolve_selectors(&graph, select, exclude)
         .map_err(|error| format!("{}: {}", error.code, error.message))?
         .into_iter()
@@ -202,18 +208,28 @@ fn resolved(
         .collect())
 }
 
+/// Published jobs as already-resolved graph selections.
+fn published_jobs(jobs: &PublishedJobs) -> BTreeMap<String, JobSelection> {
+    let mut selections: BTreeMap<String, JobSelection> = BTreeMap::new();
+    for (name, keys) in jobs {
+        let keys: Vec<(String, String)> = keys.iter().filter_map(|key| object_key(key)).collect();
+        selections.insert(name.clone(), JobSelection::Resolved { keys });
+    }
+    selections
+}
+
 /// Sources `sqb freshness` observes: selected or upstream sources, less those the exclusions reach.
 fn freshness_sources(
-    resources: &[PlannerResource],
+    publication: (&[PlannerResource], &PublishedJobs),
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
     let selected: BTreeSet<String> =
-        upstream_sources(resources, &resolved(resources, select, &[])?);
+        upstream_sources(publication.0, &resolved(publication, select, &[])?);
     let excluded: BTreeSet<String> = if exclude.is_empty() {
         BTreeSet::new()
     } else {
-        upstream_sources(resources, &resolved(resources, exclude, &[])?)
+        upstream_sources(publication.0, &resolved(publication, exclude, &[])?)
     };
     let sources: BTreeSet<String> = selected.difference(&excluded).cloned().collect();
     if sources.is_empty() {

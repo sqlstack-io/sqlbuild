@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { appPath, to } from '$lib/paths';
 	import logoForDark from '$website/src/assets/logo-dark.png';
 	import logoForLight from '$website/src/assets/logo-light.png';
 	import { page } from '$app/state';
@@ -26,8 +27,9 @@
 	);
 
 	function isActive(href: string): boolean {
-		if (href === '/') return page.url.pathname === '/';
-		return page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
+		const path = appPath(page.url.pathname);
+		if (href === '/') return path === '/';
+		return path === href || path.startsWith(`${href}/`);
 	}
 
 	function itemClass(href: string): string {
@@ -56,7 +58,7 @@
 			{#each group.items as item (item.href)}
 				{@const Glyph = item.icon}
 				{@const count = item.badge && app.navCounts ? item.badge.value(app.navCounts) : 0}
-				<a href={item.href} class="relative flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass(item.href)}">
+				<a href={to(item.href)} class="relative flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass(item.href)}">
 					<span class="grid w-4 place-items-center opacity-80"><Glyph size={15} /></span>
 					{item.label}
 					{#if item.badge && count > 0}
@@ -75,7 +77,7 @@
 
 	<div class="mt-2 flex flex-col gap-px border-t border-[var(--sidebar-border)] pt-2.5">
 		{#if app.client.supports('serverSettings')}
-		<a href="/settings" class="flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass('/settings')}">
+		<a href={to(`/settings`)} class="flex items-center gap-2.5 rounded-md px-3 py-[7px] text-[13px] {itemClass('/settings')}">
 			<span class="grid w-4 place-items-center opacity-80"><SettingsIcon size={15} /></span>
 			Settings
 		</a>

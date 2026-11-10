@@ -6,7 +6,9 @@ use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
-use crate::api::models::{ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery};
+use crate::api::models::{
+    PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery,
+};
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_trigger_changes::list_person_trigger_changes;
@@ -15,9 +17,12 @@ use crate::declarations::main::read_person_job::read_person_job;
 use crate::declarations::models::{
     JobDetailRecord, JobRecord, PersonTriggerChange, PersonTriggerRecord,
 };
+use crate::platform::main::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::read_person_problems::read_person_problems;
-use crate::platform::models::{LocationHealthObservation, PlatformProblems};
+use crate::platform::models::{
+    LocationHealthObservation, PersonPlatformEventPage, PlatformProblems,
+};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::{
     NodeRunRecord, RunEventRecord, RunNodeFailure, RunNodeRecord, RunOutput, RunStatementRecord,
@@ -25,6 +30,8 @@ use crate::runs::models::{
 };
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
+use crate::sensors::main::read_person_sensor::read_person_sensor;
+use crate::sensors::models::PersonSensorState;
 use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;
 use crate::store::models::ControlStore;
@@ -367,6 +374,37 @@ pub(crate) async fn trigger_changes(
     .ok_or_else(|| not_found("trigger not found"))
 }
 
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/sensor", operation_id = "readPersonSensorState",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("trigger_id" = Uuid, Path),
+        ("limit" = Option<u32>, Query, description = "Maximum recent checks and run requests; defaults to 100, capped at 1000")),
+    responses((status = 200, body = PersonSensorState, description = "The cursor, recent checks newest first and requested runs"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 404, description = "Sensor not found for a person who may view the whole target")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn sensor_state(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, trigger_id)), Query(options)): (
+        Path<(Uuid, String, Uuid)>,
+        Query<ReadQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<PersonSensorState>, ApiError> {
+    read_person_sensor(
+        &store,
+        (&context, principal),
+        (
+            (location_id, &target),
+            (trigger_id, options.limit.unwrap_or(100)),
+        ),
+        default_role,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("sensor not found"))
+}
+
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/snapshots", operation_id = "listPersonSnapshots",
     params(("location_id" = Uuid, Path), ("target" = String, Path),
         ("limit" = Option<u32>, Query, description = "Maximum recent publications; defaults to 20, capped at 100")),
@@ -422,6 +460,27 @@ pub(crate) async fn problems(
 ) -> Result<Json<PlatformProblems>, ApiError> {
     Ok(Json(
         read_person_problems(&store, principal, default_role).await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/platform/events", operation_id = "listPersonPlatformEvents",
+    params(("before" = Option<i64>, Query, description = "Continue after this storage ID of the previous page"),
+        ("limit" = Option<u32>, Query, description = "Events to scan; defaults to 200, clamped to 1..500")),
+    responses((status = 200, body = PersonPlatformEventPage, description = "One scan of stored platform events newest first, without heartbeats: server-wide ones, and those of targets the person lists"),
+        (status = 401, description = "Session rejected")), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn platform_events(
+    (State(store), Query(options)): (State<ControlStore>, Query<PlatformEventsQuery>),
+    Extension(default_role): Extension<DefaultRole>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<PersonPlatformEventPage>, ApiError> {
+    Ok(Json(
+        list_person_platform_events(
+            &store,
+            principal,
+            (options.before, options.limit.unwrap_or(200)),
+            default_role,
+        )
+        .await?,
     ))
 }
 

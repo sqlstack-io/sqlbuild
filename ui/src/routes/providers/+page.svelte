@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import PuzzleIcon from '@lucide/svelte/icons/puzzle';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -35,12 +36,12 @@
 		</thead>
 		<tbody>
 			{#each shown as p (p.name)}
-				<tr onclick={() => goto(`/providers/${p.name}`)}>
+				<tr onclick={() => goto(to(`/providers/${p.name}`))}>
 					<td>
 						<div class="cell-name">
 							<PuzzleIcon size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								<a href="/providers/{p.name}" onclick={(e) => e.stopPropagation()}>{p.name}</a>
+								<a href={to(`/providers/${p.name}`)} onclick={(e) => e.stopPropagation()}>{p.name}</a>
 								<div class="cell-desc">{p.description}</div>
 							</div>
 						</div>

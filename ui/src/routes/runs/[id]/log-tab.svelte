@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -115,7 +116,7 @@
 		{#each shown as e (e.id)}
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'}>
 				<td class="faint nowrap" title={formatStamp(e.at)}>{clockTime(e.at)}</td>
-				{#if grouped}<td class="mono faint"><a href="/runs/{e.runId}">{shortRunId(e.runId)}</a></td>{/if}
+				{#if grouped}<td class="mono faint"><a href={to(`/runs/${e.runId}`)}>{shortRunId(e.runId)}</a></td>{/if}
 				<td class="mono" class:faint={!e.nodeKey}>{e.nodeKey ?? e.stream ?? 'run'}</td>
 				<td class:out={e.stream}>
 					{#if e.stream}

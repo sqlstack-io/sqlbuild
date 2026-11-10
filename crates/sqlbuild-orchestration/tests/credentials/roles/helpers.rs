@@ -23,6 +23,7 @@ use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{PersonTriggerChange, TriggerChange, TriggerChangeRequest};
 use crate::runs::main::list_person_runs::list_person_runs;
 use crate::runs::tests::helpers::snapshot;
+use crate::runs::types::RunsListing;
 use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
@@ -323,10 +324,15 @@ pub(crate) async fn member_listings(
         .await
         .map(|_| ())
         .map_err(denial),
-        list_person_runs(store, member, (scope.0, scope.1, 10), DefaultRole::None)
-            .await
-            .map(|_| ())
-            .map_err(denial),
+        list_person_runs(
+            store,
+            member,
+            (scope.0, scope.1, RunsListing::Newest(10, None)),
+            DefaultRole::None,
+        )
+        .await
+        .map(|_| ())
+        .map_err(denial),
     ]
 }
 

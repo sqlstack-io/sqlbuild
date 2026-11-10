@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import '@xyflow/svelte/dist/style.css';
 	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
@@ -477,7 +478,7 @@
 
 <AppTopbar title="Lineage">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
-	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(runSelection))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>{/if}
+	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>{/if}
 </AppTopbar>
 
 
@@ -640,7 +641,7 @@
 			<div class="inspector-head">
 				<div class="flex items-center gap-2">
 					<span class="truncate text-[15px] font-semibold" title={String(primary?.data.name ?? '')}>{primary?.data.label ?? primary?.data.name}</span>
-					{#if d}<a href="/catalog/{primarySlug}" class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
+					{#if d}<a href={to(`/catalog/${primarySlug}`)} class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
 				</div>
 				<div class="inspector-meta">
 					<!-- From the selected card, so the header never names the previous node's facts while its detail is held. -->
@@ -681,7 +682,7 @@
 				</InspectorSection>
 			{:else}
 				<InspectorSection title="Last build">
-					{#snippet meta()}{#if d.lastBuild?.runId}<a class="section-link" href="/runs/{d.lastBuild.runId}">View run →</a>{/if}{/snippet}
+					{#snippet meta()}{#if d.lastBuild?.runId}<a class="section-link" href={to(`/runs/${d.lastBuild.runId}`)}>View run →</a>{/if}{/snippet}
 					<div class="status-top">
 						{#if d.lastOutcome}<StatusLabel tone={nodeOutcomeTone[d.lastOutcome]} label={nodeOutcomeLabel[d.lastOutcome]} />{:else if !d.lastBuild}<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />{/if}
 						<StaleBadges reasons={d.stale} />
@@ -704,7 +705,7 @@
 					{/each}
 					<dl class="kv">
 						<div><dt>Last built</dt><dd><BuildSource build={d.lastBuild} /></dd></div>
-						{#if d.lastBuild?.jobKey}<div><dt>Job</dt><dd><a class="link" href="/jobs/{d.lastBuild.jobKey}">{d.lastBuild.jobKey}</a></dd></div>{/if}
+						{#if d.lastBuild?.jobKey}<div><dt>Job</dt><dd><a class="link" href={to(`/jobs/${d.lastBuild.jobKey}`)}>{d.lastBuild.jobKey}</a></dd></div>{/if}
 						{#if d.lastBuild}<div><dt>Started</dt><dd>{formatStamp(d.lastBuild.builtAt)}</dd></div>{/if}
 						<div><dt>Relation</dt><dd class="mono">{relationName(d.relation)}</dd></div>
 					</dl>
@@ -732,7 +733,7 @@
 				<InspectorSection title="Checks">
 					{#snippet meta()}<span>{d.checks.passing} of {d.checks.total} passing</span>{/snippet}
 					{#each d.checkResults as c (c.id)}
-						<a class="check-row" href="/checks/{c.id}">
+						<a class="check-row" href={to(`/checks/${c.id}`)}>
 							<i style:background={checkOutcomeTone[c.latest?.outcome ?? 'skipped']}></i><code>{c.name}</code>
 							<span>{runScopePhaseLabel[c.runScopePhase]}</span>
 						</a>
@@ -742,7 +743,7 @@
 
 			{#if d?.columns.length}
 				<InspectorSection title="Columns">
-					{#snippet meta()}<a class="section-link" href="/catalog/{primarySlug}?tab=columns">All {d.columns.length} →</a>{/snippet}
+					{#snippet meta()}<a class="section-link" href={to(`/catalog/${primarySlug}?tab=columns`)}>All {d.columns.length} →</a>{/snippet}
 					<dl class="kv">
 						{#each d.columns.slice(0, 6) as c (c.name)}
 							<div><dt class="mono fg">{c.name}</dt><dd class="muted">{c.description}</dd><dd class="mono muted type">{c.type}</dd></div>
@@ -753,9 +754,9 @@
 
 			{#if d && !isSource && d.runs}
 				<InspectorSection title="Recent runs">
-					{#snippet meta()}<a class="section-link" href="/catalog/{primarySlug}?tab=runs">All →</a>{/snippet}
+					{#snippet meta()}<a class="section-link" href={to(`/catalog/${primarySlug}?tab=runs`)}>All →</a>{/snippet}
 					{#each d.runs.slice(0, 3) as run, i (i)}
-						<a class="mini-run" href={run.runId ? `/runs/${run.runId}` : undefined}>
+						<a class="mini-run" href={run.runId ? to(`/runs/${run.runId}`) : undefined}>
 							<i style:background={nodeOutcomeTone[run.outcome]}></i>
 							<span class="mini-run-main"><b>{nodeOutcomeLabel[run.outcome]}</b><span>{run.jobKey ?? (run.runId ? 'started by hand' : `from the command line · ${shortRunId(run.fingerprintRunId ?? '')}`)}</span></span>
 							<span class="mini-run-meta">{formatMs(run.durationMs)} · {formatAgo(run.startedAt, app.now)}</span>

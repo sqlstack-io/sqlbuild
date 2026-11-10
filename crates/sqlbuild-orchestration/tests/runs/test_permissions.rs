@@ -26,7 +26,8 @@ use crate::runs::models::{
     RunChangeRequest,
 };
 use crate::runs::tests::helpers::{request_run, snapshot};
-use crate::runs::tests::test_types::PersonRunPermissionTestCase;
+use crate::runs::tests::test_types::{ExactKeyPlanner, PersonRunPermissionTestCase};
+use crate::runs::types::RunsListing;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
@@ -141,13 +142,15 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         priority: 0,
                         window: None,
                         full_refresh: false,
+                        select: Vec::new(),
+                        exclude: Vec::new(),
                     };
                     assert!(
                         matches!(
                             request_person_run(
                                 store,
                                 (&context, credentials),
-                                PersonRunRequest::Job(&request)
+                                PersonRunRequest::Job(&ExactKeyPlanner, &request)
                             )
                             .await,
                             Err(ControlError::Denied { .. })
@@ -174,7 +177,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         list_person_runs(
                             store,
                             (&context, credentials),
-                            (location_id, "development", 10),
+                            (location_id, "development", RunsListing::Newest(10, None)),
                             DefaultRole::None,
                         )
                         .await
@@ -190,11 +193,14 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         let result = request_person_run(
                             store,
                             (&context, credentials),
-                            PersonRunRequest::Job(&JobRunRequest {
-                                run_id: Uuid::now_v7(),
-                                job_key: job_key.into(),
-                                ..request.clone()
-                            }),
+                            PersonRunRequest::Job(
+                                &ExactKeyPlanner,
+                                &JobRunRequest {
+                                    run_id: Uuid::now_v7(),
+                                    job_key: job_key.into(),
+                                    ..request.clone()
+                                },
+                            ),
                         )
                         .await;
                         assert_eq!(
@@ -212,7 +218,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         let source_id = Uuid::now_v7();
                         request_job_run(
                             store,
-                            &context,
+                            (&context, None),
                             &JobRunRequest {
                                 run_id: source_id,
                                 job_key: job_key.into(),
@@ -244,7 +250,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         let source_id = Uuid::now_v7();
                         request_job_run(
                             store,
-                            &context,
+                            (&context, None),
                             &JobRunRequest {
                                 run_id: source_id,
                                 job_key: job_key.into(),
@@ -283,6 +289,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             from_failure: false,
                             reason: "Rerun the original frozen execution".into(),
                             priority: 0,
+                            nodes: Vec::new(),
                         };
                         for expected in [true, false] {
                             let result =
@@ -330,6 +337,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         from_failure: false,
                         reason: "Repeat ad-hoc execution".into(),
                         priority: 0,
+                        nodes: Vec::new(),
                     };
                     let can_rerun_adhoc = test_case.role == BuiltinRole::Admin
                         || (test_case.role == BuiltinRole::Developer && settings_index == 0);
@@ -390,10 +398,13 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             request_person_run(
                                 store,
                                 (&context, credentials),
-                                PersonRunRequest::Job(&JobRunRequest {
-                                    run_id: Uuid::now_v7(),
-                                    ..request
-                                })
+                                PersonRunRequest::Job(
+                                    &ExactKeyPlanner,
+                                    &JobRunRequest {
+                                        run_id: Uuid::now_v7(),
+                                        ..request
+                                    }
+                                )
                             )
                             .await,
                             Err(ControlError::Denied { .. })

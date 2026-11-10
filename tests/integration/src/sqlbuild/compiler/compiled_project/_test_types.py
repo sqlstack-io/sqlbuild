@@ -276,6 +276,8 @@ class SnapshotDiscoveryTestCase:
     expected_groups: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     expected_sensors: dict[str, dict[str, object]] = field(default_factory=dict)
     expected_schedules: tuple[str, ...] = ()
+    expected_declared_at: dict[str, dict[str, object] | None] = field(default_factory=dict)
+    expected_trigger_declared_at: dict[str, dict[str, object] | None] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

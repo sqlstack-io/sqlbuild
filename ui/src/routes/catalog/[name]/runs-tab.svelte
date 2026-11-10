@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { CatalogNodeDetail } from '$lib/api';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
@@ -22,10 +23,10 @@
 					{#if r.message}<div class="detail" style:color={r.outcome === 'failed' ? 'var(--sb-error)' : 'var(--muted-foreground)'}>{r.message}</div>{/if}
 				</td>
 				<td>
-					{#if r.runId}<a class="mono link" href="/runs/{r.runId}">{r.runId}</a>
+					{#if r.runId}<a class="mono link" href={to(`/runs/${r.runId}`)}>{r.runId}</a>
 					{:else}<span class="muted" title="Built by sqb outside this server, e.g. from a laptop or CI (fingerprint run {r.fingerprintRunId})">from the command line · <code>{shortRunId(r.fingerprintRunId ?? '')}</code></span>{/if}
 				</td>
-				<td>{#if r.jobKey}<a class="link" href="/jobs/{r.jobKey}">{r.jobKey}</a>{:else}<span class="muted">{r.runId ? 'started by hand' : '—'}</span>{/if}</td>
+				<td>{#if r.jobKey}<a class="link" href={to(`/jobs/${r.jobKey}`)}>{r.jobKey}</a>{:else}<span class="muted">{r.runId ? 'started by hand' : '—'}</span>{/if}</td>
 				<td class="num muted">{formatNumber(r.rows)}</td>
 				<td class="num muted">{formatMs(r.durationMs)}</td>
 				<td><RelativeTime value={formatAgo(r.startedAt, app.now)} exact={formatStamp(r.startedAt)} /></td>

@@ -22,6 +22,8 @@ mod output_helpers;
 mod person_sessions_helpers;
 #[path = "person_sessions/test_types.rs"]
 mod person_sessions_test_types;
+#[path = "plans/helpers.rs"]
+mod plans_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
 #[path = "statistics/eligibility/helpers.rs"]
@@ -68,6 +70,8 @@ mod test_passwords;
 mod test_person_live;
 #[path = "test_person_location_work.rs"]
 mod test_person_location_work;
+#[path = "test_person_plans.rs"]
+mod test_person_plans;
 #[path = "test_person_sessions.rs"]
 mod test_person_sessions;
 #[path = "test_proxy.rs"]
@@ -80,6 +84,8 @@ mod test_reads;
 mod test_server_errors;
 #[path = "test_statistics_recovery.rs"]
 mod test_statistics_recovery;
+#[path = "test_trigger_upcoming.rs"]
+mod test_trigger_upcoming;
 #[path = "test_types.rs"]
 mod test_types;
 #[path = "test_ui_assets.rs"]

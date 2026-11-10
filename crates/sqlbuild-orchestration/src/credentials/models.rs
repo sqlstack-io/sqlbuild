@@ -126,6 +126,10 @@ impl AuditRetention {
     pub(crate) fn cutoff(self, now: DateTime<Utc>) -> DateTime<Utc> {
         now - chrono::Duration::days(i64::from(self.days))
     }
+
+    pub(crate) fn kept_days(self) -> u16 {
+        self.days
+    }
 }
 
 impl Default for AuditRetention {

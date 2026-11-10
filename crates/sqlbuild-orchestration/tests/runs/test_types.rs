@@ -17,6 +17,12 @@ pub(crate) struct PersonRunPermissionTestCase {
     pub(crate) expected_allowed: bool,
 }
 
+pub(crate) struct QueueStateTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_claim_order: [u128; 3],
+}
+
 pub(crate) struct ScopedClaimTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -163,33 +169,84 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
     fn plan(
         &self,
         command: &[String],
-        resources: &[crate::runs::models::PlannerResource],
+        (resources, jobs): (
+            &[crate::runs::models::PlannerResource],
+            &crate::runs::types::PublishedJobs,
+        ),
     ) -> Result<crate::runs::models::CommandPlan, String> {
         let mut plan = crate::runs::models::CommandPlan {
             verb: command.first().cloned().unwrap_or_default(),
             selection: Default::default(),
             settings: Default::default(),
         };
+        let mut excluded: std::collections::BTreeSet<String> = Default::default();
+        let mut excluding = false;
         let mut tokens = command.iter().skip(1);
         while let Some(token) = tokens.next() {
-            match token.as_str() {
+            let keys: Vec<String> = match token.as_str() {
                 "--full-refresh" => {
                     plan.settings
                         .insert("full_refresh".into(), serde_json::json!(true));
+                    continue;
                 }
                 "--warehouse" => {
                     let name = tokens.next().ok_or("--warehouse needs a name")?;
                     plan.settings
                         .insert("warehouse".into(), serde_json::json!(name));
+                    continue;
                 }
-                key if resources.iter().any(|resource| resource.key == key) => {
-                    plan.selection.insert(key.to_owned());
+                "--select" | "--exclude" => {
+                    excluding = token == "--exclude";
+                    continue;
                 }
-                other => return Err(format!("{other} is not available for ad-hoc runs")),
+                key if resources.iter().any(|resource| resource.key == key) => vec![key.to_owned()],
+                other => match other.strip_prefix("job:").and_then(|name| jobs.get(name)) {
+                    Some(keys) => keys.iter().cloned().collect(),
+                    None => return Err(format!("{other} is not available for ad-hoc runs")),
+                },
+            };
+            if excluding {
+                excluded.extend(keys);
+            } else {
+                plan.selection.extend(keys);
             }
         }
+        if plan.selection.is_empty() && !excluded.is_empty() {
+            plan.selection = resources
+                .iter()
+                .map(|resource| resource.key.clone())
+                .collect();
+        }
+        plan.selection.retain(|key| !excluded.contains(key));
         Ok(plan)
     }
+}
+
+pub(crate) struct NarrowingDenialTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) select: &'static [&'static str],
+    pub(crate) exclude: &'static [&'static str],
+    pub(crate) expected_denied: bool,
+}
+
+pub(crate) struct JobSubsetTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) job_key: &'static str,
+    pub(crate) select: &'static [&'static str],
+    pub(crate) exclude: &'static [&'static str],
+    /// The frozen selection, or `None` when the request is refused as invalid.
+    pub(crate) expected_selection: Option<&'static [&'static str]>,
+}
+
+pub(crate) struct NamedRerunTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) nodes: &'static [&'static str],
+    pub(crate) from_failure: bool,
+    /// The member holds view and run.rerun on `orders` only; otherwise the administrator asks.
+    pub(crate) by_member: bool,
+    /// The rerun's frozen selection, or `None` when it is refused.
+    pub(crate) expected_selection: Option<&'static [&'static str]>,
+    pub(crate) expected_denied: bool,
 }
 
 pub(crate) struct RunNodeErrorTestCase {

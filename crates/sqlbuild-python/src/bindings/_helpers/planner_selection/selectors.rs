@@ -11,6 +11,7 @@ use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::models::{ParsedSelector, ProjectGraph};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
+use crate::bindings::_helpers::compiled_project::job_catalog::graph_with_jobs;
 use crate::bindings::_helpers::graph::algorithms::closure;
 use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::graph::project_graph::{CompiledProjectGraph, NativeProjectGraph};
@@ -107,12 +108,10 @@ pub(crate) fn resolve_graph_keys<'py>(
     let exclude: Vec<Bound<'py, PyString>> = py_strings(exclude)?;
     let texts: Vec<Bound<'py, PyString>> = select.iter().chain(&exclude).cloned().collect();
     let carrier: Carrier<'py> = Carrier::new(py, &texts, || Ok(graph_names(graph)))?;
-    resolve_selectors(
-        graph,
-        &carrier.send_all(&select)?,
-        &carrier.send_all(&exclude)?,
-    )
-    .map_err(|error| carrier.error(error))
+    let (select, exclude) = (carrier.send_all(&select)?, carrier.send_all(&exclude)?);
+    let all: Vec<String> = select.iter().chain(&exclude).cloned().collect();
+    let graph = graph_with_jobs(py, graph, &all, &[])?;
+    resolve_selectors(&graph, &select, &exclude).map_err(|error| carrier.error(error))
 }
 
 fn view_graph(mappings: GraphViewMappings<'_, '_>) -> PyResult<NativeProjectGraph> {
@@ -183,10 +182,9 @@ pub(crate) fn resolve_project_selector_tokens<'py>(
     let graph: NativeProjectGraph = arguments_graph(&arguments)?;
     let texts: Vec<Bound<'py, PyString>> = py_strings(&arguments.value("selectors")?)?;
     let carrier: Carrier<'py> = Carrier::new(py, &texts, || Ok(graph_names(graph.graph())))?;
-    selected(
-        &carrier,
-        resolve_selector_tokens(graph.graph(), &carrier.send_all(&texts)?),
-    )
+    let selectors: Vec<String> = carrier.send_all(&texts)?;
+    let graph = graph_with_jobs(py, graph.graph(), &selectors, &[])?;
+    selected(&carrier, resolve_selector_tokens(&graph, &selectors))
 }
 
 fn arguments_graph(arguments: &KeywordArguments<'_>) -> PyResult<NativeProjectGraph> {
@@ -220,10 +218,11 @@ pub(crate) fn match_project_selector<'py>(
         Ok(graph_names(graph.graph()))
     })?;
     let kind: String = native_field(parsed, "kind")?.str()?.extract()?;
+    let value: String = carrier.send(&value)?;
+    let graph = graph_with_jobs(py, graph.graph(), &[format!("{kind}:{value}")], &[])?;
     selected(
         &carrier,
-        match_selector(graph.graph(), &kind, &carrier.send(&value)?)
-            .map(|keys| keys.into_iter().collect()),
+        match_selector(&graph, &kind, &value).map(|keys| keys.into_iter().collect()),
     )
 }
 

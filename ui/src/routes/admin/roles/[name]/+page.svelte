@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -44,7 +45,7 @@
 {:else}
 	<div class="flex min-h-0 flex-1 flex-col">
 		<div class="head">
-			<a href="/admin/roles" class="back">← Roles</a>
+			<a href={to(`/admin/roles`)} class="back">← Roles</a>
 			<span class="title">{name}</span>
 			{#if r}
 				<RoleSourceBadge role={r} />
@@ -73,7 +74,7 @@
 								{/snippet}
 								{#if r.extends}
 									<p>
-										Starts from <a class="link" href={roleHref(r.extends)}>{builtInLabel(r.extends)}</a>: {plural(baseActions.size, 'action')} on every node, then adds the actions below. Roles don't
+										Starts from <a class="link" href={to(roleHref(r.extends))}>{builtInLabel(r.extends)}</a>: {plural(baseActions.size, 'action')} on every node, then adds the actions below. Roles don't
 										inherit further than one built-in role.
 									</p>
 								{:else}
@@ -147,7 +148,7 @@
 												{#if open[s.selector]}
 													<div class="nodes">
 														{#each s.nodes as n (n)}
-															<a href="/catalog/{n}" class:new={s.newSinceLastWeek.includes(n)} title={s.newSinceLastWeek.includes(n) ? 'Started matching in the last week' : undefined}>{n}</a>
+															<a href={to(`/catalog/${n}`)} class:new={s.newSinceLastWeek.includes(n)} title={s.newSinceLastWeek.includes(n) ? 'Started matching in the last week' : undefined}>{n}</a>
 														{:else}
 															<span class="muted">Matches nothing today.</span>
 														{/each}
@@ -172,7 +173,7 @@
 							<ul class="holders">
 								{#each r.assignments as a (a.id)}
 									<li class:stale={a.stale}>
-										<a href={personHref(a.principal)}>{a.principal.displayName}</a>
+										<a href={to(personHref(a.principal))}>{a.principal.displayName}</a>
 										<span class="muted">{scopeWords(a.scope.locationId, locations)}</span>
 										<SourceChip assignment={a} />
 									</li>

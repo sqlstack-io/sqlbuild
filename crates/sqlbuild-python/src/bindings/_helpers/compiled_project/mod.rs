@@ -1,5 +1,6 @@
 pub(crate) mod attachment_inputs;
 pub(crate) mod constants;
+pub(crate) mod job_catalog;
 pub(crate) mod project;
 pub(crate) mod registration;
 pub(crate) mod rows;

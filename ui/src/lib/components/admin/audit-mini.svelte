@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { AuditEntry } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkHref } from '$lib/platform/access';
@@ -23,12 +24,12 @@
 					{e.outcome === 'denied' ? 'Denied: ' : ''}<span title={e.action}>{auditActionLabel(e.action)}</span>{#if e.scope.subject}&nbsp;· <code>{e.scope.subject}</code>{/if}
 				</span>
 				{#if e.decisionId && app.client.supports('lookupDecision')}
-					<a href={checkHref({ decision: e.decisionId })} title="Check this request again">Check this</a>
+					<a href={to(checkHref({ decision: e.decisionId }))} title="Check this request again">Check this</a>
 				{/if}
 			</li>
 		{/each}
 	</ul>
-	<a class="all" href="/admin/audit?actor={encodeURIComponent(actor)}">All their activity →</a>
+	<a class="all" href={to(`/admin/audit?actor=${encodeURIComponent(actor)}`)}>All their activity →</a>
 {:else if entries.data}
 	<p class="muted">Nothing recorded yet.</p>
 {:else if entries.error}

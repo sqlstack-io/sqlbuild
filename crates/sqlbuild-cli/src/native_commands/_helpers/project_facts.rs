@@ -2,21 +2,19 @@
 
 use std::path::Path;
 
-use sqlbuild_config::effective::main::effective_target_name::effective_target_name;
-use sqlbuild_config::effective::models::TargetChoice;
-use sqlbuild_config::models::ConfigValue;
-use sqlbuild_config::project::main::load_local_config::load_local_config;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
 use sqlbuild_config::project::models::{Built, ConfigPaths};
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_orchestration::store::errors::ControlError;
+
+use crate::native_commands::main::effective_target::effective_target;
 
 use crate::native_commands::constants::{
     CUSTOM_RULES_DIRECTORY, EVENT_EXPORTERS_DIRECTORY, LEGACY_LOCAL_CONFIG_FILENAME,
     LEGACY_PROJECT_CONFIG_FILENAME, LIFECYCLE_SINK_PATH, LOCAL_CONFIG_FILENAME, SINKS_DIRECTORY,
 };
 
-fn object_field<'a>(built: &'a Built, name: &str) -> Option<&'a Built> {
+pub(crate) fn object_field<'a>(built: &'a Built, name: &str) -> Option<&'a Built> {
     match built {
         Built::Object(_, fields) => fields
             .iter()
@@ -39,7 +37,7 @@ fn names_lifecycle_sinks(config: &Built) -> bool {
 }
 
 /// The four configuration files of `project_dir`.
-fn config_paths(project_dir: &Path) -> ConfigPaths {
+pub(crate) fn config_paths(project_dir: &Path) -> ConfigPaths {
     ConfigPaths {
         project: project_dir.join(PROJECT_CONFIG_FILENAME),
         legacy_project: project_dir.join(LEGACY_PROJECT_CONFIG_FILENAME),
@@ -75,35 +73,9 @@ pub(crate) fn development_target(
     project_dir: &Path,
     selected: Option<String>,
 ) -> Result<String, ControlError> {
-    let paths = config_paths(project_dir);
-    let invalid =
-        || ControlError::Invalid("project configuration is invalid; run sqb debug".into());
-    let project = load_project_config(&paths).map_err(|_| invalid())?;
-    let local = load_local_config(&paths).map_err(|_| invalid())?;
-    let text = |config: &Built, name: &str| match object_field(config, name) {
-        Some(Built::Value(ConfigValue::String(value))) => Some(value.clone()),
-        _ => None,
-    };
-    let defined: Vec<String> = [&project, &local]
-        .into_iter()
-        .filter_map(|config| object_field(config, "targets"))
-        .filter_map(|targets| match targets {
-            Built::Dict(targets) => Some(targets),
-            _ => None,
+    effective_target(project_dir, selected)
+        .map_err(ControlError::Invalid)?
+        .ok_or_else(|| {
+            ControlError::Invalid("sqb dev requires --target or a configured default target".into())
         })
-        .flatten()
-        .map(|(name, _)| name.clone())
-        .collect();
-    effective_target_name(TargetChoice {
-        selected,
-        local: text(&local, "target"),
-        default: text(&project, "default_target"),
-        defined,
-    })
-    .map_err(|_| {
-        ControlError::Invalid("unknown development target; run sqb debug --target <name>".into())
-    })?
-    .ok_or_else(|| {
-        ControlError::Invalid("sqb dev requires --target or a configured default target".into())
-    })
 }

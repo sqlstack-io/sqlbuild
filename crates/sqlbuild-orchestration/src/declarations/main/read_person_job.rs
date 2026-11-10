@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::_helpers::job_detail::{
-    critical_nodes, groups_running, members_in_order, shown_settings,
+    critical_nodes, cursor_type, groups_running, members_in_order, shown_settings,
 };
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::declarations::models::{JobDetailRecord, StoredJob};
@@ -60,8 +60,13 @@ pub async fn read_person_job(
         members,
         member_of: groups_running(&definitions, job_key),
         critical_nodes: critical_nodes(&nodes),
+        cursor_type: cursor_type(&nodes),
         selection: job.selection,
         concurrency_groups: job.concurrency_groups,
+        select: job.select,
+        exclude: job.exclude,
+        targets: job.targets,
+        declared_at: job.declared_at,
     }))
 }
 

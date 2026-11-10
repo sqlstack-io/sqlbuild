@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import RadarIcon from '@lucide/svelte/icons/radar';
 	import UserIcon from '@lucide/svelte/icons/user';
@@ -8,7 +9,7 @@
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import RunStatusPill from '$lib/components/operate/run-status-pill.svelte';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
-	import { shortRunId } from '$lib/operate/labels';
+	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { runKindLabel, runStatusTone } from '$lib/status';
 	import type { RunsState } from './state.svelte';
@@ -46,8 +47,8 @@
 	function open(e: MouseEvent, id: string) {
 		if ((e.target as Element).closest(CONTROL)) return;
 		const href = `/runs/${id}`;
-		if (e.metaKey || e.ctrlKey || e.button === 1) window.open(href, '_blank', 'noopener');
-		else void goto(href);
+		if (e.metaKey || e.ctrlKey || e.button === 1) window.open(to(href), '_blank', 'noopener');
+		else void goto(to(href));
 	}
 
 	const toneColor = { muted: 'var(--muted-foreground)', warn: 'var(--sb-warning)', error: 'var(--sb-error)', live: 'var(--sb-running)' };
@@ -94,7 +95,7 @@
 					</td>
 					<td>
 						<div class="run-id">
-							<a class="mono" href="/runs/{r.id}" title={r.id}>{shortRunId(r.id)}</a>
+							<a class="mono" href={to(`/runs/${r.id}`)} title={r.id}>{shortRunId(r.id)}</a>
 							<CopyButton value={r.id} label="Copy run ID" />
 							{#if r.childRunCount && !d.child && !list.params.children}
 								<button type="button" class="expand" onclick={() => list.toggleExpanded(r.id)} aria-expanded={list.expanded.has(r.id)} title="{list.expanded.has(r.id) ? 'Hide' : 'Show'} the {r.childRunCount} job runs in this group">
@@ -103,13 +104,14 @@
 							{/if}
 						</div>
 						{#if d.child || (list.params.children && r.parentRunId)}
-							<div class="cell-desc">in group <a href="/runs/{r.parentRunId}">{shortRunId(r.parentRunId ?? '')}</a></div>
+							<div class="cell-desc">in group <a href={to(`/runs/${r.parentRunId}`)}>{shortRunId(r.parentRunId ?? '')}</a></div>
 						{/if}
 					</td>
 					<td class="what">
 						<div class="line">
 							{#if r.jobKey}
 								{@render chip('job', r.jobKey, r.jobKey, `Show only runs of ${r.jobKey}`)}
+								{#if r.narrowing}<span class="part" title="Ran part of {r.jobKey}: sqb build {narrowingText(r.narrowing)}">part</span>{/if}{#if r.window}<span class="part" title="Processed the cursor range {r.window.start} → {r.window.end}">window</span>{/if}
 							{:else}
 								<span class="adhoc" title={d.row.selection.join(' ')}>ad hoc: <code>{d.row.selection.join(' ') || 'whole project'}</code></span>
 							{/if}
@@ -121,18 +123,18 @@
 							{#if r.origin === 'schedule' && r.triggerName}
 								<CalendarClockIcon size={13} />
 								{@render chip('schedule', r.triggerName, r.triggerName, `Show only runs started by the ${r.triggerName} schedule`)}
-								<a class="go" href="/triggers/{r.triggerId}" title="Open the schedule">↗</a>
+								<a class="go" href={to(`/triggers/${r.triggerId}`)} title="Open the schedule">↗</a>
 							{:else if r.origin === 'sensor' && r.triggerName}
 								<RadarIcon size={13} />
 								{@render chip('sensor', r.triggerName, r.triggerName, `Show only runs started by the ${r.triggerName} sensor`)}
-								<a class="go" href="/triggers/{r.triggerId}" title="Open the sensor">↗</a>
+								<a class="go" href={to(`/triggers/${r.triggerId}`)} title="Open the sensor">↗</a>
 							{:else}
 								<UserIcon size={13} />
 								{@render chip('by', r.requestedBy.name, r.requestedBy.displayName, `Show only runs started by ${r.requestedBy.displayName} (${r.requestedBy.name})`)}
 							{/if}
 						</div>
 						{#if r.rerunOfRunId}
-							<div class="cell-desc">Rerun of <a href="/runs/{r.rerunOfRunId}">{shortRunId(r.rerunOfRunId)}</a></div>
+							<div class="cell-desc">Rerun of <a href={to(`/runs/${r.rerunOfRunId}`)}>{shortRunId(r.rerunOfRunId)}</a></div>
 						{:else if r.origin === 'schedule' && r.tickScheduledFor}
 							<div class="cell-desc" title="Scheduled time of the tick that requested it">due {formatStamp(r.tickScheduledFor).slice(11)}</div>
 						{:else if r.runKey}
@@ -278,6 +280,10 @@
 		background: var(--sb-hover);
 	}
 	.what .chip + .chip {
+		color: var(--muted-foreground);
+		font-size: 11.5px;
+	}
+	.part {
 		color: var(--muted-foreground);
 		font-size: 11.5px;
 	}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -24,7 +25,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="flex items-center gap-3 border-b border-border px-6 py-3.5">
-		<a href="/providers" class="text-muted-foreground hover:text-foreground text-[13px]">← Providers</a>
+		<a href={to(`/providers`)} class="text-muted-foreground hover:text-foreground text-[13px]">← Providers</a>
 		<span class="font-display text-[17px] font-semibold">{name}</span>
 		{#if provider}<span class="text-muted-foreground text-[12px]">{provider.type}</span>{/if}
 	</div>
@@ -61,7 +62,7 @@
 								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Nodes · {provider.usedBy.nodes.length}</div>
 								<div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-1.5">
 									{#each provider.usedBy.nodes as m (m)}
-										<a href="/catalog/{m}" class="bg-secondary hover:bg-[var(--sb-hover)] flex items-center gap-2 rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{m}</a>
+										<a href={to(`/catalog/${m}`)} class="bg-secondary hover:bg-[var(--sb-hover)] flex items-center gap-2 rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{m}</a>
 									{/each}
 								</div>
 							</div>
@@ -71,7 +72,7 @@
 								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Jobs · {provider.usedBy.jobs.length}</div>
 								<div class="flex flex-wrap gap-1.5">
 									{#each provider.usedBy.jobs as j (j)}
-										<a href="/jobs/{j}" class="bg-secondary hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{j}</a>
+										<a href={to(`/jobs/${j}`)} class="bg-secondary hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{j}</a>
 									{/each}
 								</div>
 							</div>
@@ -81,7 +82,7 @@
 								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Sensors · {provider.usedBy.triggers.length}</div>
 								<div class="flex flex-wrap gap-1.5">
 									{#each provider.usedBy.triggers as t (t.id)}
-										<a href="/triggers/{t.id}" class="bg-secondary hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{t.name}</a>
+										<a href={to(`/triggers/${t.id}`)} class="bg-secondary hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{t.name}</a>
 									{/each}
 								</div>
 							</div>

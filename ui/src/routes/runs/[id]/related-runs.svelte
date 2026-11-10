@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import type { Run } from '$lib/api';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -30,7 +31,7 @@
 			<ul>
 				{#each related as r (`${r.role}-${r.run.id}`)}
 					<li>
-						<a href="/runs/{r.run.id}" title="{r.role} {r.run.id} · {runStatusLabel[r.run.status]} · queued {formatStamp(r.run.queuedAt)}">
+						<a href={to(`/runs/${r.run.id}`)} title="{r.role} {r.run.id} · {runStatusLabel[r.run.status]} · queued {formatStamp(r.run.queuedAt)}">
 							<span class="faint">{r.role}</span>
 							<i style:background={runStatusTone[r.run.status]}></i>
 							<span class="mono">{shortRunId(r.run.id)}</span>
@@ -79,7 +80,7 @@
 						{#each d.invocations as inv (inv.invocationId)}
 							<tr>
 								<td class="mono">{inv.invocationId}</td>
-								<td class="mono"><a href="/runs/{inv.runId}">{shortRunId(inv.runId)}</a></td>
+								<td class="mono"><a href={to(`/runs/${inv.runId}`)}>{shortRunId(inv.runId)}</a></td>
 								<td>{inv.attempt}</td>
 								<td>{formatStamp(inv.startedAt)}</td>
 								<td>{inv.endedAt ? formatStamp(inv.endedAt) : '—'}</td>

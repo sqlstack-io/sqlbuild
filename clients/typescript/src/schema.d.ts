@@ -64,6 +64,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readServerSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/cli/approve": {
         parameters: {
             query?: never;
@@ -546,6 +562,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -722,6 +770,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/sensor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonSensorState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks": {
         parameters: {
             query?: never;
@@ -730,6 +794,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPersonTicks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/platform/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonPlatformEvents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1467,6 +1547,12 @@ export interface components {
             /** @enum {string} */
             status: "timed_out";
         };
+        /** @description Where a declaration was written, relative to the project root. */
+        DeclaredAt: {
+            /** Format: int32 */
+            line: number;
+            path: string;
+        };
         /** @description Local definition identity only, not upstream data or graph currency. */
         DefinitionEvidence: {
             local_hash: string;
@@ -1527,18 +1613,33 @@ export interface components {
             failed: components["schemas"]["Table"][];
             failure?: string | null;
         };
+        /** @description The control store's installation and schema, as recorded when it was created. */
+        InstallationRecord: {
+            /** Format: date-time */
+            installed_at: string;
+            /** Format: date-time */
+            schema_applied_at: string;
+            /** @description Digest of the schema; a server starts only on the exact schema it creates. */
+            schema_checksum: string;
+            storage: components["schemas"]["StorageKind"];
+        };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
             concurrency_groups: string[];
             /** @description Selected nodes whose failure stops a group. */
             critical_nodes: string[];
+            /** @description The cursor type every selected cursor node shares; absent when none has a cursor or types differ. */
+            cursor_type?: string | null;
+            declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
+            exclude?: string | null;
             job_key: string;
             kind: components["schemas"]["RunKind"];
             /** @description The groups this job belongs to. */
             member_of: string[];
             /** @description A group's member jobs in run order; empty for a job. */
             members: components["schemas"]["JobMember"][];
+            select?: string | null;
             selection: string[];
             /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
             settings: {
@@ -1546,6 +1647,8 @@ export interface components {
             };
             /** Format: uuid */
             snapshot_id: string;
+            /** @description Empty when the declaration applies to every target. */
+            targets: string[];
         };
         JobMember: {
             job_key: string;
@@ -1555,16 +1658,21 @@ export interface components {
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
             concurrency_groups: string[];
+            declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
             job_key: string;
             /** @description `job` or `group`; a group's selection is the union of its member jobs' selections. */
             kind: components["schemas"]["RunKind"];
+            /** @description A job's selectors as written; absent for a group and for snapshots published before they were recorded. */
+            select?: string | null;
             selection: string[];
             /** Format: uuid */
             snapshot_id: string;
         };
         /** @description A trusted operator names a published job; execution inputs are never supplied by the caller. */
         JobRunRequest: {
+            /** @description Leave nodes out of the job with `sqb build` selectors. */
+            exclude?: string[];
             /** @description Rebuild every selected model from scratch; it rewrites history, as a window does. */
             full_refresh?: boolean;
             job_key: string;
@@ -1575,6 +1683,8 @@ export interface components {
             reason: string;
             /** Format: uuid */
             run_id: string;
+            /** @description Narrow the job with `sqb build` selectors; only nodes already in the job can remain. */
+            select?: string[];
             target: string;
             window?: null | components["schemas"]["RunWindow"];
         };
@@ -1646,6 +1756,12 @@ export interface components {
             evaluation: Record<string, never>;
             /** @enum {string} */
             kind: "evaluate_sensor";
+        } | {
+            command: string[];
+            /** @enum {string} */
+            kind: "plan";
+            selection: string[];
+            settings: Record<string, never>;
         };
         LocationWorkClaim: {
             /** Format: uuid */
@@ -1666,6 +1782,10 @@ export interface components {
             /** @enum {string} */
             kind: "sensor_evaluation";
             outcome: components["schemas"]["CustomSensorOutcome"];
+        } | {
+            document: Record<string, never>;
+            /** @enum {string} */
+            kind: "plan";
         } | {
             /** @enum {string} */
             kind: "superseded";
@@ -1710,6 +1830,26 @@ export interface components {
          * @enum {string}
          */
         LoginMode: "password" | "trusted_proxy" | "oidc";
+        /** @description A running calendar schedule whose last date is at most a day away, or which has none left. */
+        LowCalendar: {
+            /**
+             * Format: date-time
+             * @description The calendar's last date; absent when none are left.
+             */
+            horizon_end?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            /**
+             * Format: date-time
+             * @description When the location next works out the calendar's dates.
+             */
+            refresh_at: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
+        };
         /** @description Recorded moves, their old-name view steps and janitor cleanups, newest moves first. */
         MaintenanceHistory: {
             /** @description Empty when the history is for one model; cleanups are not tied to models. */
@@ -1904,6 +2044,28 @@ export interface components {
             /** Format: uuid */
             principal_id: string;
         };
+        /** @description A stored platform event a person may see; the location target is absent for server-wide events. */
+        PersonPlatformEvent: {
+            event: components["schemas"]["PlatformEvent"];
+            /** Format: uuid */
+            event_id: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: int64 */
+            storage_id: number;
+            target?: string | null;
+        };
+        /** @description One scan of stored platform events, keeping those the person may see. */
+        PersonPlatformEventPage: {
+            /**
+             * Format: int64
+             * @description The `before` that continues the scan, absent once no older events remain; a page can be empty and still continue.
+             */
+            before?: number | null;
+            events: components["schemas"]["PersonPlatformEvent"][];
+        };
         /** @description A role assigned to one person, everywhere or on one location and target. */
         PersonRole: {
             /** Format: uuid */
@@ -1915,6 +2077,49 @@ export interface components {
             principal_id: string;
             role_key: string;
             target?: string | null;
+        };
+        /** @description The control event position built-in conditions read from, and a custom sensor's own value after secret redaction; the value needs view.evidence. */
+        PersonSensorCursor: {
+            custom?: string | null;
+            /** Format: int64 */
+            event_storage_id: number;
+        };
+        PersonSensorEvaluation: {
+            cursor_after?: null | components["schemas"]["PersonSensorCursor"];
+            cursor_before: components["schemas"]["PersonSensorCursor"];
+            definition_fingerprint: string;
+            /** Format: uuid */
+            evaluation_id: string;
+            /** @description The failure code of a failed check. */
+            failure_code?: string | null;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** @description The latest phase: `requested` alone means the check is in flight; otherwise `completed`, `failed`, `timed_out` or `abandoned`. */
+            phase: string;
+            /** Format: date-time */
+            requested_at: string;
+            run_count: number;
+        };
+        /** @description A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence. */
+        PersonSensorRunRequest: {
+            /** Format: uuid */
+            evaluation_id: string;
+            /** Format: date-time */
+            queued_at: string;
+            /** Format: uuid */
+            run_id: string;
+            run_key: string;
+            status: components["schemas"]["RunStatus"];
+        };
+        /** @description A sensor's committed position and recent checks, for a person who may list the target. */
+        PersonSensorState: {
+            cursor?: null | components["schemas"]["PersonSensorCursor"];
+            /** @description Fingerprint of the published definition; a check with another one ran older code. */
+            definition_fingerprint: string;
+            /** @description Newest first. */
+            evaluations: components["schemas"]["PersonSensorEvaluation"][];
+            /** @description Runs the sensor requested, by run key, newest first. */
+            run_requests: components["schemas"]["PersonSensorRunRequest"][];
         };
         /** @description A person as administrators see them: how they sign in, their SSO groups and live sessions. */
         PersonSummary: {
@@ -1961,6 +2166,8 @@ export interface components {
         /** @description A trigger as people list it, with its newest tick so a list needs no read per trigger. */
         PersonTriggerRecord: components["schemas"]["TriggerRecord"] & {
             latest_tick?: null | components["schemas"]["TickRecord"];
+            /** @description A running schedule's next due times from `next_due_at` on, at most five; empty otherwise. */
+            upcoming: string[];
         };
         /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
         PhysicalEvidence: {
@@ -1972,11 +2179,60 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description A person's build command to plan on the location; the server freezes it like an ad-hoc run. */
+        PlanRequest: {
+            command: string[];
+            /** Format: uuid */
+            request_id: string;
+        };
+        PlatformEvent: {
+            /** @enum {string} */
+            kind: "heartbeat";
+            /** Format: uuid */
+            replica_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "scheduler_no_leader";
+        } | {
+            /** @enum {string} */
+            kind: "tick_overdue";
+            /** Format: date-time */
+            scheduled_for: string;
+            /** Format: uuid */
+            trigger_id: string;
+        } | {
+            /** Format: date-time */
+            horizon_end?: string | null;
+            /** @enum {string} */
+            kind: "calendar_horizon_low";
+            /** Format: date-time */
+            refresh_at: string;
+            /** Format: uuid */
+            trigger_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "location_broken";
+            /** Format: date-time */
+            last_seen_at: string;
+            /** Format: uuid */
+            location_id: string;
+            target: string;
+        } | {
+            /** Format: uuid */
+            claim_id: string;
+            code: string;
+            /** @enum {string} */
+            kind: "launch_failed";
+            /** Format: uuid */
+            run_id: string;
+        };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
+            /** @description Running calendar schedules whose dates run out within a day. */
+            low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];
             scheduler_leader: boolean;
             /**
@@ -2006,6 +2262,45 @@ export interface components {
             /** Format: uuid */
             snapshot_id: string;
             sqb_version: string;
+        };
+        /** @description Why the scheduler cannot claim a queued run yet. Runs outside the listed location and target are counted, never named. */
+        QueueWait: {
+            /** @enum {string} */
+            kind: "group_parent";
+            /** Format: uuid */
+            run_id: string;
+        } | {
+            job_key: string;
+            /** @enum {string} */
+            kind: "upstream_job";
+            /** Format: uuid */
+            run_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "job_running";
+            /** Format: uuid */
+            run_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "write_claim";
+            node_key: string;
+            /** Format: int32 */
+            other_nodes: number;
+            /** Format: uuid */
+            run_id?: string | null;
+        } | {
+            /** Format: int32 */
+            elsewhere: number;
+            holders: string[];
+            /** @enum {string} */
+            kind: "concurrency_limit";
+            limit: string;
+        } | {
+            /** @enum {string} */
+            kind: "earlier_run";
+            limit: string;
+            /** Format: uuid */
+            run_id?: string | null;
         };
         /** @description One invocation's records; the server owns its claim namespace, start time and version. */
         RecallBatch: {
@@ -2044,6 +2339,8 @@ export interface components {
         /** @description A retry derives its execution scope from a terminal run, never from caller selectors. */
         RerunRequest: {
             from_failure: boolean;
+            /** @description Rerun only these nodes of the source run; each must be in its selection. */
+            nodes?: string[];
             /** Format: int64 */
             priority: number;
             reason: string;
@@ -2213,6 +2510,11 @@ export interface components {
         };
         /** @enum {string} */
         RunKind: "job" | "group" | "adhoc";
+        /** @description The `sqb build` selectors one run of a job was narrowed with. */
+        RunNarrowing: {
+            exclude: string[];
+            select: string[];
+        };
         /** @description A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL. */
         RunNodeFailure: {
             error_code?: string | null;
@@ -2256,6 +2558,16 @@ export interface components {
             stream: string;
             text: string;
         };
+        /** @description A queued run's place in claim order within its location and target, and what holds it back. */
+        RunQueueState: {
+            /**
+             * Format: int32
+             * @description 1-based, in the order the scheduler claims: priority, then queue time.
+             */
+            position: number;
+            /** @description Empty when nothing holds the run back and it starts on a free worker. */
+            waits: components["schemas"]["QueueWait"][];
+        };
         RunRecord: {
             /** Format: date-time */
             cancel_requested_at?: string | null;
@@ -2269,6 +2581,7 @@ export interface components {
             launched_at?: string | null;
             /** Format: uuid */
             location_id: string;
+            narrowing?: null | components["schemas"]["RunNarrowing"];
             node_counts_json: {
                 [key: string]: number;
             };
@@ -2277,6 +2590,7 @@ export interface components {
             parent_run_id?: string | null;
             /** Format: int64 */
             priority: number;
+            queue?: null | components["schemas"]["RunQueueState"];
             /** Format: date-time */
             queued_at: string;
             /** @description The stored actor: `principal:<id>` for a person, otherwise a system actor such as `system:scheduler`. */
@@ -2303,6 +2617,7 @@ export interface components {
             /** Format: uuid */
             trigger_id?: string | null;
             trigger_name?: string | null;
+            window?: null | components["schemas"]["RunWindow"];
         };
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {
@@ -2313,6 +2628,7 @@ export interface components {
             kind: components["schemas"]["RunKind"];
             /** Format: uuid */
             location_id: string;
+            narrowing?: null | components["schemas"]["RunNarrowing"];
             origin: components["schemas"]["RunOrigin"];
             /** Format: uuid */
             parent_run_id?: string | null;
@@ -2451,12 +2767,44 @@ export interface components {
             kind: "custom";
         };
         SensorDefinition: {
+            declared_at?: null | components["schemas"]["DeclaredAt"];
             default_status?: components["schemas"]["TriggerStatus"];
             description: string;
             job_key: string;
             /** Format: int32 */
             minimum_interval_seconds: number;
+            /** @description The targets the declaration is limited to; empty for every target. */
+            targets?: string[];
             when: components["schemas"]["SensorCondition"];
+        };
+        /** @description How long the server keeps each kind of record. */
+        ServerRetention: {
+            /** Format: int64 */
+            audit_days: number;
+            /** Format: int64 */
+            heartbeat_days: number;
+            /** Format: int64 */
+            location_health_days: number;
+            /** Format: int64 */
+            platform_alert_days: number;
+            /** Format: int64 */
+            sensor_evaluation_days: number;
+            /**
+             * Format: int64
+             * @description Publications kept per location target.
+             */
+            snapshots_kept: number;
+            /** Format: int64 */
+            statistics_days: number;
+        };
+        /** @description The server's version, storage, sign-in and retention, for administrators. */
+        ServerSettings: {
+            installation: components["schemas"]["InstallationRecord"];
+            login_mode: components["schemas"]["LoginMode"];
+            retention: components["schemas"]["ServerRetention"];
+            /** @description Whether this server runs the scheduler; another server may hold the lease. */
+            scheduler: boolean;
+            version: string;
         };
         SessionIdentity: {
             /** Format: date-time */
@@ -2552,6 +2900,11 @@ export interface components {
             next_after?: string | null;
         };
         /**
+         * @description Where the control store keeps its data.
+         * @enum {string}
+         */
+        StorageKind: "sqlite" | "postgresql";
+        /**
          * @description The tables Recall writes.
          * @enum {string}
          */
@@ -2613,12 +2966,15 @@ export interface components {
         /** @description Legacy schedule documents retain their stored shape; sensors add a distinct condition shape. */
         TriggerDeclaration: components["schemas"]["TriggerDefinition"] | components["schemas"]["SensorDefinition"];
         TriggerDefinition: {
+            declared_at?: null | components["schemas"]["DeclaredAt"];
             default_status?: components["schemas"]["TriggerStatus"];
             description: string;
             job_key: string;
             schedule: components["schemas"]["Schedule"];
             /** Format: date-time */
             starts_at?: string | null;
+            /** @description The targets the declaration is limited to; empty for every target. */
+            targets?: string[];
         };
         TriggerRecord: {
             definition_json: components["schemas"]["TriggerDeclaration"];
@@ -2915,6 +3271,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readServerSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerSettings"];
                 };
             };
             /** @description Session rejected */
@@ -4090,15 +4480,65 @@ export interface operations {
             };
         };
     };
-    listPersonRuns: {
+    requestPlan: {
         parameters: {
-            query?: {
-                limit?: number;
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
             };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPlan: {
+        parameters: {
+            query?: never;
             header?: never;
             path: {
                 location_id: string;
                 target: string;
+                request_id: string;
             };
             cookie?: never;
         };
@@ -4109,8 +4549,61 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/json": null | components["schemas"]["LocationWorkRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listPersonRuns: {
+        parameters: {
+            query?: {
+                /** @description Page size; defaults to 100, capped at 1000 */
+                limit?: number;
+                /** @description With before_run_id: continue after this run of the previous page */
+                before_queued_at?: string;
+                before_run_id?: string;
+                /** @description List queued runs in claim order, each with its position and what it waits on */
+                queued?: boolean;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs newest first, or the queue in claim order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     "application/json": components["schemas"]["RunRecord"][];
                 };
+            };
+            /** @description Only one of the before_* pair was given, or a cursor with queued */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session rejected */
             401: {
@@ -4596,6 +5089,55 @@ export interface operations {
             };
         };
     };
+    readPersonSensorState: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent checks and run requests; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cursor, recent checks newest first and requested runs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonSensorState"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Sensor not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listPersonTicks: {
         parameters: {
             query?: {
@@ -4637,6 +5179,38 @@ export interface operations {
             };
             /** @description Trigger not found for a person who may view the whole target */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listPersonPlatformEvents: {
+        parameters: {
+            query?: {
+                /** @description Continue after this storage ID of the previous page */
+                before?: number;
+                /** @description Events to scan; defaults to 200, clamped to 1..500 */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One scan of stored platform events newest first, without heartbeats: server-wide ones, and those of targets the person lists */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonPlatformEventPage"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { to } from '$lib/paths';
 	import { untrack } from 'svelte';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
@@ -172,7 +173,7 @@
 						<li>
 							<span class="step"><SourceChip assignment={{ source: g.assignmentSource, ssoGroup: g.ssoGroup, definedIn: g.definedIn }} /> gives</span>
 							<ArrowRightIcon size={12} />
-							<span class="step">role {#if canSeeRoles}<a href={roleHref(g.role)}>{g.role}</a>{:else}<b>{g.role}</b>{/if}</span>
+							<span class="step">role {#if canSeeRoles}<a href={to(roleHref(g.role))}>{g.role}</a>{:else}<b>{g.role}</b>{/if}</span>
 							<ArrowRightIcon size={12} />
 							<span class="step">
 								{#if g.via === 'base' && g.baseRole && g.baseRole !== g.role}which includes {builtInLabel(g.baseRole)}{:else if g.via === 'base'}a built-in role{:else}an addition{/if}
@@ -196,7 +197,7 @@
 				{#if result.wouldBeGrantedBy.length}
 					<div class="group-title">Roles that would allow it here</div>
 					<p>
-						{#each result.wouldBeGrantedBy as r, i (r)}{#if i},&nbsp;{/if}{#if canSeeRoles}<a href={roleHref(r)}>{r}</a>{:else}{r}{/if}{/each}
+						{#each result.wouldBeGrantedBy as r, i (r)}{#if i},&nbsp;{/if}{#if canSeeRoles}<a href={to(roleHref(r))}>{r}</a>{:else}{r}{/if}{/each}
 					</p>
 				{/if}
 				{#if !result.nearMisses.length && !result.wouldBeGrantedBy.length}

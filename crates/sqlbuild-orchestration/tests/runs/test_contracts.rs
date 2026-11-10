@@ -22,6 +22,8 @@ mod test_group_admission;
 mod test_groups;
 #[path = "test_job_detail.rs"]
 mod test_job_detail;
+#[path = "test_job_subsets.rs"]
+mod test_job_subsets;
 #[path = "test_lifecycle.rs"]
 mod test_lifecycle;
 #[path = "test_monitor.rs"]

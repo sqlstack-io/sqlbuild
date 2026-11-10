@@ -16,18 +16,18 @@ use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::group_dependencies::group_dependencies;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    Definitions, GroupDefinition, JobDefinition, TriggerDeclaration, TriggerDefinition,
+    DeclaredAt, Definitions, GroupDefinition, JobDefinition, TriggerDeclaration, TriggerDefinition,
 };
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, module_jobs,
+    AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, declared_at, module_jobs,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     compile_calendars, compile_cron, compile_sensors,
 };
 
-/// Dedicated declaration modules are imported only in the code-location interpreter.
+/// Dedicated declaration modules, imported by publication and by selectors that name a job.
 pub(crate) fn discover_declarations<'py>(
     py: Python<'py>,
     project_dir: &Path,
@@ -118,10 +118,16 @@ pub(crate) fn compile_declarations(
                 .into_iter()
                 .map(|(kind, name)| format!("{kind}:{name}"))
                 .collect();
+        let declared_at: Option<DeclaredAt> = declared_at(project_dir, job.declared_at)?;
+        let targets: BTreeSet<String> = job.targets.into_iter().collect();
         if let Some(schedule) = job.schedule {
             triggers.insert(
                 job.name.clone(),
-                compile_cron(schedule.bind(py), &job.name, &job.description)?,
+                TriggerDefinition {
+                    targets: targets.clone(),
+                    declared_at: declared_at.clone(),
+                    ..compile_cron(schedule.bind(py), &job.name, &job.description)?
+                },
             );
         }
         jobs.insert(
@@ -131,6 +137,10 @@ pub(crate) fn compile_declarations(
                 selection,
                 settings,
                 concurrency_groups: job.concurrency_groups.into_iter().collect(),
+                select: Some(job.select),
+                exclude: Some(job.exclude).filter(|exclude| !exclude.trim().is_empty()),
+                targets,
+                declared_at,
             },
         );
     }
@@ -159,10 +169,16 @@ pub(crate) fn compile_declarations(
             .iter()
             .flat_map(|name| jobs[name].selection.iter().cloned())
             .collect();
+        let declared_at: Option<DeclaredAt> = declared_at(project_dir, group.declared_at)?;
+        let targets: BTreeSet<String> = group.targets.into_iter().collect();
         if let Some(schedule) = group.schedule {
             triggers.insert(
                 group.name.clone(),
-                compile_cron(schedule.bind(py), &group.name, &group.description)?,
+                TriggerDefinition {
+                    targets: targets.clone(),
+                    declared_at: declared_at.clone(),
+                    ..compile_cron(schedule.bind(py), &group.name, &group.description)?
+                },
             );
         }
         groups.insert(
@@ -173,6 +189,10 @@ pub(crate) fn compile_declarations(
                     selection,
                     settings: BTreeMap::new(),
                     concurrency_groups: group.concurrency_groups.into_iter().collect(),
+                    select: None,
+                    exclude: None,
+                    targets,
+                    declared_at,
                 },
                 jobs: dependencies,
             },
