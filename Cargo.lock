@@ -4136,6 +4136,7 @@ dependencies = [
  "sqlbuild-cache",
  "sqlbuild-core",
  "sqlbuild-discovery",
+ "sqlbuild-host",
  "sqlbuild-model-config",
  "sqlbuild-render",
  "sqlbuild-scopes",

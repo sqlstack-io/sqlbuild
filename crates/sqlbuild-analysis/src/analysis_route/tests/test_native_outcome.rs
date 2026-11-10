@@ -1,6 +1,5 @@
 use crate::analysis_route::main::fast_lineage::fast_lineage;
-use crate::analysis_route::main::model_outcome::model_outcome;
-use crate::analysis_route::tests::helpers::{column_line, session_relations};
+use crate::analysis_route::tests::helpers::{column_line, model_outcome, session_relations};
 use crate::analysis_route::tests::test_types::{
     CataloguedDialect, FoldingDialect, MarkerLineageTestCase, NativeLineageTestCase,
     NativeOutcomeTestCase, OpenRelationTestCase, PivotlessDialect,

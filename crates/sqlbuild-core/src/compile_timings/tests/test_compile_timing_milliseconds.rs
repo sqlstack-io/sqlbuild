@@ -26,7 +26,7 @@ fn given_recorded_timings_when_reported_then_lists_every_phase_and_metric_in_ord
     ];
     for test_case in test_cases {
         let entries = compile_timing_milliseconds(&test_case.timings);
-        assert_eq!(entries.len(), 23, "{}", test_case.description);
+        assert_eq!(entries.len(), 25, "{}", test_case.description);
         assert_eq!(
             vec![entries[0], entries[20]],
             test_case.expected_entries,

@@ -2,11 +2,13 @@ use std::collections::HashMap;
 
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
+use crate::analysis_route::main::model_outcome::{analysed_sql, native_outcome, native_sql};
 use crate::analysis_route::main::schema_column::schema_column as stored_column;
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, StandInSchema};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::models::{
-    LineageFacts, LineageRow, ModelAnalysis, ModelOutcome, SessionFunctions, SessionSchema,
+    LineageFacts, LineageRow, ModelAnalysis, ModelOutcome, ModelRequest, SessionFunctions,
+    SessionSchema,
 };
 use crate::assembly::analysis_session::types::Shapes;
 use crate::lineage::models::{LineageColumn, LineageSource};
@@ -144,4 +146,24 @@ pub(super) fn finding_rows(
         rows.push((code.as_str(), *start, *end));
     }
     rows
+}
+
+/// The model's outcome over `schema` with the adapter's declared functions, and why it failed.
+pub(crate) fn model_outcome(
+    dialect: &dyn NativeDialect,
+    model: &ModelRequest,
+    (schema, relations): (Shapes, &SessionSchema),
+    settings: (&[String], bool),
+) -> (ModelOutcome, Option<String>) {
+    let cleaned: Result<String, String> = native_sql(dialect, model, &HashMap::new());
+    let analysed: Result<NativeAnalysis, String> = match &cleaned {
+        Ok(sql) => analysed_sql(
+            dialect,
+            sql,
+            (relations, &model.lineage_references),
+            settings,
+        ),
+        Err(reason) => Err(reason.clone()),
+    };
+    native_outcome(model, schema, cleaned.unwrap_or_default(), analysed)
 }

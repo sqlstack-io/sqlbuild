@@ -252,3 +252,7 @@ pub(crate) const LINEAGE_RESOURCE_TYPES: [(&str, &str); 4] = [
     ("seed", "seed"),
     ("table_fn", "table_fn"),
 ];
+/// Compile metric: native models that took another model's analysis of the same shape.
+pub(crate) const NATIVE_ANALYSIS_SHARED: &str = "native_analysis_shared";
+/// Compile metric: native models analysed on their own.
+pub(crate) const NATIVE_ANALYSIS_UNSHARED: &str = "native_analysis_unshared";

@@ -9,10 +9,10 @@ use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::errors::StoreDecodeError;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
+use sqlbuild_host::compile_context::main::record_compile_metric::record_compile_metric;
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
 use crate::analysis_route::main::analysis_route::analysis_route;
-use crate::analysis_route::main::model_outcome::model_outcome;
 use crate::analysis_route::models::AnalysisRoute;
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::_helpers::analysis_cache::{
@@ -35,7 +35,12 @@ use crate::assembly::analysis_session::_helpers::mappings::{
     session_schema,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
-use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
+use crate::assembly::analysis_session::_helpers::native_sharing::{
+    NativeMember, ShareCounts, analysed_members, native_member,
+};
+use crate::assembly::analysis_session::constants::{
+    NATIVE_ANALYSIS_SHARED, NATIVE_ANALYSIS_UNSHARED, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+};
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
     AnalysisSession, ColumnFact, ContractProof, DeferredCleaning, FinishedSession, LineageFacts,
@@ -331,19 +336,27 @@ impl AnalysisSession {
             (&self.available_types, &self.available_nullability);
         let declared: Vec<String> = declared_functions(request);
         let functions: SessionFunctions = session_functions(request);
-        let outcomes: Vec<(ModelOutcome, Option<String>)> = pool.install(|| {
+        let relations_of = |schema: &Shapes| -> SessionSchema {
+            session_schema(dialect, schema, tables, &functions)
+        };
+        let members: Vec<NativeMember<'_>> = pool.install(|| {
             misses
                 .par_iter()
                 .map(|position| {
                     let model: &ModelRequest = &request.models[models[*position]];
-                    let schema: Shapes = schemas[*position].clone();
-                    let relations: SessionSchema =
-                        session_schema(dialect, &schema, tables, &functions);
-                    let analysis = (declared.as_slice(), request.quoted_ignore_case);
-                    model_outcome(dialect, model, (schema, &relations), analysis)
+                    native_member(dialect, model, schemas[*position].clone(), &relations_of)
                 })
                 .collect()
         });
+        let settings = (declared.as_slice(), request.quoted_ignore_case);
+        let (outcomes, counts): (Vec<(ModelOutcome, Option<String>)>, ShareCounts) =
+            analysed_members(dialect, &pool, members, (&relations_of, settings));
+        for (metric, value) in [
+            (NATIVE_ANALYSIS_SHARED, counts.shared),
+            (NATIVE_ANALYSIS_UNSHARED, counts.unshared),
+        ] {
+            record_compile_metric(metric, i64::try_from(value).unwrap_or(i64::MAX));
+        }
         for (position, (outcome, failure)) in misses.iter().zip(outcomes) {
             self.failures.extend(failure);
             self.outcomes[models[*position]] = Some(outcome);
