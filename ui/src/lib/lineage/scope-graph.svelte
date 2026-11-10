@@ -57,7 +57,7 @@
 	});
 </script>
 
-<div class="graph sb-flow" class:unfitted={!fitted}>
+<div class="graph sb-flow" class:unfitted={!fitted && nodes.length > 0}>
 	<SvelteFlow
 		bind:nodes
 		bind:edges
