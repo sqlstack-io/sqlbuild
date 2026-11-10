@@ -169,6 +169,9 @@ def write_sources(out: pathlib.Path) -> None:
                 settings["na_values"] = sorted(values)
             if entry.get("expression"):
                 entry["expression"] = translate(entry["expression"]) + "\n"
+            if (entry.get("freshness") or {}).get("query"):
+                # The query reads the Snowflake raw table, which the copy does not have.
+                del entry["freshness"]
         path.write_text(yaml.safe_dump(doc, sort_keys=False, width=100))
     for path in out.rglob("*.py"):
         if "functions" not in path.parts:
