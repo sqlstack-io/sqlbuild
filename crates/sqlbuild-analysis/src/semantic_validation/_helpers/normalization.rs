@@ -195,14 +195,16 @@ pub(crate) fn normalize_analysis_sql(
 }
 
 /// Analysis SQL as a native parser reads it, with every stub spelled under `stub_prefix`.
+/// Each reference `relations` names is spelled as its value instead.
 pub(crate) fn normalize_native_sql(
     sql: &str,
     dialect: &str,
     stub_prefix: &str,
+    relations: &HashMap<String, String>,
 ) -> Result<String, String> {
     let none: HashMap<String, String> = HashMap::new();
     let udf_prefix: String = format!("{stub_prefix}udf_");
-    let normalized: String = normalize(sql, dialect, (&none, &none), &udf_prefix)?.sql;
+    let normalized: String = normalize(sql, dialect, (relations, &none), &udf_prefix)?.sql;
     let stubs: &Regex = NATIVE_STUBS.as_ref()?;
     let non_code: Vec<(usize, usize)> =
         dialect_non_code_ranges(&normalized, &dialect_lexical_syntax(dialect));

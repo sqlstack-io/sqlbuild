@@ -18,6 +18,8 @@ mod model_columns;
 mod names_set_operation;
 #[path = "tests/test_native_dialect.rs"]
 mod native_dialect;
+#[path = "tests/test_native_sharing.rs"]
+mod native_sharing;
 #[path = "tests/test_reference_facts.rs"]
 mod reference_facts;
 #[path = "tests/test_types.rs"]

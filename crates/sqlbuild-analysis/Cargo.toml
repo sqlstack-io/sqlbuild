@@ -20,6 +20,7 @@ sqlbuild-attachments.workspace = true
 sqlbuild-cache.workspace = true
 sqlbuild-core.workspace = true
 sqlbuild-discovery.workspace = true
+sqlbuild-host.workspace = true
 sqlbuild-model-config.workspace = true
 sqlbuild-render.workspace = true
 sqlbuild-scopes.workspace = true

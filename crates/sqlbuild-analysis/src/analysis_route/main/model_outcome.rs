@@ -1,5 +1,7 @@
 //! One model's outcome from its dialect's native analysis module, in the session's facts.
 
+use std::collections::HashMap;
+
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap};
@@ -8,32 +10,48 @@ use crate::assembly::analysis_session::models::{
     LineageFacts, ModelAnalysis, ModelOutcome, ModelRequest, SessionSchema,
 };
 use crate::assembly::analysis_session::types::Shapes;
-use crate::semantic_validation::main::normalize_native::normalize_native_sql;
+use crate::semantic_validation::_helpers::normalization::normalize_native_sql;
 
-/// The model's outcome over `schema` with the adapter's declared functions, and why it failed.
-pub(crate) fn model_outcome(
+/// The model's analysis SQL as its native parser reads it, each reference in `relations` renamed.
+pub(crate) fn native_sql(
     dialect: &dyn NativeDialect,
     model: &ModelRequest,
-    (schema, relations): (Shapes, &SessionSchema),
+    relations: &HashMap<String, String>,
+) -> Result<String, String> {
+    normalize_native_sql(
+        &model.query_sql,
+        dialect.name(),
+        dialect.stub_prefix(),
+        relations,
+    )
+    .map(|normalised| placeholder_defaults(&normalised, &model.placeholders))
+}
+
+/// The native analysis of `sql` over `relations` and `references`, or why the parser refused it.
+pub(crate) fn analysed_sql(
+    dialect: &dyn NativeDialect,
+    sql: &str,
+    (relations, references): (&SessionSchema, &[(String, String, String)]),
     (extension_functions, quoted_ignore_case): (&[String], bool),
+) -> Result<NativeAnalysis, String> {
+    dialect
+        .analyse(&AnalysisInput {
+            sql,
+            schema: relations,
+            references,
+            extension_functions,
+            quoted_ignore_case,
+        })
+        .map_err(|gap: ParserGap| gap.message)
+}
+
+/// The model's outcome from its cleaned SQL and analysis, and why the analysis failed.
+pub(crate) fn native_outcome(
+    model: &ModelRequest,
+    schema: Shapes,
+    cleaned_sql: String,
+    analysed: Result<NativeAnalysis, String>,
 ) -> (ModelOutcome, Option<String>) {
-    let (cleaned_sql, analysed): (String, Result<NativeAnalysis, String>) =
-        match normalize_native_sql(&model.query_sql, dialect.name(), dialect.stub_prefix()) {
-            Ok(normalised) => {
-                let sql: String = placeholder_defaults(&normalised, &model.placeholders);
-                let analysed = dialect
-                    .analyse(&AnalysisInput {
-                        sql: &sql,
-                        schema: relations,
-                        references: &model.lineage_references,
-                        extension_functions,
-                        quoted_ignore_case,
-                    })
-                    .map_err(|gap: ParserGap| gap.message);
-                (sql, analysed)
-            }
-            Err(reason) => (String::new(), Err(reason)),
-        };
     let failure: Option<String> = analysed
         .as_ref()
         .err()
