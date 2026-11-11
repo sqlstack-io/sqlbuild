@@ -3,7 +3,7 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     CatalogRead, WarehouseCatalogColumn, WarehouseCatalogRecord, WarehouseHistoryPage,
@@ -49,23 +49,43 @@ pub(crate) fn read_catalog(
             "catalog listing is not authoritative for this namespace; scan incomplete",
         ));
     }
-    let relations = call_with(
-        &adapter.getattr("list_relations")?,
-        &[
-            ("connection", connection.clone()),
-            (
-                "database",
-                request.location.database.clone().into_bound_py_any(py)?,
-            ),
-            (
-                "schemas",
-                (request.location.schema.clone(),).into_bound_py_any(py)?,
-            ),
-        ],
+    let schema_scoped = adapter.is_instance(
+        &py.import("sqlbuild.adapter.relations.types")?
+            .getattr("SchemaScopedMetadataReader")?,
     )?;
-    let mut selected: Vec<(String, Bound<'_, PyAny>)> = Vec::new();
-    for relation in relations.try_iter()? {
-        let relation = relation?;
+    let mut selected: Vec<(String, String, Bound<'_, PyAny>)> = Vec::new();
+    let listed = if schema_scoped {
+        field(
+            &call_with(
+                &adapter.getattr("read_schema_relation_listing")?,
+                &[
+                    ("connection", connection.clone()),
+                    namespace[0].clone(),
+                    namespace[1].clone(),
+                ],
+            )?,
+            "entries",
+        )?
+    } else {
+        call_with(
+            &adapter.getattr("list_relations")?,
+            &[
+                ("connection", connection.clone()),
+                namespace[0].clone(),
+                (
+                    "schemas",
+                    (request.location.schema.clone(),).into_bound_py_any(py)?,
+                ),
+            ],
+        )?
+    };
+    for item in listed.try_iter()? {
+        let item = item?;
+        let (relation, key) = if schema_scoped {
+            (field(&item, "relation")?, field(&item, "stored_name")?)
+        } else {
+            (item.clone(), field(&item, "name")?)
+        };
         let name: String = field(&relation, "name")?.extract()?;
         if request
             .after
@@ -73,7 +93,8 @@ pub(crate) fn read_catalog(
             .and_then(|cursor| cursor[0].as_deref())
             .is_none_or(|after| name.as_str() > after)
         {
-            selected.push((name, relation));
+            let relation_type: String = field(&relation, "relation_type")?.extract()?;
+            selected.push((name, relation_type, key));
         }
     }
     selected.sort_by(|left, right| left.0.cmp(&right.0));
@@ -85,28 +106,43 @@ pub(crate) fn read_catalog(
             next_after: None,
         });
     }
-    let names = PyTuple::new(py, selected.iter().map(|(name, _)| name))?;
-    let columns = call_with(
-        &adapter.getattr("get_all_columns")?,
-        &[
-            ("connection", connection.clone()),
-            ("database", namespace[0].1.clone()),
-            (
-                "schemas",
-                (request.location.schema.clone(),).into_bound_py_any(py)?,
-            ),
-            ("names", names.into_any()),
-        ],
-    )?;
+    let keys = selected.iter().map(|(_, _, key)| key);
+    let columns = if schema_scoped {
+        field(
+            &call_with(
+                &adapter.getattr("read_schema_column_listing")?,
+                &[
+                    ("connection", connection.clone()),
+                    namespace[0].clone(),
+                    namespace[1].clone(),
+                    ("stored_names", PyFrozenSet::new(py, keys)?.into_any()),
+                ],
+            )?,
+            "columns_by_stored_name",
+        )?
+    } else {
+        call_with(
+            &adapter.getattr("get_all_columns")?,
+            &[
+                ("connection", connection.clone()),
+                namespace[0].clone(),
+                (
+                    "schemas",
+                    (request.location.schema.clone(),).into_bound_py_any(py)?,
+                ),
+                ("names", PyTuple::new(py, keys)?.into_any()),
+            ],
+        )?
+    };
     let columns = columns.cast::<PyDict>()?;
     let next_after = if more {
-        selected.last().map(|(name, _)| vec![Some(name.clone())])
+        selected.last().map(|(name, _, _)| vec![Some(name.clone())])
     } else {
         None
     };
     let mut records: Vec<WarehouseHistoryRecord> = Vec::new();
-    for (name, relation) in selected {
-        let relation_columns = columns.get_item(name.as_str())?.ok_or_else(|| {
+    for (name, relation_type, key) in selected {
+        let relation_columns = columns.get_item(key)?.ok_or_else(|| {
             PyValueError::new_err("catalog relation columns are unavailable; scan incomplete")
         })?;
         let mut decoded: Vec<WarehouseCatalogColumn> = Vec::new();
@@ -121,7 +157,7 @@ pub(crate) fn read_catalog(
             state_database: request.location.database.clone(),
             state_schema: request.location.schema.clone(),
             name,
-            relation_type: field(&relation, "relation_type")?.extract()?,
+            relation_type,
             columns: decoded,
         }));
     }
