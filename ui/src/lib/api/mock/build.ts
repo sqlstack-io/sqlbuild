@@ -4,6 +4,7 @@
 // (synced fingerprints), compared against the snapshot change feed.
 
 import { ApiError } from '../client';
+import { problemRunsOf } from '../http-overview';
 import type {
 	AttentionItem,
 	BuiltDefinition,
@@ -235,12 +236,13 @@ export class MockBuild {
 		const staleSources = nodes.filter((n) => n.sourceFreshness && n.sourceFreshness.status !== 'pass');
 
 		const attention: AttentionItem[] = [];
-		const pick = (r: Run) => ({ id: r.id, jobKey: r.jobKey, kind: r.kind, status: r.status, statusReason: r.statusReason, startedAt: r.startedAt, endedAt: r.endedAt });
-		for (const r of runs.filter((r) => r.endedAt && Date.parse(r.endedAt) >= dayAgo && ['failed', 'partial', 'presumed_failed'].includes(r.status)).slice(0, 3)) {
-			attention.push({ kind: 'run_problem', run: pick(r) });
+		const pick = (r: Run) => ({ id: r.id, jobKey: r.jobKey, kind: r.kind, status: r.status, statusReason: r.statusReason, nodeCounts: r.nodeCounts, startedAt: r.startedAt, endedAt: r.endedAt });
+		const acknowledged = (r: Run) => this.#ctx.operate.acknowledgement(r.id);
+		for (const r of problemRunsOf(runs, now)) {
+			attention.push({ kind: 'run_problem', run: pick(r), acknowledged: acknowledged(r) });
 		}
 		for (const r of runs.filter((r) => r.status === 'unresponsive')) {
-			attention.push({ kind: 'run_unresponsive', run: pick(r), lastHeartbeatAt: this.#ctx.operate.lastHeartbeat(r.id) });
+			attention.push({ kind: 'run_unresponsive', run: pick(r), lastHeartbeatAt: this.#ctx.operate.lastHeartbeat(r.id), acknowledged: acknowledged(r) });
 		}
 		if (changed.length || behind.length) attention.push({ kind: 'stale_models', changed, behind });
 		if (staleSources.length) attention.push({ kind: 'stale_sources', sources: staleSources.map((n) => ({ key: n.key, ...n.sourceFreshness! })) });

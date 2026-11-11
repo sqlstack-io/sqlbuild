@@ -26,6 +26,8 @@ use crate::api::_helpers::resources::{
     person_operations::rerun,
     person_operations::change_trigger,
     person_operations::recent_runs,
+    person_operations::acknowledge,
+    person_operations::acknowledgements,
     person_reads::run_nodes,
     person_reads::nodes,
     person_reads::node_runs,

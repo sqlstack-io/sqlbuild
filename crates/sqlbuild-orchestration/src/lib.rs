@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod acknowledgements;
 pub mod api;
 pub mod authorization;
 pub mod credentials;

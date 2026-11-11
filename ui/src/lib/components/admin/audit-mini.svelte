@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import type { AuditEntry } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -35,7 +36,7 @@
 {:else if entries.error}
 	<p class="muted">Couldn't load: {entries.error}</p>
 {:else}
-	<p class="muted">Loading…</p>
+	<Loading />
 {/if}
 
 <style>

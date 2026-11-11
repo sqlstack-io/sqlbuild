@@ -258,6 +258,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/acknowledgements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRunAcknowledgements"];
+        put?: never;
+        post: operations["acknowledgeRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/catalog": {
         parameters: {
             query?: never;
@@ -1270,6 +1286,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Marks a run as handled for everyone who can see it, or withdraws the mark; retried with the same event ID it applies once. */
+        AcknowledgementRequest: {
+            acknowledged: boolean;
+            /** Format: uuid */
+            event_id: string;
+            /** Format: uuid */
+            run_id: string;
+        };
         /**
          * @description Closed permission vocabulary; unknown actions fail deserialization.
          * @enum {string}
@@ -2386,6 +2410,15 @@ export interface components {
             };
             nodes: string[];
             permissions: components["schemas"]["Action"][];
+        };
+        /** @description A run whose latest acknowledgement event marks it handled. */
+        RunAcknowledgement: {
+            /** Format: date-time */
+            acknowledged_at: string;
+            /** @description The person's name, or the audit actor when the person no longer exists. */
+            acknowledged_by: string;
+            /** Format: uuid */
+            run_id: string;
         };
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
@@ -3678,6 +3711,95 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listRunAcknowledgements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs marked handled in the last week */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunAcknowledgement"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    acknowledgeRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcknowledgementRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether the run's acknowledgement changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description The run is not in this location and target, or the event ID was reused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };

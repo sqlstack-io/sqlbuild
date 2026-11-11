@@ -340,11 +340,13 @@ export type SnapshotChange = {
 
 // ---- overview ----
 
-export type AttentionRun = Pick<Run, 'id' | 'jobKey' | 'kind' | 'status' | 'statusReason' | 'startedAt' | 'endedAt'>;
+export type AttentionRun = Pick<Run, 'id' | 'jobKey' | 'kind' | 'status' | 'statusReason' | 'nodeCounts' | 'startedAt' | 'endedAt'>;
 
+/** Who marked a problem run handled; everyone who can see the run sees it. */
+export type Acknowledgement = { by: string; at: Iso };
 export type AttentionItem =
-	| { kind: 'run_problem'; run: AttentionRun }
-	| { kind: 'run_unresponsive'; run: AttentionRun; lastHeartbeatAt: Iso | null }
+	| { kind: 'run_problem'; run: AttentionRun; acknowledged: Acknowledgement | null }
+	| { kind: 'run_unresponsive'; run: AttentionRun; lastHeartbeatAt: Iso | null; acknowledged: Acknowledgement | null }
 	| { kind: 'stale_models'; changed: string[]; behind: string[] }
 	| { kind: 'stale_sources'; sources: ({ key: string } & SourceFreshness)[] }
 	| { kind: 'platform_event'; event: PlatformEvent }

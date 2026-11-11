@@ -21,7 +21,7 @@
 	<Button variant="outline" size="sm" onclick={() => providers.refresh()}>↻ Refresh</Button>
 </AppTopbar>
 
-<ListToolbar bind:query placeholder="Search providers" total="{shown.length} of {all.length} providers">
+<ListToolbar loading={providers.data === undefined} bind:query placeholder="Search providers" total="{shown.length} of {all.length} providers">
 </ListToolbar>
 
 <div class="sb-list-wrap">

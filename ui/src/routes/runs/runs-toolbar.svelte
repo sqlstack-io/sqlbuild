@@ -11,14 +11,15 @@
 	import type { RangePreset, RunsView } from './types';
 	import { invalidTokens, parseTokens, removeToken, TOKEN_HELP } from './utils';
 
-	let { list, queued }: { list: RunsState; queued: number | null } = $props();
+	/** `queued` is undefined while the queue loads and null when it couldn't. */
+	let { list, queued }: { list: RunsState; queued: number | null | undefined } = $props();
 
 	const p = $derived(list.params);
 	/** Views the server can load; the switch hides when only the list is left. */
 	const views = $derived([
 		{ value: 'list' as RunsView, label: 'List' },
 		...(app.client.supports('timeline') ? [{ value: 'timeline' as RunsView, label: 'Timeline' }] : []),
-		...(app.client.supports('listQueue') ? [{ value: 'queue' as RunsView, label: 'Queue', count: queued ?? undefined }] : [])
+		...(app.client.supports('listQueue') ? [{ value: 'queue' as RunsView, label: 'Queue', count: queued === null ? undefined : (queued ?? 0) }] : [])
 	]);
 
 	// The box edits a local copy; the URL follows after a short pause.
@@ -52,8 +53,10 @@
 		{ value: 'cancelled', label: 'Cancelled', title: 'Cancelled runs' }
 	]);
 
-	const freshnessText = { live: 'Live', reconnecting: 'Reconnecting', stale: 'Stale' } as const;
+	// Only a problem gets a word; the dot and its title cover the usual states, as the top bar already says Live.
+	const freshnessText = { reconnecting: 'Reconnecting', stale: 'Stale' } as const;
 	const freshnessTitle = {
+		connecting: 'Connecting for live updates…',
 		live: 'Updates arrive as runs change',
 		reconnecting: 'Lost the live connection; trying again. The list may be behind.',
 		stale: 'Not updating. Refresh to load the latest runs.'
@@ -70,11 +73,12 @@
 	</div>
 	<div class="right">
 		{#if views.length > 1}
-			<SegmentedFilter bind:value={() => p.view, (v: RunsView) => list.update({ view: v })} options={views} />
+			<SegmentedFilter bind:value={() => p.view, (v: RunsView) => list.update({ view: v })} options={views} loading={queued === undefined} />
 		{/if}
+		<!-- Fixed-width parts, so the view switch beside them doesn't shift as the list loads and the label ticks. -->
 		<span class="fresh {list.freshness}" title={freshnessTitle[list.freshness]}>
-			{#if list.updatedAt}<span class="ago">updated {formatAgo(new Date(list.updatedAt).toISOString(), app.now)}</span>{/if}
-			<i></i>{freshnessText[list.freshness]}
+			<span class="ago" class:waiting={!list.updatedAt}>{list.updatedAt ? `updated ${formatAgo(new Date(list.updatedAt).toISOString(), app.now)}` : 'updated just now'}</span>
+			<i></i>{#if list.freshness === 'reconnecting' || list.freshness === 'stale'}{freshnessText[list.freshness]}{/if}
 			<button class="refresh" onclick={() => list.refresh()} aria-label="Refresh now" title="Refresh now"><RefreshCwIcon size={12} /></button>
 		</span>
 	</div>
@@ -189,13 +193,22 @@
 		white-space: nowrap;
 	}
 	.fresh .ago {
+		min-width: 7.6em;
 		color: var(--sb-text-faint);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.fresh .ago.waiting {
+		visibility: hidden;
 	}
 	.fresh i {
 		width: 7px;
 		height: 7px;
 		border-radius: 50%;
 		background: var(--sb-success);
+	}
+	.fresh.connecting i {
+		background: var(--sb-text-faint);
 	}
 	.fresh.reconnecting i {
 		background: var(--sb-warning);

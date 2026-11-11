@@ -20,8 +20,9 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 
 /// Location-scoped reads and the action each needs.
-const READS: [(&str, &str); 13] = [
+const READS: [(&str, &str); 14] = [
     ("runs", "view"),
+    ("acknowledgements", "view"),
     ("nodes", "view"),
     ("nodes/orders/runs", "view"),
     ("jobs", "view"),
@@ -236,6 +237,27 @@ fn given_refused_requests_when_people_send_them_then_no_node_is_named_and_unknow
                             cancel.clone(),
                             Some(json!({"run_id": unknown_run, "event_id": Uuid::now_v7(),
                                 "reason": "Stop orders"})),
+                        ),
+                    ],
+                ),
+                (
+                    "acknowledge".to_owned(),
+                    "view",
+                    vec![
+                        (
+                            read(inventory, "acknowledgements"),
+                            Some(json!({"event_id": Uuid::now_v7(), "run_id": queued.run_id,
+                                "acknowledged": true})),
+                        ),
+                        (
+                            read(inventory, "acknowledgements"),
+                            Some(json!({"event_id": Uuid::now_v7(), "run_id": unknown_run,
+                                "acknowledged": true})),
+                        ),
+                        (
+                            read(Uuid::now_v7(), "acknowledgements"),
+                            Some(json!({"event_id": Uuid::now_v7(), "run_id": queued.run_id,
+                                "acknowledged": true})),
                         ),
                     ],
                 ),

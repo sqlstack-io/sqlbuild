@@ -2,6 +2,8 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { untrack } from 'svelte';
 import { channelMatches, isRefusal, type RunRow, type RunTabCounts } from '$lib/api';
+import { to } from '$lib/paths';
+import { rerunHref } from '$lib/run/command';
 import { app } from '$lib/state/app.svelte';
 import type { BulkAction, DisplayRow, Freshness, ListParams } from './types';
 import { eligibleIds, readParams, toQuery, writeParams } from './utils';
@@ -12,8 +14,6 @@ const SIGNAL_GAP_MS = 300;
 /** Safety refresh in case a signal was missed. */
 const SAFETY_MS = 5 * 60_000;
 
-/** A first load faster than this shows no loading text, so it doesn't flash. */
-const SLOW_MS = 400;
 /** The first page of each filter, for this page load only, so coming back to the list shows it at once while it reloads. */
 const remembered = new Map<string, { rows: RunRow[]; nextCursor: string | null; counts: RunTabCounts | null }>();
 
@@ -30,7 +30,8 @@ export function createRunsState() {
 	let rows = $state<RunRow[]>([]);
 	let nextCursor = $state<string | null>(null);
 	let loading = $state(true);
-	let slow = $state(false);
+	/** Loading rows from the start of a filter, as opposed to refreshing the ones shown. */
+	let resetting = $state(true);
 	let loadingMore = $state(false);
 	let error = $state<string | null>(null);
 	let updatedAt = $state<number | null>(null);
@@ -56,7 +57,7 @@ export function createRunsState() {
 			loadingMore = true;
 		} else {
 			loading = true;
-			if (!rows.length) setTimeout(() => (slow = id === request && loading && !rows.length), SLOW_MS);
+			if (mode === 'reset') resetting = true;
 		}
 		try {
 			const result = await app.client.listRunRows(scope, {
@@ -83,7 +84,7 @@ export function createRunsState() {
 		} finally {
 			if (id === request) {
 				loading = false;
-				slow = false;
+				resetting = false;
 				loadingMore = false;
 			}
 		}
@@ -196,7 +197,7 @@ export function createRunsState() {
 		if (app.connection === 'offline') return 'stale';
 		if (updatedAt != null && app.now - updatedAt > SAFETY_MS + 30_000) return 'stale';
 		if (app.connection === 'live') return 'live';
-		return 'reconnecting';
+		return app.connection === 'connecting' ? 'connecting' : 'reconnecting';
 	});
 
 	// ---- selection and bulk actions ----
@@ -233,6 +234,11 @@ export function createRunsState() {
 
 	/** First click arms, second click runs; any selection change disarms. */
 	async function bulk(action: BulkAction) {
+		// Reruns are reviewed first, like every other run; only cancelling is confirmed here.
+		if (action !== 'cancel') {
+			void goto(to(rerunHref(eligibleFor[action], action === 'rerun' ? 'all' : 'from_failure')));
+			return;
+		}
 		if (armed !== action) {
 			armed = action;
 			return;
@@ -244,11 +250,11 @@ export function createRunsState() {
 		busy = action;
 		result = null;
 		const outcomes = await Promise.allSettled(
-			ids.map((id) => (action === 'cancel' ? app.client.cancelRun(scope, id) : app.client.rerunRun(scope, id, action === 'rerun' ? 'all' : 'from_failure')))
+			ids.map((id) => app.client.cancelRun(scope, id))
 		);
 		const failed = ids.filter((_, i) => outcomes[i].status === 'rejected');
 		const firstError = outcomes.find((o): o is PromiseRejectedResult => o.status === 'rejected');
-		const verb = action === 'cancel' ? 'Cancel requested for' : 'Started reruns of';
+		const verb = 'Cancel requested for';
 		const ok = ids.length - failed.length;
 		result = failed.length
 			? { text: `${ok ? `${verb} ${ok} run${ok === 1 ? '' : 's'}. ` : ''}${failed.length} failed: ${message(firstError?.reason)}. The failed runs stay selected.`, failed: true }
@@ -296,8 +302,8 @@ export function createRunsState() {
 		get loading() {
 			return loading;
 		},
-		get slow() {
-			return slow;
+		get resetting() {
+			return resetting;
 		},
 		get loadingMore() {
 			return loadingMore;

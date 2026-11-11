@@ -32,6 +32,8 @@ mod statistics_eligibility;
 mod statistics_helpers;
 #[path = "statistics/retention/helpers.rs"]
 mod statistics_retention;
+#[path = "test_acknowledgements.rs"]
+mod test_acknowledgements;
 #[path = "test_catalog_reads.rs"]
 mod test_catalog_reads;
 #[path = "test_changes.rs"]
@@ -42,6 +44,8 @@ mod test_checks;
 mod test_cli_login;
 #[path = "test_column_lineage.rs"]
 mod test_column_lineage;
+#[path = "test_compression.rs"]
+mod test_compression;
 #[path = "test_contract.rs"]
 mod test_contract;
 #[path = "test_custom_roles.rs"]

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { Trigger } from '$lib/api';
@@ -7,13 +8,15 @@
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
-	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
+	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
 	import { formatCost, narrowingText, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
-	import LaunchForm from './launch-form.svelte';
+	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
+	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
+	import { formatMs } from '$lib/build-area/labels';
 
 	let { name }: { name: string } = $props();
 
@@ -41,7 +44,10 @@
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
 		const showCost = $derived(runs.some((r) => r.cost !== null));
 	const canToggle = $derived(app.can('trigger.toggle'));
-	let launchOpen = $state(false);
+	// A run is always reviewed on the plan page before it starts.
+	function run(keys: string[]) {
+		void goto(to(planHref(keys, 'build', { job: name })));
+	}
 	let tab = $state<'overview' | 'runs' | 'code'>('overview');
 	// Nodes picked in the graph, by catalog key. A job runs with or without them; a group's pick runs as an ad-hoc command.
 	let picked = $state<string[]>([]);
@@ -50,6 +56,14 @@
 	const pickedNodes = $derived(picked.map((k) => byKey.get(k)).filter((n) => !!n));
 	const canRunPicked = $derived(app.client.supports('launchAdhocRun'));
 	const latest = $derived(runs[0] ?? null);
+	// Recent finished runs, oldest first, for the sidebar's strip and typical duration.
+	const finished = $derived(runs.filter((r) => r.endedAt).slice(0, 20).reverse());
+	const succeeded = $derived(finished.filter((r) => r.status === 'success').length);
+	const typicalMs = $derived.by(() => {
+		const took = finished.flatMap((r) => (r.startedAt && r.endedAt ? [Date.parse(r.endedAt) - Date.parse(r.startedAt)] : [])).sort((a, b) => a - b);
+		return took.length ? took[Math.floor(took.length / 2)] : null;
+	});
+	const hasSettings = $derived(!!def && (!!def.overlap || !!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length) || !!def.concurrency?.length || (def.concurrency === null && def.concurrencyGroups.length > 0)));
 	// A group draws each member job, in run order, as a box around the nodes it builds.
 	const boxes = $derived(
 		def?.kind === 'group'
@@ -76,23 +90,21 @@
 	{#if picked.length && def?.kind === 'job'}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
 		<GatedButton requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}>▷ Run all but {picked.length}</GatedButton>
-		<GatedButton requires="job.run" variant="default" onclick={() => goto(to(planHref(picked, 'build', { job: name })))}>▷ Run {picked.length} selected</GatedButton>
+		<GatedButton requires="job.run" variant="default" onclick={() => run(picked)}>▷ Run {picked.length} selected</GatedButton>
 	{:else if picked.length && canRunPicked}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
 		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}>▷ Run {picked.length} selected</GatedButton>
 	{:else}
-		<div class="relative">
-			<GatedButton
-				requires="job.run"
-				variant="default"
-				disabled={!def || targetBlocked}
-				reason={targetBlocked ? `This job only runs on ${def?.targets?.join(', ')}` : undefined}
-				onclick={() => (launchOpen = !launchOpen)}
-			>▷ Run now</GatedButton>
-			{#if launchOpen && def}<LaunchForm job={def} onclose={() => (launchOpen = false)} />{/if}
-		</div>
+		<GatedButton
+			requires="job.run"
+			variant="default"
+			disabled={!def || targetBlocked}
+			reason={targetBlocked ? `This job only runs on ${def?.targets?.join(', ')}` : undefined}
+			onclick={() => run([])}
+		>▷ Run</GatedButton>
 	{/if}
 </AppTopbar>
+
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
@@ -140,11 +152,11 @@
 					{#if catalog.data && (def.kind !== 'group' || members.data)}
 						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} {boxes} members={def.groupMembers ?? []} onselect={(keys) => (picked = keys)} />
 					{:else}
-						<p class="faint graph-wait">{catalog.error ?? members.error ?? (catalog.slow || members.slow ? 'Loading…' : '')}</p>
+						{#if catalog.error ?? members.error}<p class="faint graph-wait">{catalog.error ?? members.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
 					{/if}
 				</div>
 
-				<aside class="rail sb-scroll">
+				<aside class="rail sb-scroll" class:sections={!pickedNodes.length}>
 					{#if pickedNodes.length === 1}
 						{@const n = pickedNodes[0]}
 						<p class="label">{kindLine(n)}</p>
@@ -163,37 +175,74 @@
 							{#each pickedNodes as n (n.key)}<li><a href={to(`/catalog/${n.key}`)} class="mono">{n.key}</a></li>{/each}
 						</ul>
 					{:else}
-						{#if def.description}<h3 class="first">Description</h3><p class="desc">{def.description}</p>{/if}
-						<dl>
-							{#if def.select}<div><dt>Selection</dt><dd class="mono">{def.select}</dd></div>{/if}
-							{#if def.exclude.length}<div><dt>Excludes</dt><dd class="mono">{def.exclude.join(' ')}</dd></div>{/if}
-							{#if def.overlap}<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>{/if}
-							{#if def.onFailure}<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>{/if}
-							{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
-							{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
-							{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
-							{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
-							{#if def.memberOf?.length}
-								<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href={to(`/jobs/${g}`)}>{g}</a>{/each}</dd></div>
+						{#if def.description}<p class="about">{def.description}</p>{/if}
+						<InspectorSection title="Recent runs">
+							{#snippet meta()}{#if runs.length}<button class="section-link" onclick={() => (tab = 'runs')}>All runs →</button>{/if}{/snippet}
+							{#if finished.length}
+								<OutcomeStrip outcomes={finished.map((r) => r.status)} tones={runStatusTone} caption="Last {finished.length} runs" />
+								<dl class="spaced">
+									<div><dt>Succeeded</dt><dd>{succeeded} of {finished.length}</dd></div>
+									{#if typicalMs !== null}<div><dt>Typically takes</dt><dd>{formatMs(typicalMs)}</dd></div>{/if}
+									{#if latest}<div><dt>Latest</dt><dd><a href={to(`/runs/${latest.id}`)}><i style:background={runStatusTone[latest.status]}></i>{runStatusLabel[latest.status]} · {formatAgo(latest.startedAt ?? latest.queuedAt, app.now)}</a></dd></div>{/if}
+								</dl>
+							{:else if jobRuns.data === undefined && !jobRuns.error}
+								<Loading lines={2} />
+							{:else}
+								<p class="faint">No finished runs yet.</p>
 							{/if}
-						</dl>
-						{#if def.settings && Object.keys(def.settings).length}
-							<h3>Options</h3>
-							{#each Object.entries(def.settings) as [flag, value] (flag)}
-								<p class="setting"><code>{flag}{value === true ? '' : ` ${value}`}</code></p>
-							{/each}
-						{/if}
-						{#if def.concurrency?.length}
-							<h3>Shared slots</h3>
-							{#each def.concurrency as g (g.key)}
-								<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
-									<span>{g.holders.length} of {g.limit} {slotLabel(g.key)} in use</span>
-									{#each g.holders as h (h)}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}
-								</p>
-							{/each}
-						{:else if def.concurrency === null && def.concurrencyGroups.length}
-							<h3>Shared slots</h3>
-							{#each def.concurrencyGroups as g (g)}<p class="setting" title="Concurrency group {g}">{slotLabel(g)}</p>{/each}
+						</InspectorSection>
+						<InspectorSection title="Starts">
+							{#if jobTriggers.length}
+								<dl>
+									{#each jobTriggers as t (t.id)}
+										<div>
+											<dt><a href={to(`/triggers/${t.id}`)}>{t.name}</a></dt>
+											<dd class:faint={t.state === 'paused'}>{t.state === 'paused' ? 'Paused' : t.nextDueAt ? `Next ${formatIn(t.nextDueAt, app.now)}` : t.cadence}</dd>
+										</div>
+									{/each}
+								</dl>
+							{:else}
+								<p class="faint">Only when someone runs it.</p>
+							{/if}
+						</InspectorSection>
+						<InspectorSection title="Definition">
+							{#if def.select}<p class="label">Selection</p><p class="code">{def.select}</p>{/if}
+							{#if def.exclude.length}<p class="label">Excludes</p><p class="code">{def.exclude.join(' ')}</p>{/if}
+							<dl>
+								{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
+								{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
+								{#if def.memberOf?.length}
+									<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href={to(`/jobs/${g}`)}>{g}</a>{/each}</dd></div>
+								{/if}
+							</dl>
+						</InspectorSection>
+						{#if hasSettings}
+							<InspectorSection title="Settings">
+								<dl>
+									{#if def.overlap}<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>{/if}
+									{#if def.onFailure}<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>{/if}
+									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
+									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
+								</dl>
+								{#if def.settings && Object.keys(def.settings).length}
+									<p class="label">Options</p>
+									{#each Object.entries(def.settings) as [flag, value] (flag)}
+										<p class="setting"><code>{flag}{value === true ? '' : ` ${value}`}</code></p>
+									{/each}
+								{/if}
+								{#if def.concurrency?.length}
+									<p class="label">Shared slots</p>
+									{#each def.concurrency as g (g.key)}
+										<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
+											<span>{g.holders.length} of {g.limit} {slotLabel(g.key)} in use</span>
+											{#each g.holders as h (h)}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}
+										</p>
+									{/each}
+								{:else if def.concurrency === null && def.concurrencyGroups.length}
+									<p class="label">Shared slots</p>
+									{#each def.concurrencyGroups as g (g)}<p class="setting" title="Concurrency group {g}">{slotLabel(g)}</p>{/each}
+								{/if}
+							</InspectorSection>
 						{/if}
 					{/if}
 				</aside>
@@ -221,7 +270,7 @@
 						</tbody>
 					</table>
 				{:else}
-					<p class="faint">{jobRuns.loading ? (jobRuns.slow ? 'Loading…' : '') : 'No runs yet.'}</p>
+					{#if jobRuns.data === undefined && !jobRuns.error}<Loading />{:else}<p class="faint">No runs yet.</p>{/if}
 				{/if}
 			</div>
 		{:else if def.declaration}
@@ -335,7 +384,7 @@
 		padding: 12px 24px;
 	}
 	.rail {
-		width: 280px;
+		width: 320px;
 		flex-shrink: 0;
 		overflow: auto;
 		padding: 16px 18px;
@@ -348,15 +397,31 @@
 		font-weight: 600;
 		word-break: break-all;
 	}
-	.rail h3 {
-		margin: 16px 0 4px;
-		color: var(--sb-text-faint);
+	.rail.sections {
+		padding: 0;
+	}
+	.about {
+		padding: 16px 16px 14px;
+		border-bottom: 1px solid var(--border);
+		line-height: 1.5;
+	}
+	.spaced {
+		margin-top: 12px;
+	}
+	.code {
+		margin-bottom: 10px;
+		padding: 6px 8px;
+		border-radius: 4px;
+		background: var(--sb-inset);
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		overflow-wrap: anywhere;
+	}
+	.section-link {
+		color: var(--primary);
 		font-size: 12px;
-		font-weight: 500;
 	}
-	.rail h3.first {
-		margin-top: 0;
-	}
+
 	.runs th {
 		padding: 6px 12px 6px 0;
 		border-bottom: 1px solid var(--border);

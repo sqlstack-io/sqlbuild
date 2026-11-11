@@ -1,9 +1,10 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import type { TimelineBar, TimelineTickMarker } from '$lib/api';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { runKindLabel, runOriginLabel, runStatusLabel, runStatusRank, runStatusTone } from '$lib/status';
@@ -58,8 +59,17 @@
 		['runs', 'ticks']
 	);
 	const now = $derived(timeline.data ? Date.parse(timeline.data.now) : anchor);
+	// Moving the anchor moves the window, which reads again; so it follows the server's clock only once that
+	// is a minute away, not on every answer, which would read again as soon as each answer arrived.
 	$effect(() => {
-		if (timeline.data) anchor = Date.parse(timeline.data.now);
+		// A remembered answer shown while the page reloads is from an earlier visit; only a current one moves the window.
+		const serverNow = timeline.data && !timeline.loading && !timeline.error ? Date.parse(timeline.data.now) : null;
+		if (serverNow !== null && Math.abs(serverNow - untrack(() => anchor)) >= MIN) anchor = serverNow;
+	});
+	// The window moves on with time once a minute, which reads it once.
+	$effect(() => {
+		const timer = setInterval(() => (anchor += MIN), MIN);
+		return () => clearInterval(timer);
 	});
 	const nowPct = $derived(pct(now));
 
@@ -238,7 +248,7 @@
 				</div>
 			{:else}
 				<div class="empty">
-					{#if timeline.error}Couldn't load the timeline: {timeline.error}{:else if !timeline.data}Loading…{:else if query}No jobs match “{query}”.{:else}No runs in this window.{/if}
+					{#if timeline.error}Couldn't load the timeline: {timeline.error}{:else if !timeline.data}<Loading lines={2} />{:else if query}No jobs match “{query}”.{:else}No runs in this window.{/if}
 				</div>
 			{/each}
 		</div>

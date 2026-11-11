@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import RadarIcon from '@lucide/svelte/icons/radar';
@@ -163,8 +164,8 @@
 					<td colspan="7" class="empty">
 						{#if list.error}
 							<span class="err">Couldn't load runs: {list.error}</span> <button class="retry" onclick={() => list.refresh()}>Retry</button>
-						{:else if list.loading}
-							{list.slow ? 'Loading…' : ''}
+						{:else if list.resetting}
+							<Loading lines={4} />
 						{:else}
 							{emptyText}
 						{/if}

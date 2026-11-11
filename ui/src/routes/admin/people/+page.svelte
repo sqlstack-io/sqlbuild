@@ -45,7 +45,7 @@
 {#if !allowed}
 	<NoAccess what="people" requires={['user.manage', 'role.assign']} />
 {:else}
-	<ListToolbar bind:query={people.query} placeholder="Search people and roles" total="{people.shown.length} of {people.accounts.length} people">
+	<ListToolbar loading={d.accounts.data === undefined} bind:query={people.query} placeholder="Search people and roles" total="{people.shown.length} of {people.accounts.length} people">
 		{#snippet filters()}
 			<ChoiceFilter label="Role" bind:value={people.role} options={people.roleNames.map((r) => ({ value: r, label: r }))} all="Any role" />
 			<ChoiceFilter label="Location" bind:value={people.locationId} options={locations.map((l) => ({ value: l.id, label: l.name }))} all="All locations" />

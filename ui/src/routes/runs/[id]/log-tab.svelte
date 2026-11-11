@@ -8,6 +8,7 @@
 	import { clockTime, shortRunId } from '$lib/operate/labels';
 	import type { EventCategory } from './types';
 	import { EVENT_CATEGORIES, type LogEntry } from './utils';
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 
 	let {
 		entries,
@@ -27,14 +28,16 @@
 		onstatement?: (nodeKey: string) => void;
 	} = $props();
 
-	const LEVELS: { value: RunEventLevel; label: string }[] = [
+	// One choice each, like the Checks page's outcome filter: All, or a single level or kind.
+	const LEVELS: { value: RunEventLevel | 'all'; label: string }[] = [
+		{ value: 'all', label: 'All' },
 		{ value: 'error', label: 'Errors' },
 		{ value: 'warn', label: 'Warnings' },
 		{ value: 'info', label: 'Info' },
 		{ value: 'debug', label: 'Debug' }
 	];
-	let levels = $state<Set<RunEventLevel>>(new Set(['info', 'warn', 'error']));
-	let categories = $state<Set<EventCategory>>(new Set(['run', 'nodes', 'queries', 'checks']));
+	let level = $state<RunEventLevel | 'all'>('all');
+	let category = $state<EventCategory | 'all'>('all');
 	let query = $state('');
 	// Long printed blocks fold to their first lines.
 	const FOLD = 4;
@@ -46,14 +49,18 @@
 	const present = $derived(EVENT_CATEGORIES.filter((c) => c.value !== 'output' && entries.some((e) => e.category === c.value)));
 	const hasOutput = $derived(entries.some((e) => e.category === 'output'));
 	const hidden = $derived(entries.filter((e) => e.category === 'output' && !e.pinned).length);
-	const kindShown = (e: LogEntry) => (e.category === 'output' ? printed || e.pinned : categories.has(e.category));
+	const kindShown = (e: LogEntry) => (e.category === 'output' ? printed || e.pinned : category === 'all' || e.category === category);
+	const levelShown = (e: LogEntry) => level === 'all' || e.level === level;
 	const q = $derived(query.trim().toLowerCase());
 	const matches = (e: LogEntry) => !q || [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(q);
 	const byCategory = $derived(entries.filter(kindShown));
-	const byLevel = $derived(entries.filter((e) => levels.has(e.level)));
-	const shown = $derived(entries.filter((e) => levels.has(e.level) && kindShown(e) && matches(e)));
-	const levelCount = (l: RunEventLevel) => byCategory.filter((e) => e.level === l).length;
-	const categoryCount = (c: EventCategory) => byLevel.filter((e) => e.category === c).length;
+	const byLevel = $derived(entries.filter((e) => levelShown(e) && e.category !== 'output'));
+	const shown = $derived(entries.filter((e) => levelShown(e) && kindShown(e) && matches(e)));
+	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: byCategory.filter((e) => l.value === 'all' || e.level === l.value).length })));
+	const kindOptions = $derived([
+		{ value: 'all' as const, label: 'All kinds', count: byLevel.length },
+		...present.map((c) => ({ value: c.value, label: c.label, count: byLevel.filter((e) => e.category === c.value).length }))
+	]);
 
 	function toggle<T>(set: Set<T>, value: T): Set<T> {
 		const next = new Set(set);
@@ -75,16 +82,8 @@
 </script>
 
 <div class="filters">
-	<div class="chips" role="group" aria-label="Levels">
-		{#each LEVELS as l (l.value)}
-			<button class:on={levels.has(l.value)} onclick={() => (levels = toggle(levels, l.value))}>{l.label} <span>{levelCount(l.value)}</span></button>
-		{/each}
-	</div>
-	<div class="chips" role="group" aria-label="Kinds">
-		{#each present as c (c.value)}
-			<button class:on={categories.has(c.value)} onclick={() => (categories = toggle(categories, c.value))}>{c.label} <span>{categoryCount(c.value)}</span></button>
-		{/each}
-	</div>
+	<SegmentedFilter bind:value={level} options={levelOptions} />
+	{#if present.length > 1}<SegmentedFilter bind:value={category} options={kindOptions} />{/if}
 	{#if hasOutput}
 		<label class="switch" title="What sqb printed while the run worked. A failing run's last block, with its failures, is always shown.">
 			<input type="checkbox" class="sb-check" bind:checked={printed} /> Show printed output <span>{hidden}</span>
@@ -168,27 +167,6 @@
 		padding: 6px 16px;
 		border-bottom: 1px solid var(--border);
 		background: var(--background);
-	}
-	.chips {
-		display: flex;
-		gap: 2px;
-		padding: 2px;
-		border-radius: 2px;
-		background: var(--sb-hover);
-	}
-	.chips button {
-		padding: 2px 8px;
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.chips button.on {
-		background: var(--card);
-		color: var(--foreground);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-	}
-	.chips span {
-		color: var(--sb-text-faint);
 	}
 	.switch {
 		display: inline-flex;
