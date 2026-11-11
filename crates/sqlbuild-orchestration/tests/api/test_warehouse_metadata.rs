@@ -349,6 +349,12 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                 (&client, &url, &token.bearer),
             )
             .await;
+            crate::api::tests::warehouse_metadata_helpers::sync_due_scope(
+                store,
+                (session_id, preview_session),
+                (&client, &url, &token.bearer),
+            )
+            .await;
             crate::api::tests::warehouse_reconciliation_helpers::reconcile_history(
                 store,
                 (&client, &url, &token.bearer),

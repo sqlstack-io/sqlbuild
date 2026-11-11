@@ -153,6 +153,25 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 "a sync request never reads back as a connection test"
             );
             for (other, target) in [(Uuid::now_v7(), "development"), (location, "preview")] {
+                assert!(
+                    matches!(
+                        request_location_work(
+                            store,
+                            (&context, Some(credentials)),
+                            &LocationWorkRequest {
+                                request_id: Uuid::now_v7(),
+                                location_id: other,
+                                target: target.into(),
+                                ..sync.clone()
+                            }
+                        )
+                        .await,
+                        Err(ControlError::Denied { .. })
+                    ),
+                    "a sync outside the Developer's location and target is denied"
+                );
+            }
+            for (other, target) in [(Uuid::now_v7(), "development"), (location, "preview")] {
                 assert!(matches!(
                     read_person_connection_test(
                         store,
@@ -178,7 +197,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 (&context, sessions[0].identity.principal_id),
                 &RoleAssignmentRequest {
                     revoke: true,
-                    ..assignment
+                    ..assignment.clone()
                 },
             )
             .await
@@ -193,7 +212,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                     (&context, Some(credentials)),
                     &LocationWorkRequest {
                         request_id: Uuid::now_v7(),
-                        ..sync
+                        ..sync.clone()
                     }
                 )
                 .await,
@@ -208,6 +227,44 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 .await,
                 Err(ControlError::Denied { .. })
             ));
+            for role in [BuiltinRole::Viewer, BuiltinRole::Operator] {
+                let lesser = RoleAssignmentRequest {
+                    role: role.into(),
+                    ..assignment.clone()
+                };
+                assign_builtin_role(
+                    store,
+                    (&context, sessions[0].identity.principal_id),
+                    &lesser,
+                )
+                .await
+                .expect("assign lesser role");
+                assert!(
+                    matches!(
+                        request_location_work(
+                            store,
+                            (&context, Some(credentials)),
+                            &LocationWorkRequest {
+                                request_id: Uuid::now_v7(),
+                                ..sync.clone()
+                            }
+                        )
+                        .await,
+                        Err(ControlError::Denied { .. })
+                    ),
+                    "{role:?} cannot request a sync"
+                );
+                assign_builtin_role(
+                    store,
+                    (&context, sessions[0].identity.principal_id),
+                    &RoleAssignmentRequest {
+                        revoke: true,
+                        ..lesser
+                    },
+                )
+                .await
+                .expect("revoke lesser role");
+            }
             close_test_store(fixture).await;
         });
     }
