@@ -1,8 +1,13 @@
 use std::path::Path;
 
+use sqlbuild_orchestration::warehouse_metadata::models::MetadataBatch;
+use uuid::Uuid;
+
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
 use crate::argv::models::{ArgvOutcome, ArgvSettings};
 use crate::native_commands::_helpers::argv_host::{NativeArgvHost, namespace_defaults};
+use crate::native_commands::_helpers::execution::acknowledge_metadata_page;
+use crate::native_commands::models::{LocationMetadataPage, LocationMetadataSync};
 
 /// Parse `argv` onto the `CliNamespace` defaults with the native host.
 pub(super) fn parse(argv: &[&str]) -> (ArgvOutcome, NativeArgvHost) {
@@ -34,4 +39,24 @@ pub(super) fn plan_output(diff_line: &str, count: usize) -> Vec<u8> {
         .collect();
     serde_json::to_vec(&serde_json::json!({"selected_count": count, "models": models}))
         .expect("plan output")
+}
+
+/// Acknowledges `pages` complete, empty pages, each finishing the kind it was read for.
+pub(super) fn acknowledge_complete_pages(
+    state: LocationMetadataSync,
+    pages: usize,
+) -> LocationMetadataSync {
+    (0..pages).fold(state, |mut state, _| {
+        state.pending = Some(LocationMetadataPage {
+            batch: MetadataBatch {
+                kind: state.kind(),
+                session_id: Uuid::nil(),
+                generation: 1,
+                records: Vec::new(),
+                scan: None,
+            },
+            next_source_after: None,
+        });
+        acknowledge_metadata_page(state)
+    })
 }
