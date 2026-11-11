@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -146,7 +147,7 @@
 					{#if catalog.data && (def.kind !== 'group' || members.data)}
 						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} {boxes} members={def.groupMembers ?? []} onselect={(keys) => (picked = keys)} />
 					{:else}
-						<p class="faint graph-wait">{catalog.error ?? members.error ?? (catalog.slow || members.slow ? 'Loading…' : '')}</p>
+						{#if catalog.error ?? members.error}<p class="faint graph-wait">{catalog.error ?? members.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
 					{/if}
 				</div>
 
@@ -227,7 +228,7 @@
 						</tbody>
 					</table>
 				{:else}
-					<p class="faint">{jobRuns.loading ? (jobRuns.slow ? 'Loading…' : '') : 'No runs yet.'}</p>
+					{#if jobRuns.data === undefined && !jobRuns.error}<Loading />{:else}<p class="faint">No runs yet.</p>{/if}
 				{/if}
 			</div>
 		{:else if def.declaration}

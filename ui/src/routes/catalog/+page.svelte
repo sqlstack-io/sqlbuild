@@ -87,6 +87,7 @@
 
 
 <ListToolbar
+	loading={catalog.data === undefined}
 	bind:query
 	placeholder="Search catalog"
 	total="{filtered.length} of {all.length} nodes"
@@ -99,7 +100,7 @@
 		: []}
 >
 	{#snippet filters()}
-		<SegmentedFilter
+		<SegmentedFilter loading={catalog.data === undefined}
 			bind:value={kindFilter}
 			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: nodeKindPlural[k], count: all.filter((n) => n.kind === k).length }))]}
 		/>

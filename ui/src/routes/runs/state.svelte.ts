@@ -12,8 +12,6 @@ const SIGNAL_GAP_MS = 300;
 /** Safety refresh in case a signal was missed. */
 const SAFETY_MS = 5 * 60_000;
 
-/** A first load faster than this shows no loading text, so it doesn't flash. */
-const SLOW_MS = 400;
 /** The first page of each filter, for this page load only, so coming back to the list shows it at once while it reloads. */
 const remembered = new Map<string, { rows: RunRow[]; nextCursor: string | null; counts: RunTabCounts | null }>();
 
@@ -30,7 +28,8 @@ export function createRunsState() {
 	let rows = $state<RunRow[]>([]);
 	let nextCursor = $state<string | null>(null);
 	let loading = $state(true);
-	let slow = $state(false);
+	/** Loading rows from the start of a filter, as opposed to refreshing the ones shown. */
+	let resetting = $state(true);
 	let loadingMore = $state(false);
 	let error = $state<string | null>(null);
 	let updatedAt = $state<number | null>(null);
@@ -56,7 +55,7 @@ export function createRunsState() {
 			loadingMore = true;
 		} else {
 			loading = true;
-			if (!rows.length) setTimeout(() => (slow = id === request && loading && !rows.length), SLOW_MS);
+			if (mode === 'reset') resetting = true;
 		}
 		try {
 			const result = await app.client.listRunRows(scope, {
@@ -83,7 +82,7 @@ export function createRunsState() {
 		} finally {
 			if (id === request) {
 				loading = false;
-				slow = false;
+				resetting = false;
 				loadingMore = false;
 			}
 		}
@@ -296,8 +295,8 @@ export function createRunsState() {
 		get loading() {
 			return loading;
 		},
-		get slow() {
-			return slow;
+		get resetting() {
+			return resetting;
 		},
 		get loadingMore() {
 			return loadingMore;

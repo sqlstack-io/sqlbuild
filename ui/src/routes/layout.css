@@ -477,3 +477,25 @@
 	font-weight: 500;
 }
 
+/* Placeholder bars a page shows while a read has nothing to show yet. */
+.sb-skeleton {
+	display: block;
+	height: 10px;
+	border-radius: 4px;
+	background: linear-gradient(90deg, var(--sb-hover) 0%, var(--sb-surface-high) 50%, var(--sb-hover) 100%);
+	background-size: 200% 100%;
+	animation: sb-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes sb-shimmer {
+	from {
+		background-position: 100% 0;
+	}
+	to {
+		background-position: -100% 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.sb-skeleton {
+		animation: none;
+	}
+}

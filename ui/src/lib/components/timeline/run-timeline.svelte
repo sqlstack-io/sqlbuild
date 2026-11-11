@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
@@ -238,7 +239,7 @@
 				</div>
 			{:else}
 				<div class="empty">
-					{#if timeline.error}Couldn't load the timeline: {timeline.error}{:else if !timeline.data}Loading…{:else if query}No jobs match “{query}”.{:else}No runs in this window.{/if}
+					{#if timeline.error}Couldn't load the timeline: {timeline.error}{:else if !timeline.data}<Loading lines={2} />{:else if query}No jobs match “{query}”.{:else}No runs in this window.{/if}
 				</div>
 			{/each}
 		</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import AccessChecker from '$lib/components/admin/access-checker.svelte';
 	import PermissionName from '$lib/components/admin/permission-name.svelte';
@@ -47,7 +48,7 @@
 						]}
 					/>
 				{:else}
-					<p class="muted">Loading…</p>
+					<Loading />
 				{/if}
 			</Panel>
 
@@ -123,10 +124,6 @@
 	}
 	.err {
 		color: var(--sb-error);
-		font-size: 12.5px;
-	}
-	.muted {
-		color: var(--muted-foreground);
 		font-size: 12.5px;
 	}
 	.framed {
