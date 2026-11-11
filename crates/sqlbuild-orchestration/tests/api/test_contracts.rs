@@ -32,6 +32,8 @@ mod statistics_eligibility;
 mod statistics_helpers;
 #[path = "statistics/retention/helpers.rs"]
 mod statistics_retention;
+#[path = "test_acknowledgements.rs"]
+mod test_acknowledgements;
 #[path = "test_catalog_reads.rs"]
 mod test_catalog_reads;
 #[path = "test_changes.rs"]

@@ -237,3 +237,13 @@ pub(crate) struct UpcomingTestCase {
     pub(crate) expected_hourly: [&'static str; 5],
     pub(crate) expected_calendar: [&'static str; 3],
 }
+
+pub(crate) struct AcknowledgementTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Statuses of: acknowledge, the same request retried, a run of another target, withdraw.
+    pub(crate) expected_statuses: [u16; 4],
+    /// Whether acknowledging, retrying and withdrawing each changed anything.
+    pub(crate) expected_applied: [bool; 3],
+    pub(crate) expected_acknowledged_by: &'static str,
+}

@@ -5,8 +5,8 @@ import type { CatalogNode, Check, NodeChange, PlatformEvent, Run, SnapshotChange
 const now = Date.parse('2026-11-09T12:00:00Z');
 const hoursAgo = (h: number) => new Date(now - h * 3_600_000).toISOString();
 
-function run(id: string, status: Run['status'], queuedHoursAgo: number, endedHoursAgo: number | null, parentRunId: string | null = null): Run {
-	return { id, status, parentRunId, jobKey: 'orders', kind: 'job', statusReason: null, queuedAt: hoursAgo(queuedHoursAgo), startedAt: hoursAgo(queuedHoursAgo), endedAt: endedHoursAgo === null ? null : hoursAgo(endedHoursAgo) } as Run;
+function run(id: string, status: Run['status'], queuedHoursAgo: number, endedHoursAgo: number | null, jobKey: string | null = 'orders', parentRunId: string | null = null): Run {
+	return { id, status, parentRunId, jobKey, kind: jobKey ? 'job' : 'adhoc', statusReason: null, queuedAt: hoursAgo(queuedHoursAgo), startedAt: hoursAgo(queuedHoursAgo), endedAt: endedHoursAgo === null ? null : hoursAgo(endedHoursAgo) } as Run;
 }
 
 const node = (key: string, kind: CatalogNode['kind']) => ({ key, kind }) as CatalogNode;
@@ -19,15 +19,19 @@ describe('overview from live reads', () => {
 	// Newest queued first, as the runs listing returns them.
 	const runs = [
 		run('active', 'running', 1, null),
-		run('child-failed', 'failed', 2, 2, 'group'),
-		run('failed', 'failed', 3, 2.5),
-		run('presumed', 'presumed_failed', 4, 3.5),
-		run('partial', 'partial', 5, 4.5),
-		run('failed-4th', 'failed', 6, 5.5),
-		run('ok', 'success', 7, 0.5),
-		run('stuck', 'unresponsive', 8, null),
-		run('warn', 'warn', 23.5, 23),
-		run('yesterday-failed', 'failed', 25, 24.5)
+		run('child-failed', 'failed', 2, 2, 'orders', 'group'),
+		run('adhoc-new', 'failed', 2.2, 2.1, null),
+		run('orders-new', 'failed', 3, 2.5),
+		run('fulfilment-failed', 'failed', 4, 3.5, 'fulfilment'),
+		run('catalogue-partial', 'partial', 5, 4.5, 'catalogue'),
+		run('orders-old', 'failed', 6, 5.5),
+		// Queued before the fulfilment failure but ended after it, so fulfilment has recovered.
+		run('fulfilment-ok', 'success', 7, 0.5, 'fulfilment'),
+		run('presumed', 'presumed_failed', 8, 1.5, 'inventory'),
+		run('stuck', 'unresponsive', 8, null, 'returns'),
+		run('adhoc-old', 'failed', 9, 8, null),
+		run('warn', 'warn', 23.5, 23, 'support'),
+		run('yesterday-failed', 'failed', 25, 24.5, 'archive')
 	];
 	const overview = overviewOf({
 		runs,
@@ -35,19 +39,22 @@ describe('overview from live reads', () => {
 		nodes: [node('model:orders', 'table'), node('model:totals', 'view'), node('model:events', 'incremental'), node('source:raw', 'source'), node('seed:regions', 'seed')],
 		changes: [change(1, [['added', 'model:orders'], ['added', 'seed:regions'], ['removed', 'model:old']]), change(24 * 8, [['added', 'model:totals']])],
 		events: [event('scheduler', true), event('cleared', false)],
+		acknowledgements: new Map([['orders-new', { by: 'ada', at: hoursAgo(1) }]]),
 		now
 	});
 
 	it('counts top-level runs queued in the last 24 hours', () => {
-		expect(overview.metrics.runs24h).toEqual({ total: 8, success: 1, warn: 1, partial: 1, failed: 3, active: 2 });
+		expect(overview.metrics.runs24h).toEqual({ total: 11, success: 1, warn: 1, partial: 1, failed: 6, active: 2 });
 	});
 
-	it('lists the three newest failed runs that ended today, then unresponsive runs and active platform events', () => {
-		expect(overview.attention.map((i) => (i.kind === 'platform_event' ? `event:${i.event.id}` : 'run' in i ? `${i.kind}:${i.run.id}` : i.kind))).toEqual([
-			'run_problem:failed',
-			'run_problem:presumed',
-			'run_problem:partial',
-			'run_unresponsive:stuck',
+	it('lists each job’s latest run once when it ended today without succeeding, newest first, then unresponsive runs and active platform events', () => {
+		// Acknowledging the orders failure keeps its place and never brings the older orders failure back.
+		expect(overview.attention.map((i) => (i.kind === 'platform_event' ? `event:${i.event.id}` : 'run' in i ? `${i.kind}:${i.run.id}:${i.acknowledged?.by ?? '-'}` : i.kind))).toEqual([
+			'run_problem:presumed:-',
+			'run_problem:adhoc-new:-',
+			'run_problem:orders-new:ada',
+			'run_problem:catalogue-partial:-',
+			'run_unresponsive:stuck:-',
 			'event:scheduler'
 		]);
 	});
@@ -61,7 +68,7 @@ describe('overview from live reads', () => {
 	});
 
 	it('names the run that ended last, not the newest queued', () => {
-		expect(overview.latestRun?.id).toBe('ok');
+		expect(overview.latestRun?.id).toBe('fulfilment-ok');
 	});
 
 	it('leaves parts without a server read empty instead of zero', () => {

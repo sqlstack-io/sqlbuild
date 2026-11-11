@@ -1,12 +1,10 @@
 import { checkCountsOf } from './http-catalog';
-import type { AttentionItem, AttentionRun, CatalogNode, Check, Overview, PlatformEvent, Run, SnapshotChange } from './types';
+import type { Acknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, Overview, PlatformEvent, Run, SnapshotChange } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
 const MODEL_KINDS = new Set(['view', 'table', 'incremental']);
 const PROBLEM_STATUSES = new Set(['failed', 'partial', 'presumed_failed']);
 const ACTIVE_STATUSES = new Set(['queued', 'launched', 'running', 'unresponsive']);
-/** The failed runs the health banner lists; the runs page has the rest. */
-const PROBLEM_RUNS = 3;
 const RECENT_CHANGES = 4;
 
 export type OverviewInputs = {
@@ -17,25 +15,42 @@ export type OverviewInputs = {
 	/** Publications, newest first. */
 	changes: SnapshotChange[];
 	events: PlatformEvent[];
+	/** Problem runs marked handled, by run ID. */
+	acknowledgements: Map<string, Acknowledgement>;
 	now: number;
 };
 
-const attentionRun = ({ id, jobKey, kind, status, statusReason, startedAt, endedAt }: Run): AttentionRun => ({ id, jobKey, kind, status, statusReason, startedAt, endedAt });
+/**
+ * One problem per job, newest first: the job's latest run that ended today, when that run did not succeed.
+ * A later good run clears the job, and acknowledging its latest failure never brings an older one back.
+ * Ad-hoc runs count as one job.
+ */
+export function problemRunsOf(topLevel: Run[], now: number): Run[] {
+	const latest = new Map<string, Run>();
+	for (const r of topLevel) {
+		if (!r.endedAt || Date.parse(r.endedAt) < now - DAY) continue;
+		const seen = latest.get(r.jobKey ?? '');
+		if (!seen || Date.parse(r.endedAt) > Date.parse(seen.endedAt!)) latest.set(r.jobKey ?? '', r);
+	}
+	return [...latest.values()].filter((r) => PROBLEM_STATUSES.has(r.status)).sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!));
+}
+
+const attentionRun = ({ id, jobKey, kind, status, statusReason, nodeCounts, startedAt, endedAt }: Run): AttentionRun => ({ id, jobKey, kind, status, statusReason, nodeCounts, startedAt, endedAt });
 
 /**
  * The overview from reads the person already has. The server has no project-wide build state, cost
  * or group read yet, so stale counts and group status are null and cost is left out; the page hides them.
  */
-export function overviewOf({ runs, checks, nodes, changes, events, now }: OverviewInputs): Overview {
+export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, now }: OverviewInputs): Overview {
+	const acknowledged = (r: Run) => acknowledgements.get(r.id) ?? null;
 	const topLevel = runs.filter((r) => !r.parentRunId);
 	const recent = topLevel.filter((r) => Date.parse(r.queuedAt) >= now - DAY);
 	const count = (statuses: string[]) => recent.filter((r) => statuses.includes(r.status)).length;
 	const attention: AttentionItem[] = [
+		...problemRunsOf(topLevel, now).map((r): AttentionItem => ({ kind: 'run_problem', run: attentionRun(r), acknowledged: acknowledged(r) })),
 		...topLevel
-			.filter((r) => r.endedAt && Date.parse(r.endedAt) >= now - DAY && PROBLEM_STATUSES.has(r.status))
-			.slice(0, PROBLEM_RUNS)
-			.map((r): AttentionItem => ({ kind: 'run_problem', run: attentionRun(r) })),
-		...topLevel.filter((r) => r.status === 'unresponsive').map((r): AttentionItem => ({ kind: 'run_unresponsive', run: attentionRun(r), lastHeartbeatAt: null })),
+			.filter((r) => r.status === 'unresponsive')
+			.map((r): AttentionItem => ({ kind: 'run_unresponsive', run: attentionRun(r), lastHeartbeatAt: null, acknowledged: acknowledged(r) })),
 		...events.filter((e) => e.active).map((event): AttentionItem => ({ kind: 'platform_event', event }))
 	];
 	const thisWeek = changes.filter((c) => Date.parse(c.publishedAt) >= now - 7 * DAY).flatMap((c) => c.nodes);

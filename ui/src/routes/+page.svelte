@@ -3,6 +3,8 @@
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
+	import BellOffIcon from '@lucide/svelte/icons/bell-off';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import AlertCircleIcon from '@lucide/svelte/icons/circle-alert';
 	import HistoryIcon from '@lucide/svelte/icons/history';
 	import InfoIcon from '@lucide/svelte/icons/info';
@@ -17,6 +19,7 @@
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionRank, attentionView, type AttentionTone } from '$lib/build-area/attention';
+	import type { AttentionItem } from '$lib/api';
 	import { changeOpLabel, formatCredits } from '$lib/build-area/labels';
 	import { summarizeChange } from '$lib/build-area/changes';
 	import { pagesBeyondTarget } from '$lib/nav';
@@ -34,9 +37,30 @@
 		stale: HistoryIcon,
 		info: InfoIcon
 	};
-	const issues = $derived(
+	const viewed = $derived(
 		(data?.attention ?? []).map((item) => ({ item, view: attentionView(item, app.now) })).sort((a, b) => attentionRank(a.view.tone) - attentionRank(b.view.tone))
 	);
+	const acknowledgementOf = (item: AttentionItem) => ('acknowledged' in item ? item.acknowledged : null);
+	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
+	const issues = $derived(viewed.filter(({ item }) => !acknowledgementOf(item)));
+	const handled = $derived(viewed.filter(({ item }) => acknowledgementOf(item)));
+	let showHandled = $state(false);
+	let acknowledging = $state<string | null>(null);
+	let acknowledgeError = $state<string | null>(null);
+	async function acknowledge(runId: string, acknowledged: boolean) {
+		const scope = app.scope;
+		if (!scope || acknowledging) return;
+		acknowledging = runId;
+		acknowledgeError = null;
+		try {
+			await app.client.acknowledgeRun(scope, runId, acknowledged);
+			await overview.refresh();
+		} catch (error) {
+			acknowledgeError = error instanceof Error ? error.message : String(error);
+		} finally {
+			acknowledging = null;
+		}
+	}
 	const stale = $derived(data?.attention.find((i) => i.kind === 'stale_models'));
 	const staleSelection = $derived(stale && stale.kind === 'stale_models' ? [...new Set([...stale.changed, ...stale.behind])] : []);
 	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
@@ -54,6 +78,7 @@
 	// Parts without a server read stay hidden rather than showing zeros, and wait for the read so they don't appear and vanish.
 	const showGroups = $derived(!!data && data.groups !== null);
 	const showTimeline = $derived(app.client.supports('timeline'));
+	const canAcknowledge = $derived(app.client.supports('acknowledgeRun'));
 
 </script>
 
@@ -114,12 +139,42 @@
 									{#if item.kind === 'stale_models'}
 										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(planHref(staleSelection)))}>Rebuild {staleSelection.length}</GatedButton>
 									{/if}
+									{#if 'acknowledged' in item && canAcknowledge}
+										<button class="ack" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
+											<BellOffIcon size={13} />Acknowledge
+										</button>
+									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>
 							</div>
 						{/each}
 					</div>
 				{/if}
+				{#if handled.length}
+					<div class="handled">
+						<button class="handled-toggle" aria-expanded={showHandled} onclick={() => (showHandled = !showHandled)}>
+							<ChevronRightIcon size={13} class={showHandled ? 'open' : ''} />Acknowledged · {handled.length}
+						</button>
+						{#if showHandled}
+							{#each handled as { item, view } (view.key)}
+								{@const ack = acknowledgementOf(item)}
+								<div class="issue muted">
+									<span class="issue-icon info"><BellOffIcon size={13} /></span>
+									<a class="issue-title" href={to(view.href)}>{view.title}</a>
+									<span class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)}` : ''}</span>
+									<small>{view.since}</small>
+									<span class="issue-actions">
+										{#if 'acknowledged' in item && canAcknowledge}
+											<button class="undo" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, false)}>Undo</button>
+										{/if}
+										<a href={to(view.href)}>{view.action} →</a>
+									</span>
+								</div>
+							{/each}
+						{/if}
+					</div>
+				{/if}
+				{#if acknowledgeError}<p class="ack-error">{acknowledgeError}</p>{/if}
 			</section>
 
 			<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (m?.cost ? 1 : 0)}>
@@ -231,6 +286,18 @@
 	.issue small { color: var(--sb-text-faint); font-size: 12px; white-space: nowrap; }
 	.issue-actions { display: flex; min-width: 120px; align-items: center; justify-content: flex-end; gap: 10px; }
 	.issue-actions a { color: var(--primary); font-weight: 500; white-space: nowrap; }
+	.ack { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 2px; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
+	.ack:hover:not(:disabled) { border-color: var(--border-strong); color: var(--foreground); }
+	.ack:disabled, .undo:disabled { opacity: 0.5; }
+	.handled { border-top: 1px solid var(--inner-line); }
+	.handled-toggle { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px 0 17px; color: var(--muted-foreground); font-size: 12px; }
+	.handled-toggle:hover { color: var(--foreground); }
+	.handled-toggle :global(svg) { transition: transform 120ms; }
+	.handled-toggle :global(svg.open) { transform: rotate(90deg); }
+	.issue.muted .issue-title { color: var(--muted-foreground); font-weight: 500; }
+	.undo { color: var(--muted-foreground); font-size: 12px; }
+	.undo:hover:not(:disabled) { color: var(--foreground); }
+	.ack-error { margin: 0; padding: 8px 17px; border-top: 1px solid var(--inner-line); color: var(--sb-error); font-size: 12px; }
 	.issue-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 2px; }
 	.issue-icon.error { color: var(--sb-error); background: color-mix(in srgb, var(--sb-error) 12%, transparent); }
 	.issue-icon.warning { color: var(--sb-warning); background: color-mix(in srgb, var(--sb-warning) 12%, transparent); }

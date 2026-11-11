@@ -7,6 +7,7 @@ import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
 import type { LocalChangeBus } from '../signals';
 import type {
+	Acknowledgement,
 	AdhocPermission,
 	AdhocRunCheck,
 	PlanResult,
@@ -653,6 +654,15 @@ export class MockOperate {
 	}
 
 	/** Liveness of an active run, for the overview's unresponsive item. */
+	#acknowledgements = new Map<string, Acknowledgement>();
+	acknowledgement(runId: string): Acknowledgement | null {
+		return this.#acknowledgements.get(runId) ?? null;
+	}
+	acknowledgeRun(runId: string, acknowledged: boolean, by: string): void {
+		if (acknowledged) this.#acknowledgements.set(runId, { by, at: new Date().toISOString() });
+		else this.#acknowledgements.delete(runId);
+	}
+
 	lastHeartbeat(runId: string): string | null {
 		const rec = this.#byId(runId);
 		return rec ? (liveness(rec, Date.now())?.lastHeartbeatAt ?? null) : null;

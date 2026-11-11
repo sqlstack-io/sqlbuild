@@ -6,6 +6,9 @@ use axum::extract::{Path, Query, State};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
+use crate::acknowledgements::main::acknowledge_person_run::acknowledge_person_run;
+use crate::acknowledgements::main::list_person_acknowledgements::list_person_acknowledgements;
+use crate::acknowledgements::models::{AcknowledgementRequest, RunAcknowledgement};
 use crate::api::errors::ApiError;
 use crate::api::models::{MutationResponse, RunsQuery};
 use crate::credentials::models::AuthenticatedPerson;
@@ -155,6 +158,55 @@ pub(crate) async fn rerun(
     Ok(Json(MutationResponse {
         applied: request_rerun(&store, (&context, Some(principal)), &request).await?,
     }))
+}
+
+#[utoipa::path(post, path = "/api/control/locations/{location_id}/targets/{target}/acknowledgements", operation_id = "acknowledgeRun",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("x-sqb-csrf" = String, Header)),
+    request_body = AcknowledgementRequest,
+    responses((status = 200, body = MutationResponse, description = "Whether the run's acknowledgement changed"),
+        (status = 400, description = "The run is not in this location and target, or the event ID was reused"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn acknowledge(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Path((location_id, target)), Extension(default_role)): (
+        Path<(Uuid, String)>,
+        Extension<DefaultRole>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+    Json(request): Json<AcknowledgementRequest>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: acknowledge_person_run(
+            &store,
+            (&context, principal),
+            (location_id, &target, &request),
+            default_role,
+        )
+        .await?,
+    }))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/acknowledgements", operation_id = "listRunAcknowledgements",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = Vec<RunAcknowledgement>, description = "Runs marked handled in the last week"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn acknowledgements(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<RunAcknowledgement>>, ApiError> {
+    Ok(Json(
+        list_person_acknowledgements(
+            &store,
+            (&context, principal),
+            (location_id, &target),
+            default_role,
+        )
+        .await?,
+    ))
 }
 
 #[utoipa::path(post, path = "/api/control/triggers", operation_id = "changeTrigger",
