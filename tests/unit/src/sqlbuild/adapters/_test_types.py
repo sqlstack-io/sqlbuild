@@ -148,6 +148,8 @@ class RelationRowCountEstimateTestCase:
     metadata_only: bool = False
     expected_byte_count: int | None = None
     expected_byte_count_basis: str | None = None
+    metadata_columns: tuple[str, ...] = ()
+    name: str = "orders"
 
 
 @dataclass(frozen=True)
