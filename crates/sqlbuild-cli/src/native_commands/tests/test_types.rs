@@ -1,3 +1,5 @@
+use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
+
 use crate::argv::models::{TypeFailure, Value};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{CommandOutput, NativeCommand, RulesAction};
@@ -88,4 +90,12 @@ pub(super) struct PlanDocumentTestCase {
     pub(super) output: Vec<u8>,
     pub(super) planned: bool,
     pub(super) expected_first_model: serde_json::Value,
+}
+
+/// One failed metadata read and the statistics page size the sync uses afterwards.
+pub(super) struct MetadataRetryTestCase {
+    pub(super) description: &'static str,
+    pub(super) failed_kind: WarehouseHistoryKind,
+    pub(super) acknowledged_pages: usize,
+    pub(super) expected_statistics_limit: usize,
 }
