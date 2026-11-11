@@ -83,9 +83,16 @@ def grant_execute(connection: GrantConnection) -> Callable[..., GrantRows]:
 class MetadataCursor:
     """A cursor that records metadata SQL and returns fixed rows."""
 
-    def __init__(self, *, rows: tuple[tuple[object, ...], ...], executed: list[str]) -> None:
+    def __init__(
+        self,
+        *,
+        rows: tuple[tuple[object, ...], ...],
+        executed: list[str],
+        columns: tuple[str, ...] = (),
+    ) -> None:
         self._rows: tuple[tuple[object, ...], ...] = rows
         self._executed: list[str] = executed
+        self.description: tuple[tuple[str], ...] = tuple((column,) for column in columns)
 
     def execute(self, sql: str, params: tuple[object, ...] | None = None) -> MetadataCursor:
         self._executed.append(f"{sql} {params or ()}")
@@ -104,12 +111,13 @@ class MetadataCursor:
 class MetadataConnection:
     """A connection whose cursors share one SQL log and fixed rows."""
 
-    def __init__(self, rows: tuple[tuple[object, ...], ...]) -> None:
+    def __init__(self, rows: tuple[tuple[object, ...], ...], columns: tuple[str, ...] = ()) -> None:
         self.rows: tuple[tuple[object, ...], ...] = rows
+        self.columns: tuple[str, ...] = columns
         self.executed: list[str] = []
 
     def cursor(self) -> MetadataCursor:
-        return MetadataCursor(rows=self.rows, executed=self.executed)
+        return MetadataCursor(rows=self.rows, executed=self.executed, columns=self.columns)
 
 
 @dataclass(frozen=True)

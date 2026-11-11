@@ -28,6 +28,7 @@ from tests.unit.src.sqlbuild.adapters.helpers import (
     execute_through_cursor,
 )
 
+_SNOWFLAKE_SHOW_OBJECTS_COLUMNS: tuple[str, ...] = ("name", "kind", "rows", "bytes")
 _DATABRICKS_DETAIL_HEADER: tuple[tuple[object, ...], ...] = (
     ("order_id", "bigint", None),
     ("", "", ""),
@@ -79,28 +80,49 @@ _DATABRICKS_DETAIL_HEADER: tuple[tuple[object, ...], ...] = (
             expected_sql_fragment="pg_class",
         ),
         RelationRowCountEstimateTestCase(
-            description="snowflake table reports information schema row count",
+            description="snowflake table reports its row count from SHOW OBJECTS",
             adapter=SnowflakeAdapter(),
-            metadata_rows=((5000,),),
+            metadata_rows=(("ORDERS", "TABLE", 5000, 65536),),
+            metadata_columns=_SNOWFLAKE_SHOW_OBJECTS_COLUMNS,
             expected_row_count=5000,
             expected_detail=None,
-            expected_sql_fragment="SELECT row_count FROM",
+            expected_sql_fragment="SHOW OBJECTS LIKE 'ORDERS' IN SCHEMA",
         ),
         RelationRowCountEstimateTestCase(
-            description="snowflake view has no row count",
+            description="snowflake view has no row count although SHOW lists zero rows",
             adapter=SnowflakeAdapter(),
-            metadata_rows=((None,),),
+            metadata_rows=(("ORDERS", "VIEW", 0, 0),),
+            metadata_columns=_SNOWFLAKE_SHOW_OBJECTS_COLUMNS,
             expected_row_count=None,
             expected_detail="no row count (view)",
-            expected_sql_fragment="('ORDERS', 'DEV', 'ANALYTICS')",
+            expected_sql_fragment="SHOW OBJECTS LIKE 'ORDERS' IN SCHEMA",
         ),
         RelationRowCountEstimateTestCase(
-            description="snowflake missing relation is unknown",
+            description="snowflake neighbour matched by the LIKE wildcard is not the relation",
             adapter=SnowflakeAdapter(),
-            metadata_rows=(),
+            metadata_rows=(("ORDERS_ARCHIVE", "TABLE", 9, 512),),
+            metadata_columns=_SNOWFLAKE_SHOW_OBJECTS_COLUMNS,
             expected_row_count=None,
             expected_detail="relation not found",
-            expected_sql_fragment="information_schema.tables",
+            expected_sql_fragment="SHOW OBJECTS LIKE 'ORDERS' IN SCHEMA",
+        ),
+        RelationRowCountEstimateTestCase(
+            description="snowflake name with a backslash reads the information schema",
+            adapter=SnowflakeAdapter(),
+            metadata_rows=((5000, 65536),),
+            name="order\\s",
+            expected_row_count=5000,
+            expected_detail=None,
+            expected_sql_fragment="SELECT row_count,bytes FROM",
+        ),
+        RelationRowCountEstimateTestCase(
+            description="snowflake relation without a schema reads the information schema",
+            adapter=SnowflakeAdapter(),
+            metadata_rows=((5000, 65536),),
+            schema=None,
+            expected_row_count=5000,
+            expected_detail=None,
+            expected_sql_fragment="SELECT row_count,bytes FROM",
         ),
         RelationRowCountEstimateTestCase(
             description="databricks analyzed table reports statistics rows",
@@ -185,22 +207,36 @@ _DATABRICKS_DETAIL_HEADER: tuple[tuple[object, ...], ...] = (
         RelationRowCountEstimateTestCase(
             description="snowflake bytes and rows are distinct",
             adapter=SnowflakeAdapter(),
+            metadata_rows=(("ORDERS", "TABLE", 17, 4096),),
+            metadata_columns=_SNOWFLAKE_SHOW_OBJECTS_COLUMNS,
+            expected_row_count=17,
+            expected_detail=None,
+            expected_sql_fragment="SHOW OBJECTS LIKE 'ORDERS' IN SCHEMA",
+            metadata_only=True,
+            expected_byte_count=4096,
+            expected_byte_count_basis="show_objects_bytes",
+        ),
+        RelationRowCountEstimateTestCase(
+            description="snowflake missing view statistics remain unavailable",
+            adapter=SnowflakeAdapter(),
+            metadata_rows=(("ORDERS", "VIEW", 0, 0),),
+            metadata_columns=_SNOWFLAKE_SHOW_OBJECTS_COLUMNS,
+            expected_row_count=None,
+            expected_detail="no row count (view)",
+            expected_sql_fragment="SHOW OBJECTS LIKE 'ORDERS' IN SCHEMA",
+            metadata_only=True,
+        ),
+        RelationRowCountEstimateTestCase(
+            description="snowflake bytes without a schema keep the information schema basis",
+            adapter=SnowflakeAdapter(),
             metadata_rows=((17, 4096),),
+            schema=None,
             expected_row_count=17,
             expected_detail=None,
             expected_sql_fragment="SELECT row_count,bytes FROM",
             metadata_only=True,
             expected_byte_count=4096,
             expected_byte_count_basis="information_schema_bytes",
-        ),
-        RelationRowCountEstimateTestCase(
-            description="snowflake missing view statistics remain unavailable",
-            adapter=SnowflakeAdapter(),
-            metadata_rows=((None, None),),
-            expected_row_count=None,
-            expected_detail="no row count (view)",
-            expected_sql_fragment="SELECT row_count,bytes FROM",
-            metadata_only=True,
         ),
         RelationRowCountEstimateTestCase(
             description="databricks bytes do not imply an analyzed row count",
@@ -240,7 +276,9 @@ _DATABRICKS_DETAIL_HEADER: tuple[tuple[object, ...], ...] = (
 def test_given_catalog_metadata_when_estimating_row_count_then_reads_only_metadata(
     test_case: RelationRowCountEstimateTestCase, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    connection: MetadataConnection = MetadataConnection(test_case.metadata_rows)
+    connection: MetadataConnection = MetadataConnection(
+        test_case.metadata_rows, test_case.metadata_columns
+    )
 
     monkeypatch.setattr(test_case.adapter, "execute", execute_through_cursor)
 
@@ -248,7 +286,7 @@ def test_given_catalog_metadata_when_estimating_row_count_then_reads_only_metada
         connection=connection,
         database=test_case.database,
         schema=test_case.schema,
-        name="orders",
+        name=test_case.name,
         metadata_only=test_case.metadata_only,
     )
 
