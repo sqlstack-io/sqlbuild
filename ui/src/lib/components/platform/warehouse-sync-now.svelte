@@ -20,7 +20,7 @@
 	let requested = $state<{ at: number; seen: string } | null>(null);
 	let failure = $state<string | null>(null);
 	const last = $derived(sync.data ?? null);
-	const reportOf = (report: typeof last) => `${report?.lastSyncedAt ?? ''}|${report?.lastError ?? ''}`;
+	const reportOf = (report: typeof last) => `${report?.lastReportedAt ?? ''}|${report?.lastSyncedAt ?? ''}|${report?.lastError ?? ''}`;
 	const pending = $derived(requested !== null && reportOf(last) === requested.seen && app.now - requested.at < 5 * 60_000);
 
 	async function request() {

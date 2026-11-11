@@ -9,7 +9,7 @@ use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// At most 100, newest first, from every retained day (a sync follows only runs) plus each instance's last check-in.
+/// At most 100, newest first, from the health retention window (a sync follows only runs) plus instance check-ins.
 pub(crate) async fn recent_health(
     transaction: ControlTransaction,
     location_id: Uuid,

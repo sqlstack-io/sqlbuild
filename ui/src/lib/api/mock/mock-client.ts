@@ -338,7 +338,8 @@ export class MockApiClient implements ApiClient {
 		this.#require('connection.test');
 		const sync = this.#sync(scope);
 		setTimeout(() => {
-			Object.assign(sync, { lastSyncedAt: new Date().toISOString(), lastError: null });
+			const now = new Date().toISOString();
+			Object.assign(sync, { lastSyncedAt: now, lastError: null, lastReportedAt: now });
 			this.changes.emit(`warehouse_sync:${scope.locationId}`);
 		}, 1500);
 		return this.#reply(undefined);
