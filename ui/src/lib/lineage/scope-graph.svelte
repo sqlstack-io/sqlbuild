@@ -25,6 +25,13 @@
 	let fitted = $state(false);
 	let shape = '';
 	let laidOut = '';
+	/** Boxes showing only their header. */
+	let collapsed = $state<ReadonlySet<string>>(new Set());
+	function toggle(jobKey: string) {
+		const next = new Set(collapsed);
+		if (!next.delete(jobKey)) next.add(jobKey);
+		collapsed = next;
+	}
 
 	/** Clears the selection, as clicking the empty canvas does. */
 	export function clear() {
@@ -33,8 +40,9 @@
 	}
 
 	$effect(() => {
-		const next = jobGraph(keys, catalog, boxes, members);
-		const sig = next.nodes.map((n) => `${n.id}@${n.parentId ?? ''}`).join(',');
+		const next = jobGraph(keys, catalog, boxes, members, collapsed);
+		for (const n of next.nodes) if (n.type === 'job') n.data = { ...n.data, ontoggle: toggle };
+		const sig = next.nodes.map((n) => `${n.id}@${n.parentId ?? ''}`).join(',') + `|${[...collapsed].join(',')}`;
 		if (sig === shape) {
 			// Same shape: keep positions and sizes, refresh build states.
 			const data = new Map(next.nodes.map((n) => [n.id, n.data]));

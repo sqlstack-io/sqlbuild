@@ -12,6 +12,10 @@ const NODE_HEIGHT = 61;
 const PAD = 14;
 const HEADER = 30;
 const EMPTY_HEIGHT = 44;
+/** A collapsed box shows only its header. */
+const COLLAPSED_HEIGHT = HEADER + 2;
+/** Wide enough for a header's name, node count and last run on one line. */
+const COLLAPSED_WIDTH = 380;
 
 export type JobBox = { jobKey: string; nodes: string[]; lastRun?: RunRef | null };
 
@@ -23,26 +27,47 @@ export function boxId(jobKey: string): string {
 }
 
 /**
- * Cards for `nodes` and the lineage between them. With `boxes`, each node sits in the first box
- * that builds it, and a declared `after` between two members with no lineage between them is a
- * dashed edge between their boxes.
+ * Cards for `nodes` and the lineage between them. With `boxes`, a node built by several members sits
+ * in the most specific box, the one building the fewest nodes (the earliest on a tie), so a small
+ * job inside a broad one keeps its nodes; a declared `after` between two members with no lineage
+ * between them is a dashed edge between their boxes. A box in `collapsed` shows only its header,
+ * and lineage to its cards meets the box instead.
  */
-export function jobGraph(nodes: string[], catalog: CatalogNode[], boxes: JobBox[] = [], members: JobGroupMember[] = []): { nodes: Node[]; edges: Edge[] } {
+export function jobGraph(
+	nodes: string[],
+	catalog: CatalogNode[],
+	boxes: JobBox[] = [],
+	members: JobGroupMember[] = [],
+	collapsed: ReadonlySet<string> = new Set()
+): { nodes: Node[]; edges: Edge[] } {
 	const byKey = new Map(catalog.map((n) => [n.key, n]));
 	const inJob = new Set(nodes);
+	const built = new Map(boxes.map((b) => [b.jobKey, b.nodes.filter((n) => inJob.has(n))]));
 	const owner = new Map<string, string>();
-	for (const box of boxes) for (const n of box.nodes) if (inJob.has(n) && !owner.has(n)) owner.set(n, box.jobKey);
+	for (const box of [...boxes].sort((a, b) => built.get(a.jobKey)!.length - built.get(b.jobKey)!.length))
+		for (const n of built.get(box.jobKey)!) if (!owner.has(n)) owner.set(n, box.jobKey);
+	// What a card is drawn as: itself, or its collapsed box.
+	const shownAs = (key: string) => {
+		const parent = owner.get(key);
+		return parent && collapsed.has(parent) ? boxId(parent) : key;
+	};
 
 	const boxNodes: Node[] = boxes.map((b) => ({
 		id: boxId(b.jobKey),
 		type: 'job',
 		position: { x: 0, y: 0 },
-		width: NODE_WIDTH + 2 * PAD,
-		height: EMPTY_HEIGHT,
+		width: collapsed.has(b.jobKey) ? COLLAPSED_WIDTH : NODE_WIDTH + 2 * PAD,
+		height: collapsed.has(b.jobKey) ? COLLAPSED_HEIGHT : EMPTY_HEIGHT,
 		selectable: false,
-		data: { jobKey: b.jobKey, lastRun: b.lastRun ?? null, nodeCount: nodes.filter((n) => owner.get(n) === b.jobKey).length }
+		data: {
+			jobKey: b.jobKey,
+			lastRun: b.lastRun ?? null,
+			nodeCount: built.get(b.jobKey)!.length,
+			drawnElsewhere: built.get(b.jobKey)!.filter((n) => owner.get(n) !== b.jobKey).length,
+			collapsed: collapsed.has(b.jobKey)
+		}
 	}));
-	const cards: Node[] = nodes.map((key) => {
+	const cards: Node[] = nodes.filter((key) => shownAs(key) === key).map((key) => {
 		const parent = owner.get(key);
 		const node = byKey.get(key);
 		return {
@@ -54,10 +79,20 @@ export function jobGraph(nodes: string[], catalog: CatalogNode[], boxes: JobBox[
 		};
 	});
 
+	const seen = new Set<string>();
 	const lineage: Edge[] = nodes.flatMap((key) =>
-		(byKey.get(key)?.upstream ?? []).filter((up) => inJob.has(up)).map((up) => ({ id: `${up}-${key}`, source: up, target: key, type: 'bezier', style: edgeStyle }))
+		(byKey.get(key)?.upstream ?? [])
+			.filter((up) => inJob.has(up))
+			.flatMap((up) => {
+				const [source, target] = [shownAs(up), shownAs(key)];
+				const id = `${source}-${target}`;
+				if (source === target || seen.has(id)) return [];
+				seen.add(id);
+				return [{ id, source, target, type: 'bezier', style: edgeStyle }];
+			})
 	);
-	const linked = new Set(lineage.map((e) => `${owner.get(e.source)}>${owner.get(e.target)}`));
+	const jobOf = (id: string) => owner.get(id) ?? id.slice('job:'.length);
+	const linked = new Set(lineage.map((e) => `${jobOf(e.source)}>${jobOf(e.target)}`));
 	const after: Edge[] = members.flatMap((m) =>
 		m.upstream
 			.filter((u) => !linked.has(`${u.jobKey}>${m.jobKey}`) && boxes.some((b) => b.jobKey === u.jobKey))
@@ -84,7 +119,7 @@ export function layoutJobGraph(nodes: Node[], edges: Edge[]): Node[] {
 		if (n.type === 'job') {
 			// An empty box is laid out as a plain node; dagre sizes boxes with children itself.
 			if (children.has(n.id)) g.setNode(n.id, {});
-			else g.setNode(n.id, { width: NODE_WIDTH + 2 * PAD, height: EMPTY_HEIGHT });
+			else g.setNode(n.id, { width: n.width ?? NODE_WIDTH + 2 * PAD, height: n.height ?? EMPTY_HEIGHT });
 		} else g.setNode(n.id, size(n));
 	}
 	for (const n of nodes) if (n.parentId) g.setParent(n.id, n.parentId);
@@ -106,7 +141,9 @@ export function layoutJobGraph(nodes: Node[], edges: Edge[]): Node[] {
 		const kids = (children.get(n.id) ?? []).map(topLeft);
 		if (!kids.length) {
 			const p = g.node(n.id);
-			boxes.set(n.id, { x: p.x - (NODE_WIDTH + 2 * PAD) / 2, y: p.y - EMPTY_HEIGHT / 2, width: NODE_WIDTH + 2 * PAD, height: EMPTY_HEIGHT });
+			const width = n.width ?? NODE_WIDTH + 2 * PAD;
+			const height = n.height ?? EMPTY_HEIGHT;
+			boxes.set(n.id, { x: p.x - width / 2, y: p.y - height / 2, width, height });
 			continue;
 		}
 		const left = Math.min(...kids.map((k) => k.x)) - PAD;

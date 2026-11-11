@@ -48,6 +48,30 @@ describe('job graph', () => {
 		expect(box('orders').position.x + box('orders').width!).toBeLessThan(box('reports').position.x);
 	});
 
+	it('puts a shared node in the job that builds fewer nodes, even when a broader job runs first', () => {
+		// `everything` runs first and also builds `orders`, which `orders_only` exists to build.
+		const shared = [{ jobKey: 'everything', nodes: all }, { jobKey: 'orders_only', nodes: ['model:orders'] }];
+		const { nodes } = jobGraph(all, catalog, shared);
+		expect(nodes.find((n) => n.id === 'model:orders')?.parentId).toBe(boxId('orders_only'));
+		expect(nodes.find((n) => n.id === 'model:stg')?.parentId).toBe(boxId('everything'));
+		const data = (k: string) => nodes.find((n) => n.id === boxId(k))!.data;
+		expect([data('everything').nodeCount, data('everything').drawnElsewhere]).toEqual([4, 1]);
+		expect([data('orders_only').nodeCount, data('orders_only').drawnElsewhere]).toEqual([1, 0]);
+	});
+
+	it('hides a collapsed box’s cards and joins their lineage to the box', () => {
+		const { nodes, edges } = jobGraph(all, catalog, boxes, members, new Set(['staging']));
+		expect(nodes.filter((n) => n.type === 'asset').map((n) => n.id).sort()).toEqual(['model:orders', 'model:report']);
+		expect(nodes.find((n) => n.id === boxId('staging'))!.data.collapsed).toBe(true);
+		// raw → stg sits inside the box and disappears; stg → orders now leaves the box. Staging and
+		// reports still have no lineage between them, so their `after` edge stays.
+		expect(edges.map((e) => `${e.source}>${e.target}`).sort()).toEqual(
+			[`${boxId('staging')}>model:orders`, `${boxId('orders')}>${boxId('reports')}`, `${boxId('staging')}>${boxId('reports')}`].sort()
+		);
+		const laid = layoutJobGraph(measured(nodes), edges);
+		expect(laid.find((n) => n.id === boxId('staging'))!.height).toBeLessThan(61);
+	});
+
 	it('draws a plain job without boxes', () => {
 		const { nodes } = jobGraph(['model:raw', 'model:stg'], catalog);
 		expect(nodes.map((n) => [n.id, n.type, n.parentId])).toEqual([
