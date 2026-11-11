@@ -15,7 +15,8 @@ use sqlbuild_core::constants::{
 use sqlbuild_core::models::SqlValue;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryPage, WarehouseHistoryRead, WarehouseHistoryRecord, WarehouseStateLocation,
+    ConsumptionRead, NodeResultsRead, WarehouseHistoryPage, WarehouseHistoryRead,
+    WarehouseHistoryRecord, WarehouseStateLocation,
 };
 use sqlbuild_state::consumption::constants::{CONSUMPTION_COLUMN_TYPES, RECORDED_AT_COLUMN};
 use sqlbuild_state::events::constants::{
@@ -491,11 +492,9 @@ fn decode_record(
         | WarehouseHistoryRead::ColumnMigrations(read) => {
             return decode_event_record(&read.location, row, (columns, &[timestamp]));
         }
-        WarehouseHistoryRead::NodeResults(read) => {
-            return decode_event_record(&read.location, row, (columns, &[timestamp]));
-        }
-        WarehouseHistoryRead::Consumption(read) => {
-            return decode_event_record(&read.location, row, (columns, &[timestamp]));
+        WarehouseHistoryRead::NodeResults(NodeResultsRead { location, .. })
+        | WarehouseHistoryRead::Consumption(ConsumptionRead { location, .. }) => {
+            return decode_event_record(location, row, (columns, &[timestamp]));
         }
         WarehouseHistoryRead::JanitorEvents(read) => {
             return decode_event_record(

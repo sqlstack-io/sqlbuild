@@ -323,8 +323,8 @@ impl WarehouseHistoryKind {
         }
     }
 
-    #[must_use]
     /// The state table a kind mirrors; catalog and statistics read the warehouse catalog instead.
+    #[must_use]
     pub const fn source_table(self) -> Option<&'static str> {
         match self {
             Self::Fingerprints => Some(FINGERPRINT_TABLE_NAME),
@@ -341,6 +341,7 @@ impl WarehouseHistoryKind {
         }
     }
 
+    #[must_use]
     pub const fn mirror_table(self) -> &'static str {
         match self {
             Self::Fingerprints => "sqb_warehouse_fingerprints",
