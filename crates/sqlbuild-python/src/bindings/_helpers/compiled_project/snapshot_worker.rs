@@ -6,12 +6,13 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::{PyRef, PyResult, Python};
 use pyo3::{pyclass, pymethods};
 use sqlbuild_orchestration::runs::models::RunChange;
+use sqlbuild_orchestration::worker::errors::WorkerError;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use sqlbuild_orchestration::worker::models::{WorkerClient, WorkerSession};
 use uuid::Uuid;
 
-use crate::bindings::_helpers::compiled_project::constants::REPORT_ATTEMPTS;
+use crate::bindings::_helpers::compiled_project::constants::{REPORT_ATTEMPTS, STORE_BUSY_STATUS};
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 
 struct WorkerOwner {
@@ -60,7 +61,7 @@ impl NativeOrchestrationWorker {
         self.with_owner(py, |owner| Ok(owner.session.execution.clone()))
     }
 
-    /// A bounded retry keeps the exact event identity across an uncertain acknowledgement.
+    /// A bounded retry keeps the event identity across an uncertain acknowledgement or busy store.
     pub(crate) fn change(&self, py: Python<'_>, key: &str, change: RunChange) -> PyResult<()> {
         self.with_owner(py, |owner| {
             let event_id = Uuid::new_v5(&owner.session.execution.claim.claim_id, key.as_bytes());
@@ -70,8 +71,15 @@ impl NativeOrchestrationWorker {
                     attempts += 1;
                     match owner.client.report(event_id, change.clone()).await {
                         Ok(_) => return Ok(()),
-                        Err(sqlbuild_orchestration::worker::errors::WorkerError::Transport(_))
-                            if attempts < REPORT_ATTEMPTS =>
+                        Err(error)
+                            if attempts < REPORT_ATTEMPTS
+                                && match &error {
+                                    WorkerError::Transport(_) => true,
+                                    WorkerError::Rejected(status) => {
+                                        status.as_u16() == STORE_BUSY_STATUS
+                                    }
+                                    _ => false,
+                                } =>
                         {
                             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                         }

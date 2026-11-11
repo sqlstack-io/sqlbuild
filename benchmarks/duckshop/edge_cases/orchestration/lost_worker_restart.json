@@ -1,0 +1,4 @@
+{
+  "description": "A scheduler and its launched local worker are both killed before the worker reports anything. The replacement scheduler adopts the claim, finds the worker gone and fails the run with a reason that names the restart.",
+  "expected_reason": "the control service restarted during this run, and its worker stopped without reporting a result"
+}

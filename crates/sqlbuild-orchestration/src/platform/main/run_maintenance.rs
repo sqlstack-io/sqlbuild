@@ -31,7 +31,11 @@ pub async fn run_maintenance(
     let mut reported = 0;
     let mut retained_at: Option<Instant> = None;
     while !*shutdown.borrow() {
-        scan_health(store, replica_id, &shutdown).await?;
+        match scan_health(store, replica_id, &shutdown).await {
+            Ok(()) => {}
+            Err(error) if error.transient() => {}
+            Err(error) => return Err(error),
+        }
         if retained_at.is_none_or(|at| at.elapsed() >= Duration::from_secs(60)) {
             match retain(store, retention, &sinks).await {
                 Ok(retained) => {
@@ -40,7 +44,7 @@ pub async fn run_maintenance(
                     }
                     reported = retained;
                 }
-                Err(ControlError::Database(error)) if ControlError::transient_database(&error) => {}
+                Err(error) if error.transient() => {}
                 Err(error) => return Err(error),
             }
             retained_at = Some(Instant::now());

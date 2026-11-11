@@ -96,6 +96,8 @@ pub(super) struct ClaimedWorker {
     pub(super) stopping: Option<Instant>,
     pub(super) exit: Option<WorkerExit>,
     pub(super) launch_failure: Option<&'static str>,
+    /// Supervision resumed after a scheduler restart rather than from this scheduler's launch.
+    pub(super) recovered: bool,
 }
 
 /// Physical ownership survives leadership loss; only the current fence changes durable lifecycle.

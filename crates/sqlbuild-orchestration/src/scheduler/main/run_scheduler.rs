@@ -1,5 +1,7 @@
 //! Embedded and standalone roles share the same interruptible, durable scheduling loop.
 
+use std::time::Duration;
+
 use tokio::sync::watch;
 
 use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
@@ -8,7 +10,7 @@ use crate::scheduler::types::RunLauncher;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
-/// Durable database state drives work; shutdown interrupts the wait.
+/// Durable database state drives work; a transient store failure retries the next cycle.
 pub async fn run_scheduler(
     store: &ControlStore,
     mut state: SchedulerState,
@@ -18,12 +20,27 @@ pub async fn run_scheduler(
     let mut last_lease = None;
     let result = async {
         while !*shutdown.borrow() {
-            let (next_state, cycle) = scheduler_cycle(store, state).await?;
-            state = next_state;
-            last_lease = state.lease.clone();
-            launcher.poll(store, state.lease.as_ref()).await?;
+            let polled = match scheduler_cycle(store, state.clone()).await {
+                Ok((next_state, cycle)) => {
+                    state = next_state;
+                    last_lease = state.lease.clone();
+                    launcher
+                        .poll(store, state.lease.as_ref())
+                        .await
+                        .map(|()| cycle.wait_for)
+                }
+                Err(error) => Err(error),
+            };
+            let wait_for = match polled {
+                Ok(wait_for) => wait_for,
+                Err(error) if error.transient() => {
+                    launcher.retrying(&error);
+                    Duration::from_secs(1)
+                }
+                Err(error) => return Err(error),
+            };
             tokio::select! {
-                _ = tokio::time::sleep(cycle.wait_for.min(std::time::Duration::from_secs(1))) => {},
+                _ = tokio::time::sleep(wait_for.min(Duration::from_secs(1))) => {},
                 result = shutdown.changed() => { if result.is_err() { break; } },
             }
         }

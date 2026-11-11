@@ -38,6 +38,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     cancel_running_statement,
     claimed_worker,
+    running_statement,
     scheduled_worker,
     snapshot_api,
     wait_for_log,
@@ -472,6 +473,44 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = worker_result(worker, test_case)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "a write lock outlasting the busy timeout during a running statement",
+            Path(
+                "benchmarks/duckshop/edge_cases/orchestration/local_worker_recovery.sql"
+            ).read_text(),
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",
+            "cancelled",
+            [(0,)],
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_busy_control_store_when_a_build_runs_then_the_scheduler_retries_and_keeps_its_outcome(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    edge_case: dict[str, Any] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/busy_control_store.json").read_text()
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        active: dict[str, Any] = running_statement(worker)
+        holder: sqlite3.Connection = sqlite3.connect(worker.control_store, isolation_level=None)
+        try:
+            _ = holder.execute("BEGIN IMMEDIATE")
+            time.sleep(edge_case["lock_seconds"])
+            assert worker.process.poll() is None, worker.log.read_text()
+        finally:
+            _ = holder.execute("ROLLBACK")
+            holder.close()
+        cancel_running_statement(worker, run_id=active["run_id"])
+        run: dict[str, Any] = worker_result(worker, test_case)
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        assert "the scheduler retries: control store: database is locked" in worker.log.read_text()
+        assert worker.process.poll() is None, worker.log.read_text()
 
 
 @pytest.mark.parametrize(
