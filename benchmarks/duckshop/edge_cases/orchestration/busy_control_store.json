@@ -1,0 +1,4 @@
+{
+  "description": "Another connection holds the SQLite control store's write lock for longer than the store's busy timeout while a scheduled build's warehouse statement is running. The scheduler retries its cycle instead of exiting and terminating its worker, the statement keeps running, and the run ends with its real outcome: here an operator cancellation after the lock is released.",
+  "lock_seconds": 35
+}

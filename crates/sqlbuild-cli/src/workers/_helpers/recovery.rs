@@ -66,6 +66,7 @@ impl Workers {
                         stopping: None,
                         exit: None,
                         launch_failure: rejected.then_some("docker_configuration_rejected"),
+                        recovered: true,
                     });
                     if rejected {
                         self.active[index]

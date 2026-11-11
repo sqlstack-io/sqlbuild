@@ -213,10 +213,16 @@ impl WorkerBuild {
         self.start_key(py, &format!("{kind}:{name}"))
     }
 
-    /// Report a selected node as started; the deterministic event ID makes a repeat a no-op.
+    /// Report a selected node as started unless its outcome is final, such as a planner skip.
     pub(crate) fn start_key(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         self.check_cancelled(py)?;
-        if self.execution.claim.request.selection.contains(key) {
+        if self.execution.claim.request.selection.contains(key)
+            && !self
+                .completed
+                .lock()
+                .map_err(|_| poisoned())?
+                .contains_key(key)
+        {
             self.worker.bind(py).get().change(
                 py,
                 &format!("node-started/{key}"),

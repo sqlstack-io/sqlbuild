@@ -1,5 +1,6 @@
 """A replacement Linux dev scheduler retains physical ownership of surviving local workers."""
 
+import json
 import os
 import signal
 import sqlite3
@@ -252,3 +253,51 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
             with suppress(ProcessLookupError):
                 signal.pidfd_send_signal(handle, signal.SIGKILL)
             os.close(handle)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux inherited-lock and pidfd recovery")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "a launched worker lost with its scheduler",
+            "SELECT 23 AS amount",
+            "",
+            "failed",
+            [],
+            launcher="uncooperative",
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_lost_with_its_scheduler_when_restarted_then_the_run_fails_naming_the_restart(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    edge_case: dict[str, Any] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/lost_worker_restart.json").read_text()
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        pid: int = wait_for_interpreter(worker.process, worker.project / "worker.pid", worker.log)
+        worker.process.kill()
+        assert worker.process.wait(timeout=10) == -signal.SIGKILL
+        os.kill(pid, signal.SIGKILL)
+        log: Path = tmp_path / "replacement-scheduler.log"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "scheduler",
+                "--database-env",
+                "SQLBUILD_SCHEDULER_TEST_STORE",
+                "--launchers",
+                str(tmp_path / "launchers.json"),
+            ],
+            log,
+            tmp_path / "replacement-scheduler.stdout",
+        ) as process:
+            wait_for_log(process, log, "Worker supervision recovered for run", timeout=45)
+            run: dict[str, Any] = wait_for_run(worker.api, process, log)
+            assert (run["status"], run["status_reason"]) == (
+                test_case.expected_status,
+                edge_case["expected_reason"],
+            ), log.read_text()
+            assert "Worker launched for run" not in log.read_text()

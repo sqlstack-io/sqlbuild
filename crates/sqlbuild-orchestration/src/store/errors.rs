@@ -27,6 +27,19 @@ pub enum ControlError {
 }
 
 impl ControlError {
+    /// A store that is briefly busy or unreachable; the same operation may succeed when retried.
+    #[must_use]
+    pub fn transient(&self) -> bool {
+        match self {
+            Self::Database(error) => Self::transient_database(error),
+            Self::Sqlite(rusqlite::Error::SqliteFailure(error, _)) => matches!(
+                error.code,
+                rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked
+            ),
+            _ => false,
+        }
+    }
+
     pub(crate) fn transient_database(error: &sqlx_core::Error) -> bool {
         match error {
             sqlx_core::Error::Io(_)

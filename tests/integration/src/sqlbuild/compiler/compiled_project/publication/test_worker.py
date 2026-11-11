@@ -38,6 +38,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     cancel_running_statement,
     claimed_worker,
+    running_statement,
     scheduled_worker,
     snapshot_api,
     wait_for_log,
@@ -190,6 +191,71 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
             ).fetchone() == (0,)
         with duckdb.connect(str(project_dir / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "a stale source blocks only its own branch",
+            "SELECT 11 AS amount",
+            "SELECT amount FROM orders UNION ALL SELECT return_id FROM returns ORDER BY 1",
+            "partial",
+            [(2,), (11,)],
+            files={
+                "sources/raw.yml": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/worker_freshness_skip.yml"
+                ).read_text(),
+                "models/stale_orders.sql": (
+                    "MODEL (description 'Stale orders.', materialized table);\n"
+                    'SELECT order_id FROM __source("raw_orders")\n'
+                ),
+                "models/late_orders.sql": (
+                    "MODEL (description 'Late orders.', materialized table);\n"
+                    'SELECT order_id FROM __source("raw_orders")\n'
+                ),
+                "models/returns.sql": (
+                    "MODEL (description 'Returns.', materialized table);\n"
+                    'SELECT return_id FROM __source("raw_returns")\n'
+                ),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, schedule\n"
+                    'annual_orders = job("annual_orders", '
+                    'select="orders stale_orders late_orders returns", '
+                    'description="Build orders.", '
+                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
+                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                ),
+            },
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_stale_source_when_a_worker_builds_then_blocked_nodes_finish_skipped_unstarted(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, bool]] = [
+                (key, status, started is not None)
+                for key, status, started in control.execute(
+                    "SELECT node_key, status, started_at FROM sqb_run_nodes "
+                    "WHERE run_id=? AND kind='node' ORDER BY node_key",
+                    (run["run_id"],),
+                )
+            ]
+        assert nodes == [
+            ("model:late_orders", "skipped", False),
+            ("model:orders", "success", True),
+            ("model:returns", "success", True),
+            ("model:stale_orders", "skipped", False),
+        ], worker.log.read_text()
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
 
@@ -515,6 +581,44 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = worker_result(worker, test_case)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "a write lock outlasting the busy timeout during a running statement",
+            Path(
+                "benchmarks/duckshop/edge_cases/orchestration/local_worker_recovery.sql"
+            ).read_text(),
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",
+            "cancelled",
+            [(0,)],
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_busy_control_store_when_a_build_runs_then_the_scheduler_retries_and_keeps_its_outcome(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    edge_case: dict[str, Any] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/busy_control_store.json").read_text()
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        active: dict[str, Any] = running_statement(worker)
+        holder: sqlite3.Connection = sqlite3.connect(worker.control_store, isolation_level=None)
+        try:
+            _ = holder.execute("BEGIN IMMEDIATE")
+            time.sleep(edge_case["lock_seconds"])
+            assert worker.process.poll() is None, worker.log.read_text()
+        finally:
+            _ = holder.execute("ROLLBACK")
+            holder.close()
+        cancel_running_statement(worker, run_id=active["run_id"])
+        run: dict[str, Any] = worker_result(worker, test_case)
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        assert "the scheduler retries: control store: database is locked" in worker.log.read_text()
+        assert worker.process.poll() is None, worker.log.read_text()
 
 
 @pytest.mark.parametrize(

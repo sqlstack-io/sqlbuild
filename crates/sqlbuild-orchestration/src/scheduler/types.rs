@@ -17,4 +17,7 @@ pub trait RunLauncher {
         store: &ControlStore,
         lease: Option<&SchedulerLease>,
     ) -> impl Future<Output = Result<(), ControlError>> + Send;
+
+    /// Hears each transient store failure the scheduler retries instead of stopping.
+    fn retrying(&mut self, _error: &ControlError) {}
 }

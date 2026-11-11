@@ -105,6 +105,17 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
                     } else {
                         RunOutcome::Failed
                     };
+                    worker.publish_launch_failure(store, lease).await?;
+                    let reason = if worker.child.is_none() {
+                        "worker launch preparation failed before a child started"
+                    } else if worker.recovered
+                        && worker.stopping.is_none()
+                        && state.cancel_requested_at.is_none()
+                    {
+                        "the control service restarted during this run, and its worker stopped without reporting a result"
+                    } else {
+                        "worker stopped; physical exit or absence confirmed"
+                    };
                     publish(
                         store,
                         lease,
@@ -113,7 +124,7 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
                             "local-exit",
                             RunChange::Finished {
                                 outcome,
-                                reason: "worker stopped; physical exit or absence confirmed".into(),
+                                reason: reason.into(),
                                 exit_code: worker.exit.and_then(WorkerExit::code),
                             },
                         ),
@@ -136,6 +147,15 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
         lease: Option<&SchedulerLease>,
     ) -> Result<(), ControlError> {
         self.shutdown_workers(store, lease).await
+    }
+
+    /// A claim whose commit outcome is unknown is adopted by the next recovery pass.
+    fn retrying(&mut self, error: &ControlError) {
+        self.recovered_epoch = None;
+        drop(writeln!(
+            std::io::stderr().lock(),
+            "Control store unavailable; the scheduler retries: {error}"
+        ));
     }
 }
 
@@ -182,6 +202,7 @@ impl Workers {
                     stopping: None,
                     exit: None,
                     launch_failure: None,
+                    recovered: false,
                 });
                 let worker = &mut self.active[index];
                 let claim = &worker.claim;

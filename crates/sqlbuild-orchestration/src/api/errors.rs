@@ -27,6 +27,13 @@ pub struct ApiError {
 
 impl From<ControlError> for ApiError {
     fn from(error: ControlError) -> Self {
+        if error.transient() {
+            return Self {
+                status: StatusCode::SERVICE_UNAVAILABLE,
+                message: "control store is busy; retry the request".into(),
+                decision_id: None,
+            };
+        }
         match error {
             ControlError::Invalid(message) => Self {
                 status: StatusCode::BAD_REQUEST,

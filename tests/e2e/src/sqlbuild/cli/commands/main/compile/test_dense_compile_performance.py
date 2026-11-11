@@ -45,8 +45,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
 _MIB: int = 1024 * 1024
 _GIB: int = 1024 * _MIB
 # Temporary allowance for the native parser switch: each cold wall budget below is its original
-# value times the approved 1.49 dense cold wall ratio ceiling. Drop the multiplier, back to the
-# original value, when the 1.10x same-runner ratio guards return.
+# value times 1.49, the approved dense cold slowdown of native analysis. Drop the multiplier, back
+# to the original value, when the native analysis cold path is optimised.
 _NATIVE_COLD_WALL_ALLOWANCE: float = 1.49
 # A delta reruns the edited model or the edited SQL test's few models; a full compile all of them.
 _MAX_DELTA_ANALYSED_MODELS: int = 10
