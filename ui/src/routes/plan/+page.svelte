@@ -15,7 +15,7 @@
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import { PERMISSIONS } from '$lib/platform/permission-catalog';
 	import { VERBS } from '$lib/run/command-table';
-	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, suggest, windowOf, withVerb, withWindow, type Suggestion } from '$lib/run/command';
+	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
 	import PlanReport from '$lib/run/plan-report.svelte';
 	import { changedModelKeys, readySummary } from '$lib/run/plan-text';
@@ -30,7 +30,10 @@
 	/** The job this run belongs to; the command then only narrows it. */
 	let job = $state<string | null>(page.url.searchParams.get('job'));
 
-	const parts = $derived(parseCommand(cmd));
+	const typed = $derived(parseCommand(cmd));
+	/** For a job run, an option still being typed is left out until it is finished. */
+	const settled = $derived(job ? settledJobCommand(typed) : { parts: typed, typing: false });
+	const parts = $derived(settled.parts);
 	const verb = $derived(parts.verb);
 	const jobProblem = $derived(job ? jobRunProblem(parts) : null);
 	const request = $derived<AdhocRunRequest>({ command: job ? jobBuildTokens(job, parts) : commandTokens(cmd), priority: 0 });
@@ -53,7 +56,7 @@
 	/** Drops the job and keeps what the command selected, as an ad-hoc command. */
 	function detachJob() {
 		if (!job) return;
-		cmd = `sqb ${jobBuildTokens(job, parts).join(' ')}`;
+		cmd = `sqb ${jobBuildTokens(job, typed).join(' ')}`;
 		job = null;
 	}
 
@@ -207,7 +210,7 @@
 	let launchError = $state<string | null>(null);
 	const planned = $derived(check?.verb !== 'build' || planCurrent);
 	const allowed = $derived(job ? jobPermissions.every((p) => p.allowed) : !!check?.launchable);
-	const canLaunch = $derived(fresh && !check?.error && !jobProblem && allowed && planned);
+	const canLaunch = $derived(fresh && !check?.error && !jobProblem && !settled.typing && allowed && planned);
 	const problem = $derived(jobProblem ?? checkError ?? (fresh ? check?.error : null) ?? (planError?.key === requestKey ? planError.message : null));
 	/** One loading state over the whole result, from the first check until the plan arrives, so the page doesn't rebuild itself in steps. */
 	const waiting = $derived<'check' | 'plan' | null>(
@@ -224,7 +227,7 @@
 					(job
 						? jobPermissions.find((p) => !p.allowed) && "You don't have permission to rebuild or reprocess data (run.rewrite_history)"
 						: check?.permissions.find((p) => !p.allowed)?.reason) ??
-					(planned ? undefined : (planError?.message ?? 'Waiting for the plan')))
+					(planned ? (settled.typing ? 'Finish the option you are typing' : undefined) : (planError?.message ?? 'Waiting for the plan')))
 	);
 
 	async function launch() {
@@ -290,8 +293,8 @@
 		</div>
 	</div>
 
-	{#if job && jobDetail.data?.cursorType}
-		<div class="data"><span class="faint">Data</span><DataRange cursorType={jobDetail.data.cursorType} window={runWindow} onchange={(w) => (cmd = withWindow(cmd, w))} /></div>
+	{#if job && jobDetail.data}
+		<div class="data"><span class="faint">Data</span><DataRange cursorType={jobDetail.data.cursorType} window={runWindow} {fullRefresh} onchange={(c) => (cmd = withFullRefresh(withWindow(cmd, c.window), c.fullRefresh))} /></div>
 	{/if}
 
 	{#if problem}<p class="problem-bar" data-testid="adhoc-error">{problem}</p>{/if}

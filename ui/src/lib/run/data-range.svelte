@@ -1,10 +1,18 @@
 <script lang="ts">
-	// Which data a run processes: the latest, as a scheduled run does, or a date range that incremental models
-	// reprocess (`--start-cursor-ts` / `--end-cursor-ts`). The window is the caller's; this only edits it.
+	// Which data a run processes: the latest, as a scheduled run does; a date range that incremental models
+	// reprocess (`--start-cursor-ts` / `--end-cursor-ts`), for jobs with a cursor; or everything, rebuilt from
+	// scratch (`--full-refresh`). The choice is the caller's; this only edits it.
 	import type { CursorWindow } from '$lib/api';
 	import { app } from '$lib/state/app.svelte';
 
-	let { cursorType, window, onchange }: { cursorType: 'timestamp' | 'integer' | null; window: CursorWindow | null; onchange: (w: CursorWindow | null) => void } = $props();
+	type Choice = { window: CursorWindow | null; fullRefresh: boolean };
+	let {
+		cursorType,
+		window,
+		fullRefresh = false,
+		onchange: choose
+	}: { cursorType: 'timestamp' | 'integer' | null; window: CursorWindow | null; fullRefresh?: boolean; onchange: (choice: Choice) => void } = $props();
+	const onchange = (w: CursorWindow | null) => choose({ window: w, fullRefresh: false });
 
 	const canRewrite = $derived(app.can('run.rewrite_history'));
 	const day = 86_400_000;
@@ -25,7 +33,7 @@
 	const preset = $derived(
 		cursorType === 'timestamp' && window && !custom ? (PRESETS.find((p) => { const w = presetWindow(p.days); return w.start === window.start && w.end === window.end; })?.key ?? null) : null
 	);
-	const ranged = $derived(!!window || custom);
+	const ranged = $derived(!fullRefresh && (!!window || custom));
 
 	function setCustom(start: string, end: string) {
 		if (cursorType === 'integer') return onchange({ type: 'integer', start: start || null, end: end || null });
@@ -42,16 +50,21 @@
 	});
 </script>
 
-{#if cursorType}
-	<div class="range" title={canRewrite ? undefined : "Reprocessing a date range needs the rewrite-history permission (run.rewrite_history)"}>
-		<div class="pills" role="group" aria-label="Data">
-			<button aria-pressed={!ranged} onclick={() => { custom = false; onchange(null); }}>Latest data</button>
+<div class="range" title={canRewrite ? undefined : "Reprocessing past data or rebuilding from scratch needs the rewrite-history permission (run.rewrite_history)"}>
+	<div class="pills" role="group" aria-label="Data">
+		<button aria-pressed={!ranged && !fullRefresh} onclick={() => { custom = false; onchange(null); }}>Latest data</button>
+		{#if cursorType}
 			<button aria-pressed={ranged} disabled={!canRewrite} onclick={() => {
 				if (ranged) return;
 				if (cursorType === 'timestamp') onchange(presetWindow(7));
-				else custom = true;
+				else { custom = true; onchange(null); }
 			}}>{cursorType === 'timestamp' ? 'Date range' : 'Cursor range'}</button>
-		</div>
+		{/if}
+		<button aria-pressed={fullRefresh} disabled={!canRewrite} onclick={() => { custom = false; choose({ window: null, fullRefresh: true }); }}>Full refresh</button>
+	</div>
+	{#if fullRefresh}
+		<p class="note">Every model in this run is rebuilt from scratch, replacing all of its data. Recorded in the audit log.</p>
+	{/if}
 		{#if ranged}
 			{#if cursorType === 'timestamp'}
 				<div class="pills" role="group" aria-label="Range">
@@ -76,8 +89,7 @@
 			{/if}
 			<p class="note">Incremental models reprocess this range, replacing what was built for it. Recorded in the audit log.</p>
 		{/if}
-	</div>
-{/if}
+</div>
 
 <style>
 	.range {

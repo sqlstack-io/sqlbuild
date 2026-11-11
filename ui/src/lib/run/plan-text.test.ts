@@ -59,7 +59,7 @@ describe('plan text, as sqb plan prints it', () => {
 
 	it('collapses a plan that is all full refresh into counts by materialization', () => {
 		const full = plan([model('a', { reason: 'full_refresh' }), model('b', { reason: 'full_refresh' }), model('v', { reason: 'full_refresh', materialization_type: 'view' })]);
-		expect(planSections(full)).toEqual([{ title: 'Full refresh', changed: true, entries: [{ name: '2', value: 'table', detail: [] }, { name: '1', value: 'view', detail: [] }] }]);
+		expect(planSections(full)).toEqual([{ title: 'Full refresh', changed: true, entries: [{ name: 'table', value: '2 models', detail: [] }, { name: 'view', value: '1 model', detail: [] }] }]);
 		expect(readySummary(full)).toBe('full refresh, 3 selected');
 	});
 });

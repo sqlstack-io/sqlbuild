@@ -128,6 +128,28 @@ export function withWindow(text: string, window: CursorWindow | null): string {
 	return buildCommand({ ...parts, flags });
 }
 
+/** The command with `--full-refresh` set or removed. */
+export function withFullRefresh(text: string, on: boolean): string {
+	const parts = parseCommand(text);
+	const flags = Object.fromEntries(Object.entries(parts.flags).filter(([flag]) => flag !== '--full-refresh'));
+	if (on) flags['--full-refresh'] = true;
+	return buildCommand({ ...parts, flags });
+}
+
+/** Options a job run takes, for telling an option still being typed from one it can't take. */
+const JOB_OPTIONS = ['--select', '--exclude', ...JOB_RUN_FLAGS];
+
+const unfinished = (flag: string) => !JOB_RUN_FLAGS.includes(flag) && JOB_OPTIONS.some((o) => o.startsWith(flag) && o !== flag);
+
+/**
+ * A job run's command without options still being typed, such as `--` or `--sel`, so typing one neither
+ * reports a problem nor replans; `typing` says one is there, which holds Run until it is finished.
+ */
+export function settledJobCommand(parts: CommandParts): { parts: CommandParts; typing: boolean } {
+	const flags = Object.fromEntries(Object.entries(parts.flags).filter(([flag]) => !unfinished(flag)));
+	return { parts: { ...parts, flags }, typing: Object.keys(flags).length !== Object.keys(parts.flags).length };
+}
+
 /** The `sqb build` command that selects what a narrowed run of `job` builds: each selector intersected with the job. */
 export function jobBuildTokens(job: string, parts: CommandParts): string[] {
 	const out = ['build', '--select', ...(parts.select.length ? parts.select.map((s) => `job:${job},${s}`) : [`job:${job}`])];
