@@ -32,4 +32,4 @@ export type BulkAction = 'cancel' | 'rerun' | 'from_failure';
 export type DisplayRow = { key: string; row: RunRow; child: boolean };
 
 /** The list's live-update indicator. */
-export type Freshness = 'live' | 'reconnecting' | 'stale';
+export type Freshness = 'connecting' | 'live' | 'reconnecting' | 'stale';

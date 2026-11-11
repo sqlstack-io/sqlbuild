@@ -5,8 +5,8 @@ import type { CatalogNode, Check, NodeChange, PlatformEvent, Run, SnapshotChange
 const now = Date.parse('2026-11-09T12:00:00Z');
 const hoursAgo = (h: number) => new Date(now - h * 3_600_000).toISOString();
 
-function run(id: string, status: Run['status'], queuedHoursAgo: number, endedHoursAgo: number | null, jobKey: string | null = 'orders', parentRunId: string | null = null): Run {
-	return { id, status, parentRunId, jobKey, kind: jobKey ? 'job' : 'adhoc', statusReason: null, queuedAt: hoursAgo(queuedHoursAgo), startedAt: hoursAgo(queuedHoursAgo), endedAt: endedHoursAgo === null ? null : hoursAgo(endedHoursAgo) } as Run;
+function run(id: string, status: Run['status'], queuedHoursAgo: number, endedHoursAgo: number | null, jobKey: string | null = 'orders', parentRunId: string | null = null, narrowing: Run['narrowing'] = null): Run {
+	return { id, status, parentRunId, jobKey, narrowing, window: null, kind: jobKey ? 'job' : 'adhoc', statusReason: null, queuedAt: hoursAgo(queuedHoursAgo), startedAt: hoursAgo(queuedHoursAgo), endedAt: endedHoursAgo === null ? null : hoursAgo(endedHoursAgo) } as Run;
 }
 
 const node = (key: string, kind: CatalogNode['kind']) => ({ key, kind }) as CatalogNode;
@@ -25,6 +25,9 @@ describe('overview from live reads', () => {
 		run('fulfilment-failed', 'failed', 4, 3.5, 'fulfilment'),
 		run('catalogue-partial', 'partial', 5, 4.5, 'catalogue'),
 		run('orders-old', 'failed', 6, 5.5),
+		// Neither a cancelled run nor a run of part of a job shows the job has recovered.
+		run('catalogue-cancelled', 'cancelled', 4.2, 1, 'catalogue'),
+		run('orders-part-ok', 'success', 2.4, 0.8, 'orders', null, { select: ['stg_orders'], exclude: [] }),
 		// Queued before the fulfilment failure but ended after it, so fulfilment has recovered.
 		run('fulfilment-ok', 'success', 7, 0.5, 'fulfilment'),
 		run('presumed', 'presumed_failed', 8, 1.5, 'inventory'),
@@ -44,16 +47,17 @@ describe('overview from live reads', () => {
 	});
 
 	it('counts top-level runs queued in the last 24 hours', () => {
-		expect(overview.metrics.runs24h).toEqual({ total: 11, success: 1, warn: 1, partial: 1, failed: 6, active: 2 });
+		expect(overview.metrics.runs24h).toEqual({ total: 13, success: 2, warn: 1, partial: 1, failed: 6, active: 2 });
 	});
 
-	it('lists each job’s latest run once when it ended today without succeeding, newest first, then unresponsive runs and active platform events', () => {
+	it('lists each job’s latest failure once, and each ad-hoc failure, newest first, then unresponsive runs and active platform events', () => {
 		// Acknowledging the orders failure keeps its place and never brings the older orders failure back.
 		expect(overview.attention.map((i) => (i.kind === 'platform_event' ? `event:${i.event.id}` : 'run' in i ? `${i.kind}:${i.run.id}:${i.acknowledged?.by ?? '-'}` : i.kind))).toEqual([
 			'run_problem:presumed:-',
 			'run_problem:adhoc-new:-',
 			'run_problem:orders-new:ada',
 			'run_problem:catalogue-partial:-',
+			'run_problem:adhoc-old:-',
 			'run_unresponsive:stuck:-',
 			'event:scheduler'
 		]);

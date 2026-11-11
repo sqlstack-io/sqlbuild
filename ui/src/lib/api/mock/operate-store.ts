@@ -653,7 +653,7 @@ export class MockOperate {
 		}));
 	}
 
-	/** Liveness of an active run, for the overview's unresponsive item. */
+	/** Problem runs marked handled, by run ID. */
 	#acknowledgements = new Map<string, Acknowledgement>();
 	acknowledgement(runId: string): Acknowledgement | null {
 		return this.#acknowledgements.get(runId) ?? null;
@@ -663,6 +663,7 @@ export class MockOperate {
 		else this.#acknowledgements.delete(runId);
 	}
 
+	/** Liveness of an active run, for the overview's unresponsive item. */
 	lastHeartbeat(runId: string): string | null {
 		const rec = this.#byId(runId);
 		return rec ? (liveness(rec, Date.now())?.lastHeartbeatAt ?? null) : null;

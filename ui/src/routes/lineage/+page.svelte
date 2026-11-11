@@ -459,15 +459,32 @@
 	});
 
 	let fitFlow = $state<((opts?: { duration?: number }) => void) | undefined>();
-	// refit the graph when side panels open/close so nodes never hide behind them
+	// Side panels change the graph's width. The zoom stays where the person left it; the view only pans when
+	// the selected node would otherwise end up behind a panel.
 	let panelKey = '';
 	$effect(() => {
 		const key = `${browserOpen}|${inspectorOpen}|${sqlOpen}`;
 		if (key === panelKey) return;
 		const first = panelKey === '';
 		panelKey = key;
-		if (!first) tick().then(() => fitFlow?.({ duration: 200 }));
+		if (!first) tick().then(keepSelectionInView);
 	});
+	function keepSelectionInView() {
+		const node = nodes.find((n) => n.selected);
+		if (!node || !graphPanel || !setFlowViewport) return;
+		// The SQL drawer lies over the graph's right side, so the visible graph ends where it starts.
+		const panel = graphPanel.getBoundingClientRect();
+		const drawer = graphPanel.parentElement?.querySelector('.sql-drawer')?.getBoundingClientRect();
+		const width = Math.min(panel.right, drawer?.left ?? Infinity) - panel.left;
+		const height = panel.height;
+		const { x, y, zoom } = viewport;
+		const w = (node.measured?.width ?? 236) * zoom;
+		const h = (node.measured?.height ?? 61) * zoom;
+		const left = node.position.x * zoom + x;
+		const top = node.position.y * zoom + y;
+		if (left >= 0 && left + w <= width && top >= 0 && top + h <= height) return;
+		setFlowViewport({ zoom, x: (width - w) / 2 - node.position.x * zoom, y: (height - h) / 2 - node.position.y * zoom });
+	}
 	async function resetLayout() {
 		neighbourhoodOnly = false;
 		if (scaleLayout) {

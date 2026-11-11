@@ -43,8 +43,17 @@ const PAGE_READS: [RegExp, Read][] = [
 	[/^\/providers(\/[^/]+)?$/, (c, s) => [c.listProviders(s)]]
 ];
 
+// The first paint waits for the web fonts, up to a limit, so text doesn't reflow when they arrive.
+// The build imports this module outside a browser to read its options.
+const FONTS = ['13px "Inter Variable"', '600 15px "Space Grotesk Variable"', '12px "IBM Plex Mono"', '500 12px "IBM Plex Mono"'];
+const fontsReady =
+	typeof document === 'undefined'
+		? Promise.resolve()
+		: Promise.race([Promise.all(FONTS.map((font) => document.fonts.load(font))).catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 1500))]);
+
 // Reads only the path, so filter changes within a page don't wait on this.
-export const load: LayoutLoad = ({ url, untrack }) => {
+export const load: LayoutLoad = async ({ url, untrack }) => {
 	const search = untrack(() => url.searchParams);
 	prefetch(app.scope, appPath(url.pathname), search, PAGE_READS);
+	await fontsReady;
 };

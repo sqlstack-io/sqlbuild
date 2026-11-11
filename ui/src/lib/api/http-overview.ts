@@ -22,15 +22,19 @@ export type OverviewInputs = {
 
 /**
  * One problem per job, newest first: the job's latest run that ended today, when that run did not succeed.
- * A later good run clears the job, and acknowledging its latest failure never brings an older one back.
- * Ad-hoc runs count as one job.
+ * Only a later failure or a good run of the whole job replaces it, so a cancelled run or a run of part of the
+ * job never hides a failure, and acknowledging the latest failure never brings an older one back.
+ * Each ad-hoc run is its own item.
  */
 export function problemRunsOf(topLevel: Run[], now: number): Run[] {
 	const latest = new Map<string, Run>();
 	for (const r of topLevel) {
 		if (!r.endedAt || Date.parse(r.endedAt) < now - DAY) continue;
-		const seen = latest.get(r.jobKey ?? '');
-		if (!seen || Date.parse(r.endedAt) > Date.parse(seen.endedAt!)) latest.set(r.jobKey ?? '', r);
+		const settles = PROBLEM_STATUSES.has(r.status) || ((r.status === 'success' || r.status === 'warn') && !r.narrowing && !r.window);
+		if (!settles) continue;
+		const job = r.jobKey ?? `adhoc:${r.id}`;
+		const seen = latest.get(job);
+		if (!seen || Date.parse(r.endedAt) > Date.parse(seen.endedAt!)) latest.set(job, r);
 	}
 	return [...latest.values()].filter((r) => PROBLEM_STATUSES.has(r.status)).sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!));
 }

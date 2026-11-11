@@ -245,6 +245,11 @@
 	text-align: left;
 	white-space: nowrap;
 }
+/* While the loading rows show, the header keeps its height but not its text: its columns are sized from
+   the header alone until the rows arrive, so it would visibly reflow. Header and rows then appear together. */
+.sb-list:has(tr.load-row[role='status']) thead th {
+	color: transparent;
+}
 .sb-list tbody td {
 	padding: 10px 16px;
 	border-bottom: 1px solid var(--border);

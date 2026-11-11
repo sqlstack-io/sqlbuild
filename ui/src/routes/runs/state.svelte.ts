@@ -197,7 +197,7 @@ export function createRunsState() {
 		if (app.connection === 'offline') return 'stale';
 		if (updatedAt != null && app.now - updatedAt > SAFETY_MS + 30_000) return 'stale';
 		if (app.connection === 'live') return 'live';
-		return 'reconnecting';
+		return app.connection === 'connecting' ? 'connecting' : 'reconnecting';
 	});
 
 	// ---- selection and bulk actions ----

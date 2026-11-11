@@ -33,7 +33,12 @@
 	const first = $derived(details.data?.[0] ?? null);
 	/** One run's choices, as its rerun button offers them; reruns of several runs only rerun all or from failure. */
 	const choices = $derived(single && first ? rerunChoices(first, app.client.supports('rerunSelectedNodes') ? picked : [], can) : []);
+	const offered = (m: RerunMode) => (single ? choices.some((c) => c.mode === m && !c.disabledReason) : m !== 'selected');
 	let mode = $state<RerunMode>(requested);
+	// A mode this run can't rerun, typed into the address, falls back to rerunning all.
+	$effect(() => {
+		if (details.data && !offered(mode)) mode = 'all';
+	});
 	const nodesOf = (d: RunDetail): string[] => (mode === 'selected' ? picked : mode === 'from_failure' ? d.rerunFromFailureNodes : d.selection);
 	const blockedOf = (d: RunDetail): string | null => rerunChoices(d, [], can).find((c) => c.mode === (mode === 'selected' ? 'all' : mode))?.disabledReason ?? null;
 	const rows = $derived((details.data ?? []).map((d) => ({ detail: d, nodes: nodesOf(d), blocked: blockedOf(d) })));
@@ -65,11 +70,13 @@
 			ready.map(({ detail }) => (mode === 'selected' ? app.client.rerunSelectedNodes(scope, detail.run.id, picked) : app.client.rerunRun(scope, detail.run.id, mode as Exclude<RerunMode, 'selected'>)))
 		);
 		launching = false;
-		const failed = outcomes.flatMap((o) => (o.status === 'rejected' ? [o.reason] : []));
+		const failed = ready.filter((_, i) => outcomes[i].status === 'rejected').map((r) => r.detail.run.id);
 		const started = outcomes.flatMap((o) => (o.status === 'fulfilled' ? [o.value] : []));
 		if (failed.length) {
-			const reason = failed[0] instanceof Error ? failed[0].message : String(failed[0]);
-			launchError = `${started.length ? `Started ${started.length}; ` : ''}${failed.length} failed: ${reason}`;
+			const first = outcomes.find((o): o is PromiseRejectedResult => o.status === 'rejected')?.reason;
+			launchError = `${started.length ? `Started ${started.length}; ` : ''}${failed.length} failed: ${first instanceof Error ? first.message : String(first)}`;
+			// Only the failed ones stay, so pressing Run again never repeats a rerun that started.
+			if (started.length) await goto(to(rerunHref(failed, mode, mode === 'selected' ? picked : [])), { replaceState: true });
 			return;
 		}
 		await goto(to(started.length === 1 ? `/runs/${started[0].id}` : '/runs'));
