@@ -1,23 +1,22 @@
 <script lang="ts">
 	// A plan in the order and words of `sqb plan`: what runs first, each change with its detail and diff,
-	// then the routine models. The plan page shows it in full; the run panel in a narrow, shorter form.
+	// then the routine models.
 	import { to } from '$lib/paths';
 	import type { PlanDocument } from '$lib/api';
 	import { planSections, type PlanEntry } from './plan-text';
 
-	let { plan, compact = false }: { plan: PlanDocument; compact?: boolean } = $props();
+	let { plan }: { plan: PlanDocument } = $props();
 
 	const sections = $derived(planSections(plan));
 	/** Rows a section shows before "Show all", as the CLI truncates long sections. */
-	const limit = $derived(compact ? 6 : 50);
+	const limit = 50;
 	let expanded = $state<Record<string, boolean>>({});
-	let diffs = $state<Record<string, boolean>>({});
 
 	const href = (e: PlanEntry, title: string) => (/^\d+$/.test(e.name) || title.includes('unction') || title.startsWith('Sources') || title.startsWith('Loaders') ? null : to(`/catalog/model:${e.name}`));
 	const diffClass = (line: string) => (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@') ? 'hunk' : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : '');
 </script>
 
-<div class="report" class:compact>
+<div class="report">
 	{#each sections as s (s.title)}
 		{@const shown = expanded[s.title] ? s.entries : s.entries.slice(0, limit)}
 		<section>
@@ -29,12 +28,9 @@
 					<div class="line">
 						{#if link}<a class="name" href={link}>{e.name}</a>{:else}<span class="name">{e.name}</span>{/if}
 						<span class="value" class:accent={s.changed}>{e.value}</span>
-						{#if hasDiff && compact}
-							<button class="toggle" onclick={() => (diffs[e.name] = !diffs[e.name])}>{diffs[e.name] ? 'Hide diff' : 'Show diff'}</button>
-						{/if}
 					</div>
 					{#each e.detail as d, i (i)}<div class="detail">{d}</div>{/each}
-					{#if hasDiff && (!compact || diffs[e.name])}
+					{#if hasDiff}
 						{#if e.schema?.length}
 							<div class="detail">schema diff:</div>
 							<pre class="diff">{#each e.schema as f (f.text)}<span class={f.sign === '+' ? 'add' : f.sign === '-' ? 'del' : 'hunk'}>{f.sign} {f.text}</span>{'\n'}{/each}</pre>
@@ -74,9 +70,6 @@
 		flex-direction: column;
 		gap: 18px;
 		font-size: 12.5px;
-	}
-	.report.compact {
-		gap: 12px;
 	}
 	h4 {
 		display: flex;
@@ -126,10 +119,6 @@
 		flex: 0 1 auto;
 		width: 280px;
 	}
-	.compact .name {
-		width: auto;
-		flex: 1;
-	}
 	a.name:hover {
 		color: var(--primary);
 	}
@@ -168,15 +157,9 @@
 	.diff .hunk {
 		color: var(--sb-text-faint);
 	}
-	.toggle,
 	.more {
 		color: var(--primary);
 		font-size: 11.5px;
-	}
-	.toggle {
-		margin-left: auto;
-	}
-	.more {
 		align-self: flex-start;
 		padding-top: 4px;
 	}

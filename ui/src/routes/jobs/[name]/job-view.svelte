@@ -2,7 +2,6 @@
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
 	import type { Trigger } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
@@ -18,7 +17,6 @@
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import { formatMs } from '$lib/build-area/labels';
-	import RunPanel from './run-panel.svelte';
 
 	let { name }: { name: string } = $props();
 
@@ -46,12 +44,9 @@
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
 		const showCost = $derived(runs.some((r) => r.cost !== null));
 	const canToggle = $derived(app.can('trigger.toggle'));
-	// Two ways to start a run, side by side while one is chosen: the plan page (default) or a panel here (?flow=panel).
-	const flow = $derived(page.url.searchParams.get('flow') === 'panel' ? 'panel' : 'review');
-	let panelOpen = $state(false);
+	// A run is always reviewed on the plan page before it starts.
 	function run(keys: string[]) {
-		if (flow === 'panel') panelOpen = true;
-		else void goto(to(planHref(keys, 'build', { job: name })));
+		void goto(to(planHref(keys, 'build', { job: name })));
 	}
 	let tab = $state<'overview' | 'runs' | 'code'>('overview');
 	// Nodes picked in the graph, by catalog key. A job runs with or without them; a group's pick runs as an ad-hoc command.
@@ -110,7 +105,6 @@
 	{/if}
 </AppTopbar>
 
-{#if panelOpen && def}<RunPanel job={def} picked={def.kind === 'job' ? picked : []} onclose={() => (panelOpen = false)} />{/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
