@@ -7,6 +7,7 @@ import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
 import type { LocalChangeBus } from '../signals';
 import type {
+	Acknowledgement,
 	AdhocPermission,
 	AdhocRunCheck,
 	PlanResult,
@@ -650,6 +651,16 @@ export class MockOperate {
 			kind: j.kind,
 			triggerIds: TRIGGER_DEFS.filter((t) => t.jobKey === j.key).map((t) => triggerId(t.name))
 		}));
+	}
+
+	/** Problem runs marked handled, by run ID. */
+	#acknowledgements = new Map<string, Acknowledgement>();
+	acknowledgement(runId: string): Acknowledgement | null {
+		return this.#acknowledgements.get(runId) ?? null;
+	}
+	acknowledgeRun(runId: string, acknowledged: boolean, by: string): void {
+		if (acknowledged) this.#acknowledgements.set(runId, { by, at: new Date().toISOString() });
+		else this.#acknowledgements.delete(runId);
 	}
 
 	/** Liveness of an active run, for the overview's unresponsive item. */

@@ -5,8 +5,6 @@ import { app } from './app.svelte';
 
 /** How long a burst of change signals may last before one reload starts. */
 const SIGNAL_PAUSE_MS = 300;
-/** A first load faster than this shows no loading text, so it doesn't flash. */
-const SLOW_MS = 400;
 
 /**
  * The last answer of each read, kept in memory for this page load only, so returning to a page shows
@@ -26,8 +24,6 @@ export type Resource<T> = {
 	readonly data: T | undefined;
 	readonly error: string | null;
 	readonly loading: boolean;
-	/** Loading with nothing to show for longer than a moment; pages show loading text only then. */
-	readonly slow: boolean;
 	refresh(): void;
 };
 
@@ -51,8 +47,6 @@ export function createResource<T>(
 	let data = $state<T | undefined>(undefined);
 	let error = $state<string | null>(null);
 	let loading = $state(true);
-	let slow = $state(false);
-	let slowTimer: ReturnType<typeof setTimeout> | null = null;
 	let shownKey = '';
 	let latest = 0;
 	let settled = 0;
@@ -66,12 +60,7 @@ export function createResource<T>(
 		if (key !== shownKey && remembered.has(key)) data = remembered.get(key) as T;
 		shownKey = key;
 		loading = true;
-		if (slowTimer) clearTimeout(slowTimer);
-		slowTimer = setTimeout(() => (slow = data === undefined), SLOW_MS);
 		const done = () => {
-			if (slowTimer) clearTimeout(slowTimer);
-			slowTimer = null;
-			slow = false;
 			settled = request;
 			if (reloadAgain && request === latest) {
 				reloadAgain = false;
@@ -126,7 +115,6 @@ export function createResource<T>(
 		});
 		return () => {
 			unsubscribe();
-			if (slowTimer) clearTimeout(slowTimer);
 			if (pause) clearTimeout(pause);
 			pause = null;
 		};
@@ -141,9 +129,6 @@ export function createResource<T>(
 		},
 		get loading() {
 			return loading;
-		},
-		get slow() {
-			return slow;
 		},
 		refresh
 	};

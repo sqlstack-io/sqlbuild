@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -56,7 +57,7 @@
 	{:else if location.data === null}
 		<div class="text-muted-foreground px-6 py-4 text-[13px]"><a href={to(`/locations`)} class="back">← Locations</a> No location with ID <code>{id}</code>.</div>
 	{:else if !detail}
-		<div class="text-muted-foreground px-6 py-4 text-[13px]">Loading…</div>
+		<div class="px-6 py-4"><Loading /></div>
 	{:else}
 		<header class="head">
 			<div class="line title-line">

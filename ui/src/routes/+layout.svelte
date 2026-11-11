@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import './layout.css';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -45,7 +46,7 @@
 		</div>
 	</div>
 {:else if !app.scope}
-	<div class="text-muted-foreground grid h-screen place-items-center text-[13px]">Loading…</div>
+	<div class="grid h-screen place-items-center"><div class="w-60"><Loading /></div></div>
 {:else}
 	<div class="flex h-screen overflow-hidden">
 		<AppSidebar />

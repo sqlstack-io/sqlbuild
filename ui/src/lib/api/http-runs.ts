@@ -15,8 +15,12 @@ const PERSON = 'principal:';
 export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 	if (outcome.kind === 'superseded') return { plan: null, error: 'The project changed on the location while it was planning; plan again' };
 	if (outcome.kind !== 'plan') return { plan: null, error: 'The location answered with something other than a plan' };
-	const document = outcome.document as Partial<PlanDocument> & { error?: { code?: string; message?: string } };
-	if (document.error) return { plan: null, error: [document.error.code, document.error.message].filter(Boolean).join(': ') };
+	const document = outcome.document as Partial<PlanDocument> & { error?: { code?: string; message?: string; help?: string | null } };
+	// The help line carries the fix, as `sqb plan` prints it under the error.
+	if (document.error) {
+		const { code, message, help } = document.error;
+		return { plan: null, error: [code, message].filter(Boolean).join(': ') + (help ? `\nhelp: ${help}` : '') };
+	}
 	const list = <T>(value: T[] | undefined): T[] => value ?? [];
 	return {
 		plan: {

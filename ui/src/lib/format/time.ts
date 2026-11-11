@@ -7,7 +7,8 @@ const DAY = 24 * HOUR;
 export function formatAgo(iso: string | null | undefined, now: number): string {
 	if (!iso) return '—';
 	const diff = now - Date.parse(iso);
-	if (diff < 0) return formatIn(iso, now);
+	// The clock ticks once a second and server clocks differ a little, so a moment ago can read a few seconds ahead.
+	if (diff < -10 * SECOND) return formatIn(iso, now);
 	if (diff < 10 * SECOND) return 'just now';
 	// Seconds move in steps of ten, so a ticking label changes rarely.
 	if (diff < MINUTE) return `${Math.floor(diff / (10 * SECOND)) * 10}s ago`;

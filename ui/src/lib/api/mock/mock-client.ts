@@ -237,6 +237,11 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.cancelRun(scope, runId);
 	}
 
+	async acknowledgeRun(scope: Scope, runId: string, acknowledged: boolean): Promise<void> {
+		this.#location(scope);
+		this.#operate.acknowledgeRun(runId, acknowledged, 'you');
+	}
+
 	async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 		this.#location(scope);
 		return this.#operate.rerunRun(scope, runId, mode);

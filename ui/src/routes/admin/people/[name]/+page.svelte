@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
@@ -113,7 +114,7 @@
 							{:else if access.error}
 								<p class="err">Couldn't load: {access.error}</p>
 							{:else}
-								<p class="muted">Loading…</p>
+								<Loading />
 							{/if}
 						</Panel>{/if}
 
@@ -146,7 +147,7 @@
 				</div>
 			</div>
 		{:else}
-			<p class="muted px-6 py-4">Loading…</p>
+			<div class="px-6 py-4"><Loading /></div>
 		{/if}
 	</div>
 {/if}

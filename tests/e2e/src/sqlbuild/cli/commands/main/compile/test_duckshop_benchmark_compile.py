@@ -13,6 +13,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     BenchmarkCoreCopyCompileTestCase,
+    BenchmarkDuckDBPortTestCase,
     BenchmarkProjectCompileTestCase,
     BenchmarkProjectTestPlanTestCase,
 )
@@ -146,3 +147,47 @@ def test_given_benchmark_core_copy_when_compiling_then_leaves_out_the_excluded_a
     )
     assert checksum.returncode == 0, checksum.stdout + checksum.stderr
     assert checksum.stdout.strip() == test_case.expected_compiled_checksum
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        BenchmarkDuckDBPortTestCase(
+            description="duckshop_duckdb",
+            port_script=REPO_ROOT / "benchmarks" / "duckshop" / "scripts" / "duckdb_project.py",
+            expected_final_line_prefix="\u2713 Completed",
+            expected_final_line_fragment=" FAIL=0 ",
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_duckdb_port_when_building_then_every_model_loads_builds_and_passes(
+    test_case: BenchmarkDuckDBPortTestCase, tmp_path: Path
+) -> None:
+    """The DuckDB copy is the demonstration project, so it must compile and build end to end."""
+    project_dir: Path = tmp_path / test_case.description
+    ported: subprocess.CompletedProcess[str] = subprocess.run(
+        ["uv", "run", "-q", "--script", str(test_case.port_script), str(project_dir)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ported.returncode == 0, ported.stdout + ported.stderr
+
+    compiled: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "compile", "--json"),
+        project_dir=project_dir,
+    )
+    assert compiled.returncode == 0, compiled.stdout + compiled.stderr
+    report: dict[str, Any] = json.loads(compiled.stdout)
+    assert report["summary"]["errors"] == 0, report["diagnostics"]
+    assert report["summary"]["models"] > 0
+
+    built: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build"),
+        project_dir=project_dir,
+    )
+    assert built.returncode == 0, built.stdout + built.stderr
+    final_line: str = built.stdout.strip().splitlines()[-1]
+    assert final_line.startswith(test_case.expected_final_line_prefix), built.stdout[-4000:]
+    assert test_case.expected_final_line_fragment in final_line, built.stdout[-4000:]

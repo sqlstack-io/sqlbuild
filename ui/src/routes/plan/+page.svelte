@@ -7,7 +7,7 @@
 	import { page } from '$app/state';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
-	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument, PlanModel } from '$lib/api';
+	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { kindLine } from '$lib/build-area/labels';
@@ -15,7 +15,10 @@
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import { PERMISSIONS } from '$lib/platform/permission-catalog';
 	import { VERBS } from '$lib/run/command-table';
-	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, suggest, withVerb, type Suggestion } from '$lib/run/command';
+	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
+	import DataRange from '$lib/run/data-range.svelte';
+	import PlanReport from '$lib/run/plan-report.svelte';
+	import { changedModelKeys, readySummary } from '$lib/run/plan-text';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
@@ -27,19 +30,25 @@
 	/** The job this run belongs to; the command then only narrows it. */
 	let job = $state<string | null>(page.url.searchParams.get('job'));
 
-	const parts = $derived(parseCommand(cmd));
+	const typed = $derived(parseCommand(cmd));
+	/** For a job run, an option still being typed is left out until it is finished. */
+	const settled = $derived(job ? settledJobCommand(typed) : { parts: typed, typing: false });
+	const parts = $derived(settled.parts);
 	const verb = $derived(parts.verb);
 	const jobProblem = $derived(job ? jobRunProblem(parts) : null);
 	const request = $derived<AdhocRunRequest>({ command: job ? jobBuildTokens(job, parts) : commandTokens(cmd), priority: 0 });
 	const requestKey = $derived(JSON.stringify(request));
 	const mayRun = $derived(app.can(job ? 'job.run' : 'run.adhoc'));
 	const fullRefresh = $derived(parts.flags['--full-refresh'] === true);
+	/** The date range a job run reprocesses, kept in the command as its cursor-window flags. */
+	const runWindow = $derived(windowOf(parts));
+	const jobDetail = createResource((client, scope) => (job ? client.getJob(scope, job) : Promise.resolve(null)), ['jobs', 'snapshot']);
 	/** A job run's permissions, which the server checks when Run is pressed; the dry run only checks ad-hoc ones. */
 	const jobPermissions = $derived(
 		job
 			? [
 					{ action: 'job.run' as const, allowed: app.can('job.run'), reason: null },
-					...(fullRefresh ? [{ action: 'run.rewrite_history' as const, allowed: app.can('run.rewrite_history'), reason: null }] : [])
+					...(fullRefresh || runWindow ? [{ action: 'run.rewrite_history' as const, allowed: app.can('run.rewrite_history'), reason: null }] : [])
 				]
 			: []
 	);
@@ -47,7 +56,7 @@
 	/** Drops the job and keeps what the command selected, as an ad-hoc command. */
 	function detachJob() {
 		if (!job) return;
-		cmd = `sqb ${jobBuildTokens(job, parts).join(' ')}`;
+		cmd = `sqb ${jobBuildTokens(job, typed).join(' ')}`;
 		job = null;
 	}
 
@@ -126,66 +135,13 @@
 	}
 	const planCurrent = $derived(plannedKey === requestKey && !planning);
 
-	const REASONS: { value: string; label: string; tone: string }[] = [
-		{ value: 'source_freshness_error', label: 'Source freshness error', tone: 'var(--sb-error)' },
-		{ value: 'external_upstream_failed', label: 'Upstream failed', tone: 'var(--sb-error)' },
-		{ value: 'full_refresh', label: 'Full refresh', tone: 'var(--sb-warning)' },
-		{ value: 'query_changed', label: 'Query changed', tone: 'var(--sb-warning)' },
-		{ value: 'function_changed', label: 'Function changed', tone: 'var(--sb-warning)' },
-		{ value: 'config_changed', label: 'Config changed', tone: 'var(--sb-warning)' },
-		{ value: 'schema_changed', label: 'Schema changed', tone: 'var(--sb-warning)' },
-		{ value: 'first_run', label: 'First run', tone: 'var(--sb-warning)' },
-		{ value: 'renamed', label: 'Renamed', tone: 'var(--sb-warning)' },
-		{ value: 'normal_incremental', label: 'Incremental', tone: 'var(--primary)' },
-		{ value: 'no_change', label: 'Unchanged', tone: 'var(--sb-success)' },
-		{ value: 'disabled', label: 'Disabled', tone: 'var(--sb-text-faint)' }
-	];
-	const QUIET = new Set(['no_change', 'disabled']);
-	const ACTIONS: Record<string, string> = {
-		create_view: 'create view',
-		create_table: 'create table',
-		incremental_append: 'append',
-		incremental_delete_insert: 'delete + insert',
-		incremental_merge: 'merge',
-		load_seed: 'load seed'
-	};
-	const reasonGroups = $derived.by(() => {
-		const models = plan?.models ?? [];
-		const known = new Set(REASONS.map((r) => r.value));
-		const extra = [...new Set(models.map((m) => m.reason).filter((r) => !known.has(r)))].map((r) => ({ value: r, label: r.replaceAll('_', ' '), tone: 'var(--sb-text-faint)' }));
-		return [...REASONS, ...extra].map((r) => ({ ...r, models: models.filter((m) => m.reason === r.value) })).filter((g) => g.models.length);
-	});
-	const toBuild = $derived((plan?.models ?? []).filter((m) => !QUIET.has(m.reason)).length);
-	function detail(m: PlanModel): string {
-		const parts: string[] = [];
-		if (m.backfill.action === 'full') parts.push('full backfill');
-		if (m.backfill.action === 'bounded') parts.push(`backfill ${m.backfill.duration ?? ''}`.trim());
-		if (m.cursor_column) {
-			const b = m.cursor_bounds;
-			parts.push(b && (b.start || b.end) ? `${m.cursor_column} ${b.start ?? '…'} → ${b.end ?? '…'}` : `cursor ${m.cursor_column}`);
-		}
-		if (m.changed_functions?.length) parts.push(`uses ${m.changed_functions.join(', ')}`);
-		return parts.join(' · ');
-	}
-	const extras = $derived(
-		plan
-			? [
-					{ title: 'Sources to load', rows: plan.source_loads.map((r) => [r.name, [r.write_strategy, r.cursor_column && `cursor ${r.cursor_column}`, r.is_reload && 'reload'].filter(Boolean).join(' · ')]) },
-					{ title: 'Seeds', rows: plan.seeds.map((r) => [r.name, r.reason.replaceAll('_', ' ')]) },
-					{ title: 'Functions', rows: plan.functions.map((r) => [r.name, [r.language, r.reason?.replaceAll('_', ' ')].filter(Boolean).join(' · ')]) },
-					{ title: 'Python', rows: plan.python_nodes.map((r) => [r.name, `${r.kind} · ${r.identity_status}`]) },
-					{ title: 'Migrations', rows: plan.migrations.map((r) => [r.model, [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · ')]) },
-					{ title: 'Column migrations', rows: plan.column_migrations.map((r) => [r.model, `${r.origin_column} → ${r.destination_column} · ${r.decision}`]) },
-					{ title: 'Table type changes', rows: plan.table_type_conversions.map((r) => [r.model, [r.actual_type, r.desired_type].filter(Boolean).join(' → ')]) },
-					{ title: 'Retention', rows: plan.retention.map((r) => [r.model, r.action ?? '']) }
-				].filter((x) => x.rows.length)
-			: []
-	);
-
 	// ---- what a non-build verb picks, from the catalog ----
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const picked = $derived(shown?.selection ?? []);
-	const graphHeight = $derived(picked.length <= 3 ? 190 : picked.length <= 8 ? 270 : 360);
+	let view = $state<'plan' | 'graph'>('plan');
+	/** A large selection draws only what the plan changes; the whole of it would be unreadable. */
+	const GRAPH_LIMIT = 150;
+	const graphKeys = $derived(picked.length > GRAPH_LIMIT && plan ? changedModelKeys(plan) : picked);
 
 	// ---- autocomplete ----
 	let caret = $state(0);
@@ -254,8 +210,12 @@
 	let launchError = $state<string | null>(null);
 	const planned = $derived(check?.verb !== 'build' || planCurrent);
 	const allowed = $derived(job ? jobPermissions.every((p) => p.allowed) : !!check?.launchable);
-	const canLaunch = $derived(fresh && !check?.error && !jobProblem && allowed && planned);
+	const canLaunch = $derived(fresh && !check?.error && !jobProblem && !settled.typing && allowed && planned);
 	const problem = $derived(jobProblem ?? checkError ?? (fresh ? check?.error : null) ?? (planError?.key === requestKey ? planError.message : null));
+	/** One loading state over the whole result, from the first check until the plan arrives, so the page doesn't rebuild itself in steps. */
+	const waiting = $derived<'check' | 'plan' | null>(
+		problem ? null : !shown ? 'check' : shown.verb === 'build' && (planning || (wantsPlan && !planCurrent && !planError)) ? 'plan' : null
+	);
 	const blockedReason = $derived(
 		!mayRun
 			? job
@@ -265,9 +225,9 @@
 				? undefined
 				: (check?.error ??
 					(job
-						? jobPermissions.find((p) => !p.allowed) && "You don't have permission to rebuild from scratch (run.rewrite_history)"
+						? jobPermissions.find((p) => !p.allowed) && "You don't have permission to rebuild or reprocess data (run.rewrite_history)"
 						: check?.permissions.find((p) => !p.allowed)?.reason) ??
-					(planned ? undefined : (planError?.message ?? 'Waiting for the plan')))
+					(planned ? (settled.typing ? 'Finish the option you are typing' : undefined) : (planError?.key === requestKey ? planError.message : 'Waiting for the plan')))
 	);
 
 	async function launch() {
@@ -276,7 +236,7 @@
 		launching = true;
 		launchError = null;
 		try {
-			const narrowing = { select: parts.select, exclude: parts.exclude };
+			const narrowing = { select: parts.select, exclude: parts.exclude, window: runWindow ?? undefined };
 			const run = job
 				? await (fullRefresh ? app.client.launchJobFromScratch(scope, job, narrowing) : app.client.launchJob(scope, job, narrowing))
 				: await app.client.launchAdhocRun(scope, request);
@@ -333,64 +293,40 @@
 		</div>
 	</div>
 
+	{#if job && jobDetail.data}
+		<div class="data"><span class="faint">Data</span><DataRange cursorType={jobDetail.data.cursorType} window={runWindow} {fullRefresh} onchange={(c) => (cmd = withFullRefresh(withWindow(cmd, c.window), c.fullRefresh))} /></div>
+	{/if}
+
 	{#if problem}<p class="problem-bar" data-testid="adhoc-error">{problem}</p>{/if}
 
 	<div class="body">
+		<div class="stage">
 		<div class="main sb-scroll" class:stale={!!shown && (!!problem || !fresh || (planning && !!plan))}>
-			{#if shown?.verb === 'build'}
-				{#if plan}
-					<div class="summary">
-						<b>{plan.selected_count}</b> selected <span>·</span> <b>{toBuild}</b> to build
-						{#if plan.models.length - toBuild}<span>·</span> {plan.models.length - toBuild} unchanged{/if}
-						{#if plan.warnings.length}<span>·</span> <i style:background="var(--sb-warning)"></i>{plan.warnings.length} warning{plan.warnings.length === 1 ? '' : 's'}{/if}
-						<button class="replan" onclick={replan} disabled={planning}><RotateCwIcon size={11} class={planning ? 'animate-spin' : ''} /> {planning ? 'Planning…' : 'Plan again'}</button>
-					</div>
-					{#if plan.warnings.length}
-						<ul class="warnings">
-							{#each plan.warnings as w, i (i)}
-								<li class:err={w.severity === 'error'}>{#if w.code}<code>{w.code}</code>{/if}{w.message}</li>
-							{/each}
-						</ul>
+			{#if shown?.verb}
+				<div class="summary">
+					{#if shown.verb === 'build'}
+						{#if plan}<b>{readySummary(plan)}</b>{/if}
+					{:else}
+						<b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
-				{:else if planning || (wantsPlan && !planError)}
-					<div class="planning" role="status" data-testid="plan-loading">
-						<RotateCwIcon size={13} class="animate-spin" />
-						<div>
-							<div>Planning on the location…</div>
-							<div class="faint">Reading the current warehouse state</div>
-						</div>
+					<div class="tabs" role="tablist">
+						<button role="tab" aria-selected={view === 'plan'} onclick={() => (view = 'plan')}>{shown.verb === 'build' ? 'Plan' : 'Nodes'}</button>
+						<button role="tab" aria-selected={view === 'graph'} onclick={() => (view = 'graph')}>Graph</button>
 					</div>
-				{/if}
-			{:else if shown?.verb}
-				<div class="summary"><b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}</div>
-			{:else if checking && !problem}
-				<p class="msg faint">Checking the command…</p>
+					{#if shown.verb === 'build' && plan}
+						<button class="replan" onclick={replan} disabled={planning}><RotateCwIcon size={11} class={planning ? 'animate-spin' : ''} /> {planning ? 'Planning…' : 'Plan again'}</button>
+					{/if}
+				</div>
 			{/if}
-			{#if shown?.verb === 'build' && plan}
-				<table class="nodes">
-					{#each reasonGroups as g (g.value)}
-						<tbody>
-							<tr class="group"><td colspan="5"><i style:background={g.tone}></i>{g.label} · {g.models.length}</td></tr>
-							{#each g.models as m (m.name)}
-								<tr>
-									<td><a href={to(`/catalog/model:${m.name}`)} class="mono">{m.name}</a></td>
-									<td class="faint">{m.materialization_type}{m.incremental_strategy ? ` · ${m.incremental_strategy}` : ''}</td>
-									<td>{ACTIONS[m.action] ?? m.action.replaceAll('_', ' ')}</td>
-									<td class="faint wrap">{detail(m)}</td>
-									<td class="faint right mono">{m.qualified_name ?? ''}</td>
-								</tr>
-							{/each}
-						</tbody>
-					{/each}
-					{#each extras as x (x.title)}
-						<tbody>
-							<tr class="group"><td colspan="5">{x.title} · {x.rows.length}</td></tr>
-							{#each x.rows as [name, what], i (i)}
-								<tr><td class="mono">{name}</td><td class="faint" colspan="4">{what}</td></tr>
-							{/each}
-						</tbody>
-					{/each}
-				</table>
+			{#if view === 'graph' && shown?.verb && catalog.data && (shown.verb !== 'build' || plan)}
+				{#if graphKeys.length < picked.length}
+					<p class="faint graph-note">{picked.length} nodes are too many to draw, so the graph shows only the {graphKeys.length === 1 ? 'model' : `${graphKeys.length} models`} this plan changes.</p>
+				{/if}
+				{#if graphKeys.length}
+					<div class="graph"><ScopeGraph keys={graphKeys} catalog={catalog.data} onselect={() => {}} /></div>
+				{/if}
+			{:else if shown?.verb === 'build' && plan}
+				<PlanReport {plan} />
 			{:else if shown?.verb && shown.verb !== 'build'}
 				<table class="nodes">
 					<tbody>
@@ -405,13 +341,24 @@
 					</tbody>
 				</table>
 			{/if}
-			{#if shown?.verb && picked.length && catalog.data}
-				<div class="graph" class:below={!!plan || shown?.verb !== 'build'} style:height="{graphHeight}px"><ScopeGraph keys={picked} catalog={catalog.data} onselect={() => {}} /></div>
-			{/if}
 		</div>
 
-		{#if shown?.verb}
+		{#if waiting}
+			<div class="overlay" role="status" data-testid="plan-loading">
+				<div class="spinner-card">
+					<RotateCwIcon size={16} class="animate-spin" />
+					<div>
+						<div>{waiting === 'plan' ? 'Planning on the location…' : 'Checking the command…'}</div>
+						<div class="faint">{waiting === 'plan' ? 'Reading the current warehouse state' : 'Resolving what it selects'}</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+		</div>
+
+		<!-- Always present, so the result never changes width when the check returns. -->
 		<aside class="rail sb-scroll" class:stale={!fresh || !!problem}>
+		{#if shown?.verb}
 				<h3>Permissions</h3>
 				{#each job ? jobPermissions : shown.permissions as p (p.action)}
 					<p class="decision" data-testid="adhoc-permission">
@@ -426,8 +373,8 @@
 						{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code">{value === true ? name : `${name}=${value}`}</span>{/each}
 					</div>
 				{/if}
-		</aside>
 		{/if}
+		</aside>
 	</div>
 
 	<div class="foot">
@@ -560,9 +507,17 @@
 		min-height: 0;
 		flex: 1;
 	}
-	.main {
+	.stage {
+		position: relative;
+		display: flex;
 		min-width: 0;
 		flex: 1;
+	}
+	.main {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		flex-direction: column;
 		overflow: auto;
 		padding: 14px 24px;
 		transition: opacity 0.15s;
@@ -570,9 +525,6 @@
 	.main.stale,
 	.rail.stale {
 		opacity: 0.55;
-	}
-	.msg {
-		font-size: 13px;
 	}
 	.problem-bar {
 		margin: 0;
@@ -582,16 +534,25 @@
 		color: var(--sb-error);
 		font-family: var(--font-mono);
 		font-size: 12px;
+		white-space: pre-line;
 	}
-	.planning {
+	.overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 5;
+		display: grid;
+		place-items: center;
+		background: color-mix(in srgb, var(--background) 72%, transparent);
+	}
+	.spinner-card {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		margin-bottom: 12px;
-		padding: 12px 14px;
+		gap: 12px;
+		padding: 14px 18px;
 		border: 1px solid var(--border);
 		border-radius: 2px;
-		background: var(--sb-inset);
+		background: var(--card);
+		box-shadow: var(--sb-elev);
 		font-size: 12.5px;
 	}
 	.replan {
@@ -604,26 +565,6 @@
 	}
 	.replan:hover:not(:disabled) {
 		color: var(--foreground);
-	}
-	.warnings {
-		margin: 0 0 12px;
-		padding: 0;
-		list-style: none;
-		font-size: 12.5px;
-	}
-	.warnings li {
-		padding: 4px 0 4px 10px;
-		border-left: 2px solid var(--sb-warning);
-	}
-	.warnings li.err {
-		border-left-color: var(--sb-error);
-	}
-	.warnings code {
-		margin-right: 8px;
-		color: var(--sb-text-faint);
-	}
-	.wrap {
-		white-space: normal;
 	}
 	.summary {
 		display: flex;
@@ -641,23 +582,39 @@
 	.summary span {
 		color: var(--sb-text-faint);
 	}
-	i {
-		display: inline-block;
-		width: 7px;
-		height: 7px;
-		margin-right: 6px;
-		border-radius: 50%;
+	.data {
+		display: flex;
+		align-items: flex-start;
+		gap: 14px;
+		padding: 8px 24px;
+		border-bottom: 1px solid var(--border);
 	}
-	.summary i {
-		margin-right: 0;
+	.data > .faint {
+		padding-top: 3px;
+	}
+	.tabs {
+		display: flex;
+		gap: 14px;
+		margin-left: 18px;
+	}
+	.tabs button {
+		padding: 2px 0;
+		border-bottom: 1px solid transparent;
+		color: var(--muted-foreground);
+		font-size: 12px;
+	}
+	.tabs button[aria-selected='true'] {
+		border-bottom-color: var(--foreground);
+		color: var(--foreground);
 	}
 	.graph {
-		margin-bottom: 14px;
-	}
-	.graph.below {
-		margin-top: 16px;
+		min-height: 320px;
+		flex: 1;
 		border: 1px solid var(--border);
 		border-radius: 2px;
+	}
+	.graph-note {
+		margin: 0 0 8px;
 	}
 	.nodes {
 		width: 100%;
@@ -668,15 +625,6 @@
 		padding: 5px 12px 5px 0;
 		border-bottom: 1px solid var(--border-subtle);
 		white-space: nowrap;
-	}
-	.nodes tr.group td {
-		padding-top: 14px;
-		color: var(--sb-text-faint);
-		font-size: 12px;
-		font-weight: 500;
-	}
-	.nodes tbody:first-child tr.group td {
-		padding-top: 4px;
 	}
 	.right {
 		text-align: right;

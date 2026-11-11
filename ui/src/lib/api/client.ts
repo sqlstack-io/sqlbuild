@@ -102,6 +102,8 @@ export interface ApiClient extends PlatformApi {
 	/** Queued runs in claim order, with why each one waits. */
 	listQueue(scope: Scope): Promise<QueueEntry[]>;
 	timeline(scope: Scope, window: { since: string; until: string }): Promise<Timeline>;
+	/** Marks a run handled for everyone who can see it, or withdraws the mark; recorded in the audit log. */
+	acknowledgeRun(scope: Scope, runId: string, acknowledged: boolean): Promise<void>;
 	/** Writes a `cancel_requested` fact; the scheduler then signals the worker. */
 	cancelRun(scope: Scope, runId: string): Promise<Run>;
 	/** `nodes` is required for `selected` and ignored otherwise. */

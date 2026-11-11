@@ -22,8 +22,16 @@
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
 	let fit = $state<((opts?: { duration?: number }) => void) | undefined>();
+	let fitted = $state(false);
 	let shape = '';
 	let laidOut = '';
+	/** Boxes showing only their header. */
+	let collapsed = $state<ReadonlySet<string>>(new Set());
+	function toggle(jobKey: string) {
+		const next = new Set(collapsed);
+		if (!next.delete(jobKey)) next.add(jobKey);
+		collapsed = next;
+	}
 
 	/** Clears the selection, as clicking the empty canvas does. */
 	export function clear() {
@@ -32,8 +40,9 @@
 	}
 
 	$effect(() => {
-		const next = jobGraph(keys, catalog, boxes, members);
-		const sig = next.nodes.map((n) => `${n.id}@${n.parentId ?? ''}`).join(',');
+		const next = jobGraph(keys, catalog, boxes, members, collapsed);
+		for (const n of next.nodes) if (n.type === 'job') n.data = { ...n.data, ontoggle: toggle };
+		const sig = next.nodes.map((n) => `${n.id}@${n.parentId ?? ''}`).join(',') + `|${[...collapsed].join(',')}`;
 		if (sig === shape) {
 			// Same shape: keep positions and sizes, refresh build states.
 			const data = new Map(next.nodes.map((n) => [n.id, n.data]));
@@ -56,18 +65,18 @@
 	});
 </script>
 
-<div class="graph sb-flow">
+<div class="graph sb-flow" class:unfitted={!fitted && nodes.length > 0}>
 	<SvelteFlow
 		bind:nodes
 		bind:edges
 		{nodeTypes}
 		nodesDraggable={false}
 		multiSelectionKey={['Meta', 'Control', 'Shift']}
-		minZoom={0.3}
+		minZoom={0.1}
 		proOptions={{ hideAttribution: true }}
 		onselectionchange={({ nodes: picked }) => onselect(picked.filter((n) => n.type === 'asset').map((n) => n.id))}
 	>
-		<FlowController bind:fitView={fit} />
+		<FlowController bind:fitView={fit} bind:fitted />
 		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 		<Controls showLock={false} />
 	</SvelteFlow>
@@ -81,6 +90,11 @@
 		border: 1px solid var(--border);
 		border-radius: 2px;
 		background: var(--sb-inset);
+	}
+	.unfitted :global(.svelte-flow__viewport),
+	.unfitted :global(.svelte-flow__controls) {
+		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
+		opacity: 0;
 	}
 	.graph :global(.svelte-flow__node-asset) {
 		cursor: pointer;

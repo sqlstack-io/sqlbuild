@@ -74,6 +74,7 @@
 
 
 <ListToolbar
+	loading={checks.data === undefined}
 	bind:query
 	placeholder="Search checks"
 	total="{counts.pass} of {counts.all} passing"
@@ -83,7 +84,7 @@
 	]}
 >
 	{#snippet filters()}
-		<SegmentedFilter bind:value={outcomeFilter} options={outcomeOptions.map((o) => ({ ...o, count: counts[o.value] }))} />
+		<SegmentedFilter loading={checks.data === undefined} bind:value={outcomeFilter} options={outcomeOptions.map((o) => ({ ...o, count: counts[o.value] }))} />
 		<ChoiceFilter label="Attached to" bind:value={attachment} options={(['model', 'source', 'seed', 'end'] as CheckAttachment[]).map((a) => ({ value: a, label: attachmentLabel[a], count: all.filter((c) => c.attachment === a).length }))} />
 		<ChoiceFilter label="Node" bind:value={nodeFilter} options={nodes.map((n) => ({ value: n, label: n, count: all.filter((c) => c.node === n).length }))} />
 	{/snippet}

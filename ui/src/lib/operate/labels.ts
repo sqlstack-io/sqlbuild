@@ -2,6 +2,7 @@
 
 import type {
 	LivenessState,
+	NodeCounts,
 	OnFailure,
 	OverlapPolicy,
 	QueueWait,
@@ -99,6 +100,11 @@ export const onFailurePlain: Record<OnFailure, string> = {
 };
 
 export type WaitPart = { text: string; href?: string; code?: boolean };
+
+/** What went wrong in a finished run, such as "3 failed, 12 skipped"; empty when nothing did. */
+export function outcomeCounts(c: NodeCounts): string {
+	return [c.failed ? `${c.failed} failed` : null, c.skipped ? `${c.skipped} skipped` : null].filter(Boolean).join(', ');
+}
 
 /** `run-4f2a` → `4f2a`, a UUID → its first 8 digits: the short form shown in lists; the full ID stays in links and copies. */
 export function shortRunId(id: string): string {

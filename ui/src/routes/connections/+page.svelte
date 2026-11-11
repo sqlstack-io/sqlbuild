@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import DatabaseIcon from '@lucide/svelte/icons/database';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -59,7 +60,7 @@
 			</div>
 		</Panel>
 	{:else}
-		<p class="muted">{connections.data ? 'No location you can see in full has reported yet.' : connections.slow ? 'Loading…' : ''}</p>
+		{#if connections.data}<p class="muted">No location you can see in full has reported yet.</p>{:else if !connections.error}<Loading />{/if}
 	{/each}
 </div>
 
