@@ -4,7 +4,7 @@
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import type { TimelineBar, TimelineTickMarker } from '$lib/api';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { runKindLabel, runOriginLabel, runStatusLabel, runStatusRank, runStatusTone } from '$lib/status';
@@ -59,8 +59,17 @@
 		['runs', 'ticks']
 	);
 	const now = $derived(timeline.data ? Date.parse(timeline.data.now) : anchor);
+	// Moving the anchor moves the window, which reads again; so it follows the server's clock only once that
+	// is a minute away, not on every answer, which would read again as soon as each answer arrived.
 	$effect(() => {
-		if (timeline.data) anchor = Date.parse(timeline.data.now);
+		// A remembered answer shown while the page reloads is from an earlier visit; only a current one moves the window.
+		const serverNow = timeline.data && !timeline.loading && !timeline.error ? Date.parse(timeline.data.now) : null;
+		if (serverNow !== null && Math.abs(serverNow - untrack(() => anchor)) >= MIN) anchor = serverNow;
+	});
+	// The window moves on with time once a minute, which reads it once.
+	$effect(() => {
+		const timer = setInterval(() => (anchor += MIN), MIN);
+		return () => clearInterval(timer);
 	});
 	const nowPct = $derived(pct(now));
 
