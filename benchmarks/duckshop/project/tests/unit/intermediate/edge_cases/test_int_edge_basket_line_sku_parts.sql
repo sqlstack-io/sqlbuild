@@ -1,0 +1,37 @@
+TEST (name "int_edge_basket_line_sku_parts__splits_skus_through_a_comma_joined_lateral");
+
+WITH __ref__stg_edge_basket_lines AS (
+  SELECT
+    v.line_id::VARCHAR AS line_id,
+    v.basket_id::VARCHAR AS basket_id,
+    v.line_no::NUMBER(38, 0) AS line_no,
+    v.sku::VARCHAR AS sku,
+    v.tag::VARCHAR AS tag
+  FROM VALUES
+    ('BL-01', 'B-1', 1, 'DK-RED-01', 'red'),
+    ('BL-02', 'B-1', 2, 'DK-BLUE-02', 'blue'),
+    ('BL-03', 'B-1', 3, 'DK-RED-03', 'red'),
+    ('BL-04', 'B-2', 1, 'TL-GREEN-01', NULL) AS v(line_id, basket_id, line_no, sku, tag)
+),
+
+__expected__int_edge_basket_line_sku_parts AS (
+  SELECT
+    'BL-01' AS line_id,
+    'DK' AS sku_prefix,
+    'RED' AS sku_colour
+  UNION ALL
+  SELECT
+    'BL-02' AS line_id,
+    'DK' AS sku_prefix,
+    'BLUE' AS sku_colour
+  UNION ALL
+  SELECT
+    'BL-03' AS line_id,
+    'DK' AS sku_prefix,
+    'RED' AS sku_colour
+  UNION ALL
+  SELECT
+    'BL-04' AS line_id,
+    'TL' AS sku_prefix,
+    'GREEN' AS sku_colour
+)

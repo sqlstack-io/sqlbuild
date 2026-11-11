@@ -70,6 +70,59 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
             expected_column_counts={"series": 1, "renamed_orders": 2},
         ),
         DialectSyntaxCompileE2ETestCase(
+            description="DuckDB windows, comma-joined LATERAL and grouped lambdas bind",
+            adapter="duckdb",
+            models={
+                "orders": dialect_syntax_model(
+                    "Orders.", "SELECT 1 AS order_id, 'g' AS grp, 10 AS amount, [1, 2] AS items"
+                ),
+                "neighbours": dialect_syntax_model(
+                    "Neighbours.",
+                    "SELECT o.order_id, LAG(o.amount) OVER (ORDER BY o.order_id) AS prev_1, "
+                    "LAG(o.amount, 2) OVER (ORDER BY o.order_id) AS prev_2, "
+                    "LEAD(o.amount, 1, 0) OVER (ORDER BY o.order_id) AS next_1 "
+                    'FROM __ref("orders") AS o',
+                ),
+                "items": dialect_syntax_model(
+                    "Items.",
+                    'SELECT o.order_id, u.item FROM __ref("orders") AS o, '
+                    "LATERAL (SELECT x.item FROM (SELECT UNNEST(o.items) AS item) AS x) AS u",
+                ),
+                "groups": dialect_syntax_model(
+                    "Groups.",
+                    "SELECT o.grp, list_filter(list(o.amount), lambda e: e > 1) AS big_amounts "
+                    'FROM __ref("orders") AS o GROUP BY o.grp',
+                ),
+            },
+            expected_exit_code=0,
+            expected_codes=(),
+            expected_column_counts={"neighbours": 4, "items": 2, "groups": 2},
+            ignored_rules=("SQLCLEAN039",),
+        ),
+        DialectSyntaxCompileE2ETestCase(
+            description="DuckDB JSON and AT TIME ZONE outputs prove their contract types",
+            adapter="duckdb",
+            models={
+                "orders": dialect_syntax_model(
+                    "Orders.",
+                    "SELECT 1 AS order_id, 10 AS amount, "
+                    "TIMESTAMPTZ '2024-01-01 00:00:00+00' AS placed_at",
+                ),
+                "documents": dialect_syntax_model(
+                    "Documents.",
+                    "SELECT o.order_id, CAST('{\"a\": 1}' AS JSON) AS doc, "
+                    "to_json(o.amount) AS amount_json, "
+                    "o.placed_at AT TIME ZONE 'UTC' AS placed_at_utc "
+                    'FROM __ref("orders") AS o',
+                    ", contract enforced, columns (order_id (type INTEGER), doc (type JSON), "
+                    "amount_json (type JSON), placed_at_utc (type TIMESTAMP))",
+                ),
+            },
+            expected_exit_code=0,
+            expected_codes=(),
+            expected_column_counts={"documents": 4},
+        ),
+        DialectSyntaxCompileE2ETestCase(
             description="Snowflake typed lambdas and subscripts before a colon path parse",
             adapter="snowflake",
             models={
