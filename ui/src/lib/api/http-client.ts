@@ -689,11 +689,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
 					: null,
-				checkResults(scope).catch(() => []),
+				keptRead(`checks ${scope.locationId}`, () => checkResults(scope)).catch(() => []),
 				node.kind === 'source'
 					? null
 					: http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs', { params: { path: { ...path, node_key: node.key }, query: { limit: 100 } } }),
-				Promise.all([listedJobs(scope), listedTriggers(scope)]).then(([j, t]) => nodeJobsOf(node.key, j, t)).catch(() => null),
+				// Read afresh, not through a listing already in flight, which may predate the change that just cleared these.
+				Promise.all([keptRead(`jobs ${scope.locationId}`, () => fetchJobs(scope)), keptRead(`triggers ${scope.locationId}`, () => fetchTriggers(scope))])
+					.then(([j, t]) => nodeJobsOf(node.key, j, t))
+					.catch(() => null),
 				node.relation ? relationStatistics(scope, node.relation) : [],
 				node.materialization?.includes('microbatch')
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/microbatches/{model}', { params: { path: { ...path, model: shortName(node.key) } } })
@@ -800,6 +803,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		inFlight.clear();
 		olderWindows.clear();
 	}
+	/**
+	 * Project-wide lists a node's detail needs only a slice of, kept between node clicks until the next
+	 * change signal, and at most a minute in case a signal was missed while the feed reconnected.
+	 */
+	const kept = new Map<string, { at: number; read: Promise<unknown> }>();
+	const KEEP_MS = 60_000;
+	function keptRead<T>(key: string, load: () => Promise<T>): Promise<T> {
+		const held = kept.get(key);
+		if (held && Date.now() - held.at < KEEP_MS) return held.read as Promise<T>;
+		const read = load();
+		kept.set(key, { at: Date.now(), read });
+		read.catch(() => kept.get(key)?.read === read && kept.delete(key));
+		return read;
+	}
+
 	function shared<T>(key: string, load: () => Promise<T>): Promise<T> {
 		const pending = inFlight.get(key) as Promise<T> | undefined;
 		if (pending) return pending;
@@ -1068,6 +1086,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		return data;
 	}
 
+	implemented.changes.subscribe(() => kept.clear());
 	return new Proxy(implemented, {
 		get(target, property, receiver) {
 			if (property in target) return Reflect.get(target, property, receiver);
