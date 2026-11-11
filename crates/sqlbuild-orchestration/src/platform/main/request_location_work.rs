@@ -29,7 +29,7 @@ pub async fn request_location_work(
                 "plans must be requested by a person on the current publication".into(),
             ));
         }
-        LocationWork::CheckConnection {} => {}
+        LocationWork::CheckConnection {} | LocationWork::SyncWarehouse {} => {}
     }
     if request.target.trim().is_empty()
         || request.reason.trim().is_empty()

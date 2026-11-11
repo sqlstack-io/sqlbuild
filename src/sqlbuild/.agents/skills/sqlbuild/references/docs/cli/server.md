@@ -12,6 +12,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Set retention
 - Grant roles to OIDC groups (beta)
 - Inspect published SQL
+- Sync from the warehouse now
 - Run ad-hoc commands
 - Plan builds
 - Define project roles
@@ -158,6 +159,26 @@ SQL inspection does not execute SQL or return Python source, execution artifacts
 data. Every successful inspection records an audit entry without copying SQL into it. If the
 audit cannot be saved, the request fails without returning SQL. Revocation takes effect on the
 next request, including sessions created by [`sqb login`](login.md).
+
+## Sync from the warehouse now
+
+A code location reads what has been built, checks and freshness back from the warehouse when it
+starts and after each run the server starts has ended. It does not see a `sqb build` you run on
+your own machine until then. To sync now, select **Sync now** on the location's page, or run:
+
+```bash
+sqb control sync \
+  --server https://control.example.com \
+  --location-id "$LOCATION_ID" \
+  --target development
+```
+
+The command prints `{"applied": true}` when the server has queued the request. The location starts
+the sync within a few seconds, and the top bar shows when it last synced. A sync reads the
+warehouse and never writes to it.
+
+Requesting a sync needs the same access as a connection test: Developer or Admin on the location
+and target. Viewer and Operator cannot request one. Every request is recorded in the audit log.
 
 ## Run ad-hoc commands
 

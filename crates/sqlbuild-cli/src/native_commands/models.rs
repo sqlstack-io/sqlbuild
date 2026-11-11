@@ -211,6 +211,14 @@ pub(crate) struct LocationMetadataSync {
 }
 
 impl LocationMetadataSync {
+    /// A person asked for a sync: start one now when idle, or one more after the current one.
+    pub(crate) fn request_sync(&mut self) {
+        self.cycle_started_at = None;
+        if self.idle {
+            self.next_at = tokio::time::Instant::now();
+        }
+    }
+
     /// Failed samples revisit catalog before retrying; no frozen delivery is discarded.
     pub(crate) fn retry_read(&mut self) {
         self.statistics = None;

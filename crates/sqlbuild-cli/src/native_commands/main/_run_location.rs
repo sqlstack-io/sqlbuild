@@ -155,7 +155,7 @@ async fn poll_location(
     tokio::pin!(stopped);
     if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
         if Instant::now() >= work_at {
-            let Some(files) = run_location_work(
+            let Some((files, sync)) = run_location_work(
                 (options, script),
                 (client, poll, &watch),
                 generation,
@@ -167,6 +167,9 @@ async fn poll_location(
             };
             watch = exclude_location_databases(&options.project_dir, files, watch);
             work_at = Instant::now() + Duration::from_secs(2);
+            if sync && let Some(state) = metadata.as_mut() {
+                state.request_sync();
+            }
         }
         if let Some(state) = metadata.take() {
             metadata = sync_location_metadata(

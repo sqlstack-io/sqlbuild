@@ -136,6 +136,8 @@ export interface ApiClient extends PlatformApi {
 
 	/** Null when the location has reported no recent sync. */
 	getWarehouseSync(scope: Scope): Promise<WarehouseSync | null>;
+	/** Asks the location to read SQLBuild's state back from the warehouse now. `connection.test` */
+	requestWarehouseSync(scope: Scope): Promise<void>;
 
 	/** Live "changed" signals (SSE in the server client); consumers refetch. */
 	changes: ChangeSubscription;

@@ -80,6 +80,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRoles',
 	'getRole',
 	'getWarehouseSync',
+	'requestWarehouseSync',
 	'maintenanceHistory',
 	'testConnection',
 	'listWarehouseConnections',
@@ -548,6 +549,16 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return warehouseSyncOf(data);
+		},
+		/** The location takes the request within seconds; the sync's result arrives as a `warehouse_sync` change. */
+		async requestWarehouseSync(scope: Scope): Promise<void> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/warehouse-syncs', {
+				body: { request_id: crypto.randomUUID(), reason: 'Requested from the web UI' },
+				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		},
 		/** Asks the location to connect, then waits for its answer until the request expires. */
 		async testConnection(scope: Scope): Promise<ConnectionTest> {

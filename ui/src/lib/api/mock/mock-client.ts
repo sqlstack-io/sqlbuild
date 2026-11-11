@@ -334,6 +334,16 @@ export class MockApiClient implements ApiClient {
 		return this.#reply({ ...this.#sync(scope) });
 	}
 
+	async requestWarehouseSync(scope: Scope): Promise<void> {
+		this.#require('connection.test');
+		const sync = this.#sync(scope);
+		setTimeout(() => {
+			Object.assign(sync, { lastSyncedAt: new Date().toISOString(), lastError: null });
+			this.changes.emit(`warehouse_sync:${scope.locationId}`);
+		}, 1500);
+		return this.#reply(undefined);
+	}
+
 	// ---- platform and admin: delegated to MockPlatformApi (mock/platform.ts) ----
 
 	platformHealth(...args: Parameters<PlatformApi['platformHealth']>) {

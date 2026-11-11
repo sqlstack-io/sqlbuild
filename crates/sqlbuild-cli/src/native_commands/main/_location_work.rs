@@ -20,13 +20,13 @@ use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
 use crate::native_commands::models::{LocationServe, LocationWatch};
 
-/// Retry the exact completed result after uncertain delivery; never rerun it to obtain a new result.
+/// Retry the exact completed result without rerunning it; `true` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
     (options, script): (&LocationServe, &Path),
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<Vec<PathBuf>>, ControlError> {
+) -> Result<Option<(Vec<PathBuf>, bool)>, ControlError> {
     tokio::pin!(stopped);
     let claim = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
@@ -34,12 +34,12 @@ pub(super) async fn run_location_work(
             Ok(claim) => claim,
             Err(error) => {
                 work_error(&error)?;
-                return Ok(Some(Vec::new()));
+                return Ok(Some((Vec::new(), false)));
             },
         },
     };
     let Some(claim) = claim else {
-        return Ok(Some(Vec::new()));
+        return Ok(Some((Vec::new(), false)));
     };
     let deadline = Instant::now()
         + (claim.lease_expires_at - Utc::now())
@@ -49,12 +49,6 @@ pub(super) async fn run_location_work(
     let outcome = if generation == Some(claim.generation)
         && location_inputs(&options.project_dir, &watch.rules, &watch.local_files) == watch.observed
     {
-        let message = match &claim.request.work {
-            LocationWork::CheckConnection {} => "Checking requested location connection...\n",
-            LocationWork::EvaluateSensor { .. } => "Evaluating requested custom sensor...\n",
-            LocationWork::Plan { .. } => "Planning requested command...\n",
-        };
-        drop(write_output(&[(Stream::Stderr, message)]));
         let mut shutting_down = false;
         let expires = async {
             tokio::select! {
@@ -62,34 +56,13 @@ pub(super) async fn run_location_work(
                 () = tokio::time::sleep_until(deadline) => Ok(()),
             }
         };
-        let checked = match claim.request.work {
-            LocationWork::CheckConnection {} => check_location_connection(options, script, expires)
-                .await?
-                .map(|(healthy, files)| (LocationWorkOutcome::Connection { healthy }, files)),
-            LocationWork::EvaluateSensor { evaluation } => {
-                evaluate_location_sensor(options, script, &evaluation, expires)
-                    .await?
-                    .map(|outcome| {
-                        (
-                            LocationWorkOutcome::SensorEvaluation { outcome },
-                            Vec::new(),
-                        )
-                    })
-            }
-            LocationWork::Plan {
-                selection,
-                settings,
-                ..
-            } => plan_location((options, script), (&selection, &settings), expires)
-                .await?
-                .map(|document| (LocationWorkOutcome::Plan { document }, Vec::new())),
-        };
+        let checked = perform_work((options, script), claim.request.work, expires).await?;
         let Some((outcome, local_files)) = checked else {
             drop(write_output(&[(
                 Stream::Stderr,
                 "Location work stopped before completion; no result reported.\n",
             )]));
-            return Ok((!shutting_down).then_some(files));
+            return Ok((!shutting_down).then_some((files, false)));
         };
         files = local_files;
         let mut expected = watch.observed.clone();
@@ -106,6 +79,7 @@ pub(super) async fn run_location_work(
     } else {
         LocationWorkOutcome::Superseded {}
     };
+    let sync = matches!(outcome, LocationWorkOutcome::SyncStarted {});
     let result = LocationWorkResult {
         claim_id: claim.claim_id,
         session_id: poll.session_id,
@@ -123,7 +97,7 @@ pub(super) async fn run_location_work(
                     Stream::Stderr,
                     "Location work completed.\n",
                 )]));
-                return Ok(Some(files));
+                return Ok(Some((files, sync)));
             }
             Err(error) => {
                 work_error(&error)?;
@@ -141,7 +115,45 @@ pub(super) async fn run_location_work(
         Stream::Stderr,
         "Location work acknowledgement expired; check the server result before retrying.\n",
     )]));
-    Ok(Some(files))
+    Ok(Some((files, sync)))
+}
+
+/// One named operation; `None` means it stopped at shutdown or its lease ended.
+async fn perform_work(
+    (options, script): (&LocationServe, &Path),
+    work: LocationWork,
+    expires: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<(LocationWorkOutcome, Vec<PathBuf>)>, ControlError> {
+    let message = match &work {
+        LocationWork::CheckConnection {} => "Checking requested location connection...\n",
+        LocationWork::SyncWarehouse {} => "Synchronizing warehouse history on request...\n",
+        LocationWork::EvaluateSensor { .. } => "Evaluating requested custom sensor...\n",
+        LocationWork::Plan { .. } => "Planning requested command...\n",
+    };
+    drop(write_output(&[(Stream::Stderr, message)]));
+    Ok(match work {
+        LocationWork::SyncWarehouse {} => Some((LocationWorkOutcome::SyncStarted {}, Vec::new())),
+        LocationWork::CheckConnection {} => check_location_connection(options, script, expires)
+            .await?
+            .map(|(healthy, files)| (LocationWorkOutcome::Connection { healthy }, files)),
+        LocationWork::EvaluateSensor { evaluation } => {
+            evaluate_location_sensor(options, script, &evaluation, expires)
+                .await?
+                .map(|outcome| {
+                    (
+                        LocationWorkOutcome::SensorEvaluation { outcome },
+                        Vec::new(),
+                    )
+                })
+        }
+        LocationWork::Plan {
+            selection,
+            settings,
+            ..
+        } => plan_location((options, script), (&selection, &settings), expires)
+            .await?
+            .map(|document| (LocationWorkOutcome::Plan { document }, Vec::new())),
+    })
 }
 
 fn work_error(error: &ClientError) -> Result<(), ControlError> {

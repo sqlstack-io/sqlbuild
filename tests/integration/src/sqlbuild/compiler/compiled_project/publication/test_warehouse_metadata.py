@@ -45,6 +45,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
     record_finished_run,
+    request_warehouse_sync,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     append_audit_history,
@@ -63,6 +64,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     snapshot_api,
     sync_warehouse_history,
     wait_for_generation,
+    wait_for_location_work,
     wait_for_warehouse_sync_health,
     warehouse_history_page,
     warehouse_history_pages,
@@ -1094,6 +1096,17 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
             assert (
                 log.read_text().count("Warehouse history synchronization completed.") == completed
             ), "an idle location read the warehouse without a run ending"
+            work: dict[str, Any] = wait_for_location_work(
+                api, request_warehouse_sync(control), location, log
+            )
+            assert work["result_json"]["outcome"] == {"kind": "sync_started"}
+            deadline = time.monotonic() + 45
+            while (
+                log.read_text().count("Warehouse history synchronization completed.") == completed
+            ):
+                assert location.poll() is None, log.read_text()
+                assert time.monotonic() < deadline, log.read_text()
+                time.sleep(0.05)
             for availability in fixture["availability"]:
                 _ = (project / availability["source"]).rename(project / availability["destination"])
                 record_finished_run(control)

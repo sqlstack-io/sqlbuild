@@ -69,6 +69,8 @@ pub struct LocationHealthObservation {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LocationWork {
     CheckConnection {},
+    /// Read SQLBuild's state and catalog back from the warehouse now, not only after a run ends.
+    SyncWarehouse {},
     EvaluateSensor {
         #[schema(value_type = Object)]
         evaluation: Box<SensorEvaluationRequest>,
@@ -100,9 +102,10 @@ pub struct PlanRequest {
     pub command: Vec<String>,
 }
 
+/// A person asks a location for one named read-only operation, such as a connection test.
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-pub struct ConnectionTestRequest {
+pub struct PersonWorkRequest {
     pub request_id: Uuid,
     pub reason: String,
 }
@@ -138,6 +141,8 @@ pub enum LocationWorkOutcome {
         #[schema(value_type = Object)]
         document: serde_json::Value,
     },
+    /// The location took the request; its next metadata sync reads the warehouse.
+    SyncStarted {},
     Superseded {},
 }
 

@@ -59,6 +59,7 @@ use crate::api::_helpers::resources::{
     person_bootstrap::read,
     person_maintenance::coverage,
     person_location_work::request,
+    person_location_work::request_sync,
     person_location_work::result,
     person_plans::request,
     person_plans::read,

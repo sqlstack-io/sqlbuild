@@ -1,8 +1,10 @@
 """An installed CLI inspects actual published SQL through a bounded live person session."""
 
 import json
+import sqlite3
 import subprocess
 import sys
+from contextlib import closing
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -103,6 +105,16 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
             "--target",
             "development",
         ]
+        sync: list[str] = [
+            binary,
+            "control",
+            "sync",
+            *common,
+            "--location-id",
+            worker.api.location_id,
+            "--target",
+            "development",
+        ]
         absent: subprocess.CompletedProcess[str] = invoke(command)
         assert absent.returncode != 0 and not absent.stdout and "not signed in" in absent.stderr
         with pending_login(
@@ -126,6 +138,12 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
         assert (
             denied.returncode != 0 and not denied.stdout and "HTTP 403; decision " in denied.stderr
         )
+        refused: subprocess.CompletedProcess[str] = invoke(sync)
+        assert (
+            refused.returncode != 0
+            and not refused.stdout
+            and "Warehouse sync request rejected (HTTP 403; decision " in refused.stderr
+        )
         administrator, _ = browser(origin, certificate)
         admin_csrf: str = sign_in(
             administrator, origin, "password", admin["name"], "orders-person-password-2026"
@@ -140,6 +158,15 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
             request(administrator, origin + "/api/admin/roles", assignment, csrf=admin_csrf)[0]
             == 200
         )
+        requested: subprocess.CompletedProcess[str] = invoke(sync)
+        assert requested.returncode == 0, requested.stderr
+        assert json.loads(requested.stdout) == {"applied": True}
+        with closing(sqlite3.connect(tmp_path / "control/.sqlbuild/control.sqlite3")) as store:
+            queued: list[tuple[str]] = store.execute(
+                "SELECT requested_by FROM sqb_location_work "
+                "WHERE json_extract(request_json,'$.work.kind')='sync_warehouse'"
+            ).fetchall()
+        assert queued == [("principal:" + person["principal_id"],)]
         inspected: subprocess.CompletedProcess[str] = invoke(command)
         assert inspected.returncode == 0 and "Published SQL read successfully" in inspected.stderr
         sql: dict[str, Any] = json.loads(inspected.stdout)
@@ -182,6 +209,7 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
             and not revoked.stdout
             and "HTTP 403; decision " in revoked.stderr
         )
+        assert invoke(sync).returncode != 0
         changed: subprocess.CompletedProcess[str] = administer(
             (Path(binary), tmp_path / "control"),
             ["set-password", person["principal_id"]],

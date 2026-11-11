@@ -3,11 +3,15 @@
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::decision::text;
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::main::_run_warehouse_sync::run_warehouse_sync;
 use crate::person_login::main::read_node_sql::read_node_sql;
 
 pub(crate) fn run_person_invocation(namespace: &Namespace) -> Option<i32> {
     if text(namespace, "command").as_deref() != Some("control") {
         return None;
+    }
+    if text(namespace, "person_action").as_deref() == Some("sync") {
+        return Some(run_warehouse_sync(namespace));
     }
     drop(write_output(&[(
         Stream::Stderr,

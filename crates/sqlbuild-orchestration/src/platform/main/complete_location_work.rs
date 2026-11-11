@@ -93,7 +93,8 @@ fn redacted(result: &LocationWorkResult) -> LocationWorkResult {
 fn valid_outcome(work: &LocationWork, outcome: &LocationWorkOutcome) -> bool {
     match (work, outcome) {
         (_, LocationWorkOutcome::Superseded {})
-        | (LocationWork::CheckConnection {}, LocationWorkOutcome::Connection { .. }) => true,
+        | (LocationWork::CheckConnection {}, LocationWorkOutcome::Connection { .. })
+        | (LocationWork::SyncWarehouse {}, LocationWorkOutcome::SyncStarted {}) => true,
         (LocationWork::Plan { .. }, LocationWorkOutcome::Plan { document }) => {
             document
                 .as_object()

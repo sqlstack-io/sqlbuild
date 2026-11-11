@@ -1,4 +1,4 @@
-//! Person connection tests use live built-ins and the same atomic work queue on both stores.
+//! Person connection tests and warehouse syncs use live built-ins and the same atomic work queue on both stores.
 
 use uuid::Uuid;
 
@@ -130,6 +130,28 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             );
             assert_eq!(result.requested_by, format!("principal:{person}"));
             assert!(result.result_json.is_none());
+            let sync = LocationWorkRequest {
+                request_id: Uuid::now_v7(),
+                reason: "Sync orders state now".into(),
+                work: LocationWork::SyncWarehouse {},
+                ..request.clone()
+            };
+            assert!(
+                request_location_work(store, (&context, Some(credentials)), &sync)
+                    .await
+                    .expect("connection-test authority requests a sync")
+            );
+            assert!(
+                read_person_connection_test(
+                    store,
+                    (&context, credentials),
+                    (location, "development", sync.request_id)
+                )
+                .await
+                .expect("authorized read")
+                .is_none(),
+                "a sync request never reads back as a connection test"
+            );
             for (other, target) in [(Uuid::now_v7(), "development"), (location, "preview")] {
                 assert!(matches!(
                     read_person_connection_test(
@@ -163,6 +185,18 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             .expect("live revoke");
             assert!(matches!(
                 request_location_work(store, (&context, Some(credentials)), &request).await,
+                Err(ControlError::Denied { .. })
+            ));
+            assert!(matches!(
+                request_location_work(
+                    store,
+                    (&context, Some(credentials)),
+                    &LocationWorkRequest {
+                        request_id: Uuid::now_v7(),
+                        ..sync
+                    }
+                )
+                .await,
                 Err(ControlError::Denied { .. })
             ));
             assert!(matches!(

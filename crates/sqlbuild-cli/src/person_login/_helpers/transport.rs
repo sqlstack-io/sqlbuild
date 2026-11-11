@@ -4,11 +4,14 @@ use std::path::Path;
 use std::time::Duration;
 
 use reqwest::header::{AUTHORIZATION, HeaderValue};
-use sqlbuild_orchestration::api::models::ApiErrorBody;
+use sqlbuild_orchestration::api::main::parse_origin::parse_origin;
+use sqlbuild_orchestration::api::models::{ApiErrorBody, MutationResponse};
 use sqlbuild_orchestration::credentials::models::SessionIdentity;
+use sqlbuild_orchestration::platform::models::PersonWorkRequest;
 use sqlbuild_orchestration::snapshots::models::NodeSql;
 use uuid::Uuid;
 
+use crate::person_login::_helpers::credentials;
 use crate::person_login::constants::REQUEST_SECONDS;
 use crate::person_login::models::{PersonClient, PersonCredential};
 
@@ -36,6 +39,21 @@ pub(crate) fn connect(origin: &str, ca: Option<&Path>) -> Result<PersonClient, s
             .map_err(|_| std::io::Error::other("could not initialize the HTTPS client"))?,
         origin: origin.into(),
     })
+}
+
+/// Runs one request with the saved credential for `server`, failing when nobody is signed in.
+pub(crate) fn with_person_session<T>(
+    (server, ca): (&str, Option<&Path>),
+    request: impl AsyncFnOnce(&PersonClient, &PersonCredential) -> Result<T, std::io::Error>,
+) -> Result<T, std::io::Error> {
+    let origin = parse_origin(server, "CLI").map_err(std::io::Error::other)?;
+    let credential = credentials::load(&origin)?
+        .ok_or_else(|| std::io::Error::other("not signed in; run sqb login"))?;
+    let client = connect(&origin, ca)?;
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(request(&client, &credential))
 }
 
 pub(crate) fn authorized(
@@ -104,6 +122,65 @@ pub(crate) async fn node_sql(
     credential: &PersonCredential,
     (location, target, node): (Uuid, &str, &str),
 ) -> Result<Option<NodeSql>, std::io::Error> {
+    let path = target_path(client, (location, target), &["nodes", node, "sql"])?;
+    send_json(
+        authorized(client, reqwest::Method::GET, &path, credential)?,
+        (
+            "read published SQL from",
+            "SQL inspection",
+            "SQL inspection result",
+        ),
+    )
+    .await
+}
+
+/// Whether the server queued the request; `false` means this request ID was already queued.
+pub(crate) async fn warehouse_sync(
+    client: &PersonClient,
+    credential: &PersonCredential,
+    (location, target): (Uuid, &str),
+) -> Result<bool, std::io::Error> {
+    let path = target_path(client, (location, target), &["warehouse-syncs"])?;
+    let request = PersonWorkRequest {
+        request_id: Uuid::now_v7(),
+        reason: "Requested from the CLI".into(),
+    };
+    send_json::<MutationResponse>(
+        authorized(client, reqwest::Method::POST, &path, credential)?.json(&request),
+        (
+            "request a warehouse sync from",
+            "Warehouse sync request",
+            "warehouse sync response",
+        ),
+    )
+    .await
+    .map(|response| response.applied)
+}
+
+/// Each failure names the action, e.g. "could not read published SQL from the server".
+async fn send_json<T: serde::de::DeserializeOwned>(
+    request: reqwest::RequestBuilder,
+    (unreachable, action, result): (&str, &str, &str),
+) -> Result<T, std::io::Error> {
+    let response = request
+        .send()
+        .await
+        .map_err(|_| std::io::Error::other(format!("could not {unreachable} the server")))?;
+    if !response.status().is_success() {
+        return Err(rejection(response, action).await);
+    }
+    response
+        .json()
+        .await
+        .map_err(|_| std::io::Error::other(format!("server returned an invalid {result}")))
+}
+
+/// Each segment is percent-encoded, so a target or node key cannot change the route.
+fn target_path(
+    client: &PersonClient,
+    (location, target): (Uuid, &str),
+    rest: &[&str],
+) -> Result<String, std::io::Error> {
     let mut url = reqwest::Url::parse(&client.origin).map_err(std::io::Error::other)?;
     url.path_segments_mut()
         .map_err(|()| std::io::Error::other("invalid server origin"))?
@@ -115,39 +192,26 @@ pub(crate) async fn node_sql(
             &location.to_string(),
             "targets",
             target,
-            "nodes",
-            node,
-            "sql",
-        ]);
-    let response = authorized(client, reqwest::Method::GET, url.path(), credential)?
-        .send()
-        .await
-        .map_err(|_| std::io::Error::other("could not read published SQL from the server"))?;
+        ])
+        .extend(rest);
+    Ok(url.path().to_owned())
+}
+
+async fn rejection(response: reqwest::Response, action: &str) -> std::io::Error {
     let status = response.status();
-    if !status.is_success() {
-        if status == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(std::io::Error::other(
-                "CLI session is unavailable or revoked; run sqb login again",
-            ));
-        }
-        let decision = response
-            .json::<ApiErrorBody>()
-            .await
-            .map_err(|_| {
-                std::io::Error::other(format!(
-                    "SQL inspection rejected (HTTP {}); invalid error response",
-                    status.as_u16()
-                ))
-            })?
-            .decision_id;
-        return Err(std::io::Error::other(format!(
-            "SQL inspection rejected (HTTP {}{})",
-            status.as_u16(),
-            decision.map_or_else(String::new, |id| format!("; decision {id}"))
-        )));
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        return std::io::Error::other("CLI session is unavailable or revoked; run sqb login again");
     }
-    response
-        .json()
-        .await
-        .map_err(|_| std::io::Error::other("server returned an invalid SQL inspection result"))
+    match response.json::<ApiErrorBody>().await {
+        Ok(body) => std::io::Error::other(format!(
+            "{action} rejected (HTTP {}{})",
+            status.as_u16(),
+            body.decision_id
+                .map_or_else(String::new, |id| format!("; decision {id}"))
+        )),
+        Err(_) => std::io::Error::other(format!(
+            "{action} rejected (HTTP {}); invalid error response",
+            status.as_u16()
+        )),
+    }
 }

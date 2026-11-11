@@ -2,7 +2,7 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
 
-	// The location syncs SQLBuild's own tables from the warehouse on its own schedule;
+	// The location syncs SQLBuild's own tables from the warehouse after each run ends and on request;
 	// the shell only says when that last happened.
 	const sync = $derived(app.warehouseSync);
 
