@@ -38,6 +38,7 @@
 		background: transparent;
 		color: var(--muted-foreground);
 		font-size: 12.5px;
+		white-space: nowrap;
 	}
 	.segmented-filter button:hover {
 		color: var(--foreground);

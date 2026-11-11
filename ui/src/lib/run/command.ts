@@ -3,7 +3,7 @@
 // nodes. The server resolves selectors and refuses flags; nothing here decides
 // whether a command may run. Pure: no side effects.
 
-import type { CursorWindow, LaunchVerb, SnapshotNode } from '$lib/api';
+import type { CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
 import { flagSpec, VERBS, type FlagSpec } from './command-table';
 
 /** The command line read for the panel's own controls: verb tabs, flag hints and verb switching. */
@@ -91,6 +91,12 @@ export function tokenAt(text: string, caret: number): TokenContext {
 export function planHref(selection: string[] = [], verb: LaunchVerb = 'build', narrowing: { job?: string; exclude?: string[] } = {}): string {
 	const command = buildCommand({ verb, select: selection.map(selectorOf), exclude: (narrowing.exclude ?? []).map(selectorOf), flags: {} });
 	return `/plan?cmd=${encodeURIComponent(command)}${narrowing.job ? `&job=${encodeURIComponent(narrowing.job)}` : ''}`;
+}
+
+/** The review page for rerunning runs, opened before anything reruns; `nodes` only for one run's selected nodes. */
+export function rerunHref(runIds: string[], mode: RerunMode, nodes: string[] = []): string {
+	const query = new URLSearchParams([...runIds.map((id) => ['run', id]), ['mode', mode], ...nodes.map((n) => ['node', n])]);
+	return `/plan/rerun?${query}`;
 }
 
 /** An RFC 3339 timestamp with a zone, the form the server reads a job run's window in. */

@@ -2,6 +2,8 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { untrack } from 'svelte';
 import { channelMatches, isRefusal, type RunRow, type RunTabCounts } from '$lib/api';
+import { to } from '$lib/paths';
+import { rerunHref } from '$lib/run/command';
 import { app } from '$lib/state/app.svelte';
 import type { BulkAction, DisplayRow, Freshness, ListParams } from './types';
 import { eligibleIds, readParams, toQuery, writeParams } from './utils';
@@ -232,6 +234,11 @@ export function createRunsState() {
 
 	/** First click arms, second click runs; any selection change disarms. */
 	async function bulk(action: BulkAction) {
+		// Reruns are reviewed first, like every other run; only cancelling is confirmed here.
+		if (action !== 'cancel') {
+			void goto(to(rerunHref(eligibleFor[action], action === 'rerun' ? 'all' : 'from_failure')));
+			return;
+		}
 		if (armed !== action) {
 			armed = action;
 			return;
@@ -243,11 +250,11 @@ export function createRunsState() {
 		busy = action;
 		result = null;
 		const outcomes = await Promise.allSettled(
-			ids.map((id) => (action === 'cancel' ? app.client.cancelRun(scope, id) : app.client.rerunRun(scope, id, action === 'rerun' ? 'all' : 'from_failure')))
+			ids.map((id) => app.client.cancelRun(scope, id))
 		);
 		const failed = ids.filter((_, i) => outcomes[i].status === 'rejected');
 		const firstError = outcomes.find((o): o is PromiseRejectedResult => o.status === 'rejected');
-		const verb = action === 'cancel' ? 'Cancel requested for' : 'Started reruns of';
+		const verb = 'Cancel requested for';
 		const ok = ids.length - failed.length;
 		result = failed.length
 			? { text: `${ok ? `${verb} ${ok} run${ok === 1 ? '' : 's'}. ` : ''}${failed.length} failed: ${message(firstError?.reason)}. The failed runs stay selected.`, failed: true }
