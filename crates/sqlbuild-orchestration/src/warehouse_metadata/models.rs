@@ -305,58 +305,78 @@ impl WarehouseHistoryKind {
         Self::Statistics,
     ];
 
+    /// Wire name, control-store mirror table and warehouse state table of each kind.
+    const fn names(self) -> (&'static str, &'static str, Option<&'static str>) {
+        match self {
+            Self::Fingerprints => (
+                "fingerprints",
+                "sqb_warehouse_fingerprints",
+                Some(FINGERPRINT_TABLE_NAME),
+            ),
+            Self::SourceFreshness => (
+                "source_freshness",
+                "sqb_warehouse_freshness",
+                Some(SOURCE_FRESHNESS_TABLE_NAME),
+            ),
+            Self::AuditResults => (
+                "audit_results",
+                "sqb_warehouse_audit_results",
+                Some(AUDIT_RESULTS_TABLE_NAME),
+            ),
+            Self::JanitorEvents => (
+                "janitor_events",
+                "sqb_warehouse_janitor_events",
+                Some(JANITOR_EVENTS_TABLE_NAME),
+            ),
+            Self::Migrations => (
+                "migrations",
+                "sqb_warehouse_migrations",
+                Some(MIGRATION_TABLE_NAME),
+            ),
+            Self::OldNameViews => (
+                "old_name_views",
+                "sqb_warehouse_old_name_views",
+                Some(OLD_NAME_VIEW_TABLE_NAME),
+            ),
+            Self::Microbatches => (
+                "microbatches",
+                "sqb_warehouse_microbatches",
+                Some(MICROBATCH_TABLE_NAME),
+            ),
+            Self::ColumnMigrations => (
+                "column_migrations",
+                "sqb_warehouse_column_migrations",
+                Some(COLUMN_MIGRATION_TABLE_NAME),
+            ),
+            Self::NodeResults => (
+                "node_results",
+                "sqb_warehouse_node_results",
+                Some(NODE_RESULTS_TABLE_NAME),
+            ),
+            Self::Consumption => (
+                "consumption",
+                "sqb_warehouse_consumption",
+                Some(CONSUMPTION_TABLE_NAME),
+            ),
+            Self::Catalog => ("catalog", "sqb_warehouse_catalog", None),
+            Self::Statistics => ("statistics", "sqb_warehouse_statistics", None),
+        }
+    }
+
     #[must_use]
     pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Fingerprints => "fingerprints",
-            Self::SourceFreshness => "source_freshness",
-            Self::AuditResults => "audit_results",
-            Self::JanitorEvents => "janitor_events",
-            Self::Migrations => "migrations",
-            Self::OldNameViews => "old_name_views",
-            Self::Microbatches => "microbatches",
-            Self::ColumnMigrations => "column_migrations",
-            Self::NodeResults => "node_results",
-            Self::Consumption => "consumption",
-            Self::Catalog => "catalog",
-            Self::Statistics => "statistics",
-        }
+        self.names().0
     }
 
     /// The state table a kind mirrors; catalog and statistics read the warehouse catalog instead.
     #[must_use]
     pub const fn source_table(self) -> Option<&'static str> {
-        match self {
-            Self::Fingerprints => Some(FINGERPRINT_TABLE_NAME),
-            Self::SourceFreshness => Some(SOURCE_FRESHNESS_TABLE_NAME),
-            Self::AuditResults => Some(AUDIT_RESULTS_TABLE_NAME),
-            Self::JanitorEvents => Some(JANITOR_EVENTS_TABLE_NAME),
-            Self::Migrations => Some(MIGRATION_TABLE_NAME),
-            Self::OldNameViews => Some(OLD_NAME_VIEW_TABLE_NAME),
-            Self::Microbatches => Some(MICROBATCH_TABLE_NAME),
-            Self::ColumnMigrations => Some(COLUMN_MIGRATION_TABLE_NAME),
-            Self::NodeResults => Some(NODE_RESULTS_TABLE_NAME),
-            Self::Consumption => Some(CONSUMPTION_TABLE_NAME),
-            Self::Catalog | Self::Statistics => None,
-        }
+        self.names().2
     }
 
     #[must_use]
     pub const fn mirror_table(self) -> &'static str {
-        match self {
-            Self::Fingerprints => "sqb_warehouse_fingerprints",
-            Self::SourceFreshness => "sqb_warehouse_freshness",
-            Self::AuditResults => "sqb_warehouse_audit_results",
-            Self::JanitorEvents => "sqb_warehouse_janitor_events",
-            Self::Migrations => "sqb_warehouse_migrations",
-            Self::OldNameViews => "sqb_warehouse_old_name_views",
-            Self::Microbatches => "sqb_warehouse_microbatches",
-            Self::ColumnMigrations => "sqb_warehouse_column_migrations",
-            Self::NodeResults => "sqb_warehouse_node_results",
-            Self::Consumption => "sqb_warehouse_consumption",
-            Self::Catalog => "sqb_warehouse_catalog",
-            Self::Statistics => "sqb_warehouse_statistics",
-        }
+        self.names().1
     }
 }
 
