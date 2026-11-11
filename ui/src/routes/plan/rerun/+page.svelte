@@ -24,6 +24,9 @@
 	const picked = page.url.searchParams.getAll('node');
 	const requested = (page.url.searchParams.get('mode') ?? 'all') as RerunMode;
 	const single = runIds.length === 1;
+	// Runs whose rerun already started; the page drops them so pressing Run again never repeats one.
+	let done = $state(new Set<string>());
+	const remaining = $derived(runIds.filter((id) => !done.has(id)));
 
 	const details = createResource(async (client, scope) => (await Promise.all(runIds.map((id) => client.getRunDetail(scope, id)))).filter((d): d is RunDetail => !!d), runIds.map((id) => `run:${id}`));
 	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot']);
@@ -33,7 +36,7 @@
 	const first = $derived(details.data?.[0] ?? null);
 	/** One run's choices, as its rerun button offers them; reruns of several runs only rerun all or from failure. */
 	const choices = $derived(single && first ? rerunChoices(first, app.client.supports('rerunSelectedNodes') ? picked : [], can) : []);
-	const offered = (m: RerunMode) => (single ? choices.some((c) => c.mode === m && !c.disabledReason) : m !== 'selected');
+	const offered = (m: RerunMode) => (single ? choices.some((c) => c.mode === m && !c.disabledReason) : m === 'all' || m === 'from_failure');
 	let mode = $state<RerunMode>(requested);
 	// A mode this run can't rerun, typed into the address, falls back to rerunning all.
 	$effect(() => {
@@ -41,7 +44,7 @@
 	});
 	const nodesOf = (d: RunDetail): string[] => (mode === 'selected' ? picked : mode === 'from_failure' ? d.rerunFromFailureNodes : d.selection);
 	const blockedOf = (d: RunDetail): string | null => rerunChoices(d, [], can).find((c) => c.mode === (mode === 'selected' ? 'all' : mode))?.disabledReason ?? null;
-	const rows = $derived((details.data ?? []).map((d) => ({ detail: d, nodes: nodesOf(d), blocked: blockedOf(d) })));
+	const rows = $derived((details.data ?? []).filter((d) => !done.has(d.run.id)).map((d) => ({ detail: d, nodes: nodesOf(d), blocked: blockedOf(d) })));
 	const ready = $derived(rows.filter((r) => !r.blocked && r.nodes.length));
 	const nodes = $derived(single && rows[0] ? rows[0].nodes : []);
 	const needs = $derived<Capability[]>(['run.rerun', ...((details.data ?? []).some((d) => d.run.rewriteHistory) ? (['run.rewrite_history'] as const) : [])]);
@@ -50,7 +53,7 @@
 
 	function choose(next: RerunMode) {
 		mode = next;
-		void goto(to(rerunHref(runIds, next, next === 'selected' ? picked : [])), { replaceState: true, keepFocus: true, noScroll: true });
+		void goto(to(rerunHref(remaining, next, next === 'selected' ? picked : [])), { replaceState: true, keepFocus: true, noScroll: true });
 	}
 
 	const loadError = $derived(details.error ? String(details.error) : details.data && !details.data.length ? 'These runs were not found in this location.' : null);
@@ -71,12 +74,16 @@
 		);
 		launching = false;
 		const failed = ready.filter((_, i) => outcomes[i].status === 'rejected').map((r) => r.detail.run.id);
+		const startedFrom = ready.filter((_, i) => outcomes[i].status === 'fulfilled').map((r) => r.detail.run.id);
 		const started = outcomes.flatMap((o) => (o.status === 'fulfilled' ? [o.value] : []));
 		if (failed.length) {
 			const first = outcomes.find((o): o is PromiseRejectedResult => o.status === 'rejected')?.reason;
 			launchError = `${started.length ? `Started ${started.length}; ` : ''}${failed.length} failed: ${first instanceof Error ? first.message : String(first)}`;
-			// Only the failed ones stay, so pressing Run again never repeats a rerun that started.
-			if (started.length) await goto(to(rerunHref(failed, mode, mode === 'selected' ? picked : [])), { replaceState: true });
+			// Only the failed ones stay, here and in the address, so pressing Run again never repeats a rerun that started.
+			if (started.length) {
+				done = new Set([...done, ...startedFrom]);
+				await goto(to(rerunHref(remaining, mode, mode === 'selected' ? picked : [])), { replaceState: true, keepFocus: true, noScroll: true });
+			}
 			return;
 		}
 		await goto(to(started.length === 1 ? `/runs/${started[0].id}` : '/runs'));
@@ -94,7 +101,7 @@
 			{#if single && first}
 				<span class="faint">Rerun of</span><a href={to(`/runs/${first.run.id}`)}>{what(first)} · {shortRunId(first.run.id)}</a>
 			{:else}
-				<span class="faint">Rerun</span><span>{runIds.length} runs</span>
+				<span class="faint">Rerun</span><span>{remaining.length} runs</span>
 			{/if}
 		</span>
 		<div class="verbs" role="group" aria-label="What to rerun">

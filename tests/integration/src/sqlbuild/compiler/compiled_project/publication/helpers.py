@@ -727,9 +727,9 @@ def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -
     """Run/node outcomes, Recall, claims and the physical warehouse agree."""
     api, project, control_store, process, log, _ = worker
     run: dict[str, Any] = wait_for_run(api, process, log)
-    assert run["node_counts_json"] == {test_case.expected_status: test_case.expected_node_count}, (
-        log.read_text()
-    )
+    assert run["node_counts_json"] == (
+        test_case.expected_node_counts or {test_case.expected_status: test_case.expected_node_count}
+    ), log.read_text()
     assert run["job_key"] == "annual_orders"
     runs_url: str = f"{api.url}/api/locations/{api.location_id}/targets/development/runs"
     headers: dict[str, str] = {"Authorization": f"Bearer {api.bearer}"}

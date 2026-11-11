@@ -441,13 +441,13 @@ impl WorkerBuild {
                 }
             }
         }
-        // A build has nothing to run for a selected source: once the command returns, the source is done, not skipped.
         let returned = self.returned.load(Ordering::SeqCst);
         let build = self.command().is_build();
+        let source_needs_no_run = |key: &str| build && key.starts_with("source:");
         for key in &self.execution.claim.request.selection {
             let outcome = if cancelled {
                 NodeOutcome::Cancelled
-            } else if build && returned && key.starts_with("source:") {
+            } else if returned && source_needs_no_run(key) {
                 NodeOutcome::Success
             } else {
                 NodeOutcome::Skipped
@@ -457,9 +457,10 @@ impl WorkerBuild {
         let outcome = {
             let completed = self.completed.lock().map_err(|_| poisoned())?;
             let outcomes: Vec<NodeOutcome> = completed.values().copied().collect();
-            let good = outcomes
-                .iter()
-                .any(|value| matches!(value, NodeOutcome::Success | NodeOutcome::Warn));
+            let good = completed.iter().any(|(key, value)| {
+                matches!(value, NodeOutcome::Success | NodeOutcome::Warn)
+                    && !source_needs_no_run(key)
+            });
             let bad = outcomes.iter().any(|value| {
                 matches!(
                     value,
