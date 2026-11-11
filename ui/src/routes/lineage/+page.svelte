@@ -681,7 +681,8 @@
 					</dl>
 				</InspectorSection>
 			{:else if !d}
-				<InspectorSection title="Details">{#if detail.error ?? catalog.error}<p class="insp-description">{detail.error ?? catalog.error}</p>{:else}<Loading />{/if}</InspectorSection>
+				<!-- Titled like the section the facts fill, so it does not switch title when they arrive. -->
+				<InspectorSection title={catalogByKey.get(String(primarySlug))?.kind === 'source' ? 'Source' : 'Last build'}>{#if detail.error ?? catalog.error}<p class="insp-description">{detail.error ?? catalog.error}</p>{:else}<Loading />{/if}</InspectorSection>
 			{:else if isSource}
 				<InspectorSection title="Source">
 					<dl class="kv">
