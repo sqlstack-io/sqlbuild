@@ -184,6 +184,14 @@ pub(crate) struct UiPathTestCase {
     pub(crate) expected_body: &'static str,
 }
 
+pub(crate) struct CompressionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) method: reqwest::Method,
+    pub(crate) path: &'static str,
+    pub(crate) accept_gzip: bool,
+    pub(crate) expected_gzip: bool,
+}
+
 pub(crate) struct ServerErrorTestCase {
     pub(crate) description: &'static str,
     pub(crate) path: &'static str,
