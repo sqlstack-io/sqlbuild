@@ -165,18 +165,6 @@ pub struct RunRequest {
     pub narrowing: Option<RunNarrowing>,
 }
 
-impl RunRequest {
-    /// Whether the run executes and reports `key`; a build has nothing to run for a selected source.
-    pub fn executes(&self, key: &str) -> bool {
-        self.selection.contains(key) && !(self.command.is_build() && key.starts_with("source:"))
-    }
-
-    /// The selected nodes the run executes and reports, in selection order.
-    pub fn executed_nodes(&self) -> impl Iterator<Item = &String> {
-        self.selection.iter().filter(|key| self.executes(key))
-    }
-}
-
 /// A trusted operator names a published job; execution inputs are never supplied by the caller.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

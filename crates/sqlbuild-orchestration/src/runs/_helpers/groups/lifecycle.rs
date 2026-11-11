@@ -149,7 +149,7 @@ async fn finish_group(
         }
     }
     let mut outcomes: BTreeSet<String> = BTreeSet::new();
-    for key in parent.request_json.executed_nodes() {
+    for key in &parent.request_json.selection {
         let node = nodes
             .get(key)
             .ok_or_else(|| ControlError::Invalid("group node has no child evidence".into()))?;

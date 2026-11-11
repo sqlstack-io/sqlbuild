@@ -429,11 +429,12 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             },
         ),
         WorkerExecutionTestCase(
-            "a selected upstream source is never counted as a skipped node",
+            "a selected upstream source succeeds once the build returns",
             'SELECT order_id AS amount FROM __source("raw_orders")',
             "SELECT amount FROM orders",
             "success",
             [(23,)],
+            expected_node_count=2,
             files={
                 "sources/raw_orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"

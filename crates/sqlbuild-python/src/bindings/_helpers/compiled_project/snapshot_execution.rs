@@ -168,7 +168,7 @@ impl WorkerBuild {
             (Option<String>, Option<String>),
         ),
     ) -> PyResult<()> {
-        if !self.execution.claim.request.executes(key) {
+        if !self.execution.claim.request.selection.contains(key) {
             return Ok(());
         }
         if self
@@ -441,20 +441,18 @@ impl WorkerBuild {
                 }
             }
         }
+        // A build has nothing to run for a selected source: once the command returns, the source is done, not skipped.
+        let returned = self.returned.load(Ordering::SeqCst);
+        let build = self.command().is_build();
         for key in &self.execution.claim.request.selection {
-            self.complete(
-                py,
-                key,
-                (
-                    if cancelled {
-                        NodeOutcome::Cancelled
-                    } else {
-                        NodeOutcome::Skipped
-                    },
-                    None,
-                    (None, None),
-                ),
-            )?;
+            let outcome = if cancelled {
+                NodeOutcome::Cancelled
+            } else if build && returned && key.starts_with("source:") {
+                NodeOutcome::Success
+            } else {
+                NodeOutcome::Skipped
+            };
+            self.complete(py, key, (outcome, None, (None, None)))?;
         }
         let outcome = {
             let completed = self.completed.lock().map_err(|_| poisoned())?;
