@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Runs the job without leaving it: what runs (all of the job, or the nodes picked in the graph), which data,
-	// and the plan of exactly that, then Run. Anything more, such as a rebuild from scratch, is a command on the
-	// plan page, which Edit command opens with this run filled in.
+	// and the plan of exactly that, then Run. Anything more is a command on the plan page, which Edit command
+	// opens with this run filled in.
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -9,7 +9,7 @@
 	import type { CursorWindow, JobDetail, PlanDocument } from '$lib/api';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { to } from '$lib/paths';
-	import { jobBuildTokens, jobRunProblem, parseCommand, selectorOf, withWindow } from '$lib/run/command';
+	import { jobBuildTokens, jobRunProblem, parseCommand, selectorOf, withFullRefresh, withWindow } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
 	import PlanReport from '$lib/run/plan-report.svelte';
 	import { readySummary } from '$lib/run/plan-text';
@@ -18,7 +18,8 @@
 	let { job, picked, onclose }: { job: JobDetail; picked: string[]; onclose: () => void } = $props();
 
 	let window = $state<CursorWindow | null>(null);
-	const command = $derived(withWindow(`sqb build${picked.length ? ` --select ${picked.map(selectorOf).join(' ')}` : ''}`, window));
+	let fullRefresh = $state(false);
+	const command = $derived(withFullRefresh(withWindow(`sqb build${picked.length ? ` --select ${picked.map(selectorOf).join(' ')}` : ''}`, window), fullRefresh));
 	const parts = $derived(parseCommand(command));
 	const tokens = $derived(jobBuildTokens(job.key, parts));
 	const planPage = $derived(`/plan?cmd=${encodeURIComponent(command)}&job=${encodeURIComponent(job.key)}`);
@@ -54,7 +55,7 @@
 
 	/** The same check the plan page makes, so a range that would plan but not launch is stopped here too. */
 	const rangeProblem = $derived(jobRunProblem(parts));
-	const blocked = $derived(rangeProblem ?? (window && !app.can('run.rewrite_history') ? "You don't have permission to reprocess data (run.rewrite_history)" : !current ? 'Waiting for the plan' : planError));
+	const blocked = $derived(rangeProblem ?? ((window || fullRefresh) && !app.can('run.rewrite_history') ? "You don't have permission to rebuild or reprocess data (run.rewrite_history)" : !current ? 'Waiting for the plan' : planError));
 	let launching = $state(false);
 	let launchError = $state<string | null>(null);
 	async function launch() {
@@ -63,7 +64,8 @@
 		launching = true;
 		launchError = null;
 		try {
-			const run = await app.client.launchJob(scope, job.key, { select: parts.select, window: window ?? undefined });
+			const narrowing = { select: parts.select, window: window ?? undefined };
+			const run = await (fullRefresh ? app.client.launchJobFromScratch(scope, job.key, narrowing) : app.client.launchJob(scope, job.key, narrowing));
 			onclose();
 			await goto(to(`/runs/${run.id}`));
 		} catch (e) {
@@ -87,7 +89,7 @@
 	</header>
 	<div class="body sb-scroll">
 		<p class="scope">{picked.length ? `${picked.length} selected node${picked.length === 1 ? '' : 's'}` : `All ${job.nodeCount} nodes`}</p>
-		{#if job.cursorType}<DataRange cursorType={job.cursorType} {window} onchange={(w) => (window = w)} />{/if}
+		<DataRange cursorType={job.cursorType} {window} {fullRefresh} onchange={(c) => ((window = c.window), (fullRefresh = c.fullRefresh))} />
 		<div class="plan">
 			{#if !plan && !current}
 				<p class="wait"><RotateCwIcon size={13} class="animate-spin" /> Planning on the location…</p>

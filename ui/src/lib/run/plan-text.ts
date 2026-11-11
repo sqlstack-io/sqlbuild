@@ -117,7 +117,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	if (isFullRefresh(plan)) {
 		const counts = new Map<string, number>();
 		for (const m of active) counts.set(m.materialization_type, (counts.get(m.materialization_type) ?? 0) + 1);
-		add('Full refresh', [...counts].map(([kind, n]) => ({ name: `${n}`, value: kind, detail: [] })), true);
+		add('Full refresh', [...counts].map(([kind, n]) => ({ name: kind, value: `${n} ${n === 1 ? 'model' : 'models'}`, detail: [] })), true);
 	} else {
 		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason)), true);
 		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => ({ name: m.name, value: materializationLabel(m), detail: cursorLines(m, true) })));
