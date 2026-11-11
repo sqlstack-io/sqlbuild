@@ -115,6 +115,13 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
             "--target",
             "development",
         ]
+        for misused in ([*command[:3], *command[4:]], [*sync[:3], "model:orders", *sync[3:]]):
+            usage: subprocess.CompletedProcess[str] = invoke(misused)
+            assert (usage.returncode, usage.stdout, usage.stderr[:20]) == (
+                2,
+                "",
+                "sqb control: error: ",
+            )
         absent: subprocess.CompletedProcess[str] = invoke(command)
         assert absent.returncode != 0 and not absent.stdout and "not signed in" in absent.stderr
         with pending_login(

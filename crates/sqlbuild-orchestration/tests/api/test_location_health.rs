@@ -6,8 +6,10 @@ use crate::platform::main::report_remote_location_health::report_remote_location
 use crate::platform::models::{LocationHealth, LocationHealthObservation, LocationHealthReport};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::helpers::read_recall_events;
-use chrono::Utc;
+use chrono::{TimeDelta, Utc};
 use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
@@ -202,6 +204,28 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                     .is_empty(),
                 "another target's read leaves this target's observations out"
             );
+            // A location syncs only after runs, so its newest report can be days old.
+            for (age, kept) in [(7, true), (8, false), (0, true)] {
+                let transaction = begin(store, TransactionMode::Write).await.expect("age");
+                let day = (transaction.now - TimeDelta::days(age)).date_naive();
+                let (transaction, _) = query(
+                    transaction,
+                    "UPDATE recall_events SET invocation_id=$1 WHERE event_type='location_health'",
+                    vec![Parameter::Text(format!("location/{location_id}/{day}"))],
+                )
+                .await
+                .expect("aged report");
+                commit(transaction).await.expect("aged report committed");
+                let reports = person_read("preview #1").await.expect("aged health");
+                assert_eq!(
+                    reports
+                        .iter()
+                        .any(|observation| observation.report == connection),
+                    kept,
+                    "{}: a report {age} days old is read within location health retention",
+                    test_case.description
+                );
+            }
             let events = read_recall_events(store, 0, 100)
                 .await
                 .expect("read durable events");

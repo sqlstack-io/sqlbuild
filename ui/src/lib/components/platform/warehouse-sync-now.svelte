@@ -13,19 +13,23 @@
 
 	const sync = createResource((client) => client.getWarehouseSync(scope), ['warehouse_sync']);
 	let requesting = $state(false);
-	/** When this page asked; cleared once a sync newer than the request is reported. */
-	let requestedAt = $state<number | null>(null);
+	/**
+	 * The sync report this page saw when it asked, compared by value rather than by clock, since browser and
+	 * server clocks differ. Any newer report ends the wait; so does the request's five-minute expiry.
+	 */
+	let requested = $state<{ at: number; seen: string } | null>(null);
 	let failure = $state<string | null>(null);
 	const last = $derived(sync.data ?? null);
-	const pending = $derived(requestedAt !== null && !(last?.lastSyncedAt && Date.parse(last.lastSyncedAt) >= requestedAt));
+	const reportOf = (report: typeof last) => `${report?.lastSyncedAt ?? ''}|${report?.lastError ?? ''}`;
+	const pending = $derived(requested !== null && reportOf(last) === requested.seen && app.now - requested.at < 5 * 60_000);
 
 	async function request() {
 		requesting = true;
 		failure = null;
 		try {
-			const asked = Date.now();
+			const seen = { at: Date.now(), seen: reportOf(last) };
 			await app.client.requestWarehouseSync(scope);
-			requestedAt = asked;
+			requested = seen;
 		} catch (error) {
 			failure = errorMessage(error);
 		} finally {
