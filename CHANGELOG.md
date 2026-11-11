@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.210.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.209.0...v0.210.0) (2026-11-11)
+
+
+### Features
+
+* **plan:** `sqb plan --json` now includes each changed model's query diff, config diff and schema findings, as the text plan prints them ([3f335b7](https://github.com/sqlstack-io/sqlbuild/commit/3f335b716783dc5708982316b902493288839157))
+
 ## [0.209.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.208.0...v0.209.0) (2026-11-10)
 
 
