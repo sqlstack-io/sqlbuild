@@ -1150,6 +1150,11 @@ jobs:
       retention-days: 3
       # Release Distributions builds and smoke tests the slower dist profile for every release.
       cargo-profile: release
+      # Pull requests and merge groups build the wheel Compose installs; manual runs build every
+      # platform, and Release Distributions builds every platform for each release.
+      platforms: >-
+        ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+        && 'linux-x86_64' || '' }}
 
   compose:
     name: Packaged Compose lifecycle
