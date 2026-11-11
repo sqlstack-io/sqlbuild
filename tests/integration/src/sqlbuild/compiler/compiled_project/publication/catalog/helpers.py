@@ -4,15 +4,34 @@ import json
 import sqlite3
 import time
 from contextlib import closing
+from datetime import UTC, datetime
 from pathlib import Path
 from subprocess import Popen
 from typing import Any
+from uuid import uuid4
+
+
+def record_finished_run(control: Path) -> None:
+    """Record a run that just ended for every published target, which makes its location resync."""
+    ended_at: str = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    run_id: str = str(uuid4())
+    with closing(sqlite3.connect(control)) as database:
+        _ = database.execute(
+            "INSERT INTO sqb_runs (run_id,location_id,target,snapshot_id,kind,origin,root_run_id,"
+            "requested_by,selection_json,request_json,write_set_digest,status,queued_at,ended_at,"
+            "node_counts_json,last_event_storage_id) SELECT ?,location_id,target,snapshot_id,"
+            "'adhoc','manual',?,'test-admin','[]','{}','','success',?,?,'{}',0 "
+            "FROM sqb_current_snapshots",
+            (run_id, run_id, ended_at, ended_at),
+        )
+        database.commit()
 
 
 def wait_for_catalog(
     control: Path, expected: list[dict[str, Any]], process: Popen[bytes], log: Path
 ) -> None:
     """Wait for the exact synthetic relation, not a count that unrelated rows can satisfy."""
+    record_finished_run(control)
     deadline: float = time.monotonic() + 45
     observed: list[dict[str, Any]] = [{}]
     while observed != expected:

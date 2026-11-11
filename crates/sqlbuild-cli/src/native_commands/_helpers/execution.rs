@@ -37,7 +37,7 @@ use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, StatisticsRetention,
-    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation,
+    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::webhooks::main::{
@@ -70,7 +70,8 @@ use crate::native_commands::_helpers::terminal::{
 };
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_POLL_SECONDS,
-    METADATA_RECONCILE_SECONDS, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    METADATA_RECONCILE_SECONDS, METADATA_SYNC_CHECK_SECONDS, SCHEDULER_COMMAND,
+    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -349,6 +350,8 @@ pub(crate) fn metadata_sync(
         statistics_limit: MAX_HISTORY_RECORDS,
         pending: None,
         next_at: Instant::now(),
+        idle: true,
+        cycle_started_at: None,
     }
 }
 
@@ -447,6 +450,34 @@ pub(crate) fn freeze_history_page(
     Ok(state)
 }
 
+/// An idle location asks the server, never the warehouse, whether a run ended since it last began.
+pub(crate) async fn begin_after_run(
+    mut state: LocationMetadataSync,
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    target: &str,
+) -> (LocationMetadataSync, Result<bool, ClientError>) {
+    state.next_at = Instant::now() + Duration::from_secs(METADATA_SYNC_CHECK_SECONDS);
+    let request = WarehouseSyncDueRead {
+        session_id: poll.session_id,
+        generation: state.generation,
+    };
+    let due = match client.metadata_sync_due(target, &request).await {
+        Ok(due) => due,
+        Err(error) => return (state, Err(error)),
+    };
+    let ran = match (state.cycle_started_at, due.runs_ended_at) {
+        (None, _) => true,
+        (Some(started_at), Some(ended_at)) => ended_at >= started_at,
+        (Some(_), None) => false,
+    };
+    if ran {
+        state.idle = false;
+        state.cycle_started_at = Some(due.now);
+        state.next_at = Instant::now();
+    }
+    (state, Ok(ran))
+}
+
 pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> LocationMetadataSync {
     let Some(pending) = state.pending.take() else {
         return state;
@@ -470,7 +501,8 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
                 state.reconcile_at =
                     Instant::now() + Duration::from_secs(u64::from(state.reconcile_seconds));
             }
-            state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+            state.idle = true;
+            state.next_at = Instant::now();
             drop(write_output(&[(
                 Stream::Stderr,
                 "Warehouse history synchronization completed.\n",

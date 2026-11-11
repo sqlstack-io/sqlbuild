@@ -16,8 +16,8 @@ use tokio::time::Instant;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
-    acknowledge_metadata_page, freeze_history_page, history_request, location_result,
-    metadata_health, statistics_page,
+    acknowledge_metadata_page, begin_after_run, freeze_history_page, history_request,
+    location_result, metadata_health, statistics_page,
 };
 use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
@@ -41,6 +41,18 @@ pub(super) async fn sync_location_metadata(
     }
     let started = Instant::now();
     tokio::pin!(stopped);
+    if state.idle {
+        let (next, due) = tokio::select! {
+            result = &mut stopped => { result?; return Ok(None); },
+            result = begin_after_run(state, (client, poll), &options.target) => result,
+        };
+        state = next;
+        match due {
+            Ok(true) => {}
+            Ok(false) => return Ok(Some(state)),
+            Err(error) => return retry_metadata(state, error),
+        }
+    }
     if state.pending.is_none() {
         if state.kind() == WarehouseHistoryKind::Statistics && state.statistics.is_none() {
             state.statistics = Some(tokio::select! {

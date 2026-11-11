@@ -43,6 +43,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     StateEventsTestCase,
     WarehouseHistoryTestCase,
 )
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
+    record_finished_run,
+)
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     append_audit_history,
     append_column_migration_history,
@@ -396,7 +399,8 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
                         mirrored = database.execute(
                             f"SELECT event_id,record_json FROM {mirror_table} ORDER BY event_id"
                         ).fetchall()
-                    time.sleep(0.05)
+                    record_finished_run(control)
+                    time.sleep(0.5)
                 assert {json.loads(row)[source_key] for _, row in mirrored} == expected_ids
                 for event_id, text in mirrored:
                     record: dict[str, Any] = json.loads(text)
@@ -415,6 +419,7 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
                 )
                 _ = adapter.execute(connection=connection, sql=warehouse_sql)
                 adapter.close(connection)
+                record_finished_run(control)
 
 
 @pytest.mark.parametrize(
@@ -945,7 +950,8 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
                             "SELECT (SELECT COUNT(*) FROM sqb_warehouse_fingerprints),"
                             "(SELECT COUNT(*) FROM sqb_warehouse_freshness)"
                         ).fetchone()
-                    time.sleep(0.05)
+                    record_finished_run(control)
+                    time.sleep(0.5)
                 with closing(sqlite3.connect(control)) as database:
                     bodies: list[tuple[bytes]] = database.execute(
                         "SELECT t.body FROM sqb_warehouse_fingerprints f "
@@ -971,6 +977,7 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
                         connection=connection, sql=warehouse_sql.format(table=table)
                     )
                 adapter.close(connection)
+                record_finished_run(control)
 
 
 @pytest.mark.parametrize(
@@ -1040,6 +1047,7 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                     for table in ("sqb_warehouse_fingerprints", "sqb_warehouse_freshness"):
                         _ = database.execute(stage["mirror_sql"].format(table=table))
                     database.commit()
+                record_finished_run(control)
                 expected: set[str] = set(stage["expected_runs"]) | {
                     f"middle-{index:03}"
                     for index in range(stage.get("expected_overlap_count", stage["overlap_count"]))
@@ -1080,8 +1088,15 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                 observed_health_at = max(
                     datetime.fromisoformat(report["received_at"]) for report in reports
                 )
+            time.sleep(6)
+            completed: int = log.read_text().count("Warehouse history synchronization completed.")
+            time.sleep(12)
+            assert (
+                log.read_text().count("Warehouse history synchronization completed.") == completed
+            ), "an idle location read the warehouse without a run ending"
             for availability in fixture["availability"]:
                 _ = (project / availability["source"]).rename(project / availability["destination"])
+                record_finished_run(control)
                 reports = wait_for_warehouse_sync_health(
                     api, availability, location, log, after=observed_health_at
                 )

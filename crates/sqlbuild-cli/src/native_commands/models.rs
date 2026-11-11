@@ -204,6 +204,10 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) statistics_limit: usize,
     pub(crate) pending: Option<LocationMetadataPage>,
     pub(crate) next_at: tokio::time::Instant,
+    /// Between synchronizations; the warehouse is read again only after a run ends.
+    pub(crate) idle: bool,
+    /// Server time when the current or last synchronization began; `None` before the first.
+    pub(crate) cycle_started_at: Option<DateTime<Utc>>,
 }
 
 impl LocationMetadataSync {
