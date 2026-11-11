@@ -1,0 +1,46 @@
+{
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "event_id": "rename-000",
+    "target_name": null,
+    "model_name": "orders",
+    "relation_database": null,
+    "relation_schema": "main",
+    "relation_name": "orders_🧾",
+    "origin_column": "customer_🧾",
+    "destination_column": "customer_id",
+    "discovery": "manual",
+    "decision": "rename",
+    "run_id": "external-rename",
+    "created_at": "2026-02-03T04:05:06Z"
+  },
+  "source_rows": 104,
+  "duplicate_rows": 3,
+  "later_time": "2026-02-03T04:05:06.000001Z",
+  "page_lengths": [
+    100,
+    4
+  ],
+  "later_index": 103,
+  "source_count": 104,
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 1 AS order_id",
+  "retained_result": "rename-103",
+  "kind": "column_migrations",
+  "source_key": "event_id",
+  "timestamp_key": "created_at",
+  "id_prefix": "rename",
+  "later_record": {
+    "event_id": "rename-103",
+    "created_at": "2026-02-03T04:05:06.000001Z"
+  },
+  "last_record": {
+    "event_id": "rename-103",
+    "created_at": "2026-02-03T04:05:06.000001Z"
+  },
+  "record_overrides": {
+    "rename-103": {
+      "created_at": "2026-02-03T04:05:06.000001Z"
+    }
+  }
+}

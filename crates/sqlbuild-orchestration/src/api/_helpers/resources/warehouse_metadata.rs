@@ -8,17 +8,20 @@ use crate::api::_helpers::authentication::bearer::require_location;
 use crate::api::errors::ApiError;
 use crate::credentials::models::TokenIdentity;
 use crate::store::models::ControlStore;
-use crate::warehouse_metadata::main::ingest_audit_results::ingest_audit_results;
-use crate::warehouse_metadata::main::ingest_catalog::ingest_catalog;
-use crate::warehouse_metadata::main::ingest_fingerprints::ingest_fingerprints;
-use crate::warehouse_metadata::main::ingest_janitor_events::ingest_janitor_events;
-use crate::warehouse_metadata::main::ingest_microbatches::ingest_microbatches;
-use crate::warehouse_metadata::main::ingest_migrations::ingest_migrations;
-use crate::warehouse_metadata::main::ingest_old_name_views::ingest_old_name_views;
-use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
-use crate::warehouse_metadata::main::ingest_statistics::ingest_statistics;
-use crate::warehouse_metadata::main::read_statistics_due::read_statistics_due;
-use crate::warehouse_metadata::main::read_watermark::read_watermark;
+use crate::warehouse_metadata::main::ingest::ingest_audit_results::ingest_audit_results;
+use crate::warehouse_metadata::main::ingest::ingest_catalog::ingest_catalog;
+use crate::warehouse_metadata::main::ingest::ingest_column_migrations::ingest_column_migrations;
+use crate::warehouse_metadata::main::ingest::ingest_consumption::ingest_consumption;
+use crate::warehouse_metadata::main::ingest::ingest_fingerprints::ingest_fingerprints;
+use crate::warehouse_metadata::main::ingest::ingest_janitor_events::ingest_janitor_events;
+use crate::warehouse_metadata::main::ingest::ingest_microbatches::ingest_microbatches;
+use crate::warehouse_metadata::main::ingest::ingest_migrations::ingest_migrations;
+use crate::warehouse_metadata::main::ingest::ingest_node_results::ingest_node_results;
+use crate::warehouse_metadata::main::ingest::ingest_old_name_views::ingest_old_name_views;
+use crate::warehouse_metadata::main::ingest::ingest_source_freshness::ingest_source_freshness;
+use crate::warehouse_metadata::main::ingest::ingest_statistics::ingest_statistics;
+use crate::warehouse_metadata::main::location_reads::read_statistics_due::read_statistics_due;
+use crate::warehouse_metadata::main::location_reads::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
     MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseSyncResponse,
     WarehouseWatermarkRead,
@@ -47,6 +50,11 @@ pub(crate) async fn report(
         WarehouseHistoryKind::Migrations => ingest_migrations(&store, scope, &batch).await,
         WarehouseHistoryKind::OldNameViews => ingest_old_name_views(&store, scope, &batch).await,
         WarehouseHistoryKind::Microbatches => ingest_microbatches(&store, scope, &batch).await,
+        WarehouseHistoryKind::ColumnMigrations => {
+            ingest_column_migrations(&store, scope, &batch).await
+        }
+        WarehouseHistoryKind::NodeResults => ingest_node_results(&store, scope, &batch).await,
+        WarehouseHistoryKind::Consumption => ingest_consumption(&store, scope, &batch).await,
         WarehouseHistoryKind::Catalog => ingest_catalog(&store, scope, &batch).await,
         WarehouseHistoryKind::Statistics => ingest_statistics(&store, scope, &batch).await,
     }?;

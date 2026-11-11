@@ -9,7 +9,8 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_metadata::main::{
-    ingest_statistics::ingest_statistics, read_person_statistics::read_person_statistics,
+    ingest::ingest_statistics::ingest_statistics,
+    person_reads::read_person_statistics::read_person_statistics,
 };
 use crate::warehouse_metadata::models::{MetadataBatch, StatisticsQuery};
 

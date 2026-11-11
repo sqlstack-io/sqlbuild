@@ -15,7 +15,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_metadata::main::read_person_column_lineage::read_person_column_lineage;
+use crate::warehouse_metadata::main::person_reads::read_person_column_lineage::read_person_column_lineage;
 
 #[test]
 fn given_published_column_lineage_when_people_read_a_node_then_only_its_reachable_columns_return() {

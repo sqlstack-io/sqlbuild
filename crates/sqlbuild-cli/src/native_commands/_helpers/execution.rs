@@ -346,6 +346,7 @@ pub(crate) fn metadata_sync(
         reconcile_at: Instant::now(),
         reconcile_seconds,
         limit: MAX_HISTORY_RECORDS,
+        statistics_limit: MAX_HISTORY_RECORDS,
         pending: None,
         next_at: Instant::now(),
     }
@@ -389,7 +390,7 @@ pub(crate) async fn statistics_page(
                 generation: state.generation,
                 location: state.location().clone(),
                 after,
-                limit: state.limit,
+                limit: state.statistics_limit,
             },
         )
         .await
@@ -423,8 +424,13 @@ pub(crate) fn freeze_history_page(
         > BODY_BYTES
     {
         state.statistics = None;
-        if state.limit > 1 {
-            state.limit = (state.limit / 2).max(1);
+        let limit = if state.kind() == WarehouseHistoryKind::Statistics {
+            &mut state.statistics_limit
+        } else {
+            &mut state.limit
+        };
+        if *limit > 1 {
+            *limit /= 2;
         } else {
             state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
             drop(write_output(&[(
@@ -450,6 +456,9 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
         state.statistics = None;
     }
     if state.source_after.is_none() {
+        if state.kind() == WarehouseHistoryKind::Statistics {
+            state.statistics_limit = MAX_HISTORY_RECORDS;
+        }
         state.index += 1;
         state.scan_id = Uuid::now_v7();
         state.observed_since = None;

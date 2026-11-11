@@ -1,6 +1,6 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
-use crate::state_tables::constants::SQLSERVER_ADAPTER;
+use crate::state_tables::constants::{MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
 use crate::state_tables::models::HistoryRead;
 
 /// Cursor values are already rendered by the adapter; `None` sorts before every SQL value.
@@ -25,11 +25,15 @@ pub fn read_history_sql(
         ", NULL AS event_id"
     });
     let mut columns = key_columns.unwrap_or(columns).to_vec();
-    columns.push(if has_event_id { "event_id" } else { "NULL" });
+    columns.push(if has_event_id {
+        "event_id"
+    } else {
+        MISSING_EVENT_ID_KEY
+    });
     let ordered = columns
         .iter()
         .map(|column| {
-            if *column == timestamp_column {
+            if *column == timestamp_column || *column == MISSING_EVENT_ID_KEY {
                 Ok((*column).to_owned())
             } else {
                 binary(column, adapter)
@@ -81,6 +85,7 @@ pub fn read_history_sql(
     let order: Vec<String> = columns
         .iter()
         .zip(&ordered)
+        .filter(|(column, _)| **column != MISSING_EVENT_ID_KEY)
         .map(|(column, ordered)| format!("CASE WHEN {column} IS NULL THEN 0 ELSE 1 END, {ordered}"))
         .collect();
     let top = adapter == SQLSERVER_ADAPTER;

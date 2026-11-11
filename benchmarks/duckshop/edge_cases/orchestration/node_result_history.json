@@ -1,0 +1,52 @@
+{
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "node_type": "task",
+    "node_name": "result-000",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": null,
+    "run_id": "external-run",
+    "status": "success",
+    "payload_json_b64": "eyJub3RlIjoiUmV0YWluZWQgJ29yZGVycycgXHVkODNlXHVkZGZlIiwicm93cyI6N30=",
+    "metadata_json_b64": "e30=",
+    "error_message": null,
+    "materialized": "true",
+    "ts": "2026-02-03T04:05:06Z"
+  },
+  "source_rows": 104,
+  "duplicate_rows": 3,
+  "later_time": "2026-02-03T04:05:06.000001Z",
+  "page_lengths": [
+    100,
+    7
+  ],
+  "later_index": 106,
+  "source_count": 107,
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 1 AS order_id",
+  "retained_result": "result-103",
+  "kind": "node_results",
+  "source_key": "node_name",
+  "timestamp_key": "ts",
+  "id_prefix": "result",
+  "later_record": {
+    "node_name": "result-103",
+    "status": "failed",
+    "error_message": "Rejected 'orders' 🧾",
+    "ts": "2026-02-03T04:05:06.000001Z"
+  },
+  "last_record": {
+    "node_name": "result-103",
+    "status": "failed",
+    "error_message": "Rejected 'orders' 🧾",
+    "ts": "2026-02-03T04:05:06.000001Z"
+  },
+  "record_overrides": {
+    "result-103": {
+      "status": "failed",
+      "error_message": "Rejected 'orders' 🧾",
+      "ts": "2026-02-03T04:05:06.000001Z"
+    }
+  }
+}

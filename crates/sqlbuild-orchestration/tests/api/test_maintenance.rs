@@ -15,7 +15,7 @@ use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_metadata::main::{
+use crate::warehouse_metadata::main::ingest::{
     ingest_janitor_events::ingest_janitor_events, ingest_migrations::ingest_migrations,
     ingest_old_name_views::ingest_old_name_views,
 };

@@ -417,3 +417,12 @@ class SnowflakePlatformDetectionTestCase:
     description: str
     environment: dict[str, str]
     expected_value: str
+
+
+@dataclass(frozen=True)
+class SnowflakeSchemaExistsTestCase:
+    description: str
+    schema: str
+    cursor: object
+    expected_exists: bool
+    expected_sql_fragment: str

@@ -29,8 +29,8 @@ use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, TransactionMode};
-use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
-use crate::warehouse_metadata::main::read_person_statistics::read_person_statistics;
+use crate::warehouse_metadata::main::person_reads::read_person_catalog::read_person_catalog;
+use crate::warehouse_metadata::main::person_reads::read_person_statistics::read_person_statistics;
 use crate::warehouse_metadata::models::{CatalogQuery, StatisticsQuery, StatisticsRetention};
 
 pub(crate) const SUPPORT_ROLE: &str = "orders_support";

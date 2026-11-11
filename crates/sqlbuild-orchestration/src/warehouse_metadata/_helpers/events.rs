@@ -27,7 +27,12 @@ pub(crate) async fn ingest_events(
         ),
     )?;
     let table = batch.kind.mirror_table();
-    let source_table = format!("_sqlbuild_{}", batch.kind.as_str());
+    let source_table = batch.kind.source_table().ok_or_else(|| {
+        ControlError::Invalid(format!(
+            "{} is not a state-table history",
+            batch.kind.as_str()
+        ))
+    })?;
     let mut transaction = begin_ingestion(
         store,
         (location_id, target),
@@ -42,7 +47,7 @@ pub(crate) async fn ingest_events(
             (
                 record.location.database.as_deref(),
                 &record.location.schema,
-                &source_table,
+                source_table,
             ),
             &record.source_id,
         )?;

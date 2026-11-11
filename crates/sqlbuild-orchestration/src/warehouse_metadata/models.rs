@@ -4,6 +4,12 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use sqlbuild_core::constants::{
+    AUDIT_RESULTS_TABLE_NAME, COLUMN_MIGRATION_TABLE_NAME, CONSUMPTION_TABLE_NAME,
+    FINGERPRINT_TABLE_NAME, JANITOR_EVENTS_TABLE_NAME, MICROBATCH_TABLE_NAME, MIGRATION_TABLE_NAME,
+    NODE_RESULTS_TABLE_NAME, OLD_NAME_VIEW_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
+};
+
 use crate::store::errors::ControlError;
 use crate::warehouse_metadata::constants::DEFAULT_STATISTICS_RETENTION_DAYS;
 
@@ -202,6 +208,68 @@ pub struct WarehouseStateLocation {
     pub schema: String,
 }
 
+/// Column renames a model migration decided; only the event identity and time are required.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseColumnMigrationRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub event_id: String,
+    pub target_name: Option<String>,
+    pub model_name: Option<String>,
+    pub relation_database: Option<String>,
+    pub relation_schema: Option<String>,
+    pub relation_name: Option<String>,
+    pub origin_column: Option<String>,
+    pub destination_column: Option<String>,
+    pub discovery: Option<String>,
+    pub decision: Option<String>,
+    pub run_id: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// One node's recorded outcome in one run, with its encoded payloads kept as written.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseNodeResultRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub node_type: Option<String>,
+    pub node_name: Option<String>,
+    pub target_database: Option<String>,
+    pub target_schema: Option<String>,
+    pub target_name: Option<String>,
+    pub run_id: Option<String>,
+    pub status: Option<String>,
+    pub payload_json_b64: Option<String>,
+    pub metadata_json_b64: Option<String>,
+    pub error_message: Option<String>,
+    pub materialized: Option<String>,
+    pub ts: DateTime<Utc>,
+}
+
+/// One input version an execution consumed, or the row marking that the execution started.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseConsumptionRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub execution_id: Option<String>,
+    pub phase: Option<String>,
+    pub run_id: Option<String>,
+    pub node_type: Option<String>,
+    pub node_name: Option<String>,
+    pub target_database: Option<String>,
+    pub target_schema: Option<String>,
+    pub target_name: Option<String>,
+    pub version_hash: Option<String>,
+    pub input_count: Option<i64>,
+    pub input_kind: Option<String>,
+    pub input_name: Option<String>,
+    pub input_version: Option<String>,
+    pub recorded_at: DateTime<Utc>,
+}
+
 /// Catalog observations require full scans; only immutable history supports a watermark.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -213,12 +281,16 @@ pub enum WarehouseHistoryKind {
     Migrations,
     OldNameViews,
     Microbatches,
+    ColumnMigrations,
+    NodeResults,
+    Consumption,
     Catalog,
     Statistics,
 }
 
 impl WarehouseHistoryKind {
-    pub const ALL: [Self; 9] = [
+    /// Catalog and statistics stay last: a failed statistics read rewinds one kind, to catalog.
+    pub const ALL: [Self; 12] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
@@ -226,38 +298,85 @@ impl WarehouseHistoryKind {
         Self::Migrations,
         Self::OldNameViews,
         Self::Microbatches,
+        Self::ColumnMigrations,
+        Self::NodeResults,
+        Self::Consumption,
         Self::Catalog,
         Self::Statistics,
     ];
 
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
+    /// Wire name, control-store mirror table and warehouse state table of each kind.
+    const fn names(self) -> (&'static str, &'static str, Option<&'static str>) {
         match self {
-            Self::Fingerprints => "fingerprints",
-            Self::SourceFreshness => "source_freshness",
-            Self::AuditResults => "audit_results",
-            Self::JanitorEvents => "janitor_events",
-            Self::Migrations => "migrations",
-            Self::OldNameViews => "old_name_views",
-            Self::Microbatches => "microbatches",
-            Self::Catalog => "catalog",
-            Self::Statistics => "statistics",
+            Self::Fingerprints => (
+                "fingerprints",
+                "sqb_warehouse_fingerprints",
+                Some(FINGERPRINT_TABLE_NAME),
+            ),
+            Self::SourceFreshness => (
+                "source_freshness",
+                "sqb_warehouse_freshness",
+                Some(SOURCE_FRESHNESS_TABLE_NAME),
+            ),
+            Self::AuditResults => (
+                "audit_results",
+                "sqb_warehouse_audit_results",
+                Some(AUDIT_RESULTS_TABLE_NAME),
+            ),
+            Self::JanitorEvents => (
+                "janitor_events",
+                "sqb_warehouse_janitor_events",
+                Some(JANITOR_EVENTS_TABLE_NAME),
+            ),
+            Self::Migrations => (
+                "migrations",
+                "sqb_warehouse_migrations",
+                Some(MIGRATION_TABLE_NAME),
+            ),
+            Self::OldNameViews => (
+                "old_name_views",
+                "sqb_warehouse_old_name_views",
+                Some(OLD_NAME_VIEW_TABLE_NAME),
+            ),
+            Self::Microbatches => (
+                "microbatches",
+                "sqb_warehouse_microbatches",
+                Some(MICROBATCH_TABLE_NAME),
+            ),
+            Self::ColumnMigrations => (
+                "column_migrations",
+                "sqb_warehouse_column_migrations",
+                Some(COLUMN_MIGRATION_TABLE_NAME),
+            ),
+            Self::NodeResults => (
+                "node_results",
+                "sqb_warehouse_node_results",
+                Some(NODE_RESULTS_TABLE_NAME),
+            ),
+            Self::Consumption => (
+                "consumption",
+                "sqb_warehouse_consumption",
+                Some(CONSUMPTION_TABLE_NAME),
+            ),
+            Self::Catalog => ("catalog", "sqb_warehouse_catalog", None),
+            Self::Statistics => ("statistics", "sqb_warehouse_statistics", None),
         }
     }
 
     #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        self.names().0
+    }
+
+    /// The state table a kind mirrors; catalog and statistics read the warehouse catalog instead.
+    #[must_use]
+    pub const fn source_table(self) -> Option<&'static str> {
+        self.names().2
+    }
+
+    #[must_use]
     pub const fn mirror_table(self) -> &'static str {
-        match self {
-            Self::Fingerprints => "sqb_warehouse_fingerprints",
-            Self::SourceFreshness => "sqb_warehouse_freshness",
-            Self::AuditResults => "sqb_warehouse_audit_results",
-            Self::JanitorEvents => "sqb_warehouse_janitor_events",
-            Self::Migrations => "sqb_warehouse_migrations",
-            Self::OldNameViews => "sqb_warehouse_old_name_views",
-            Self::Microbatches => "sqb_warehouse_microbatches",
-            Self::Catalog => "sqb_warehouse_catalog",
-            Self::Statistics => "sqb_warehouse_statistics",
-        }
+        self.names().1
     }
 }
 
@@ -346,6 +465,26 @@ pub struct FingerprintRead {
     pub limit: Option<usize>,
 }
 
+/// Node results carry no event identity, so the cursor holds the row's identity columns.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NodeResultsRead {
+    pub location: WarehouseStateLocation,
+    pub after: Option<[Option<String>; 9]>,
+    pub observed_since: Option<DateTime<Utc>>,
+    pub limit: Option<usize>,
+}
+
+/// Consumption rows carry no event identity, so the cursor holds the row's identity columns.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConsumptionRead {
+    pub location: WarehouseStateLocation,
+    pub after: Option<[Option<String>; 7]>,
+    pub observed_since: Option<DateTime<Utc>>,
+    pub limit: Option<usize>,
+}
+
 /// Stable event identities and timestamps order observations without comparing their payloads.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -367,6 +506,9 @@ pub enum WarehouseHistoryRead {
     Migrations(StateEventsRead),
     OldNameViews(StateEventsRead),
     Microbatches(StateEventsRead),
+    ColumnMigrations(StateEventsRead),
+    NodeResults(NodeResultsRead),
+    Consumption(ConsumptionRead),
     Catalog(CatalogRead),
     Statistics(StatisticsRead),
 }
@@ -381,6 +523,9 @@ pub enum WarehouseHistoryRecord {
     Migration(Box<WarehouseMigrationRecord>),
     OldNameView(Box<WarehouseOldNameRecord>),
     Microbatch(Box<WarehouseMicrobatchRecord>),
+    ColumnMigration(Box<WarehouseColumnMigrationRecord>),
+    NodeResult(Box<WarehouseNodeResultRecord>),
+    Consumption(Box<WarehouseConsumptionRecord>),
     Catalog(WarehouseCatalogRecord),
     Statistics(WarehouseStatisticsRecord),
 }

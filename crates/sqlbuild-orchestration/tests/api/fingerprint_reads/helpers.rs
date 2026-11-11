@@ -9,7 +9,8 @@ use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::{
-    ingest_fingerprints::ingest_fingerprints, read_person_fingerprint::read_person_fingerprint,
+    ingest::ingest_fingerprints::ingest_fingerprints,
+    person_reads::read_person_fingerprint::read_person_fingerprint,
 };
 use crate::warehouse_metadata::models::{FingerprintQuery, MetadataBatch};
 

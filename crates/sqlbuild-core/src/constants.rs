@@ -30,6 +30,27 @@ pub const MIGRATION_TABLE_NAME: &str = "_sqlbuild_migrations";
 pub const COLUMN_MIGRATION_TABLE_NAME: &str = "_sqlbuild_column_migrations";
 /// State table of old-name view events.
 pub const OLD_NAME_VIEW_TABLE_NAME: &str = "_sqlbuild_old_name_views";
+/// State table of each node's outcome in each run.
+pub const NODE_RESULTS_TABLE_NAME: &str = "_sqlbuild_node_results";
+/// State table of microbatch requirements and completions.
+pub const MICROBATCH_TABLE_NAME: &str = "_sqlbuild_microbatches";
+/// State table of audit outcomes.
+pub const AUDIT_RESULTS_TABLE_NAME: &str = "_sqlbuild_audit_results";
+/// State table of janitor archive and drop events.
+pub const JANITOR_EVENTS_TABLE_NAME: &str = "_sqlbuild_janitor_events";
+/// Every state table SQLBuild writes in a target's state schema.
+pub const STATE_TABLE_NAMES: [&str; 10] = [
+    FINGERPRINT_TABLE_NAME,
+    MICROBATCH_TABLE_NAME,
+    SOURCE_FRESHNESS_TABLE_NAME,
+    CONSUMPTION_TABLE_NAME,
+    NODE_RESULTS_TABLE_NAME,
+    AUDIT_RESULTS_TABLE_NAME,
+    JANITOR_EVENTS_TABLE_NAME,
+    MIGRATION_TABLE_NAME,
+    COLUMN_MIGRATION_TABLE_NAME,
+    OLD_NAME_VIEW_TABLE_NAME,
+];
 /// A zero-length cursor duration.
 pub const ZERO_DAY_DURATION: &str = "0d";
 /// Node key of a common table expression in the polyglot SQL AST.

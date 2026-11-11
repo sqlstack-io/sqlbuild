@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -28,6 +29,8 @@ import duckdb
 import pytest
 
 from sqlbuild._native import (
+    ColumnMigrationDecision,
+    ColumnMigrationEvent,
     Fingerprint,
     MigrationDecision,
     MigrationDiscovery,
@@ -35,6 +38,9 @@ from sqlbuild._native import (
     MigrationRelation,
     OldNameViewEvent,
     OldNameViewEventType,
+    StateSqlValueType,
+    build_consumption_create_table_sql,
+    render_state_sql_literal,
     write_fingerprint,
     write_migration_state_event,
 )
@@ -47,6 +53,8 @@ from sqlbuild.executor.janitor_events.main.create_table_sql import (
 )
 from sqlbuild.executor.janitor_events.models import JanitorEventRecord
 from sqlbuild.executor.janitor_events.types import JanitorEventType
+from sqlbuild.executor.node_results.classes.direct_store import DirectNodeResultStore
+from sqlbuild.executor.node_results.models import NodeResultRecord
 from sqlbuild.microbatches.classes.direct_store import DirectMicrobatchEventStore
 from sqlbuild.microbatches.classes.event_codec import MicrobatchEventCodec
 from sqlbuild.microbatches.constants import MICROBATCH_COLUMNS
@@ -233,6 +241,92 @@ def append_migration_history(adapter: Any, connection: Any, fixture: dict[str, A
     )
 
 
+def append_column_migration_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Real column-rename facts, including idempotent duplicate attempts."""
+    data: dict[str, Any] = migration_history_data(fixture, ("relation",))
+    data["discovery"] = MigrationDiscovery(data["discovery"])
+    data["decision"] = ColumnMigrationDecision(data["decision"])
+    record: ColumnMigrationEvent = ColumnMigrationEvent(**data)
+    write_migration_history(
+        adapter,
+        connection,
+        fixture,
+        record,
+        "column",
+        adapter.render_create_column_migration_state_table_sql(database=None, schema="main"),
+        {},
+    )
+
+
+def append_node_result_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Real node-result writer; retried writes repeat rows, which carry no event identity."""
+    store: DirectNodeResultStore = DirectNodeResultStore(
+        adapter=adapter, connection=connection, database=None, schema="main"
+    )
+    rows: list[dict[str, Any]] = identified_rows(fixture)
+    for row in rows + [rows[0]] * fixture["duplicate_rows"]:
+        store.write(
+            NodeResultRecord(
+                node_type=row["node_type"],
+                node_name=row["node_name"],
+                target_database=row["target_database"],
+                target_schema=row["target_schema"],
+                target_name=row["target_name"],
+                run_id=row["run_id"],
+                status=row["status"],
+                payload=json.loads(base64.b64decode(row["payload_json_b64"])),
+                metadata=json.loads(base64.b64decode(row["metadata_json_b64"])),
+                error_message=row["error_message"],
+                materialized=row["materialized"] == "true",
+                ts=datetime.fromisoformat(row["ts"]),
+            )
+        )
+
+
+def append_consumption_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Consumption rows in the real table layout; retried appends repeat identical rows."""
+    _ = adapter.execute(
+        connection=connection,
+        sql=build_consumption_create_table_sql(
+            database=None,
+            schema="main",
+            render_qualified_name=adapter.render_qualified_name,
+            render_framework_type=adapter.render_framework_type,
+        ),
+    )
+    columns: list[str] = list(fixture["record"])[2:]
+    types: dict[str, StateSqlValueType] = dict.fromkeys(columns, StateSqlValueType.STRING) | {
+        "input_count": StateSqlValueType.INTEGER,
+        "recorded_at": StateSqlValueType.TIMESTAMP,
+    }
+    rows: list[dict[str, Any]] = [
+        row | {"recorded_at": datetime.fromisoformat(row["recorded_at"])}
+        for row in identified_rows(fixture)
+    ]
+    for row in rows + [rows[0]] * fixture["duplicate_rows"]:
+        values: list[str] = [
+            render_state_sql_literal(
+                value=row[column], declared_type=types[column], timestamp_type="TIMESTAMP"
+            )
+            for column in columns
+        ]
+        _ = adapter.execute(
+            connection=connection,
+            sql=f"INSERT INTO main._sqlbuild_consumption ({', '.join(columns)}) "
+            f"VALUES ({', '.join(values)})",
+        )
+
+
+def identified_rows(fixture: dict[str, Any]) -> list[dict[str, Any]]:
+    """The fixture record once per source identity, with its per-identity overrides."""
+    return [
+        fixture["record"]
+        | {fixture["source_key"]: f"{fixture['id_prefix']}-{index:03}"}
+        | fixture["record_overrides"].get(f"{fixture['id_prefix']}-{index:03}", {})
+        for index in range(fixture["source_rows"])
+    ]
+
+
 def append_old_name_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
     """Real compatibility-view facts, including nullable and populated expiry."""
     data: dict[str, Any] = migration_history_data(fixture, ("old", "new"))
@@ -254,7 +348,7 @@ def append_old_name_history(adapter: Any, connection: Any, fixture: dict[str, An
     )
 
 
-def migration_history_data(fixture: dict[str, Any], relations: tuple[str, str]) -> dict[str, Any]:
+def migration_history_data(fixture: dict[str, Any], relations: tuple[str, ...]) -> dict[str, Any]:
     """Reconstruct native relation values from the warehouse-shaped fixture."""
     data: dict[str, Any] = fixture["record"].copy()
     del data["state_database"]
@@ -273,8 +367,8 @@ def write_migration_history(
     adapter: Any,
     connection: Any,
     fixture: dict[str, Any],
-    record: MigrationEvent | OldNameViewEvent,
-    kind: Literal["model", "old_name"],
+    record: MigrationEvent | ColumnMigrationEvent | OldNameViewEvent,
+    kind: Literal["model", "column", "old_name"],
     create_sql: str,
     last_values: dict[str, Any],
 ) -> None:

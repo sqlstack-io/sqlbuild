@@ -78,6 +78,14 @@ class FakeSnowflakeQueryCursor(FakeSnowflakeDescribeCursor):
         return self._rows[:size]
 
 
+class FakeSnowflakeMissingObjectCursor(FakeSnowflakeQueryCursor):
+    """Cursor double whose statement fails as Snowflake reports a missing object."""
+
+    def execute(self, sql: str) -> None:
+        super().execute(sql)
+        raise RuntimeError("Database 'GONE' does not exist or not authorized.")
+
+
 class FakeSnowflakeDescribeConnection:
     """Connection double returning a preconfigured describe cursor."""
 

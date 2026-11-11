@@ -26,11 +26,11 @@ use crate::runs::models::{
 use crate::runs::types::{CommandPlanner, RunsListing};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
-use crate::warehouse_metadata::main::read_person_column_lineage::read_person_column_lineage;
-use crate::warehouse_metadata::main::read_person_fingerprint::read_person_fingerprint;
-use crate::warehouse_metadata::main::read_person_node_status::read_person_node_status;
-use crate::warehouse_metadata::main::read_person_statistics::read_person_statistics;
+use crate::warehouse_metadata::main::person_reads::read_person_catalog::read_person_catalog;
+use crate::warehouse_metadata::main::person_reads::read_person_column_lineage::read_person_column_lineage;
+use crate::warehouse_metadata::main::person_reads::read_person_fingerprint::read_person_fingerprint;
+use crate::warehouse_metadata::main::person_reads::read_person_node_status::read_person_node_status;
+use crate::warehouse_metadata::main::person_reads::read_person_statistics::read_person_statistics;
 use crate::warehouse_metadata::models::{
     CatalogPage, CatalogQuery, ColumnLineageRead, FingerprintObservation, FingerprintQuery,
     NodeStatus, NodeStatusQuery, StatisticsPage, StatisticsQuery, StatisticsRetention,

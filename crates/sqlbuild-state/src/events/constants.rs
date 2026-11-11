@@ -34,6 +34,21 @@ pub const MIGRATION_COLUMNS: [&str; 15] = [
     "run_id",
     "created_at",
 ];
+/// Columns of `_sqlbuild_node_results`, in the order the executor writes them.
+pub const NODE_RESULT_COLUMNS: [&str; 12] = [
+    "node_type",
+    "node_name",
+    "target_database",
+    "target_schema",
+    "target_name",
+    "run_id",
+    "status",
+    "payload_json_b64",
+    "metadata_json_b64",
+    "error_message",
+    "materialized",
+    "ts",
+];
 pub const COLUMN_MIGRATION_COLUMNS: [&str; 12] = [
     "event_id",
     "target_name",

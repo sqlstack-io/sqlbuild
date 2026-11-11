@@ -11,3 +11,11 @@ pub(crate) struct ValuesInsertTestCase {
     pub(crate) rows: Vec<Vec<String>>,
     pub(crate) expected_sql: &'static str,
 }
+
+pub(crate) struct HistoryReadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) adapter: &'static str,
+    pub(crate) has_event_id: bool,
+    pub(crate) after: Option<Vec<Option<String>>>,
+    pub(crate) expected_sql: &'static str,
+}

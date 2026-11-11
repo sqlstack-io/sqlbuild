@@ -3,11 +3,12 @@
 use chrono::{Duration, Utc};
 use reqwest::StatusCode;
 use serde_json::json;
+use sqlbuild_core::constants::STATE_TABLE_NAMES;
 use uuid::Uuid;
 
 use crate::api::tests::changes_helpers::{connect, expect_topics};
 use crate::api::tests::helpers::{start_api, stop_api};
-use crate::api::tests::test_types::WarehouseMetadataTestCase;
+use crate::api::tests::test_types::{StateTableClassificationTestCase, WarehouseMetadataTestCase};
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
@@ -25,6 +26,38 @@ use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
+
+#[test]
+fn given_state_tables_when_classified_then_each_is_mirrored_by_exactly_one_kind() {
+    let mut written: Vec<&str> = STATE_TABLE_NAMES.to_vec();
+    written.sort_unstable();
+    let test_cases = [StateTableClassificationTestCase {
+        description: "every state table SQLBuild writes, with statistics rewinding to catalog",
+        expected_tables: written,
+        expected_last_kinds: [
+            WarehouseHistoryKind::Catalog,
+            WarehouseHistoryKind::Statistics,
+        ],
+    }];
+    for test_case in test_cases {
+        let mut mirrored: Vec<&str> = WarehouseHistoryKind::ALL
+            .iter()
+            .filter_map(|kind| kind.source_table())
+            .collect();
+        mirrored.sort_unstable();
+        assert_eq!(
+            mirrored, test_case.expected_tables,
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            WarehouseHistoryKind::ALL[WarehouseHistoryKind::ALL.len() - 2..],
+            test_case.expected_last_kinds,
+            "{}",
+            test_case.description
+        );
+    }
+}
 
 #[test]
 fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicity_are_preserved() {
@@ -347,6 +380,21 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                     WarehouseHistoryKind::Microbatches,
                     "microbatch_history",
                     "event_id",
+                ),
+                (
+                    WarehouseHistoryKind::ColumnMigrations,
+                    "column_migration_history",
+                    "event_id",
+                ),
+                (
+                    WarehouseHistoryKind::NodeResults,
+                    "node_result_history",
+                    "node_name",
+                ),
+                (
+                    WarehouseHistoryKind::Consumption,
+                    "consumption_history",
+                    "execution_id",
                 ),
             ] {
                 crate::api::tests::warehouse_events_helpers::event_history(

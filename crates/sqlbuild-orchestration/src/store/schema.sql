@@ -465,6 +465,42 @@ CREATE TABLE sqb_warehouse_microbatches (
 );
 CREATE INDEX sqb_microbatches_namespace ON sqb_warehouse_microbatches (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE INDEX sqb_microbatches_model ON sqb_warehouse_microbatches (location_id,target,model_name);
+CREATE TABLE sqb_warehouse_column_migrations (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL,
+    scan_id {uuid}
+);
+CREATE INDEX sqb_column_migrations_namespace ON sqb_warehouse_column_migrations (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE TABLE sqb_warehouse_node_results (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL,
+    scan_id {uuid}
+);
+CREATE INDEX sqb_node_results_namespace ON sqb_warehouse_node_results (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE TABLE sqb_warehouse_consumption (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL,
+    scan_id {uuid}
+);
+CREATE INDEX sqb_consumption_namespace ON sqb_warehouse_consumption (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE INDEX sqb_freshness_source_latest ON sqb_warehouse_freshness (
     location_id, target, (record_json ->> 'source_name'),
     (record_json ->> 'target_database'), (record_json ->> 'target_schema'),
