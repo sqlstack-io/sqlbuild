@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import '@xyflow/svelte/dist/style.css';
@@ -49,6 +50,8 @@
 	let modelQuery = $state('');
 
 	const nodeTypes = { asset: AssetNode };
+	// Automatic fits stop at a zoom where cards stay readable; the fit button and the wheel go further, to the whole graph.
+	const FIT_FLOOR = 0.3;
 
 	// The graph is the catalog: every node in the current snapshot with its
 	// build state. Later refreshes update card data in place so positions,
@@ -58,15 +61,28 @@
 	const initialFocus = page.url.searchParams.get('select');
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
+	// The first graph is built a frame after the listing arrives, so the page and its loading state
+	// paint before the cards are created and laid out, which takes a moment on a large project.
+	let building = false;
+	let fitted = $state(false);
 	$effect(() => {
 		const data = catalog.data;
 		if (!data || scaleMode) return;
 		untrack(() => {
 			if (!nodes.length) {
-				const graph = catalogGraph(data);
-				const focus = data.some((n) => n.key === initialFocus) ? initialFocus : null;
-				nodes = graph.nodes.map((n) => (n.id === focus ? { ...n, selected: true } : n));
-				edges = graph.edges;
+				if (building) return;
+				building = true;
+				requestAnimationFrame(() =>
+					setTimeout(() => {
+						building = false;
+						const latest = catalog.data;
+						if (!latest || nodes.length) return;
+						const graph = catalogGraph(latest);
+						const focus = latest.some((n) => n.key === initialFocus) ? initialFocus : null;
+						nodes = graph.nodes.map((n) => (n.id === focus ? { ...n, selected: true } : n));
+						edges = graph.edges;
+					})
+				);
 				return;
 			}
 			const byKey = new Map(data.map((n) => [n.key, n]));
@@ -253,21 +269,13 @@
 		return scaleMode || !primarySlug || !detailSupported || !listing ? Promise.resolve(null) : client.getCatalogNode(scope, String(primarySlug), listing);
 	});
 	const fresh = $derived(detail.data && detail.data.key === primarySlug ? detail.data : null);
-	// While the next node loads, the inspector keeps the last one instead of collapsing to
-	// "Loading…"; it dims only if the switch is slow, and gives up on it after a while.
+	// A reload of the node already shown keeps its facts until the new answer arrives; another node
+	// shows the loading state until its own facts arrive, never the previous node's.
 	let held = $state.raw<typeof fresh>(null);
-	let heldTooLong = $state(false);
 	$effect(() => {
 		if (fresh) held = fresh;
 	});
-	$effect(() => {
-		void primarySlug;
-		heldTooLong = false;
-		const timer = setTimeout(() => (heldTooLong = true), 1500);
-		return () => clearTimeout(timer);
-	});
-	const d = $derived(fresh ?? (heldTooLong || detail.error || catalog.error ? null : held));
-	const switching = $derived(!!d && d !== fresh);
+	const d = $derived(fresh ?? (held && held.key === primarySlug && !detail.error && !catalog.error ? held : null));
 	const listed = $derived(detailSupported ? null : (catalogByKey.get(String(primarySlug)) ?? null));
 	const isSource = $derived(d?.kind === 'source');
 	const hasSql = $derived(!!d?.sql);
@@ -438,7 +446,7 @@
 
 	$effect(() => {
 		const key = layoutKey; // track only field state + measured heights
-		if (scaleMode || key === lastLayoutKey) return;
+		if (scaleMode || !nodes.length || key === lastLayoutKey) return;
 		const measured = nodes.every((n) => n.measured?.width && n.measured?.height);
 		if (!measured) return;
 		lastLayoutKey = key;
@@ -587,8 +595,8 @@
 			bind:edges
 			{nodeTypes}
 			fitView
-			fitViewOptions={{ padding: 0.08, maxZoom: 1, includeHiddenNodes: scaleMode }}
-			minZoom={scaleMode ? 0.02 : 0.3}
+			fitViewOptions={{ padding: 0.08, maxZoom: 1, minZoom: scaleMode ? undefined : FIT_FLOOR, includeHiddenNodes: scaleMode }}
+			minZoom={scaleMode ? 0.02 : 0.05}
 			onlyRenderVisibleElements={scaleMode}
 			onpaneclick={onFarClick}
 			elementsSelectable
@@ -599,10 +607,13 @@
 			onnodepointerenter={({ node }) => (hoveredId = node.id)}
 			onnodepointerleave={() => (hoveredId = null)}
 		>
-			<FlowController bind:fitView={fitFlow} bind:viewport bind:setViewport={setFlowViewport} />
+			<FlowController bind:fitView={fitFlow} bind:viewport bind:setViewport={setFlowViewport} bind:fitted fitFloor={scaleMode ? undefined : FIT_FLOOR} />
 			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 			<Controls />
 		</SvelteFlow>
+		{#if !scaleMode && !fitted && !catalog.error && catalog.data?.length !== 0}
+			<div class="graph-loading"><div><Loading lines={4} /></div></div>
+		{/if}
 		{#if scaleMode}
 			<canvas class="far-canvas" bind:this={farCanvas} style:width="{panelSize.w}px" style:height="{panelSize.h}px" style:display={far ? 'block' : 'none'}></canvas>
 			<div class="scale-hint">{scaleModels.toLocaleString()} models · {far ? 'zoomed out: status overview' : 'cards'} · zoom {Math.round(viewport.zoom * 100)}%</div>
@@ -644,14 +655,14 @@
 					{#if d}<a href={to(`/catalog/${primarySlug}`)} class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
 				</div>
 				<div class="inspector-meta">
-					<!-- From the selected card, so the header never names the previous node's facts while its detail is held. -->
+					<!-- From the selected card, so the header names the node at once, before its detail arrives. -->
 					<span>{primary?.data.kind}</span>
 					{#if primary?.data.group}<span>{primary.data.group}</span>{/if}
 					{#if (primary?.data.owner as string[] | undefined)?.length}<span>{(primary?.data.owner as string[]).join(', ')}</span>{/if}
 				</div>
 			</div>
 		{/if}
-		<div class="insp-body" class:switching aria-busy={switching}>
+		<div class="insp-body">
 			{#if !scaleMode && !primary}
 				<InspectorSection title="Details"><p class="insp-description">Select a node to see its details.</p></InspectorSection>
 			{:else}
@@ -670,7 +681,7 @@
 					</dl>
 				</InspectorSection>
 			{:else if !d}
-				<InspectorSection title="Details"><p class="insp-description">{detail.error ?? catalog.error ?? 'Loading…'}</p></InspectorSection>
+				<InspectorSection title="Details">{#if detail.error ?? catalog.error}<p class="insp-description">{detail.error ?? catalog.error}</p>{:else}<Loading />{/if}</InspectorSection>
 			{:else if isSource}
 				<InspectorSection title="Source">
 					<dl class="kv">
@@ -1000,6 +1011,16 @@
 		font: 11.5px var(--font-sans);
 		text-align: center;
 	}
+	.graph-loading {
+		position: absolute;
+		inset: 0;
+		z-index: 5;
+		background: var(--sb-inset);
+		padding: 24px;
+	}
+	.graph-loading > div {
+		width: 240px;
+	}
 	.inspector-panel {
 		height: 100%;
 	}
@@ -1267,11 +1288,6 @@
 		display: flex;
 		flex-direction: column;
 		transition: opacity 120ms;
-	}
-	/* A quick switch never dims; only one that takes longer than 150ms does. */
-	.insp-body.switching {
-		opacity: 0.55;
-		transition: opacity 120ms 150ms;
 	}
 	.mini-run {
 		display: grid;

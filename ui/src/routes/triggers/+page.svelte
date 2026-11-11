@@ -100,6 +100,7 @@
 </AppTopbar>
 
 <ListToolbar
+	loading={triggers.data === undefined}
 	bind:query
 	placeholder="Search schedules, sensors and jobs"
 	total="{filtered.length} of {all.length} schedules and sensors"
@@ -110,7 +111,7 @@
 	]}
 >
 	{#snippet filters()}
-		<SegmentedFilter
+		<SegmentedFilter loading={triggers.data === undefined}
 			bind:value={type}
 			options={[
 				{ value: 'all', label: 'All' },

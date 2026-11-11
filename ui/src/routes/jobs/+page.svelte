@@ -63,6 +63,7 @@
 </AppTopbar>
 
 <ListToolbar
+	loading={jobs.data === undefined}
 	bind:query
 	placeholder="Search jobs and groups"
 	total="{filtered.length} of {all.length}"
@@ -72,7 +73,7 @@
 	]}
 >
 	{#snippet filters()}
-		<SegmentedFilter
+		<SegmentedFilter loading={jobs.data === undefined}
 			bind:value={kind}
 			options={[
 				{ value: 'all', label: 'All', count: all.length },

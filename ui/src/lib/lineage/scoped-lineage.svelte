@@ -198,13 +198,15 @@
 			bind:edges
 			{nodeTypes}
 			fitView
+			fitViewOptions={{ minZoom: 0.3 }}
+			minZoom={0.1}
 			elementsSelectable
 			nodesDraggable
 			multiSelectionKey={['Shift', 'Meta', 'Control']}
 			selectionKey="Shift"
 			proOptions={{ hideAttribution: true }}
 		>
-			<FlowController bind:fitView={fitFn} bind:fitted />
+			<FlowController bind:fitView={fitFn} bind:fitted fitFloor={0.3} />
 			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 			<Controls />
 		</SvelteFlow>

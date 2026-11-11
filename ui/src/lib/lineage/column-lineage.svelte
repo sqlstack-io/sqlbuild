@@ -350,8 +350,8 @@
 			}}
 		>
 			{#if selectedCol}
-				<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView fitViewOptions={{ padding: 0.12, maxZoom: 1 }} nodesDraggable proOptions={{ hideAttribution: true }}>
-					<FlowController bind:fitView={fitFn} />
+				<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView fitViewOptions={{ padding: 0.12, maxZoom: 1, minZoom: 0.3 }} minZoom={0.1} nodesDraggable proOptions={{ hideAttribution: true }}>
+					<FlowController bind:fitView={fitFn} fitFloor={0.3} />
 					<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 					<Controls />
 				</SvelteFlow>

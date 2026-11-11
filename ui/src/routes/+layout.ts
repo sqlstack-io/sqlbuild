@@ -44,7 +44,7 @@ const PAGE_READS: [RegExp, Read][] = [
 ];
 
 // Reads only the path, so filter changes within a page don't wait on this.
-export const load: LayoutLoad = async ({ url, untrack }) => {
+export const load: LayoutLoad = ({ url, untrack }) => {
 	const search = untrack(() => url.searchParams);
-	await prefetch(app.scope, appPath(url.pathname), search, PAGE_READS);
+	prefetch(app.scope, appPath(url.pathname), search, PAGE_READS);
 };

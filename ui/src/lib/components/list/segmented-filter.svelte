@@ -1,17 +1,20 @@
 <script lang="ts" generics="T extends string">
 	let {
 		value = $bindable(),
-		options
+		options,
+		loading = false
 	}: {
 		value: T;
 		options: { value: T; label: string; count?: number }[];
+		/** Nothing loaded yet: counts would read as zero, so they wait for the list. */
+		loading?: boolean;
 	} = $props();
 </script>
 
 <div class="segmented-filter" role="tablist">
 	{#each options as o (o.value)}
 		<button role="tab" aria-selected={value === o.value} class:on={value === o.value} onclick={() => (value = o.value)}>
-			{o.label}{#if o.count != null}<span>{o.count}</span>{/if}
+			{o.label}{#if o.count != null && !loading}<span>{o.count}</span>{/if}
 		</button>
 	{/each}
 </div>
