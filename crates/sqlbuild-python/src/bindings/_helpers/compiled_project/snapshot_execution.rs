@@ -214,9 +214,17 @@ impl WorkerBuild {
     }
 
     /// Report a selected node as started; the deterministic event ID makes a repeat a no-op.
+    ///
+    /// A node whose outcome is already final, such as a planner skip, is never restarted.
     pub(crate) fn start_key(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         self.check_cancelled(py)?;
-        if self.execution.claim.request.selection.contains(key) {
+        if self.execution.claim.request.selection.contains(key)
+            && !self
+                .completed
+                .lock()
+                .map_err(|_| poisoned())?
+                .contains_key(key)
+        {
             self.worker.bind(py).get().change(
                 py,
                 &format!("node-started/{key}"),
