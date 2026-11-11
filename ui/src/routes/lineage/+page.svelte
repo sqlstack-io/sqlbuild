@@ -780,6 +780,8 @@
 				</InspectorSection>
 			{/if}
 
+			<!-- Waits for the node's facts too, so the whole panel fills at once instead of sections arriving above it. -->
+			{#if d || listed || scaleMode}
 			<InspectorSection title="Dependencies">
 				{#snippet meta()}<span>{upstream.length} up · {downstream.length} down</span>{/snippet}
 				<div class="deps">
@@ -797,6 +799,7 @@
 					</div>
 				</div>
 			</InspectorSection>
+			{/if}
 
 			{#if d}
 				<InspectorSection title="Definition">
