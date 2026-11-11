@@ -482,7 +482,13 @@
 	display: block;
 	height: 10px;
 	border-radius: 4px;
-	background: linear-gradient(90deg, var(--sb-hover) 0%, var(--sb-surface-high) 50%, var(--sb-hover) 100%);
+	/* Mixed from the text colour, so the bar and its sheen stand out from any surface in both themes. */
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--foreground) 8%, transparent) 0%,
+		color-mix(in srgb, var(--foreground) 18%, transparent) 50%,
+		color-mix(in srgb, var(--foreground) 8%, transparent) 100%
+	);
 	background-size: 200% 100%;
 	animation: sb-shimmer 1.2s ease-in-out infinite;
 }

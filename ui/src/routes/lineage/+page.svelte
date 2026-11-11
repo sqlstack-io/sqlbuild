@@ -9,6 +9,7 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import FocusIcon from '@lucide/svelte/icons/focus';
+	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
 	import PanelLeftIcon from '@lucide/svelte/icons/panel-left';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -682,7 +683,20 @@
 				</InspectorSection>
 			{:else if !d}
 				<!-- Titled like the section the facts fill, so it does not switch title when they arrive. -->
-				<InspectorSection title={catalogByKey.get(String(primarySlug))?.kind === 'source' ? 'Source' : 'Last build'}>{#if detail.error ?? catalog.error}<p class="insp-description">{detail.error ?? catalog.error}</p>{:else}<Loading />{/if}</InspectorSection>
+				<InspectorSection title={catalogByKey.get(String(primarySlug))?.kind === 'source' ? 'Source' : 'Last build'}>
+					{#snippet meta()}{#if !(detail.error ?? catalog.error)}<span class="loading-meta"><LoaderIcon size={13} class="spin" />Loading</span>{/if}{/snippet}
+					{#if detail.error ?? catalog.error}<p class="insp-description">{detail.error ?? catalog.error}</p>
+					{:else}
+						<!-- Shaped like the facts it stands in for, so they replace it without the panel jumping. -->
+						<div class="status-stats" role="status" aria-label="Loading">
+							{#each [0, 1, 2] as i (i)}<div><span class="sb-skeleton stat-label"></span><span class="sb-skeleton stat-value"></span></div>{/each}
+						</div>
+						<span class="sb-skeleton strip-bar"></span>
+						<dl class="kv">
+							{#each [64, 48, 56] as w (w)}<div><dt><span class="sb-skeleton" style:width="70%"></span></dt><dd><span class="sb-skeleton" style:width="{w}%"></span></dd></div>{/each}
+						</dl>
+					{/if}
+				</InspectorSection>
 			{:else if isSource}
 				<InspectorSection title="Source">
 					<dl class="kv">
@@ -1568,6 +1582,39 @@
 	}
 	.strip-wrap {
 		margin-top: 14px;
+	}
+	.loading-meta {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--muted-foreground);
+		font-size: 12px;
+	}
+	.loading-meta :global(.spin) {
+		animation: spin 1s linear infinite;
+	}
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	.status-stats .stat-label {
+		width: 50%;
+		height: 8px;
+	}
+	.status-stats .stat-value {
+		width: 40%;
+		height: 16px;
+		margin-top: 6px;
+	}
+	.strip-bar {
+		height: 14px;
+		margin: 16px 0 14px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.loading-meta :global(.spin) {
+			animation: none;
+		}
 	}
 	.status-top {
 		flex-wrap: wrap;
