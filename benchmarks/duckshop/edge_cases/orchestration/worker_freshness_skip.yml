@@ -1,0 +1,16 @@
+# A scheduled build where raw_orders fails its freshness check and raw_returns has none.
+# The planner skips the models that read raw_orders before execution; the worker must never
+# report those skips as started, and models that read raw_returns must still build.
+sources:
+  - name: raw_orders
+    description: Raw orders.
+    expression: SELECT 1 AS order_id
+    freshness:
+      strategy: sql
+      type: timestamp
+      query: SELECT CAST('2000-01-01 00:00:00' AS TIMESTAMP) AS data_version
+      age_policy:
+        error_after: 1h
+  - name: raw_returns
+    description: Raw returns.
+    expression: SELECT 2 AS return_id
