@@ -4,6 +4,7 @@
 	// scratch (`--full-refresh`). The choice is the caller's; this only edits it.
 	import type { CursorWindow } from '$lib/api';
 	import { app } from '$lib/state/app.svelte';
+	import RangeCalendar from './range-calendar.svelte';
 
 	type Choice = { window: CursorWindow | null; fullRefresh: boolean };
 	let {
@@ -80,6 +81,7 @@
 						<input type="date" aria-label="From" value={dateOf(window?.start ?? null)} onchange={(e) => setCustom(e.currentTarget.value, customEnd)} />
 						<span>to</span>
 						<input type="date" aria-label="To, included" value={customEnd} onchange={(e) => setCustom(dateOf(window?.start ?? null), e.currentTarget.value)} />
+						<RangeCalendar start={dateOf(window?.start ?? null)} end={customEnd} today={dateOf(iso(midnight(app.now)))} onpick={setCustom} />
 					{:else}
 						<input inputmode="numeric" aria-label="From" placeholder="start" value={window?.start ?? ''} onchange={(e) => setCustom(e.currentTarget.value, window?.end ?? '')} />
 						<span>to</span>
