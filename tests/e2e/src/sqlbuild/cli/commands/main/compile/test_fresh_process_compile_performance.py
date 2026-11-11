@@ -23,8 +23,8 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 _MIB: int = 1024 * 1024
 _GIB: int = 1024 * _MIB
 # Temporary allowance for the native parser switch: each wall budget below is its original value
-# times the approved 1.42 fresh cold wall ratio ceiling. Drop the multiplier, back to the original
-# value, when the 1.10x same-runner ratio guards return.
+# times 1.42, the approved fresh cold slowdown of native analysis. Drop the multiplier, back to the
+# original value, when the native analysis cold path is optimised.
 _NATIVE_COLD_WALL_ALLOWANCE: float = 1.42
 
 

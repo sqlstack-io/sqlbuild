@@ -845,20 +845,10 @@ jobs:
         include:
           - kind: dense
             max_ratio: "1.10"
-            # Temporary native-analysis allowance on the cold compile only; restore 1.10 when the
-            # native analysis cold path is optimised. Measured 1.326/1.347 wall and 1.642/1.677 CPU
-            # over main, plus 10%.
-            cold_max_ratio: "1.49"
-            cold_max_cpu_ratio: "1.85"
             edit_max_ratio: "1.20"
             edit_max_cpu_ratio: "1.75"
           - kind: fresh
             max_ratio: "1.10"
-            # Temporary native-analysis allowance on the cold compile only; restore 1.10 when the
-            # native analysis cold path is optimised. Measured 1.285/1.153 wall and 1.551/1.404 CPU
-            # over main, plus 10%.
-            cold_max_ratio: "1.42"
-            cold_max_cpu_ratio: "1.71"
           - kind: dense
             label: contracts CPU vs base
             gate_phase: contracts_cpu_ms
@@ -867,9 +857,7 @@ jobs:
             label: model analysis CPU vs base
             gate_phase: model_analysis_cpu_ms
             compile_args: --compile-arg=--select=*
-            # Temporary native-analysis allowance; restore 1.10 when the native analysis path is
-            # optimised. Measured 2.660/2.554 over main, plus 10%.
-            max_ratio: "2.93"
+            max_ratio: "1.10"
           - kind: dense
             label: custom rules CPU vs base
             gate_phase: custom_rules_cpu_ms

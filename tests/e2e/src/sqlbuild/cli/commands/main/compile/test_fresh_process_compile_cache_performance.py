@@ -20,6 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
     assert_complete_compile_cache_hit,
     assert_successful_compile_cache_payload,
     fresh_process_compile_cache_metrics,
+    measure_runner_calibration,
     run_fresh_process_compile_cache_benchmark,
 )
 
@@ -200,6 +201,21 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
     test_case: FreshProcessCompileCachePerformanceGuardTestCase,
 ) -> None:
     assert_required_cgroup_memory_limit()
+    # Fixed work that does not depend on SQLBuild scales the wall budgets on a slower runner
+    # class; the in-job ratios below and the same-runner ratio jobs catch a slower compiler.
+    factor: float = measure_runner_calibration().factor
+    cold_budget: float = test_case.expected_cold_max_wall_seconds * factor
+    warm_budget: float = test_case.expected_warm_max_wall_seconds * factor
+    edit_budget: float = test_case.expected_edit_max_wall_seconds * factor
+    project_config_edit_budget: float = (
+        test_case.expected_project_config_edit_max_wall_seconds * factor
+    )
+    print(
+        f"fresh-process cache models={test_case.model_count} cold_budget={cold_budget:.2f}s "
+        f"warm_budget={warm_budget:.2f}s edit_budget={edit_budget:.2f}s "
+        f"project_config_edit_budget={project_config_edit_budget:.2f}s",
+        flush=True,
+    )
     result: FreshProcessCompileCacheBenchmarkResult = run_fresh_process_compile_cache_benchmark(
         project_dir=tmp_path / f"semantic_cache_{test_case.model_count}",
         model_count=test_case.model_count,
@@ -209,12 +225,10 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
         macro_count=test_case.macro_count,
         test_count=test_case.test_count,
         audit_count=test_case.audit_count,
-        expected_cold_max_wall_seconds=test_case.expected_cold_max_wall_seconds,
-        expected_warm_max_wall_seconds=test_case.expected_warm_max_wall_seconds,
-        expected_edit_max_wall_seconds=test_case.expected_edit_max_wall_seconds,
-        expected_project_config_edit_max_wall_seconds=(
-            test_case.expected_project_config_edit_max_wall_seconds
-        ),
+        expected_cold_max_wall_seconds=cold_budget,
+        expected_warm_max_wall_seconds=warm_budget,
+        expected_edit_max_wall_seconds=edit_budget,
+        expected_project_config_edit_max_wall_seconds=project_config_edit_budget,
         macro_call_interval=test_case.macro_call_interval,
         scoped_macros=test_case.scoped_macros,
         compiler_only=test_case.compiler_only,
@@ -246,7 +260,7 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
         assert_successful_compile_cache_payload(measurement=measurement, test_case=test_case)
         assert measurement.peak_rss_bytes < test_case.expected_max_rss_bytes
 
-    assert result.cold.elapsed_seconds < test_case.expected_cold_max_wall_seconds
+    assert result.cold.elapsed_seconds < cold_budget
     cache_write_wall_ratio: float = (
         result.cold.elapsed_seconds / result.cache_disabled.elapsed_seconds
     )
@@ -265,7 +279,7 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
         result.after_macro_edit,
         result.after_project_config_edit,
     ):
-        assert measurement.elapsed_seconds < test_case.expected_warm_max_wall_seconds
+        assert measurement.elapsed_seconds < warm_budget
     for measurement in (result.warm, result.after_leaf_edit, result.after_macro_edit):
         assert (
             measurement.elapsed_seconds / result.cold.elapsed_seconds
@@ -276,15 +290,12 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
         <= _MAX_AFTER_PROJECT_REWRITE_TO_COLD_RATIO
     )
     for measurement in (result.leaf_edit, result.macro_edit):
-        assert measurement.elapsed_seconds < test_case.expected_edit_max_wall_seconds
+        assert measurement.elapsed_seconds < edit_budget
         assert (
             measurement.elapsed_seconds / result.cold.elapsed_seconds
             <= test_case.expected_max_edit_to_cold_ratio
         )
-    assert (
-        result.project_config_edit.elapsed_seconds
-        < test_case.expected_project_config_edit_max_wall_seconds
-    )
+    assert result.project_config_edit.elapsed_seconds < project_config_edit_budget
     assert result.cache_bytes < test_case.expected_max_cache_bytes
 
     assert result.cache_disabled.semantic_fingerprint == test_case.expected_cold_fingerprint

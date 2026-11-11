@@ -88,11 +88,13 @@ All cases carry `models_3000` identifiers so they run only in the 3,000-model fr
 
 ## Same-runner comparison with the base branch
 
-Absolute budgets must absorb the spread between hosted runners, so every pull request that touches
-the compiler also runs `scripts/compare_compile_performance.py` on the dense and the fresh
-3,000-model benchmark. Base and head each compile a project written by their own generator, on the
-same runner, three alternating runs per mode, and the medians of wall and CPU time must stay within
-1.10x of base for each mode:
+Absolute budgets must absorb the spread between hosted runner classes, up to 1.9x on the same
+compile: the dense and fresh-process cache guards scale their wall budgets by a fixed calibration
+workload on slower classes. An absolute budget therefore cannot catch a slower compiler, so every
+pull request that touches the compiler also runs `scripts/compare_compile_performance.py` on the
+dense and the fresh 3,000-model benchmark. Base and head each compile a project written by their
+own generator, on the same runner, three alternating runs per mode, and the medians of wall and CPU
+time must stay within 1.10x of base for each mode:
 
 - cold: `sqb compile --json --no-cache` after removing `target`, after one untimed warm-up;
 - warm: an unchanged `sqb compile --json` after one untimed run that writes the cache;
