@@ -348,7 +348,7 @@ def append_old_name_history(adapter: Any, connection: Any, fixture: dict[str, An
     )
 
 
-def migration_history_data(fixture: dict[str, Any], relations: tuple[str, str]) -> dict[str, Any]:
+def migration_history_data(fixture: dict[str, Any], relations: tuple[str, ...]) -> dict[str, Any]:
     """Reconstruct native relation values from the warehouse-shaped fixture."""
     data: dict[str, Any] = fixture["record"].copy()
     del data["state_database"]
