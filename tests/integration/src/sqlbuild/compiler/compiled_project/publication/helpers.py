@@ -644,6 +644,7 @@ def scheduled_worker(
         }
         | test_case.files,
     )
+    test_case.warehouse_setup(project / "warehouse.duckdb")
     executable: str = str(Path(sys.executable).with_name("sqb"))
     launchers: dict[str, Callable[[Path, str], AbstractContextManager[WorkerDeployment]]] = {
         "native": native_launcher,

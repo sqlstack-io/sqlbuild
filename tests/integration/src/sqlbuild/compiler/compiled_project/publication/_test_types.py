@@ -111,6 +111,7 @@ class WorkerExecutionTestCase:
     store_setup: str = ""
     concurrency_limits: dict[str, int] = field(default_factory=dict)
     launcher: Literal["native", "uncooperative", "docker"] = "native"
+    warehouse_setup: Callable[[Path], None] = lambda _: None
 
 
 @dataclass(frozen=True)

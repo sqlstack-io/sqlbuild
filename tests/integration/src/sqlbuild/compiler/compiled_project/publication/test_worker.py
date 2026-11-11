@@ -429,6 +429,26 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             },
         ),
         WorkerExecutionTestCase(
+            "a selected upstream source is never counted as a skipped node",
+            'SELECT order_id AS amount FROM __source("raw_orders")',
+            "SELECT amount FROM orders",
+            "success",
+            [(23,)],
+            files={
+                "sources/raw_orders.yml": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
+                ).read_text(),
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/upstream_source_orders.py"
+                ).read_text(),
+            },
+            warehouse_setup=lambda path: (
+                duckdb.connect(str(path))
+                .execute("CREATE TABLE raw_orders AS SELECT CAST(23 AS BIGINT) AS order_id")
+                .close()
+            ),
+        ),
+        WorkerExecutionTestCase(
             "warehouse error retains failed node evidence",
             "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS BIGINT) AS amount FROM source",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",

@@ -36,9 +36,9 @@ pub(crate) async fn project_queued_run(
             Parameter::OptionalText(request.job_key.clone()), Parameter::OptionalId(request.parent_run_id), Parameter::Id(request.root_run_id),
             Parameter::OptionalId(request.trigger_id), Parameter::OptionalId(request.tick_id), Parameter::OptionalId(request.rerun_of_run_id),
             Parameter::Text(request.requested_by.clone()), Parameter::Integer(request.priority), Parameter::Json(selection), Parameter::Text(digest),
-            Parameter::Time(now), Parameter::Json(json!({"pending": request.selection.len()})), Parameter::Integer(cursor), Parameter::Json(json!(request)),
+            Parameter::Time(now), Parameter::Json(json!({"pending": request.executed_nodes().count()})), Parameter::Integer(cursor), Parameter::Json(json!(request)),
             Parameter::Boolean(rewrites_history(request, std::slice::from_ref(request)))]).await?;
-    for node in &request.selection {
+    for node in request.executed_nodes() {
         (transaction, _) = query(transaction,
             "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes) VALUES ($1,$2,'pending',$3)",
             vec![Parameter::Id(request.run_id), Parameter::Text(node.clone()), Parameter::Boolean(request.write_set.contains(node))]).await?;

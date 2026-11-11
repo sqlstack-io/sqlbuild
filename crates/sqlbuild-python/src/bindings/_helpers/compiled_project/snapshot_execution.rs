@@ -168,7 +168,7 @@ impl WorkerBuild {
             (Option<String>, Option<String>),
         ),
     ) -> PyResult<()> {
-        if !self.execution.claim.request.selection.contains(key) {
+        if !self.execution.claim.request.executes(key) {
             return Ok(());
         }
         if self
