@@ -330,6 +330,14 @@ The hook creates a JavaScript function, whose body Snowflake takes as one dollar
 """
 
 [[rules.rule_ignores]]
+rules = ["SQLCLEAN039"]
+paths = ["models/intermediate/edge_cases/int_edge_basket_line_sku_parts.sql"]
+reason = """
+The edge case reads the line through a derived table nested in a comma-joined LATERAL on purpose:
+that shape is the case under test.
+"""
+
+[[rules.rule_ignores]]
 rules = ["SQLCLEAN040"]
 paths = ["models/intermediate/edge_cases/int_edge_amount_bit_reads.sql"]
 reason = """

@@ -1,0 +1,41 @@
+TEST (name "int_edge_basket_line_neighbours__reads_neighbouring_skus_with_one_to_three_arguments");
+
+WITH __ref__stg_edge_basket_lines AS (
+  SELECT
+    v.line_id::VARCHAR AS line_id,
+    v.basket_id::VARCHAR AS basket_id,
+    v.line_no::NUMBER(38, 0) AS line_no,
+    v.sku::VARCHAR AS sku,
+    v.tag::VARCHAR AS tag
+  FROM VALUES
+    ('BL-01', 'B-1', 1, 'DK-RED-01', 'red'),
+    ('BL-02', 'B-1', 2, 'DK-BLUE-02', 'blue'),
+    ('BL-03', 'B-1', 3, 'DK-RED-03', 'red'),
+    ('BL-04', 'B-2', 1, 'TL-GREEN-01', NULL) AS v(line_id, basket_id, line_no, sku, tag)
+),
+
+__expected__int_edge_basket_line_neighbours AS (
+  SELECT
+    'BL-01' AS line_id,
+    CAST(NULL AS VARCHAR) AS previous_sku,
+    CAST(NULL AS VARCHAR) AS second_previous_sku,
+    'DK-BLUE-02' AS next_sku
+  UNION ALL
+  SELECT
+    'BL-02' AS line_id,
+    'DK-RED-01' AS previous_sku,
+    CAST(NULL AS VARCHAR) AS second_previous_sku,
+    'DK-RED-03' AS next_sku
+  UNION ALL
+  SELECT
+    'BL-03' AS line_id,
+    'DK-BLUE-02' AS previous_sku,
+    'DK-RED-01' AS second_previous_sku,
+    'NONE' AS next_sku
+  UNION ALL
+  SELECT
+    'BL-04' AS line_id,
+    CAST(NULL AS VARCHAR) AS previous_sku,
+    CAST(NULL AS VARCHAR) AS second_previous_sku,
+    'NONE' AS next_sku
+)
