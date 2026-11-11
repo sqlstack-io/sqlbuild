@@ -2,6 +2,7 @@ import { to } from '$lib/paths';
 import { goto } from '$app/navigation';
 import type { RerunMode } from '$lib/api';
 import { app } from '$lib/state/app.svelte';
+import { rerunHref } from '$lib/run/command';
 import { createResource } from '$lib/state/resource.svelte';
 import { isActiveRun } from '$lib/status';
 import type { BottomTab } from './types';
@@ -89,19 +90,9 @@ export function createRunDetailState(runId: string) {
 		}
 	}
 
-	async function rerun(mode: RerunMode) {
-		const scope = app.scope;
-		if (!scope || !run) return;
-		busy = mode;
-		actionError = null;
-		try {
-			const next = mode === 'selected' ? await app.client.rerunSelectedNodes(scope, run.id, selected) : await app.client.rerunRun(scope, run.id, mode);
-			await goto(to(`/runs/${next.id}`));
-		} catch (e) {
-			actionError = message(e);
-		} finally {
-			busy = null;
-		}
+	/** Reruns are reviewed first, like every other run. */
+	function rerun(mode: RerunMode) {
+		if (run) void goto(to(rerunHref([run.id], mode, mode === 'selected' ? selected : [])));
 	}
 
 	return {

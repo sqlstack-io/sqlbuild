@@ -1,11 +1,6 @@
 import { browser } from '$app/environment';
 import type { ApiClient, Scope } from '$lib/api';
 
-/**
- * How long a click waits on the current page for the next page's data, so a quick answer shows
- * whole instead of empty for a moment; longer than this, the page switches and shows its own loading state.
- */
-const HOLD_MS = 200;
 /** A prefetched read older than this, such as from a hover with no click, is read again instead. */
 const KEEP_MS = 5000;
 
@@ -22,6 +17,8 @@ const keyOf = (method: PropertyKey, args: unknown[]) => `${String(method)}|${JSO
  */
 export function withPrefetch(client: ApiClient): ApiClient {
 	base = client;
+	// After a change, a read started earlier may predate it; the page reads again instead.
+	client.changes.subscribe(() => started.clear());
 	return new Proxy(client, {
 		get(target, method, receiver) {
 			const value = Reflect.get(target, method, receiver);
@@ -40,13 +37,15 @@ export function withPrefetch(client: ApiClient): ApiClient {
 }
 
 /**
- * Starts the reads the page at `pathname` makes first and waits for them briefly, so a fast answer
- * arrives with the page. Errors are left for the page to show.
+ * Starts the reads the page at `pathname` makes first, from a hover or a click, without holding the
+ * switch: the page takes them over and shows its loading state until they answer. Errors are left
+ * for the page to show.
  */
-export async function prefetch(scope: Scope | null, pathname: string, search: URLSearchParams, reads: [RegExp, Read][]): Promise<void> {
+export function prefetch(scope: Scope | null, pathname: string, search: URLSearchParams, reads: [RegExp, Read][]): void {
 	if (!browser || !base || !scope) return;
 	const found = reads.map(([pattern, read]) => [pathname.match(pattern), read] as const).find(([match]) => match);
 	if (!found) return;
+	for (const [key, kept] of started) if (Date.now() - kept.at >= KEEP_MS) started.delete(key);
 	const client = base;
 	const recorder = new Proxy(client, {
 		get(target, method, receiver) {
@@ -61,6 +60,5 @@ export async function prefetch(scope: Scope | null, pathname: string, search: UR
 			};
 		}
 	});
-	const pending = Promise.allSettled(found[1](recorder, scope, found[0]!, search));
-	await Promise.race([pending, new Promise((resolve) => setTimeout(resolve, HOLD_MS))]);
+	found[1](recorder, scope, found[0]!, search);
 }

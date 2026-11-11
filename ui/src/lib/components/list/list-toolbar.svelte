@@ -10,6 +10,7 @@
 		placeholder = 'Search',
 		counts = [],
 		total,
+		loading = false,
 		filters,
 		actions
 	}: {
@@ -17,6 +18,8 @@
 		placeholder?: string;
 		counts?: ToolbarCount[];
 		total: string;
+		/** Nothing loaded yet: the totals would read as zero, so they wait for the list. */
+		loading?: boolean;
 		filters?: Snippet;
 		actions?: Snippet;
 	} = $props();
@@ -32,7 +35,7 @@
 	</label>
 	{#if filters}<div class="list-filters">{@render filters()}</div>{/if}
 	{#if actions}{@render actions()}{/if}
-	<div class="list-summary">
+	<div class="list-summary" class:invisible={loading}>
 		{#each counts.filter((c) => c.count > 0) as c (c.label)}
 			<span title="{c.count} {c.label}"><i style:background={c.tone}></i>{c.count} {c.label}</span>
 		{/each}

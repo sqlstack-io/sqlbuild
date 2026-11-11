@@ -47,8 +47,8 @@
 					? `Version ${snapshot.generation}: commit ${snapshot.gitRevision}${snapshot.gitDirty ? ' (with uncommitted changes)' : ''} by ${snapshot.gitAuthor} (snapshot ${snapshot.id}, generation ${snapshot.generation})`
 					: 'Nothing deployed to this location yet'}`}
 		>
-			<span class="h-[7px] w-[7px] rounded-full" style:background={connectionTone[app.connection]}></span>
-			{connectionLabel[app.connection]}
+			<!-- A fixed slot, so going from Connecting to Live doesn't shift the bar. -->
+			<span class="connection"><span class="h-[7px] w-[7px] rounded-full" style:background={connectionTone[app.connection]}></span>{connectionLabel[app.connection]}</span>
 			{#if snapshot !== undefined}
 				<span class="text-[var(--sb-text-faint)]">·</span>
 				{snapshot ? `Version ${snapshot.generation}, deployed ${formatAgo(snapshot.publishedAt, app.now)}` : 'nothing deployed yet'}
@@ -75,6 +75,13 @@
 <PlatformEventBanner />
 
 <style>
+	.connection {
+		display: inline-flex;
+		min-width: 6.8em;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 7px;
+	}
 	.app-topbar {
 		background: color-mix(in srgb, var(--background) 94%, transparent);
 		backdrop-filter: blur(12px);

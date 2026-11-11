@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { runStatusTone } from '$lib/status';
@@ -123,7 +124,7 @@
 			{/if}
 		</div>
 	{:else if view.detailRes.loading}
-		<div class="empty">{view.detailRes.slow ? 'Loading…' : ''}</div>
+		<div class="empty"><Loading lines={4} /></div>
 	{:else if view.detailRes.error}
 		<div class="empty">Couldn't load this run: {view.detailRes.error}</div>
 	{:else}

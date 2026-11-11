@@ -1,7 +1,7 @@
 // Presentation of the overview's attention items. Pure; no side effects.
 
 import type { AttentionItem } from '$lib/api';
-import { describeWait } from '$lib/operate/labels';
+import { describeWait, outcomeCounts } from '$lib/operate/labels';
 import { eventKindLabel, problemHref } from '$lib/platform/labels';
 import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
@@ -28,7 +28,8 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				key: `run:${item.run.id}`,
 				tone: 'error',
 				title: `${item.run.jobKey ?? 'Ad-hoc run'} ${runStatusLabel[item.run.status].toLowerCase()}`,
-				detail: item.run.statusReason ?? item.run.id,
+				// The node counts say what went wrong; the worker's reason only says how it stopped.
+				detail: outcomeCounts(item.run.nodeCounts) || item.run.statusReason || item.run.id,
 				since: formatAgo(item.run.endedAt, now),
 				href: `/runs/${item.run.id}`,
 				action: 'View run'

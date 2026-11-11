@@ -288,6 +288,7 @@ describe('planResultOf', () => {
 	it.each([
 		{ description: 'a plan keeps its models and fills missing sections', outcome: { kind: 'plan', document: { selected_count: 1, models: [{ name: 'orders', reason: 'first_run' }] } }, expected: { plan: 'orders', error: null } },
 		{ description: "sqb plan's own error is the result", outcome: { kind: 'plan', document: { error: { code: 'S007', message: "unknown selector name 'ordrs'" } } }, expected: { plan: null, error: "S007: unknown selector name 'ordrs'" } },
+		{ description: 'the help line follows the error', outcome: { kind: 'plan', document: { error: { code: 'S000', message: 'no cursor interval', help: 'pass --start-cursor-ts' } } }, expected: { plan: null, error: 'S000: no cursor interval\nhelp: pass --start-cursor-ts' } },
 		{ description: 'a superseded plan asks to plan again', outcome: { kind: 'superseded' }, expected: { plan: null, error: 'The project changed on the location while it was planning; plan again' } }
 	])('$description', ({ outcome, expected }) => {
 		const result = planResultOf(outcome as never);

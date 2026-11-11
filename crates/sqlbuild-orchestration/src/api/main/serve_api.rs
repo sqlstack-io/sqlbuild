@@ -2,8 +2,10 @@
 
 use axum::routing::get;
 use axum::{Extension, Json, Router, middleware};
+use tower_http::compression::CompressionLayer;
 
 use crate::api::_helpers::authentication::{bearer::local_request, configure::configure};
+use crate::api::_helpers::resources::compression::compress_reads_only;
 use crate::api::_helpers::resources::server_errors::generic_server_errors;
 use crate::api::_helpers::resources::ui_assets::{UI_ASSETS, serve_ui};
 use crate::api::_helpers::resources::{changes, router::router};
@@ -82,5 +84,8 @@ fn development_application(
             .layer(middleware::from_fn_with_state(address, local_request)),
         None => application,
     };
-    application.layer(middleware::map_response(generic_server_errors))
+    application
+        .layer(middleware::map_response(generic_server_errors))
+        .layer(CompressionLayer::new())
+        .layer(middleware::from_fn(compress_reads_only))
 }

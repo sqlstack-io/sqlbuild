@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import type { IssuedToken, LocationToken } from '$lib/api';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -78,7 +79,7 @@
 				{/if}
 			</li>
 		{:else}
-			<li class="muted">{tokens ? 'No tokens yet. Create one and give it to the location so it can connect.' : 'Loading…'}</li>
+			<li class="muted">{#if tokens}No tokens yet. Create one and give it to the location so it can connect.{:else}<Loading lines={2} />{/if}</li>
 		{/each}
 	</ul>
 	<div class="create">

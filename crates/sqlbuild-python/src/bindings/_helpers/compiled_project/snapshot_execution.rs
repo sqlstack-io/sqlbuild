@@ -447,27 +447,26 @@ impl WorkerBuild {
                 }
             }
         }
+        let returned = self.returned.load(Ordering::SeqCst);
+        let build = self.command().is_build();
+        let source_needs_no_run = |key: &str| build && key.starts_with("source:");
         for key in &self.execution.claim.request.selection {
-            self.complete(
-                py,
-                key,
-                (
-                    if cancelled {
-                        NodeOutcome::Cancelled
-                    } else {
-                        NodeOutcome::Skipped
-                    },
-                    None,
-                    (None, None),
-                ),
-            )?;
+            let outcome = if cancelled {
+                NodeOutcome::Cancelled
+            } else if returned && source_needs_no_run(key) {
+                NodeOutcome::Success
+            } else {
+                NodeOutcome::Skipped
+            };
+            self.complete(py, key, (outcome, None, (None, None)))?;
         }
         let outcome = {
             let completed = self.completed.lock().map_err(|_| poisoned())?;
             let outcomes: Vec<NodeOutcome> = completed.values().copied().collect();
-            let good = outcomes
-                .iter()
-                .any(|value| matches!(value, NodeOutcome::Success | NodeOutcome::Warn));
+            let good = completed.iter().any(|(key, value)| {
+                matches!(value, NodeOutcome::Success | NodeOutcome::Warn)
+                    && !source_needs_no_run(key)
+            });
             let bad = outcomes.iter().any(|value| {
                 matches!(
                     value,
