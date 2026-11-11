@@ -20,7 +20,8 @@
 	let value = $state<{ start: DateValue | undefined; end: DateValue | undefined }>({ start: undefined, end: undefined });
 	// Opening starts from the typed range, so the calendar and the fields never disagree.
 	$effect(() => {
-		if (open) value = { start: day(start), end: day(end) };
+		// An end alone would make the next click a whole range, so it seeds nothing.
+		if (open) value = { start: day(start), end: day(start) ? day(end) : undefined };
 	});
 </script>
 
@@ -37,7 +38,8 @@
 			placeholder={day(start) ?? day(today)}
 			onValueChange={(v) => {
 				if (!v.start || !v.end) return;
-				onpick(v.start.toString(), v.end.toString());
+				const [first, last] = v.start.compare(v.end) <= 0 ? [v.start, v.end] : [v.end, v.start];
+				onpick(first.toString(), last.toString());
 				open = false;
 			}}
 		>

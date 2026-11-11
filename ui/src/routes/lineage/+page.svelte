@@ -684,8 +684,9 @@
 			{:else if !d}
 				<!-- Titled like the section the facts fill, so it does not switch title when they arrive. -->
 				<InspectorSection title={catalogByKey.get(String(primarySlug))?.kind === 'source' ? 'Source' : 'Last build'}>
-					{#snippet meta()}{#if !(detail.error ?? catalog.error)}<span class="loading-meta"><LoaderIcon size={13} class="spin" />Loading</span>{/if}{/snippet}
+					{#snippet meta()}{#if !(detail.error ?? catalog.error) && detail.loading}<span class="loading-meta"><LoaderIcon size={13} class="spin" />Loading</span>{/if}{/snippet}
 					{#if detail.error ?? catalog.error}<p class="insp-description">{detail.error ?? catalog.error}</p>
+					{:else if !detail.loading}<p class="insp-description">This node is no longer in the project.</p>
 					{:else}
 						<!-- Shaped like the facts it stands in for, so they replace it without the panel jumping. -->
 						<div class="status-stats" role="status" aria-label="Loading">
@@ -794,8 +795,8 @@
 				</InspectorSection>
 			{/if}
 
-			<!-- Waits for the node's facts too, so the whole panel fills at once instead of sections arriving above it. -->
-			{#if d || listed || scaleMode}
+			<!-- Waits while the node's facts load, so the whole panel fills at once instead of sections arriving above it. -->
+			{#if d || listed || scaleMode || !detail.loading || detail.error || catalog.error}
 			<InspectorSection title="Dependencies">
 				{#snippet meta()}<span>{upstream.length} up · {downstream.length} down</span>{/snippet}
 				<div class="deps">
