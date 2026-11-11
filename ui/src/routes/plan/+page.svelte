@@ -227,7 +227,7 @@
 					(job
 						? jobPermissions.find((p) => !p.allowed) && "You don't have permission to rebuild or reprocess data (run.rewrite_history)"
 						: check?.permissions.find((p) => !p.allowed)?.reason) ??
-					(planned ? (settled.typing ? 'Finish the option you are typing' : undefined) : (planError?.message ?? 'Waiting for the plan')))
+					(planned ? (settled.typing ? 'Finish the option you are typing' : undefined) : (planError?.key === requestKey ? planError.message : 'Waiting for the plan')))
 	);
 
 	async function launch() {
@@ -534,6 +534,7 @@
 		color: var(--sb-error);
 		font-family: var(--font-mono);
 		font-size: 12px;
+		white-space: pre-line;
 	}
 	.overlay {
 		position: absolute;
