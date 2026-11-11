@@ -42,6 +42,8 @@ mod test_checks;
 mod test_cli_login;
 #[path = "test_column_lineage.rs"]
 mod test_column_lineage;
+#[path = "test_compression.rs"]
+mod test_compression;
 #[path = "test_contract.rs"]
 mod test_contract;
 #[path = "test_custom_roles.rs"]

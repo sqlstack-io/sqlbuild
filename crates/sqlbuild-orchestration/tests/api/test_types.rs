@@ -184,6 +184,16 @@ pub(crate) struct UiPathTestCase {
     pub(crate) expected_body: &'static str,
 }
 
+pub(crate) struct CompressionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) method: reqwest::Method,
+    /// `{location}` stands for the fixture's location ID.
+    pub(crate) path: &'static str,
+    pub(crate) accept_encoding: &'static str,
+    pub(crate) expected_status: u16,
+    pub(crate) expected_gzip: bool,
+}
+
 pub(crate) struct ServerErrorTestCase {
     pub(crate) description: &'static str,
     pub(crate) path: &'static str,
