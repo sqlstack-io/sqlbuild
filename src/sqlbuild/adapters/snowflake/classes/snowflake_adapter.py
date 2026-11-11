@@ -4201,6 +4201,25 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         database: str | None,
         schema: str,
     ) -> bool:
+        """Check with SHOW SCHEMAS, which needs no running warehouse, where the name allows."""
+
+        show_database: str | None = (
+            database if database is not None else self._current_database(connection=connection)
+        )
+        if show_database is not None and SHOW_LIKE_ESCAPE_CHARACTER not in schema:
+            try:
+                rows: list[dict[str, object]] = self._fetch_show_rows(
+                    connection=connection,
+                    query=(
+                        f"SHOW SCHEMAS LIKE '{show_like_pattern(schema.upper())}' "
+                        f"IN DATABASE {self.render_identifier(show_database)}"
+                    ),
+                )
+            except Exception as error:
+                if not is_missing_object_error(error):
+                    raise
+                return False
+            return any(str(row.get("name")).upper() == schema.upper() for row in rows)
         query: str = (
             "SELECT 1 FROM information_schema.schemata WHERE UPPER(schema_name) = UPPER(%s)"
         )

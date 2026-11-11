@@ -47,6 +47,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
     SnowflakeRenderPythonFunctionTestCase,
     SnowflakeRenderTableFunctionTestCase,
     SnowflakeSchemaDiffTestCase,
+    SnowflakeSchemaExistsTestCase,
     SnowflakeTableFreshnessBatchTestCase,
     SnowflakeTableFreshnessMetadataErrorTestCase,
     SnowflakeTableFreshnessMetadataTestCase,
@@ -59,6 +60,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake.helpers import (
     FakeSnowflakeMetadataConnection,
     FakeSnowflakeMetadataCursor,
     FakeSnowflakeMetadataSequenceConnection,
+    FakeSnowflakeMissingObjectCursor,
     FakeSnowflakeQueryCursor,
     FakeSnowflakeRawConnection,
     build_bulk_columns_rows,
@@ -1357,3 +1359,52 @@ def test_given_snowflake_relation_timestamps_when_listing_then_exposes_utc_age_m
         str(test_case.expected_created_at),
         str(test_case.expected_last_altered_at),
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakeSchemaExistsTestCase(
+            description="SHOW SCHEMAS finds a schema stored in another case",
+            schema="staging",
+            cursor=FakeSnowflakeQueryCursor((("name",),), [("Staging",)]),
+            expected_exists=True,
+            expected_sql_fragment="SHOW SCHEMAS LIKE 'STAGING' IN DATABASE",
+        ),
+        SnowflakeSchemaExistsTestCase(
+            description="a neighbour matched by the LIKE wildcard is not the schema",
+            schema="stg_a",
+            cursor=FakeSnowflakeQueryCursor((("name",),), [("STGXA",)]),
+            expected_exists=False,
+            expected_sql_fragment="SHOW SCHEMAS LIKE 'STG_A' IN DATABASE",
+        ),
+        SnowflakeSchemaExistsTestCase(
+            description="a missing database holds no schema",
+            schema="staging",
+            cursor=FakeSnowflakeMissingObjectCursor((("name",),), []),
+            expected_exists=False,
+            expected_sql_fragment="SHOW SCHEMAS LIKE 'STAGING' IN DATABASE",
+        ),
+        SnowflakeSchemaExistsTestCase(
+            description="a name with a backslash reads the information schema",
+            schema="stag\\ing",
+            cursor=FakeSnowflakeMetadataCursor(row=(1,)),
+            expected_exists=True,
+            expected_sql_fragment="information_schema.schemata",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_schema_when_checking_existence_then_show_needs_no_running_warehouse(
+    test_case: SnowflakeSchemaExistsTestCase,
+) -> None:
+    connection: FakeSnowflakeDescribeConnection = FakeSnowflakeDescribeConnection(
+        cast(Any, test_case.cursor)
+    )
+
+    exists: bool = SnowflakeAdapter().schema_exists(
+        connection=cast(Any, connection), database="ANALYTICS", schema=test_case.schema
+    )
+
+    assert exists is test_case.expected_exists
+    assert test_case.expected_sql_fragment in str(cast(Any, test_case.cursor).executed_sql)
