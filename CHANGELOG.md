@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.210.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.210.0...v0.210.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **compile:** `LAG` and `LEAD` with one or two arguments on DuckDB, comma-joined `LATERAL` subqueries that read an earlier FROM item, and lambdas in grouped queries compile again ([c9bf628](https://github.com/sqlstack-io/sqlbuild/commit/c9bf628a942432c474b92d104811db1d0a235a74))
+* **compile:** DuckDB JSON casts, `to_json` and `AT TIME ZONE` outputs prove their JSON and TIMESTAMP contract types ([c9bf628](https://github.com/sqlstack-io/sqlbuild/commit/c9bf628a942432c474b92d104811db1d0a235a74))
+* **lineage:** a column merged by a set operation takes its strongest branch's transform kind ([c9bf628](https://github.com/sqlstack-io/sqlbuild/commit/c9bf628a942432c474b92d104811db1d0a235a74))
+
 ## [0.210.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.209.0...v0.210.0) (2026-11-11)
 
 
