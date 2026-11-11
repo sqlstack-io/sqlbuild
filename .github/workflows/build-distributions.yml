@@ -39,6 +39,13 @@ on:
         required: false
         type: string
         default: dist
+      platforms:
+        description: >-
+          Space-separated wheel platforms to build, such as linux-x86_64; empty builds every
+          platform. Releases and the nightly Verify build every platform.
+        required: false
+        type: string
+        default: ""
     outputs:
       sha:
         description: "Commit the distributions were built from"
@@ -54,7 +61,36 @@ jobs:
     outputs:
       sha: ${{ steps.source.outputs.sha }}
       tree: ${{ steps.source.outputs.tree }}
+      platforms: ${{ steps.platforms.outputs.matrix }}
     steps:
+      - name: Select the wheel platforms
+        id: platforms
+        env:
+          SELECTED: ${{ inputs.platforms }}
+          ALL: >-
+            [
+              {"name": "linux-x86_64", "runner": "ubuntu-24.04", "target": "x86_64"},
+              {"name": "linux-aarch64", "runner": "ubuntu-24.04-arm", "target": "aarch64"},
+              {"name": "macos-x86_64", "runner": "macos-15", "target": "x86_64",
+               "python-architecture": "x64", "smoke-arch": "x86_64"},
+              {"name": "macos-arm64", "runner": "macos-15", "target": "aarch64"},
+              {"name": "windows-x86_64", "runner": "windows-2025", "target": "x86_64"}
+            ]
+        run: |
+          matrix="$(jq -c --arg selected "${SELECTED}" '
+            ($selected | split(" ") | map(select(. != ""))) as $names
+            | if ($names | length) == 0 then . else map(select(.name as $n | $names | index($n))) end
+          ' <<< "${ALL}")"
+          unknown="$(jq -rn --arg selected "${SELECTED}" --argjson all "${ALL}" '
+            $selected | split(" ") | map(select(. != "" and (. as $n | $all | map(.name) | index($n) | not)))
+            | join(" ")')"
+          if [[ -n "${unknown}" ]]; then
+            echo "Unknown wheel platforms: ${unknown}" >&2
+            exit 1
+          fi
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+          echo "Wheel platforms: $(jq -r 'map(.name) | join(", ")' <<< "${matrix}")" \
+            >> "${GITHUB_STEP_SUMMARY}"
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
@@ -98,24 +134,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - name: linux-x86_64
-            runner: ubuntu-24.04
-            target: x86_64
-          - name: linux-aarch64
-            runner: ubuntu-24.04-arm
-            target: aarch64
-          - name: macos-x86_64
-            runner: macos-15
-            target: x86_64
-            python-architecture: x64
-            smoke-arch: x86_64
-          - name: macos-arm64
-            runner: macos-15
-            target: aarch64
-          - name: windows-x86_64
-            runner: windows-2025
-            target: x86_64
+        platform: ${{ fromJSON(needs.source.outputs.platforms) }}
     steps:
       - uses: actions/checkout@v4
         if: inputs.prebuilt-run-id == ''
