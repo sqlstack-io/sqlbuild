@@ -17,6 +17,7 @@ SUCCESS_STATUS_TOKENS: tuple[str, ...] = ("success", "created", "dropped")
 TEXT_TYPE_NAMES: frozenset[str] = frozenset({"TEXT", "VARCHAR", "CHAR", "CHARACTER"})
 TRUE_METADATA_VALUE: str = "YES"
 SHOW_LIKE_ESCAPE_CHARACTER: str = "\\"
+SHOW_OBJECTS_TABLE_KIND: str = "TABLE"
 CURRENT_DATABASE_ATTRIBUTE: str = "_sqlbuild_current_database"
 STATE_TABLE_RETENTION_DAYS: int = 90
 STATE_TABLE_FALLBACK_RETENTION_DAYS: int = 1
