@@ -1,0 +1,11 @@
+# GitHub's language bar counts shipped code only: test suites, development scripts and
+# benchmarks are documentation to Linguist, in every language.
+tests/** linguist-documentation
+scripts/** linguist-documentation
+benchmarks/** linguist-documentation
+crates/**/tests/** linguist-documentation
+crates/**/tests.rs linguist-documentation
+ui/src/**/*.test.ts linguist-documentation
+ui/scripts/** linguist-documentation
+clients/typescript/tests/** linguist-documentation
+clients/typescript/scripts/** linguist-documentation
