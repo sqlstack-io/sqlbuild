@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.211.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.210.1...v0.211.0) (2026-11-11)
+
+
+### Features
+
+* **ui:** steadier orchestration pages, reviewed reruns and acknowledgements ([#1409](https://github.com/sqlstack-io/sqlbuild/issues/1409)) ([9e53736](https://github.com/sqlstack-io/sqlbuild/commit/9e537363cdaa626f62893cfd8fc77787336d6c9b))
+
 ## [0.210.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.210.0...v0.210.1) (2026-11-11)
 
 
