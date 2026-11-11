@@ -12,8 +12,9 @@ use tokio::process::Child;
 
 use crate::argv::main::accepted_settings_arguments::accepted_settings_arguments;
 use crate::native_commands::_helpers::execution::location_child;
+use crate::native_commands::_helpers::execution::plan_failure;
 use crate::native_commands::constants::{PLAN_COMMAND, PLAN_OUTPUT_BYTES};
-use crate::native_commands::main::_plan_document::{failure, plan_document};
+use crate::native_commands::main::_plan_document::plan_document;
 use crate::native_commands::models::LocationServe;
 
 /// The plan document, an `{"error": ...}` report when planning failed, or `None` when stopped first.
@@ -24,7 +25,7 @@ pub(super) async fn plan_location(
 ) -> Result<Option<Value>, ControlError> {
     let mut child = match plan_child((options, script), (selection, settings)) {
         Ok(child) => child?,
-        Err(message) => return Ok(Some(failure(&message))),
+        Err(message) => return Ok(Some(plan_failure(&message))),
     };
     let stdout = child
         .stdout
