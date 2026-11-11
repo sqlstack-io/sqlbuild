@@ -980,3 +980,8 @@ pub(crate) fn run_command(
         output,
     ))
 }
+
+/// The `{"error": ...}` report a location sends when it has no plan to show.
+pub(crate) fn plan_failure(message: &str) -> serde_json::Value {
+    json!({"error": {"code": "plan_failed", "message": message, "help": null}})
+}

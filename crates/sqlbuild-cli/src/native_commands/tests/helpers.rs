@@ -26,3 +26,12 @@ pub(super) fn write_tree(root: &Path, directories: &[&str], files: &[(&str, &str
         std::fs::write(root.join(relative), contents).expect("write file");
     }
 }
+
+/// `sqb plan --json` output naming `count` changed models, each with `diff_line` as its query diff.
+pub(super) fn plan_output(diff_line: &str, count: usize) -> Vec<u8> {
+    let models: Vec<serde_json::Value> = (0..count)
+        .map(|i| serde_json::json!({"name": format!("model_{i}"), "reason": "query_changed", "query_diff": [diff_line], "config_diff": ["+a"]}))
+        .collect();
+    serde_json::to_vec(&serde_json::json!({"selected_count": count, "models": models}))
+        .expect("plan output")
+}

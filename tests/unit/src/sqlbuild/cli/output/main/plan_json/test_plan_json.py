@@ -463,6 +463,25 @@ def test_given_direct_diagnostics_policy_when_formatting_plan_json_then_evidence
             expected_fragments=('"reason": "renamed"', '"query_changed": true'),
         ),
         JsonOutputTestCase(
+            description="plan json includes the query diff a changed model prints",
+            plan_output=build_plan_output(
+                model_entries=(
+                    build_model_entry(
+                        name="fact_orders",
+                        action=PlanAction.CREATE_TABLE,
+                        reason=PlanReason.QUERY_CHANGED,
+                        previous_query_sql="SELECT id FROM orders",
+                    ),
+                ),
+            ),
+            expected_keys=("models",),
+            expected_fragments=(
+                '"query_diff": [',
+                '"-SELECT id FROM orders"',
+                '"+SELECT * FROM fact_orders"',
+            ),
+        ),
+        JsonOutputTestCase(
             description="plan json includes seeds and warnings",
             plan_output=build_plan_output(
                 model_entries=(build_model_entry(name="orders", action=PlanAction.CREATE_TABLE),),

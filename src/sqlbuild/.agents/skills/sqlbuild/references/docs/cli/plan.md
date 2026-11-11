@@ -119,7 +119,7 @@ Seeds (1)
 
 When query, function, or schema changes are detected, the plan lists each affected model under its own change with its backfill action. A model that calls a changed function directly appears under `Function changed` with `cause: function <name> changed`; models further downstream continue forward. See [Replay decisions](../concepts/planning/replay-decisions.md).
 
-In `sqb plan --json`, each model's `reason` is its own change. A direct caller of a changed function has `"reason": "function_changed"` and a `changed_functions` list, and a renamed model whose query also changed has `"reason": "renamed"` and `"query_changed": true`.
+In `sqb plan --json`, each model's `reason` is its own change. A direct caller of a changed function has `"reason": "function_changed"` and a `changed_functions` list, and a renamed model whose query also changed has `"reason": "renamed"` and `"query_changed": true`. A changed model also carries the detail the text plan prints under it: `query_diff` when its query changed and the previous query is known, and `config_diff` when its config changed, each as unified diff lines, and `schema_findings` for added, removed, or retyped columns.
 
 Warnings and maintenance notices, such as `migrate_from can be removed`, are listed in a `Warnings` section before the final `Plan complete` line. `sqb plan --json` output is unchanged.
 
