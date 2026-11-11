@@ -166,6 +166,7 @@ from sqlbuild.adapters.snowflake.constants import (
     SECONDARY_ROLES_ALL,
     SECONDARY_ROLES_NONE,
     SHOW_LIKE_ESCAPE_CHARACTER,
+    SHOW_OBJECTS_TABLE_KIND,
     STATUS_COLUMN_NAME,
     SUCCESS_STATUS_TOKENS,
     TEMPORARY_FUNCTION_PREFIX,
@@ -3561,15 +3562,23 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         name: str,
         metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
-        """Read ``ROW_COUNT`` from the information schema; views report no count."""
+        """Read rows and bytes from SHOW OBJECTS, which needs no running warehouse."""
 
-        row: tuple[Any, ...] | None = self._information_schema_table_row(
-            connection=connection,
-            database=database,
-            schema=schema,
-            name=name,
-            projection="row_count,bytes" if metadata_only else "row_count",
-        )
+        basis: str = "show_objects_bytes"
+        row: tuple[Any, ...] | None
+        if schema is None or SHOW_LIKE_ESCAPE_CHARACTER in name:
+            basis = "information_schema_bytes"
+            row = self._information_schema_table_row(
+                connection=connection,
+                database=database,
+                schema=schema,
+                name=name,
+                projection="row_count,bytes",
+            )
+        else:
+            row = self._show_object_row_count(
+                connection=connection, database=database, schema=schema, name=name
+            )
         if row is None:
             return RelationRowCountEstimate(row_count=None, detail="relation not found")
         byte_count: int | None = int(row[1]) if metadata_only and row[1] is not None else None
@@ -3577,8 +3586,35 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
             row_count=int(row[0]) if row[0] is not None else None,
             detail="no row count (view)" if row[0] is None else None,
             byte_count=byte_count,
-            byte_count_basis="information_schema_bytes" if byte_count is not None else None,
+            byte_count_basis=basis if byte_count is not None else None,
         )
+
+    def _show_object_row_count(
+        self, *, connection: Any, database: str | None, schema: str, name: str
+    ) -> tuple[Any, Any] | None:
+        """Rows and bytes of one table; a view or other object lists neither."""
+
+        stored_name: str = self._information_schema_identifier(name)
+        rows: list[dict[str, object]] = self._fetch_schema_show_rows(
+            connection=connection,
+            query=(
+                f"SHOW OBJECTS LIKE '{show_like_pattern(stored_name)}' IN SCHEMA "
+                + self._show_schema_scope(connection=connection, database=database, schema=schema)
+            ),
+            show_database=self._show_database(
+                connection=connection, database=database, schema=schema
+            ),
+            schema=schema,
+        )
+        row: dict[str, object]
+        for row in rows:
+            if str(row.get("name")) == stored_name:
+                return (
+                    (row.get("rows"), row.get("bytes"))
+                    if str(row.get("kind")) == SHOW_OBJECTS_TABLE_KIND
+                    else (None, None)
+                )
+        return None
 
     def inspect_row_diff_coverage(
         self,
