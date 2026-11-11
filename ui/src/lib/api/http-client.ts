@@ -19,7 +19,7 @@ import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
-import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
+import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
@@ -43,6 +43,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getStatementSql',
 	'listRunOutput',
 	'getRunNodeError',
+	'acknowledgeRun',
 	'cancelRun',
 	'cancelMatchingRuns',
 	'rerunRun',
@@ -423,6 +424,15 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
 		},
+		async acknowledgeRun(scope: Scope, runId: string, acknowledged: boolean): Promise<void> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/acknowledgements', {
+				body: { event_id: crypto.randomUUID(), run_id: runId, acknowledged },
+				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		},
 		async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 			const source = await requireRun(scope, runId);
 			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
@@ -689,11 +699,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
 					: null,
-				checkResults(scope).catch(() => []),
+				keptRead(`checks ${scope.locationId}`, () => checkResults(scope)).catch(() => []),
 				node.kind === 'source'
 					? null
 					: http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs', { params: { path: { ...path, node_key: node.key }, query: { limit: 100 } } }),
-				Promise.all([listedJobs(scope), listedTriggers(scope)]).then(([j, t]) => nodeJobsOf(node.key, j, t)).catch(() => null),
+				// Read afresh, not through a listing already in flight, which may predate the change that just cleared these.
+				Promise.all([keptRead(`jobs ${scope.locationId}`, () => fetchJobs(scope)), keptRead(`triggers ${scope.locationId}`, () => fetchTriggers(scope))])
+					.then(([j, t]) => nodeJobsOf(node.key, j, t))
+					.catch(() => null),
 				node.relation ? relationStatistics(scope, node.relation) : [],
 				node.materialization?.includes('microbatch')
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/microbatches/{model}', { params: { path: { ...path, model: shortName(node.key) } } })
@@ -716,7 +729,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				implemented.listChecks(scope),
 				implemented.listCatalogNodes(scope),
 				implemented.listSnapshotChanges(scope, { limit: 100 }),
-				implemented.listPlatformEvents()
+				implemented.listPlatformEvents(),
+				acknowledgementsOf(scope)
 			]);
 			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
 			const read = await reads.catch((error: unknown) => {
@@ -724,8 +738,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				throw error;
 			});
 			if (!read) return null;
-			const [runs, checks, nodes, changes, events] = read;
-			return overviewOf({ runs, checks, nodes, changes, events, now: Date.now() });
+			const [runs, checks, nodes, changes, events, acknowledgements] = read;
+			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, now: Date.now() });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
@@ -800,6 +814,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		inFlight.clear();
 		olderWindows.clear();
 	}
+	/**
+	 * Project-wide lists a node's detail needs only a slice of, kept between node clicks until the next
+	 * change signal, and at most a minute in case a signal was missed while the feed reconnected.
+	 */
+	const kept = new Map<string, { at: number; read: Promise<unknown> }>();
+	const KEEP_MS = 60_000;
+	function keptRead<T>(key: string, load: () => Promise<T>): Promise<T> {
+		const held = kept.get(key);
+		if (held && Date.now() - held.at < KEEP_MS) return held.read as Promise<T>;
+		const read = load();
+		kept.set(key, { at: Date.now(), read });
+		read.catch(() => kept.get(key)?.read === read && kept.delete(key));
+		return read;
+	}
+
 	function shared<T>(key: string, load: () => Promise<T>): Promise<T> {
 		const pending = inFlight.get(key) as Promise<T> | undefined;
 		if (pending) return pending;
@@ -945,6 +974,16 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	}
 
 	const recentRuns = async (scope: Scope) => toRuns(await listedRuns(scope), scope.locationId);
+	/** Problem runs marked handled in the last week, by run ID. */
+	async function acknowledgementsOf(scope: Scope): Promise<Map<string, Acknowledgement>> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/acknowledgements', {
+			params: { path: { location_id: locationId, target } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return new Map(data.map((a) => [a.run_id, { by: a.acknowledged_by, at: a.acknowledged_at }]));
+	}
 
 	/** Triggers with their latest tick and the newest listed run each started. */
 	async function triggersOf(scope: Scope): Promise<Trigger[]> {
@@ -1068,6 +1107,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		return data;
 	}
 
+	implemented.changes.subscribe(() => kept.clear());
 	return new Proxy(implemented, {
 		get(target, property, receiver) {
 			if (property in target) return Reflect.get(target, property, receiver);

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import GitCommitIcon from '@lucide/svelte/icons/git-commit-horizontal';
 	import PackageIcon from '@lucide/svelte/icons/package';
@@ -49,9 +50,9 @@
 	<Button variant="outline" size="sm" onclick={() => changes.refresh()}>↻ Refresh</Button>
 </AppTopbar>
 
-<ListToolbar bind:query placeholder="Search nodes, commits, authors" total="{filtered.length} of {all.length} deploys">
+<ListToolbar loading={changes.data === undefined} bind:query placeholder="Search nodes, commits, authors" total="{filtered.length} of {all.length} deploys">
 	{#snippet filters()}
-		<SegmentedFilter bind:value={area} options={areaOptions.map((o) => ({ ...o, count: all.filter((c) => hasArea(c, o.value)).length }))} />
+		<SegmentedFilter loading={changes.data === undefined} bind:value={area} options={areaOptions.map((o) => ({ ...o, count: all.filter((c) => hasArea(c, o.value)).length }))} />
 	{/snippet}
 </ListToolbar>
 
@@ -169,7 +170,7 @@
 			</div>
 		</article>
 	{:else}
-		<div class="msg">{changes.loading ? (changes.slow ? 'Loading…' : '') : all.length ? 'No deploys match the filter.' : 'Nothing has been deployed to this location yet.'}</div>
+		{#if changes.data === undefined && !changes.error}<div class="msg"><Loading lines={4} /></div>{:else}<div class="msg">{all.length ? 'No deploys match the filter.' : 'Nothing has been deployed to this location yet.'}</div>{/if}
 	{/each}
 </div>
 

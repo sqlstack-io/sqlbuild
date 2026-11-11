@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
@@ -188,7 +189,7 @@
 		{:else if role.error}
 			<p class="err px-6 py-4">Couldn't load: {role.error}</p>
 		{:else}
-			<p class="muted px-6 py-4">Loading…</p>
+			<div class="px-6 py-4"><Loading /></div>
 		{/if}
 	</div>
 {/if}

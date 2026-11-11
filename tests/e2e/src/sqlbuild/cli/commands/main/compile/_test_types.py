@@ -1282,6 +1282,16 @@ class BenchmarkCoreCopyCompileTestCase:
 
 
 @dataclass(frozen=True)
+class BenchmarkDuckDBPortTestCase:
+    """A script that ports a Snowflake benchmark project to DuckDB, and the port's build summary."""
+
+    description: str
+    port_script: Path
+    expected_final_line_prefix: str
+    expected_final_line_fragment: str
+
+
+@dataclass(frozen=True)
 class GeneratedBenchmarkCompileTestCase:
     """A generated benchmark project, its recorded checksum and its cold compile budget."""
 

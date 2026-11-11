@@ -55,6 +55,7 @@
 {#if showsServer}<ServerStatus bind:this={status} />{/if}
 
 <ListToolbar
+	loading={locations.data === undefined}
 	bind:query
 	placeholder="Search locations"
 	total="{filtered.length} of {all.length} locations"

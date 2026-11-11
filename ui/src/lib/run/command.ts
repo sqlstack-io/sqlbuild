@@ -3,7 +3,7 @@
 // nodes. The server resolves selectors and refuses flags; nothing here decides
 // whether a command may run. Pure: no side effects.
 
-import type { LaunchVerb, SnapshotNode } from '$lib/api';
+import type { CursorWindow, LaunchVerb, RerunMode, SnapshotNode } from '$lib/api';
 import { flagSpec, VERBS, type FlagSpec } from './command-table';
 
 /** The command line read for the panel's own controls: verb tabs, flag hints and verb switching. */
@@ -93,8 +93,68 @@ export function planHref(selection: string[] = [], verb: LaunchVerb = 'build', n
 	return `/plan?cmd=${encodeURIComponent(command)}${narrowing.job ? `&job=${encodeURIComponent(narrowing.job)}` : ''}`;
 }
 
-/** The only option a job run adds to the job's own settings. */
-export const JOB_RUN_FLAGS: readonly string[] = ['--full-refresh'];
+/** The review page for rerunning runs, opened before anything reruns; `nodes` only for one run's selected nodes. */
+export function rerunHref(runIds: string[], mode: RerunMode, nodes: string[] = []): string {
+	const query = new URLSearchParams([...runIds.map((id) => ['run', id]), ['mode', mode], ...nodes.map((n) => ['node', n])]);
+	return `/plan/rerun?${query}`;
+}
+
+/** An RFC 3339 timestamp with a zone, the form the server reads a job run's window in. */
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/** The cursor-window flags of each cursor type, as `sqb build` names them. */
+const WINDOW_FLAGS = {
+	timestamp: ['--start-cursor-ts', '--end-cursor-ts'],
+	integer: ['--start-cursor-int', '--end-cursor-int']
+} as const;
+
+/** The options a job run adds to the job's own settings: a rebuild from scratch, or a cursor window. */
+export const JOB_RUN_FLAGS: readonly string[] = ['--full-refresh', ...WINDOW_FLAGS.timestamp, ...WINDOW_FLAGS.integer];
+
+/** The command's cursor window, from its window flags, or null when it has none. */
+export function windowOf(parts: CommandParts): CursorWindow | null {
+	for (const type of ['timestamp', 'integer'] as const) {
+		const [startFlag, endFlag] = WINDOW_FLAGS[type];
+		const start = parts.flags[startFlag];
+		const end = parts.flags[endFlag];
+		if (start !== undefined || end !== undefined) return { type, start: typeof start === 'string' ? start : null, end: typeof end === 'string' ? end : null };
+	}
+	return null;
+}
+
+/** The command with its cursor window replaced by `window`, or removed when it is null. */
+export function withWindow(text: string, window: CursorWindow | null): string {
+	const parts = parseCommand(text);
+	const flags = Object.fromEntries(Object.entries(parts.flags).filter(([flag]) => flag === '--full-refresh' || !JOB_RUN_FLAGS.includes(flag)));
+	if (window) {
+		const [startFlag, endFlag] = WINDOW_FLAGS[window.type];
+		if (window.start) flags[startFlag] = window.start;
+		if (window.end) flags[endFlag] = window.end;
+	}
+	return buildCommand({ ...parts, flags });
+}
+
+/** The command with `--full-refresh` set or removed. */
+export function withFullRefresh(text: string, on: boolean): string {
+	const parts = parseCommand(text);
+	const flags = Object.fromEntries(Object.entries(parts.flags).filter(([flag]) => flag !== '--full-refresh'));
+	if (on) flags['--full-refresh'] = true;
+	return buildCommand({ ...parts, flags });
+}
+
+/** Options a job run takes, for telling an option still being typed from one it can't take. */
+const JOB_OPTIONS = ['--select', '--exclude', ...JOB_RUN_FLAGS];
+
+const unfinished = (flag: string) => !JOB_RUN_FLAGS.includes(flag) && JOB_OPTIONS.some((o) => o.startsWith(flag) && o !== flag);
+
+/**
+ * A job run's command without options still being typed, such as `--` or `--sel`, so typing one neither
+ * reports a problem nor replans; `typing` says one is there, which holds Run until it is finished.
+ */
+export function settledJobCommand(parts: CommandParts): { parts: CommandParts; typing: boolean } {
+	const flags = Object.fromEntries(Object.entries(parts.flags).filter(([flag]) => !unfinished(flag)));
+	return { parts: { ...parts, flags }, typing: Object.keys(flags).length !== Object.keys(parts.flags).length };
+}
 
 /** The `sqb build` command that selects what a narrowed run of `job` builds: each selector intersected with the job. */
 export function jobBuildTokens(job: string, parts: CommandParts): string[] {
@@ -108,7 +168,15 @@ export function jobBuildTokens(job: string, parts: CommandParts): string[] {
 export function jobRunProblem(parts: CommandParts): string | null {
 	if (parts.verb !== 'build') return `A job run is a build; remove the job to run sqb ${parts.verb}.`;
 	const other = Object.keys(parts.flags).filter((f) => !JOB_RUN_FLAGS.includes(f));
-	return other.length ? `A job run uses the job's own settings; ${other.join(', ')} can't be added. Remove the job to run it as a command.` : null;
+	if (other.length) return `A job run uses the job's own settings; ${other.join(', ')} can't be added. Remove the job to run it as a command.`;
+	const window = windowOf(parts);
+	if (window && parts.flags['--full-refresh']) return 'A run rebuilds from scratch or reprocesses a date range, not both.';
+	if (window && !(window.start && window.end)) return 'Give the range a start and an end.';
+	const valid = (v: string | null) => (window?.type === 'integer' ? /^-?\d+$/.test(v ?? '') && Number.isSafeInteger(Number(v)) : TIMESTAMP.test(v ?? ''));
+	if (window && ![window.start, window.end].every(valid)) {
+		return window.type === 'integer' ? 'Range bounds are whole numbers.' : 'Range bounds are full timestamps, such as 2026-11-03T00:00:00Z.';
+	}
+	return null;
 }
 
 /** How `sqb` names a node in a selector: seeds and sources by kind, everything else by bare name. */

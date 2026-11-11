@@ -245,6 +245,11 @@
 	text-align: left;
 	white-space: nowrap;
 }
+/* While the loading rows show, the header keeps its height but not its text: its columns are sized from
+   the header alone until the rows arrive, so it would visibly reflow. Header and rows then appear together. */
+.sb-list:has(tr.load-row[role='status']) thead th {
+	color: transparent;
+}
 .sb-list tbody td {
 	padding: 10px 16px;
 	border-bottom: 1px solid var(--border);
@@ -477,3 +482,31 @@
 	font-weight: 500;
 }
 
+/* Placeholder bars a page shows while a read has nothing to show yet. */
+.sb-skeleton {
+	display: block;
+	height: 10px;
+	border-radius: 4px;
+	/* Mixed from the text colour, so the bar and its sheen stand out from any surface in both themes. */
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--foreground) 8%, transparent) 0%,
+		color-mix(in srgb, var(--foreground) 18%, transparent) 50%,
+		color-mix(in srgb, var(--foreground) 8%, transparent) 100%
+	);
+	background-size: 200% 100%;
+	animation: sb-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes sb-shimmer {
+	from {
+		background-position: 100% 0;
+	}
+	to {
+		background-position: -100% 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.sb-skeleton {
+		animation: none;
+	}
+}

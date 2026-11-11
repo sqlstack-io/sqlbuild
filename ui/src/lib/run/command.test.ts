@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SnapshotNode } from '$lib/api';
-import { commandTokens, jobBuildTokens, jobRunProblem, parseCommand, planHref, suggest, withVerb } from './command';
+import { commandTokens, jobBuildTokens, jobRunProblem, parseCommand, planHref, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow } from './command';
 
 const node = (key: string, kind: SnapshotNode['kind'], path: string, tags: string[] = []): SnapshotNode => ({ key, kind, group: '', tags, path, cursor: null, upstream: [] });
 
@@ -37,6 +37,43 @@ describe('the plan page command line', () => {
 		expect(jobRunProblem(parseCommand('sqb build --exclude orders --full-refresh'))).toBeNull();
 		expect(jobRunProblem(parseCommand('sqb test orders'))).toMatch(/is a build/);
 		expect(jobRunProblem(parseCommand('sqb build --warehouse WH_S'))).toMatch(/--warehouse can't be added/);
+	});
+
+	it('waits for an option being typed in a job run instead of refusing it', () => {
+		// `--` and `--sel` may become --select; `--war` can only become an option a job run refuses.
+		for (const text of ['sqb build --', 'sqb build orders --sel', 'sqb build --full']) {
+			const settled = settledJobCommand(parseCommand(text));
+			expect(settled.typing).toBe(true);
+			expect(jobRunProblem(settled.parts)).toBeNull();
+		}
+		const refused = settledJobCommand(parseCommand('sqb build --war'));
+		expect(refused.typing).toBe(false);
+		expect(jobRunProblem(refused.parts)).toMatch(/--war can't be added/);
+		expect(settledJobCommand(parseCommand('sqb build --full-refresh')).typing).toBe(false);
+	});
+
+	it('switches a job run between the latest data, a date range and a full refresh in the command', () => {
+		const ranged = 'sqb build --select orders --start-cursor-ts 2026-11-03T00:00:00Z --end-cursor-ts 2026-11-10T00:00:00Z';
+		const scratch = withFullRefresh(withWindow(ranged, null), true);
+		expect(scratch).toBe('sqb build --select orders --full-refresh');
+		expect(jobRunProblem(parseCommand(scratch))).toBeNull();
+		expect(withFullRefresh(scratch, false)).toBe('sqb build --select orders');
+	});
+
+	it('keeps a job run\'s date range in the command as its cursor-window flags', () => {
+		const ranged = withWindow('sqb build orders --full-refresh --start-cursor-int 5', { type: 'timestamp', start: '2026-11-03T00:00:00Z', end: '2026-11-10T00:00:00Z' });
+		// A new window replaces the old one of either type and leaves the other options alone.
+		expect(ranged).toBe('sqb build --select orders --full-refresh --start-cursor-ts 2026-11-03T00:00:00Z --end-cursor-ts 2026-11-10T00:00:00Z');
+		expect(windowOf(parseCommand(ranged))).toEqual({ type: 'timestamp', start: '2026-11-03T00:00:00Z', end: '2026-11-10T00:00:00Z' });
+		expect(windowOf(parseCommand('sqb build --end-cursor-int 1500'))).toEqual({ type: 'integer', start: null, end: '1500' });
+		expect(withWindow(ranged, null)).toBe('sqb build --select orders --full-refresh');
+		expect(jobRunProblem(parseCommand('sqb build --start-cursor-ts 2026-11-03T00:00:00Z --end-cursor-ts 2026-11-10T00:00:00Z'))).toBeNull();
+		expect(jobRunProblem(parseCommand(ranged))).toMatch(/not both/);
+		// The server reads a job run's window as two full timestamps, so a half or date-only range is refused before planning.
+		expect(jobRunProblem(parseCommand('sqb build --start-cursor-ts 2026-11-03T00:00:00Z'))).toMatch(/start and an end/);
+		expect(jobRunProblem(parseCommand('sqb build --start-cursor-ts 2026-11-03 --end-cursor-ts 2026-11-10T00:00:00Z'))).toMatch(/full timestamps/);
+		expect(jobRunProblem(parseCommand('sqb build --start-cursor-int 12 --end-cursor-int 1x'))).toMatch(/whole numbers/);
+		expect(jobRunProblem(parseCommand('sqb build --start-cursor-int +12 --end-cursor-int 9007199254740993'))).toMatch(/whole numbers/);
 	});
 
 	it('opens a narrowed job run on the plan page with the job kept beside the command', () => {

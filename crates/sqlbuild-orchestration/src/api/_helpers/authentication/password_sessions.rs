@@ -127,6 +127,11 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_operations::recent_runs),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/acknowledgements",
+            get(crate::api::_helpers::resources::person_operations::acknowledgements)
+                .post(crate::api::_helpers::resources::person_operations::acknowledge),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes",
             get(crate::api::_helpers::resources::person_reads::run_nodes),
         )

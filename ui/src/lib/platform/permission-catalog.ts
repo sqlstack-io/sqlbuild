@@ -89,6 +89,8 @@ const AUDIT_ONLY: Record<string, string> = {
 	'password.changed': 'Changed password',
 	'principal.created': 'Added person',
 	'role.assigned': 'Changed role',
+	'run.acknowledged': 'Acknowledged run',
+	'run.acknowledgement_withdrawn': 'Withdrew acknowledgement',
 	'run.cancel_requested': 'Requested cancel',
 	'run.rerun_requested': 'Requested rerun',
 	'session.created': 'Signed in',

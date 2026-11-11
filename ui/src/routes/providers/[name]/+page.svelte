@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
 	import LockIcon from '@lucide/svelte/icons/lock';
@@ -103,6 +104,6 @@
 			</aside>
 		</div>
 	{:else}
-		<div class="text-muted-foreground px-6 py-4 text-[13px]">Loading…</div>
+		<div class="px-6 py-4"><Loading /></div>
 	{/if}
 </div>

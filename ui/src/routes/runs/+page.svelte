@@ -44,7 +44,7 @@
 	{/if}
 </AppTopbar>
 
-<RunsToolbar {list} queued={queue.data?.length ?? null} />
+<RunsToolbar {list} queued={queue.data ? queue.data.length : queue.error ? null : undefined} />
 
 {#if shown === 'timeline'}
 	<div class="timeline-page"><RunTimeline bind:query={timelineQuery} /></div>

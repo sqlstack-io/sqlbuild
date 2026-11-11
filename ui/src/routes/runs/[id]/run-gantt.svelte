@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { onMount } from 'svelte';
 	import type { RunNode } from '$lib/api';
 	import { nodeStatusTone } from '$lib/operate/labels';
@@ -81,11 +82,19 @@
 	const ordered = $derived([...nodes].sort((a, b) => (a.startedAt ?? '\uffff').localeCompare(b.startedAt ?? '\uffff')));
 
 	type Row = { type: 'group'; group: GanttGroup; count: number } | { type: 'node'; node: RunNode };
+	/** Job runs whose node rows are folded away. */
+	let collapsed = $state<Set<string>>(new Set());
+	function toggleGroup(runId: string) {
+		const next = new Set(collapsed);
+		if (!next.delete(runId)) next.add(runId);
+		collapsed = next;
+	}
 	const rows = $derived.by((): Row[] => {
 		if (groups.length < 2) return ordered.map((node) => ({ type: 'node', node }));
 		return groups.flatMap((group): Row[] => {
 			const own = ordered.filter((n) => n.runId === group.runId);
-			return [{ type: 'group', group, count: own.length }, ...own.map((node): Row => ({ type: 'node', node }))];
+			const head: Row = { type: 'group', group, count: own.length };
+			return collapsed.has(group.runId) ? [head] : [head, ...own.map((node): Row => ({ type: 'node', node }))];
 		});
 	});
 
@@ -143,6 +152,15 @@
 				{#if row.type === 'group'}
 					<div class="row group-row">
 						<div class="gutter cell" class:shadow={scrolledX} style:width="{gutterW}px">
+							<button
+								class="fold"
+								class:open={!collapsed.has(row.group.runId)}
+								onclick={() => toggleGroup(row.group.runId)}
+								aria-expanded={!collapsed.has(row.group.runId)}
+								aria-label="{collapsed.has(row.group.runId) ? 'Show' : 'Hide'} the nodes of {row.group.label}"
+							>
+								<ChevronRightIcon size={13} />
+							</button>
 							<i style:background={row.group.tone}></i>
 							<a href={to(row.group.href)}>{row.group.label}</a>
 							<span class="faint">{row.count}</span>
@@ -384,6 +402,23 @@
 		font-family: var(--font-sans);
 		font-weight: 600;
 		color: var(--foreground);
+	}
+	.fold {
+		display: grid;
+		width: 16px;
+		height: 16px;
+		margin-left: -4px;
+		place-items: center;
+		color: var(--muted-foreground);
+	}
+	.fold:hover {
+		color: var(--foreground);
+	}
+	.fold :global(svg) {
+		transition: transform 0.12s;
+	}
+	.fold.open :global(svg) {
+		transform: rotate(90deg);
 	}
 	.group-row i {
 		width: 7px;

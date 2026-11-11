@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import type { PlatformEventLink, PlatformEventReaction, PlatformEventRecord } from '$lib/api';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
@@ -105,7 +106,7 @@
 		{:else}
 			<tr class="load-row">
 				<td colspan={2 + Number(showAffected) + Number(showReactions)} class="empty">
-					{#if resource.error}<span class="err">Couldn't load problems: {resource.error}</span>{:else if resource.loading && !events.length}{resource.slow ? 'Loading…' : ''}{:else}{empty}{/if}
+					{#if resource.error}<span class="err">Couldn't load problems: {resource.error}</span>{:else if resource.data === undefined}<Loading lines={2} />{:else}{empty}{/if}
 				</td>
 			</tr>
 		{/each}
