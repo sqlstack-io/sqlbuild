@@ -24,7 +24,7 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::{
-    ingest_catalog::ingest_catalog, read_person_catalog::read_person_catalog,
+    ingest::ingest_catalog::ingest_catalog, person_reads::read_person_catalog::read_person_catalog,
 };
 use crate::warehouse_metadata::models::{CatalogQuery, MetadataBatch};
 
@@ -307,7 +307,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             .await
             .expect("revoke");
             assert!(matches!(
-                crate::warehouse_metadata::main::read_person_statistics::read_person_statistics(
+                crate::warehouse_metadata::main::person_reads::read_person_statistics::read_person_statistics(
                     store,
                     credentials,
                     (
@@ -328,7 +328,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                 Err(ControlError::Denied { .. })
             ));
             assert!(matches!(
-                crate::warehouse_metadata::main::read_person_node_status::read_person_node_status(
+                crate::warehouse_metadata::main::person_reads::read_person_node_status::read_person_node_status(
                     store,
                     credentials,
                     (
@@ -351,7 +351,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                 name: Some("orders".into()),
             };
             assert!(matches!(
-                crate::warehouse_metadata::main::read_person_fingerprint::read_person_fingerprint(
+                crate::warehouse_metadata::main::person_reads::read_person_fingerprint::read_person_fingerprint(
                     store,
                     credentials,
                     (location, "development", &evidence),

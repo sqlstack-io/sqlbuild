@@ -41,7 +41,7 @@ use crate::warehouse_history::main::read_person_run_node_error::read_person_run_
 use crate::warehouse_history::main::read_person_run_output::read_person_run_output;
 use crate::warehouse_history::main::read_person_run_statement_sql::read_person_run_statement_sql;
 use crate::warehouse_history::main::read_person_run_statements::read_person_run_statements;
-use crate::warehouse_metadata::main::list_person_catalog_nodes::list_person_catalog_nodes;
+use crate::warehouse_metadata::main::person_reads::list_person_catalog_nodes::list_person_catalog_nodes;
 use crate::warehouse_metadata::models::CatalogNodeRecord;
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes", operation_id = "listPersonRunNodes",

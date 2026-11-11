@@ -1,0 +1,63 @@
+{
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "execution_id": "execution-000",
+    "phase": "succeeded",
+    "run_id": "external-run",
+    "node_type": "model",
+    "node_name": "orders",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": "orders_🧾",
+    "version_hash": "orders-version",
+    "input_count": 1,
+    "input_kind": "source",
+    "input_name": "shop.orders_🧾",
+    "input_version": "source-version",
+    "recorded_at": "2026-02-03T04:05:06Z"
+  },
+  "source_rows": 104,
+  "duplicate_rows": 3,
+  "later_time": "2026-02-03T04:05:06.000001Z",
+  "page_lengths": [
+    100,
+    7
+  ],
+  "later_index": 106,
+  "source_count": 107,
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 1 AS order_id",
+  "retained_result": "execution-103",
+  "kind": "consumption",
+  "source_key": "execution_id",
+  "timestamp_key": "recorded_at",
+  "id_prefix": "execution",
+  "later_record": {
+    "execution_id": "execution-103",
+    "phase": "started",
+    "input_count": 0,
+    "input_kind": null,
+    "input_name": null,
+    "input_version": null,
+    "recorded_at": "2026-02-03T04:05:06.000001Z"
+  },
+  "last_record": {
+    "execution_id": "execution-103",
+    "phase": "started",
+    "input_count": 0,
+    "input_kind": null,
+    "input_name": null,
+    "input_version": null,
+    "recorded_at": "2026-02-03T04:05:06.000001Z"
+  },
+  "record_overrides": {
+    "execution-103": {
+      "phase": "started",
+      "input_count": 0,
+      "input_kind": null,
+      "input_name": null,
+      "input_version": null,
+      "recorded_at": "2026-02-03T04:05:06.000001Z"
+    }
+  }
+}

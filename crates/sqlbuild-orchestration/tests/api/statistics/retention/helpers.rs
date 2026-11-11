@@ -6,9 +6,10 @@ use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::store::models::ControlStore;
-use crate::warehouse_metadata::main::prune_statistics::prune_statistics;
+use crate::warehouse_metadata::main::ingest::prune_statistics::prune_statistics;
 use crate::warehouse_metadata::main::{
-    ingest_statistics::ingest_statistics, read_person_statistics::read_person_statistics,
+    ingest::ingest_statistics::ingest_statistics,
+    person_reads::read_person_statistics::read_person_statistics,
 };
 use crate::warehouse_metadata::models::{MetadataBatch, StatisticsQuery, StatisticsRetention};
 

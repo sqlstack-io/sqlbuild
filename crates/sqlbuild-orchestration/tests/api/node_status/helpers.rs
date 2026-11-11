@@ -14,10 +14,10 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::warehouse_metadata::main::{
-    ingest_catalog::ingest_catalog, ingest_fingerprints::ingest_fingerprints,
-    ingest_source_freshness::ingest_source_freshness,
-    list_person_catalog_nodes::list_person_catalog_nodes,
-    read_person_node_status::read_person_node_status,
+    ingest::ingest_catalog::ingest_catalog, ingest::ingest_fingerprints::ingest_fingerprints,
+    ingest::ingest_source_freshness::ingest_source_freshness,
+    person_reads::list_person_catalog_nodes::list_person_catalog_nodes,
+    person_reads::read_person_node_status::read_person_node_status,
 };
 use crate::warehouse_metadata::models::{MetadataBatch, NodeStatusQuery};
 

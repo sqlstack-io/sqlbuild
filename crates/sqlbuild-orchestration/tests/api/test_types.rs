@@ -1,6 +1,7 @@
 use crate::runs::models::RunStatus;
 use crate::store::errors::ControlError;
 use crate::store::tests::store_test_types::Backend;
+use crate::warehouse_metadata::models::WarehouseHistoryKind;
 
 pub(crate) struct ApiContractTestCase {
     pub(crate) description: &'static str,
@@ -101,6 +102,12 @@ pub(crate) struct ColumnLineageTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_orders_edges: Vec<(&'static str, &'static str)>,
     pub(crate) expected_leaf_edges: usize,
+}
+
+pub(crate) struct StateTableClassificationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_tables: Vec<&'static str>,
+    pub(crate) expected_last_kinds: [WarehouseHistoryKind; 2],
 }
 
 pub(crate) struct WarehouseMetadataTestCase {

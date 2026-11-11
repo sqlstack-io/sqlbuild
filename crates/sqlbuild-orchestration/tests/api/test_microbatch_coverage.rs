@@ -10,7 +10,7 @@ use crate::api::tests::warehouse_history_helpers::{
 };
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_metadata::main::ingest_microbatches::ingest_microbatches;
+use crate::warehouse_metadata::main::ingest::ingest_microbatches::ingest_microbatches;
 
 const HOUR_0: &str = "2026-01-01 00:00:00+00";
 const HOUR_1: &str = "2026-01-01T09:00:00+08:00";

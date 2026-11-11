@@ -28,7 +28,7 @@ use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
+use crate::warehouse_metadata::main::ingest::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::models::{
     MetadataBatch, MetadataScan, WarehouseFreshnessRecord, WarehouseHistoryKind,
     WarehouseStateLocation,

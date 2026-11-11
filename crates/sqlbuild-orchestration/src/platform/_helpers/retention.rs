@@ -14,7 +14,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{query::query, write::write};
 use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
-use crate::warehouse_metadata::main::prune_statistics::prune_statistics;
+use crate::warehouse_metadata::main::ingest::prune_statistics::prune_statistics;
 use crate::warehouse_metadata::models::StatisticsRetention;
 
 /// Old evaluation phases go once a later attempt of the same sensor exists.
