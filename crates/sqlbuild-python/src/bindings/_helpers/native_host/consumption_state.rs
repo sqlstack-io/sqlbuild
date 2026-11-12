@@ -25,7 +25,7 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
 
 /// Rows per `INSERT`; SQL Server accepts at most 1,000 rows in one `VALUES` list.
-const ROWS_PER_STATEMENT: usize = 500;
+pub(crate) const ROWS_PER_STATEMENT: usize = 500;
 /// Warehouse timestamp texts with a UTC offset, as drivers render aware values.
 const OFFSET_TIME_FORMATS: [&str; 2] = ["%Y-%m-%dT%H:%M:%S%.f%:z", "%Y-%m-%d %H:%M:%S%.f%:z"];
 /// Warehouse timestamp texts without an offset, which the consumption table stores as UTC.
@@ -46,7 +46,7 @@ impl Location {
         }
     }
 
-    fn keywords<'py>(&self, py: Python<'py>) -> Vec<(&'static str, Bound<'py, PyAny>)> {
+    pub(crate) fn keywords<'py>(&self, py: Python<'py>) -> Vec<(&'static str, Bound<'py, PyAny>)> {
         vec![
             (
                 "database",
@@ -158,7 +158,7 @@ fn build_consumption_prune_sql(
     .unwrap_or_default())
 }
 
-fn execute<'py>(
+pub(crate) fn execute<'py>(
     adapter: &Bound<'py, PyAny>,
     connection: &Bound<'py, PyAny>,
     sql: &str,
@@ -314,7 +314,7 @@ fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
     })
 }
 
-fn literal(py: Python<'_>, value: Option<&str>) -> PyResult<String> {
+pub(crate) fn literal(py: Python<'_>, value: Option<&str>) -> PyResult<String> {
     let value: Bound<'_, PyAny> =
         value.map_or_else(|| py.None().into_bound(py), |value| text(py, value));
     render_state_sql_literal(py, &value, STRING_STATE_VALUE_TYPE, None)
@@ -392,7 +392,7 @@ impl ConsumptionConnection {
         }
     }
 
-    fn connected<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    pub(crate) fn connected<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let mut open = self
             .connection
             .lock()

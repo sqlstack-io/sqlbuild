@@ -41,6 +41,7 @@ use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::native_host::consumption_state::recorder_callbacks;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
+use crate::bindings::_helpers::observations::publication::append_cursor_observations;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
 use crate::bindings::_helpers::records::construct::new_record;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -483,6 +484,15 @@ pub(crate) fn execute_build_plan<'py>(
         &connection_config,
         &native_field(&project, "run_id")?,
     )?;
+    for warning in append_cursor_observations(
+        (&project, &successful_models),
+        (&adapter, &connection_config),
+        &native_field(&project, "run_id")?
+            .str()?
+            .extract::<String>()?,
+    ) {
+        emit(&context.stream, &format!("warning: {warning}\n"))?;
+    }
     lifecycle.finalize(py)?;
     Ok(Outcome {
         result: native_result,
