@@ -7,7 +7,8 @@ use uuid::Uuid;
 use sqlbuild_core::constants::{
     AUDIT_RESULTS_TABLE_NAME, COLUMN_MIGRATION_TABLE_NAME, CONSUMPTION_TABLE_NAME,
     FINGERPRINT_TABLE_NAME, JANITOR_EVENTS_TABLE_NAME, MICROBATCH_TABLE_NAME, MIGRATION_TABLE_NAME,
-    NODE_RESULTS_TABLE_NAME, OLD_NAME_VIEW_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
+    NODE_RESULTS_TABLE_NAME, OBSERVATIONS_TABLE_NAME, OLD_NAME_VIEW_TABLE_NAME,
+    SOURCE_FRESHNESS_TABLE_NAME,
 };
 
 use crate::store::errors::ControlError;
@@ -270,6 +271,21 @@ pub struct WarehouseConsumptionRecord {
     pub recorded_at: DateTime<Utc>,
 }
 
+/// A display-only value a build observed, such as a cursor `MAX`; planning never reads it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseObservationRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub observation_id: String,
+    pub kind: String,
+    pub node: String,
+    pub cursor_type: Option<String>,
+    pub value: String,
+    pub run_id: String,
+    pub observed_at: DateTime<Utc>,
+}
+
 /// Catalog observations require full scans; only immutable history supports a watermark.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -284,13 +300,14 @@ pub enum WarehouseHistoryKind {
     ColumnMigrations,
     NodeResults,
     Consumption,
+    Observations,
     Catalog,
     Statistics,
 }
 
 impl WarehouseHistoryKind {
     /// Catalog and statistics stay last: a failed statistics read rewinds one kind, to catalog.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
@@ -301,6 +318,7 @@ impl WarehouseHistoryKind {
         Self::ColumnMigrations,
         Self::NodeResults,
         Self::Consumption,
+        Self::Observations,
         Self::Catalog,
         Self::Statistics,
     ];
@@ -357,6 +375,11 @@ impl WarehouseHistoryKind {
                 "consumption",
                 "sqb_warehouse_consumption",
                 Some(CONSUMPTION_TABLE_NAME),
+            ),
+            Self::Observations => (
+                "observations",
+                "sqb_warehouse_observations",
+                Some(OBSERVATIONS_TABLE_NAME),
             ),
             Self::Catalog => ("catalog", "sqb_warehouse_catalog", None),
             Self::Statistics => ("statistics", "sqb_warehouse_statistics", None),
@@ -540,6 +563,7 @@ pub enum WarehouseHistoryRead {
     ColumnMigrations(StateEventsRead),
     NodeResults(NodeResultsRead),
     Consumption(ConsumptionRead),
+    Observations(StateEventsRead),
     Catalog(CatalogRead),
     Statistics(StatisticsRead),
 }
@@ -557,6 +581,7 @@ pub enum WarehouseHistoryRecord {
     ColumnMigration(Box<WarehouseColumnMigrationRecord>),
     NodeResult(Box<WarehouseNodeResultRecord>),
     Consumption(Box<WarehouseConsumptionRecord>),
+    Observation(Box<WarehouseObservationRecord>),
     Catalog(WarehouseCatalogRecord),
     Statistics(WarehouseStatisticsRecord),
 }

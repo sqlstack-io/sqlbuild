@@ -402,6 +402,11 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                     "consumption_history",
                     "execution_id",
                 ),
+                (
+                    WarehouseHistoryKind::Observations,
+                    "observation_history",
+                    "observation_id",
+                ),
             ] {
                 crate::api::tests::warehouse_events_helpers::event_history(
                     store,
