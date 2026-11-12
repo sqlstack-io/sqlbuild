@@ -1269,13 +1269,20 @@ def test_given_fingerprint_history_when_read_in_isolated_pages_then_legacy_retri
     assert not (project / "warehouse.db").exists()
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [AutomaticHistoryTestCase("DuckDB change tokens", "duckdb", "database", "legacy-run")],
+    ids=lambda case: case.description,
+)
 def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or_lost_tables_are_read(
-    tmp_path: Path,
+    test_case: AutomaticHistoryTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
     adapter: Any
     connection: Any
-    adapter, connection = open_legacy_warehouse(project, "duckdb", "database")
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
     adapter.close(connection)
     (project / "orchestration/orders.py").write_text("")
     fixture: dict[str, Any] = json.loads(
@@ -1366,14 +1373,14 @@ def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or
             assert resync() == [], "unchanged tokens read nothing"
             assert mirrored() == initial
 
-            connection = adapter.connect({"database": str(project / "warehouse.db")})
+            connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
             _ = adapter.execute(
                 connection=connection,
                 sql=(
                     "INSERT INTO _sqlbuild_fingerprints SELECT node_type,'orders-changed',"
                     "target_database,target_schema,target_name,'changed-run',definition_hash,"
                     "version_hash,schema_fingerprint,definition_b64,metadata_json_b64,ts "
-                    "FROM _sqlbuild_fingerprints WHERE run_id='legacy-run'"
+                    f"FROM _sqlbuild_fingerprints WHERE run_id='{test_case.expected_run_id}'"
                 ),
             )
             adapter.close(connection)

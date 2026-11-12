@@ -225,7 +225,7 @@ pub(crate) struct ScanToken {
     pub(crate) token: String,
     /// A complete reconciling read, so the mirror held exactly the table's rows.
     pub(crate) reconciled: bool,
-    /// The read delivered rows, so an empty mirror means they were lost.
+    /// The read delivered rows or read on top of mirrored rows, so an empty mirror lost rows.
     pub(crate) delivered: bool,
 }
 
@@ -260,8 +260,7 @@ impl LocationMetadataSync {
             && (self.reconcile || self.kind() == WarehouseHistoryKind::Catalog)
     }
 
-    /// A scan skips when its table still has this token: any complete read's, but only a reconciling
-    /// read's while reconciling, and never when the mirror lost the rows that read delivered.
+    /// The recorded token a scan may skip on, given whether it reconciles and the mirror holds rows.
     pub(crate) fn unchanged_token(&self) -> Option<&str> {
         let recorded = self.change_tokens.get(&self.index)?;
         ((recorded.reconciled || !self.reconciling())

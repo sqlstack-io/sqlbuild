@@ -10,20 +10,18 @@ use sqlbuild_orchestration::platform::models::{
 };
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseWatermarkRead,
+    WarehouseHistoryKind, WarehouseHistoryPage,
 };
 use tokio::time::Instant;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
     acknowledge_metadata_page, begin_after_run, freeze_history_page, history_request,
-    location_result, metadata_health, next_scan, statistics_page,
+    load_watermark, location_result, metadata_health, next_scan, statistics_page,
 };
 use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
-use crate::native_commands::constants::{
-    METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_REPLY_BYTES,
-};
+use crate::native_commands::constants::{METADATA_POLL_SECONDS, METADATA_REPLY_BYTES};
 use crate::native_commands::models::{LocationMetadataSync, LocationServe, LocationWatch};
 
 /// One bounded source or mirror page leaves named work polling a turn between pages.
@@ -64,44 +62,15 @@ pub(super) async fn sync_location_metadata(
             });
         }
         if !state.watermark_loaded {
-            if state.index == 0 {
-                state.reconcile = Instant::now() >= state.reconcile_at;
+            let Some((loaded, failure)) =
+                load_watermark(state, (options, client, poll), (started, stopped.as_mut())).await?
+            else {
+                return Ok(None);
+            };
+            state = loaded;
+            if let Some(error) = failure {
+                return retry_metadata(state, error);
             }
-            state.mirror_holds_rows = false;
-            if (!state.reconcile || state.change_tokens.contains_key(&state.index))
-                && !matches!(
-                    state.kind(),
-                    WarehouseHistoryKind::Catalog | WarehouseHistoryKind::Statistics
-                )
-            {
-                let request = WarehouseWatermarkRead {
-                    session_id: poll.session_id,
-                    generation: state.generation,
-                    location: state.location().clone(),
-                    kind: state.kind(),
-                };
-                let watermark = tokio::select! {
-                    result = &mut stopped => { result?; return Ok(None); },
-                    result = client.metadata_watermark(&options.target, &request) => result,
-                };
-                let watermark = match watermark {
-                    Ok(watermark) => watermark,
-                    Err(error) => {
-                        tokio::select! {
-                            result = &mut stopped => { result?; return Ok(None); },
-                            () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Watermark))) => {},
-                        }
-                        return retry_metadata(state, error);
-                    }
-                };
-                state.mirror_holds_rows = watermark.is_some();
-                if !state.reconcile {
-                    state.observed_since = watermark.and_then(|time| {
-                        time.checked_sub_signed(chrono::Duration::seconds(METADATA_OVERLAP_SECONDS))
-                    });
-                }
-            }
-            state.watermark_loaded = true;
         }
         let Some(page) = read_metadata_page((options, script), &state, stopped.as_mut()).await?
         else {

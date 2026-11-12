@@ -105,6 +105,8 @@ pub(super) struct UnchangedScanTestCase {
     pub(super) description: &'static str,
     pub(super) read_reconciled: bool,
     pub(super) read_delivered: bool,
+    pub(super) read_incremental: bool,
+    pub(super) rereads_without_token: usize,
     pub(super) scan_reconciles: bool,
     pub(super) mirror_holds_rows: bool,
     pub(super) expected_token: Option<&'static str>,

@@ -39,6 +39,7 @@ use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, StatisticsRetention,
     WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead,
+    WarehouseWatermarkRead,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::webhooks::main::{
@@ -70,9 +71,9 @@ use crate::native_commands::_helpers::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
-    ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_POLL_SECONDS,
-    METADATA_RECONCILE_SECONDS, METADATA_SYNC_CHECK_SECONDS, SCHEDULER_COMMAND,
-    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
+    METADATA_POLL_SECONDS, METADATA_RECONCILE_SECONDS, METADATA_SYNC_CHECK_SECONDS,
+    SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -510,7 +511,7 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
                 let recorded = ScanToken {
                     token,
                     reconciled: state.reconciling(),
-                    delivered: state.scan_delivered,
+                    delivered: state.scan_delivered || state.observed_since.is_some(),
                 };
                 state.change_tokens.insert(state.index, recorded);
             }
@@ -521,6 +522,54 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
         state = next_scan(state);
     }
     state
+}
+
+/// The mirror's watermark bounds an incremental scan and shows whether the mirror holds rows.
+pub(crate) async fn load_watermark(
+    mut state: LocationMetadataSync,
+    (options, client, poll): (&LocationServe, &LocationWorkClient, &LocationWorkPoll),
+    (started, stopped): (Instant, impl Future<Output = Result<(), ControlError>>),
+) -> Result<Option<(LocationMetadataSync, Option<ClientError>)>, ControlError> {
+    tokio::pin!(stopped);
+    if state.index == 0 {
+        state.reconcile = Instant::now() >= state.reconcile_at;
+    }
+    state.mirror_holds_rows = false;
+    if (!state.reconcile || state.change_tokens.contains_key(&state.index))
+        && !matches!(
+            state.kind(),
+            WarehouseHistoryKind::Catalog | WarehouseHistoryKind::Statistics
+        )
+    {
+        let request = WarehouseWatermarkRead {
+            session_id: poll.session_id,
+            generation: state.generation,
+            location: state.location().clone(),
+            kind: state.kind(),
+        };
+        let watermark = tokio::select! {
+            result = &mut stopped => { result?; return Ok(None); },
+            result = client.metadata_watermark(&options.target, &request) => result,
+        };
+        let watermark = match watermark {
+            Ok(watermark) => watermark,
+            Err(error) => {
+                tokio::select! {
+                    result = &mut stopped => { result?; return Ok(None); },
+                    () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Watermark))) => {},
+                }
+                return Ok(Some((state, Some(error))));
+            }
+        };
+        state.mirror_holds_rows = watermark.is_some();
+        if !state.reconcile {
+            state.observed_since = watermark.and_then(|time| {
+                time.checked_sub_signed(chrono::Duration::seconds(METADATA_OVERLAP_SECONDS))
+            });
+        }
+    }
+    state.watermark_loaded = true;
+    Ok(Some((state, None)))
 }
 
 /// Move to the next scan; after the last one the synchronization completes and waits for a run.
