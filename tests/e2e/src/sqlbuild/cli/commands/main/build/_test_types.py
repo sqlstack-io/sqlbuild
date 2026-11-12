@@ -373,6 +373,15 @@ class CursorObservationBuildE2ETestCase:
 
 
 @dataclass(frozen=True)
+class SourceColumnObservationE2ETestCase:
+    """Commands after which each build, and no plan, must have recorded described source columns."""
+
+    description: str
+    commands: tuple[tuple[str, ...], ...]
+    expected_observations: tuple[tuple[str, str, int], ...]
+
+
+@dataclass(frozen=True)
 class AppendCursorBuildE2ETestCase:
     """Test case for append cursor lower-bound behavior across reruns."""
 

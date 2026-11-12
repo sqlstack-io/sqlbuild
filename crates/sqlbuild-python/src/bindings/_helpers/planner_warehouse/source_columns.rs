@@ -4,6 +4,7 @@ use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::observations::source_capture::capture_source_columns;
 use crate::bindings::_helpers::planner_phases::objects::{frozenset, text, tuple};
 use crate::bindings::_helpers::planner_warehouse::constants::{
     COLUMN_INFO, METADATA_NAME_FILTER_LIMIT, RELATION_LOOKUP,
@@ -97,13 +98,18 @@ pub(crate) fn source_inspection<'py>(
                     &[("connection", connection.clone()), ("sql", expression)],
                 )?;
                 let mut columns: Vec<_> = Vec::new();
+                let mut described: Vec<String> = Vec::new();
                 for name in names.try_iter()? {
+                    let name: Bound<'py, PyAny> = name?;
+                    described.push(name.extract()?);
                     columns.push(call_with(
                         &column_info,
-                        &[("name", name?), ("type", text(py, ""))],
+                        &[("name", name), ("type", text(py, ""))],
                     )?);
                 }
-                result.set_item(native_field(entry, "name")?, tuple(py, columns)?)?;
+                let source: Bound<'py, PyAny> = native_field(entry, "name")?;
+                capture_source_columns(&source.extract::<String>()?, &described);
+                result.set_item(source, tuple(py, columns)?)?;
             }
             continue;
         }
