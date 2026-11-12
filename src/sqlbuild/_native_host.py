@@ -7,6 +7,11 @@ import importlib
 _TARGETS: dict[str, tuple[str, str]] = {
     "BaseAdapter": ("sqlbuild.adapter.contract.classes.base_adapter", "BaseAdapter"),
     "AdapterUserError": ("sqlbuild.adapter.contract.exceptions", "AdapterUserError"),
+    "SyncedCopyGapError": ("sqlbuild.adapter.contract.exceptions", "SyncedCopyGapError"),
+    "synced_copy_adapter": (
+        "sqlbuild.adapter.contract.classes.synced_copy_adapter",
+        "synced_copy_adapter",
+    ),
     "ColumnInfo": ("sqlbuild.adapter.contract.models", "ColumnInfo"),
     "ExpressionInferenceProfile": (
         "sqlbuild.adapter.contract.models",

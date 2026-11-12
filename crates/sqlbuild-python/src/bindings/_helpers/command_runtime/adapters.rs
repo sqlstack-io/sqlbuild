@@ -5,9 +5,10 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_core::build_command::constants::PLAN_SYNCED_COPY_ENV;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
+use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -42,12 +43,25 @@ pub(crate) fn resolve_cli_adapter<'py>(
             ("project_dir", project_dir.clone()),
         ],
     );
-    match resolved {
+    let adapter: Bound<'py, PyAny> = match resolved {
         Err(error) if error.is_instance(py, &host::entry(py, AdapterHost::AdapterUserError)?) => {
-            Err(cli_adapter_error(py, &error)?)
+            return Err(cli_adapter_error(py, &error)?);
         }
-        resolved => resolved,
-    }
+        resolved => resolved?,
+    };
+    let Some(synced_copy) = std::env::var_os(PLAN_SYNCED_COPY_ENV) else {
+        return Ok(adapter);
+    };
+    call_with(
+        &host::entry(py, AdapterHost::SyncedCopyAdapter)?,
+        &[
+            ("adapter", adapter),
+            (
+                "path",
+                imported(py, "pathlib", "Path")?.call1((synced_copy.to_string_lossy(),))?,
+            ),
+        ],
+    )
 }
 
 /// Resolve an adapter name from project config to an adapter instance.

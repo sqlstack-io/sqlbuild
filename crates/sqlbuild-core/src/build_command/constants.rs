@@ -69,3 +69,6 @@ pub const RETENTION_DECREASE_DBT_HELP: &str = "sqb dbt has no confirmation flag:
 pub const EXECUTION_LIMIT_BUILD_NOTE: &str = "No warehouse changes were made.";
 pub const EXECUTION_LIMIT_DBT_NOTE: &str =
     "dbt work has already run; no SQLBuild models were built.";
+
+/// Names the synced-copy file a location writes for a plan preview; set, the plan never connects.
+pub const PLAN_SYNCED_COPY_ENV: &str = "SQLBUILD_PLAN_SYNCED_COPY";

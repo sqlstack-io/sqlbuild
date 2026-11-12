@@ -1,7 +1,11 @@
 """The staying-Python entry points native code calls, resolved lazily by name."""
 
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter as BaseAdapter
+from sqlbuild.adapter.contract.classes.synced_copy_adapter import (
+    synced_copy_adapter as synced_copy_adapter,
+)
 from sqlbuild.adapter.contract.exceptions import AdapterUserError as AdapterUserError
+from sqlbuild.adapter.contract.exceptions import SyncedCopyGapError as SyncedCopyGapError
 from sqlbuild.adapter.contract.models import ColumnInfo as ColumnInfo
 from sqlbuild.adapter.contract.models import (
     ExpressionInferenceProfile as ExpressionInferenceProfile,

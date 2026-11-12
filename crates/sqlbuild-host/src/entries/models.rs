@@ -64,6 +64,8 @@ pub struct HostId {
 pub enum AdapterHost {
     BaseAdapter,
     AdapterUserError,
+    SyncedCopyGapError,
+    SyncedCopyAdapter,
     ColumnInfo,
     ExpressionInferenceProfile,
     RelationInfo,

@@ -13,6 +13,7 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use sqlbuild_host::entries::models::AdapterHost;
 use std::collections::{BTreeSet, HashSet};
 
 fn entries_of<'py>(
@@ -92,10 +93,21 @@ pub(crate) fn source_inspection<'py>(
         let expression = native_field(entry, "expression")?;
         if !expression.is_none() {
             if native_field(entry, "type_enforcement")?.is_truthy()? {
-                let names = call_with(
+                let names = match call_with(
                     &native_field(adapter, "query_column_names")?,
                     &[("connection", connection.clone()), ("sql", expression)],
-                )?;
+                ) {
+                    Ok(names) => names,
+                    Err(gap)
+                        if gap.is_instance(
+                            py,
+                            &host::entry(py, AdapterHost::SyncedCopyGapError)?,
+                        ) =>
+                    {
+                        continue;
+                    }
+                    Err(error) => return Err(error),
+                };
                 let mut columns: Vec<_> = Vec::new();
                 for name in names.try_iter()? {
                     columns.push(call_with(

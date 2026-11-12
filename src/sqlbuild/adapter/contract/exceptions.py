@@ -45,3 +45,15 @@ class UnsupportedTypedSqlRenderingError(AdapterUserError, SqlValueRenderingError
                 f"{reason_text}"
             )
         )
+
+
+class WarehouseAccessRefusedError(RuntimeError):
+    """Raised when a plan preview, which reads only the synced copy, would reach the warehouse."""
+
+    def __init__(self, access: str) -> None:
+        super().__init__(f"plan previews read only the synced copy; refused warehouse access: {access}")
+        self.access = access
+
+
+class SyncedCopyGapError(WarehouseAccessRefusedError):
+    """Raised for a read the synced copy does not hold, which a preview treats as unknown."""

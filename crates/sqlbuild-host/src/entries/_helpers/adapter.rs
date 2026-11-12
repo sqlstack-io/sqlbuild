@@ -15,6 +15,16 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Adapter,
     },
     HostEntry {
+        name: "SyncedCopyGapError",
+        kind: HostKind::Exception,
+        edge: HostEdge::Adapter,
+    },
+    HostEntry {
+        name: "synced_copy_adapter",
+        kind: HostKind::Function,
+        edge: HostEdge::Adapter,
+    },
+    HostEntry {
         name: "ColumnInfo",
         kind: HostKind::Class,
         edge: HostEdge::Adapter,
