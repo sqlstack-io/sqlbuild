@@ -3,5 +3,6 @@
   "compiled_sql": "SELECT 23 AS amount -- Orders 🧾\n",
   "python_source": "def order_amount():\n    return 23\n",
   "function_sql": "43",
-  "updated_sql": "SELECT 37 AS amount -- Updated orders 🧾\n"
+  "updated_sql": "SELECT 37 AS amount -- Updated orders 🧾\n",
+  "expression_ranges": {"amount": [7, 19]}
 }

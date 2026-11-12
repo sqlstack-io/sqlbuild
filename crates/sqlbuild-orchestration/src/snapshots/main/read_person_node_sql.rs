@@ -40,11 +40,18 @@ pub async fn read_person_node_sql(
                  WHERE s.snapshot_id=$1 AND s.node_key=$2 AND s.kind IN ('raw_sql','compiled_sql')",
                 vec![Parameter::Id(record.snapshot_id), Parameter::Text(node_key.into())]).await?;
             if let Some(node) = attach_sources(nodes, rows)?.remove(node_key) {
+                let expression_ranges = node
+                    .definition
+                    .get("expression_ranges")
+                    .cloned()
+                    .and_then(|ranges| serde_json::from_value(ranges).ok())
+                    .unwrap_or_default();
                 result = Some(NodeSql {
                     snapshot_id: record.snapshot_id,
                     node_key: node_key.into(),
                     raw_sql: node.raw_sql,
                     compiled_sql: node.compiled_sql,
+                    expression_ranges,
                 });
             }
         }

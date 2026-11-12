@@ -35,7 +35,7 @@ pub(crate) async fn node_sql_boundaries(
     for (key, expected) in [
         (
             "udf:orders",
-            json!({"snapshot_id":snapshot_id,"node_key":"udf:orders","raw_sql":null,"compiled_sql":data["function_sql"]}),
+            json!({"snapshot_id":snapshot_id,"node_key":"udf:orders","raw_sql":null,"compiled_sql":data["function_sql"],"expression_ranges":{}}),
         ),
         ("missing-orders", Value::Null),
         ("orders+", Value::Null),
@@ -61,7 +61,7 @@ pub(crate) async fn node_sql_boundaries(
     assert_eq!(read.status(), StatusCode::OK);
     assert_eq!(
         read.json::<Value>().await.expect("current SQL"),
-        json!({"snapshot_id":snapshot_id,"node_key":"orders","raw_sql":data["raw_sql"],"compiled_sql":data["compiled_sql"]})
+        json!({"snapshot_id":snapshot_id,"node_key":"orders","raw_sql":data["raw_sql"],"compiled_sql":data["compiled_sql"],"expression_ranges":data["expression_ranges"]})
     );
     let mut after = logical_state(store).await;
     assert_ne!(
@@ -125,6 +125,6 @@ pub(crate) async fn node_sql_boundaries(
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         response.json::<Value>().await.expect("latest SQL"),
-        json!({"snapshot_id":current.snapshot_id,"node_key":"orders","raw_sql":data["raw_sql"],"compiled_sql":data["updated_sql"]})
+        json!({"snapshot_id":current.snapshot_id,"node_key":"orders","raw_sql":data["raw_sql"],"compiled_sql":data["updated_sql"],"expression_ranges":data["expression_ranges"]})
     );
 }
