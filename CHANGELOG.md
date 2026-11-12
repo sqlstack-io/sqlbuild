@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.214.0...v0.214.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **deps:** pin SQLClean e6ad5fa2 and SQLQuack 0.8.0 ([#1429](https://github.com/sqlstack-io/sqlbuild/issues/1429)) ([dc21de3](https://github.com/sqlstack-io/sqlbuild/commit/dc21de394b1d4be41759d9700bb674296ebe55e8))
+
 ## [0.214.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.213.0...v0.214.0) (2026-11-12)
 
 
