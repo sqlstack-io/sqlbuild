@@ -231,7 +231,7 @@ fn given_sql_test_shapes_when_evaluating_empty_input_rule_then_flags_only_filler
             ),
             allowed_tests: json!([]),
             expected_messages: &[
-                "SQBRTEST203 tests/unit/test_orders__empty_inputs_produce_no_rows.sql: Rule SQBRTEST203 could not be evaluated for test block 1: could not parse SQL-test fixture: Parse error at line 1, column 42: Unexpected token: Limit",
+                "SQBRTEST203 tests/unit/test_orders__empty_inputs_produce_no_rows.sql: Rule SQBRTEST203 could not be evaluated for test block 1: could not parse SQL-test fixture: Parse error at line 1, column 42: Expected an expression after LIMIT",
             ],
         },
         test_types::EmptyInputTestRuleTestCase {

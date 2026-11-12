@@ -136,7 +136,7 @@ def test_given_model_query_layout_when_running_rules_then_findings_use_file_posi
             expected_messages=(
                 "CTE/3:o AS",
                 "Join/3:JOIN",
-                "Star/3:HASH",
+                "Star/3:*) A",
                 "Star/3:o.*,",
                 "Subquery/3:(SEL",
             ),
@@ -156,7 +156,7 @@ def test_given_model_query_layout_when_running_rules_then_findings_use_file_posi
                 )
                 for name in ("customers", "raw_orders")
             },
-            expected_messages=("CTE/2:c AS", "Join/2:JOIN", "Star/2:SELE", "Star/2:o.*,"),
+            expected_messages=("CTE/2:c AS", "Join/2:JOIN", "Star/2:* FR", "Star/2:o.*,"),
         ),
     ],
     ids=lambda case: case.description,

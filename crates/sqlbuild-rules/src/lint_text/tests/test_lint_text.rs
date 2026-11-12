@@ -804,7 +804,7 @@ fn given_snowflake_table_function_calls_when_formatting_then_each_call_is_kept_w
             contents: "MODEL ();\nselect t.a from t join lateral __table_fn(\"f\")(t.x) as l on true\n",
             expected_formatted: vec![(
                 0,
-                "MODEL ();\nSELECT t.a\nFROM t\nJOIN LATERAL __table_fn(\"f\")(t.x) AS l\n  ON TRUE\n"
+                "MODEL ();\nSELECT t.a\nFROM t\nJOIN LATERAL __table_fn(\"f\")(t.x) AS l ON TRUE\n"
                     .to_string(),
             )],
             expected_fault_lines: vec![],
