@@ -1,4 +1,4 @@
-"""Find control-store state nothing reads and Rust enum variants nothing names."""
+"""Find control-store state nothing reads, Rust enum variants nothing names, and state uses."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from scripts.fensu_policy.constants import (
     BRACKET_OPEN,
     LIST_SEPARATOR,
     NATIVE_PATH_SEPARATOR,
+    OBSERVATION_STATE_PATTERN,
     PARENTHESIS_CLOSE,
     PARENTHESIS_OPEN,
     REASON_SEPARATOR,
@@ -23,6 +24,7 @@ from scripts.fensu_policy.constants import (
     RUST_ENUM_PATTERN,
     RUST_FROM_ATTRIBUTE_PATTERN,
     RUST_IMPL_HEADER_PATTERN,
+    RUST_LINE_COMMENT,
     RUST_LINE_CONTINUATION,
     RUST_LITERAL_PATTERN,
     RUST_LOOKBEHIND,
@@ -66,6 +68,7 @@ from scripts.fensu_policy.constants import (
 )
 from scripts.fensu_policy.models import EnumVariant, StateDefinition, StateReads
 
+_OBSERVATION_STATE: re.Pattern[str] = re.compile(OBSERVATION_STATE_PATTERN)
 _LEXEMES: re.Pattern[str] = re.compile(RUST_LITERAL_PATTERN, re.DOTALL)
 _CONTINUATION: re.Pattern[str] = re.compile(RUST_LINE_CONTINUATION)
 _TEST_MODULE: re.Pattern[str] = re.compile(RUST_TEST_MODULE_PATTERN)
@@ -589,3 +592,15 @@ def _state_key(*, definition: StateDefinition) -> str:
     if definition.column is None:
         return definition.table
     return f"{definition.table}{SQL_QUALIFIER}{definition.column}"
+
+
+def observation_reference_lines(*, source: str) -> list[int]:
+    """One-based lines whose code, not a line comment, names display-only observation state."""
+
+    lines: list[int] = []
+    number: int
+    line: str
+    for number, line in enumerate(source.splitlines(), start=1):
+        if _OBSERVATION_STATE.search(line.partition(RUST_LINE_COMMENT)[0]):
+            lines.append(number)
+    return lines

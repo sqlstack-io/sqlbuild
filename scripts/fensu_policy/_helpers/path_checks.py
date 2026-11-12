@@ -32,3 +32,13 @@ def is_adapter_implementation_path(*, path: str) -> bool:
             "/adapter/contract/classes/duckdb_backed_adapter.py",
         )
     )
+
+
+def allowed_prefix(*, path: str, prefixes: list[str]) -> str | None:
+    """The allowed file or directory entry that covers a repository-relative path."""
+
+    prefix: str
+    for prefix in prefixes:
+        if path == prefix or path.startswith(prefix.rstrip("/") + "/"):
+            return prefix
+    return None
