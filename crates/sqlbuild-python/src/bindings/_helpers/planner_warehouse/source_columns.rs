@@ -93,6 +93,7 @@ pub(crate) fn source_inspection<'py>(
         let expression = native_field(entry, "expression")?;
         if !expression.is_none() {
             if native_field(entry, "type_enforcement")?.is_truthy()? {
+                let sql: String = expression.extract()?;
                 let names = call_with(
                     &native_field(adapter, "query_column_names")?,
                     &[("connection", connection.clone()), ("sql", expression)],
@@ -108,7 +109,7 @@ pub(crate) fn source_inspection<'py>(
                     )?);
                 }
                 let source: Bound<'py, PyAny> = native_field(entry, "name")?;
-                capture_source_columns(&source.extract::<String>()?, &described);
+                capture_source_columns(&source.extract::<String>()?, &sql, &described);
                 result.set_item(source, tuple(py, columns)?)?;
             }
             continue;

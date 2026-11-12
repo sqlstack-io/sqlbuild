@@ -20,3 +20,7 @@ pub const NULLABLE_OBSERVATION_COLUMNS: [&str; 1] = ["cursor_type"];
 pub const CURSOR_MAX_KIND: &str = "cursor_max";
 /// Observation of the columns a live `DESCRIBE` returned for an expression source.
 pub const SOURCE_COLUMNS_KIND: &str = "source_columns";
+/// Key of a `source_columns` value holding the SHA-256 of the SQL that was described.
+pub const SOURCE_COLUMNS_SQL_HASH_KEY: &str = "sql_hash";
+/// Key of a `source_columns` value holding the described column names in order.
+pub const SOURCE_COLUMNS_NAMES_KEY: &str = "columns";

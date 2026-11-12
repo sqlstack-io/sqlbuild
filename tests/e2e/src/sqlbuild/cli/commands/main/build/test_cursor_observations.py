@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import subprocess
 from pathlib import Path
 from textwrap import dedent
@@ -151,9 +153,23 @@ def test_given_incremental_models_when_building_then_cursor_max_observations_are
     "test_case",
     [
         SourceColumnObservationE2ETestCase(
-            description="builds record described source columns and plans record none",
+            description="builds record the described SQL hash and columns and plans record none",
             commands=(("build",), ("plan",), ("build",)),
-            expected_observations=(("raw_refunds", '["refund_id","amount_cents"]', 2),),
+            expected_observations=(
+                (
+                    "raw_refunds",
+                    json.dumps(
+                        {
+                            "sql_hash": hashlib.sha256(
+                                b"SELECT * FROM (VALUES (1, 100)) AS refunds(refund_id, amount_cents)\n"
+                            ).hexdigest(),
+                            "columns": ["refund_id", "amount_cents"],
+                        },
+                        separators=(",", ":"),
+                    ),
+                    2,
+                ),
+            ),
         ),
     ],
     ids=lambda case: case.description,
