@@ -177,21 +177,16 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
         inspected: subprocess.CompletedProcess[str] = invoke(command)
         assert inspected.returncode == 0 and "Published SQL read successfully" in inspected.stderr
         sql: dict[str, Any] = json.loads(inspected.stdout)
-        assert set(sql) == {
-            "snapshot_id",
-            "node_key",
-            "raw_sql",
-            "compiled_sql",
-            "expression_ranges",
-        }
-        compiled: bytes = sql["compiled_sql"].encode()
-        assert {
-            column: compiled[start:end].decode()
-            for column, (start, end) in sql["expression_ranges"].items()
-        } == {
-            "amount": "23 AS amount",
-            "description": "'" + "orders " * 400 + "' AS description",
-        }
+        assert (
+            set(sql),
+            {
+                column: sql["compiled_sql"].encode()[start:end].decode()
+                for column, (start, end) in sql["expression_ranges"].items()
+            },
+        ) == (
+            {"snapshot_id", "node_key", "raw_sql", "compiled_sql", "expression_ranges"},
+            {"amount": "23 AS amount", "description": "'" + "orders " * 400 + "' AS description"},
+        )
         assert (
             sql["snapshot_id"]
             == current_snapshot(worker.api, "development")["record"]["snapshot_id"]
