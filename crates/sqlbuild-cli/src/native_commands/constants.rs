@@ -55,9 +55,6 @@ pub(crate) const SKILL_FILES_HEADER: &str = "Updated SQLBuild skill files:\n";
 pub(crate) const RULE_SELECTOR_REQUIRED: &str = "A rule code or family prefix is required";
 /// `run_rules_command`'s exit status for a missing or unknown rule.
 pub(crate) const RULES_USAGE_EXIT_CODE: i32 = 2;
-pub(crate) const LEGACY_PROJECT_CONFIG_FILENAME: &str = "sqlbuild_project.yml";
-pub(crate) const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
-pub(crate) const LEGACY_LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.yml";
 /// The class Python's last-resort log handler names for a user error.
 pub(crate) const USER_ERROR_CLASS: &str = "sqlbuild._native.CliUserError";
 pub(crate) const INIT_FAILURE_PREFIX: &str = "sqb init: ";

@@ -16,6 +16,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     CompileReuseBypassTestCase,
     CompileReuseConcurrentWriterTestCase,
     CompileReuseCorruptEntryTestCase,
+    CompileReuseDeprecatedSettingTestCase,
     CompileReuseEventTestCase,
     CompileReuseHitTestCase,
     CompileReuseInvalidationTestCase,
@@ -568,6 +569,56 @@ def test_given_failed_text_compile_when_rerun_then_report_notes_and_exit_code_ar
     assert progress_only(text=cold.stdout.removesuffix(warm.stdout))
     assert compile_notes(stderr=cold.stderr)[0].startswith(test_case.expected_note_prefix)
     assert compile_notes(stderr=warm.stderr) == compile_notes(stderr=cold.stderr)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CompileReuseDeprecatedSettingTestCase(
+            description="column_contract_mode_alias",
+            settings_line='column_contract_mode = "explicit"',
+            expected_warning=(
+                "Warning: settings.column_contract_mode in sqlbuild_project.toml is deprecated; "
+                "replace it with settings.check_declared_columns = false"
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_deprecated_setting_alias_when_compile_is_reused_then_the_warning_still_prints_once(
+    compile_reuse_project: Path,
+    test_case: CompileReuseDeprecatedSettingTestCase,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project_dir: Path = compile_reuse_project
+    replace_project_text(
+        project_dir, "sqlbuild_project.toml", "[settings]", f"[settings]\n{test_case.settings_line}"
+    )
+
+    cold: subprocess.CompletedProcess[str] = run_reuse_text_compile(
+        project_dir=project_dir, args=()
+    )
+    warm: subprocess.CompletedProcess[str] = run_reuse_text_compile(
+        project_dir=project_dir, args=()
+    )
+    enable_compile_reuse(monkeypatch)
+    _ = compile_in_process_output(project_dir=project_dir, capsys=capsys)
+    in_process: tuple[int, str, str] = compile_in_process_output(
+        project_dir=project_dir, capsys=capsys
+    )
+
+    assert (cold.returncode, warm.returncode, in_process[0]) == (0, 0, 0), cold.stderr
+    assert (COMPILE_REUSE_HIT_LINE in warm.stderr, COMPILE_REUSE_HIT_LINE in in_process[2]) == (
+        True,
+        True,
+    )
+    assert (
+        cold.stderr.count(test_case.expected_warning),
+        warm.stderr.count(test_case.expected_warning),
+        in_process[2].count(test_case.expected_warning),
+    ) == (1, 1, 1)
+    assert test_case.expected_warning not in cold.stdout + warm.stdout + in_process[1]
 
 
 @pytest.mark.parametrize(

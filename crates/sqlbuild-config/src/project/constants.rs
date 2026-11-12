@@ -1,6 +1,8 @@
 //! Project configuration file names, keys and the vocabularies their values come from.
 
 pub(crate) const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
+pub(crate) const LEGACY_PROJECT_CONFIG_FILENAME: &str = "sqlbuild_project.yml";
+pub(crate) const LEGACY_LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.yml";
 pub(crate) const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 pub(crate) const LEGACY_SQL_VALIDATION_KEY: &str = "sql_validation";
 pub(crate) const CHECK_DECLARED_COLUMNS_KEY: &str = "check_declared_columns";
