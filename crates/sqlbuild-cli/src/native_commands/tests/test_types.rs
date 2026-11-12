@@ -99,3 +99,15 @@ pub(super) struct MetadataRetryTestCase {
     pub(super) acknowledged_pages: usize,
     pub(super) expected_statistics_limit: usize,
 }
+
+/// A completed state-table read, the later scan of the same table, and whether that scan may skip.
+pub(super) struct UnchangedScanTestCase {
+    pub(super) description: &'static str,
+    pub(super) read_reconciled: bool,
+    pub(super) read_delivered: bool,
+    pub(super) read_incremental: bool,
+    pub(super) rereads_without_token: usize,
+    pub(super) scan_reconciles: bool,
+    pub(super) mirror_holds_rows: bool,
+    pub(super) expected_token: Option<&'static str>,
+}

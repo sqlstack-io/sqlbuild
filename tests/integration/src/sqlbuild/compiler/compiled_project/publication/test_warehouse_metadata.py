@@ -1267,3 +1267,131 @@ def test_given_fingerprint_history_when_read_in_isolated_pages_then_legacy_retri
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
     assert page() is None
     assert not (project / "warehouse.db").exists()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [AutomaticHistoryTestCase("DuckDB change tokens", "duckdb", "database", "legacy-run")],
+    ids=lambda case: case.description,
+)
+def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or_lost_tables_are_read(
+    test_case: AutomaticHistoryTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    adapter.close(connection)
+    (project / "orchestration/orders.py").write_text("")
+    fixture: dict[str, Any] = json.loads(
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/automatic_warehouse_history.json"
+        ).read_text()
+    )
+    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    hook: Path = tmp_path / "token-hook"
+    hook.mkdir()
+    tokens: Path = hook / "tokens.json"
+    reads: Path = hook / "reads.log"
+    tokens.write_text(
+        json.dumps({"_sqlbuild_fingerprints": "f1", "_sqlbuild_source_freshness": "s1"})
+    )
+    (hook / "sitecustomize.py").write_text(
+        "import json, re\n"
+        "from pathlib import Path\n"
+        "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n"
+        "def read_relation_change_token(self, *, connection, database, schema, name):\n"
+        f"    return json.loads(Path({str(tokens)!r}).read_text()).get(name)\n"
+        "DuckDbAdapter.read_relation_change_token = read_relation_change_token\n"
+        "original_query = DuckDbAdapter.query\n"
+        "def query(self, *, connection, sql, limit):\n"
+        "    read = re.search(r'FROM\\s+\\S*(_sqlbuild_\\w+)', sql)\n"
+        "    if read:\n"
+        f"        with Path({str(reads)!r}).open('a') as log:\n"
+        "            log.write(read.group(1) + '\\n')\n"
+        "    return original_query(self, connection=connection, sql=sql, limit=limit)\n"
+        "DuckDbAdapter.query = query\n"
+    )
+    mirrors: tuple[str, str] = ("sqb_warehouse_fingerprints", "sqb_warehouse_freshness")
+    with snapshot_api(tmp_path / "control") as api:
+        log: Path = tmp_path / "location.log"
+        control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ
+            | {
+                "SQLBUILD_LOCATION_TOKEN": api.bearer,
+                "SQLBUILD_METADATA_RECONCILE_SECONDS": "3600",
+                "PYTHONPATH": str(hook),
+            },
+        ) as location:
+            _ = wait_for_generation(api, "development", 1, location, log)
+
+            def mirrored() -> tuple[int, int]:
+                with closing(sqlite3.connect(control)) as database:
+                    counts: tuple[int, int] = database.execute(
+                        f"SELECT (SELECT COUNT(*) FROM {mirrors[0]}),"
+                        f"(SELECT COUNT(*) FROM {mirrors[1]})"
+                    ).fetchone()
+                return counts
+
+            def resync() -> list[str]:
+                """Start one synchronization after a finished run and return the tables it read."""
+                completed: int = log.read_text().count("synchronization completed")
+                reads.write_text("")
+                record_finished_run(control)
+                deadline: float = time.monotonic() + 45
+                while log.read_text().count("synchronization completed") == completed:
+                    assert location.poll() is None, log.read_text()
+                    assert time.monotonic() < deadline, log.read_text()
+                    time.sleep(0.2)
+                return sorted(set(reads.read_text().split()))
+
+            deadline: float = time.monotonic() + 45
+            while log.read_text().count("synchronization completed") == 0 or 0 in mirrored():
+                assert location.poll() is None, log.read_text()
+                assert time.monotonic() < deadline, log.read_text()
+                time.sleep(0.2)
+            initial: tuple[int, int] = mirrored()
+
+            assert resync() == [], "unchanged tokens read nothing"
+            assert mirrored() == initial
+
+            connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
+            _ = adapter.execute(
+                connection=connection,
+                sql=(
+                    "INSERT INTO _sqlbuild_fingerprints SELECT node_type,'orders-changed',"
+                    "target_database,target_schema,target_name,'changed-run',definition_hash,"
+                    "version_hash,schema_fingerprint,definition_b64,metadata_json_b64,ts "
+                    f"FROM _sqlbuild_fingerprints WHERE run_id='{test_case.expected_run_id}'"
+                ),
+            )
+            adapter.close(connection)
+            tokens.write_text(
+                json.dumps({"_sqlbuild_fingerprints": "f2", "_sqlbuild_source_freshness": "s1"})
+            )
+            assert resync() == ["_sqlbuild_fingerprints"], "only the changed table is read"
+            assert mirrored() == (initial[0] + 1, initial[1])
+
+            with closing(sqlite3.connect(control)) as database:
+                _ = database.execute(f"DELETE FROM {mirrors[1]}")
+                database.commit()
+            assert resync() == ["_sqlbuild_source_freshness"], "a lost mirror is read again"
+            assert mirrored() == (initial[0] + 1, initial[1])
