@@ -20,6 +20,7 @@ from sqlbuild._native import (
     discover_project_inputs,
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from sqlbuild.orchestration import (
     RunEventKind,
@@ -37,6 +38,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotDiscoveryRejectionTestCase,
     SnapshotDiscoveryTestCase,
     SnapshotEnvironmentTestCase,
+    SnapshotExpressionRangeTestCase,
     SnapshotIdentityTestCase,
     SnapshotLineageTestCase,
     SnapshotRejectionTestCase,
@@ -397,6 +399,188 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
     sources: set[str] = {edge[0] for edge in edges}
     targets: set[str] = {edge[2] for edge in edges}
     assert sources | targets <= set(publication["nodes"])
+
+
+_DUCKSHOP: Path = Path("benchmarks/duckshop/project")
+_STRICT_SPANS: str = (
+    "SQLQuack's strict parsers do not yet record projection-item spans: Snowflake gives aliased "
+    "items none, and DuckDB's column span leaves out the qualifier"
+)
+_PRICE_MODELS: dict[str, str] = {
+    "models/stg_prices.sql": (
+        'MODEL (description "Staged prices");\n'
+        "SELECT 'W-1' AS window_id, CAST(12345 AS BIGINT) AS price_minor, "
+        "CAST('2026-03-30 08:00:00' AS TIMESTAMP) AS loaded_at\n"
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        pytest.param(
+            SnapshotExpressionRangeTestCase(
+                description="SQL and Python macros, a variable and cursor bounds rewrite the SQL",
+                adapter="duckdb",
+                files={
+                    "sqlbuild_project.toml": (
+                        'name = "orders"\nadapter = "duckdb"\n\n'
+                        '[vars]\nreporting_currency = "USD"\n'
+                    ),
+                    "models/_macros/sql/minor_to_major.sql": (
+                        "MACRO (\n"
+                        '  description "Minor units to major units",\n'
+                        "  arguments (amount BIGINT, places INT CONST DEFAULT 2),\n"
+                        "  returns DECIMAL(18, 2),\n"
+                        ");\n\n"
+                        "ROUND(@amount / 100, @places)::DECIMAL(18, 2)\n"
+                    ),
+                    "models/_macros/python/rounding.py": (
+                        "def round_half_even(ctx, expression: str, places: int = 2) -> str:\n"
+                        "    return f'ROUND_EVEN({expression}, {places})'\n"
+                    ),
+                    **_PRICE_MODELS,
+                    "models/price_spans.sql": (
+                        "MODEL (\n"
+                        '  description "Prices with rewritten expressions",\n'
+                        "  materialized incremental,\n"
+                        "  incremental_strategy delete_insert,\n"
+                        "  cursor loaded_at,\n"
+                        "  cursor_type timestamp,\n"
+                        "  cursor_grain second,\n"
+                        ");\n\n"
+                        "-- Prix à jour €\n"
+                        "SELECT\n"
+                        "  p.window_id AS window_id,\n"
+                        "  @sql.minor_to_major(p.price_minor) AS price_amount,\n"
+                        '  @py.round_half_even("p.price_minor / 100", 2) AS rounded_price,\n'
+                        "  '@@reporting_currency' AS currency,\n"
+                        "  'Prix à jour €' AS label,\n"
+                        "  p.loaded_at AS loaded_at\n"
+                        'FROM __ref("stg_prices") AS p\n'
+                        "WHERE p.loaded_at >= __cursor_start() AND p.loaded_at < __cursor_end()\n"
+                    ),
+                },
+                model_name="price_spans",
+                expected_texts={
+                    "window_id": "p.window_id AS window_id",
+                    "price_amount": (
+                        "ROUND(p.price_minor / 100, 2)::DECIMAL(18, 2) AS price_amount"
+                    ),
+                    "rounded_price": "ROUND_EVEN(p.price_minor / 100, 2) AS rounded_price",
+                    "currency": "'USD' AS currency",
+                    "label": "'Prix à jour €' AS label",
+                    "loaded_at": "p.loaded_at AS loaded_at",
+                },
+            ),
+            id="DuckDB macros, variable and cursor bounds",
+        ),
+        pytest.param(
+            SnapshotExpressionRangeTestCase(
+                description="an unaliased qualified column covers its qualifier",
+                adapter="duckdb",
+                files={
+                    "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
+                    **_PRICE_MODELS,
+                    "models/price_columns.sql": (
+                        'MODEL (description "Price columns");\n'
+                        'SELECT p.window_id, p.price_minor FROM __ref("stg_prices") AS p\n'
+                    ),
+                },
+                model_name="price_columns",
+                expected_texts={
+                    "window_id": "p.window_id",
+                    "price_minor": "p.price_minor",
+                },
+            ),
+            id="DuckDB qualified columns",
+            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason=_STRICT_SPANS),
+        ),
+        pytest.param(
+            SnapshotExpressionRangeTestCase(
+                description="DuckShop macros, variable and cursor bounds rewrite the SQL",
+                adapter="snowflake",
+                files={
+                    "sqlbuild_project.toml": (
+                        'name = "duckshop"\nadapter = "snowflake"\n\n'
+                        '[defaults]\ndatabase = "WAREHOUSE"\nschema = "MAIN"\n\n'
+                        '[vars]\nreporting_currency = "USD"\n'
+                    ),
+                    "sources/edge_cases.yml": (
+                        "sources:\n"
+                        "  - name: edge__price_windows\n"
+                        "    description: Price windows\n"
+                        "    columns:\n"
+                        "      - name: window_id\n"
+                        "        type: VARCHAR\n"
+                        "      - name: price_minor\n"
+                        "        type: NUMBER(38,0)\n"
+                        "      - name: _loaded_at\n"
+                        "        type: TIMESTAMP_NTZ\n"
+                    ),
+                    # A second consumer keeps the DuckShop macros project-wide, as they are there.
+                    "models/price_checks.sql": (
+                        'MODEL (description "Price checks");\n'
+                        "SELECT @sql.money_from_minor(150, 2) AS amount, "
+                        '@py.round_half_even("1.25", 1) AS rounded\n'
+                    ),
+                    **{
+                        path: (_DUCKSHOP / path).read_text()
+                        for path in (
+                            "macros/sql/money_from_minor.sql",
+                            "macros/sql/safe_divide.sql",
+                            "macros/python/rounding.py",
+                            "models/intermediate/edge_cases/int_edge_expression_spans.sql",
+                        )
+                    },
+                },
+                model_name="int_edge_expression_spans",
+                expected_texts={
+                    "window_id": "w.window_id",
+                    "price_amount": (
+                        "ROUND((\n  w.price_minor / NULLIF((POWER(10, 2)::NUMBER(38, 0)), 0)\n)"
+                        "::NUMBER(38, 6), 2)::NUMBER(38, 6) AS price_amount"
+                    ),
+                    "rounded_price": (
+                        "ROUND(w.price_minor / 100, 2, 'HALF_TO_EVEN')::NUMBER(18, 2)"
+                        " AS rounded_price"
+                    ),
+                    "currency": "'USD'::VARCHAR AS currency",
+                    "label": "'Prix à jour €'::VARCHAR AS label",
+                    "loaded_at": "w._loaded_at AS loaded_at",
+                },
+            ),
+            id="Snowflake DuckShop edge model",
+            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason=_STRICT_SPANS),
+        ),
+    ],
+)
+def test_given_rewritten_model_sql_when_publishing_then_expression_ranges_slice_the_compiled_sql(
+    test_case: SnapshotExpressionRangeTestCase,
+    tmp_path: Path,
+) -> None:
+    write_files(project_dir=tmp_path, files=test_case.files)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discovered,
+        adapter=SnowflakeAdapter() if test_case.adapter == "snowflake" else DuckDbAdapter(),
+        resolved_connection={"database": "WAREHOUSE", "schema": "MAIN"},
+    )
+    assert not any(item.severity == "error" for item in project.diagnostics), [
+        item.message for item in project.diagnostics
+    ]
+    publication: dict[str, Any] = json.loads(
+        build_orchestration_snapshot(
+            project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
+        ).to_json()
+    )
+    node: dict[str, Any] = publication["nodes"][f"model:{test_case.model_name}"]
+    assert node["compiled_sql"] != node["raw_sql"]
+    compiled: bytes = node["compiled_sql"].encode()
+    assert {
+        column: compiled[start:end].decode()
+        for column, (start, end) in node["definition"].get("expression_ranges", {}).items()
+    } == test_case.expected_texts
 
 
 @pytest.mark.parametrize(

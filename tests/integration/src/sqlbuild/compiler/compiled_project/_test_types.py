@@ -234,6 +234,17 @@ class SnapshotEnvironmentTestCase:
 
 
 @dataclass(frozen=True)
+class SnapshotExpressionRangeTestCase:
+    """A published model whose compiled SQL differs from its source, and each column's text."""
+
+    description: str
+    adapter: str
+    files: dict[str, str]
+    model_name: str
+    expected_texts: dict[str, str]
+
+
+@dataclass(frozen=True)
 class SnapshotLineageTestCase:
     description: str
     files: dict[str, str]

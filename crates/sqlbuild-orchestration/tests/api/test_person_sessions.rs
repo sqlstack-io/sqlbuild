@@ -115,6 +115,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     .expect("compiled SQL")
                     .into(),
             );
+            orders.definition["expression_ranges"] = sql_input["expression_ranges"].clone();
             orders.python_source = Some(
                 sql_input["python_source"]
                     .as_str()

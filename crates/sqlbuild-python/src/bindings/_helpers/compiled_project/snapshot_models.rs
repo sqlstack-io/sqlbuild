@@ -5,15 +5,21 @@ use std::collections::BTreeMap;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyResult, Python};
 use pyo3::types::PyTupleMethods;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
+use sqlbuild_analysis::analysis_route::main::query_expression_ranges::query_expression_ranges;
+use sqlbuild_analysis::assembly::analysis_session::models::{LineageFacts, LineageRow};
 use sqlbuild_analysis::compiled_project::main::model_facts::model_facts;
+use sqlbuild_analysis::compiled_project::models::CompiledModelFacts;
+use sqlbuild_analysis::sql_macros::main::typed_analysis_sql::typed_analysis_sql;
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 
+use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_splices;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_project::snapshot::{
     dependency_keys, destination, insert_node,
 };
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
+use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 
 pub(crate) fn model_nodes(
@@ -22,6 +28,7 @@ pub(crate) fn model_nodes(
     owner: &NativeCompiledProject,
     mut nodes: BTreeMap<String, SnapshotNode>,
 ) -> PyResult<BTreeMap<String, SnapshotNode>> {
+    let dialect: Option<String> = project.sql_analysis_dialect();
     for model in project.models(py).bind(py).iter() {
         let model = model.cast::<NativeCompiledModel>()?.get();
         let (name, _, _) = model.file_texts(py)?;
@@ -47,14 +54,23 @@ pub(crate) fn model_nodes(
                     json!({"name": name, "type": data_type, "nullability": nullability})
                 })
                 .collect();
-            Ok(json!({
+            let mut definition: Value = json!({
                 "name": facts.name,
                 "path": facts.relative_path,
                 "config": facts.config.values,
                 "materialization": facts.config.materialized,
                 "deps": dependency_keys(&record.deps),
                 "columns": columns,
-            }))
+            });
+            let lineage: Option<&LineageFacts> = record.analysis.lineage.as_ref();
+            let ranges: Map<String, Value> = match (dialect.as_deref(), lineage) {
+                (Some(dialect), Some(lineage)) => expression_ranges(dialect, input, facts, lineage),
+                _ => Map::new(),
+            };
+            if !ranges.is_empty() {
+                definition["expression_ranges"] = Value::Object(ranges);
+            }
+            Ok(definition)
         })?;
         definition["destination"] = model.read_destination(py, |value| Ok(destination(value)))?;
         nodes = insert_node(
@@ -70,4 +86,70 @@ pub(crate) fn model_nodes(
         )?;
     }
     Ok(nodes)
+}
+
+/// Each output column's defining expression as a `[start, end)` byte range of the compiled SQL
+/// the node SQL read returns; empty when the analysis SQL cannot be rebuilt exactly.
+fn expression_ranges(
+    dialect: &str,
+    input: &ModelInputRecord,
+    facts: &CompiledModelFacts,
+    lineage: &LineageFacts,
+) -> Map<String, Value> {
+    let mut ranges: Map<String, Value> = Map::new();
+    let (LineageFacts::Native(rows) | LineageFacts::NativeFacts(rows)) = lineage;
+    if *input.query_sql != *facts.query_sql || rows.iter().all(|row| row.expression_range.is_none())
+    {
+        return ranges;
+    }
+    let Some(placeholders) = placeholder_texts(facts.config.values.get("placeholders")) else {
+        return ranges;
+    };
+    let (typed, typed_splices) = typed_analysis_sql(&input.query_sql, &input.typed_calls, dialect);
+    let cursor_type: Option<&str> = facts
+        .config
+        .values
+        .get("cursor_type")
+        .and_then(Value::as_str);
+    let Some((analysis_sql, cursor_splices)) = analysis_cursor_splices(&typed, cursor_type) else {
+        return ranges;
+    };
+    let cleaned: Vec<Option<(usize, usize)>> =
+        rows.iter().map(|row| row.expression_range).collect();
+    let mapped = query_expression_ranges(
+        dialect,
+        (&analysis_sql, &placeholders),
+        &[typed_splices, cursor_splices],
+        &cleaned,
+    );
+    for (row, range) in rows.iter().zip(mapped) {
+        let LineageRow { output_column, .. } = row;
+        if let Some((start, end)) = range {
+            ranges
+                .entry(output_column.clone())
+                .or_insert_with(|| json!([start, end]));
+        }
+    }
+    ranges
+}
+
+/// The `placeholders` config as the `(name, text)` pairs analysis read, the way Python's `str`
+/// renders each value; `None` when a value's text could differ from what analysis read.
+fn placeholder_texts(value: Option<&Value>) -> Option<Vec<(String, String)>> {
+    let Some(Value::Object(values)) = value else {
+        return Some(Vec::new());
+    };
+    values
+        .iter()
+        .map(|(name, value)| {
+            let text: String = match value {
+                Value::String(text) => text.clone(),
+                Value::Number(number) if number.is_i64() || number.is_u64() => number.to_string(),
+                Value::Bool(true) => "True".to_owned(),
+                Value::Bool(false) => "False".to_owned(),
+                _ => return None,
+            };
+            Some((name.clone(), text))
+        })
+        .collect()
 }
