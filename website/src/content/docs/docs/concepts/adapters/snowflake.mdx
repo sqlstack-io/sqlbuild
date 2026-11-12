@@ -72,46 +72,18 @@ A snapshot or microbatch build stops when an unquoted setting names a case-sensi
 an error such as
 `unique_key 'orderId' names the case-sensitive column "orderId"; write it with its quotes, as '"orderId"'`.
 
-## Planning metadata
+## Metadata reads
 
-Planning reads relation and column metadata with `SHOW TABLES`, `SHOW VIEWS`, and `SHOW COLUMNS`
-once per schema, several schemas at a time. `SHOW` commands are served by Snowflake's metadata
-service, so they don't wait for, or resume, a warehouse. Two reads still use `INFORMATION_SCHEMA`
-and need a running warehouse:
-
-- `LAST_ALTERED` for source freshness, read only for the sources the plan observes.
-- Columns for a schema whose `SHOW COLUMNS` output is exactly 10,000 rows, the documented
-  limit at which the output may be cut off.
-
-Run `sqb plan -v` to see each metadata query with its elapsed time and row count.
-
-## Build metadata
-
-Builds and scenario runs read relation metadata with `SHOW` commands too, so these reads don't
-need a running warehouse either:
-
-| Read | Statement |
-| -- | -- |
-| Whether one relation exists | `SHOW TERSE TABLES` and `SHOW TERSE VIEWS` |
-| A second relation in the same schema | `SHOW TABLES` and `SHOW VIEWS` for the whole schema, once |
-| A table's time travel retention | `SHOW TABLES LIKE`, or the schema listing |
-| One relation's columns | `SHOW COLUMNS` |
-| A scenario's leftover relations | `SHOW TERSE OBJECTS` for the scenario's name prefix |
-
-Each run reuses these answers until it changes that relation, for example by replacing a delta
-table or adding a column, and then reads it again.
+Planning and builds read table, view and column metadata with `SHOW` commands, which don't need a
+running warehouse, so a plan doesn't wake one up. Source freshness reads `LAST_ALTERED` from
+`INFORMATION_SCHEMA` and does need one. Run `sqb plan -v` to see each metadata query with its time
+and row count.
 
 ## State tables
 
-SQLBuild records its state in `_sqlbuild_*` tables, such as `_sqlbuild_fingerprints`,
-`_sqlbuild_source_freshness`, and `_sqlbuild_microbatches`. On Snowflake, SQLBuild creates every
-state table as a permanent table with `DATA_RETENTION_TIME_IN_DAYS = 90`, the maximum time travel,
-so the table also has Fail-safe. On editions that allow only 1 day of time travel, Snowflake
-rejects 90 and SQLBuild creates the table with 1 day instead.
-
-The retention is set only in the statement that creates the table. SQLBuild never alters an
-existing state table, so a state table that already exists keeps its current table type and
-retention. Models are not affected: their table type follows the model `table_type` setting.
+SQLBuild records its state in `_sqlbuild_*` tables. On Snowflake it creates them as permanent tables
+with 90 days of time travel, or 1 day on editions that allow only that. It never alters an existing
+state table. Models are not affected: their table type follows the model's `table_type` setting.
 
 ## Shared connections across targets
 
@@ -156,22 +128,18 @@ contract rate. Use `sqb cost`, `sqb cost latest`, `sqb cost <run_id>`, or
 provide a versioned, decimal-safe output contract. Pending detail records are refreshed from
 Snowflake when inspected again.
 
-SQLBuild reads `INFORMATION_SCHEMA.QUERY_HISTORY` for the whole run in one query when the run
-finishes. Each read has a 10-second statement timeout; a window that reaches it, or that returns
-more rows than one read allows, is split in half and read again. Collection at the end of a command
-has a 30-second budget so the command exits promptly. If history cannot be read within it, the
-build is unaffected and its cost is recorded as `pending`, with a message naming the timeout.
-`sqb cost <run_id>` collects it later with a 5-minute budget, which completes long runs. Any other
-failure is recorded as `collection_failed` with the Snowflake error that caused it.
+The estimate is read from `INFORMATION_SCHEMA.QUERY_HISTORY` when the run finishes. If it can't be
+read within 30 seconds, the build is unaffected and its cost is recorded as `pending`;
+`sqb cost <run_id>` collects it later. Any other failure is recorded as `collection_failed` with the
+Snowflake error.
 
-These values are attributed compute credits and estimated cost, not Snowflake-billed credits or
-invoice reconciliation. The estimate uses only query history visible to the executing role and does
-not reconstruct invisible concurrent work, warehouse resume or idle tail, the 60-second minimum,
-cloud-services credits, contract adjustments, or multi-cluster billing. A statement run with a `QUERY_TAG`
-of your own is not recognised as a metadata-only `CREATE`, so it may report missing warehouse
-metadata. Run metadata and query IDs
-are stored under `target/executions/<run_id>/`; that statement ledger stores only an SQL digest,
-not SQL text. Executed SQL artifacts are stored separately under the sensitive `target/run/` tree.
+The estimate is attributed compute, not your Snowflake bill. It sees only query history visible to
+the executing role, and leaves out warehouse resume and idle time, the 60-second minimum,
+cloud-services credits, contract adjustments and multi-cluster billing.
+
+A statement run with your own `QUERY_TAG` may report missing warehouse metadata. Executed SQL is
+kept under `target/run/`, which can hold sensitive data; the cost records under
+`target/executions/` store only a digest of each statement.
 
 ## Functions in unit tests
 
