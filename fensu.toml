@@ -2837,6 +2837,7 @@ module_layers = [
     "native_host/orchestration_triggers=project",
     "native_host/warehouse_metadata=commands",
     "native_threads=infra",
+    "observations=plan",
     "output_capture=output",
     "plan_command=commands",
     "plan_output=plan",

@@ -67,6 +67,7 @@ pub(crate) mod microbatches;
 pub(crate) mod model_config;
 pub(crate) mod native_host;
 pub(crate) mod native_threads;
+pub(crate) mod observations;
 pub(crate) mod output_capture;
 pub(crate) mod plan_command;
 pub(crate) mod plan_output;
