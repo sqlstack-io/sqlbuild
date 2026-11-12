@@ -147,8 +147,10 @@ fn check_declared_columns(mapping: &Entries) -> Loaded<bool> {
         .map(|(_, checked)| *checked)
         .ok_or_else(|| {
             ConfigFailure::plain(
-                "settings.column_contract_mode must be one of: implicit, explicit; it is \
-                 deprecated, so set settings.check_declared_columns = true or false instead",
+                "settings.column_contract_mode must be one of: implicit, explicit. It is \
+                 deprecated; set this in sqlbuild_project.toml instead, with false to leave \
+                 declared columns unchecked:\n            [settings]\n            \
+                 check_declared_columns = true",
             )
         })
 }
