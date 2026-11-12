@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import cast
 
 from sqlbuild._native import (
-    ColumnContractMode,
     CompiledModel,
     CompiledObjectKey,
     CompiledProject,
@@ -30,7 +29,7 @@ def make_contract_project(
     inferred_columns: tuple[tuple[str, str | None], ...] | None,
     type_enforcement: bool | None,
     contract: str | None = None,
-    column_contract_mode: str = "implicit",
+    check_declared_columns: bool = True,
     model_name: str = "orders",
     column_locations: dict[str, SourceLocation] | None = None,
     not_null_audit_columns: tuple[str, ...] = (),
@@ -52,7 +51,7 @@ def make_contract_project(
         effective_target_name="dev",
         effective_connection={},
         effective_vars={},
-        settings=SettingsConfig(column_contract_mode=ColumnContractMode(column_contract_mode)),
+        settings=SettingsConfig(check_declared_columns=check_declared_columns),
         models=(
             CompiledModel(
                 key=key,

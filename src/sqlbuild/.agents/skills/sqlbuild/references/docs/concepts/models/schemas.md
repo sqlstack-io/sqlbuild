@@ -139,7 +139,7 @@ Physical SQL output order is not currently enforced. Static contract analysis ma
 
 ## Contracts and planning
 
-`contract enforced` treats the complete named-plus-local declaration as the exact output shape. An unspecified model follows the project's `column_contract_mode`; `contract none` explicitly keeps the resolved columns as metadata, audit attachment, and type-enforcement inputs without activating shape validation. See [Contracts](contracts.md).
+`contract enforced` treats the complete named-plus-local declaration as the exact output shape. An unspecified model follows the project's `check_declared_columns` setting; `contract none` explicitly keeps the resolved columns as metadata, audit attachment, and type-enforcement inputs without activating shape validation. See [Contracts](contracts.md).
 
 For models bound to a reusable schema, effective column names, types, nullability, and enum members participate in model version identity. Changing those fields on a parent therefore affects models bound through descendants. Descriptions do not change model identity. Audits have their own audit-gate identities, so audit changes invalidate reusable audit results without changing the model version itself.
 

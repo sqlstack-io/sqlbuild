@@ -1,3 +1,4 @@
+pub mod deprecated_setting_warnings;
 pub mod explicit_references_help;
 pub mod load_git_base_ref;
 pub mod load_local_config;

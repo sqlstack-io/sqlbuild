@@ -58,7 +58,6 @@ native_ids! {
         ClonePolicy => "ClonePolicy",
         CloneSourcePlanEntry => "CloneSourcePlanEntry",
         CollectionRendering => "CollectionRendering",
-        ColumnContractMode => "ColumnContractMode",
         ColumnLineage => "ColumnLineage",
         ColumnLineageConfidence => "ColumnLineageConfidence",
         ColumnLineageEdge => "ColumnLineageEdge",

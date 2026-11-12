@@ -162,7 +162,7 @@ error[K001]: declared column 'total_cents' was not found in statically inferred 
   --> models/marts/fact_orders.sql:6:5
   6 |     total_cents (),
     |     ^^^^^^^^^^^
-  = help: add total_cents to the SELECT list or correct/remove MODEL(columns (...)); MODEL(columns (...)) is validated using static SQL analysis because settings.column_contract_mode is "implicit" (the default). If this project intentionally uses columns only for metadata and audits, set [settings] column_contract_mode = "explicit"; models with contract enforced remain validated
+  = help: add total_cents to the SELECT list or correct/remove MODEL(columns (...)); MODEL(columns (...)) is validated using static SQL analysis because settings.check_declared_columns is true (the default). If this project intentionally uses columns only for metadata and audits, set [settings] check_declared_columns = false; models with contract enforced remain validated
 ```
 
 | Code | Meaning |
@@ -172,16 +172,16 @@ error[K001]: declared column 'total_cents' was not found in statically inferred 
 | `K003` | A column's type can't be proven (with `type_enforcement` on) |
 | `K013` | A string literal fills an enum-typed column of an enforced contract but isn't a member of the enum (not checked on SQL Server) |
 
-Which models are checked depends on `[settings] column_contract_mode`:
+Which models are checked depends on `[settings] check_declared_columns`:
 
-- `implicit` (default): a model with declared columns and no `contract` setting must output every
+- `true` (default): a model with declared columns and no `contract` setting must output every
   declared column.
-- `explicit`: only models with `contract enforced` are shape-checked; declared columns elsewhere
+- `false`: only models with `contract enforced` are shape-checked; declared columns elsewhere
   are metadata and audit targets.
 
-Explicit type enforcement works in both modes. Switching to `explicit` is a project policy, not a
+Explicit type enforcement works with either value. Setting `false` is a project policy, not a
 way to silence an error: if a model is meant to have a contract, fix the query or the
-declaration. Errors on `contract enforced` models don't suggest changing the mode. See
+declaration. Errors on `contract enforced` models don't suggest changing the setting. See
 [Contracts](../concepts/models/contracts.md).
 
 ## Output

@@ -13,7 +13,6 @@ import pytest
 
 import sqlbuild._native as native_module
 from sqlbuild._native import (
-    ColumnContractMode,
     CompilerDiagnostic,
     ContractPolicy,
     ContractValidationResult,
@@ -191,7 +190,7 @@ def perturbed_project(*, project: CompiledProjectView, rng: random.Random) -> Co
         native_project=None,
         settings=replace(
             project.settings,
-            column_contract_mode=rng.choice(tuple(ColumnContractMode)),
+            check_declared_columns=rng.choice((True, False)),
             table_promotion_mode=rng.choice(_PROMOTION_MODES),
         ),
         models=tuple(perturbed_model(model=model, rng=rng) for model in project.models),
@@ -338,7 +337,7 @@ def contract_statuses(
 
     request: NativeContractRequest = (
         "",
-        project.settings.column_contract_mode == ColumnContractMode.IMPLICIT,
+        project.settings.check_declared_columns,
         [_status_row(model) for model in project.models],
     )
     return native_contract_statuses(request=request, diagnostics=len(result.diagnostics))

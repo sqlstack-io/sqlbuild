@@ -369,11 +369,6 @@ const E_MICROBATCH_LIMIT_ACTION: EnumSpec = EnumSpec {
         ("WARN", "warn"),
     ],
 };
-const E_COLUMN_CONTRACT_MODE: EnumSpec = EnumSpec {
-    name: "ColumnContractMode",
-    doc: "Default contract behavior for model column declarations.",
-    members: &[("IMPLICIT", "implicit"), ("EXPLICIT", "explicit")],
-};
 const E_SOURCE_FRESHNESS_STRATEGY: EnumSpec = EnumSpec {
     name: "SourceFreshnessStrategy",
     doc: "",
@@ -765,7 +760,6 @@ pub(crate) const COMPILER_ENUMS: &[EnumSpec] = &[
     E_SOURCE_WRITE_STRATEGY,
     E_FUTURE_CURSOR_ACTION,
     E_MICROBATCH_LIMIT_ACTION,
-    E_COLUMN_CONTRACT_MODE,
     E_SOURCE_FRESHNESS_STRATEGY,
     E_SOURCE_FRESHNESS_VALUE_KIND,
     E_TIME_TRAVEL_RETENTION_SOURCE,

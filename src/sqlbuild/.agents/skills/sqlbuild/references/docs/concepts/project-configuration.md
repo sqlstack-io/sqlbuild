@@ -653,7 +653,7 @@ Global feature toggles:
 sql_analysis = true
 require_sql_analysis = false
 query_change_tracking = true
-column_contract_mode = "implicit"
+check_declared_columns = true
 concurrency = 1
 microbatch_concurrency = false
 auto_load_sources = true
@@ -671,7 +671,7 @@ delta_compile = true
 | `sql_analysis` | `true` | Enable SQL syntax analysis, column binding, type inference, output inference, and semantic validation at compile time |
 | `require_sql_analysis` | `false` | Allow `sql_analysis false` (in a MODEL header or a `[path_defaults]` entry) only on models whose SQL the parser cannot read, and reject `[settings] sql_analysis = false` in `sqlbuild_local.toml`. Project file only. See [SQL analysis](models/configuration.md#sql-analysis). |
 | `query_change_tracking` | `true` | Track query fingerprints for change detection. A fingerprint covers the SQL tokens of the compiled query and ignores whitespace, comments, and the letter case of reserved keywords and built-in function names, so formatting-only edits do not rebuild. Every other word, including non-reserved keywords, identifiers, aliases, JSON path keys and user-defined function names, counts exactly, as do string literals, quoted identifiers, numbers, and optimizer hints. |
-| `column_contract_mode` | `implicit` | Controls whether column declarations on models without a `contract` declaration activate static shape/nullability validation. `implicit` preserves that validation; `explicit` treats columns as metadata and audit attachment unless the model declares `contract enforced`. Model-level `contract enforced` and `contract none` override this setting. Explicit type enforcement remains independent. See [Contracts](models/contracts.md). |
+| `check_declared_columns` | `true` | Controls whether column declarations on models without a `contract` declaration activate static shape/nullability validation. `true` checks that every declared column is in the SELECT and checks its nullability; `false` treats columns as metadata and audit attachment unless the model declares `contract enforced`. Model-level `contract enforced` and `contract none` override this setting. Explicit type enforcement remains independent. See [Contracts](models/contracts.md). |
 | `concurrency` | `1` | Default number of worker connections for commands that run resources in parallel, such as `sqb build`, `sqb test`, `sqb audit`, and `sqb seed`, and for `sqb janitor` actions on warehouses that run DDL concurrently; a target's `concurrency` and `--concurrency` override it (see [Target concurrency](#target-concurrency)) |
 | `microbatch_concurrency` | `false` | Explicitly permit models with `batch_concurrency > 1`; concurrent batches use immutable coordination facts |
 | `auto_load_sources` | `true` | Automatically run source loaders before building dependent models during `sqb build`. See [Loaders](python-nodes/loaders.md). |

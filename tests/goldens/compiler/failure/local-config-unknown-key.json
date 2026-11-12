@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D001",
-     "message": "<project>/sqlbuild_local.toml settings contains unknown key(s): sql_analysiss. Allowed keys: auto_load_sources, column_contract_mode, concurrency, default_audit_run_scope, default_audit_severity, delta_compile, max_concurrency, microbatch_concurrency, microbatch_unaccounted_partition_policy, query_change_tracking, require_sql_analysis, scenario_timeout, sql_analysis, sql_validation, table_promotion_mode, test_timeout, unit_test_max_real_models",
+     "message": "<project>/sqlbuild_local.toml settings contains unknown key(s): sql_analysiss. Allowed keys: auto_load_sources, check_declared_columns, column_contract_mode, concurrency, default_audit_run_scope, default_audit_severity, delta_compile, max_concurrency, microbatch_concurrency, microbatch_unaccounted_partition_policy, query_change_tracking, require_sql_analysis, scenario_timeout, sql_analysis, sql_validation, table_promotion_mode, test_timeout, unit_test_max_real_models",
      "help": "did you mean 'sql_analysis'?"
     }
    ]

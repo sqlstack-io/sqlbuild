@@ -1762,7 +1762,7 @@ default_target = "dev"
 database = ":memory:"
 
 [settings]
-column_contract_mode = "explicit"
+check_declared_columns = false
 
 [vars]
 benchmark_revision = "0"

@@ -30,7 +30,6 @@ use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sqltext::model_headers::{ColumnLocation, location_rows};
 
 const PATHLIB_MODULE: &str = "pathlib";
-const IMPLICIT_COLUMN_CONTRACTS: &str = "implicit";
 const GENERIC_DIALECT: &str = "generic";
 const OUTPUT_LABEL: &str = "output";
 const CONTRACT_PHASE: &str = "contract";
@@ -295,9 +294,8 @@ pub(crate) fn evaluate_model_contracts<'py>(
     adapter_default: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let settings: Bound<'py, PyAny> = native_field(project, "settings")?;
-    let mode: String = native_field(&settings, "column_contract_mode")?
-        .str()?
-        .extract()?;
+    let check_declared_columns: bool =
+        native_field(&settings, "check_declared_columns")?.is_truthy()?;
     let explicit_promotion: Option<String> =
         native_field(&settings, "table_promotion_mode")?.extract()?;
     let promotion: Option<String> = match explicit_promotion {
@@ -318,7 +316,7 @@ pub(crate) fn evaluate_model_contracts<'py>(
         py,
         (
             dialect_name.clone(),
-            mode == IMPLICIT_COLUMN_CONTRACTS,
+            check_declared_columns,
             promotion.as_deref() == Some(STAGED_PROMOTION_MODE),
         ),
         &native,
