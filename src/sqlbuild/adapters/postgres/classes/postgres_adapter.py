@@ -39,6 +39,7 @@ from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import 
     HistoricalTimestampSnapshotSql,
 )
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
+from sqlbuild.adapter.contract.classes.observations import ObservationsMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.classes.unkeyed_diff import UnkeyedDiffMixin
@@ -122,7 +123,9 @@ from sqlbuild.runtime.execution_limits.main.execution_deadlines_suspended import
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
-class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
+class PostgresAdapter(
+    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+):
     """PostgreSQL adapter backed by psycopg."""
 
     def get_columns_for_relations(

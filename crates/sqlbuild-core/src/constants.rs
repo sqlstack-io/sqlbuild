@@ -38,8 +38,10 @@ pub const MICROBATCH_TABLE_NAME: &str = "_sqlbuild_microbatches";
 pub const AUDIT_RESULTS_TABLE_NAME: &str = "_sqlbuild_audit_results";
 /// State table of janitor archive and drop events.
 pub const JANITOR_EVENTS_TABLE_NAME: &str = "_sqlbuild_janitor_events";
+/// State table of display-only observations, which plan previews read and planning never does.
+pub const OBSERVATIONS_TABLE_NAME: &str = "_sqlbuild_observations";
 /// Every state table SQLBuild writes in a target's state schema.
-pub const STATE_TABLE_NAMES: [&str; 10] = [
+pub const STATE_TABLE_NAMES: [&str; 11] = [
     FINGERPRINT_TABLE_NAME,
     MICROBATCH_TABLE_NAME,
     SOURCE_FRESHNESS_TABLE_NAME,
@@ -50,6 +52,7 @@ pub const STATE_TABLE_NAMES: [&str; 10] = [
     MIGRATION_TABLE_NAME,
     COLUMN_MIGRATION_TABLE_NAME,
     OLD_NAME_VIEW_TABLE_NAME,
+    OBSERVATIONS_TABLE_NAME,
 ];
 /// A zero-length cursor duration.
 pub const ZERO_DAY_DURATION: &str = "0d";
