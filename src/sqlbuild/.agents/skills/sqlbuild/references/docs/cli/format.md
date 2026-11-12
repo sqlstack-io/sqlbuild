@@ -47,7 +47,8 @@ one-file-at-a-time run.
 
 `sqb format` skips files it already found formatted and clean, as long as the file and the format
 settings haven't changed, so `sqb format --check` on an unchanged project is fast. A file that
-needed changes or reported anything is always checked again. `--fix` never skips files. Pass
+needed changes or reported anything is always checked again, and SQL test files are always
+formatted. `--fix` never skips files. Pass
 `--no-cache` to format every file.
 
 ## Line width and descriptions

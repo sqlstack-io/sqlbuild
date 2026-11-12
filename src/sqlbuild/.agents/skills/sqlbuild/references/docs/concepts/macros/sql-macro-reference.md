@@ -63,8 +63,8 @@ The examples use the `weekly_rates` macro from
   `SELECT @weekly.keys, @weekly.refund_count AS refunds FROM @weekly`, passes; to qualify, read
   every slot through an alias.
 - Where a call's output joins the caller's query, as with expression and column-list macros, the
-  query is judged at the call. A read through the relation the call passes, such as `o.created_at`
-  above, fits either style; any other column counts as the macro writes it, so a bare `status`
+  query is judged at the call. A read through the relation the call passes, such as `o.created_at` in
+  the `audit_columns` example in [SQL macros](sql-macros.md), fits either style; any other column counts as the macro writes it, so a bare `status`
   beside a hand-qualified `o.order_id` fails.
 
 A plain group read inside a subquery, such as `EXISTS (SELECT @weekly.keys FROM refunds AS r ...)`,

@@ -30,8 +30,7 @@ MODEL (
 );
 ```
 
-A retry works out its range again from the warehouse, so a failed run is picked up by the next
-successful one with no backfill. [Concurrent microbatches](#concurrent-batches) are the exception:
+A retry works out its range again from the warehouse. [Concurrent microbatches](#concurrent-batches) are the exception:
 they record each batch to coordinate.
 
 ## Strategies

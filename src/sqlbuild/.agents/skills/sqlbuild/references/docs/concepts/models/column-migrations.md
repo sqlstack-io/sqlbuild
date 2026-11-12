@@ -86,8 +86,8 @@ only names the old column in the [old-name view](migrations.md#old-names).
 
 ## Automatic detection
 
-SQLBuild detects a rename by itself when the rename is the only change to the query: one column
-disappeared, and one new column has exactly the same expression. For example, `amount` becomes
+SQLBuild detects a rename by itself when renames are the only change to the query: each removed
+column has exactly one new column with the same expression. For example, `amount` becomes
 `amount AS revenue`. If you changed anything else in the query, declare `migrate_from`, or use
 `sqb rename`.
 

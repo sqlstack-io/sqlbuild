@@ -30,7 +30,7 @@ FROM __ref("stg_orders")
 GROUP BY customer_id
 ```
 
-Set `[settings] table_promotion_mode = "immediate"` to build straight into the destination and audit afterwards. Immediate promotion can't enforce declared types or `contract enforced`: a model that needs them is a `K011` compile error.
+Set `[settings] table_promotion_mode = "immediate"` to build straight into the destination and audit afterwards. Immediate promotion can't enforce declared types or `contract enforced`. A model with `contract enforced` is a `K011` compile error; a model with declared types fails when it builds.
 
 ## Incremental
 
@@ -106,6 +106,6 @@ The custom function owns staging, runtime type or contract enforcement, audit ti
 | View | The new view. Audits run after it is replaced. |
 | Table (staged, the default) | The old table, untouched. Checks and audits run before it is replaced. |
 | Table (`immediate`) | The new table. Audits run after it is replaced. |
-| Incremental | The old table. Delta audits run before rows are written. |
+| Incremental | The old table if a delta audit fails. Rows already written stay if a final audit or a later microbatch fails. |
 | Microbatch full rebuild | A partly rebuilt table; the old one was dropped first. |
 | Custom | Whatever the custom materialization does. |
