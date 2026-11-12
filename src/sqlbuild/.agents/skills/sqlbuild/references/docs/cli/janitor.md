@@ -61,7 +61,7 @@ sqb --project-dir <path> janitor [flags]
 | `--drop-old-name-view <name>` | Drop the [compatibility view](../concepts/models/migrations.md#old-names) at a renamed model's old name before it expires. Repeat for several views. Fails with `C503` if no compatibility view is recorded at the name |
 | `--verbose`, `-v` | List every entry of each preview section and every skipped object with its reason |
 | `--json` | Print the plan and the result as one JSON document on stdout; the preview, prompt and progress go to stderr |
-| `--warehouse <name>` | Snowflake warehouse for this run; overrides the target's `query` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this run; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Lifecycle
 
@@ -288,7 +288,7 @@ in_use_window = "7d"
 keep_in_use = false
 ```
 
-See [Project Configuration](../concepts/project-configuration.md#janitor) for every key and default.
+See [Configuration reference](../concepts/project-configuration.md#janitor) for every key and default.
 On Snowflake, BigQuery and Databricks, the actions of each phase run on up to the target's
 [`concurrency`](../concepts/project-configuration.md#target-concurrency) connections at once.
 

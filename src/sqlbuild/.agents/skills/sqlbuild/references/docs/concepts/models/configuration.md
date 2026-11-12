@@ -328,7 +328,7 @@ whole attempt, starting when the model begins executing: its hooks, statements, 
 every microbatch. Time spent waiting for upstream models or for a free worker does not count.
 
 At the deadline SQLBuild cancels the model's running statements through the adapter (see the
-[adapter table](../project-configuration.md#duration-limit)), runs no further statements
+[adapter table](../../cli/build.md#duration-limit)), runs no further statements
 for the attempt, and reports the model as timed out with the elapsed time, the limit, where it was
 set, the cancellation outcome and the query IDs it saw. Statements that already completed are not
 undone, but the attempt stops before any later promotion or swap, so a staged table is not
@@ -336,5 +336,5 @@ published. Models that depend on it are skipped as for any failure, and independ
 A model that finishes successfully just after its limit keeps its successful result.
 
 The per-model limit is separate from the target's whole-build
-[`max_duration`](../project-configuration.md#duration-limit). When both apply, each
+[`max_duration`](../../cli/build.md#duration-limit). When both apply, each
 statement is bounded by whichever deadline comes first.

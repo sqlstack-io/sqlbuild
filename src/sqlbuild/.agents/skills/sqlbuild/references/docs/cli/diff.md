@@ -70,7 +70,7 @@ In query mode, omit `FROM:TO` and model selectors; each query identifies its own
 | `--json` | Print one JSON document to stdout |
 | `--select`, `-s` | Select specific models to diff (required in model mode) |
 | `--exclude` | Exclude specific models from diffing |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Size guard
 

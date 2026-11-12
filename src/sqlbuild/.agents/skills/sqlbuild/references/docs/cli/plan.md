@@ -46,7 +46,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `SELECTOR ...` | Positional selectors, the same as `--select` |
 | `--select`, `-s` | Select specific models |
 | `--exclude` | Exclude specific models |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Output
 

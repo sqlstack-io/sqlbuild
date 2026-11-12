@@ -136,5 +136,5 @@ top-level roles as a genuine project API instead of a neutral dumping ground.
 
 Learn the features themselves in [Enums](enums.md), [Constants](constants.md),
 [Macros](macros.md), [Audits](audits.md),
-[Reusable Schemas](models/schemas.md), and [Hooks](models/hooks.md). See [Interpolation](interpolation.md) for project,
+[Reusable column schemas](models/schemas.md), and [Hooks](models/hooks.md). See [Variables and placeholders](interpolation.md) for project,
 environment, and runtime context values, which are separate from declarations.

@@ -29,7 +29,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--concurrency` | Maximum number of audits to run concurrently (default: `1`) |
 | `--json` | Print structured audit results |
 | `--json-output` | Write structured audit results to a file |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Concurrency
 

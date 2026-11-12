@@ -137,9 +137,9 @@ profiles_dir = "../profiles"
 target_path = "../dbt_project/target"
 ```
 
-See [Project Configuration](../concepts/project-configuration.md#dbt) for all fields.
+See [Using SQLBuild with dbt](../concepts/dbt-compatibility/overview.md#configuration) for all fields.
 
 SQLBuild-owned work in `sqb dbt plan`, `run` and `build` connects with the target's `build`
-[warehouse group](../concepts/project-configuration.md#command-group-warehouses). dbt itself
+[warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses). dbt itself
 keeps using the warehouse from its profile. These commands do not accept `--warehouse`, because
 their remaining arguments pass through to dbt.

@@ -27,7 +27,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--json` | Print check results as JSON |
 | `--json-output` | Write check results JSON to a file path |
 | `--vars` | Override project variables |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 Selecting a non-check node is rejected; use [`sqb build`](build.md) to run tasks and assets.
 

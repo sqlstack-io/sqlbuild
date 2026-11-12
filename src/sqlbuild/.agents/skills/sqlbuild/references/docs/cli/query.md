@@ -42,7 +42,7 @@ File paths are resolved from the current working directory.
 | `--json` | Shorthand for `--format json` |
 | `--limit` | Maximum rows to return (default: 20) |
 | `--no-limit` | Disable the row limit |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Output
 

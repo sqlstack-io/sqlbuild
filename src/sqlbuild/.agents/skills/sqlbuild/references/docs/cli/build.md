@@ -17,6 +17,7 @@ Online: https://sqlbuild.com/docs/cli/build/
 - Output
 - Deferred builds
 - Failure behavior
+- Limits
 - Fingerprints
 - Runtime artifacts
 
@@ -77,7 +78,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `SELECTOR ...` | Positional selectors, the same as `--select` |
 | `--select`, `-s` | Select specific models, or unit tests by name (`test:<name>`); selecting only unit tests runs them without building models |
 | `--exclude` | Exclude specific models |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Fast iteration
 
@@ -218,6 +219,58 @@ skipped as for any other failure. Its row shows `TIMEOUT`. In the summary line, 
 `summary.failure_count` still includes them, and `summary.timeout_count` reports how many of those
 failures were timeouts. A timeout is a failure for the exit code: the build exits non-zero and its
 JSON `status` is `failed`.
+
+## Limits
+
+A target's [`execution_limits`](../concepts/project-configuration.md#execution-limits) cap a whole
+build, and a model's [`max_duration`](../concepts/models/configuration.md#execution-time-limit) caps
+one model.
+
+### Model limit
+
+When the selection has more models than `max_models`, the build stops before any clone, load or
+model runs, and says that nothing in the warehouse changed. `sqb plan` has no limit, so use it to
+check a broad selection.
+
+### Duration limit
+
+`max_duration` covers planning and the build. At the deadline SQLBuild starts no more work and
+cancels the statements still running. Where the warehouse has a statement time limit, each
+statement also gets only the time that remains.
+
+| Adapter | Warehouse statement limit | Cancellation at the deadline | Longest accepted duration |
+|---------|---------------------------|------------------------------|---------------------------|
+| Snowflake | `STATEMENT_TIMEOUT_IN_SECONDS` per statement | Driver cancel request for the running query | 7 days |
+| DuckDB, MotherDuck | None | Connection interrupt | About 24 days |
+| PostgreSQL | `SET LOCAL statement_timeout` inside transactions; statements outside a transaction rely on cancellation | Driver cancel (`cancel_safe`) | About 24 days |
+| BigQuery | Job timeout (`job_timeout_ms`) on each query job | `jobs.cancel`; reported as requested, not confirmed | About 24 days |
+| Databricks | `STATEMENT_TIMEOUT` session setting, capped at 48 hours | Cursor cancel; reported as requested, not confirmed | About 24 days |
+| SQL Server | None; the driver's query timeout is process-wide | Driver cancel | About 24 days |
+| SQLite | None | Connection interrupt | About 24 days |
+
+A duration timeout can come after earlier models finished, so its error says that warehouse changes
+may already have been made. A custom adapter that can't cancel a running statement can't be used
+with `max_duration`.
+
+### Per-item time limits
+
+Unit test, scenario and model limits (`test_timeout`, `scenario_timeout` and a model's
+`max_duration`) count running time only, from the item's first warehouse statement. Rollback and
+cleanup always run, even after the limit. Where a warehouse reports queueing separately, queued
+time doesn't count:
+
+| Adapter | How the item limit is enforced | Queued time |
+|---------|--------------------------------|-------------|
+| Snowflake | `STATEMENT_TIMEOUT_IN_SECONDS` per statement, with a client-side backstop after a grace margin of half the limit (at least 30 seconds) | Excluded by the warehouse limit; the backstop counts it |
+| DuckDB, MotherDuck | Connection interrupt at the limit | Not applicable |
+| PostgreSQL | `SET LOCAL statement_timeout` inside transactions; cancellation at the limit | Lock waits count |
+| BigQuery | `jobs.cancel` at the limit; no job timeout, because a job timeout counts from job creation | Excluded: the clock stops while a job is pending |
+| Databricks | `STATEMENT_TIMEOUT` session setting and cursor cancel | May count |
+| SQL Server | Driver cancel at the limit | Lock waits count |
+| SQLite | Connection interrupt at the limit | Waits for the write lock count |
+
+When limits nest, such as a model's unit tests inside its own limit, the earliest deadline applies.
+After a timeout, SQLBuild checks the connection and replaces it if it is no longer usable.
 
 ## Fingerprints
 

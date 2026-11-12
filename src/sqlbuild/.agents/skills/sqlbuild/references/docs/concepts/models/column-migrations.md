@@ -121,7 +121,7 @@ based on the table's current columns first, then on recorded renames:
 | `already renamed, record` | The new column exists, the old one doesn't, and no rename is recorded. An interrupted rename leaves this. Record it without renaming again. |
 | `done` | The rename is recorded and the new column exists. Nothing to do. |
 | `conflict` | Both columns exist. The build stops (`M110`). Drop one of them, or remove `migrate_from` and let `on_schema_change` handle the columns. |
-| `source missing` | Neither column exists and no rename is recorded. The plan warns (`M109`) and the columns follow `on_schema_change`. A target can require confirmation or stop instead with [`missing_migration_origin`](../project-configuration.md#missing-migration-origins). |
+| `source missing` | Neither column exists and no rename is recorded. The plan warns (`M109`) and the columns follow `on_schema_change`. A target can require confirmation or stop instead with [`missing_migration_origin`](migrations.md#missing-migration-origins). |
 | `source still produced` | The query still selects the old column. The build stops (`M111`). |
 | `unsupported` | The warehouse can't rename this table's columns (see [Adapter support](#adapter-support)). The build stops (`M112`). |
 
