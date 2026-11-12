@@ -197,10 +197,7 @@ const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("sql_analysis", FieldDefault::True),
         FieldSpec::new("require_sql_analysis", FieldDefault::False),
         FieldSpec::new("query_change_tracking", FieldDefault::True),
-        FieldSpec::new(
-            "column_contract_mode",
-            FieldDefault::NativeMember(RecordId::ColumnContractMode, "IMPLICIT"),
-        ),
+        FieldSpec::new("check_declared_columns", FieldDefault::True),
         FieldSpec::new("concurrency", FieldDefault::Int(1)),
         FieldSpec::new("auto_load_sources", FieldDefault::True),
         FieldSpec::new("microbatch_concurrency", FieldDefault::False),

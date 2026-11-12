@@ -210,13 +210,13 @@ _FINDING_TEST_BODY: str = (
             ),
         ),
         ResourceSqlValidationCase(
-            description="explicit column contracts report each built-in audit once at the header",
+            description="unchecked declared columns report each built-in audit once at the header",
             files=(
                 (
                     "sqlbuild_project.toml",
                     'name = "orders"\nadapter = "duckdb"\n\n[connection]\n'
                     'database = "warehouse.duckdb"\n\n'
-                    '[settings]\ncolumn_contract_mode = "explicit"\n',
+                    "[settings]\ncheck_declared_columns = false\n",
                 ),
                 resource_sql_orders_model(", columns (shipped_at (audits [not_null, unique]))"),
             ),

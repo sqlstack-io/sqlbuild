@@ -3,6 +3,9 @@
 pub(crate) const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
 pub(crate) const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 pub(crate) const LEGACY_SQL_VALIDATION_KEY: &str = "sql_validation";
+pub(crate) const CHECK_DECLARED_COLUMNS_KEY: &str = "check_declared_columns";
+/// The deprecated alias of `check_declared_columns`.
+pub(crate) const LEGACY_COLUMN_CONTRACT_MODE_KEY: &str = "column_contract_mode";
 pub(crate) const REQUIRE_SQL_ANALYSIS_KEY: &str = "require_sql_analysis";
 pub(crate) const QUERY_CHANGE_TRACKING_KEY: &str = "query_change_tracking";
 pub(crate) const CONCURRENCY_KEY: &str = "concurrency";
@@ -48,7 +51,7 @@ pub(crate) const SETTINGS_KEYS: [&str; 15] = [
     "sql_analysis",
     "require_sql_analysis",
     "query_change_tracking",
-    "column_contract_mode",
+    "check_declared_columns",
     "concurrency",
     "auto_load_sources",
     "microbatch_concurrency",
@@ -253,7 +256,9 @@ pub(crate) const SNAPSHOT_SCHEMA_CHANGE_POLICIES: [&str; 3] =
     ["append_new_columns", "deny", "require_confirmation"];
 pub(crate) const UNACCOUNTED_PARTITION_POLICIES: [&str; 3] =
     ["recover_all", "recover_empty", "synthesize"];
-pub(crate) const COLUMN_CONTRACT_MODES: [&str; 2] = ["implicit", "explicit"];
+/// `column_contract_mode` values and the `check_declared_columns` value each means.
+pub(crate) const COLUMN_CONTRACT_MODES: [(&str, bool); 2] =
+    [("implicit", true), ("explicit", false)];
 pub(crate) const AUDIT_SEVERITIES: [&str; 2] = ["warn", "error"];
 pub(crate) const COLLECTION_RENDERINGS: [&str; 2] = ["value_list", "array"];
 pub(crate) const FUTURE_CURSOR_ACTIONS: [&str; 2] = ["cap", "error"];

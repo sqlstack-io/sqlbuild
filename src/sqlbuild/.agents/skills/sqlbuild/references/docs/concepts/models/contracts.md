@@ -15,22 +15,22 @@ Online: https://sqlbuild.com/docs/concepts/models/contracts/
 - Adopting an existing schema
 - Related policies
 
-A model's declared columns provide output metadata, type enforcement, and column audit attachment. The project `column_contract_mode` and model `contract` policy determine whether those declarations also define a statically validated output shape.
+A model's declared columns provide output metadata, type enforcement, and column audit attachment. The project `check_declared_columns` setting and model `contract` policy determine whether those declarations also define a statically validated output shape.
 
 | Model declaration | Behavior |
 |-------------------|----------|
-| Unspecified | Follow `settings.column_contract_mode`: `implicit` validates declared columns as an open shape; `explicit` treats them as metadata and audit attachment only. |
+| Unspecified | Follow `settings.check_declared_columns`: `true` validates declared columns as an open shape; `false` treats them as metadata and audit attachment only. |
 | `none` | Do not activate declared-shape or nullability contract validation for this model. Explicit type enforcement remains active. |
 | `enforced` | Treat declared columns as the complete authoritative output shape and enable runtime exact-schema checks on supported materializations. |
 
-The project default is `column_contract_mode = "implicit"`, which preserves SQLBuild's original behavior. Projects that use column declarations primarily for metadata and audits, including migrations from dbt, can opt into explicit contracts:
+The project default is `check_declared_columns = true`. Projects that use column declarations primarily for metadata and audits, including migrations from dbt, can turn the check off:
 
 ```toml
 [settings]
-column_contract_mode = "explicit"
+check_declared_columns = false
 ```
 
-Under explicit mode, a model must declare `contract enforced` to activate shape validation. A model-level `contract enforced` or `contract none` always overrides the project mode.
+With `check_declared_columns = false`, a model must declare `contract enforced` to activate shape validation, the same as every other model declaring `contract none`. A model-level `contract enforced` or `contract none` always overrides the project setting.
 
 ```sql
 MODEL (
@@ -59,7 +59,7 @@ When declared-shape validation is active and SQL analysis can infer the model's 
 
 If SQLBuild cannot infer the output shape, these static shape checks cannot run. An enforced contract additionally requires a non-empty column declaration and adds runtime requirements on supported materializations.
 
-Type enforcement remains independent. Typed columns continue to receive static type checks and supported runtime casts under explicit mode and `contract none`.
+Type enforcement remains independent. Typed columns continue to receive static type checks and supported runtime casts with `check_declared_columns = false` and `contract none`.
 
 Configuration fields that reference output columns, including `unique_key`, `cursor`, `updated_at`, and `check_columns`, are checked against an enforced declaration.
 
@@ -168,6 +168,6 @@ non-projection uses such as `join_on`, `where`, `group_by`, and `window_order_by
 
 ## Related policies
 
-The project default is implicit open-shape validation for models that omit `contract`. A repository can select explicit opt-in contracts with `settings.column_contract_mode = "explicit"` or configure a custom [Rule](../rules/custom-rules/overview.md) that requires enforced contracts for selected model families.
+The project default checks declared columns as an open shape for models that omit `contract`. A repository can require an explicit `contract enforced` instead with `settings.check_declared_columns = false` or configure a custom [Rule](../rules/custom-rules/overview.md) that requires enforced contracts for selected model families.
 
 Contracts also constrain schema-change behavior. For example, `snapshot_schema_change append_new_columns` is incompatible with `contract enforced` because an unannounced appended column would violate the exact declaration.

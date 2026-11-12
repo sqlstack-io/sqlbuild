@@ -5,7 +5,7 @@
 pub struct ContractRequest {
     /// The dialect name Python hands type normalization (`str(dialect or "generic")`).
     pub dialect: String,
-    /// Whether `settings.column_contract_mode` is `implicit`.
+    /// Whether `settings.check_declared_columns` is on.
     pub implicit_column_contracts: bool,
     /// Whether the effective table promotion mode is `staged`.
     pub staged_promotion: bool,

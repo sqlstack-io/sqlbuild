@@ -9,6 +9,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_config::project::errors::{ConfigFailure, FailureClass, LoadFailure};
+use sqlbuild_config::project::main::deprecated_setting_warnings::deprecated_setting_warnings;
 use sqlbuild_config::project::main::load_git_base_ref::load_git_base_ref;
 use sqlbuild_config::project::main::load_local_config::load_local_config;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
@@ -18,6 +19,7 @@ use sqlbuild_config::project::main::resolve_config_file::resolve_config_file;
 use sqlbuild_config::project::models::{Built, ConfigFile, ConfigPaths, ReviewConfig};
 
 use crate::bindings::_helpers::boundary::config_values::config_value_to_python;
+use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::{new_record, record_class};
 use crate::bindings::_helpers::records::ids::ErrorId;
@@ -159,6 +161,20 @@ fn built(py: Python<'_>, value: Built) -> PyResult<Py<PyAny>> {
                 .call1((text,))?
                 .unbind())
         }
+    }
+}
+
+/// Write a warning line to stderr for each deprecated setting alias `project_dir` still sets.
+pub(crate) fn warn_deprecated_settings(
+    py: Python<'_>,
+    project_dir: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let files = files(project_dir)?;
+    match deprecated_setting_warnings(&files.native) {
+        Ok(warnings) => warnings
+            .iter()
+            .try_for_each(|warning| write_console(py, "stderr", &format!("{warning}\n"))),
+        Err(failure) => Err(load_error(py, &failure, &files)?),
     }
 }
 
