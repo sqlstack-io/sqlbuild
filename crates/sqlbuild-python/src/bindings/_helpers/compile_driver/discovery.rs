@@ -29,7 +29,7 @@ use crate::bindings::_helpers::discovery::model_records::{
     ModelFileSelection, discovered_model_files,
 };
 use crate::bindings::_helpers::discovery::project_config::{
-    load_local_config_file, load_project_config_file,
+    load_local_config_file, load_project_config_file, warn_deprecated_settings,
 };
 use crate::bindings::_helpers::discovery::python_function_files::discover_python_function_files;
 use crate::bindings::_helpers::discovery::python_paths::reject_unsupported_python_paths;
@@ -237,6 +237,7 @@ fn assembled_inputs<'py>(
         project_config: &project_config,
         local_config: &local_config,
     })?;
+    warn_deprecated_settings(py, project_dir)?;
     reject_unsupported_python_paths(project_dir)?;
     let delta_settings: &Bound<'py, PyAny> =
         if native_field(&local_config, "setting_overrides")?.contains(DELTA_COMPILE_SETTING_KEY)? {

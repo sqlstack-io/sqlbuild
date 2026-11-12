@@ -24,8 +24,8 @@ use crate::project::_helpers::targets::{
 };
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
-    LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY,
-    REQUIRE_SQL_ANALYSIS_KEY, SQL_ANALYSIS_KEY,
+    COLUMN_CONTRACT_MODES, LEGACY_COLUMN_CONTRACT_MODE_KEY, LEGACY_EVENT_EXPORTERS_KEY,
+    LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{Built, ConfigFile, ConfigPaths, ReviewConfig};
@@ -440,4 +440,37 @@ pub(crate) fn review_config(paths: &ConfigPaths) -> Result<ReviewConfig, LoadFai
     let table = load_toml_mapping(paths, file)?;
     let payload = table.as_map().unwrap_or_default();
     Ok(load_review(get(payload, "review"), PROJECT_FILE)?)
+}
+
+/// One warning line per configuration file whose `[settings]` still sets `column_contract_mode`.
+pub(crate) fn deprecated_setting_warnings(paths: &ConfigPaths) -> Result<Vec<String>, LoadFailure> {
+    let mut warnings: Vec<String> = Vec::new();
+    for (local, name) in [
+        (false, PROJECT_CONFIG_FILENAME),
+        (true, LOCAL_CONFIG_FILENAME),
+    ] {
+        let file = resolve(paths, local)?;
+        if !path_of(paths, file).exists() {
+            continue;
+        }
+        if let Some(checked) = legacy_column_contract_mode(&load_toml_mapping(paths, file)?) {
+            warnings.push(format!(
+                "Warning: settings.column_contract_mode in {name} is deprecated; replace it with \
+                 settings.check_declared_columns = {checked}"
+            ));
+        }
+    }
+    Ok(warnings)
+}
+
+/// The `check_declared_columns` value a valid `[settings] column_contract_mode` alias maps to.
+fn legacy_column_contract_mode(table: &ConfigValue) -> Option<bool> {
+    let settings = get(table.as_map()?, SETTINGS_SECTION)?.as_map()?;
+    let ConfigValue::String(mode) = get(settings, LEGACY_COLUMN_CONTRACT_MODE_KEY)? else {
+        return None;
+    };
+    COLUMN_CONTRACT_MODES
+        .iter()
+        .find(|(value, _)| value == mode)
+        .map(|(_, checked)| *checked)
 }

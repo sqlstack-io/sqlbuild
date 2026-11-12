@@ -11,15 +11,16 @@ use crate::project::_helpers::keys::{Place, reject_removed_virtual_keys, validat
 use crate::project::_helpers::targets::seconds_value;
 use crate::project::_helpers::values::{int_below, python_equal};
 use crate::project::constants::{
-    AUDIT_SEVERITIES, COLLECTION_RENDERINGS, COLUMN_CONTRACT_MODES, CONCURRENCY_KEY,
-    DBT_DEFER_CLONE_KEY, DBT_KEYS, DBT_REMOVED_KEYS, DBT_REUSE_KEYS, DEFAULT_IN_USE_WINDOW,
-    DEFAULT_QUERY_ARTIFACT_TTL, FUTURE_CURSOR_ACTIONS, LEGACY_CONCURRENCY_KEY,
-    LEGACY_SQL_VALIDATION_KEY, LOCAL_DBT_KEYS, MAX_BATCHES_KEY, MICROBATCH_LIMIT_ACTIONS,
-    OLD_NAME_VIEWS_KEY, QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY,
-    REVIEW_DOWNSTREAM_POLICIES, REVIEW_KEYS, RUN_NAMESPACE_KEY, RUN_NAMESPACE_MAX_LENGTH,
-    SCENARIO_KEYS, SETTINGS_KEYS, SNAPSHOT_FULL_REFRESH_POLICIES, SNAPSHOT_KEYS,
-    SNAPSHOT_LIMIT_KEYS, SNAPSHOT_SCHEMA_CHANGE_POLICIES, SQL_ANALYSIS_KEY,
-    UNACCOUNTED_PARTITION_POLICIES, USD_PER_CREDIT_KEY, ZERO_FIXED_DURATION, ZERO_FLOAT,
+    AUDIT_SEVERITIES, CHECK_DECLARED_COLUMNS_KEY, COLLECTION_RENDERINGS, COLUMN_CONTRACT_MODES,
+    CONCURRENCY_KEY, DBT_DEFER_CLONE_KEY, DBT_KEYS, DBT_REMOVED_KEYS, DBT_REUSE_KEYS,
+    DEFAULT_IN_USE_WINDOW, DEFAULT_QUERY_ARTIFACT_TTL, FUTURE_CURSOR_ACTIONS,
+    LEGACY_COLUMN_CONTRACT_MODE_KEY, LEGACY_CONCURRENCY_KEY, LEGACY_SQL_VALIDATION_KEY,
+    LOCAL_DBT_KEYS, MAX_BATCHES_KEY, MICROBATCH_LIMIT_ACTIONS, OLD_NAME_VIEWS_KEY,
+    QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, REVIEW_DOWNSTREAM_POLICIES, REVIEW_KEYS,
+    RUN_NAMESPACE_KEY, RUN_NAMESPACE_MAX_LENGTH, SCENARIO_KEYS, SETTINGS_KEYS,
+    SNAPSHOT_FULL_REFRESH_POLICIES, SNAPSHOT_KEYS, SNAPSHOT_LIMIT_KEYS,
+    SNAPSHOT_SCHEMA_CHANGE_POLICIES, SQL_ANALYSIS_KEY, UNACCOUNTED_PARTITION_POLICIES,
+    USD_PER_CREDIT_KEY, ZERO_FIXED_DURATION, ZERO_FLOAT,
 };
 use crate::project::constants::{
     DEFAULT_TEST_TIMEOUT, DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE,
@@ -101,12 +102,22 @@ fn settings_mapping(payload: Option<&ConfigValue>, file: ConfigFile) -> Loaded<&
     )?;
     let allowed: Vec<&str> = SETTINGS_KEYS
         .into_iter()
-        .chain([LEGACY_CONCURRENCY_KEY, LEGACY_SQL_VALIDATION_KEY])
+        .chain([
+            LEGACY_CONCURRENCY_KEY,
+            LEGACY_SQL_VALIDATION_KEY,
+            LEGACY_COLUMN_CONTRACT_MODE_KEY,
+        ])
         .collect();
     validate_allowed_keys(mapping, &allowed, place(file, "settings"))?;
     if has(mapping, CONCURRENCY_KEY) && has(mapping, LEGACY_CONCURRENCY_KEY) {
         return Err(ConfigFailure::plain(
             "settings cannot define both 'concurrency' and legacy 'max_concurrency'",
+        ));
+    }
+    if has(mapping, CHECK_DECLARED_COLUMNS_KEY) && has(mapping, LEGACY_COLUMN_CONTRACT_MODE_KEY) {
+        return Err(ConfigFailure::plain(
+            "settings cannot define both 'check_declared_columns' and deprecated \
+             'column_contract_mode'; keep only check_declared_columns",
         ));
     }
     if let (Some(current), Some(legacy)) = (
@@ -121,20 +132,25 @@ fn settings_mapping(payload: Option<&ConfigValue>, file: ConfigFile) -> Loaded<&
     Ok(mapping)
 }
 
-fn column_contract_mode(mapping: &Entries) -> Loaded<Built> {
-    let mode = match get(mapping, "column_contract_mode") {
-        None => Some(COLUMN_CONTRACT_MODES[0]),
-        Some(ConfigValue::String(text)) => Some(text.as_str()),
-        Some(_) => None,
-    };
-    match mode {
-        Some(text) if COLUMN_CONTRACT_MODES.contains(&text) => {
-            Ok(member("ColumnContractMode", text))
-        }
-        _ => Err(ConfigFailure::plain(
-            "settings.column_contract_mode must be one of: implicit, explicit",
-        )),
+/// `check_declared_columns`, or what the deprecated `column_contract_mode` it replaces means.
+fn check_declared_columns(mapping: &Entries) -> Loaded<bool> {
+    if !has(mapping, LEGACY_COLUMN_CONTRACT_MODE_KEY) {
+        return optional_bool(mapping, CHECK_DECLARED_COLUMNS_KEY, true);
     }
+    let mode = match get(mapping, LEGACY_COLUMN_CONTRACT_MODE_KEY) {
+        Some(ConfigValue::String(text)) => Some(text.as_str()),
+        _ => None,
+    };
+    COLUMN_CONTRACT_MODES
+        .iter()
+        .find(|(name, _)| Some(*name) == mode)
+        .map(|(_, checked)| *checked)
+        .ok_or_else(|| {
+            ConfigFailure::plain(
+                "settings.column_contract_mode must be one of: implicit, explicit; it is \
+                 deprecated, so set settings.check_declared_columns = true or false instead",
+            )
+        })
 }
 
 fn unaccounted_partition_policy(mapping: &Entries) -> Loaded<String> {
@@ -208,7 +224,10 @@ pub(crate) fn load_settings(payload: Option<&ConfigValue>, file: ConfigFile) -> 
                 true,
             )?)),
         ),
-        ("column_contract_mode", column_contract_mode(mapping)?),
+        (
+            "check_declared_columns",
+            Built::Value(ConfigValue::Bool(check_declared_columns(mapping)?)),
+        ),
         (
             "auto_load_sources",
             Built::Value(ConfigValue::Bool(optional_bool(
@@ -275,6 +294,7 @@ pub(crate) fn setting_overrides(mapping: &Entries) -> Vec<String> {
         let name = match key_name(key) {
             LEGACY_CONCURRENCY_KEY => CONCURRENCY_KEY,
             LEGACY_SQL_VALIDATION_KEY => SQL_ANALYSIS_KEY,
+            LEGACY_COLUMN_CONTRACT_MODE_KEY => CHECK_DECLARED_COLUMNS_KEY,
             other if SETTINGS_KEYS.contains(&other) => other,
             _ => continue,
         };

@@ -1,7 +1,7 @@
 //! The Python shape names of the natively hosted compiler shapes.
 
 /// The Python model type a natively hosted compiler shape is captured as.
-pub const HOSTED_SHAPE_TYPES: [(&str, &str); 491] = [
+pub const HOSTED_SHAPE_TYPES: [(&str, &str); 490] = [
     (
         "sqlbuild._native:AlignedInterval",
         "sqlbuild.cursor_algebra.models:AlignedInterval",
@@ -61,10 +61,6 @@ pub const HOSTED_SHAPE_TYPES: [(&str, &str); 491] = [
     (
         "sqlbuild._native:CollectionRendering",
         "sqlbuild.sql_values.types:CollectionRendering",
-    ),
-    (
-        "sqlbuild._native:ColumnContractMode",
-        "sqlbuild.spec.contracts.types:ColumnContractMode",
     ),
     (
         "sqlbuild._native:ColumnLineage",

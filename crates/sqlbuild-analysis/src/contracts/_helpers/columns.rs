@@ -265,9 +265,9 @@ fn missing_column(
         format!(
             "add {name} to the SELECT list or correct/remove {declaration_label}; \
              {declaration_label} is validated using static SQL analysis because \
-             settings.column_contract_mode is \"implicit\" (the default). If this project \
+             settings.check_declared_columns is true (the default). If this project \
              intentionally uses columns only for metadata and audits, set [settings] \
-             column_contract_mode = \"explicit\"; models with contract enforced remain validated"
+             check_declared_columns = false; models with contract enforced remain validated"
         )
     };
     ContractDiagnostic {
