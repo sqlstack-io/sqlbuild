@@ -3,15 +3,35 @@ title: "Model migrations"
 description: "Keep a renamed model's history, and keep its old name working for a while."
 ---
 
-Renaming an incremental or snapshot model normally means rebuilding it from scratch under the new name, which loses any history the source data can no longer reproduce. A model migration moves the existing relation's data to the new name instead, then continues building incrementally.
+Rename a model with `sqb rename stg_orders orders`. On the next build, SQLBuild moves the existing
+table to the new name and carries on building it incrementally, so no history is lost and nothing is
+backfilled. The old name keeps working as a view for 30 days.
 
-Table and view models can declare a migration too. They hold no history, so they are rebuilt under the new name, but they keep their identity for change detection. For every materialization, the old name keeps working for a while through a [compatibility view](#old-names). To keep a column's history when you rename the column, see [Column migrations](/docs/concepts/models/column-migrations).
+```bash
+sqb rename hourly_order_activity order_activity_by_hour
+sqb plan
+```
+
+```text
+Migrations (1)
+└── order_activity_by_hour  migrate  dev.hourly_order_activity -> dev.order_activity_by_hour
+    ├── compatibility  compatible
+    ├── transfer  physical copy, promote by transactional rename
+    └── old name  dev.hourly_order_activity
+        ├── view  until 2026-11-06
+        └── old table  archived
+```
+
+This matters most for incremental and snapshot models, whose history the source data may no longer
+reproduce. Table and view models are rebuilt under the new name, but they keep their identity for
+change detection, and their old name keeps working too. To rename a column instead, see
+[Column migrations](/docs/concepts/models/column-migrations).
 
 ## Declaring a migration
 
-[`sqb rename`](/docs/cli/rename) and `sqb mv` rename or move a model, update every reference to it, and add `migrate_from` whenever the model's relation moves and its materialization keeps warehouse data (table, view, incremental, or snapshot).
-
-To declare a migration by hand, add `migrate_from` to the renamed model's header, naming the old model:
+[`sqb rename`](/docs/cli/rename) and `sqb mv` rename or move a model, update every reference to it,
+and write `migrate_from` into the model's header. You can also write it yourself, naming the old
+model:
 
 ```sql
 MODEL (
@@ -23,13 +43,20 @@ MODEL (
 );
 ```
 
-Use `schema.name` when the old relation is in a different schema of the same database.
+Use `schema.name` when the old relation is in another schema of the same database.
 
-On the next build, SQLBuild copies the old relation's data to the new name through a staging table (see [How a move runs](#how-a-move-runs)), records the move, and builds the model incrementally from the migrated state. There is no first-run rebuild, and no `replay_on_change` replay caused by the rename. After the model builds, the old relation is archived and a compatibility view takes its name (see [Old names](#old-names)).
+On the next build, SQLBuild copies the old relation to the new name, records the move, and builds
+the model incrementally from there. There is no first-run rebuild, and the rename alone causes no
+`replay_on_change` replay. After the model builds, the old relation is archived and a view takes its
+name (see [Old names](#old-names)).
 
-A rename is usually made together with other edits, for example a changed filter or a renamed upstream reference. If the renamed model's query also differs from the old model's, the plan still recognises the rename: the model is listed as `Renamed` with its query diff, never as a first run. The query change follows the model's own `replay_on_change`, exactly as it would without the rename (forward-only by default). Models downstream of the renamed model are not replayed because of the rename; see [Replay decisions](/docs/concepts/planning/replay-decisions).
+A rename usually comes with other edits, such as a changed filter. The plan still recognises the
+rename and lists the model as `Renamed` with its query diff. The query change follows the model's
+own `replay_on_change`, and downstream models are not replayed because of the rename; see
+[Replay decisions](/docs/concepts/planning/replay-decisions).
 
-After the move is recorded, `migrate_from` has no further effect, and SQLBuild tells you it can be removed. Keep it until every target that needs the move has built.
+Once the move is recorded, `migrate_from` has no further effect, and SQLBuild tells you it can be
+removed. Keep it until every target that needs the move has built.
 
 ## Decisions
 
@@ -39,78 +66,47 @@ After the move is recorded, `migrate_from` has no further effect, and SQLBuild t
 |----------|---------|
 | `migrate` | The new relation doesn't exist. Move the old one's data to it. |
 | `done` | The move is already recorded. Nothing to do. |
-| `redo` | The new relation exists but has no build history and no recorded move, which is what an interrupted migration leaves behind. Move it again. |
-| `superseded replace` | The new relation was itself the origin of the latest recorded move, for example after renaming a model back. Replace it with the newer data. |
+| `redo` | The new relation exists with no build history and no recorded move. An interrupted migration leaves this. Move it again. |
+| `superseded replace` | The new relation was the origin of the latest recorded move, for example after renaming a model back. Replace it with the newer data. |
 | `forced replace` | The new relation has its own build history and `migrate_force true` is set. Replace it. |
 | `conflict` | The new relation has its own build history. The build stops (`M103`) until you set `migrate_force true` or remove `migrate_from`. |
-| `origin missing` | The old relation doesn't exist and no move was recorded, for example on a target that never built the old name. The plan warns (`M102`) and the model builds fresh. A target can require confirmation or stop the build instead with [`missing_migration_origin`](/docs/concepts/project-configuration#missing-migration-origins). If SQLBuild has build history for the old relation in this target, it should exist, so the build stops (`M102`) whatever the policy: the connection may lack permission to see it, or it was dropped outside SQLBuild. Restore access, or remove `migrate_from` to build fresh deliberately. |
+| `origin missing` | The old relation doesn't exist and no move was recorded, for example on a fresh target. The plan warns (`M102`) and the model builds fresh. |
 
-The origin and destination must be compatible under the model's normal `on_schema_change` rules; otherwise the build stops (`M104`).
+On a target where the old name was never built, `origin missing` is normal. A target can ask for
+confirmation or stop the build instead with
+[`missing_migration_origin`](/docs/concepts/project-configuration#missing-migration-origins).
 
-`migrate_force true` only affects the `conflict` case and is safe to leave in the header.
+If SQLBuild built the old relation in this target but can't see it now, the build always stops with
+`M102`: the connection may lack permission, or the relation was dropped outside SQLBuild. Restore
+access, or remove `migrate_from` to build fresh on purpose.
 
-Table and view models only ever see `migrate`, `done`, and `origin missing`: nothing is replaced, so there is no conflict. `migrate_force` on a table or view model is a compile error. In `sqb plan --json`, their decision is `renamed`.
+The old and new relations must be compatible under the model's `on_schema_change` rules; otherwise
+the build stops (`M104`). `migrate_force true` only affects the `conflict` case and is safe to leave
+in the header.
+
+Table and view models only see `migrate`, `done` and `origin missing`, because nothing is replaced.
+`migrate_force` on a table or view model is a compile error. In `sqb plan --json`, their decision is
+`renamed`.
 
 ## Automatic discovery
 
-If a selected model has never been built, SQLBuild compares it with models that were removed from the project but whose relations still exist. When exactly one removed model has equivalent logic, it is migrated automatically. Equivalent means the same query and configuration, ignoring the model's own name, CTE and table alias names, comments, formatting, and storage-only settings. Renamed upstream models are matched first, so a renamed chain of models is migrated together. Removed models whose data was already moved on by a recorded migration are not candidates, so a model renamed several times matches its latest table.
+A model you rename by hand, without `migrate_from`, is still found when its logic is unchanged. If a
+selected model has never been built and exactly one removed model has the same query and
+configuration, SQLBuild migrates it automatically. Renamed upstream models are matched first, so a
+renamed chain of models moves together.
 
-Renamed tables and views are matched the same way. They are rebuilt under the new name, since they hold no history, but they keep their identity for change detection. These renames are recorded as `renamed` events.
-
-Automatic discovery never guesses. If a match is ambiguous, SQLBuild warns (`M107`) and builds from scratch; declare `migrate_from` to choose. An explicit `migrate_from` always wins. Automatic discovery covers renames within the project's schemas; use `migrate_from` to move a model to another schema. Relations last built before this feature carry no stored fingerprint and aren't matched automatically.
-
-## How a move runs
-
-A move never overwrites the destination directly:
-
-1. The old relation is cloned or copied into a new staging table named `_sqb_archive__<UTC timestamp>__migration_stage__<name>`, with the destination's configured table type.
-2. The staging table is checked: it must exist, have the expected columns and table type, and, for a physical copy, the same row count as the old relation.
-3. The staging table is swapped in as the destination. If a destination already existed, for example after `superseded replace` or `forced replace`, it is kept as `_sqb_archive__<UTC timestamp>__migration_previous__<name>` rather than dropped.
-4. The move is recorded, then the model builds as usual.
-5. After the model builds successfully, the old relation is archived and a compatibility view is created at its name (see [Old names](#old-names)).
-
-Until step 5, the old relation is not modified. Staging and replaced tables use the [janitor](/docs/cli/janitor) archive format, so an abandoned staging table or a replaced destination is deleted by janitor after `archive_retention_days`. A staging table left by an interrupted run is never reused; the next run stages again. Don't run janitor at the same time as a build in the same schema.
-
-`sqb plan` shows how each move will run, for example `physical copy, transient -> permanent, promote by swap`.
+Discovery never guesses. If more than one removed model matches, SQLBuild warns (`M107`) and builds
+from scratch; declare `migrate_from` to choose. An explicit `migrate_from` always wins. Discovery
+covers renames within the project's schemas; use `migrate_from` to move a model to another schema.
 
 ## Old names
 
-A rename breaks every query outside the project that still reads the old name: dashboards, notebooks, other teams' jobs. After the renamed model builds successfully, SQLBuild keeps the old name working for a while:
+A rename breaks every query outside the project that reads the old name: dashboards, notebooks,
+other teams' jobs. So after the renamed model builds, SQLBuild archives the old relation and creates
+a view at the old name that reads the new one. The view gets the privileges that were granted on the
+old relation; nothing new is granted.
 
-1. The old relation is renamed to `_sqb_archive__<UTC timestamp>__migration_origin__<name>`.
-2. A view is created at the old name that selects from the new relation.
-3. The view gets the privileges that were granted on the old relation, read from the archive. Only existing grants are copied; nothing new is granted.
-
-On DuckDB, MotherDuck, PostgreSQL, and SQL Server these steps and their records commit in one transaction. On Snowflake, BigQuery, and Databricks each step is recorded after it runs, and a re-run resumes from the first unrecorded step without repeating one. A failure is reported as `M117`; re-run the build.
-
-| Adapter | Privileges copied to the view |
-|---------|-------------------------------|
-| Snowflake | `SHOW GRANTS` on the archive, replayed to roles and database roles, keeping `WITH GRANT OPTION`. `OWNERSHIP`, grants to shares, and privileges that don't apply to views are skipped |
-| PostgreSQL | Table and column privileges from the catalog, including grants to `PUBLIC` and `WITH GRANT OPTION`. The owner's own privileges are not copied |
-| BigQuery | Table IAM role bindings from `INFORMATION_SCHEMA.OBJECT_PRIVILEGES`, replayed with `GRANT`. See the note below |
-| Databricks | Unity Catalog grants on the table itself that apply to views, such as `SELECT`. `OWN`, `MODIFY`, and inherited catalog or schema grants are skipped |
-| SQL Server | Object and column permissions, including `DENY` and `WITH GRANT OPTION`, that apply to views |
-| DuckDB, MotherDuck | No object privileges exist |
-
-Column privileges are copied to the view's column of the same name, which is the old name when the view aliases a renamed column. A column privilege on a column the view no longer exposes is not copied; the view shows nothing of that column.
-
-The copied grants are recorded on the view's creation. After that, the view's own privileges are what counts: when SQLBuild redefines the view after a rebuild, the view ends up with exactly the privileges it had just before, so a privilege you revoke from the view stays revoked and one you grant on the view is kept. SQLBuild uses `CREATE OR REPLACE VIEW` on PostgreSQL, `COPY GRANTS` on Snowflake, and `ALTER VIEW` on SQL Server and Databricks.
-
-Creating or replacing a view can also apply privileges you did not give it: PostgreSQL applies `ALTER DEFAULT PRIVILEGES` when it re-creates a view, and Snowflake applies the schema's future grants for views on `CREATE OR REPLACE VIEW … COPY GRANTS`. SQLBuild reads the view's privileges before every create or redefinition and reconciles afterwards: it grants what went missing and revokes what was added. A new compatibility view likewise ends up with only the privileges copied from the old relation. Ownership and the owner's own privileges are never changed.
-
-A recorded view that no longer exists at the old name is not re-created by a build; [janitor](/docs/cli/janitor) records it as dropped.
-
-On Snowflake, BigQuery, Databricks, DuckDB, and MotherDuck, views read their tables by name when queried, so a build redefines a compatibility view only when its SQL would change, for example when the view lists columns and the new relation's columns changed. PostgreSQL views are bound to the table itself, so they are redefined whenever the table is replaced.
-
-BigQuery cannot rename views, so an old view model is re-created under the archive name with its IAM bindings, and then dropped.
-
-On BigQuery, a view reads its tables with the permissions of whoever queries it. A principal that could read the old table keeps access to the old name through the copied bindings, but also needs read access on the new table. SQLBuild does not grant that and does not create authorized views; the build warns with `M118` and names the principals.
-
-If columns were renamed, the view presents them under their old names, for example `SELECT order_id, revenue AS amount FROM analytics.daily_revenue`. Incremental and snapshot models alias every recorded [column migration](/docs/concepts/models/column-migrations). A table or view model that declares `migrate_from` can declare old column names the same way, as `revenue (migrate_from amount)`; this only aliases the column in the compatibility view, since the table is rebuilt with the new name anyway. The view follows the new relation's current columns after every build of the model.
-
-`sqb plan` shows what happens at the old name:
-
-```
+```text
 Migrations (1)
 └── daily_revenue  migrate  analytics.revenue -> analytics.daily_revenue
     ├── transfer  rebuild (table)
@@ -121,61 +117,108 @@ Migrations (1)
         └── old table  archived
 ```
 
-A move resumed after the archive shows `old table  already archived`. Once the view exists it shows `view  live until 2026-10-28` and how many grants were copied. When no view is kept, the block shows `left for janitor` and the reason, such as `old_name_view false` or `name reused by model:revenue`.
+If columns were renamed, the view shows them under their old names, for example
+`SELECT order_id, revenue AS amount FROM analytics.daily_revenue`. Incremental and snapshot models
+alias every recorded [column migration](/docs/concepts/models/column-migrations). A table or view
+model can name old columns the same way, as `revenue (migrate_from amount)`; this only aliases the
+column in the view.
 
-In `sqb plan --json`, each migration has an `old_name` object with `action` (`archive_and_view`, `view_only`, `live`, or `none`), `view`, `reads`, `expires_at`, `column_aliases`, `grants_copied` (the number of grants copied once the view exists, otherwise `null`), and `reason`. The top-level `old_names` list also includes steps that resume an earlier move.
-
-The view expires after 30 days by default. After that, [janitor](/docs/cli/janitor) drops it; `sqb janitor --drop-old-name-view analytics.revenue` drops it earlier. Change the default for the project, or turn the views off with `false`:
+The view expires after 30 days. Then [janitor](/docs/cli/janitor) drops it;
+`sqb janitor --drop-old-name-view analytics.revenue` drops it earlier. Change the default for the
+project, or turn views off with `false`:
 
 ```toml
 [migrations]
 old_name_views = "7d"
 ```
 
-A model header overrides the project setting with `old_name_view 7d` or `old_name_view false`. The retention of a move is fixed when the move is recorded.
+A model header overrides this with `old_name_view 7d` or `old_name_view false`. A move keeps the
+retention it had when it was recorded.
 
-With views off, or when a view can't be kept, the old relation is left in place and janitor archives it once it is no longer part of the project, as before. No view is created when:
+No view is created when views are off, when the old relation wasn't built by SQLBuild, when another
+model builds at the old name, or when the old name is itself a view from an earlier rename. The plan
+then shows `left for janitor` and the reason, and janitor archives the old relation once it is no
+longer part of the project.
 
-- the old relation was not built by SQLBuild;
-- another model in the project builds at the old name;
-- the old name is itself a compatibility view of an earlier rename.
+### Privileges by adapter
 
-Moves recorded before a SQLBuild version that supports old-name views never gain a view later.
+| Adapter | Privileges copied to the view |
+|---------|-------------------------------|
+| Snowflake | `SHOW GRANTS` on the archive, replayed to roles and database roles, keeping `WITH GRANT OPTION`. `OWNERSHIP`, grants to shares, and privileges that don't apply to views are skipped |
+| PostgreSQL | Table and column privileges, including grants to `PUBLIC` and `WITH GRANT OPTION`. The owner's own privileges are not copied |
+| BigQuery | Table IAM role bindings from `INFORMATION_SCHEMA.OBJECT_PRIVILEGES`, replayed with `GRANT` |
+| Databricks | Unity Catalog grants on the table that apply to views, such as `SELECT`. `OWN`, `MODIFY`, and inherited catalog or schema grants are skipped |
+| SQL Server | Object and column permissions, including `DENY` and `WITH GRANT OPTION`, that apply to views |
+| DuckDB, MotherDuck | No object privileges exist |
+
+On BigQuery, a view reads its tables with the permissions of whoever queries it. A principal that
+could read the old table also needs read access on the new one. SQLBuild doesn't grant it and
+doesn't create authorized views; the build warns with `M118` and names the principals.
 
 ### Code inside the project
 
-The compatibility view is for consumers outside the project. Project code must use the new model:
+The view is for consumers outside the project. Project code must use the new name:
 
-- Python nodes, hooks, and loaders whose literal SQL names the old name fail with `P008`, at compile time for a declared `migrate_from` and at plan time for an automatically discovered rename. SQL models reading it through `__ref` are unaffected, since `__ref` resolves the new name.
-- A new model whose name is a live compatibility view stops the build with `M114`, which names the view and its expiry. Drop the view early with janitor, or choose another name.
-
-### PostgreSQL views
-
-PostgreSQL views are bound to the table they read, not its name. When a build replaces the renamed model's table, or drops or retypes its columns, SQLBuild points its compatibility views at the new table in the same transaction, so they are never missing, even if the build is interrupted. A view is replaced in place when its columns allow it, so views you build on top of the compatibility view keep working; otherwise it is dropped and re-created with the privileges it had, which fails if another view depends on it.
-
-Views outside SQLBuild that read the old relation follow it into the archive and keep reading its old data; the build warns with `M115` and names them. Re-create them against the old name or the new relation. On the other adapters, views read relations by name, so no rebinding is needed.
-
-### Upgrading
-
-Upgrade the SQLBuild version that runs `sqb janitor` together with the one that runs builds. An older janitor does not know compatibility views and archives them as stale relations.
-
-## State
-
-Each move is recorded in an append-only `_sqlbuild_migrations` table in the destination schema. A missing record means completion is unrecorded; staging or promotion may already have happened. Re-running after an interruption recovers through the migration decisions above.
-
-What happens at the old name is recorded in an append-only `_sqlbuild_old_name_views` table next to it, one row per step: `required` (with the move), `origin_archived`, `view_created`, and `view_dropped`. Rows are never updated.
+- Python nodes, hooks and loaders whose literal SQL names the old name fail with `P008`. SQL models
+  that read it through `__ref` are unaffected, since `__ref` resolves the new name.
+- A new model named like a live view stops the build with `M114`, which names the view and its
+  expiry. Drop the view early with janitor, or choose another name.
 
 ## Adapter support
 
-| Adapter | Staging | Promotion |
-|---------|---------|-----------|
-| Snowflake | Zero-copy clone with `COPY GRANTS`. Transient → permanent is a physical copy, because Snowflake can't clone a transient table into a permanent one. | `ALTER TABLE … SWAP WITH` for an existing destination; rename for a missing destination |
+| Adapter | Copy | Promotion |
+|---------|------|-----------|
+| Snowflake | Zero-copy clone with `COPY GRANTS`. Transient → permanent is a physical copy, because Snowflake can't clone a transient table into a permanent one. | `ALTER TABLE … SWAP WITH` for an existing destination; rename for a missing one |
 | BigQuery | `CREATE TABLE … CLONE`, or `CREATE TABLE … COPY` when BigQuery refuses the clone | Two renames; the destination is briefly missing between them, and an interrupted run recovers on retry |
 | Databricks | `DEEP CLONE` | Two renames, as for BigQuery |
 | PostgreSQL, SQL Server, DuckDB, MotherDuck | Physical copy | Renames and the migration record in one transaction |
 
-On PostgreSQL, views that depend on the destination are re-pointed to the new table in the same transaction, keeping their options, owner and grants. Materialized views are not re-pointed.
-
 ## Previewing another target
 
-`sqb plan --as <target>` compiles the project for another target, for example production, and shows its migration decisions using your current connection. It only inspects; nothing is written.
+`sqb plan --as <target>` compiles the project for another target, such as production, and shows its
+migration decisions using your current connection. It only inspects; nothing is written.
+
+## Details
+
+- **How a move runs.** The old relation is cloned or copied into a staging table named
+  `_sqb_archive__<UTC timestamp>__migration_stage__<name>`. The staging table is checked for its
+  columns, table type and, for a physical copy, row count. It is then swapped in as the destination.
+  A destination that already existed is kept as `_sqb_archive__<UTC timestamp>__migration_previous__<name>`.
+  The move is recorded, the model builds, and only then is the old relation archived as
+  `_sqb_archive__<UTC timestamp>__migration_origin__<name>`.
+- Staging and replaced tables use the [janitor](/docs/cli/janitor) archive format, so janitor
+  deletes an abandoned one after `archive_retention_days`. A staging table left by an interrupted
+  run is never reused. Don't run janitor at the same time as a build in the same schema.
+- Archiving the old relation, creating the view and copying grants commit in one transaction on
+  DuckDB, MotherDuck, PostgreSQL and SQL Server. On Snowflake, BigQuery and Databricks each step is
+  recorded after it runs, and a re-run resumes from the first unrecorded step. A failure is reported
+  as `M117`; re-run the build.
+- Column privileges are copied to the view's column of the same name, which is the old name when the
+  view aliases a renamed column. A privilege on a column the view doesn't expose is not copied.
+- After it is created, the view's own privileges are what counts. When SQLBuild redefines the view,
+  it reads its privileges first and restores them afterwards, so a privilege you revoke stays revoked
+  and one you grant is kept. This also undoes privileges that PostgreSQL `ALTER DEFAULT PRIVILEGES`
+  or Snowflake future grants would add. Ownership is never changed.
+- On Snowflake, BigQuery, Databricks, DuckDB and MotherDuck, views read tables by name, so a build
+  redefines the view only when its SQL would change. PostgreSQL views are bound to the table, so
+  SQLBuild re-points them in the same transaction whenever the table is replaced, and other views
+  that depend on the destination are re-pointed too, keeping their options, owner and grants.
+  Materialized views are not re-pointed.
+- On PostgreSQL, views outside SQLBuild that read the old relation follow it into the archive and
+  keep reading its old data; the build warns with `M115` and names them. Re-create them against the
+  old name or the new relation.
+- BigQuery can't rename views, so an old view model is re-created under the archive name with its
+  IAM bindings, then dropped.
+- A recorded view that no longer exists is not re-created by a build; janitor records it as dropped.
+- Run the same SQLBuild version for `sqb janitor` as for builds. An older janitor doesn't recognise
+  compatibility views and archives them as stale relations.
+- In `sqb plan --json`, each migration has an `old_name` object with `action` (`archive_and_view`,
+  `view_only`, `live` or `none`), `view`, `reads`, `expires_at`, `column_aliases`, `grants_copied`
+  and `reason`. The top-level `old_names` list also includes steps that resume an earlier move.
+- Discovery ignores the model's own name, CTE and table alias names, comments, formatting and
+  storage-only settings. A model already moved on by a recorded migration is not a candidate, so a
+  model renamed several times matches its latest table. Relations without a stored fingerprint are
+  not matched. Renamed tables and views are recorded as `renamed` events.
+- Moves are recorded in an append-only `_sqlbuild_migrations` table in the destination schema, and
+  old-name steps in `_sqlbuild_old_name_views`. A missing record means the move may be partly done;
+  re-running recovers through the decisions above.
