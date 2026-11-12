@@ -715,6 +715,15 @@ class CompileReuseCorruptEntryTestCase:
 
 
 @dataclass(frozen=True)
+class CompileReuseDeprecatedSettingTestCase:
+    """A deprecated setting alias whose warning every compile, reused or not, must print once."""
+
+    description: str
+    settings_line: str
+    expected_warning: str
+
+
+@dataclass(frozen=True)
 class CompileReuseReplayTestCase:
     """One compile whose replay must reproduce output, notes, and exit code."""
 

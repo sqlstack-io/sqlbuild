@@ -48,6 +48,7 @@ use crate::bindings::_helpers::compile_outputs::json_report::plain_json;
 use crate::bindings::_helpers::compile_outputs::reuse::{
     ReuseCheckPy, ReuseRulesPy, check_compile_reuse,
 };
+use crate::bindings::_helpers::discovery::project_config::warn_deprecated_settings;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
 use crate::bindings::_helpers::macro_bridge::first_compile::keep_delta_claim;
 use crate::bindings::_helpers::native_host::host;
@@ -303,7 +304,7 @@ fn overridden<'py>(
 
 /// Replay the stored compile on a hit; the missed attempt when it cannot be replayed.
 fn replayed<'py>(
-    native: &Bound<'py, PyAny>,
+    (native, project_dir): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     missed: Vec<(&'static str, Bound<'py, PyAny>)>,
     (started, json_output): (f64, bool),
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -339,6 +340,7 @@ fn replayed<'py>(
         py,
         &format!("{prefix}{seconds:.1}{suffix}").into_bound_py_any(py)?,
     )?;
+    warn_deprecated_settings(py, project_dir)?;
     for line in stderr_lines.try_iter()? {
         print_stderr(py, &line?)?;
     }
@@ -410,7 +412,13 @@ fn attempt_compile_reuse<'py>(request: &Bound<'py, PyAny>) -> PyResult<Bound<'py
     if checked != CHECKED_HIT {
         return reuse_attempt(py, &base);
     }
-    let attempt: Bound<'py, PyAny> = replayed(&native, base, (started, json_output.is_truthy()?))?;
+    let project_path: Bound<'py, PyAny> =
+        imported(py, "pathlib", "Path")?.call1((&project_dir,))?;
+    let attempt: Bound<'py, PyAny> = replayed(
+        (&native, &project_path),
+        base,
+        (started, json_output.is_truthy()?),
+    )?;
     if native_field(&attempt, "outcome")?.eq(outcome(py, HIT)?)? {
         write_launch_record(&attempt)?;
     }
