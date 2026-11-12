@@ -4,8 +4,8 @@ name: Rust Build Cache
 # by a pull request or merge queue run is visible only to that ref, while one saved on main is
 # visible to every pull request. Each job runs the same cargo builds as the Verify jobs sharing its
 # key, so the cached artifacts match theirs, and builds only when main has no cache for the current
-# lockfile and toolchain. The distributions jobs do the same for the dist dependency caches that
-# Build Distributions restores on macOS for pull request and release builds.
+# lockfile and toolchain. Release distributions never use these caches; Dist Dependency Cache saves
+# theirs.
 on:
   push:
     branches: [main]
@@ -125,40 +125,3 @@ jobs:
       - name: Build the extension as Verify does
         if: steps.lookup.outputs.cache-hit != 'true'
         run: uv sync --locked --no-dev --python 3.12
-
-  distributions-lookup:
-    name: macOS dist dependencies lookup
-    runs-on: macos-15
-    timeout-minutes: 15
-    outputs:
-      missing: >-
-        ${{ steps.arm64.outputs.cache-hit != 'true' || steps.x86_64.outputs.cache-hit != 'true' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-      # The keys must match the restore step of the Build Distributions wheel jobs.
-      - name: Look up the macOS arm64 cache
-        id: arm64
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: dist-macos-arm64-dist
-          lookup-only: true
-          save-if: false
-      - name: Look up the macOS x86_64 cache
-        id: x86_64
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: dist-macos-x86_64-dist
-          lookup-only: true
-          save-if: false
-
-  distributions:
-    name: macOS dist dependencies
-    needs: distributions-lookup
-    if: needs.distributions-lookup.outputs.missing == 'true'
-    uses: ./.github/workflows/build-distributions.yml
-    with:
-      sdist: false
-      dependency-cache-writer: true

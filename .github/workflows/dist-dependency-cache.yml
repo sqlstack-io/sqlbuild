@@ -1,0 +1,59 @@
+name: Dist Dependency Cache
+
+# Saves the compiled dependencies that the macOS wheel jobs of Build Distributions restore for
+# release builds. Only this workflow saves them, and only on main, so every release-please branch
+# and release tag can read them while no pull request or release run can write them. It builds the
+# macOS legs only when main has no cache for the current lockfile and toolchain. It has its own
+# concurrency group because a cold macOS dist build takes about an hour, which must not hold back
+# the Verify caches that Rust Build Cache refreshes.
+on:
+  push:
+    branches: [main]
+  # A new stable toolchain changes the key without a push to main.
+  schedule:
+    - cron: "30 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dist-dependency-cache-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lookup:
+    name: Look up the macOS caches
+    runs-on: macos-15
+    timeout-minutes: 15
+    outputs:
+      missing: >-
+        ${{ steps.arm64.outputs.cache-hit != 'true' || steps.x86_64.outputs.cache-hit != 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      # The keys must match the restore step of the Build Distributions wheel jobs.
+      - name: Look up the macOS arm64 cache
+        id: arm64
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: dist-macos-arm64-dist
+          lookup-only: true
+          save-if: false
+      - name: Look up the macOS x86_64 cache
+        id: x86_64
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: dist-macos-x86_64-dist
+          lookup-only: true
+          save-if: false
+
+  distributions:
+    name: macOS dist dependencies
+    needs: lookup
+    if: needs.lookup.outputs.missing == 'true'
+    uses: ./.github/workflows/build-distributions.yml
+    with:
+      sdist: false
+      dependency-cache-writer: true

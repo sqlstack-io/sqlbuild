@@ -106,8 +106,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # dependency-cache marks the slowest platforms, which restore compiled dependencies. Linux
-        # builds run in maturin's manylinux container, where the host cache does not apply.
+        # dependency-cache marks the slowest platforms, whose dist builds restore compiled
+        # dependencies. Linux builds run in maturin's manylinux container, where the host cache
+        # does not apply.
         platform:
           - name: linux-x86_64
             runner: ubuntu-24.04
@@ -147,11 +148,13 @@ jobs:
         if: inputs.prebuilt-run-id == ''
         with:
           toolchain: stable
-      # Compiled dependencies, keyed on the lockfile, toolchain, profile and target. Only the
-      # dependency cache writer on main saves them, so pull request and release builds restore a
-      # cache built from main and never write one.
+      # Compiled dependencies of dist builds, keyed on the lockfile, toolchain, profile and target.
+      # Only Dist Dependency Cache saves them, from main, so release builds restore a cache built
+      # from main and never write one.
       - uses: Swatinem/rust-cache@v2
-        if: inputs.prebuilt-run-id == '' && matrix.platform.dependency-cache != 'none'
+        if: >-
+          inputs.prebuilt-run-id == '' && inputs.cargo-profile == 'dist'
+          && matrix.platform.dependency-cache != 'none'
         with:
           shared-key: dist-${{ matrix.platform.name }}-${{ inputs.cargo-profile }}
           save-if: >-
