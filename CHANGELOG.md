@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.213.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.212.0...v0.213.0) (2026-11-12)
+
+
+### Features
+
+* **format:** lay out clauses, parenthesised groups and windows as SQLClean 0.9.0 does ([226ff14](https://github.com/sqlstack-io/sqlbuild/commit/226ff144aa004a7b8c17a8fc8ff936870dc5afcb))
+
+
+### Bug Fixes
+
+* **rules:** a custom rule's unqualified `*` projection reports the star's own line and column ([226ff14](https://github.com/sqlstack-io/sqlbuild/commit/226ff144aa004a7b8c17a8fc8ff936870dc5afcb))
+
 ## [0.212.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.211.0...v0.212.0) (2026-11-12)
 
 
