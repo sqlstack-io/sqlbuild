@@ -290,6 +290,40 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
                     .expect("expired excluded")
                     .is_none()
             );
+            let sync = LocationWorkRequest {
+                request_id: Uuid::now_v7(),
+                work: LocationWork::SyncWarehouse {},
+                ..next
+            };
+            request_location_work(store, (&audit, None), &sync)
+                .await
+                .expect("sync request");
+            let claim = worker.poll(&poll).await.expect("poll").expect("sync claim");
+            assert_eq!(claim.request.work, LocationWork::SyncWarehouse {});
+            let answer = |outcome| LocationWorkResult {
+                claim_id: claim.claim_id,
+                session_id: poll.session_id,
+                outcome,
+            };
+            assert!(
+                worker
+                    .complete(
+                        sync.request_id,
+                        &answer(LocationWorkOutcome::Connection { healthy: true })
+                    )
+                    .await
+                    .is_err(),
+                "a sync request is not answered by a connection result"
+            );
+            assert!(
+                worker
+                    .complete(
+                        sync.request_id,
+                        &answer(LocationWorkOutcome::SyncStarted {})
+                    )
+                    .await
+                    .expect("sync started")
+            );
             stop_api(api).await;
             close_test_store(fixture).await;
         });

@@ -21,10 +21,11 @@ use crate::warehouse_metadata::main::ingest::ingest_old_name_views::ingest_old_n
 use crate::warehouse_metadata::main::ingest::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::main::ingest::ingest_statistics::ingest_statistics;
 use crate::warehouse_metadata::main::location_reads::read_statistics_due::read_statistics_due;
+use crate::warehouse_metadata::main::location_reads::read_sync_due::read_sync_due;
 use crate::warehouse_metadata::main::location_reads::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
-    MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseSyncResponse,
-    WarehouseWatermarkRead,
+    MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseSyncDue,
+    WarehouseSyncDueRead, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata", operation_id = "report_metadata",
@@ -94,5 +95,23 @@ pub(crate) async fn watermark(
     require_location(&identity, location_id)?;
     Ok(Json(
         read_watermark(&store, (location_id, &target), &request).await?,
+    ))
+}
+
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/sync-due",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = WarehouseSyncDueRead,
+    responses((status = 200, body = WarehouseSyncDue), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized"),
+        (status = 409, description = "Reader generation fenced")),
+    security(("bearer" = [])))]
+pub(crate) async fn sync_due(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Json(request): Json<WarehouseSyncDueRead>,
+) -> Result<Json<WarehouseSyncDue>, ApiError> {
+    require_location(&identity, location_id)?;
+    Ok(Json(
+        read_sync_due(&store, (location_id, &target), &request).await?,
     ))
 }

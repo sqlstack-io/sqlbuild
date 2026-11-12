@@ -3,11 +3,28 @@
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::decision::text;
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::main::_run_warehouse_sync::run_warehouse_sync;
 use crate::person_login::main::read_node_sql::read_node_sql;
 
 pub(crate) fn run_person_invocation(namespace: &Namespace) -> Option<i32> {
     if text(namespace, "command").as_deref() != Some("control") {
         return None;
+    }
+    let action = text(namespace, "person_action");
+    let misuse = match (action.as_deref(), text(namespace, "person_node").is_some()) {
+        (Some("sync"), true) => Some("sync takes no node; it syncs the whole target"),
+        (Some("sql"), false) => Some("sql needs an exact node key, for example model:orders"),
+        _ => None,
+    };
+    if let Some(message) = misuse {
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!("sqb control: error: {message}\n"),
+        )]));
+        return Some(2);
+    }
+    if action.as_deref() == Some("sync") {
+        return Some(run_warehouse_sync(namespace));
     }
     drop(write_output(&[(
         Stream::Stderr,

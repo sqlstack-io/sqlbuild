@@ -162,6 +162,7 @@ CREATE TABLE sqb_runs (
     last_heartbeat_at {time}
 );
 CREATE INDEX sqb_runs_location_time ON sqb_runs(location_id, target, queued_at);
+CREATE INDEX sqb_runs_location_ended ON sqb_runs(location_id, target, ended_at);
 CREATE INDEX sqb_runs_queue ON sqb_runs(priority DESC, queued_at) WHERE status = 'queued';
 CREATE INDEX sqb_runs_active ON sqb_runs(location_id, target, job_key) WHERE status IN ('queued', 'launched', 'running', 'unresponsive');
 CREATE TABLE sqb_run_nodes (

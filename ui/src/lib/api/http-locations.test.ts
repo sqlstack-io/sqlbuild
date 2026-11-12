@@ -73,7 +73,7 @@ describe('warehouseSyncOf', () => {
 			sync('2026-11-08T12:01:00Z', 'catalog', null),
 			sync('2026-11-08T12:00:00Z', 'statistics', 'delivery')
 		]);
-		expect(result).toEqual({ lastSyncedAt: '2026-11-08T12:02:00Z', lastError: 'catalog: failed while reading the warehouse' });
+		expect(result).toEqual({ lastSyncedAt: '2026-11-08T12:02:00Z', lastError: 'catalog: failed while reading the warehouse', lastReportedAt: '2026-11-08T12:03:00Z' });
 	});
 
 	it("gives each table its newest sync, the time it last synced cleanly, and where the state tables are read from", () => {

@@ -9,6 +9,7 @@
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import ConnectionTest from '$lib/components/platform/connection-test.svelte';
+	import WarehouseSyncNow from '$lib/components/platform/warehouse-sync-now.svelte';
 	import KeyValues from '$lib/components/platform/key-values.svelte';
 	import LocationTokens from '$lib/components/platform/location-tokens.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
@@ -95,6 +96,7 @@
 				</span>
 				<span class="right">
 					<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection ?? 'warehouse'} last={detail.connectionTest} />
+					<WarehouseSyncNow scope={{ locationId: detail.id }} />
 				</span>
 			</div>
 

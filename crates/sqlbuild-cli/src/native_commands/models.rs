@@ -204,9 +204,21 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) statistics_limit: usize,
     pub(crate) pending: Option<LocationMetadataPage>,
     pub(crate) next_at: tokio::time::Instant,
+    /// Between synchronizations; the warehouse is read again only after a run ends.
+    pub(crate) idle: bool,
+    /// Server time when the current or last synchronization began; `None` before the first.
+    pub(crate) cycle_started_at: Option<DateTime<Utc>>,
 }
 
 impl LocationMetadataSync {
+    /// A person asked for a sync: start one now when idle, or one more after the current one.
+    pub(crate) fn request_sync(&mut self) {
+        self.cycle_started_at = None;
+        if self.idle {
+            self.next_at = tokio::time::Instant::now();
+        }
+    }
+
     /// Failed samples revisit catalog before retrying; no frozen delivery is discarded.
     pub(crate) fn retry_read(&mut self) {
         self.statistics = None;

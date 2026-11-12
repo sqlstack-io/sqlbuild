@@ -2,42 +2,53 @@
 
 use uuid::Uuid;
 
+use crate::platform::constants::LOCATION_RETENTION_DAYS;
 use crate::platform::models::LocationHealthObservation;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// At most 100, newest first, from today's and yesterday's reports plus each instance's last check-in, of one target when given.
+/// At most 100, newest first, from the health retention window (a sync follows only runs) plus instance check-ins.
 pub(crate) async fn recent_health(
     transaction: ControlTransaction,
     location_id: Uuid,
     target: Option<&str>,
 ) -> Result<(ControlTransaction, Vec<LocationHealthObservation>), ControlError> {
     let today = transaction.now.date_naive();
-    let yesterday = today - chrono::TimeDelta::days(1);
+    let days = 0..=LOCATION_RETENTION_DAYS;
+    let target_placeholder = days.clone().count() + 1;
     let (event_target, instance_target) = match target {
-        Some(_) => (" AND payload->'report'->>'target'=$3", " AND target=$2"),
-        None => ("", ""),
+        Some(_) => (
+            format!(" AND payload->'report'->>'target'=${target_placeholder}"),
+            " AND target=$2",
+        ),
+        None => (String::new(), ""),
     };
     let target_parameter: Vec<Parameter> = target
         .map(|target| Parameter::Text(target.to_owned()))
         .into_iter()
         .collect();
+    let daily = days
+        .clone()
+        .map(|day| {
+            format!("SELECT * FROM (SELECT occurred_at AS received_at, invocation_sequence, payload FROM recall_events \
+                WHERE invocation_id=${} AND event_type='location_health'{event_target} ORDER BY invocation_sequence DESC LIMIT 100) day_{day}", day + 1)
+        })
+        .collect::<Vec<_>>()
+        .join(" UNION ALL ");
     let (transaction, rows) = query(
         transaction,
-        &format!("SELECT received_at, payload FROM (\
-            SELECT * FROM (SELECT occurred_at AS received_at, invocation_sequence, payload FROM recall_events \
-                WHERE invocation_id=$1 AND event_type='location_health'{event_target} ORDER BY invocation_sequence DESC LIMIT 100) current_day \
-            UNION ALL \
-            SELECT * FROM (SELECT occurred_at AS received_at, invocation_sequence, payload FROM recall_events \
-                WHERE invocation_id=$2 AND event_type='location_health'{event_target} ORDER BY invocation_sequence DESC LIMIT 100) previous_day\
-         ) observations ORDER BY received_at DESC, invocation_sequence DESC LIMIT 100"),
-        [
-            Parameter::Text(format!("location/{location_id}/{today}")),
-            Parameter::Text(format!("location/{location_id}/{yesterday}")),
-        ]
-        .into_iter()
+        &format!(
+            "SELECT received_at, payload FROM ({daily}) observations \
+            ORDER BY received_at DESC, invocation_sequence DESC LIMIT 100"
+        ),
+        days.map(|day| {
+            Parameter::Text(format!(
+                "location/{location_id}/{}",
+                today - chrono::TimeDelta::days(day)
+            ))
+        })
         .chain(target_parameter.clone())
         .collect(),
     )

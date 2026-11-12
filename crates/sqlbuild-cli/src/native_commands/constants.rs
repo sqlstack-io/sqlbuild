@@ -93,8 +93,10 @@ pub(crate) const UNCAUGHT_EXCEPTION_STATUS: i32 = 1;
 /// Reserve half the location work claim for acknowledgement retries after killing a callback.
 pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
 pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
-/// Independent read timeout and delay between automatic history polls.
+/// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.
 pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
+/// How often an idle location asks the server, never the warehouse, whether a run ended.
+pub(crate) const METADATA_SYNC_CHECK_SECONDS: u64 = 5;
 /// Full key-set reconciliation is independent of the incremental poll and overlap window.
 pub(crate) const METADATA_RECONCILE_SECONDS: u32 = 300;
 pub(crate) const METADATA_OVERLAP_SECONDS: i64 = 300;

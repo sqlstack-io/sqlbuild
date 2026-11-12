@@ -40,6 +40,10 @@ pub(crate) fn router(store: &ControlStore, feed: ChangeFeed) -> Router<ControlSt
             post(warehouse_metadata::statistics_due),
         )
         .route(
+            "/api/locations/{location_id}/targets/{target}/metadata/sync-due",
+            post(warehouse_metadata::sync_due),
+        )
+        .route(
             "/api/locations/{location_id}/targets/{target}/metadata/watermark",
             post(warehouse_metadata::watermark),
         )

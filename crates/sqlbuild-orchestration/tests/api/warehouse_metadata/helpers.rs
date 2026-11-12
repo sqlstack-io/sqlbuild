@@ -9,7 +9,7 @@ use crate::store::main::decompress::decompress;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::warehouse_metadata::models::{MetadataBatch, WarehouseWatermarkRead};
@@ -513,6 +513,90 @@ pub(crate) async fn fingerprint_history(
             StatusCode::UNPROCESSABLE_ENTITY
         );
     }
+}
+
+/// Sync-due answers only the fenced reader's own location and target, with nothing but two times.
+pub(crate) async fn sync_due_scope(
+    store: &ControlStore,
+    (session_id, preview_session_id): (Uuid, Uuid),
+    (client, url, bearer): (&Client, &str, &str),
+) {
+    let ended_at = "2026-01-01T09:00:00Z";
+    let run_id = Uuid::now_v7();
+    let (transaction, _) = query(begin(store, TransactionMode::Write).await.expect("write"),
+        "INSERT INTO sqb_runs (run_id,location_id,target,snapshot_id,kind,origin,root_run_id,requested_by,\
+         selection_json,request_json,write_set_digest,status,queued_at,ended_at,node_counts_json,last_event_storage_id) \
+         SELECT $1,location_id,target,snapshot_id,'adhoc','manual',$2,'test-admin',$3,$4,'','success',$5,$6,$7,0 \
+         FROM sqb_current_snapshots WHERE target='preview'",
+        vec![Parameter::Id(run_id), Parameter::Id(run_id), Parameter::Json(json!([])), Parameter::Json(json!({})),
+            Parameter::Time(ended_at.parse().expect("time")), Parameter::Time(ended_at.parse().expect("time")),
+            Parameter::Json(json!({}))]).await.expect("preview run");
+    commit(transaction).await.expect("close write");
+    let due_url = format!("{url}/sync-due");
+    let preview_url = due_url.replace("/development/", "/preview/");
+    let body =
+        |session: Uuid, generation: i64| json!({"session_id": session, "generation": generation});
+    for (endpoint, session, expected) in [
+        (&due_url, session_id, Value::Null),
+        (&preview_url, preview_session_id, json!(ended_at)),
+    ] {
+        let reply: Value = client
+            .post(endpoint)
+            .bearer_auth(bearer)
+            .json(&body(session, 1))
+            .send()
+            .await
+            .expect("sync due")
+            .json()
+            .await
+            .expect("sync due reply");
+        let fields = reply.as_object().expect("object");
+        let mut keys: Vec<_> = fields.keys().collect();
+        keys.sort();
+        assert_eq!(keys, ["now", "runs_ended_at"]);
+        let ended = fields["runs_ended_at"]
+            .as_str()
+            .map(|time| time.parse::<chrono::DateTime<chrono::Utc>>().expect("time"));
+        let wanted = expected.as_str().map(|time| time.parse().expect("time"));
+        assert_eq!(ended, wanted, "another target's runs never count");
+    }
+    let other_location = due_url.replace(
+        url.split('/').nth(5).expect("location id"),
+        &Uuid::now_v7().to_string(),
+    );
+    for (endpoint, request, status) in [
+        (&due_url, body(session_id, 0), StatusCode::CONFLICT),
+        (
+            &due_url,
+            body(preview_session_id, 1),
+            StatusCode::BAD_REQUEST,
+        ),
+        (&preview_url, body(session_id, 1), StatusCode::BAD_REQUEST),
+        (&other_location, body(session_id, 1), StatusCode::FORBIDDEN),
+    ] {
+        assert_eq!(
+            client
+                .post(endpoint)
+                .bearer_auth(bearer)
+                .json(&request)
+                .send()
+                .await
+                .expect("refused sync due")
+                .status(),
+            status,
+            "{endpoint} {request}"
+        );
+    }
+    assert_eq!(
+        client
+            .post(&due_url)
+            .json(&body(session_id, 1))
+            .send()
+            .await
+            .expect("anonymous sync due")
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
 }
 
 async fn mirrored_fingerprints(store: &ControlStore) -> Vec<Value> {

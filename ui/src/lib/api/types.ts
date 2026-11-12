@@ -61,11 +61,13 @@ export type Snapshot = {
 	sqbVersion: string;
 };
 
-/** The location reads SQLBuild's own tables back from the warehouse on its own schedule. */
+/** The location reads SQLBuild's own tables back from the warehouse after each run ends, and on request. */
 export type WarehouseSync = {
 	lastSyncedAt: Iso | null;
 	/** Why the latest sync failed; null when it succeeded. */
 	lastError: string | null;
+	/** When the newest sync report arrived, failed or not; a new one means a requested sync has finished. */
+	lastReportedAt?: Iso | null;
 };
 
 /** The one target a location is deployed against, e.g. `prod` on Snowflake. */

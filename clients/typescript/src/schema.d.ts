@@ -818,6 +818,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/warehouse-syncs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestWarehouseSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/platform/events": {
         parameters: {
             query?: never;
@@ -1004,6 +1020,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["statistics_due"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/metadata/sync-due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["sync_due"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1524,11 +1556,6 @@ export interface components {
             rejected_sha256: string;
             table: components["schemas"]["Table"];
         };
-        ConnectionTestRequest: {
-            reason: string;
-            /** Format: uuid */
-            request_id: string;
-        };
         /** @description What the UI needs first: how people sign in, and what this person may see and do. */
         ControlBootstrap: {
             access: components["schemas"]["PersonAccess"];
@@ -1777,6 +1804,9 @@ export interface components {
             /** @enum {string} */
             kind: "check_connection";
         } | {
+            /** @enum {string} */
+            kind: "sync_warehouse";
+        } | {
             evaluation: Record<string, never>;
             /** @enum {string} */
             kind: "evaluate_sensor";
@@ -1810,6 +1840,9 @@ export interface components {
             document: Record<string, never>;
             /** @enum {string} */
             kind: "plan";
+        } | {
+            /** @enum {string} */
+            kind: "sync_started";
         } | {
             /** @enum {string} */
             kind: "superseded";
@@ -2192,6 +2225,12 @@ export interface components {
             latest_tick?: null | components["schemas"]["TickRecord"];
             /** @description A running schedule's next due times from `next_due_at` on, at most five; empty otherwise. */
             upcoming: string[];
+        };
+        /** @description A person asks a location for one named read-only operation, such as a connection test. */
+        PersonWorkRequest: {
+            reason: string;
+            /** Format: uuid */
+            request_id: string;
         };
         /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
         PhysicalEvidence: {
@@ -3106,6 +3145,20 @@ export interface components {
             row_count?: number | null;
             state_database?: string | null;
             state_schema: string;
+        };
+        /** @description Both times come from the server clock, so the reader compares them without clock skew. */
+        WarehouseSyncDue: {
+            /** Format: date-time */
+            now: string;
+            /** Format: date-time */
+            runs_ended_at?: string | null;
+        };
+        /** @description A registered reader asks whether a run ended since its last synchronization began. */
+        WarehouseSyncDueRead: {
+            /** Format: int64 */
+            generation: number;
+            /** Format: uuid */
+            session_id: string;
         };
         /**
          * @description Closed failure stages keep warehouse errors and credentials out of health observations.
@@ -4104,7 +4157,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ConnectionTestRequest"];
+                "application/json": components["schemas"]["PersonWorkRequest"];
             };
         };
         responses: {
@@ -5308,6 +5361,57 @@ export interface operations {
             };
         };
     };
+    requestWarehouseSync: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonWorkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     listPersonPlatformEvents: {
         parameters: {
             query?: {
@@ -5803,6 +5907,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatisticsRead"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sync_due: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseSyncDueRead"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncDue"];
                 };
             };
             400: {

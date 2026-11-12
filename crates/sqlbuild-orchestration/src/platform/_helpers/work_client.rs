@@ -10,7 +10,8 @@ use crate::platform::models::{
     LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
-    MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseSyncResponse, WarehouseWatermarkRead,
+    MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseSyncDue, WarehouseSyncDueRead,
+    WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
@@ -41,6 +42,15 @@ impl LocationWorkClient {
         request: &WarehouseWatermarkRead,
     ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ClientError> {
         self.post_metadata((target, Some("watermark")), request)
+            .await
+    }
+
+    pub async fn metadata_sync_due(
+        &self,
+        target: &str,
+        request: &WarehouseSyncDueRead,
+    ) -> Result<WarehouseSyncDue, ClientError> {
+        self.post_metadata((target, Some("sync-due")), request)
             .await
     }
 

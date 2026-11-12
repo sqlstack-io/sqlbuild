@@ -551,6 +551,35 @@ describe('administration writes', () => {
 	});
 });
 
+describe('requestWarehouseSync', () => {
+	function server(status: number) {
+		const calls: Request[] = [];
+		vi.stubGlobal('document', { cookie: '__Host-sqb-csrf=token-1' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				calls.push(request);
+				return status === 200 ? Response.json({ applied: true }) : Response.json({ error: 'You may not test this location', decision_id: 'd-1' }, { status });
+			})
+		);
+		return { calls, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('asks the location to sync with one CSRF-protected request and does not wait for the sync', async () => {
+		const { calls, client } = server(200);
+		await client.requestWarehouseSync(ORDERS);
+		expect(calls.map((c) => [c.method, new URL(c.url).pathname, c.headers.get('x-sqb-csrf')])).toEqual([
+			['POST', '/api/control/locations/0191f0aa-orders/targets/development/warehouse-syncs', 'token-1']
+		]);
+		expect(await calls[0].json()).toMatchObject({ reason: 'Requested from the web UI' });
+	});
+
+	it('reports a refused request with its status', async () => {
+		const { client } = server(403);
+		await expect(client.requestWarehouseSync(ORDERS)).rejects.toMatchObject({ status: 403 });
+	});
+});
+
 describe('testConnection', () => {
 	const record = (completed: string | null, outcome: unknown = null) => ({
 		generation: 1,

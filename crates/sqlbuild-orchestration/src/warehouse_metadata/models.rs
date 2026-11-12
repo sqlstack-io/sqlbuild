@@ -390,6 +390,22 @@ pub struct WarehouseWatermarkRead {
     pub kind: WarehouseHistoryKind,
 }
 
+/// A registered reader asks whether a run ended since its last synchronization began.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseSyncDueRead {
+    pub session_id: Uuid,
+    pub generation: i64,
+}
+
+/// Both times come from the server clock, so the reader compares them without clock skew.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseSyncDue {
+    pub runs_ended_at: Option<DateTime<Utc>>,
+    pub now: DateTime<Utc>,
+}
+
 /// Private interpreter input; cursor values are data and receive adapter literal rendering.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

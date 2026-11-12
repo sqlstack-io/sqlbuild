@@ -167,6 +167,7 @@ export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][
 	const failing = [...newest.values()].flatMap((s) => (s.report.health.failure ? [`${s.report.health.table}: failed while ${SYNC_STAGE[s.report.health.failure]}`] : []));
 	return {
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,
-		lastError: failing.length ? failing.sort().join('\n') : null
+		lastError: failing.length ? failing.sort().join('\n') : null,
+		lastReportedAt: syncs[0].received_at
 	};
 }

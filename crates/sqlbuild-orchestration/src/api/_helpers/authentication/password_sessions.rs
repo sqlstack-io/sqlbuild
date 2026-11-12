@@ -111,6 +111,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             post(crate::api::_helpers::resources::person_location_work::request),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/warehouse-syncs",
+            post(crate::api::_helpers::resources::person_location_work::request_sync),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/connection-tests/{request_id}",
             get(crate::api::_helpers::resources::person_location_work::result),
         )
