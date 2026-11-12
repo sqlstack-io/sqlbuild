@@ -16,11 +16,11 @@ SELECT id AS order_id, customer_id, status
 FROM __source("raw__orders")
 ```
 
-View audits run after the view has been replaced. A failing audit marks the build as failed but cannot preserve the previous view. Views use compile-time contract and type analysis; SQLBuild does not rewrite the view with runtime casts or run the staged runtime-contract step.
+Views are checked at compile time only; SQLBuild doesn't add runtime casts or contract checks to a view.
 
 ## Table
 
-By default, creates a staging table, applies supported type and contract enforcement, runs blocking audits, and only then promotes it to the destination. A pre-promotion failure leaves the previous destination unchanged.
+Builds the new table in a staging table, checks its types and contract, runs blocking audits, and only then replaces the old table.
 
 ```sql
 MODEL (description "One row per order", materialized table);
@@ -30,7 +30,7 @@ FROM __ref("stg_orders")
 GROUP BY customer_id
 ```
 
-Projects may opt into `settings.table_promotion_mode = "immediate"`. Immediate promotion replaces the destination before audits, so a failed audit does not restore the old table. Immediate promotion rejects models that require declared-type enforcement or `contract enforced`; use staged promotion for those guarantees. A table or incremental model with `contract enforced` under immediate promotion is a `K011` compile error, so `sqb compile`, `sqb plan`, `sqb build`, and `sqb scenario test` report it before any warehouse work.
+Set `[settings] table_promotion_mode = "immediate"` to build straight into the destination and audit afterwards. Immediate promotion can't enforce declared types or `contract enforced`: a model that needs them is a `K011` compile error.
 
 ## Incremental
 
@@ -48,7 +48,7 @@ MODEL (
 );
 ```
 
-For non-microbatch models, the first run, `--full-refresh`, and a full replay-on-change rebuild use the full-table path rather than incremental DML. Microbatch models retain batched execution: a full rebuild drops the existing target, creates its replacement from the first batch, and applies later batches with incremental DML. A failed full-refresh microbatch does not preserve the previous target.
+The first run, `--full-refresh` and a full `replay_on_change` rebuild build the whole table, as a table model does. A microbatch model instead drops the table and rebuilds it batch by batch.
 
 See [Incremental](/docs/concepts/incremental) for cursor semantics, replay, schema changes, and microbatch execution.
 
@@ -98,3 +98,14 @@ WHERE ordered_at >= @@@partition_start
 The `config` block is passed to the Python function through `ctx.config`. Runtime-owned `@@@placeholder` values remain unresolved until materialization execution.
 
 The custom function owns staging, runtime type or contract enforcement, audit timing, promotion, and rollback. Framework final audits run after the function returns unless `MaterializationResult.audit_results` is populated. A custom materialization can call `ctx.run_audits` against a staging relation before applying changes and return those results through `MaterializationResult.audit_results`.
+
+## When a build fails
+
+| Materialization | What a failed build leaves |
+|-----------------|----------------------------|
+| View | The new view. Audits run after it is replaced. |
+| Table (staged, the default) | The old table, untouched. Checks and audits run before it is replaced. |
+| Table (`immediate`) | The new table. Audits run after it is replaced. |
+| Incremental | The old table. Delta audits run before rows are written. |
+| Microbatch full rebuild | A partly rebuilt table; the old one was dropped first. |
+| Custom | Whatever the custom materialization does. |

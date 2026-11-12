@@ -13,10 +13,7 @@ SQLBuild evaluates a project in this order:
 Native built-ins always run before custom Rules. Structured compile output reports built-in and
 custom durations separately, together with cache hits and misses.
 
-## Authoritative enforcement
-
-`sqb compile` runs the complete configured Rules set. Build and execution commands use the same
-compiler path and reject Rule findings before opening a warehouse connection.
+## What a selection checks
 
 `sqb rules run` is intentionally focused. Use it to inspect one exact code or family, but run the
 normal compiler before treating the complete project as valid.
