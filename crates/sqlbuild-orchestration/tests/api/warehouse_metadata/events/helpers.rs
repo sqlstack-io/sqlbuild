@@ -137,7 +137,8 @@ pub(crate) async fn event_history(
         table: kind.mirror_table(),
         operation: "INSERT",
         condition: "WHEN 'rejected-result' IN (NEW.record_json ->> 'event_id', NEW.record_json ->> 'result_id', \
-            NEW.record_json ->> 'node_name', NEW.record_json ->> 'execution_id')",
+            NEW.record_json ->> 'node_name', NEW.record_json ->> 'execution_id', \
+            NEW.record_json ->> 'observation_id')",
         sqlite_body: "SELECT RAISE(ABORT, 'injected audit failure')",
         postgres_body: "RAISE EXCEPTION 'injected audit failure'",
     };

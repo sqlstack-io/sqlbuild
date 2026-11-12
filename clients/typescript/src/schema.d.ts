@@ -3082,7 +3082,7 @@ export interface components {
          * @description Catalog observations require full scans; only immutable history supports a watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "column_migrations" | "node_results" | "consumption" | "catalog" | "statistics";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "column_migrations" | "node_results" | "consumption" | "observations" | "catalog" | "statistics";
         /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
         WarehouseJanitorRecord: {
             archive_name: string;

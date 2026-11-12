@@ -40,6 +40,7 @@ from sqlbuild._native import (
     OldNameViewEventType,
     StateSqlValueType,
     build_consumption_create_table_sql,
+    build_observations_create_table_sql,
     render_state_sql_literal,
     write_fingerprint,
     write_migration_state_event,
@@ -313,6 +314,39 @@ def append_consumption_history(adapter: Any, connection: Any, fixture: dict[str,
         _ = adapter.execute(
             connection=connection,
             sql=f"INSERT INTO main._sqlbuild_consumption ({', '.join(columns)}) "
+            f"VALUES ({', '.join(values)})",
+        )
+
+
+def append_observation_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Observation rows in the real table layout; retried appends repeat identical rows."""
+    _ = adapter.execute(
+        connection=connection,
+        sql=build_observations_create_table_sql(
+            database=None,
+            schema="main",
+            render_qualified_name=adapter.render_qualified_name,
+            render_framework_type=adapter.render_framework_type,
+        ),
+    )
+    columns: list[str] = list(fixture["record"])[2:]
+    types: dict[str, StateSqlValueType] = dict.fromkeys(columns, StateSqlValueType.STRING) | {
+        "observed_at": StateSqlValueType.TEXT_TIMESTAMP
+    }
+    rows: list[dict[str, Any]] = [
+        row | {"observed_at": datetime.fromisoformat(row["observed_at"])}
+        for row in identified_rows(fixture)
+    ]
+    for row in rows + [rows[0]] * fixture["duplicate_rows"]:
+        values: list[str] = [
+            render_state_sql_literal(
+                value=row[column], declared_type=types[column], timestamp_type="TIMESTAMP"
+            )
+            for column in columns
+        ]
+        _ = adapter.execute(
+            connection=connection,
+            sql=f"INSERT INTO main._sqlbuild_observations ({', '.join(columns)}) "
             f"VALUES ({', '.join(values)})",
         )
 

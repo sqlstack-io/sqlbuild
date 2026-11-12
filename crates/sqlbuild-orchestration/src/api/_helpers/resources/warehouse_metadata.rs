@@ -17,6 +17,7 @@ use crate::warehouse_metadata::main::ingest::ingest_janitor_events::ingest_janit
 use crate::warehouse_metadata::main::ingest::ingest_microbatches::ingest_microbatches;
 use crate::warehouse_metadata::main::ingest::ingest_migrations::ingest_migrations;
 use crate::warehouse_metadata::main::ingest::ingest_node_results::ingest_node_results;
+use crate::warehouse_metadata::main::ingest::ingest_observations::ingest_observations;
 use crate::warehouse_metadata::main::ingest::ingest_old_name_views::ingest_old_name_views;
 use crate::warehouse_metadata::main::ingest::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::main::ingest::ingest_statistics::ingest_statistics;
@@ -56,6 +57,7 @@ pub(crate) async fn report(
         }
         WarehouseHistoryKind::NodeResults => ingest_node_results(&store, scope, &batch).await,
         WarehouseHistoryKind::Consumption => ingest_consumption(&store, scope, &batch).await,
+        WarehouseHistoryKind::Observations => ingest_observations(&store, scope, &batch).await,
         WarehouseHistoryKind::Catalog => ingest_catalog(&store, scope, &batch).await,
         WarehouseHistoryKind::Statistics => ingest_statistics(&store, scope, &batch).await,
     }?;
