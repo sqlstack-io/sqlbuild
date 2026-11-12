@@ -2204,12 +2204,16 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     ) -> str | None:
         """The last commit time, which cloud services answer without resuming a warehouse."""
 
-        qualified: str = self.render_qualified_name(database=database, schema=schema, name=name)
-        rows: list[tuple[Any, ...]] = self.execute(
-            connection=connection,
-            sql=f"SELECT SYSTEM$LAST_CHANGE_COMMIT_TIME({self._quote_sql_string(qualified)})",
-        ).fetchall()
-        return None if not rows or rows[0][0] is None else str(rows[0][0])
+        qualified: str | None = self.render_qualified_name(
+            database=database, schema=schema, name=name
+        )
+        if qualified is None:
+            return None
+        literal: str = self._quote_sql_string(qualified)
+        token_sql: str = f"SELECT SYSTEM$LAST_CHANGE_COMMIT_TIME({literal})"
+        result: QueryResult = self.query(connection=connection, sql=token_sql, limit=1)
+        token: object = result.rows[0][0] if result.rows else None
+        return None if token is None else str(token)
 
     def read_schema_relation_listing(
         self, *, connection: _SnowflakeConnection, database: str | None, schema: str
