@@ -2301,6 +2301,18 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             render_framework_type=self.render_framework_type,
         )
 
+    def render_create_observations_table_sql(self, *, database: str | None, schema: str) -> str:
+        """Render DDL that creates the observations table when it is missing."""
+
+        from sqlbuild._native import build_observations_create_table_sql
+
+        return build_observations_create_table_sql(
+            database=database,
+            schema=schema,
+            render_qualified_name=self.render_qualified_name,
+            render_framework_type=self.render_framework_type,
+        )
+
     def render_create_consumption_index_sqls(
         self,
         *,
@@ -2472,6 +2484,18 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         retain_versions: int,
     ) -> str:
         """Render SQL that prunes old consumption executions."""
+
+        del database, schema, retain_versions
+        raise AdapterUserError(message="direct-state history pruning is adapter-specific")
+
+    def render_prune_observations_history_sql(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+        retain_versions: int,
+    ) -> str:
+        """Render SQL that prunes old observations."""
 
         del database, schema, retain_versions
         raise AdapterUserError(message="direct-state history pruning is adapter-specific")

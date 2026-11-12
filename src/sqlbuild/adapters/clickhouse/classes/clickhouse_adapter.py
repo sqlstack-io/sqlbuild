@@ -32,6 +32,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
 from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_snapshot_sql import render_is_distinct_from
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
+from sqlbuild.adapter.contract.classes.observations import ObservationsMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.classes.unkeyed_diff import UnkeyedDiffMixin
@@ -154,7 +155,9 @@ _NOT_NULL_COLUMN_PATTERN: re.Pattern[str] = re.compile(
 )
 
 
-class ClickHouseAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
+class ClickHouseAdapter(
+    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+):
     """ClickHouse adapter that builds tables aside and rewrites whole partitions."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.CLICKHOUSE.value
@@ -1924,6 +1927,11 @@ class ClickHouseAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
     def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
         return _state_table_ddl(
             super().render_create_consumption_table_sql(database=database, schema=schema)
+        )
+
+    def render_create_observations_table_sql(self, *, database: str | None, schema: str) -> str:
+        return _state_table_ddl(
+            super().render_create_observations_table_sql(database=database, schema=schema)
         )
 
     def render_create_node_result_table_sql(self, *, database: str | None, schema: str) -> str:

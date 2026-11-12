@@ -38,6 +38,7 @@ from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import 
     HistoricalTimestampSnapshotSql,
 )
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
+from sqlbuild.adapter.contract.classes.observations import ObservationsMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.classes.unkeyed_diff import UnkeyedDiffMixin
@@ -151,7 +152,9 @@ from sqlbuild.runtime.observability.classes.statement_lifecycle import Statement
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
-class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
+class BigQueryAdapter(
+    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+):
     """BigQuery adapter backed by google-cloud-bigquery."""
 
     def get_columns_for_relations(
