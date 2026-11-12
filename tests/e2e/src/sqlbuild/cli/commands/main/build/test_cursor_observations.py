@@ -10,9 +10,12 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     CursorObservationBuildE2ETestCase,
+    DisplayOnlyObservationE2ETestCase,
     SourceColumnObservationE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    execute_duckdb,
+    normalize_cli_output,
     prepare_inline_project,
     query_duckdb,
     run_sqb,
@@ -178,3 +181,56 @@ def test_given_expression_source_when_building_then_source_column_observations_a
         -1
     ].stderr
     assert tuple(observations) == test_case.expected_observations
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DisplayOnlyObservationE2ETestCase(
+            description="cursor_max past the live MAX still appends from the inclusive live bound",
+            injected_observations=(
+                ("order_ids", "integer", "999"),
+                ("orders", "timestamp", "2099-01-01 00:00:00"),
+            ),
+            added_seed_rows="3,2026-01-01 02:00:00\n",
+            expected_row_counts=(("order_ids", 4), ("orders", 4)),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_wrong_cursor_observation_when_planning_and_building_then_live_max_is_used(
+    tmp_path: Path, test_case: DisplayOnlyObservationE2ETestCase
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="display_only_observations", repo_files=_PROJECT_FILES
+    )
+    database: Path = project_dir / "observations.duckdb"
+    first: subprocess.CompletedProcess[str] = run_sqb(command=("build",), project_dir=project_dir)
+    assert first.returncode == 0, first.stderr
+    seed: Path = project_dir / "seeds/raw_orders.csv"
+    seed.write_text(seed.read_text() + test_case.added_seed_rows)
+
+    honest: subprocess.CompletedProcess[str] = run_sqb(command=("plan",), project_dir=project_dir)
+    node: str
+    cursor_type: str
+    value: str
+    for node, cursor_type, value in test_case.injected_observations:
+        execute_duckdb(
+            db_path=database,
+            sql=(
+                "INSERT INTO main._sqlbuild_observations VALUES "
+                f"('injected-{node}', 'cursor_max', '{node}', '{cursor_type}', '{value}', "
+                "'injected-run', '2099-01-01 00:00:00')"
+            ),
+        )
+    misled: subprocess.CompletedProcess[str] = run_sqb(command=("plan",), project_dir=project_dir)
+    build: subprocess.CompletedProcess[str] = run_sqb(command=("build",), project_dir=project_dir)
+    counts: tuple[tuple[str, int], ...] = tuple(
+        (name, query_duckdb(db_path=database, sql=f"SELECT COUNT(*) FROM main.{name}")[0][0])
+        for name, _ in test_case.expected_row_counts
+    )
+
+    assert honest.returncode == misled.returncode == 0, misled.stderr
+    assert normalize_cli_output(misled.stdout) == normalize_cli_output(honest.stdout)
+    assert build.returncode == 0, build.stderr
+    assert counts == test_case.expected_row_counts

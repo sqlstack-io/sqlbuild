@@ -373,6 +373,19 @@ class CursorObservationBuildE2ETestCase:
 
 
 @dataclass(frozen=True)
+class DisplayOnlyObservationE2ETestCase:
+    """A wrong cursor observation that plan and build must ignore in favour of the live MAX.
+
+    A misled build would append nothing; the live bound is inclusive, so it re-reads the MAX row.
+    """
+
+    description: str
+    injected_observations: tuple[tuple[str, str, str], ...]
+    added_seed_rows: str
+    expected_row_counts: tuple[tuple[str, int], ...]
+
+
+@dataclass(frozen=True)
 class SourceColumnObservationE2ETestCase:
     """Commands after which each build, and no plan, must have recorded described source columns."""
 

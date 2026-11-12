@@ -1630,9 +1630,10 @@ tooling = []
 rule_packs = ["rust"]
 rule_modules = [
     "scripts.fensu_policy.rules.native_boundary",
+    "scripts.fensu_policy.rules.observation_boundary",
     "scripts.fensu_policy.rules.unused_state",
 ]
-select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077"]
+select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078"]
 
 [targets.rust.rule_options.XSB076]
 schema_paths = ["crates/sqlbuild-orchestration/src/store"]
@@ -1644,6 +1645,19 @@ allowed = [
     "sqb_warehouse_microbatches.execution_run_id=Reader comes with the UI epic (D132), which filters on it: the run that executed the batch.",
     "sqb_warehouse_microbatches.record_type=Reader comes with the UI epic (D132), which filters on it: the batch state.",
     "sqb_warehouse_migrations.decision=Reader comes with the UI epic (D132), which filters on it.",
+]
+
+[targets.rust.rule_options.XSB078]
+allowed_paths = [
+    "crates/sqlbuild-core/src/constants.rs=Names the observation state table.",
+    "crates/sqlbuild-orchestration=Mirrors observations into the control store and serves them for display.",
+    "crates/sqlbuild-python/src/bindings/_helpers/cli/registration.rs=Registers the observation state bindings.",
+    "crates/sqlbuild-python/src/bindings/_helpers/exported_constants=Exports the table name to Python adapters, which create it.",
+    "crates/sqlbuild-python/src/bindings/_helpers/janitor=Prunes observation history.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/mod.rs=Declares the observation state bindings module.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/observations_state.rs=Renders observation state SQL for adapters.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/warehouse_metadata.rs=Reads observations for the control-store mirror.",
+    "crates/sqlbuild-python/src/bindings/_helpers/observations=Writes observations after a build.",
 ]
 
 [targets.rust.rule_options.XSB077]
