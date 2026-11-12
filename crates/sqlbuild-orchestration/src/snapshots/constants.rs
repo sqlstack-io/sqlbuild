@@ -4,6 +4,19 @@ pub(crate) const DEFAULT_SNAPSHOT_RETENTION_COUNT: u16 = 10;
 pub(crate) const SNAPSHOT_RETENTION_BATCH: usize = 10;
 pub(crate) const CONTENT_HASH_CHUNK: usize = 500;
 
+/// `{node_key: {column: {"expression_range": [start, end]}}}`; readers skip unknown column keys.
+pub(crate) const COLUMNS_DOCUMENT: &str = "columns";
+/// Snapshot document kinds: per-snapshot metadata that never changes a node hash or node change.
+pub(crate) const SNAPSHOT_DOCUMENT_KINDS: [&str; 7] = [
+    "jobs",
+    "groups",
+    "triggers",
+    "roles",
+    "lineage",
+    COLUMNS_DOCUMENT,
+    "providers",
+];
+
 /// Beyond the newest generations, any retained reference keeps a snapshot.
 pub(crate) const EXPIRED_SNAPSHOTS: &str = "SELECT s.snapshot_id FROM sqb_snapshots s \
     WHERE (SELECT COUNT(*) FROM sqb_snapshots newer WHERE newer.location_id=s.location_id \

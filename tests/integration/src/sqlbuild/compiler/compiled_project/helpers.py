@@ -32,6 +32,7 @@ from sqlbuild._native import (
     assemble_project,
     build_compile_inputs,
     build_compiled_project,
+    build_orchestration_snapshot,
     discover_project_inputs,
     extract_sql_references,
 )
@@ -47,6 +48,9 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 if TYPE_CHECKING:
     from sqlbuild._native import CompileInputsView
+    from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
+        SnapshotExpressionRangeTestCase,
+    )
 
 METADATA: dict[str, Any] = {
     "location_id": str(UUID(int=1)),
@@ -695,3 +699,32 @@ def _located_binding(diagnostic: CompilerDiagnostic) -> tuple[object, ...]:
         diagnostic.column,
         getattr(diagnostic.location, "end_column", None),
     )
+
+
+def published_texts(test_case: SnapshotExpressionRangeTestCase, tmp_path: Path) -> dict[str, str]:
+    """Publish the case's project and return each ranged column's compiled-SQL text."""
+    write_files(project_dir=tmp_path, files=test_case.files)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discovered,
+        adapter=test_case.adapter(),
+        resolved_connection={"database": "WAREHOUSE", "schema": "MAIN"},
+    )
+    assert not any(item.severity == "error" for item in project.diagnostics), [
+        item.message for item in project.diagnostics
+    ]
+    publication: dict[str, Any] = json.loads(
+        build_orchestration_snapshot(
+            project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
+        ).to_json()
+    )
+    key: str = f"model:{test_case.model_name}"
+    node: dict[str, Any] = publication["nodes"][key]
+    assert node["compiled_sql"] != node["raw_sql"]
+    assert "expression_range" not in json.dumps(node), "ranges stay out of node identity"
+    compiled: bytes = node["compiled_sql"].encode()
+    columns: dict[str, Any] = publication["documents"].get("columns", {}).get(key, {})
+    return {
+        column: compiled[slice(*metadata["expression_range"])].decode()
+        for column, metadata in columns.items()
+    }

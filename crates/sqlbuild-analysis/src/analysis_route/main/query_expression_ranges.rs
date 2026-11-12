@@ -2,12 +2,10 @@
 
 use crate::analysis_route::main::analysis_route::analysis_route;
 use crate::analysis_route::models::AnalysisRoute;
-use crate::semantic_validation::_helpers::normalization::normalize_native_sql_mapped;
+use crate::semantic_validation::main::normalize_native_filled::normalize_native_filled;
 use crate::sql_macros::models::TextSplice;
 
-/// Each byte range of `analysis_sql`'s cleaned native analysis SQL as the byte range of the query
-/// SQL that `passes` rewrote, in order, into `analysis_sql`; `None` where there was none, where an
-/// end falls inside rewritten text, or where the dialect has no native analysis.
+/// Each cleaned-SQL byte range as a range of the SQL `passes` rewrote into `analysis_sql`.
 #[must_use]
 pub fn query_expression_ranges(
     dialect: &str,
@@ -19,7 +17,7 @@ pub fn query_expression_ranges(
         return vec![None; ranges.len()];
     };
     let Ok((cleaned, offsets)) =
-        normalize_native_sql_mapped(analysis_sql, dialect, module.stub_prefix(), placeholders)
+        normalize_native_filled(analysis_sql, dialect, module.stub_prefix(), placeholders)
     else {
         return vec![None; ranges.len()];
     };
@@ -35,6 +33,9 @@ pub fn query_expression_ranges(
     characters[cleaned.len()] = Some(cleaned.chars().count());
     let query_byte = |cleaned_byte: usize| -> Option<usize> {
         let character: usize = (*characters.get(cleaned_byte)?)?;
+        if !copied_boundary(&offsets, character) {
+            return None;
+        }
         let byte: usize = *analysis_bytes.get(*offsets.get(character)?)?;
         passes
             .iter()
@@ -51,8 +52,18 @@ pub fn query_expression_ranges(
         .collect()
 }
 
-/// The source byte of output byte `byte` of a pass whose `splices` are in text order; a byte at
-/// a splice's edge maps to the same edge of its source, and one inside rewritten text has none.
+/// Whether cleaned boundary `character` lies between source-adjacent characters, so maps exactly.
+fn copied_boundary(offsets: &[usize], character: usize) -> bool {
+    let Some(previous) = character.checked_sub(1) else {
+        return offsets.first() == Some(&0);
+    };
+    offsets
+        .get(previous)
+        .zip(offsets.get(character))
+        .is_some_and(|(before, after)| before + 1 == *after)
+}
+
+/// The source byte of output `byte`; splice edges map to source edges, inner bytes to `None`.
 fn spliced_back(byte: usize, splices: &[TextSplice]) -> Option<usize> {
     let (mut source_end, mut output_end): (usize, usize) = (0, 0);
     for splice in splices {

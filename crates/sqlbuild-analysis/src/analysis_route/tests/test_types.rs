@@ -353,3 +353,21 @@ pub(super) struct TsqlTypeTestCase {
     pub(super) spelling: &'static str,
     pub(super) expected_type: Option<(&'static str, TypeFamily)>,
 }
+
+pub(super) struct ExpressionRangeTestCase {
+    pub(super) description: &'static str,
+    pub(super) query_sql: &'static str,
+    pub(super) placeholders: &'static [(&'static str, &'static str)],
+    /// Each typed expression macro call as `(call text, returned type)`.
+    pub(super) typed_calls: &'static [(&'static str, &'static str)],
+    /// Each output column and the text of `query_sql` its mapped range covers.
+    pub(super) expected_texts: &'static [(&'static str, Option<&'static str>)],
+}
+
+pub(super) struct RebaseRangesTestCase {
+    pub(super) description: &'static str,
+    pub(super) leader: &'static str,
+    pub(super) member: &'static str,
+    /// The text of `member` each lineage row's rebased range covers.
+    pub(super) expected_texts: &'static [Option<&'static str>],
+}

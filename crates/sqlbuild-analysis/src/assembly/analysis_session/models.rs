@@ -237,8 +237,7 @@ pub struct LineageRow {
     pub transform_code: u8,
     pub confidence_code: u8,
     pub sources: Vec<(String, String, String)>,
-    /// UTF-8 byte range of the column's defining projection item in the model's cleaned
-    /// analysis SQL, when the native analysis gives one.
+    /// UTF-8 byte range of the column's projection item in the cleaned analysis SQL, if known.
     pub expression_range: Option<(usize, usize)>,
 }
 

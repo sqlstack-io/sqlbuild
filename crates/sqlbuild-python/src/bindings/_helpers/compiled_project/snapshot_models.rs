@@ -22,8 +22,7 @@ use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompil
 use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 
-/// Each model's snapshot node, and the `columns` document: per node key, each column's
-/// expression range. The ranges stay out of the node, so they never change a node's identity.
+/// Each model's snapshot node, and the `columns` document of ranges kept out of node identity.
 pub(crate) fn model_nodes(
     py: Python<'_>,
     project: &NativeProjectView,
@@ -91,9 +90,7 @@ pub(crate) fn model_nodes(
     Ok((nodes, columns_document))
 }
 
-/// Each output column's defining expression as `{"expression_range": [start, end)}`, byte
-/// offsets in the compiled SQL the node SQL read returns; empty when the analysis SQL cannot be
-/// rebuilt exactly.
+/// Each column's `{"expression_range": [start, end]}`, when the analysis SQL rebuilds exactly.
 fn expression_ranges(
     dialect: &str,
     input: &ModelInputRecord,
@@ -115,7 +112,7 @@ fn expression_ranges(
         .values
         .get("cursor_type")
         .and_then(Value::as_str);
-    let Some((analysis_sql, cursor_splices)) = analysis_cursor_splices(&typed, cursor_type) else {
+    let Ok((analysis_sql, cursor_splices)) = analysis_cursor_splices(&typed, cursor_type) else {
         return ranges;
     };
     let cleaned: Vec<Option<(usize, usize)>> =
@@ -128,7 +125,7 @@ fn expression_ranges(
     );
     for (row, range) in rows.iter().zip(mapped) {
         let LineageRow { output_column, .. } = row;
-        if let Some((start, end)) = range {
+        if let (Some((start, end)), false) = (range, output_column.is_empty()) {
             ranges
                 .entry(output_column.clone())
                 .or_insert_with(|| json!({"expression_range": [start, end]}));
@@ -137,8 +134,7 @@ fn expression_ranges(
     ranges
 }
 
-/// The `placeholders` config as the `(name, text)` pairs analysis read, the way Python's `str`
-/// renders each value; `None` when a value's text could differ from what analysis read.
+/// The `placeholders` config as analysis read it, as Python's `str` renders each value, if exact.
 fn placeholder_texts(value: Option<&Value>) -> Option<Vec<(String, String)>> {
     let Some(Value::Object(values)) = value else {
         return Some(Vec::new());

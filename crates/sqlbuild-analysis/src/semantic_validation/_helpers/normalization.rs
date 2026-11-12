@@ -3,7 +3,7 @@
 use crate::relation_markers::main::lateral_start::lateral_start;
 use crate::semantic_checks::constants::UDF_NAME_PREFIX;
 use regex::Regex;
-use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_default_edits;
+use sqlbuild_sqltext::compiler::main::placeholder_default_edits::placeholder_default_edits;
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::main::matching_paren::matching_paren;
@@ -205,8 +205,7 @@ pub(crate) fn normalize_native_sql(
     native_mapped(sql, dialect, stub_prefix, relations).map(|mapped| mapped.sql)
 }
 
-/// [`normalize_native_sql`] with placeholder defaults filled, and the character of `sql` each
-/// character of it came from.
+/// [`normalize_native_sql`] with placeholder defaults filled, and each character's source in `sql`.
 pub(crate) fn normalize_native_sql_mapped(
     sql: &str,
     dialect: &str,

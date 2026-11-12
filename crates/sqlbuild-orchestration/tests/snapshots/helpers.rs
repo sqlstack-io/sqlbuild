@@ -146,7 +146,7 @@ async fn exercise_snapshot_contract(store: &ControlStore) -> i64 {
     let changed = publish_snapshot(store, &input)
         .await
         .expect("publish changed SQL");
-    assert_ne!(changed.manifest_digest, unchanged.manifest_digest);
+    assert_ne!(changed.manifest_digest, ranged.manifest_digest);
     let loaded = current_snapshot(store, location, "development")
         .await
         .expect("read changed snapshot")

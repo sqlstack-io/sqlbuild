@@ -9,6 +9,7 @@ use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::snapshots::_helpers::reading::attach_sources;
+use crate::snapshots::constants::COLUMNS_DOCUMENT;
 use crate::snapshots::main::read_current_record::read_current_record;
 use crate::snapshots::main::read_snapshot_documents::read_snapshot_documents;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
@@ -44,12 +45,15 @@ pub async fn read_person_node_sql(
                 vec![Parameter::Id(record.snapshot_id), Parameter::Text(node_key.into())]).await?;
             if let Some(node) = attach_sources(nodes, rows)?.remove(node_key) {
                 let documents;
-                (transaction, documents) =
-                    read_snapshot_documents(transaction, record.snapshot_id, Some(&["columns"]))
-                        .await?;
+                (transaction, documents) = read_snapshot_documents(
+                    transaction,
+                    record.snapshot_id,
+                    Some(&[COLUMNS_DOCUMENT]),
+                )
+                .await?;
                 let expression_ranges = expression_ranges(
                     documents
-                        .get("columns")
+                        .get(COLUMNS_DOCUMENT)
                         .and_then(|columns| columns.get(node_key)),
                     node.compiled_sql.as_deref().unwrap_or_default(),
                 );
@@ -74,25 +78,34 @@ pub async fn read_person_node_sql(
     Ok(result)
 }
 
-/// Each column's expression range from the node's `columns` document entry; a column whose
-/// range is missing, malformed or off the compiled SQL's character boundaries has none.
+/// Each column's well-formed expression range from the node's `columns` document entry.
 fn expression_ranges(columns: Option<&Value>, compiled_sql: &str) -> BTreeMap<String, [usize; 2]> {
+    let mut ranges: BTreeMap<String, [usize; 2]> = BTreeMap::new();
     let Some(columns) = columns.and_then(Value::as_object) else {
-        return BTreeMap::new();
+        return ranges;
     };
-    columns
-        .iter()
-        .filter_map(|(column, metadata)| {
-            let range = metadata.get("expression_range")?.as_array()?;
-            let [start, end] = range.as_slice() else {
-                return None;
-            };
-            let start = usize::try_from(start.as_u64()?).ok()?;
-            let end = usize::try_from(end.as_u64()?).ok()?;
-            compiled_sql
-                .get(start..end)
-                .filter(|text| !text.is_empty())
-                .map(|_| (column.clone(), [start, end]))
-        })
-        .collect()
+    for (column, metadata) in columns {
+        if let Some(range) = column_range(metadata, compiled_sql) {
+            ranges.insert(column.clone(), range);
+        }
+    }
+    ranges
+}
+
+/// A column's `[start, end)` compiled-SQL byte range, or `None` when missing or malformed.
+fn column_range(metadata: &Value, compiled_sql: &str) -> Option<[usize; 2]> {
+    let Some([start, end]) = metadata
+        .get("expression_range")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+    else {
+        return None;
+    };
+    let (start, end): (u64, u64) = (start.as_u64()?, end.as_u64()?);
+    let length: u64 = u64::try_from(compiled_sql.len()).unwrap_or(u64::MAX);
+    if start >= end || end > length {
+        return None;
+    }
+    let range: [usize; 2] = [start as usize, end as usize];
+    compiled_sql.get(range[0]..range[1]).map(|_| range)
 }

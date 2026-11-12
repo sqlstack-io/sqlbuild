@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
+use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics_with_spans::replace_intrinsics_with_spans;
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
 use crate::analysis_route::_helpers::analysis::native_outcome::{
     analysed_sql, native_outcome, native_sql,
 };
+use crate::analysis_route::main::query_expression_ranges::query_expression_ranges;
 use crate::analysis_route::main::schema_column::schema_column as stored_column;
+use crate::analysis_route::models::DuckDbDialect;
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, StandInSchema};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::models::{
@@ -15,6 +18,9 @@ use crate::assembly::analysis_session::models::{
 use crate::assembly::analysis_session::types::Shapes;
 use crate::lineage::models::{LineageColumn, LineageSource};
 use crate::semantic_checks::types::RevisedBinding;
+use crate::semantic_validation::main::normalize_native_filled::normalize_native_filled;
+use crate::sql_macros::main::typed_analysis_sql::typed_analysis_sql;
+use crate::sql_macros::models::{TextSplice, TypedCall};
 
 /// `orders` with a non-null INTEGER id and a nullable VARCHAR status.
 pub(super) fn orders() -> StandInSchema {
@@ -167,4 +173,73 @@ pub(crate) fn model_outcome(
         )
     });
     native_outcome(model, schema, cleaned.unwrap_or_default(), analysed)
+}
+
+/// Each output column with the `query_sql` text its range covers after the compile passes.
+pub(super) fn mapped_texts(
+    query_sql: &str,
+    placeholders: &[(&str, &str)],
+    typed_calls: &[(&str, &str)],
+) -> Vec<(String, Option<String>)> {
+    let placeholders: Vec<(String, String)> = placeholders
+        .iter()
+        .map(|(name, text)| ((*name).to_owned(), (*text).to_owned()))
+        .collect();
+    let calls: Vec<TypedCall> = typed_calls
+        .iter()
+        .map(|(call, returns)| typed_call(query_sql, call, returns))
+        .collect();
+    let (typed, typed_splices) = typed_analysis_sql(query_sql, &calls, "duckdb");
+    let (analysis_sql, spans) = replace_intrinsics_with_spans(&typed, "Model SQL", |_| {
+        "CAST('2000-01-01' AS TIMESTAMP)".to_owned()
+    })
+    .expect("the cursor calls are replaced");
+    let cursor_splices: Vec<TextSplice> = spans
+        .iter()
+        .map(|span| TextSplice {
+            source: (span.source_start, span.source_end),
+            output: (span.output_start, span.output_end),
+        })
+        .collect();
+    let dialect: &DuckDbDialect = &DuckDbDialect;
+    let (cleaned, _) = normalize_native_filled(
+        &analysis_sql,
+        "duckdb",
+        dialect.stub_prefix(),
+        &placeholders,
+    )
+    .expect("the test query normalises");
+    let analysis: NativeAnalysis = analysed(dialect, &cleaned, &[]);
+    let ranges: Vec<Option<(usize, usize)>> = analysis
+        .lineage
+        .iter()
+        .map(|row| row.expression_range)
+        .collect();
+    let mapped = query_expression_ranges(
+        "duckdb",
+        (&analysis_sql, &placeholders),
+        &[typed_splices, cursor_splices],
+        &ranges,
+    );
+    analysis
+        .lineage
+        .iter()
+        .zip(mapped)
+        .map(|(row, range)| {
+            let text: Option<String> = range.map(|(start, end)| query_sql[start..end].to_owned());
+            (row.output_column.clone(), text)
+        })
+        .collect()
+}
+
+/// The typed call of the expression macro `call` in `query_sql`, returning `returns`.
+fn typed_call(query_sql: &str, call: &str, returns: &str) -> TypedCall {
+    let start: usize = query_sql.find(call).expect("the call is in the query");
+    TypedCall {
+        start,
+        end: start + call.len(),
+        macro_name: "typed_call".to_owned(),
+        returns: Some(returns.to_owned()),
+        returns_like: None,
+    }
 }

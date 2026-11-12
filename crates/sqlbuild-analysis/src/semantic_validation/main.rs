@@ -9,6 +9,7 @@ pub mod normalize_batch;
 pub mod normalize_dialect;
 pub mod normalize_mapped;
 pub mod normalize_native;
+pub mod normalize_native_filled;
 pub mod normalize_native_renamed;
 pub mod sqlbuild_code;
 pub mod text_findings;

@@ -105,14 +105,14 @@ pub(crate) fn analysis_cursor_sql(
     Ok(replaced(py, sql, MODEL_SQL_CONTEXT, (literal, literal))?.0)
 }
 
-/// `analysis_cursor_sql` with each replaced call as a splice of `sql`; `None` when a call is invalid.
+/// `analysis_cursor_sql` with each replaced call as a splice of `sql`.
 pub(crate) fn analysis_cursor_splices(
     sql: &str,
     cursor_type: Option<&str>,
-) -> Option<(String, Vec<TextSplice>)> {
+) -> Result<(String, Vec<TextSplice>), String> {
     let literal: &str = analysis_bound(cursor_type);
     let (replaced, spans) =
-        replace_intrinsics_with_spans(sql, MODEL_SQL_CONTEXT, |_| literal.to_owned()).ok()?;
+        replace_intrinsics_with_spans(sql, MODEL_SQL_CONTEXT, |_| literal.to_owned())?;
     let splices: Vec<TextSplice> = spans
         .iter()
         .map(|span| TextSplice {
@@ -120,7 +120,7 @@ pub(crate) fn analysis_cursor_splices(
             output: (span.output_start, span.output_end),
         })
         .collect();
-    Some((replaced, splices))
+    Ok((replaced, splices))
 }
 
 /// The literal static analysis reads for every cursor intrinsic of a model with `cursor_type`.

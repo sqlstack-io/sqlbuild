@@ -213,13 +213,12 @@ fn mapped(
     Ok(analysis)
 }
 
-/// Move each expression range from the leader's cleaned SQL to the member's, which differ only in
-/// the relation names they spell; a range that cannot be moved exactly is dropped.
+/// Each expression range moved onto `member`'s relation names, or dropped where it cannot move.
 pub(crate) fn rebase_ranges(analysis: &mut NativeAnalysis, leader: &str, member: &str) {
     if leader == member {
         return;
     }
-    let renamed: Option<Vec<(usize, usize, usize, usize)>> = renamed_runs(leader, member);
+    let renamed: Option<Vec<(usize, usize, usize)>> = renamed_runs(leader, member);
     for row in &mut analysis.lineage {
         row.expression_range = match (&renamed, row.expression_range) {
             (Some(runs), Some((start, end))) => rebased(runs, start).zip(rebased(runs, end)),
@@ -228,13 +227,12 @@ pub(crate) fn rebase_ranges(analysis: &mut NativeAnalysis, leader: &str, member:
     }
 }
 
-/// `(leader start, leader end, member start, member end)` of each identifier run where two SQL
-/// texts differ, when they differ only in whole identifier runs.
-fn renamed_runs(leader: &str, member: &str) -> Option<Vec<(usize, usize, usize, usize)>> {
+/// `(leader start, leader end, member end)` of each differing identifier run, if only those differ.
+fn renamed_runs(leader: &str, member: &str) -> Option<Vec<(usize, usize, usize)>> {
     let identifier = |c: u8| c.is_ascii_alphanumeric() || c == b'_' || c == b'$';
     let (left, right): (&[u8], &[u8]) = (leader.as_bytes(), member.as_bytes());
     let (mut i, mut j): (usize, usize) = (0, 0);
-    let mut runs: Vec<(usize, usize, usize, usize)> = Vec::new();
+    let mut runs: Vec<(usize, usize, usize)> = Vec::new();
     while i < left.len() || j < right.len() {
         if i < left.len() && j < right.len() && left[i] == right[j] {
             i += 1;
@@ -255,25 +253,25 @@ fn renamed_runs(leader: &str, member: &str) -> Option<Vec<(usize, usize, usize, 
         if left_end == i && right_end == j {
             return None;
         }
-        runs.push((i - back, left_end, j - back, right_end));
+        runs.push((i - back, left_end, right_end));
         (i, j) = (left_end, right_end);
     }
     Some(runs)
 }
 
 /// The member offset of leader `offset`, or `None` strictly inside a renamed run.
-fn rebased(runs: &[(usize, usize, usize, usize)], offset: usize) -> Option<usize> {
-    let mut shift: isize = 0;
-    for &(left_start, left_end, _, right_end) in runs {
+fn rebased(runs: &[(usize, usize, usize)], offset: usize) -> Option<usize> {
+    let mut moved: usize = offset;
+    for &(left_start, left_end, right_end) in runs {
         if offset <= left_start {
             break;
         }
         if offset < left_end {
             return None;
         }
-        shift = right_end as isize - left_end as isize;
+        moved = offset - left_end + right_end;
     }
-    usize::try_from(offset as isize + shift).ok()
+    Some(moved)
 }
 
 /// Whether `leader`'s `template` succeeded, found nothing and spells none of its relation names.
