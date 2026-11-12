@@ -1,4 +1,4 @@
-"""A build records the cursor MAX of each successful incremental model for plan previews."""
+"""A build records cursor MAX values and described source columns for plan previews."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     CursorObservationBuildE2ETestCase,
+    SourceColumnObservationE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
@@ -70,6 +71,30 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
+    "sources/raw.yml": dedent(
+        """
+        sources:
+          - name: raw_refunds
+            description: Refunds described from an inline query.
+            expression: |
+              SELECT * FROM (VALUES (1, 100)) AS refunds(refund_id, amount_cents)
+            type_enforcement: true
+            columns:
+              - name: refund_id
+                type: INTEGER
+              - name: amount_cents
+                type: INTEGER
+        """
+    ).strip()
+    + "\n",
+    "models/refunds.sql": dedent(
+        """
+        MODEL (description "Refunds.", materialized table);
+
+        SELECT refund_id, amount_cents FROM __source("raw_refunds")
+        """
+    ).strip()
+    + "\n",
     "models/order_count.sql": dedent(
         """
         MODEL (description "Order count without a cursor.", materialized table);
@@ -116,4 +141,40 @@ def test_given_incremental_models_when_building_then_cursor_max_observations_are
 
     assert [result.returncode for result in results] == [0] * test_case.builds, results[-1].stderr
     assert "cursor observations" not in "".join(result.stderr for result in results)
+    assert tuple(observations) == test_case.expected_observations
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SourceColumnObservationE2ETestCase(
+            description="builds record described source columns and plans record none",
+            commands=(("build",), ("plan",), ("build",)),
+            expected_observations=(("raw_refunds", '["refund_id","amount_cents"]', 2),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_expression_source_when_building_then_source_column_observations_are_recorded(
+    tmp_path: Path, test_case: SourceColumnObservationE2ETestCase
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="source_observations", repo_files=_PROJECT_FILES
+    )
+
+    results: list[subprocess.CompletedProcess[str]] = [
+        run_sqb(command=command, project_dir=project_dir) for command in test_case.commands
+    ]
+    observations: list[tuple[object, ...]] = query_duckdb(
+        db_path=project_dir / "observations.duckdb",
+        sql=(
+            "SELECT node, value, COUNT(DISTINCT run_id) "
+            "FROM main._sqlbuild_observations WHERE kind = 'source_columns' "
+            "GROUP BY node, value ORDER BY node"
+        ),
+    )
+
+    assert [result.returncode for result in results] == [0] * len(test_case.commands), results[
+        -1
+    ].stderr
     assert tuple(observations) == test_case.expected_observations

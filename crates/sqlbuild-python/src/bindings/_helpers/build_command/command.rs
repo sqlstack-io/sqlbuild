@@ -21,6 +21,9 @@ use crate::bindings::_helpers::build_command::planning::{
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::diagnostics::trackers::BuildPhaseTimingTracker;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::observations::source_capture::{
+    arm_source_capture, take_source_capture,
+};
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 fn run_with_providers(context: &BuildContext<'_>) -> PyResult<i32> {
@@ -56,8 +59,16 @@ fn run_planned_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -
     within(&cache_scope, |_| run_cached_build(context, providers))
 }
 
-/// Plan and run the build, sharing one relation metadata cache from planning to the run's end.
+/// Plan and run the build, capturing the source columns planning describes for its observations.
 fn run_cached_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -> PyResult<i32> {
+    arm_source_capture();
+    let built: PyResult<i32> = run_captured_build(context, providers);
+    let _ = take_source_capture();
+    built
+}
+
+/// Plan and run the build, sharing one relation metadata cache from planning to the run's end.
+fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -> PyResult<i32> {
     let pipeline: Bound<'_, PyAny> = compile_build_plan(context)?;
     if let Some(worker) = &context.worker {
         worker.enforce_plan_writers(&pipeline)?;
