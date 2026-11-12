@@ -175,7 +175,8 @@ sqb control sync \
 
 The command prints `{"applied": true}` when the server has queued the request. The location starts
 the sync within a few seconds, and the top bar shows when it last synced. A sync reads the
-warehouse and never writes to it.
+warehouse and never writes to it. On Snowflake, it skips state tables that haven't changed since
+the last sync, so a sync with nothing new doesn't resume the warehouse.
 
 Requesting a sync needs the same access as a connection test: Developer or Admin on the location
 and target. Viewer and Operator cannot request one. Every request is recorded in the audit log.
