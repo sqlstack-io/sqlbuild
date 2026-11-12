@@ -364,6 +364,15 @@ class ModelBackedCursorBuildE2ETestCase:
 
 
 @dataclass(frozen=True)
+class CursorObservationBuildE2ETestCase:
+    """Builds whose successful incremental models must record their cursor MAX as observations."""
+
+    description: str
+    builds: int
+    expected_observations: tuple[tuple[str, str, str, int], ...]
+
+
+@dataclass(frozen=True)
 class AppendCursorBuildE2ETestCase:
     """Test case for append cursor lower-bound behavior across reruns."""
 

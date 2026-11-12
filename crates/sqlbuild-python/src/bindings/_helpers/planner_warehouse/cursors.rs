@@ -620,7 +620,7 @@ fn report_cursor_query(
     )
 }
 
-fn bound_task<'py>(
+pub(crate) fn bound_task<'py>(
     py: Python<'py>,
     sql: String,
     (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -697,12 +697,12 @@ fn fan_out<'py>(query: &PhysicalCursorQuery, row: &Bound<'py, PyAny>) -> PyResul
 }
 
 /// The query's MIN/MAX statement, each bound read as text the way the adapter renders it.
-fn adapter_cursor_sql(
-    request: &SnapshotRequest<'_>,
+pub(crate) fn adapter_cursor_sql(
+    adapter: &Bound<'_, PyAny>,
     query: &PhysicalCursorQuery,
 ) -> PyResult<String> {
-    let py = request.adapter.py();
-    let render = native_field(&request.adapter, CURSOR_TEXT_METHOD)?;
+    let py = adapter.py();
+    let render = native_field(adapter, CURSOR_TEXT_METHOD)?;
     let failure: RefCell<Option<PyErr>> = RefCell::new(None);
     let sql: String = cursor_query_sql(query, &|expression: &str| {
         call_with(
@@ -740,7 +740,8 @@ fn execute_queries<'py>(
             if !on_progress.is_none() {
                 on_progress.call1((format!("Inspecting cursor bounds {identity}..."),))?;
             }
-            let outcome = read_cursor_query(py, &adapter_cursor_sql(request, query)?, handles)?;
+            let outcome =
+                read_cursor_query(py, &adapter_cursor_sql(&request.adapter, query)?, handles)?;
             report_cursor_query(py, query, (&outcome, &identity), on_progress)?;
             outcomes.push(outcome);
         }
@@ -756,7 +757,7 @@ fn execute_queries<'py>(
         for query in queries {
             tasks.push(bound_task(
                 py,
-                adapter_cursor_sql(request, query)?,
+                adapter_cursor_sql(&request.adapter, query)?,
                 handles,
             )?);
         }
