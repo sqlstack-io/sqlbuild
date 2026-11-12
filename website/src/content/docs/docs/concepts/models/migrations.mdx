@@ -120,8 +120,8 @@ Migrations (1)
 If columns were renamed, the view shows them under their old names, for example
 `SELECT order_id, revenue AS amount FROM analytics.daily_revenue`. Incremental and snapshot models
 alias every recorded [column migration](/docs/concepts/models/column-migrations). A table or view
-model can name old columns the same way, as `revenue (migrate_from amount)`; this only aliases the
-column in the view.
+model that declares `migrate_from` can name old columns the same way, as
+`revenue (migrate_from amount)`; this only aliases the column in the view.
 
 The view expires after 30 days. Then [janitor](/docs/cli/janitor) drops it;
 `sqb janitor --drop-old-name-view analytics.revenue` drops it earlier. Change the default for the
@@ -203,7 +203,8 @@ migration decisions using your current connection. It only inspects; nothing is 
   redefines the view only when its SQL would change. PostgreSQL views are bound to the table, so
   SQLBuild re-points them in the same transaction whenever the table is replaced, and other views
   that depend on the destination are re-pointed too, keeping their options, owner and grants.
-  Materialized views are not re-pointed.
+  A view whose columns no longer fit is dropped and re-created with its privileges, which fails if
+  another view depends on it. Materialized views are not re-pointed.
 - On PostgreSQL, views outside SQLBuild that read the old relation follow it into the archive and
   keep reading its old data; the build warns with `M115` and names them. Re-create them against the
   old name or the new relation.

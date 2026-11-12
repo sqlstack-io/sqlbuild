@@ -6,7 +6,7 @@
 
 Online: https://sqlbuild.com/docs/concepts/models/type-enforcement/
 
-Declare a column's type and SQLBuild checks it at compile time and casts the column to it at runtime. You don't switch it on: any declared type enables it.
+Declare a column's type and SQLBuild checks it at compile time and, on staged tables and incremental models, casts the column to it at runtime. You don't switch it on: any declared type enables it.
 
 ## Enabling it
 

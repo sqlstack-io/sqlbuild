@@ -48,7 +48,7 @@ table that only unselected models read does not fail the plan; its freshness is 
 
 SQLBuild finds missing tables in the warehouse listing it already reads, then probes the sources it
 didn't find there, such as streams or tables in another database, with
-`SELECT 1 FROM <relation> WHERE 1=0`. Only a not-found error counts as missing; any other error,
+`SELECT 1 FROM <relation> WHERE 1=0`. On Snowflake the probe may need a running warehouse. Only a not-found error counts as missing; any other error,
 such as a lost connection, fails planning with that error.
 
 Snowflake reports a missing table and a table the current role can't read with the same error, and
