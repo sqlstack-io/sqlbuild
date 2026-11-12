@@ -151,6 +151,10 @@ fn lineage_row(
         transform_code,
         confidence_code,
         sources,
+        expression_range: output
+            .expression_range
+            .as_ref()
+            .map(|range| (range.start, range.end)),
     }
 }
 

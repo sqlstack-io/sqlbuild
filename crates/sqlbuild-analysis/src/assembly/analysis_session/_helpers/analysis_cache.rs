@@ -451,6 +451,9 @@ pub(crate) fn encode_outcome(
             encoder.text(name);
             encoder.text(column);
         }
+        let (start, end) = row.expression_range.unzip();
+        encoder.optional_uint(start);
+        encoder.optional_uint(end);
     }
     encoder.flag(analysis.has_star);
     encoder.flag(analysis.star_resolved);
@@ -522,11 +525,18 @@ pub(crate) fn decode_outcome(
         for _ in 0..source_count {
             sources.push((decoder.text()?, decoder.text()?, decoder.text()?));
         }
+        let expression_range: Option<(usize, usize)> =
+            match (decoder.optional_index()?, decoder.optional_index()?) {
+                (Some(start), Some(end)) if start <= end => Some((start, end)),
+                (None, None) => None,
+                _ => return Err(StoreDecodeError),
+            };
         rows.push(LineageRow {
             output_column,
             transform_code,
             confidence_code,
             sources,
+            expression_range,
         });
     }
     let lineage: LineageFacts = match tag {

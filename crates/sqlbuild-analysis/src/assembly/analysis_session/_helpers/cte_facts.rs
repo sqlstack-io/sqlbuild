@@ -221,6 +221,7 @@ pub(crate) fn legacy_analysis(input: &LegacyInput<'_>) -> Fact<LegacyAnalysis> {
                 confidence
             },
             sources,
+            expression_range: None,
         });
     }
     Ok(LegacyAnalysis {
