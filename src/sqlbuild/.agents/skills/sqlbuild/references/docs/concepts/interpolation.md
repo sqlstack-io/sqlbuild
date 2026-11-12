@@ -1,6 +1,6 @@
 <!-- generated-by: sqlbuild skills -->
 
-# Interpolation
+# Variables and placeholders
 
 > How SQLBuild processes variables, context, and dynamic content in SQL and config.
 

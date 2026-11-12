@@ -34,7 +34,7 @@ Cost is a second reason to move a check into a scenario. A unit test inlines eve
 chain into one SQL statement, so the warehouse compiles and optimises the whole chain at once, and
 that cost can grow much faster than the query's size. A scenario materialises each model step by
 step, so each statement is compiled separately, as in a real build. SQLBuild limits how many real
-models one unit test may execute (see [Cost guards](testing.md#cost-guards)); when a test
+models one unit test may execute (see [Cost guards](testing-reference.md#cost-guards)); when a test
 reaches that limit because it checks behaviour across several models, it may belong here.
 
 ## Authoring scenarios

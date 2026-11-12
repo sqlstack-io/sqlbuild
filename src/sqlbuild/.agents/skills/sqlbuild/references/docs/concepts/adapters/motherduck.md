@@ -89,4 +89,4 @@ This lets you develop and test locally with zero MotherDuck compute cost, then d
 
 `sqb test` copies each SQL UDF and table function the selected tests call into a session
 `TEMP MACRO`, the same as [DuckDB](duckdb.md#functions-in-unit-tests), so the
-functions in your MotherDuck database are not replaced. See [Functions in `sqb test`](../testing.md#functions-in-sqb-test).
+functions in your MotherDuck database are not replaced. See [Functions in `sqb test`](../testing-reference.md#functions-in-sqb-test).

@@ -687,15 +687,15 @@ delta_compile = true
 
 | Setting | Limits | Details |
 |---------|--------|---------|
-| `unit_test_max_real_models` | Real (unmocked) models one SQL unit test may run; a larger test fails compilation and names each model, the path that pulls it in, and the inputs to mock | [Real-model limit](testing.md#real-model-limit) |
-| `test_timeout` | Each unit test's warehouse time, from its first statement | [Time limits](testing.md#time-limits), including precedence |
+| `unit_test_max_real_models` | Real (unmocked) models one SQL unit test may run; a larger test fails compilation and names each model, the path that pulls it in, and the inputs to mock | [Real-model limit](testing-reference.md#real-model-limit) |
+| `test_timeout` | Each unit test's warehouse time, from its first statement | [Time limits](testing-reference.md#time-limits), including precedence |
 | `scenario_timeout` | Each scenario's warehouse time; no default | Below |
 
 The scenario limit that applies is the first one set of `--scenario-timeout`,
 `SCENARIO(timeout "...")`, `[targets.<target>.execution_limits] scenario_timeout`, and
 `[settings] scenario_timeout`. At the limit, SQLBuild cancels the scenario's running statement,
 reports it as `TIMEOUT`, and continues with independent items, as for
-[unit tests](testing.md#time-limits). Every value is a positive fixed duration such as
+[unit tests](testing-reference.md#time-limits). Every value is a positive fixed duration such as
 `"45s"` or `"10m"`, or `"disabled"`. `sqlbuild_local.toml` accepts all three settings.
 
 ### Table promotion mode

@@ -54,7 +54,7 @@ are strings in JSON so their scale is preserved. Each test check in JSON output 
 `duration_ms`.
 
 Each test row shows how many real (unmocked) models the test executes, such as `3 real models`. A
-test that runs past its [time limit](../concepts/testing.md#time-limits) is reported as `TIMEOUT`,
+test that runs past its [time limit](../concepts/testing-reference.md#time-limits) is reported as `TIMEOUT`,
 counted under `TIMEOUT=` and excluded from `FAIL=` in the summary line
 (`PASS=4  FAIL=0  TIMEOUT=1  TOTAL=5`), and the run continues with the remaining tests. In `--json`
 output, `summary.fail_count` still includes timed-out tests, and `summary.timeout_count` reports how
@@ -182,14 +182,13 @@ of guessing; compare with a later ref whose project compiles, or run without `--
 with its default target instead; the run says so, and because the target changed, every test is
 selected.
 
-SQL comparisons ignore layout and comments using a generic SQL tokenizer. In dialects where `--`
-starts a comment only when followed by whitespace, such as MySQL, `1--1` is read as `1` followed by
-a comment, so an edit inside such an expression can go unnoticed. The base tree is written from git
-objects with the repository's filters. Git LFS content is restored for files that an unanchored
-`.gitattributes` pattern marks, such as `*.csv filter=lfs`, but a pattern anchored to a path, such
-as `/data/*.csv` at the repository root for a project in a subdirectory, does not match the
-exported paths. Such a file is an LFS pointer at the base and real content in the checkout, so it
-always counts as changed: at most extra tests run.
+Details:
+
+- SQL comparisons ignore layout and comments. In dialects where `--` starts a comment only before
+  whitespace, such as MySQL, an edit inside an expression like `1--1` can go unnoticed.
+- A file stored in Git LFS through a pattern anchored to a path, such as `/data/*.csv`, always
+  counts as changed, so extra tests may run. Unanchored patterns such as `*.csv filter=lfs` work as
+  expected.
 
 `<ref>` is any git ref or commit, such as the merge request's target branch from a CI variable.
 `--since` always takes a value. A ref that does not exist, or a shallow clone that does not reach

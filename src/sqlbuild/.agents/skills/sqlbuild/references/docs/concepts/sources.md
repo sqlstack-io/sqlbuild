@@ -255,15 +255,10 @@ Accepts positive durations: `15m` (minutes), `2h` (hours), `1d` (days). If the c
 
 ### Auto-observation
 
-Sources without an explicit `freshness:` block are auto-observed using the `adapter` strategy if:
-
-- The source has a physical table (not an expression source)
-- The source is not managed
-- The adapter supports table freshness metadata
-
-This means most unmanaged table sources get freshness tracking automatically on adapters that support it, with no configuration needed.
-
-Use [`sqb freshness`](../cli/freshness.md) to observe source freshness on demand without triggering a build. See [Source freshness](planning/source-freshness.md) for how freshness feeds into change-aware builds.
+A table source without a `freshness:` block is observed with the `adapter` strategy when the adapter
+supports it, unless it is managed. See [Source freshness](planning/source-freshness.md)
+for how observations feed into plans, and [`sqb freshness`](../cli/freshness.md) to observe sources
+without building.
 
 ### Freshness config reference
 

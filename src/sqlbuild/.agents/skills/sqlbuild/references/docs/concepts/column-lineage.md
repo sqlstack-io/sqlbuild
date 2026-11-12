@@ -26,7 +26,7 @@ Online: https://sqlbuild.com/docs/concepts/column-lineage/
 
 ## How it works
 
-SQLBuild analyzes column lineage statically at compile time. No warehouse connection is needed. The analyzer parses each model's SQL, resolves `ref()` and `source()` calls, and traces columns through `SELECT` lists, CTEs, JOINs, subqueries, and expressions.
+SQLBuild analyzes column lineage statically at compile time. No warehouse connection is needed. The analyzer parses each model's SQL, resolves `__ref()` and `__source()` calls, and traces columns through `SELECT` lists, CTEs, JOINs, subqueries, and expressions.
 
 Column lineage requires SQL analysis to be enabled in project settings (it is by default).
 

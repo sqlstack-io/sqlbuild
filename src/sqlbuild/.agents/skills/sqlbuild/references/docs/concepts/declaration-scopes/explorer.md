@@ -335,5 +335,10 @@ Use `--json` for editor integrations and repository tooling. Output has a versio
 ordering, filters, pagination, and move-preview results. Constant values, credentials, and secret
 connection settings are not included.
 
+In JSON, the `scope` field uses `global`,
+`inherited`, `local`, or `private`, while derived `visibility` values use underscores, such as
+`descendant_public` and `exact_owner_private`. Consumers should use the fields documented in the
+versioned JSON schema rather than parsing text labels.
+
     Review the directory rules behind the report.
     See all selectors, filters, pagination options, output sections, and JSON behavior.

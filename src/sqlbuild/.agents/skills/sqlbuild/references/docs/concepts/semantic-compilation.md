@@ -1,6 +1,6 @@
 <!-- generated-by: sqlbuild skills -->
 
-# Semantic Compilation
+# What sqb compile checks
 
 > Offline reference, semantic and type checks that sqb compile runs before any warehouse work.
 

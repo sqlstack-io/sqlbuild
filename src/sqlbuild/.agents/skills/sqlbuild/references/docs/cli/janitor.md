@@ -17,6 +17,7 @@ Online: https://sqlbuild.com/docs/cli/janitor/
 - Configuration
 - Output
 - Examples
+- Details
 
 `sqb janitor` cleans up relations your project no longer builds. It never drops a live relation
 directly: it first renames a stale relation to an archive name, and drops the archive only once it
@@ -245,62 +246,7 @@ preview and the prompt show one notice, such as `usage not checked: unsupported 
 janitor archives as usual. With `keep_in_use` on, a second notice, `nothing kept in use`, says that
 in-use relations are archived too.
 
-#### What counts as a read
-
-**Snowflake.** A relation read through the objects a query named shows `via` those objects.
-Everything a directly read object is built on, through any number of views, is in use, so a
-candidate view between a view someone reads and a candidate table is kept too. Links through views
-in other databases aren't followed, and dependencies created by `CREATE TABLE ... AS SELECT` and
-similar statements aren't recorded. These don't count as reads:
-
-- queries SQLBuild tags as its own (`QUERY_TAG` with `"app":"sqlbuild"`, set by builds, audits,
-  loads and hooks);
-- `CREATE ... CLONE` of tables, dynamic tables, schemas and databases. A statement counts as a clone
-  only when it starts with `CREATE`, after any comments, and names its source after `CLONE`.
-
-Without `OBJECT_VIEWER`, reads are still checked but view chains aren't followed, and the preview
-says `view chains not followed: grant SNOWFLAKE.OBJECT_VIEWER`.
-
-**BigQuery.** Successful query jobs that reference the relation count, by `user_email`. A job lists
-the views it reads and the tables behind them, so both count. These are missed or don't count:
-
-- a candidate view read only through another view may not show, because BigQuery doesn't document
-  whether nested views are listed;
-- jobs answered from cached results record no tables, so with an `in_use_window` under about a day
-  a reader whose queries were all cached can be missed;
-- jobs that run in another project aren't seen;
-- script parent jobs, `CREATE SNAPSHOT TABLE` and `CREATE TABLE ... CLONE` don't count;
-- SQLBuild's own jobs count like any other.
-
-**Databricks.** Read events in Unity Catalog's table lineage count, by `created_by`. A view a query
-reads is a direct read, and the tables behind it are reads through the view. Lineage covers only
-reads Databricks can infer lineage for, and can arrive late, so "not in use" is a weaker signal than
-on Snowflake. Clones and SQLBuild's own reads count as reads.
-
-**ClickHouse.** Finished `SELECT` and `INSERT` queries count, by the user who started them, once per
-initial query. A query lists every table and view it touched, so a whole view chain shows as in
-use, without `via`. Writes count, since renaming the relation breaks the writer too. These are
-missed or don't count:
-
-- queries on other replicas or shards, which matters on ClickHouse Cloud and behind load-balanced
-  replicas. When `system.clusters` shows other replicas of the connected server's shard, the preview
-  says `usage read from this server only; other replicas not checked`;
-- queries ClickHouse answers from metadata without logging the table, such as a plain `count()`;
-- readers whose settings profile turns `log_queries` off or samples it with
-  `log_queries_probability`. When `log_queries` is off for the janitor's own connection, usage isn't
-  checked;
-- queries in the last few seconds: the log is flushed about every 7.5 seconds;
-- queries older than the server's `query_log` TTL;
-- SQLBuild's own reads count.
-
-### Audit record
-
-Every archive and delete is recorded in an append-only `_sqlbuild_janitor_events` table in the
-affected schema: the original name, the archive name, the time and the invocation. The janitor
-never reads it to decide what to do; it is for auditing, and for restoring archives whose names
-were shortened, which are recorded right after their rename. Other events are written in batches
-of up to 100 per schema, so if the process is killed, up to 100 actions in a schema may have no
-event. Those archives still expire by the timestamp in their names.
+See [What counts as a read](#what-counts-as-a-read) for each warehouse's limits.
 
 ## Targets
 
@@ -406,3 +352,61 @@ sqb janitor --target prod
 # Keep relations that are still read instead of archiving them
 sqb janitor --keep-in-use
 ```
+
+## Details
+
+### What counts as a read
+
+**Snowflake.** A relation read through the objects a query named shows `via` those objects.
+Everything a directly read object is built on, through any number of views, is in use, so a
+candidate view between a view someone reads and a candidate table is kept too. Links through views
+in other databases aren't followed, and dependencies created by `CREATE TABLE ... AS SELECT` and
+similar statements aren't recorded. These don't count as reads:
+
+- queries SQLBuild tags as its own (`QUERY_TAG` with `"app":"sqlbuild"`, set by builds, audits,
+  loads and hooks);
+- `CREATE ... CLONE` of tables, dynamic tables, schemas and databases. A statement counts as a clone
+  only when it starts with `CREATE`, after any comments, and names its source after `CLONE`.
+
+Without `OBJECT_VIEWER`, reads are still checked but view chains aren't followed, and the preview
+says `view chains not followed: grant SNOWFLAKE.OBJECT_VIEWER`.
+
+**BigQuery.** Successful query jobs that reference the relation count, by `user_email`. A job lists
+the views it reads and the tables behind them, so both count. These are missed or don't count:
+
+- a candidate view read only through another view may not show, because BigQuery doesn't document
+  whether nested views are listed;
+- jobs answered from cached results record no tables, so with an `in_use_window` under about a day
+  a reader whose queries were all cached can be missed;
+- jobs that run in another project aren't seen;
+- script parent jobs, `CREATE SNAPSHOT TABLE` and `CREATE TABLE ... CLONE` don't count;
+- SQLBuild's own jobs count like any other.
+
+**Databricks.** Read events in Unity Catalog's table lineage count, by `created_by`. A view a query
+reads is a direct read, and the tables behind it are reads through the view. Lineage covers only
+reads Databricks can infer lineage for, and can arrive late, so "not in use" is a weaker signal than
+on Snowflake. Clones and SQLBuild's own reads count as reads.
+
+**ClickHouse.** Finished `SELECT` and `INSERT` queries count, by the user who started them, once per
+initial query. A query lists every table and view it touched, so a whole view chain shows as in
+use, without `via`. Writes count, since renaming the relation breaks the writer too. These are
+missed or don't count:
+
+- queries on other replicas or shards, which matters on ClickHouse Cloud and behind load-balanced
+  replicas. When `system.clusters` shows other replicas of the connected server's shard, the preview
+  says `usage read from this server only; other replicas not checked`;
+- queries ClickHouse answers from metadata without logging the table, such as a plain `count()`;
+- readers whose settings profile turns `log_queries` off or samples it with
+  `log_queries_probability`. When `log_queries` is off for the janitor's own connection, usage isn't
+  checked;
+- queries in the last few seconds: the log is flushed about every 7.5 seconds;
+- queries older than the server's `query_log` TTL;
+- SQLBuild's own reads count.
+
+### Audit record
+
+Every archive and delete is recorded in an append-only `_sqlbuild_janitor_events` table in the
+affected schema: the original name, the archive name, the time and the invocation. The janitor
+never reads it to decide what to do; it is for auditing, and for restoring archives whose names
+were shortened, which are recorded right after their rename. If the process is killed, its last
+actions may have no record; those archives still expire by the timestamp in their names.

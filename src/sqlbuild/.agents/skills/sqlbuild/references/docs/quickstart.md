@@ -13,7 +13,8 @@ Online: https://sqlbuild.com/docs/quickstart/
 - 2. Plan
 - 3. Build
 - 4. Verify
-- 5. Common operations
+- 5. Change a model
+- 6. Common operations
 - What you just built
 - Next steps
 
@@ -35,11 +36,7 @@ cd waffle-shop
 
 This creates a self-contained waffle shop project with everything you need to explore SQLBuild.
 
-The playground creates the shared `sqlbuild_project.toml`; that is sufficient for this
-quickstart. In a team project, you can additionally create a gitignored
-`sqlbuild_local.toml` to select your usual target and override your personal development
-schema or credentials without changing the committed project config. See
-[Project Configuration](concepts/project-configuration.md#sqlbuild_localtoml).
+To connect your own warehouse later, see [Set up a project](project-setup.md).
 
 ## 2. Plan
 
@@ -87,7 +84,7 @@ Seeds (1)
 Execute the full build:
 
 ```bash
-sqb --no-color build
+sqb build
 ```
 
 SQLBuild materializes all models in DAG order. SQL unit tests run before their target models. Error-severity audits run against a staging table before promotion - if any fail, the production table is untouched:
@@ -103,50 +100,14 @@ Execution  sqb build  (concurrency: 1)
            audit     not_null (customer_id)                              PASS
            audit     unique (customer_id)                                PASS
            audit     not_null (email)                                    PASS
-   7/17  view      stg_orders                                            OK     0.04s
-           test      test_daily_revenue_chain                            PASS
-             expect  expected stg_orders                                 PASS
-             expect  expected stg_payments                               PASS
-             expect  expected daily_revenue                              PASS
-             expect  assertion daily_revenue_is_non_negative             PASS
-           test      test_stg_orders                                     PASS
-             expect  expected stg_orders                                 PASS
-             expect  assertion order_ids_are_not_null                    PASS
-           audit     not_null (order_id)                                 PASS
-           audit     unique (order_id)                                   PASS
-           audit     not_null (customer_id)                              PASS
-           audit     relationships (waffle_type_id)                      PASS
-           audit     accepted_values (status)                            PASS
-   8/17  custom    daily_order_partitioned                               OK     0.21s
-           audit     waffles_ordered_is_positive                         PASS  4/4
-           audit     not_null (order_date)                               PASS  4/4
-   9/17  table     daily_revenue                                         OK     0.07s
-           test      test_daily_revenue_chain                            PASS
-             expect  expected stg_orders                                 PASS
-             expect  expected stg_payments                               PASS
-             expect  expected daily_revenue                              PASS
-             expect  assertion daily_revenue_is_non_negative             PASS
-           audit     revenue_is_non_negative                             PASS
-  11/17  table     fact_orders                                           OK     0.05s
-           test      test_fact_orders                                    PASS
-             expect  expected fact_orders                                PASS
-             expect  assertion line_totals_are_non_negative              PASS
-           audit     not_null (order_id)                                 PASS
-  12/17  table     customer_status_snapshot  (merge)                     OK     0.05s
-           audit     not_null (customer_id)                              PASS
-           audit     unique (customer_id)                                PASS
+   ...
   13/17  table     hourly_order_activity  (delete_insert)                OK     0.24s
          5 batches (1d)    range 2026-03-31T09:00:00 → 2026-04-04T14:00:00    8 rows
            audit (d) orders_placed_is_non_negative                       PASS  5/5
            audit (d) not_null (activity_hour)                            PASS  5/5
            audit (f) orders_placed_is_non_negative                       PASS
            audit (f) not_null (activity_hour)                            PASS
-  17/17  table     hourly_activity_with_daily_context  (delete_insert)   OK     0.63s
-         13 batches (6h)    range 2026-03-31T18:00:00 → 2026-04-03T23:00:00    0 rows
-           audit (d) day_orders_cover_hourly_orders                      PASS  13/13
-           audit (d) not_null (activity_hour)                            PASS  13/13
-           audit (f) day_orders_cover_hourly_orders                      PASS
-           audit (f) not_null (activity_hour)                            PASS
+   ...
 
 ✓ Completed successfully  PASS=99  WARN=0  FAIL=0  INSUFFICIENT=0  SKIP=0  TOTAL=99  (2.13s)
 ```
@@ -194,7 +155,40 @@ Seeds (1)
 
 The models and functions are no longer listed as first run, and the seed is current. The two loader-managed sources load on every build.
 
-## 5. Common operations
+## 5. Change a model
+
+Edit `models/staging/stg_orders.sql` to drop cancelled orders, by adding this line at the end:
+
+```sql
+WHERE status <> 'cancelled'
+```
+
+Then plan again:
+
+```bash
+sqb plan
+```
+
+```
+Query changed (1)
+└── stg_orders                         recreate view
+    └── query diff:
+      --- previous
+      +++ current
+      @@ -5,4 +5,5 @@
+         quantity,
+         ordered_at,
+         status
+      -FROM __source("raw__orders")
+      +FROM __source("raw__orders")
+      +WHERE status <> 'cancelled'
+```
+
+The plan shows which model changed and the exact diff, before anything runs. Downstream models
+still build as usual; each incremental model's own `replay_on_change` decides whether it reprocesses
+history. See [Planning](concepts/planning.md).
+
+## 6. Common operations
 
 ```bash
 # Rebuild a specific model

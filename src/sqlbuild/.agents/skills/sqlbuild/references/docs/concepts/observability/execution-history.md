@@ -12,14 +12,16 @@ Online: https://sqlbuild.com/docs/concepts/observability/execution-history/
 - Local SQLite
 - Deployed PostgreSQL
 
-`LifecycleEventLogStorage` stores canonical immutable lifecycle facts. `RunStorage` serves an atomically
-published, rebuildable run projection. Diagnostic and compute logs are never accepted by either
-contract. The public types, filters, pages, records, errors, and helper functions are exported from
-`sqlbuild.execution_history`.
+Execution history is a Python API for building your own run history: store SQLBuild's lifecycle
+events in SQLite or PostgreSQL and read runs back, for example to show run status in an internal
+tool. Everything is exported from `sqlbuild.execution_history`.
 
-This is a Python API for applications that store and serve SQLBuild events themselves. To look into
-what past runs did, use [Recall](recall.md), which records every command
-automatically and is queried with [`sqb recall`](../../cli/recall.md).
+To look into what past runs did, you don't need this API: use
+[Recall](recall.md), which records every command automatically and is
+queried with [`sqb recall`](../../cli/recall.md).
+
+`LifecycleEventLogStorage` stores events as they arrive and never changes them. `RunStorage` serves
+the current state of each run, rebuilt from those events. Neither stores logs or command output.
 
 ## Public contracts
 
@@ -29,10 +31,8 @@ automatically and is queried with [`sqb recall`](../../cli/recall.md).
 The concrete SQLite and PostgreSQL classes additionally provide transactional
 `append_and_project`, `reconcile`, and `check_health` operations.
 
-The deprecated `EventLogStorage` alias has been removed; use `LifecycleEventLogStorage`. Storage
-tables use the lifecycle-specific names `lifecycle_event_log` in SQLite and
-`sqlbuild_lifecycle_event_log` in PostgreSQL; the former `event_log` and `sqlbuild_event_log` names
-are retired.
+Events are stored in the `lifecycle_event_log` table in SQLite and `sqlbuild_lifecycle_event_log`
+in PostgreSQL.
 
 Each newly stored event receives a positive, increasing `storage_order`, opaque stable `cursor`,
 and UTC `received_at`. Pages ascend in storage order. `after_cursor` is exclusive,

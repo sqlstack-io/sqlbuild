@@ -61,7 +61,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--defer-sources-to` | Read managed source data from another target |
 | `--fail-fast` | Stop on first failure and skip remaining nodes |
 | `--concurrency` | Number of worker connections (default: 1) |
-| `--test-timeout <duration>` | Time limit for each unit test the build runs, such as `30s`, or `disabled`; see [Time limits](../concepts/testing.md#time-limits) |
+| `--test-timeout <duration>` | Time limit for each unit test the build runs, such as `30s`, or `disabled`; see [Time limits](../concepts/testing-reference.md#time-limits) |
 | `--verbose`, `-v` | Show lifecycle SQL inline after each model |
 | `--start-cursor` | Override the start cursor, typed from the selected incremental models' cursor type; fails with `S303` if the selection mixes timestamp and integer cursors. With no cursor model selected, an integer value is read as an integer cursor and anything else as an ISO timestamp |
 | `--end-cursor` | Override the end cursor, typed the same way as `--start-cursor` |

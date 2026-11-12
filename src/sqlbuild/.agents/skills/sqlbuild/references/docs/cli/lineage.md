@@ -1,6 +1,6 @@
 <!-- generated-by: sqlbuild skills -->
 
-# lineage
+# sqb lineage
 
 > Explore model and column-level dependency graphs from the command line.
 

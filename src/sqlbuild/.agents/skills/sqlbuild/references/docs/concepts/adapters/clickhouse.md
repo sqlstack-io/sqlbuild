@@ -201,4 +201,4 @@ history for a whole team, whichever adapter the project builds with. Set
 reader users. Recall creates its database, tables and views on first use, keeps every output byte by default, and needs
 only `SELECT` and `INSERT` once the tables exist; readers need only `SELECT` and may be
 `readonly = 1` users. See
-[Sharing history in ClickHouse](../observability/recall.md#sharing-history-in-clickhouse).
+[Sharing Recall in ClickHouse](../observability/recall-clickhouse.md).

@@ -22,7 +22,10 @@
 	{
 		"label": "Build models",
 		"items": [
-			"docs/concepts/models",
+			{
+				"label": "Models",
+				"slug": "docs/concepts/models"
+			},
 			"docs/concepts/models/materializations",
 			"docs/concepts/sources",
 			"docs/concepts/seeds",
@@ -80,7 +83,10 @@
 	{
 		"label": "Ship",
 		"items": [
-			"docs/concepts/planning",
+			{
+				"label": "Planning",
+				"slug": "docs/concepts/planning"
+			},
 			"docs/concepts/planning/replay-decisions",
 			"docs/concepts/planning/source-freshness",
 			"docs/concepts/planning/selection-and-staleness",
@@ -214,8 +220,14 @@
 	{
 		"label": "Reference",
 		"items": [
-			"docs/concepts/project-configuration",
-			"docs/concepts/models/configuration",
+			{
+				"label": "Configuration reference",
+				"slug": "docs/concepts/project-configuration"
+			},
+			{
+				"label": "MODEL() fields",
+				"slug": "docs/concepts/models/configuration"
+			},
 			"docs/concepts/testing-reference",
 			"docs/concepts/resource-identities"
 		]
