@@ -9,7 +9,9 @@ are affected and choose the correct incremental action.
 
 ## Configuration
 
-Source freshness is configured per source in `sources/*.yml` with a `freshness:` block. See [Sources: Source freshness](/docs/concepts/sources#source-freshness) for the full configuration reference.
+Configure freshness per source with a `freshness:` block, including `lag_tolerance` for timestamps
+that move without the data changing. See [Sources](/docs/concepts/sources#source-freshness) for the
+fields.
 
 ## How observations work
 
@@ -57,10 +59,6 @@ create or load the table, or grant `SELECT` on it to that role.
 A table that a model's own `pre_hook` creates does not exist yet when the plan is made, so planning
 fails with `S405`. Declare such a table as a managed source or a source with a loader, or create it
 before planning.
-
-## Lag tolerance
-
-For timestamp-based freshness, `lag_tolerance` controls how much the observed value can drift before being considered a real change. If the current timestamp is within the tolerance of the previous observation, the source is treated as unchanged. This is useful for sources where the freshness timestamp moves by seconds or minutes on every query but the underlying data hasn't meaningfully changed.
 
 ## State storage
 
