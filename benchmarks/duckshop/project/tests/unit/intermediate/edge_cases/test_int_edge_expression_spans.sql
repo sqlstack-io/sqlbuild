@@ -21,17 +21,17 @@ WITH __source__edge__price_windows AS (
 __expected__int_edge_expression_spans AS (
   SELECT
     'PW-01' AS window_id,
-    12.34::NUMBER(38, 6) AS price_amount,
-    12.34::NUMBER(18, 2) AS rounded_price,
+    12.340000::NUMBER(38,6) AS price_amount,
+    12.34::NUMBER(18,2) AS rounded_price,
     'USD' AS currency,
     'Prix à jour €' AS label,
-    '2026-03-02 09:00:00'::TIMESTAMP_NTZ AS loaded_at
+    '2026-03-02 09:00:00'::TIMESTAMP_NTZ(9) AS loaded_at
   UNION ALL
   SELECT
     'PW-02' AS window_id,
-    CAST(NULL AS NUMBER(38, 6)) AS price_amount,
-    CAST(NULL AS NUMBER(18, 2)) AS rounded_price,
+    CAST(NULL AS NUMBER(38,6)) AS price_amount,
+    CAST(NULL AS NUMBER(18,2)) AS rounded_price,
     'USD' AS currency,
     'Prix à jour €' AS label,
-    '2026-03-02 18:30:00'::TIMESTAMP_NTZ AS loaded_at
+    '2026-03-02 18:30:00'::TIMESTAMP_NTZ(9) AS loaded_at
 )
