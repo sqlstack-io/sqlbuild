@@ -39,6 +39,13 @@ on:
         required: false
         type: string
         default: dist
+      dependency-cache-writer:
+        description: >-
+          Build only the platforms that use the dependency compile cache and save it; it is saved
+          only from scheduled runs and pushes on main
+        required: false
+        type: boolean
+        default: false
     outputs:
       sha:
         description: "Commit the distributions were built from"
@@ -93,29 +100,41 @@ jobs:
     name: Build wheel (${{ matrix.platform.name }})
     needs: source
     runs-on: ${{ matrix.platform.runner }}
-    # Cold dist builds take up to about 2x the 17-31 minute release-profile jobs on Windows and macOS.
-    timeout-minutes: 120
+    # Cold dist builds take up to about 2x the 17-31 minute release-profile jobs on Windows and macOS,
+    # and a cold macOS arm64 dist build has taken an hour.
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
+        # dependency-cache marks the slowest platforms, whose dist builds restore compiled
+        # dependencies. Linux builds run in maturin's manylinux container, where the host cache
+        # does not apply.
         platform:
           - name: linux-x86_64
             runner: ubuntu-24.04
             target: x86_64
+            dependency-cache: none
           - name: linux-aarch64
             runner: ubuntu-24.04-arm
             target: aarch64
+            dependency-cache: none
           - name: macos-x86_64
             runner: macos-15
             target: x86_64
             python-architecture: x64
             smoke-arch: x86_64
+            dependency-cache: restore
           - name: macos-arm64
             runner: macos-15
             target: aarch64
+            dependency-cache: restore
           - name: windows-x86_64
             runner: windows-2025
             target: x86_64
+            dependency-cache: none
+        exclude:
+          - platform:
+              dependency-cache: ${{ inputs.dependency-cache-writer && 'none' || 'never' }}
     steps:
       - uses: actions/checkout@v4
         if: inputs.prebuilt-run-id == ''
@@ -129,6 +148,18 @@ jobs:
         if: inputs.prebuilt-run-id == ''
         with:
           toolchain: stable
+      # Compiled dependencies of dist builds, keyed on the lockfile, toolchain, profile and target.
+      # Only Dist Dependency Cache saves them, from main, so release builds restore a cache built
+      # from main and never write one.
+      - uses: Swatinem/rust-cache@v2
+        if: >-
+          inputs.prebuilt-run-id == '' && inputs.cargo-profile == 'dist'
+          && matrix.platform.dependency-cache != 'none'
+        with:
+          shared-key: dist-${{ matrix.platform.name }}-${{ inputs.cargo-profile }}
+          save-if: >-
+            ${{ inputs.dependency-cache-writer && github.ref == 'refs/heads/main'
+            && (github.event_name == 'push' || github.event_name == 'schedule') }}
       - uses: actions/setup-node@v4
         if: inputs.prebuilt-run-id == ''
         with:
@@ -338,13 +369,26 @@ jobs:
           curl -sf http://127.0.0.1:8765/runs | grep -q '/_app/immutable/'
           curl -sfI http://127.0.0.1:8765/theme.js | grep -qi '^content-type: text/javascript'
           kill "${server_pid}"
-      - uses: actions/upload-artifact@v4
+      # A transient network error in the upload would otherwise cost the whole build, so it retries
+      # once, replacing any artifact the failed attempt left behind.
+      - id: upload
+        uses: actions/upload-artifact@v4
         if: inputs.upload
+        continue-on-error: true
         with:
           name: dist-wheel-${{ matrix.platform.name }}
           path: dist
           if-no-files-found: error
           retention-days: ${{ inputs.retention-days }}
+      - name: Retry the distribution upload
+        uses: actions/upload-artifact@v4
+        if: inputs.upload && steps.upload.outcome == 'failure'
+        with:
+          name: dist-wheel-${{ matrix.platform.name }}
+          path: dist
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention-days }}
+          overwrite: true
 
   sdist:
     name: Build sdist

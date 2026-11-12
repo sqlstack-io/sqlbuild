@@ -4,7 +4,8 @@ name: Rust Build Cache
 # by a pull request or merge queue run is visible only to that ref, while one saved on main is
 # visible to every pull request. Each job runs the same cargo builds as the Verify jobs sharing its
 # key, so the cached artifacts match theirs, and builds only when main has no cache for the current
-# lockfile and toolchain. Release distributions never use these caches.
+# lockfile and toolchain. Release distributions never use these caches; Dist Dependency Cache saves
+# theirs.
 on:
   push:
     branches: [main]
