@@ -1040,6 +1040,11 @@ class StrictAdapter(
         ...
 
     @abstractmethod
+    def render_create_observations_table_sql(self, *, database: str | None, schema: str) -> str:
+        """Render DDL that creates the observations table when it is missing."""
+        ...
+
+    @abstractmethod
     def render_create_consumption_index_sqls(
         self,
         *,
@@ -1145,6 +1150,17 @@ class StrictAdapter(
         retain_versions: int,
     ) -> str:
         """Render SQL that prunes old consumption executions."""
+        ...
+
+    @abstractmethod
+    def render_prune_observations_history_sql(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+        retain_versions: int,
+    ) -> str:
+        """Render SQL that prunes old observations."""
         ...
 
     @abstractmethod

@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.duckdb_backed_adapter import DuckDbBackedAdapter
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
+from sqlbuild.adapter.contract.classes.observations import ObservationsMixin
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.types import BuiltinAdapter, LoaderLogicalType
 from sqlbuild.adapters.motherduck.constants import (
@@ -22,7 +23,7 @@ from sqlbuild.adapters.motherduck.constants import (
 )
 
 
-class MotherDuckAdapter(MicrobatchMixin, ConsumptionMixin, DuckDbBackedAdapter):
+class MotherDuckAdapter(MicrobatchMixin, ConsumptionMixin, ObservationsMixin, DuckDbBackedAdapter):
     """MotherDuck adapter backed by DuckDB's MotherDuck connection support."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.MOTHERDUCK.value
