@@ -61,10 +61,6 @@ ORCHESTRATION_NAME_CONFLICT: str = (
 )
 
 _DUCKSHOP: Path = Path("benchmarks/duckshop/project")
-_STRICT_SPANS: str = (
-    "SQLQuack's strict parsers do not yet record projection-item spans: Snowflake gives aliased "
-    "items none, and DuckDB's column span leaves out the qualifier"
-)
 _PRICE_MODELS: dict[str, str] = {
     "models/stg_prices.sql": (
         'MODEL (description "Staged prices");\n'
@@ -494,7 +490,6 @@ def test_given_rewritten_model_sql_when_publishing_then_expression_ranges_slice_
     assert published_texts(test_case, tmp_path) == test_case.expected_texts, test_case.description
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=_STRICT_SPANS)
 @pytest.mark.parametrize(
     "test_case",
     [
