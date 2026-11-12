@@ -73,7 +73,7 @@ Seeds (1)
 Execute the full build:
 
 ```bash
-sqb --no-color build
+sqb build
 ```
 
 SQLBuild materializes all models in DAG order. SQL unit tests run before their target models. Error-severity audits run against a staging table before promotion - if any fail, the production table is untouched:

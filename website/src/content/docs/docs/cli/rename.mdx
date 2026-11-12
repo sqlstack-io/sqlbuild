@@ -1,6 +1,8 @@
 ---
-title: "rename and mv"
+title: "sqb rename and sqb mv"
 description: "Rename or move a model, or rename a column, and update every reference in one verified step."
+sidebar:
+  label: "rename / mv"
 ---
 
 `sqb rename` and `sqb mv` change a name everywhere the compiler knows it is used, instead of leaving you to find every `__ref`, fixture, and header by hand. Every edit comes from compiled facts, not text search: a column rename follows the columns each query actually binds, so a same-named column of another table is left alone.

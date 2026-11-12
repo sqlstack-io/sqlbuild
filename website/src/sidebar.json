@@ -4,81 +4,128 @@
 		"items": [
 			"docs",
 			"docs/quickstart",
+			"docs/project-setup",
+			{
+				"label": "Coming from dbt",
+				"collapsed": true,
+				"items": [
+					"docs/concepts/dbt-compatibility/overview",
+					"docs/concepts/dbt-compatibility/selection",
+					"docs/concepts/dbt-compatibility/adding-sqlbuild-models"
+				]
+			},
 			"docs/feature-comparison",
 			"docs/roadmap",
 			"docs/benchmarks"
 		]
 	},
 	{
-		"label": "dbt Compatibility",
+		"label": "Build models",
 		"items": [
-			"docs/concepts/dbt-compatibility/overview",
-			"docs/concepts/dbt-compatibility/selection",
-			"docs/concepts/dbt-compatibility/adding-sqlbuild-models"
-		]
-	},
-	{
-		"label": "Concepts",
-		"items": [
-			"docs/concepts/project-configuration",
-			"docs/concepts/resource-identities",
-			"docs/concepts/semantic-compilation",
+			"docs/concepts/models",
+			"docs/concepts/models/materializations",
+			"docs/concepts/sources",
+			"docs/concepts/seeds",
+			"docs/concepts/incremental",
+			"docs/concepts/snapshots",
+			"docs/concepts/functions",
 			{
-				"label": "Refactoring",
-				"collapsed": false,
+				"label": "Macros",
+				"collapsed": true,
 				"items": [
 					{
 						"label": "Overview",
-						"slug": "docs/concepts/refactoring"
+						"slug": "docs/concepts/macros"
 					},
-					"docs/concepts/models/migrations",
-					"docs/concepts/models/column-migrations"
+					"docs/concepts/macros/sql-macros",
+					"docs/concepts/macros/sql-macro-reference",
+					"docs/concepts/macros/python-macros",
+					"docs/concepts/macros/composition-and-context"
 				]
 			},
+			"docs/concepts/selectors"
+		]
+	},
+	{
+		"label": "Testing",
+		"items": [
+			"docs/concepts/testing",
+			"docs/concepts/scenarios",
+			"docs/concepts/audits",
+			"docs/concepts/diff"
+		]
+	},
+	{
+		"label": "Correctness",
+		"items": [
+			"docs/concepts/semantic-compilation",
+			"docs/concepts/models/contracts",
+			"docs/concepts/models/type-enforcement",
+			"docs/concepts/models/schemas",
 			{
-				"label": "Adapters",
+				"label": "Rules",
 				"collapsed": true,
 				"items": [
-					"docs/concepts/adapters",
-					"docs/concepts/adapters/snowflake",
-					"docs/concepts/adapters/duckdb",
-					"docs/concepts/adapters/motherduck",
-					"docs/concepts/adapters/postgres",
-					"docs/concepts/adapters/sqlite",
-					"docs/concepts/adapters/bigquery",
-					"docs/concepts/adapters/databricks",
-					"docs/concepts/adapters/sqlserver",
-					"docs/concepts/adapters/clickhouse"
-				]
-			},
-			"docs/concepts/sources",
-			"docs/concepts/seeds",
-			{
-				"label": "Models",
-				"collapsed": true,
-				"items": [
-					"docs/concepts/models",
-					"docs/concepts/models/materializations",
-					"docs/concepts/models/schemas",
-					"docs/concepts/models/type-enforcement",
-					"docs/concepts/models/contracts",
 					{
-						"label": "Hooks",
-						"collapsed": true,
-						"items": [
-							{
-								"label": "Overview",
-								"slug": "docs/concepts/models/hooks"
-							},
-							"docs/concepts/models/hooks/sql",
-							"docs/concepts/models/hooks/python"
-						]
+						"label": "Overview",
+						"slug": "docs/concepts/rules"
 					},
-					"docs/concepts/models/configuration"
+					"docs/concepts/rules/configuration-and-selection",
+					"docs/concepts/rules/findings-and-exceptions",
+					"docs/concepts/rules/execution-and-caching"
+				]
+			}
+		]
+	},
+	{
+		"label": "Ship",
+		"items": [
+			"docs/concepts/planning",
+			"docs/concepts/planning/replay-decisions",
+			"docs/concepts/planning/source-freshness",
+			"docs/concepts/planning/selection-and-staleness",
+			{
+				"label": "Review a branch",
+				"link": "/docs/cli/review/"
+			},
+			"docs/concepts/column-lineage"
+		]
+	},
+	{
+		"label": "Refactor",
+		"items": [
+			"docs/concepts/refactoring",
+			"docs/concepts/models/migrations",
+			"docs/concepts/models/column-migrations"
+		]
+	},
+	{
+		"label": "Investigate",
+		"items": [
+			"docs/concepts/observability/recall",
+			"docs/concepts/observability/recall-clickhouse",
+			"docs/concepts/observability",
+			"docs/concepts/observability/sinks"
+		]
+	},
+	{
+		"label": "Advanced",
+		"items": [
+			{
+				"label": "Declaration scopes",
+				"collapsed": true,
+				"items": [
+					{
+						"label": "Overview",
+						"slug": "docs/concepts/declaration-scopes"
+					},
+					"docs/concepts/declaration-scopes/visibility",
+					"docs/concepts/declaration-scopes/placement",
+					"docs/concepts/declaration-scopes/explorer"
 				]
 			},
 			{
-				"label": "Enums and Constants",
+				"label": "Enums and constants",
 				"collapsed": true,
 				"items": [
 					"docs/concepts/enums",
@@ -88,70 +135,17 @@
 					"docs/concepts/model-private-values"
 				]
 			},
-			{
-				"label": "Macros",
-				"collapsed": true,
-				"items": [
-					"docs/concepts/macros",
-					"docs/concepts/macros/sql-macros",
-					"docs/concepts/macros/python-macros",
-					"docs/concepts/macros/composition-and-context"
-				]
-			},
 			"docs/concepts/interpolation",
-			"docs/concepts/functions",
-			"docs/concepts/incremental",
 			{
-				"label": "Planning and Change Detection",
+				"label": "Hooks",
 				"collapsed": true,
 				"items": [
-					"docs/concepts/planning",
-					"docs/concepts/planning/replay-decisions",
-					"docs/concepts/planning/source-freshness",
-					"docs/concepts/planning/selection-and-staleness"
-				]
-			},
-			"docs/concepts/snapshots",
-			"docs/concepts/audits",
-			{
-				"label": "Rules",
-				"collapsed": true,
-				"items": [
-					"docs/concepts/rules",
-					"docs/concepts/rules/configuration-and-selection",
-					"docs/concepts/rules/findings-and-exceptions",
-					"docs/concepts/rules/published-layer-rules",
-					"docs/concepts/rules/execution-and-caching"
-				]
-			},
-			"docs/concepts/testing",
-			"docs/concepts/scenarios",
-			"docs/concepts/selectors",
-			"docs/concepts/column-lineage",
-			"docs/concepts/diff"
-		]
-	},
-	{
-		"label": "Advanced Concepts",
-		"items": [
-			{
-				"label": "Observability",
-				"collapsed": true,
-				"items": [
-					"docs/concepts/observability",
-					"docs/concepts/observability/recall",
-					"docs/concepts/observability/sinks",
-					"docs/concepts/observability/execution-history"
-				]
-			},
-			{
-				"label": "Declarations and Scopes",
-				"collapsed": true,
-				"items": [
-					"docs/concepts/declaration-scopes",
-					"docs/concepts/declaration-scopes/visibility",
-					"docs/concepts/declaration-scopes/placement",
-					"docs/concepts/declaration-scopes/explorer"
+					{
+						"label": "Overview",
+						"slug": "docs/concepts/models/hooks"
+					},
+					"docs/concepts/models/hooks/sql",
+					"docs/concepts/models/hooks/python"
 				]
 			},
 			{
@@ -160,22 +154,45 @@
 				"items": [
 					"docs/concepts/rules/custom-rules/overview",
 					"docs/concepts/rules/custom-rules/rule-context",
-					"docs/concepts/rules/custom-rules/testing-and-determinism"
+					"docs/concepts/rules/custom-rules/testing-and-determinism",
+					"docs/concepts/rules/published-layer-rules"
 				]
-			}
+			},
+			{
+				"label": "Python nodes",
+				"collapsed": true,
+				"items": [
+					"docs/concepts/python-nodes/overview",
+					"docs/concepts/python-nodes/loaders",
+					"docs/concepts/python-nodes/tasks",
+					"docs/concepts/python-nodes/assets",
+					"docs/concepts/python-nodes/checks",
+					"docs/concepts/python-nodes/factories",
+					"docs/concepts/python-nodes/providers",
+					"docs/concepts/python-nodes/sql-references"
+				]
+			},
+			"docs/concepts/adapters/custom",
+			"docs/concepts/observability/execution-history"
 		]
 	},
 	{
-		"label": "Python Nodes",
+		"label": "Adapters",
+		"collapsed": true,
 		"items": [
-			"docs/concepts/python-nodes/overview",
-			"docs/concepts/python-nodes/loaders",
-			"docs/concepts/python-nodes/tasks",
-			"docs/concepts/python-nodes/assets",
-			"docs/concepts/python-nodes/checks",
-			"docs/concepts/python-nodes/factories",
-			"docs/concepts/python-nodes/providers",
-			"docs/concepts/python-nodes/sql-references"
+			{
+				"label": "Overview",
+				"slug": "docs/concepts/adapters"
+			},
+			"docs/concepts/adapters/snowflake",
+			"docs/concepts/adapters/duckdb",
+			"docs/concepts/adapters/motherduck",
+			"docs/concepts/adapters/postgres",
+			"docs/concepts/adapters/sqlite",
+			"docs/concepts/adapters/bigquery",
+			"docs/concepts/adapters/databricks",
+			"docs/concepts/adapters/sqlserver",
+			"docs/concepts/adapters/clickhouse"
 		]
 	},
 	{
@@ -195,38 +212,78 @@
 		]
 	},
 	{
+		"label": "Reference",
+		"items": [
+			"docs/concepts/project-configuration",
+			"docs/concepts/models/configuration",
+			"docs/concepts/testing-reference",
+			"docs/concepts/resource-identities"
+		]
+	},
+	{
 		"label": "CLI Reference",
 		"items": [
-			"docs/cli/init",
-			"docs/cli/playground",
-			"docs/cli/skills",
-			"docs/cli/server",
-			"docs/cli/login",
-			"docs/cli/compile",
-			"docs/cli/format",
-			"docs/cli/contract",
-			"docs/cli/scope",
-			"docs/cli/rename",
-			"docs/cli/rules",
-			"docs/cli/plan",
-			"docs/cli/build",
-			"docs/cli/load",
-			"docs/cli/seed",
-			"docs/cli/test",
-			"docs/cli/scenario",
-			"docs/cli/audit",
-			"docs/cli/freshness",
-			"docs/cli/check",
-			"docs/cli/clone",
-			"docs/cli/diff",
-			"docs/cli/lineage",
-			"docs/cli/dag",
-			"docs/cli/query",
-			"docs/cli/recall",
-			"docs/cli/debug",
-			"docs/cli/janitor",
-			"docs/cli/clean",
-			"docs/cli/dbt"
+			{
+				"label": "Set up",
+				"items": [
+					"docs/cli/init",
+					"docs/cli/playground",
+					"docs/cli/skills",
+					"docs/cli/debug"
+				]
+			},
+			{
+				"label": "Develop",
+				"items": [
+					"docs/cli/compile",
+					"docs/cli/format",
+					"docs/cli/test",
+					"docs/cli/scenario",
+					"docs/cli/lineage",
+					"docs/cli/scope",
+					"docs/cli/rename",
+					"docs/cli/rules",
+					"docs/cli/contract"
+				]
+			},
+			{
+				"label": "Build",
+				"items": [
+					"docs/cli/plan",
+					"docs/cli/build",
+					"docs/cli/load",
+					"docs/cli/seed",
+					"docs/cli/audit",
+					"docs/cli/check",
+					"docs/cli/freshness"
+				]
+			},
+			{
+				"label": "Compare and ship",
+				"items": [
+					"docs/cli/diff",
+					"docs/cli/review",
+					"docs/cli/clone"
+				]
+			},
+			{
+				"label": "Operate",
+				"items": [
+					"docs/cli/janitor",
+					"docs/cli/recall",
+					"docs/cli/query",
+					"docs/cli/clean",
+					"docs/cli/dag",
+					"docs/cli/dbt"
+				]
+			},
+			{
+				"label": "Server",
+				"items": [
+					"docs/cli/server",
+					"docs/cli/login"
+				]
+			}
 		]
 	}
 ]
