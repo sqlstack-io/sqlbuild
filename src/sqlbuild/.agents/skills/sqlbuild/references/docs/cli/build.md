@@ -228,7 +228,7 @@ one model.
 
 ### Model limit
 
-When the selection has more models than `max_models`, the build stops before any clone, load or
+When the build would run more models than `max_models`, the build stops before any clone, load or
 model runs, and says that nothing in the warehouse changed. `sqb plan` has no limit, so use it to
 check a broad selection.
 
@@ -256,7 +256,7 @@ with `max_duration`.
 
 Unit test, scenario and model limits (`test_timeout`, `scenario_timeout` and a model's
 `max_duration`) count running time only, from the item's first warehouse statement. Rollback and
-cleanup always run, even after the limit. Where a warehouse reports queueing separately, queued
+cleanup always run and don't count. Where a warehouse reports queueing separately, queued
 time doesn't count:
 
 | Adapter | How the item limit is enforced | Queued time |

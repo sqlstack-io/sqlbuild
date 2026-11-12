@@ -20,12 +20,13 @@ MODEL (
 );
 ```
 
-How strictly the list is checked depends on the model's `contract` setting:
+How strictly the list is checked depends on the model's `contract` setting, which can also come
+from `[defaults]` or `[path_defaults]`:
 
-| `contract` in `MODEL()` | Listed columns | Extra columns | Checked |
-|-------------------------|----------------|---------------|---------|
+| `contract` setting | Listed columns | Extra columns | Checked |
+|--------------------|----------------|---------------|---------|
 | not set (default) | must be in the output | allowed | at compile time |
-| `enforced` | must be in the output, with their declared types | not allowed | at compile time, and at runtime before the table is replaced |
+| `enforced` | must be in the output, with their declared types | not allowed | at compile time, and at runtime where the [table below](#runtime) says so |
 | `none` | documentation and audit targets only | allowed | declared types only |
 
 To make models without a `contract` setting treat their columns as documentation and audit targets
@@ -45,14 +46,13 @@ When SQLBuild can work out the model's output columns, these fail unless the mod
 documentation only:
 
 - A listed column is missing from the output (`K001`).
-- A column's type doesn't match its declared type (`K002`). This runs for every model with a declared
-  type.
-- A `nullable false` column can be null.
-- With `contract enforced` only: an extra column, or a `unique_key`, `cursor`, `updated_at` or
-  `check_columns` that names an unlisted column.
+- A `nullable false` column can be null (`K004`).
+- With `contract enforced` only: an extra column (`K005`), or a `unique_key`, `cursor`, `updated_at`
+  or `check_columns` that names an unlisted column.
 
-If SQLBuild can't work out the output, these checks are skipped. `contract enforced` needs at least
-one listed column.
+A column whose type doesn't match its declared type fails too (`K002`), whatever the contract. If
+SQLBuild can't work out the output, these checks are skipped. `contract enforced` needs at least one
+listed column (`K006`).
 
 ### Runtime
 
@@ -62,7 +62,7 @@ replaces anything:
 | Materialization | Runtime check |
 |-----------------|---------------|
 | Table (staged, the default) | Before the new table replaces the old one |
-| Table with `table_promotion_mode = "immediate"` | Not allowed: a `K011` compile error. Use staged promotion |
+| Table or incremental with `table_promotion_mode = "immediate"` | Not allowed: a `K011` compile error. Use staged promotion |
 | Incremental | On each delta, before it is written |
 | Microbatch incremental | None; compile time only |
 | Snapshot | On each delta |
@@ -86,7 +86,7 @@ decision. See [`sqb contract`](/docs/cli/contract) for `--overwrite` and what ge
 ## Models that read an enforced contract
 
 When a model reads a model or source with `contract enforced`, SQLBuild knows its exact columns. A
-reference to a column it doesn't have fails at compile time, wherever it appears: the select list, a
+reference to a column it doesn't have, or to an ambiguous one, fails at compile time, wherever it appears: the select list, a
 join, a filter, grouping, a window or `ORDER BY`. When an upstream's columns aren't fully known,
 nothing is reported. To see where a model uses each upstream column, run
 `sqb lineage <model> --include-uses --format json`.
@@ -96,6 +96,7 @@ nothing is reported. To see where a model uses each upstream column, run
 - **Reusable schemas.** A contract covers the model's full column list: the columns of its
   [reusable schema](/docs/concepts/models/schemas) plus any it adds. With `contract enforced`, the
   output must have exactly those.
+- **Column order.** Contracts match columns by name; output order isn't checked.
 - **Enum columns.** A column typed with an enum, such as `fulfillment_method (type fulfillment_method)`,
   is a `VARCHAR` or `INTEGER`. With `contract enforced`, SQLBuild adds an `accepted_values` audit for
   its members. See [Enum Model Contracts](/docs/concepts/enums/model-contracts).

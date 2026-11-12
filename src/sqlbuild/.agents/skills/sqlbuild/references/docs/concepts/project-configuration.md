@@ -478,8 +478,8 @@ delta_compile = true
 |-------|---------|-------------|
 | `sql_analysis` | `true` | Enable SQL syntax analysis, column binding, type inference, output inference, and semantic validation at compile time |
 | `require_sql_analysis` | `false` | Allow `sql_analysis false` (in a MODEL header or a `[path_defaults]` entry) only on models whose SQL the parser cannot read, and reject `[settings] sql_analysis = false` in `sqlbuild_local.toml`. Project file only. See [SQL analysis](models/configuration.md#sql-analysis). |
-| `query_change_tracking` | `true` | Rebuild a model when its compiled query changes. Whitespace, comments and keyword case don't count as changes |
-| `check_declared_columns` | `true` | Check that models without a `contract` setting output their declared columns. `false` makes those columns documentation and audit targets only. See [Contracts](models/contracts.md) |
+| `query_change_tracking` | `true` | Rebuild a model when its compiled query changes. Whitespace, comments, and the case of reserved keywords and built-in function names don't count as changes |
+| `check_declared_columns` | `true` | Check that models without a `contract` setting output their declared columns, and that `nullable false` columns can't be null. `false` makes those columns documentation and audit targets only. See [Contracts](models/contracts.md) |
 | `concurrency` | `1` | Default number of worker connections for commands that run resources in parallel, such as `sqb build`, `sqb test`, `sqb audit`, and `sqb seed`, and for `sqb janitor` actions on warehouses that run DDL concurrently; a target's `concurrency` and `--concurrency` override it (see [Target concurrency](#target-concurrency)) |
 | `microbatch_concurrency` | `false` | Allow models with `batch_concurrency > 1` |
 | `auto_load_sources` | `true` | Automatically run source loaders before building dependent models during `sqb build`. See [Loaders](python-nodes/loaders.md). |
