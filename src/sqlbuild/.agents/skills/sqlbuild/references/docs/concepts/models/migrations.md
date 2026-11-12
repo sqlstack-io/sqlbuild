@@ -118,8 +118,8 @@ missing_migration_origin = "deny"
 
 `sqlbuild_local.toml` can set it for a target too. `sqb dbt run` and `sqb dbt build` follow it but
 have no confirmation flag: they ask on a terminal and stop otherwise. In a non-interactive dbt run,
-first build the affected models with `sqb build --allow-missing-migration-origin`, or set the target
-to `allow`.
+build the affected models with `sqb build --allow-missing-migration-origin` and leave them out of
+the dbt selection, or set the target to `allow`.
 
 ## Automatic discovery
 

@@ -169,6 +169,9 @@ error[K001]: declared column 'total_cents' was not found in statically inferred 
 | `K001` | A declared column is missing from the query output |
 | `K002` | A column's inferred type doesn't match the declared type |
 | `K003` | A column's type can't be proven (with `type_enforcement` on) |
+| `K004` | A `nullable false` column can be null |
+| `K005` | A model with `contract enforced` outputs a column it doesn't list |
+| `K006` | A model with `contract enforced` lists no columns |
 | `K013` | A string literal fills an enum-typed column of an enforced contract but isn't a member of the enum (not checked on SQL Server) |
 
 Models without a `contract` setting are checked unless the project sets

@@ -143,8 +143,9 @@ A model's [contract](contracts.md) covers its full column list: the schema's
 columns plus the ones the model adds.
 
 Changing a column's name, type, nullability or enum members in a schema changes every model bound
-to it, or to a schema that extends it, so those models rebuild. Changing a description doesn't.
-Changing an audit reruns that audit without rebuilding the model.
+to it, or to a schema that extends it, so those models show as changed in the plan; see
+[Replay decisions](../planning/replay-decisions.md). Changing a description doesn't.
+Changing an audit reruns that audit without changing the model.
 
 ## Limitations
 
