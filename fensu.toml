@@ -53,6 +53,11 @@ symbols = ["BaseAdapter"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.adapter.relations.types"]
+symbols = ["RelationChangeTokenReader"]
+reason = "Native code imports this protocol by path for an isinstance capability check."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.adapter.contract.exceptions"]
 symbols = ["AdapterUserError"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."

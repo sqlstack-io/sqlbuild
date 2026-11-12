@@ -262,6 +262,21 @@ fn read_page(
         return Ok(WarehouseHistoryPage {
             records: Vec::new(),
             next_after: None,
+            change_token: None,
+            unchanged: false,
+        });
+    }
+    let change_token: Option<String> = if after.is_none() {
+        relation_change_token(py, (adapter, connection), (&database, &schema, &name))?
+    } else {
+        None
+    };
+    if change_token.is_some() && change_token.as_deref() == unchanged_token(request) {
+        return Ok(WarehouseHistoryPage {
+            records: Vec::new(),
+            next_after: None,
+            change_token,
+            unchanged: true,
         });
     }
     let catalog_columns = call_with(
@@ -462,6 +477,52 @@ fn read_page(
     Ok(WarehouseHistoryPage {
         records,
         next_after,
+        change_token,
+        unchanged: false,
+    })
+}
+
+/// The token a complete earlier read recorded; only state-table scans carry one.
+fn unchanged_token(request: &WarehouseHistoryRead) -> Option<&str> {
+    match request {
+        WarehouseHistoryRead::SourceFreshness(read) => read.unchanged_token.as_deref(),
+        WarehouseHistoryRead::Fingerprints(read) => read.unchanged_token.as_deref(),
+        WarehouseHistoryRead::AuditResults(read)
+        | WarehouseHistoryRead::JanitorEvents(read)
+        | WarehouseHistoryRead::Migrations(read)
+        | WarehouseHistoryRead::OldNameViews(read)
+        | WarehouseHistoryRead::Microbatches(read)
+        | WarehouseHistoryRead::ColumnMigrations(read) => read.unchanged_token.as_deref(),
+        WarehouseHistoryRead::NodeResults(read) => read.unchanged_token.as_deref(),
+        WarehouseHistoryRead::Consumption(read) => read.unchanged_token.as_deref(),
+        WarehouseHistoryRead::Catalog(_) | WarehouseHistoryRead::Statistics(_) => None,
+    }
+}
+
+/// The adapter's change token for one table; without one, or when reading it fails, the scan reads as before.
+fn relation_change_token(
+    py: Python<'_>,
+    (adapter, connection): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    (database, schema, name): (&Bound<'_, PyAny>, &Bound<'_, PyAny>, &Bound<'_, PyAny>),
+) -> PyResult<Option<String>> {
+    let reader = py
+        .import("sqlbuild.adapter.relations.types")?
+        .getattr("RelationChangeTokenReader")?;
+    if !adapter.is_instance(&reader)? {
+        return Ok(None);
+    }
+    let token = call_with(
+        &adapter.getattr("read_relation_change_token")?,
+        &[
+            ("connection", connection.clone()),
+            ("database", database.clone()),
+            ("schema", schema.clone()),
+            ("name", name.clone()),
+        ],
+    );
+    Ok(match token {
+        Ok(token) if !token.is_none() => Some(token.extract()?),
+        _ => None,
     })
 }
 

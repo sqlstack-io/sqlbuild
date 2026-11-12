@@ -104,6 +104,8 @@ pub(crate) fn read_catalog(
         return Ok(WarehouseHistoryPage {
             records: Vec::new(),
             next_after: None,
+            change_token: None,
+            unchanged: false,
         });
     }
     let keys = selected.iter().map(|(_, _, key)| key);
@@ -164,5 +166,7 @@ pub(crate) fn read_catalog(
     Ok(WarehouseHistoryPage {
         records,
         next_after,
+        change_token: None,
+        unchanged: false,
     })
 }

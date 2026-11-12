@@ -1,5 +1,6 @@
 //! Running a Python-free command: its checks, then its output with the observed services.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -38,6 +39,7 @@ use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, StatisticsRetention,
     WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead,
+    WarehouseWatermarkRead,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::webhooks::main::{
@@ -69,9 +71,9 @@ use crate::native_commands::_helpers::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
-    ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_POLL_SECONDS,
-    METADATA_RECONCILE_SECONDS, METADATA_SYNC_CHECK_SECONDS, SCHEDULER_COMMAND,
-    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
+    METADATA_POLL_SECONDS, METADATA_RECONCILE_SECONDS, METADATA_SYNC_CHECK_SECONDS,
+    SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -80,7 +82,7 @@ use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LostStdout, NativeCommand,
-    NativeInvocation, ProjectLocation,
+    NativeInvocation, ProjectLocation, ScanToken,
 };
 use crate::native_commands::types::LocationPublication;
 use crate::workers::main::docker_image_sources::docker_image_sources;
@@ -352,6 +354,10 @@ pub(crate) fn metadata_sync(
         next_at: Instant::now(),
         idle: true,
         cycle_started_at: None,
+        change_tokens: HashMap::new(),
+        scan_token: None,
+        scan_delivered: false,
+        mirror_holds_rows: false,
     }
 }
 
@@ -365,9 +371,14 @@ pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, C
     let kind = state.kind().as_str();
     let request = if state.kind() == WarehouseHistoryKind::Statistics {
         json!({(kind): state.statistics.as_ref().ok_or_else(|| ControlError::Invalid("statistics eligibility page missing".into()))?})
-    } else {
+    } else if state.kind() == WarehouseHistoryKind::Catalog {
         json!({(kind): {
             "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
+        }})
+    } else {
+        json!({(kind): {
+            "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit,
+            "unchanged_token":state.unchanged_token()
         }})
     };
     serde_json::to_vec(&request).map_err(|error| ControlError::Invalid(error.to_string()))
@@ -405,6 +416,11 @@ pub(crate) fn freeze_history_page(
     page: WarehouseHistoryPage,
     poll: &LocationWorkPoll,
 ) -> Result<LocationMetadataSync, ControlError> {
+    if state.source_after.is_none() {
+        state.scan_token.clone_from(&page.change_token);
+        state.scan_delivered = false;
+    }
+    state.scan_delivered |= !page.records.is_empty();
     let batch = MetadataBatch {
         kind: state.kind(),
         session_id: poll.session_id,
@@ -490,24 +506,91 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
         if state.kind() == WarehouseHistoryKind::Statistics {
             state.statistics_limit = MAX_HISTORY_RECORDS;
         }
-        state.index += 1;
-        state.scan_id = Uuid::now_v7();
-        state.observed_since = None;
-        state.watermark_loaded = false;
-        state.limit = MAX_HISTORY_RECORDS;
-        if state.index == state.locations.len() * WarehouseHistoryKind::ALL.len() {
-            state.index = 0;
-            if state.reconcile {
-                state.reconcile_at =
-                    Instant::now() + Duration::from_secs(u64::from(state.reconcile_seconds));
+        match state.scan_token.take() {
+            Some(token) => {
+                let recorded = ScanToken {
+                    token,
+                    reconciled: state.reconciling(),
+                    delivered: state.scan_delivered || state.observed_since.is_some(),
+                };
+                state.change_tokens.insert(state.index, recorded);
             }
-            state.idle = true;
-            state.next_at = Instant::now();
-            drop(write_output(&[(
-                Stream::Stderr,
-                "Warehouse history synchronization completed.\n",
-            )]));
+            None => {
+                state.change_tokens.remove(&state.index);
+            }
         }
+        state = next_scan(state);
+    }
+    state
+}
+
+/// The mirror's watermark bounds an incremental scan and shows whether the mirror holds rows.
+pub(crate) async fn load_watermark(
+    mut state: LocationMetadataSync,
+    (options, client, poll): (&LocationServe, &LocationWorkClient, &LocationWorkPoll),
+    (started, stopped): (Instant, impl Future<Output = Result<(), ControlError>>),
+) -> Result<Option<(LocationMetadataSync, Option<ClientError>)>, ControlError> {
+    tokio::pin!(stopped);
+    if state.index == 0 {
+        state.reconcile = Instant::now() >= state.reconcile_at;
+    }
+    state.mirror_holds_rows = false;
+    if (!state.reconcile || state.change_tokens.contains_key(&state.index))
+        && !matches!(
+            state.kind(),
+            WarehouseHistoryKind::Catalog | WarehouseHistoryKind::Statistics
+        )
+    {
+        let request = WarehouseWatermarkRead {
+            session_id: poll.session_id,
+            generation: state.generation,
+            location: state.location().clone(),
+            kind: state.kind(),
+        };
+        let watermark = tokio::select! {
+            result = &mut stopped => { result?; return Ok(None); },
+            result = client.metadata_watermark(&options.target, &request) => result,
+        };
+        let watermark = match watermark {
+            Ok(watermark) => watermark,
+            Err(error) => {
+                tokio::select! {
+                    result = &mut stopped => { result?; return Ok(None); },
+                    () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Watermark))) => {},
+                }
+                return Ok(Some((state, Some(error))));
+            }
+        };
+        state.mirror_holds_rows = watermark.is_some();
+        if !state.reconcile {
+            state.observed_since = watermark.and_then(|time| {
+                time.checked_sub_signed(chrono::Duration::seconds(METADATA_OVERLAP_SECONDS))
+            });
+        }
+    }
+    state.watermark_loaded = true;
+    Ok(Some((state, None)))
+}
+
+/// Move to the next scan; after the last one the synchronization completes and waits for a run.
+pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync {
+    state.index += 1;
+    state.scan_id = Uuid::now_v7();
+    state.observed_since = None;
+    state.watermark_loaded = false;
+    state.limit = MAX_HISTORY_RECORDS;
+    if state.index == state.locations.len() * WarehouseHistoryKind::ALL.len() {
+        state.index = 0;
+        if state.reconcile {
+            state.reconcile_at =
+                Instant::now() + Duration::from_secs(u64::from(state.reconcile_seconds));
+        }
+        state.idle = true;
+        state.next_at = Instant::now();
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Warehouse history synchronization completed.\n",
+        )]));
     }
     state
 }

@@ -415,6 +415,9 @@ pub struct SourceFreshnessRead {
     /// Inclusive time bound, held fixed across pages; independent of the row-key cursor.
     pub observed_since: Option<DateTime<Utc>>,
     pub limit: Option<usize>,
+    /// The table's change token after the last complete read; an equal token skips this read.
+    #[serde(default)]
+    pub unchanged_token: Option<String>,
 }
 
 /// Fingerprints remain history here; latest-row selection belongs to the existing planner reader.
@@ -479,6 +482,9 @@ pub struct FingerprintRead {
     pub after: Option<[Option<String>; 13]>,
     pub observed_since: Option<DateTime<Utc>>,
     pub limit: Option<usize>,
+    /// The table's change token after the last complete read; an equal token skips this read.
+    #[serde(default)]
+    pub unchanged_token: Option<String>,
 }
 
 /// Node results carry no event identity, so the cursor holds the row's identity columns.
@@ -489,6 +495,9 @@ pub struct NodeResultsRead {
     pub after: Option<[Option<String>; 9]>,
     pub observed_since: Option<DateTime<Utc>>,
     pub limit: Option<usize>,
+    /// The table's change token after the last complete read; an equal token skips this read.
+    #[serde(default)]
+    pub unchanged_token: Option<String>,
 }
 
 /// Consumption rows carry no event identity, so the cursor holds the row's identity columns.
@@ -499,6 +508,9 @@ pub struct ConsumptionRead {
     pub after: Option<[Option<String>; 7]>,
     pub observed_since: Option<DateTime<Utc>>,
     pub limit: Option<usize>,
+    /// The table's change token after the last complete read; an equal token skips this read.
+    #[serde(default)]
+    pub unchanged_token: Option<String>,
 }
 
 /// Stable event identities and timestamps order observations without comparing their payloads.
@@ -509,6 +521,9 @@ pub struct StateEventsRead {
     pub after: Option<[Option<String>; 3]>,
     pub observed_since: Option<DateTime<Utc>>,
     pub limit: Option<usize>,
+    /// The table's change token after the last complete read; an equal token skips this read.
+    #[serde(default)]
+    pub unchanged_token: Option<String>,
 }
 
 /// The private interpreter accepts only known state tables, never arbitrary SQL.
@@ -551,6 +566,12 @@ pub enum WarehouseHistoryRecord {
 pub struct WarehouseHistoryPage {
     pub records: Vec<WarehouseHistoryRecord>,
     pub next_after: Option<Vec<Option<String>>>,
+    /// The table's change token, read before a scan's first page where the warehouse offers one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change_token: Option<String>,
+    /// The token still equals the request's: nothing was read and nothing is delivered.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unchanged: bool,
 }
 
 /// Typed import columns are selected by code, never from location-supplied field names.
