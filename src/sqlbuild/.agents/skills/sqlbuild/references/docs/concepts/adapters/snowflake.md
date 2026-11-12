@@ -89,9 +89,9 @@ an error such as
 ## Metadata reads
 
 Planning and builds read table, view and column metadata with `SHOW` commands, which don't need a
-running warehouse. Three reads do need one: source freshness, which reads `LAST_ALTERED` from
-`INFORMATION_SCHEMA`; columns of a schema with 10,000 or more columns; and probes for sources the
-listing didn't find. Run `sqb plan -v` to see each metadata query with its time
+running warehouse. Source freshness, which reads `LAST_ALTERED` from `INFORMATION_SCHEMA`, and
+columns of a schema with 10,000 or more columns need one. Probes for sources the listing didn't
+find may need one too. Run `sqb plan -v` to see each metadata query with its time
 and row count.
 
 ## State tables
