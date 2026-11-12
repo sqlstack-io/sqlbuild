@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.212.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.211.0...v0.212.0) (2026-11-12)
+
+
+### Features
+
+* **location:** sync a location only after runs end or on request ([#1421](https://github.com/sqlstack-io/sqlbuild/issues/1421)) ([49817f3](https://github.com/sqlstack-io/sqlbuild/commit/49817f3545fa5700bf7fd48d115a36784a85bbd4))
+* **location:** sync every state table without waking a suspended warehouse ([#1419](https://github.com/sqlstack-io/sqlbuild/issues/1419)) ([55dd0de](https://github.com/sqlstack-io/sqlbuild/commit/55dd0de9751803450cd1cdb39225276898d2f806))
+
+
+### Bug Fixes
+
+* keep scheduled builds running through a busy store and planner skips ([#1413](https://github.com/sqlstack-io/sqlbuild/issues/1413)) ([16747e6](https://github.com/sqlstack-io/sqlbuild/commit/16747e6af28928a76635c7b690ca49f124bb8b18))
+* **snowflake:** read relation statistics with SHOW OBJECTS ([#1417](https://github.com/sqlstack-io/sqlbuild/issues/1417)) ([1428b5e](https://github.com/sqlstack-io/sqlbuild/commit/1428b5e7cfd2db0fd5209b877a0aee6cf94dfb7c))
+
 ## [0.211.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.210.1...v0.211.0) (2026-11-11)
 
 
