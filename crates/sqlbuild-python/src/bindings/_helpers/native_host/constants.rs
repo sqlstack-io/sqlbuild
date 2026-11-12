@@ -21,3 +21,6 @@ pub(crate) const JOB_LABEL: &str = "job";
 pub(crate) const GROUP_LABEL: &str = "job group";
 pub(crate) const SENSOR_LABEL: &str = "sensor";
 pub(crate) const CALENDAR_LABEL: &str = "calendar schedule";
+
+/// Pages one bounded state-history SELECT streams before the scan continues from its cursor.
+pub(crate) const HISTORY_STREAM_PAGES: usize = 50;

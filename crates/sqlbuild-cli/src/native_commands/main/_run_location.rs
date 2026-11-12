@@ -15,8 +15,8 @@ use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
-    check_published_location, compile_generation, location_generation, location_heartbeats,
-    metadata_sync, report_location_health, shutdown_signal,
+    check_published_location, close_metadata_reader, compile_generation, location_generation,
+    location_heartbeats, metadata_sync, report_location_health, shutdown_signal,
 };
 use crate::native_commands::_helpers::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
@@ -93,6 +93,9 @@ async fn watch_location(
             continue;
         }
         published_generation = None;
+        if let Some(state) = metadata.take() {
+            metadata = Some(close_metadata_reader(state).await?);
+        }
         let generation = tokio::select! {
             result = &mut stopped => return result,
             generation = location_generation(options, bearer) => generation?,

@@ -170,7 +170,7 @@ pub(crate) struct LocationCompileRequest {
     pub(crate) reply: tokio::sync::oneshot::Sender<Result<Option<LocationPublication>, String>>,
 }
 
-/// Only this task owns the isolated interpreter and its private stdio protocol.
+/// Only its owner (the compiler task or one metadata synchronization) uses this interpreter's stdio.
 #[derive(Debug)]
 pub(crate) struct LocationCompiler {
     pub(crate) child: tokio::process::Child,
@@ -217,6 +217,8 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) scan_delivered: bool,
     /// The server already mirrors rows of the current scan's table, per its watermark.
     pub(crate) mirror_holds_rows: bool,
+    /// One warm runtime interpreter and warehouse session serve every page of a synchronization.
+    pub(crate) reader: Option<LocationCompiler>,
 }
 
 /// A table's change token after a complete read, and what that read proves about the mirror.

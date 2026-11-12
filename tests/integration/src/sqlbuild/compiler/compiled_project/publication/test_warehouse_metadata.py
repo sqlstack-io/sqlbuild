@@ -1295,24 +1295,36 @@ def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or
     hook.mkdir()
     tokens: Path = hook / "tokens.json"
     reads: Path = hook / "reads.log"
+    sessions: Path = hook / "sessions.log"
     tokens.write_text(
         json.dumps({"_sqlbuild_fingerprints": "f1", "_sqlbuild_source_freshness": "s1"})
     )
     (hook / "sitecustomize.py").write_text(
-        "import json, re\n"
+        "import json, os, re\n"
         "from pathlib import Path\n"
         "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n"
+        "def log_session(event):\n"
+        f"    with Path({str(sessions)!r}).open('a') as log:\n"
+        "        log.write(f'{event} {os.getpid()}\\n')\n"
+        "original_connect, original_close = DuckDbAdapter.connect, DuckDbAdapter.close\n"
+        "def connect(self, config):\n"
+        "    log_session('connect')\n"
+        "    return original_connect(self, config)\n"
+        "def close(self, connection):\n"
+        "    log_session('close')\n"
+        "    return original_close(self, connection)\n"
+        "DuckDbAdapter.connect, DuckDbAdapter.close = connect, close\n"
         "def read_relation_change_token(self, *, connection, database, schema, name):\n"
         f"    return json.loads(Path({str(tokens)!r}).read_text()).get(name)\n"
         "DuckDbAdapter.read_relation_change_token = read_relation_change_token\n"
-        "original_query = DuckDbAdapter.query\n"
-        "def query(self, *, connection, sql, limit):\n"
+        "original_execute = DuckDbAdapter.execute\n"
+        "def execute(self, *, connection, sql):\n"
         "    read = re.search(r'FROM\\s+\\S*(_sqlbuild_\\w+)', sql)\n"
         "    if read:\n"
         f"        with Path({str(reads)!r}).open('a') as log:\n"
         "            log.write(read.group(1) + '\\n')\n"
-        "    return original_query(self, connection=connection, sql=sql, limit=limit)\n"
-        "DuckDbAdapter.query = query\n"
+        "    return original_execute(self, connection=connection, sql=sql)\n"
+        "DuckDbAdapter.execute = execute\n"
     )
     mirrors: tuple[str, str] = ("sqb_warehouse_fingerprints", "sqb_warehouse_freshness")
     with snapshot_api(tmp_path / "control") as api:
@@ -1355,12 +1367,26 @@ def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or
                 """Start one synchronization after a finished run and return the tables it read."""
                 completed: int = log.read_text().count("synchronization completed")
                 reads.write_text("")
+                sessions.write_text("")
                 record_finished_run(control)
                 deadline: float = time.monotonic() + 45
                 while log.read_text().count("synchronization completed") == completed:
                     assert location.poll() is None, log.read_text()
                     assert time.monotonic() < deadline, log.read_text()
                     time.sleep(0.2)
+                deadline = time.monotonic() + 10
+                while sessions.read_text().count("close") == 0:
+                    assert time.monotonic() < deadline, sessions.read_text()
+                    time.sleep(0.1)
+                events: list[list[str]] = [
+                    line.split() for line in sessions.read_text().splitlines()
+                ]
+                assert len({pid for _, pid in events}) == 1, (
+                    "one warm interpreter reads every page of a synchronization"
+                )
+                assert [event for event, _ in events] == ["connect", "close"] * (
+                    len(events) // 2
+                ), "a local database file is never held open between pages, so writers proceed"
                 return sorted(set(reads.read_text().split()))
 
             deadline: float = time.monotonic() + 45
@@ -1373,25 +1399,30 @@ def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or
             assert resync() == [], "unchanged tokens read nothing"
             assert mirrored() == initial
 
+            changed_rows: int = 250
             connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
             _ = adapter.execute(
                 connection=connection,
                 sql=(
-                    "INSERT INTO _sqlbuild_fingerprints SELECT node_type,'orders-changed',"
-                    "target_database,target_schema,target_name,'changed-run',definition_hash,"
-                    "version_hash,schema_fingerprint,definition_b64,metadata_json_b64,ts "
-                    f"FROM _sqlbuild_fingerprints WHERE run_id='{test_case.expected_run_id}'"
+                    "INSERT INTO _sqlbuild_fingerprints SELECT node_type,"
+                    "'orders-changed-' || page.i,target_database,target_schema,target_name,"
+                    "'changed-run',definition_hash,version_hash,schema_fingerprint,"
+                    "definition_b64,metadata_json_b64,ts FROM _sqlbuild_fingerprints "
+                    f"CROSS JOIN range({changed_rows}) AS page(i) "
+                    f"WHERE run_id='{test_case.expected_run_id}'"
                 ),
             )
             adapter.close(connection)
             tokens.write_text(
                 json.dumps({"_sqlbuild_fingerprints": "f2", "_sqlbuild_source_freshness": "s1"})
             )
-            assert resync() == ["_sqlbuild_fingerprints"], "only the changed table is read"
-            assert mirrored() == (initial[0] + 1, initial[1])
+            assert resync() == ["_sqlbuild_fingerprints"], (
+                "only the changed table is read, across several pages"
+            )
+            assert mirrored() == (initial[0] + changed_rows, initial[1])
 
             with closing(sqlite3.connect(control)) as database:
                 _ = database.execute(f"DELETE FROM {mirrors[1]}")
                 database.commit()
             assert resync() == ["_sqlbuild_source_freshness"], "a lost mirror is read again"
-            assert mirrored() == (initial[0] + 1, initial[1])
+            assert mirrored() == (initial[0] + changed_rows, initial[1])

@@ -46,7 +46,7 @@ use sqlbuild_orchestration::webhooks::main::{
     connect_webhook::connect_webhook, run_webhook::run_webhook,
 };
 use sqlbuild_orchestration::webhooks::models::{Webhook, WebhookSource};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
@@ -72,8 +72,9 @@ use crate::native_commands::_helpers::terminal::{
 };
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
-    METADATA_POLL_SECONDS, METADATA_RECONCILE_SECONDS, METADATA_SYNC_CHECK_SECONDS,
-    SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS, METADATA_RECONCILE_SECONDS,
+    METADATA_REPLY_BYTES, METADATA_SYNC_CHECK_SECONDS, SCHEDULER_COMMAND,
+    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -358,6 +359,7 @@ pub(crate) fn metadata_sync(
         scan_token: None,
         scan_delivered: false,
         mirror_holds_rows: false,
+        reader: None,
     }
 }
 
@@ -1108,4 +1110,152 @@ pub(crate) fn run_command(
 /// The `{"error": ...}` report a location sends when it has no plan to show.
 pub(crate) fn plan_failure(message: &str) -> serde_json::Value {
     json!({"error": {"code": "plan_failed", "message": message, "help": null}})
+}
+
+pub(crate) fn open_location_runtime(
+    options: &LocationServe,
+    script: &Path,
+    python_sources: Vec<sqlbuild_cache::project_snapshot::models::PathStamp>,
+) -> Result<LocationCompiler, ControlError> {
+    let mut child = location_runtime_child(options, script)?;
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| ControlError::Invalid("location interpreter input is unavailable".into()))?;
+    let stdout = child.stdout.take().ok_or_else(|| {
+        ControlError::Invalid("location interpreter output is unavailable".into())
+    })?;
+    Ok(LocationCompiler {
+        child,
+        stdin,
+        stdout: BufReader::new(stdout),
+        python_sources,
+    })
+}
+
+pub(crate) async fn stop_location_runtime(
+    runtime: Option<LocationCompiler>,
+) -> Result<(), ControlError> {
+    if let Some(mut runtime) = runtime {
+        if runtime.child.try_wait()?.is_none() {
+            runtime.child.kill().await?;
+        } else {
+            runtime.child.wait().await?;
+        }
+    }
+    Ok(())
+}
+
+/// An outer absence means shutdown; an inner absence is a failed read, never an empty table.
+pub(crate) async fn read_metadata_page(
+    (options, script): (&LocationServe, &Path),
+    mut state: LocationMetadataSync,
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<(LocationMetadataSync, Option<WarehouseHistoryPage>)>, ControlError> {
+    if let Some(statistics) = &state.statistics
+        && statistics.names.is_empty()
+    {
+        let page = WarehouseHistoryPage {
+            records: Vec::new(),
+            next_after: statistics.next_after.map(|id| vec![Some(id.to_string())]),
+            change_token: None,
+            unchanged: false,
+        };
+        return Ok(Some((state, Some(page))));
+    }
+    let request = history_request(&state)?;
+    let reader = match state.reader.take() {
+        Some(reader) => reader,
+        None => match open_location_runtime(options, script, Vec::new()) {
+            Ok(reader) => reader,
+            Err(_) => return Ok(Some((state, None))),
+        },
+    };
+    tokio::pin!(stopped);
+    tokio::select! {
+        result = &mut stopped => {
+            result?;
+            Ok(None)
+        },
+        result = tokio::time::timeout(
+            Duration::from_secs(METADATA_POLL_SECONDS),
+            exchange_metadata_read(reader, request),
+        ) => match result {
+            Ok((reader, Ok(page))) => {
+                state.reader = Some(reader);
+                Ok(Some((state, page)))
+            }
+            Ok((reader, Err(_))) => {
+                stop_location_runtime(Some(reader)).await?;
+                Ok(Some((state, None)))
+            }
+            Err(_) => Ok(Some((state, None))),
+        },
+    }
+}
+
+/// A completed synchronization closes its reader, so no warehouse session outlives the sync.
+pub(crate) async fn finish_metadata_page(
+    state: LocationMetadataSync,
+) -> Result<Option<LocationMetadataSync>, ControlError> {
+    if state.idle {
+        return Ok(Some(close_metadata_reader(state).await?));
+    }
+    Ok(Some(state))
+}
+
+/// End of input lets the reader close its warehouse session; one that ignores it is killed.
+pub(crate) async fn close_metadata_reader(
+    mut state: LocationMetadataSync,
+) -> Result<LocationMetadataSync, ControlError> {
+    if let Some(LocationCompiler {
+        mut child, stdin, ..
+    }) = state.reader.take()
+    {
+        drop(stdin);
+        match tokio::time::timeout(
+            Duration::from_secs(METADATA_READER_CLOSE_SECONDS),
+            child.wait(),
+        )
+        .await
+        {
+            Ok(waited) => drop(waited?),
+            Err(_) => child.kill().await?,
+        }
+    }
+    Ok(state)
+}
+
+/// A reply of `null` means the reader's read failed and it dropped its warehouse session.
+async fn exchange_metadata_read(
+    mut reader: LocationCompiler,
+    request: Vec<u8>,
+) -> (
+    LocationCompiler,
+    Result<Option<WarehouseHistoryPage>, ControlError>,
+) {
+    let result = async {
+        reader.stdin.write_all(&request).await?;
+        reader.stdin.write_all(b"\n").await?;
+        reader.stdin.flush().await?;
+        let mut line = String::new();
+        let read = (&mut reader.stdout)
+            .take(METADATA_REPLY_BYTES + 1)
+            .read_line(&mut line)
+            .await?;
+        if read == 0 {
+            return Err(ControlError::Invalid(
+                "location metadata reader exited before replying".into(),
+            ));
+        }
+        if read as u64 > METADATA_REPLY_BYTES || !line.ends_with('\n') {
+            return Err(ControlError::Invalid(
+                "location reply exceeds its byte limit".into(),
+            ));
+        }
+        serde_json::from_str(&line)
+            .map_err(|_| ControlError::Invalid("invalid location reply".into()))
+    }
+    .await;
+    (reader, result)
 }
