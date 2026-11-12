@@ -229,7 +229,7 @@ def verify_sql_inspection(
         "applied": True
     }
     sql: dict[str, Any] = person_read(api, path, session=session)
-    assert set(sql) == {"snapshot_id", "node_key", "raw_sql", "compiled_sql"}
+    assert set(sql) == {"snapshot_id", "node_key", "raw_sql", "compiled_sql", "expression_ranges"}
     assert sql["snapshot_id"] == snapshot_id
     assert sql["node_key"] == "model:orders"
     assert sql["raw_sql"] == model.read_text()
