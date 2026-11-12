@@ -1320,7 +1320,7 @@ def test_given_select_all_and_implicit_aliases_when_formatting_then_only_layout_
                 "    o.order_id,\n"
                 "    CAST(\n"
                 "      COALESCE(o.amount, o.fallback_amount, 0)\n"
-                "        + o.tax AS decimal(18, 2)\n"
+                "      + o.tax AS decimal(18, 2)\n"
                 "    ) AS total\n"
                 "  FROM orders o\n"
                 "  WHERE o.amount > 0\n"
@@ -1336,8 +1336,7 @@ def test_given_select_all_and_implicit_aliases_when_formatting_then_only_layout_
                 "  p.order_id,\n"
                 "  p.total\n"
                 "FROM paid p\n"
-                "JOIN labels l\n"
-                "  ON p.order_id = l.order_id\n"
+                "JOIN labels l ON p.order_id = l.order_id\n"
             ),
         ),
     ],
