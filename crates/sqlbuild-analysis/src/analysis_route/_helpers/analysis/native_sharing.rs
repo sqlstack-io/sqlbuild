@@ -110,7 +110,12 @@ pub(crate) fn analysed_members(
             .get(leader)
             .filter(|template| exact_for_others(template, members[*leader].model));
         match template.map(|template| mapped(template, &members[index].model.lineage_references)) {
-            Some(Ok(analysis)) => {
+            Some(Ok(mut analysis)) => {
+                rebase_ranges(
+                    &mut analysis,
+                    members[*leader].cleaned.as_deref().unwrap_or_default(),
+                    members[index].cleaned.as_deref().unwrap_or_default(),
+                );
                 analyses[index] = Some(Ok(analysis));
                 counts.shared += 1;
                 counts.unshared -= 1;
@@ -206,6 +211,67 @@ fn mapped(
         row.sources = sources;
     }
     Ok(analysis)
+}
+
+/// Each expression range moved onto `member`'s relation names, or dropped where it cannot move.
+pub(crate) fn rebase_ranges(analysis: &mut NativeAnalysis, leader: &str, member: &str) {
+    if leader == member {
+        return;
+    }
+    let renamed: Option<Vec<(usize, usize, usize)>> = renamed_runs(leader, member);
+    for row in &mut analysis.lineage {
+        row.expression_range = match (&renamed, row.expression_range) {
+            (Some(runs), Some((start, end))) => rebased(runs, start).zip(rebased(runs, end)),
+            _ => None,
+        };
+    }
+}
+
+/// `(leader start, leader end, member end)` of each differing identifier run, if only those differ.
+fn renamed_runs(leader: &str, member: &str) -> Option<Vec<(usize, usize, usize)>> {
+    let identifier = |c: u8| c.is_ascii_alphanumeric() || c == b'_' || c == b'$';
+    let (left, right): (&[u8], &[u8]) = (leader.as_bytes(), member.as_bytes());
+    let (mut i, mut j): (usize, usize) = (0, 0);
+    let mut runs: Vec<(usize, usize, usize)> = Vec::new();
+    while i < left.len() || j < right.len() {
+        if i < left.len() && j < right.len() && left[i] == right[j] {
+            i += 1;
+            j += 1;
+            continue;
+        }
+        let mut back: usize = 0;
+        while back < i && identifier(left[i - back - 1]) {
+            back += 1;
+        }
+        let (mut left_end, mut right_end): (usize, usize) = (i, j);
+        while left_end < left.len() && identifier(left[left_end]) {
+            left_end += 1;
+        }
+        while right_end < right.len() && identifier(right[right_end]) {
+            right_end += 1;
+        }
+        if left_end == i && right_end == j {
+            return None;
+        }
+        runs.push((i - back, left_end, right_end));
+        (i, j) = (left_end, right_end);
+    }
+    Some(runs)
+}
+
+/// The member offset of leader `offset`, or `None` strictly inside a renamed run.
+fn rebased(runs: &[(usize, usize, usize)], offset: usize) -> Option<usize> {
+    let mut moved: usize = offset;
+    for &(left_start, left_end, right_end) in runs {
+        if offset <= left_start {
+            break;
+        }
+        if offset < left_end {
+            return None;
+        }
+        moved = offset - left_end + right_end;
+    }
+    Some(moved)
 }
 
 /// Whether `leader`'s `template` succeeded, found nothing and spells none of its relation names.

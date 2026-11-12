@@ -10,12 +10,12 @@ fn given_control_store_when_snapshots_publish_then_generations_sources_and_chang
         SnapshotTestCase {
             description: "SQLite snapshot publication",
             backend: Backend::Sqlite,
-            expected_generation: 6,
+            expected_generation: 7,
         },
         SnapshotTestCase {
             description: "PostgreSQL snapshot publication",
             backend: Backend::Postgres,
-            expected_generation: 6,
+            expected_generation: 7,
         },
     ];
     for test_case in test_cases {

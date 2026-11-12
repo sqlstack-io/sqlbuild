@@ -121,6 +121,10 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     .expect("Python source")
                     .into(),
             );
+            input.documents.insert(
+                "columns".into(),
+                json!({"orders": sql_input["columns_document"].clone()}),
+            );
             input.nodes.insert(
                 "udf:orders".into(),
                 SnapshotNode {

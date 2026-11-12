@@ -3,7 +3,9 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::{PyString, PyStringMethods};
 use pyo3::{Python, pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::sql_macros::models::TextSplice;
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
+use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics_with_spans::replace_intrinsics_with_spans;
 use sqlbuild_attachments::cursor_intrinsics::main::validated_model_intrinsics::validated_model_intrinsics;
 use sqlbuild_attachments::cursor_intrinsics::models::IntrinsicModel;
 
@@ -99,12 +101,35 @@ pub(crate) fn analysis_cursor_sql(
     sql: &str,
     cursor_type: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
-    let literal: &str = if text_value(cursor_type).as_deref() == Some(INTEGER_CURSOR_TYPE) {
+    let literal: &str = analysis_bound(text_value(cursor_type).as_deref());
+    Ok(replaced(py, sql, MODEL_SQL_CONTEXT, (literal, literal))?.0)
+}
+
+/// `analysis_cursor_sql` with each replaced call as a splice of `sql`.
+pub(crate) fn analysis_cursor_splices(
+    sql: &str,
+    cursor_type: Option<&str>,
+) -> Result<(String, Vec<TextSplice>), String> {
+    let literal: &str = analysis_bound(cursor_type);
+    let (replaced, spans) =
+        replace_intrinsics_with_spans(sql, MODEL_SQL_CONTEXT, |_| literal.to_owned())?;
+    let splices: Vec<TextSplice> = spans
+        .iter()
+        .map(|span| TextSplice {
+            source: (span.source_start, span.source_end),
+            output: (span.output_start, span.output_end),
+        })
+        .collect();
+    Ok((replaced, splices))
+}
+
+/// The literal static analysis reads for every cursor intrinsic of a model with `cursor_type`.
+fn analysis_bound(cursor_type: Option<&str>) -> &'static str {
+    if cursor_type == Some(INTEGER_CURSOR_TYPE) {
         INTEGER_ANALYSIS_BOUND
     } else {
         TIMESTAMP_ANALYSIS_BOUND
-    };
-    Ok(replaced(py, sql, MODEL_SQL_CONTEXT, (literal, literal))?.0)
+    }
 }
 
 /// One model query with canonical intrinsic calls, raising `CompileInputError` when invalid.

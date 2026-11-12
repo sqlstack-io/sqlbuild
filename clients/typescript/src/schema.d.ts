@@ -2009,6 +2009,10 @@ export interface components {
         /** @description SQL inspection never returns Python source, execution artifacts or unrelated node metadata. */
         NodeSql: {
             compiled_sql?: string | null;
+            /** @description Each placed column's defining expression as a `[start, end)` byte range of `compiled_sql`. */
+            expression_ranges?: {
+                [key: string]: number[];
+            };
             node_key: string;
             raw_sql?: string | null;
             /** Format: uuid */

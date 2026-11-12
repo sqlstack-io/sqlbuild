@@ -3,6 +3,7 @@
 use crate::relation_markers::main::lateral_start::lateral_start;
 use crate::semantic_checks::constants::UDF_NAME_PREFIX;
 use regex::Regex;
+use sqlbuild_sqltext::compiler::main::placeholder_default_edits::placeholder_default_edits;
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::main::matching_paren::matching_paren;
@@ -201,41 +202,67 @@ pub(crate) fn normalize_native_sql(
     stub_prefix: &str,
     relations: &HashMap<String, String>,
 ) -> Result<String, String> {
+    native_mapped(sql, dialect, stub_prefix, relations).map(|mapped| mapped.sql)
+}
+
+/// [`normalize_native_sql`] with placeholder defaults filled, and each character's source in `sql`.
+pub(crate) fn normalize_native_sql_mapped(
+    sql: &str,
+    dialect: &str,
+    stub_prefix: &str,
+    placeholders: &[(String, String)],
+) -> Result<(String, Vec<usize>), String> {
+    let native: MappedSql = native_mapped(sql, dialect, stub_prefix, &HashMap::new())?;
+    let edits: Vec<Edit> = placeholder_default_edits(&native.sql, placeholders)
+        .into_iter()
+        .map(|(start, end, default)| {
+            let anchor: usize = native.offsets[native.sql[..start].chars().count()];
+            (start, end, MappedSql::generated(default.to_owned(), anchor))
+        })
+        .collect();
+    let filled: MappedSql = native.edits(edits);
+    Ok((filled.sql, filled.offsets))
+}
+
+fn native_mapped(
+    sql: &str,
+    dialect: &str,
+    stub_prefix: &str,
+    relations: &HashMap<String, String>,
+) -> Result<MappedSql, String> {
     let none: HashMap<String, String> = HashMap::new();
     let udf_prefix: String = format!("{stub_prefix}udf_");
-    let normalized: String = normalize(sql, dialect, (relations, &none), &udf_prefix)?.sql;
+    let normalized: MappedSql = normalize(sql, dialect, (relations, &none), &udf_prefix)?;
     let stubs: &Regex = NATIVE_STUBS.as_ref()?;
     let non_code: Vec<(usize, usize)> =
-        dialect_non_code_ranges(&normalized, &dialect_lexical_syntax(dialect));
-    let mut native: String = String::with_capacity(normalized.len());
-    let mut copied_until: usize = 0;
-    for captures in stubs.captures_iter(&normalized) {
+        dialect_non_code_ranges(&normalized.sql, &dialect_lexical_syntax(dialect));
+    let mut edits: Vec<Edit> = Vec::new();
+    for captures in stubs.captures_iter(&normalized.sql) {
         let whole = captures.get(0).ok_or("missing stub match")?;
         let quoted: bool = non_code
             .iter()
             .any(|&(start, end)| start <= whole.start() && whole.start() < end);
         let glued: bool = captures.get(1).is_some()
-            && normalized[..whole.start()]
+            && normalized.sql[..whole.start()]
                 .chars()
                 .next_back()
                 .is_some_and(|character| character.is_alphanumeric() || character == '_');
         if quoted || glued {
             continue;
         }
-        native.push_str(&normalized[copied_until..whole.start()]);
-        match (captures.get(1), captures.get(2)) {
-            (Some(bound), _) => {
-                native.push_str(&format!("{stub_prefix}cursor_{}()", bound.as_str()));
-            }
-            (None, Some(parameter)) => {
-                native.push_str(&format!("'{HOOK_PARAMETER_PREFIX}{}'", parameter.as_str()));
-            }
-            (None, None) => native.push_str(whole.as_str()),
-        }
-        copied_until = whole.end();
+        let text: String = match (captures.get(1), captures.get(2)) {
+            (Some(bound), _) => format!("{stub_prefix}cursor_{}()", bound.as_str()),
+            (None, Some(parameter)) => format!("'{HOOK_PARAMETER_PREFIX}{}'", parameter.as_str()),
+            (None, None) => continue,
+        };
+        let anchor: usize = normalized.offsets[normalized.sql[..whole.start()].chars().count()];
+        edits.push((
+            whole.start(),
+            whole.end(),
+            MappedSql::generated(text, anchor),
+        ));
     }
-    native.push_str(&normalized[copied_until..]);
-    Ok(native)
+    Ok(normalized.edits(edits))
 }
 
 pub(crate) fn normalize_dialect_sql_mapped(

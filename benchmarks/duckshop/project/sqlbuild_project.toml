@@ -338,6 +338,18 @@ that shape is the case under test.
 """
 
 [[rules.rule_ignores]]
+rules = ["SQLCLEAN034"]
+paths = [
+  "models/intermediate/edge_cases/int_edge_expression_spans.sql",
+  "models/intermediate/edge_cases/int_edge_reference_qualified_spans.sql",
+]
+reason = """
+These edge cases keep their macro calls, variable, literals and reference calls in the terminal
+select on purpose: column expression ranges point at the terminal select's items, so that is where
+the compiled SQL must differ from the authored text.
+"""
+
+[[rules.rule_ignores]]
 rules = ["SQLCLEAN040"]
 paths = ["models/intermediate/edge_cases/int_edge_amount_bit_reads.sql"]
 reason = """

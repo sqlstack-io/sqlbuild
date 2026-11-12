@@ -24,6 +24,9 @@ pub struct NodeSql {
     pub node_key: String,
     pub raw_sql: Option<String>,
     pub compiled_sql: Option<String>,
+    /// Each placed column's defining expression as a `[start, end)` byte range of `compiled_sql`.
+    #[serde(default)]
+    pub expression_ranges: BTreeMap<String, [usize; 2]>,
 }
 
 /// A location's successful compile for one target.

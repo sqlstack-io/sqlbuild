@@ -864,6 +864,7 @@ impl SharedResult {
                 transform_code: row.transform_code,
                 confidence_code: row.confidence_code,
                 sources: named_sources(&row.sources, &names),
+                expression_range: None,
             })
             .collect();
         Some(MemberResult {
@@ -1361,6 +1362,7 @@ fn project_fact(
             transform_code: u8::try_from(transform).map_err(|error| error.to_string())?,
             confidence_code: u8::try_from(confidence).map_err(|error| error.to_string())?,
             sources: resolved,
+            expression_range: None,
         },
     ))
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.orchestration_declarations.models.authoring import (
     CalendarSchedule,
     Job,
@@ -231,6 +232,17 @@ class SnapshotEnvironmentTestCase:
     first_lockfile: str
     second_lockfile: str
     expected_environment_count: int
+
+
+@dataclass(frozen=True)
+class SnapshotExpressionRangeTestCase:
+    """A published model whose compiled SQL differs from its source, and each column's text."""
+
+    description: str
+    adapter: type[BaseAdapter]
+    files: dict[str, str]
+    model_name: str
+    expected_texts: dict[str, str]
 
 
 @dataclass(frozen=True)
