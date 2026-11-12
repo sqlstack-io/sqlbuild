@@ -199,7 +199,6 @@ crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	BindingCatalog.
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	BindingCatalog.quoted_ignore_case
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	BindingCatalog.schemas
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	CollectionRendering.name
-crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	ColumnContractMode.name
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	ColumnLineageConfidence.name
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	ColumnTransformKind.name
 crates/sqlbuild-python/src/bindings/_helpers/frontier/encoder.rs	CompiledResourceType.name

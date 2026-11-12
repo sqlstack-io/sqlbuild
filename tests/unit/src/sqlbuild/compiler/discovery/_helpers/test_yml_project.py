@@ -19,8 +19,8 @@ from sqlbuild._native import (
 )
 from sqlbuild.runtime.event_exporting.types import LifecycleEventKind
 from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
-    ColumnContractModeConfigErrorTestCase,
-    ColumnContractModeConfigTestCase,
+    CheckDeclaredColumnsConfigErrorTestCase,
+    CheckDeclaredColumnsConfigTestCase,
     DeepProjectConnectionTestCase,
     DiffConfigTestCase,
     EffectiveBatchDefaultTestCase,
@@ -2039,15 +2039,21 @@ def test_given_legacy_local_config_file_when_loading_local_config_then_it_raises
 @pytest.mark.parametrize(
     "test_case",
     [
-        ColumnContractModeConfigTestCase("omitted mode uses implicit default", "", "implicit"),
-        ColumnContractModeConfigTestCase(
-            "explicit mode is accepted", 'column_contract_mode = "explicit"', "explicit"
+        CheckDeclaredColumnsConfigTestCase("omitted setting checks declared columns", "", True),
+        CheckDeclaredColumnsConfigTestCase(
+            "false leaves declared columns unchecked", "check_declared_columns = false", False
+        ),
+        CheckDeclaredColumnsConfigTestCase(
+            "deprecated implicit mode maps to true", 'column_contract_mode = "implicit"', True
+        ),
+        CheckDeclaredColumnsConfigTestCase(
+            "deprecated explicit mode maps to false", 'column_contract_mode = "explicit"', False
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_column_contract_mode_when_loading_project_then_policy_is_typed(
-    test_case: ColumnContractModeConfigTestCase, tmp_path: Path
+def test_given_check_declared_columns_when_loading_project_then_setting_is_a_bool(
+    test_case: CheckDeclaredColumnsConfigTestCase, tmp_path: Path
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "demo"\nadapter = "duckdb"\n[settings]\n{test_case.settings_toml}\n',
@@ -2056,22 +2062,33 @@ def test_given_column_contract_mode_when_loading_project_then_policy_is_typed(
 
     config: ProjectConfig = load_project_config(project_dir=tmp_path)
 
-    assert config.settings.column_contract_mode == test_case.expected_mode
+    assert config.settings.check_declared_columns is test_case.expected_checked
 
 
 @pytest.mark.parametrize(
     "test_case",
     [
-        ColumnContractModeConfigErrorTestCase(
-            "unsupported mode is rejected",
+        CheckDeclaredColumnsConfigErrorTestCase(
+            "unsupported deprecated mode is rejected",
             'column_contract_mode = "disabled"',
             "settings.column_contract_mode must be one of: implicit, explicit",
-        )
+        ),
+        CheckDeclaredColumnsConfigErrorTestCase(
+            "non-boolean value is rejected",
+            'check_declared_columns = "yes"',
+            "check_declared_columns",
+        ),
+        CheckDeclaredColumnsConfigErrorTestCase(
+            "setting both keys is rejected",
+            'check_declared_columns = true\ncolumn_contract_mode = "implicit"',
+            "settings cannot define both 'check_declared_columns' and deprecated "
+            "'column_contract_mode'",
+        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_invalid_column_contract_mode_when_loading_project_then_error_is_raised(
-    test_case: ColumnContractModeConfigErrorTestCase, tmp_path: Path
+def test_given_invalid_check_declared_columns_when_loading_project_then_error_is_raised(
+    test_case: CheckDeclaredColumnsConfigErrorTestCase, tmp_path: Path
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "demo"\nadapter = "duckdb"\n[settings]\n{test_case.settings_toml}\n',

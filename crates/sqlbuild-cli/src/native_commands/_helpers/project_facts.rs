@@ -3,15 +3,14 @@
 use std::path::Path;
 
 use sqlbuild_config::project::main::load_project_config::load_project_config;
+use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::models::{Built, ConfigPaths};
-use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_orchestration::store::errors::ControlError;
 
 use crate::native_commands::main::effective_target::effective_target;
 
 use crate::native_commands::constants::{
-    CUSTOM_RULES_DIRECTORY, EVENT_EXPORTERS_DIRECTORY, LEGACY_LOCAL_CONFIG_FILENAME,
-    LEGACY_PROJECT_CONFIG_FILENAME, LIFECYCLE_SINK_PATH, LOCAL_CONFIG_FILENAME, SINKS_DIRECTORY,
+    CUSTOM_RULES_DIRECTORY, EVENT_EXPORTERS_DIRECTORY, LIFECYCLE_SINK_PATH, SINKS_DIRECTORY,
 };
 
 pub(crate) fn object_field<'a>(built: &'a Built, name: &str) -> Option<&'a Built> {
@@ -36,16 +35,6 @@ fn names_lifecycle_sinks(config: &Built) -> bool {
     }
 }
 
-/// The four configuration files of `project_dir`.
-pub(crate) fn config_paths(project_dir: &Path) -> ConfigPaths {
-    ConfigPaths {
-        project: project_dir.join(PROJECT_CONFIG_FILENAME),
-        legacy_project: project_dir.join(LEGACY_PROJECT_CONFIG_FILENAME),
-        local: project_dir.join(LOCAL_CONFIG_FILENAME),
-        legacy_local: project_dir.join(LEGACY_LOCAL_CONFIG_FILENAME),
-    }
-}
-
 /// Whether `discover_runtime_extensions` would import nothing and accept the project file.
 pub(crate) fn has_no_runtime_extensions(project_dir: &Path) -> bool {
     if project_dir.join(EVENT_EXPORTERS_DIRECTORY).exists()
@@ -53,7 +42,7 @@ pub(crate) fn has_no_runtime_extensions(project_dir: &Path) -> bool {
     {
         return false;
     }
-    let paths: ConfigPaths = config_paths(project_dir);
+    let paths: ConfigPaths = project_config_paths(project_dir);
     if !paths.project.exists() {
         return true;
     }

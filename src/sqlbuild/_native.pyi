@@ -11665,12 +11665,6 @@ class MicrobatchLimitAction(StrEnum):
     ERROR = "error"
     WARN = "warn"
 
-class ColumnContractMode(StrEnum):
-    """Default contract behavior for model column declarations."""
-
-    IMPLICIT = "implicit"
-    EXPLICIT = "explicit"
-
 class SourceFreshnessStrategy(StrEnum):
     ADAPTER = "adapter"
     COLUMN = "column"
@@ -11958,7 +11952,7 @@ class SettingsConfig(NativeRecord):
     sql_analysis: bool
     require_sql_analysis: bool
     query_change_tracking: bool
-    column_contract_mode: ColumnContractMode
+    check_declared_columns: bool
     concurrency: int
     auto_load_sources: bool
     microbatch_concurrency: bool
@@ -11977,7 +11971,7 @@ class SettingsConfig(NativeRecord):
         sql_analysis: bool = ...,
         require_sql_analysis: bool = ...,
         query_change_tracking: bool = ...,
-        column_contract_mode: ColumnContractMode = ...,
+        check_declared_columns: bool = ...,
         concurrency: int = ...,
         auto_load_sources: bool = ...,
         microbatch_concurrency: bool = ...,

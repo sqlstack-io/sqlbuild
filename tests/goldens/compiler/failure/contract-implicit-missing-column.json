@@ -22,7 +22,7 @@
       "end_line": 6,
       "end_column": 16
      },
-     "help": "add order_count to the SELECT list or correct/remove MODEL(columns (...)); MODEL(columns (...)) is validated using static SQL analysis because settings.column_contract_mode is \"implicit\" (the default). If this project intentionally uses columns only for metadata and audits, set [settings] column_contract_mode = \"explicit\"; models with contract enforced remain validated"
+     "help": "add order_count to the SELECT list or correct/remove MODEL(columns (...)); MODEL(columns (...)) is validated using static SQL analysis because settings.check_declared_columns is true (the default). If this project intentionally uses columns only for metadata and audits, set [settings] check_declared_columns = false; models with contract enforced remain validated"
     }
    ]
   }

@@ -7,16 +7,17 @@ use sqlbuild_config::effective::models::TargetChoice;
 use sqlbuild_config::models::ConfigValue;
 use sqlbuild_config::project::main::load_local_config::load_local_config;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
+use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::models::Built;
 
-use crate::native_commands::_helpers::project_facts::{config_paths, object_field};
+use crate::native_commands::_helpers::project_facts::object_field;
 
 /// The effective target of `project_dir` with `selected` as `--target`, `None` when nothing selects one.
 pub fn effective_target(
     project_dir: &Path,
     selected: Option<String>,
 ) -> Result<Option<String>, String> {
-    let paths = config_paths(project_dir);
+    let paths = project_config_paths(project_dir);
     let invalid = |_| "project configuration is invalid; run sqb debug".to_owned();
     let project = load_project_config(&paths).map_err(invalid)?;
     let local = load_local_config(&paths).map_err(invalid)?;

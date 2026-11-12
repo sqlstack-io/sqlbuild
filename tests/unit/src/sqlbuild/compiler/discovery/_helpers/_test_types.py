@@ -141,14 +141,14 @@ class EffectiveBatchDefaultTestCase:
 
 
 @dataclass(frozen=True)
-class ColumnContractModeConfigTestCase:
+class CheckDeclaredColumnsConfigTestCase:
     description: str
     settings_toml: str
-    expected_mode: str
+    expected_checked: bool
 
 
 @dataclass(frozen=True)
-class ColumnContractModeConfigErrorTestCase:
+class CheckDeclaredColumnsConfigErrorTestCase:
     description: str
     settings_toml: str
     expected_error_fragment: str

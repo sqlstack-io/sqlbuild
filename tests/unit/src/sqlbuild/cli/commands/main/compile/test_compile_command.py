@@ -247,8 +247,8 @@ def test_given_python_project_dag_flag_when_running_compile_then_writes_python_d
                 "  --> models/orders.sql:5:5",
                 "  5 |     customer_id (),",
                 "    |     ^^^^^^^^^^^",
-                'settings.column_contract_mode is "implicit" (the default)',
-                'column_contract_mode = "explicit"',
+                "settings.check_declared_columns is true (the default)",
+                "check_declared_columns = false",
                 "models with contract enforced remain validated",
                 "\u2717 Project compiled  1 model, 0 seeds, 0 functions, 1 error, 0 warnings",
                 "  Wrote: target/compiled/",
@@ -420,24 +420,38 @@ def test_given_contract_errors_when_running_compile_json_then_serializes_diagnos
     "test_case",
     [
         CompileColumnContractModeTestCase(
-            description="explicit mode retains column audit",
-            mode="explicit",
+            description="unchecked declared columns retain column audit",
+            settings_toml="check_declared_columns = false",
             expected_audit_name="not_null",
             expected_column_name="customer_id",
-        )
+            expected_stderr_fragment="deprecated",
+            expected_stderr_count=0,
+        ),
+        CompileColumnContractModeTestCase(
+            description="deprecated explicit mode warns and retains column audit",
+            settings_toml='column_contract_mode = "explicit"',
+            expected_audit_name="not_null",
+            expected_column_name="customer_id",
+            expected_stderr_fragment=(
+                "Warning: settings.column_contract_mode in sqlbuild_project.toml is deprecated; "
+                "replace it with settings.check_declared_columns = false"
+            ),
+            expected_stderr_count=1,
+        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_explicit_column_contract_mode_when_compiling_column_audit_then_audit_is_retained_without_contract_error(
+def test_given_unchecked_declared_columns_when_compiling_column_audit_then_audit_is_retained_without_contract_error(
     test_case: CompileColumnContractModeTestCase,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = prepare_static_compile_project(tmp_path)
     project_config_path: Path = project_dir / "sqlbuild_project.toml"
     project_config_path.write_text(
         project_config_path.read_text(encoding="utf-8")
-        + f'\n[settings]\ncolumn_contract_mode = "{test_case.mode}"\n',
+        + f"\n[settings]\n{test_case.settings_toml}\n",
         encoding="utf-8",
     )
     (project_dir / "models" / "orders.sql").write_text(
@@ -467,6 +481,8 @@ def test_given_explicit_column_contract_mode_when_compiling_column_audit_then_au
     assert len(dag_payload["checks"]) == 1
     assert dag_payload["checks"][0]["name"] == test_case.expected_audit_name
     assert dag_payload["checks"][0]["attached_column_name"] == test_case.expected_column_name
+    stderr: str = capsys.readouterr().err
+    assert stderr.count(test_case.expected_stderr_fragment) == test_case.expected_stderr_count
 
 
 @pytest.mark.parametrize(

@@ -1,11 +1,13 @@
 //! The native reuse check against a launch record and the output a hit replays.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use sqlbuild_cache::project_reuse::main::check_reuse::check_reuse;
 use sqlbuild_cache::project_reuse::main::replay_stdout::replay_stdout;
 use sqlbuild_cache::project_reuse::models::{ReuseCheck, ReuseOutcome, ReuseRules, StoredOutput};
+use sqlbuild_config::project::main::deprecated_setting_warnings::deprecated_setting_warnings;
+use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 
 use crate::replay::_helpers::console::tenths_of_seconds;
 use crate::replay::_helpers::records::{hit_timings, host_identity};
@@ -49,7 +51,12 @@ pub(crate) fn served(
     let stdout = replay_stdout(output, &timings)?;
     let (prefix, suffix) = &record.hit_message;
     let mut stderr = format!("{prefix}{}{suffix}\n", tenths_of_seconds(check_ms));
-    for line in &output.stderr_lines {
+    let warnings: Vec<String> =
+        match deprecated_setting_warnings(&project_config_paths(Path::new(&record.project_dir))) {
+            Ok(warnings) => warnings,
+            Err(_) => return None,
+        };
+    for line in warnings.iter().chain(&output.stderr_lines) {
         stderr.push_str(line);
         stderr.push('\n');
     }

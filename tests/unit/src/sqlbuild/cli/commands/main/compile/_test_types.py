@@ -38,9 +38,11 @@ class CompileCommandTestCase:
 @dataclass(frozen=True)
 class CompileColumnContractModeTestCase:
     description: str
-    mode: str
+    settings_toml: str
     expected_audit_name: str
     expected_column_name: str
+    expected_stderr_fragment: str
+    expected_stderr_count: int
 
 
 @dataclass(frozen=True)
