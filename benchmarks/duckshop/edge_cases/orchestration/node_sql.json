@@ -4,5 +4,13 @@
   "python_source": "def order_amount():\n    return 23\n",
   "function_sql": "43",
   "updated_sql": "SELECT 37 AS amount -- Updated orders 🧾\n",
-  "expression_ranges": {"amount": [7, 19]}
+  "columns_document": {
+    "amount": {"expression_range": [7, 19], "described_as": "a later per-column key readers ignore"},
+    "past_the_end": {"expression_range": [7, 4096]},
+    "split_character": {"expression_range": [7, 32]},
+    "reversed": {"expression_range": [19, 7]},
+    "no_range": {}
+  },
+  "expression_ranges": {"amount": [7, 19]},
+  "updated_expression_ranges": {"amount": [7, 19], "split_character": [7, 32]}
 }

@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::snapshots::_helpers::preparation::prepare_snapshot;
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
@@ -113,7 +114,30 @@ async fn exercise_snapshot_contract(store: &ControlStore) -> i64 {
         Err(ControlError::StaleGeneration)
     ));
 
+    // Column metadata lives outside node identity: new expression ranges alone keep every node
+    // hash and record no node change.
+    let before = input.clone();
     input.generation = 3;
+    input.documents.insert(
+        "columns".into(),
+        json!({"orders": {"customer_id": {"expression_range": [7, 18]}}}),
+    );
+    assert_eq!(
+        prepare_snapshot(&input).expect("prepare ranged").hashes,
+        prepare_snapshot(&before).expect("prepare unranged").hashes
+    );
+    let ranged = publish_snapshot(store, &input)
+        .await
+        .expect("publish expression ranges only");
+    assert_ne!(ranged.manifest_digest, unchanged.manifest_digest);
+    let loaded = current_snapshot(store, location, "development")
+        .await
+        .expect("read ranged snapshot")
+        .expect("ranged snapshot exists");
+    assert!(loaded.changes.is_empty());
+    assert_eq!(loaded.documents, input.documents);
+
+    input.generation = 4;
     input
         .nodes
         .get_mut("orders")
@@ -146,7 +170,7 @@ async fn exercise_snapshot_contract(store: &ControlStore) -> i64 {
             .expect("development target exists")
             .record
             .generation,
-        3
+        4
     );
     assert_eq!(
         current_snapshot(store, location, "testing")
@@ -159,7 +183,7 @@ async fn exercise_snapshot_contract(store: &ControlStore) -> i64 {
     );
 
     input.target = "development".into();
-    input.generation = 4;
+    input.generation = 5;
     input.nodes.remove("orders");
     publish_snapshot(store, &input)
         .await
@@ -175,8 +199,8 @@ async fn exercise_snapshot_contract(store: &ControlStore) -> i64 {
 
     // The newer compiler wins regardless of which publisher takes the transaction lock first.
     let mut older = input.clone();
-    older.generation = 5;
-    input.generation = 6;
+    older.generation = 6;
+    input.generation = 7;
     input
         .nodes
         .get_mut("customers")
@@ -192,7 +216,7 @@ async fn exercise_snapshot_contract(store: &ControlStore) -> i64 {
         .await
         .expect("read winning snapshot")
         .expect("winning snapshot exists");
-    assert_eq!(loaded.record.generation, 6);
+    assert_eq!(loaded.record.generation, 7);
     assert_eq!(loaded.nodes, input.nodes);
     close_store(second).await;
     loaded.record.generation

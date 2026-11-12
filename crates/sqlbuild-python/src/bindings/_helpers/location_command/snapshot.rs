@@ -98,7 +98,13 @@ pub(crate) fn orchestration_snapshot<'py>(
     input.sqb_version = env!("CARGO_PKG_VERSION").into();
     input.environment_hash = environment_hash(py, &project_dir)?;
     let owner = project.owner().bind(py).borrow();
-    input.nodes = model_nodes(py, &project, &owner, input.nodes)?;
+    let (nodes, columns) = model_nodes(py, &project, &owner, input.nodes)?;
+    input.nodes = nodes;
+    if !columns.is_empty() {
+        input
+            .documents
+            .insert("columns".into(), serde_json::Value::Object(columns));
+    }
     input.nodes = resource_nodes(py, &project, &owner, input.nodes)?;
     drop(owner);
     let declarations = match declarations {

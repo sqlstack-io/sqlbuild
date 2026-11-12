@@ -22,13 +22,16 @@ use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompil
 use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 
+/// Each model's snapshot node, and the `columns` document: per node key, each column's
+/// expression range. The ranges stay out of the node, so they never change a node's identity.
 pub(crate) fn model_nodes(
     py: Python<'_>,
     project: &NativeProjectView,
     owner: &NativeCompiledProject,
     mut nodes: BTreeMap<String, SnapshotNode>,
-) -> PyResult<BTreeMap<String, SnapshotNode>> {
+) -> PyResult<(BTreeMap<String, SnapshotNode>, Map<String, Value>)> {
     let dialect: Option<String> = project.sql_analysis_dialect();
+    let mut columns_document: Map<String, Value> = Map::new();
     for model in project.models(py).bind(py).iter() {
         let model = model.cast::<NativeCompiledModel>()?.get();
         let (name, _, _) = model.file_texts(py)?;
@@ -39,7 +42,7 @@ pub(crate) fn model_nodes(
                 "model config cannot be represented in snapshot metadata",
             ));
         }
-        let mut definition = model.read(py, |input, _| {
+        let (mut definition, ranges) = model.read(py, |input, _| {
             let record = input
                 .compiled
                 .as_ref()
@@ -54,7 +57,7 @@ pub(crate) fn model_nodes(
                     json!({"name": name, "type": data_type, "nullability": nullability})
                 })
                 .collect();
-            let mut definition: Value = json!({
+            let definition: Value = json!({
                 "name": facts.name,
                 "path": facts.relative_path,
                 "config": facts.config.values,
@@ -67,11 +70,11 @@ pub(crate) fn model_nodes(
                 (Some(dialect), Some(lineage)) => expression_ranges(dialect, input, facts, lineage),
                 _ => Map::new(),
             };
-            if !ranges.is_empty() {
-                definition["expression_ranges"] = Value::Object(ranges);
-            }
-            Ok(definition)
+            Ok((definition, ranges))
         })?;
+        if !ranges.is_empty() {
+            columns_document.insert(format!("model:{}", facts.name), Value::Object(ranges));
+        }
         definition["destination"] = model.read_destination(py, |value| Ok(destination(value)))?;
         nodes = insert_node(
             nodes,
@@ -85,11 +88,12 @@ pub(crate) fn model_nodes(
             },
         )?;
     }
-    Ok(nodes)
+    Ok((nodes, columns_document))
 }
 
-/// Each output column's defining expression as a `[start, end)` byte range of the compiled SQL
-/// the node SQL read returns; empty when the analysis SQL cannot be rebuilt exactly.
+/// Each output column's defining expression as `{"expression_range": [start, end)}`, byte
+/// offsets in the compiled SQL the node SQL read returns; empty when the analysis SQL cannot be
+/// rebuilt exactly.
 fn expression_ranges(
     dialect: &str,
     input: &ModelInputRecord,
@@ -127,7 +131,7 @@ fn expression_ranges(
         if let Some((start, end)) = range {
             ranges
                 .entry(output_column.clone())
-                .or_insert_with(|| json!([start, end]));
+                .or_insert_with(|| json!({"expression_range": [start, end]}));
         }
     }
     ranges

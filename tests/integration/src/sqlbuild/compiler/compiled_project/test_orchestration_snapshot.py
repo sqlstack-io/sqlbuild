@@ -574,12 +574,15 @@ def test_given_rewritten_model_sql_when_publishing_then_expression_ranges_slice_
             project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
         ).to_json()
     )
-    node: dict[str, Any] = publication["nodes"][f"model:{test_case.model_name}"]
+    key: str = f"model:{test_case.model_name}"
+    node: dict[str, Any] = publication["nodes"][key]
     assert node["compiled_sql"] != node["raw_sql"]
+    assert "expression_range" not in json.dumps(node), "ranges stay out of node identity"
     compiled: bytes = node["compiled_sql"].encode()
+    columns: dict[str, Any] = publication["documents"].get("columns", {}).get(key, {})
     assert {
-        column: compiled[start:end].decode()
-        for column, (start, end) in node["definition"].get("expression_ranges", {}).items()
+        column: compiled[slice(*metadata["expression_range"])].decode()
+        for column, metadata in columns.items()
     } == test_case.expected_texts
 
 

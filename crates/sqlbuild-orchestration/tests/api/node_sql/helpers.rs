@@ -125,6 +125,6 @@ pub(crate) async fn node_sql_boundaries(
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         response.json::<Value>().await.expect("latest SQL"),
-        json!({"snapshot_id":current.snapshot_id,"node_key":"orders","raw_sql":data["raw_sql"],"compiled_sql":data["updated_sql"],"expression_ranges":data["expression_ranges"]})
+        json!({"snapshot_id":current.snapshot_id,"node_key":"orders","raw_sql":data["raw_sql"],"compiled_sql":data["updated_sql"],"expression_ranges":data["updated_expression_ranges"]})
     );
 }
