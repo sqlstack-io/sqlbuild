@@ -1,24 +1,10 @@
 ---
-title: "Execution Observability"
-description: "Choose authoritative lifecycle facts, readable logs, or command-output records."
+title: "Observability"
+description: "Find out what a run did, or send its events to your own systems."
 ---
 
-SQLBuild keeps execution facts separate from human output. Do not parse terminal text to determine
-whether work started, completed, failed, skipped, or retried.
-
-| Record | Purpose | Authority |
-|--------|---------|-----------|
-| `LifecycleEvent` | Immutable invocation, run, resource-attempt, operation, statement, retry, and audit facts | Canonical lifecycle evidence once durably stored |
-| `DiagnosticLog` | Structured framework diagnostics | Explanatory only |
-| [Recall](/docs/concepts/observability/recall) | Queryable history of invocations, statements, SQL, audit results, and output, locally or in ClickHouse | Troubleshooting history; best effort |
-| `stdout.log` / `stderr.log` | Exact host-local process output (compute log files) | Troubleshooting transcript; also stored by Recall |
-| `CommandOutputRecord` | Bounded, ANSI-free remote stdout/stderr chunks | Potentially sensitive and lossy troubleshooting data |
-| Final JSON output | End-of-command aggregate | Result projection, not event history |
-
-Human-readable CLI output remains the normal operator interface. Structured records are a separate
-contract for integrations and durable consumers.
-
-## Which to use
+SQLBuild records what each command did, separately from what it prints. Use these records instead
+of parsing terminal output.
 
 | You want to | Use |
 |-------------|-----|
@@ -29,12 +15,23 @@ contract for integrations and durable consumers.
 
 Recall is on by default and covers investigation for people and agents. Sinks and execution history
 are for building on SQLBuild's events elsewhere. The `stdout.log`, `stderr.log` and
-`diagnostics.jsonl` compute log files under `logs/<date>/` are still written alongside Recall and
-hold the same bytes; prefer `sqb recall output`, which works the same with a shared store.
+`diagnostics.jsonl` files under `logs/<date>/` hold the same output as Recall; prefer
+`sqb recall output`, which also works with a shared store.
+
+## What SQLBuild records
+
+| Record | What it holds | How far to rely on it |
+|--------|---------------|-----------------------|
+| `LifecycleEvent` | Each invocation, run, resource attempt, operation, statement, retry and audit | Complete once stored; events are never changed |
+| `DiagnosticLog` | SQLBuild's structured diagnostics | Explanation only |
+| [Recall](/docs/concepts/observability/recall) | Invocations, statements, SQL, audit results and output, locally or in ClickHouse | Best effort, for troubleshooting |
+| `stdout.log` / `stderr.log` | The exact output of each process on this machine | For troubleshooting; Recall also stores it |
+| `CommandOutputRecord` | Command output in bounded chunks, without colour codes, for remote systems | May be incomplete and may hold sensitive data |
+| Final JSON output | The command's result | The result only, not what happened on the way |
 
 ## Lifecycle envelope
 
-New events use lifecycle schema version 2:
+Events use lifecycle schema version 2:
 
 ```json
 {

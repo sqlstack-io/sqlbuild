@@ -21,15 +21,11 @@ During planning, SQLBuild observes the current data version of each source that 
 
 Sources without explicit `freshness:` config are auto-observed using the `adapter` strategy if the adapter supports table metadata and the source has a physical table (not an expression source, not a managed source).
 
-Adapter metadata for all sources is fetched in one batched lookup, but each source gets its own
-result. When one source can't be observed, only that source is unknown; the others keep their
-freshness. The `Freshness metadata` progress line reports the outcome, for example
-`Freshness metadata  OK (257 sources, 3 unknown)`. The plan adds one warning per reason, listing up
-to 10 sources, such as `source freshness unknown (unavailable) for raw_events, raw_sessions: ...`.
-Sources without freshness configuration that the adapter can't observe are not warned about.
-Every unknown source is listed with its reason and message under `unknown_source_details` in the
-`direct_source_freshness` metadata of `sqb plan --json`; run `sqb freshness` for the same detail
-in text form.
+When one source can't be observed, only that source is unknown; the others keep their freshness.
+The plan warns once per reason, for example
+`source freshness unknown (unavailable) for raw_events, raw_sessions: ...`. Sources without
+freshness configuration that the adapter can't observe are not warned about. `sqb freshness` shows
+each unknown source with its reason, as does `unknown_source_details` in `sqb plan --json`.
 
 ## Missing source tables
 
@@ -48,15 +44,10 @@ sources and sources with a loader are exempt, because SQLBuild creates their tab
 them. Expression sources, sources without a schema, and wildcard tables are also exempt. A missing
 table that only unselected models read does not fail the plan; its freshness is reported as unknown.
 
-The check first looks for each source in the warehouse listing that planning already reads for
-source columns, so it normally issues no extra queries. A source the listing does not find (for
-example because of identifier case, a stream, a materialized view, or a table in another database)
-is then probed directly with `SELECT 1 FROM <relation> WHERE 1=0`, using the same relation name the
-model SQL reads. Probes for several such sources run concurrently, within the same limit as other
-warehouse inspection reads. Only a not-found error from that probe counts as missing, including a
-missing schema, catalog, or attached database; any other error (for example a connection error)
-fails planning with that error. On Snowflake the probe may need a running warehouse, but it only
-runs for sources the listing did not find.
+SQLBuild finds missing tables in the warehouse listing it already reads, then probes the sources it
+didn't find there, such as streams or tables in another database, with
+`SELECT 1 FROM <relation> WHERE 1=0`. Only a not-found error counts as missing; any other error,
+such as a lost connection, fails planning with that error.
 
 Snowflake reports a missing table and a table the current role can't read with the same error, and
 its listing hides tables the role can't access. For those sources `S405` says the table "does not
