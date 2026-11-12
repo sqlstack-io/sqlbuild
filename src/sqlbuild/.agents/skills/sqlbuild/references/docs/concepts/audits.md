@@ -301,7 +301,7 @@ runs the audit exactly where any other audit on that target runs:
   promotion, a `final` audit checks the staged table before promotion; with `immediate` promotion,
   or for final-phase audits on incremental and snapshot models, it runs after the write, like any
   other audit there. See [Run scope](#run-scope) and
-  [Table promotion mode](project-configuration.md#table-promotion-mode).
+  [Table promotion mode](models/materializations.md#table).
 - On a source or seed, it runs before any model that depends on it is built.
 
 An `error` failure blocks everything downstream of the target, and where the target's other audits

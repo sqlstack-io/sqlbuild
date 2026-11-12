@@ -141,7 +141,7 @@ By default a column rename is one step: downstream models keep their output name
 
 A renamed model keeps its warehouse history through a [model migration](../concepts/models/migrations.md). Whenever the model's relation moves and its materialization keeps warehouse data (table, view, incremental, or snapshot), the command adds `migrate_from <old_name>` to the model header, so the move does not depend on automatic discovery finding exactly one match. The next `sqb build` migrates the relation and leaves a compatibility view at the old name. A move that keeps the relation, such as a folder change in the same schema, adds nothing.
 
-On a target that never built the old name, the origin is missing. By default the plan warns and the model builds fresh; set [`missing_migration_origin`](../concepts/project-configuration.md#missing-migration-origins) on a target to require confirmation or stop the build instead.
+On a target that never built the old name, the origin is missing. By default the plan warns and the model builds fresh; set [`missing_migration_origin`](../concepts/models/migrations.md#missing-migration-origins) on a target to require confirmation or stop the build instead.
 
 A renamed column of an incremental or snapshot model gets `<new> (migrate_from <old>)` in its `columns` block, so the next build renames it in place as a [column migration](../concepts/models/column-migrations.md). Table and view models are rebuilt with the new column anyway; they get the declaration only when the model itself declares `migrate_from`.
 

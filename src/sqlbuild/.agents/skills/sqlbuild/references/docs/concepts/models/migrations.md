@@ -86,8 +86,7 @@ removed. Keep it until every target that needs the move has built.
 | `origin missing` | The old relation doesn't exist and no move was recorded, for example on a fresh target. The plan warns (`M102`) and the model builds fresh. |
 
 On a target where the old name was never built, `origin missing` is normal. A target can ask for
-confirmation or stop the build instead with
-[`missing_migration_origin`](../project-configuration.md#missing-migration-origins).
+confirmation or stop the build instead; see [Missing migration origins](#missing-migration-origins).
 
 If SQLBuild built the old relation in this target but can't see it now, the build always stops with
 `M102`: the connection may lack permission, or the relation was dropped outside SQLBuild. Restore
@@ -100,6 +99,27 @@ in the header.
 Table and view models only see `migrate`, `done` and `origin missing`, because nothing is replaced.
 `migrate_force` on a table or view model is a compile error. In `sqb plan --json`, their decision is
 `renamed`.
+
+### Missing migration origins
+
+On a target that never built the old name, such as a fresh development schema, there is nothing to
+move. The target's `missing_migration_origin` decides what the build does:
+
+| Value | Behavior |
+|-------|----------|
+| `allow` | Default. The plan warns (`M102` for models, `M109` for columns) and the model builds as if `migrate_from` were absent. |
+| `require_confirmation` | The build asks on a terminal and stops otherwise. Pass `--allow-missing-migration-origin` to confirm in a non-interactive run. |
+| `deny` | The build stops with `M102` or `M109`. Use it where a missing origin means the wrong target or a lost table. |
+
+```toml
+[targets.prod]
+missing_migration_origin = "deny"
+```
+
+`sqlbuild_local.toml` can set it for a target too. `sqb dbt run` and `sqb dbt build` follow it but
+have no confirmation flag: they ask on a terminal and stop otherwise. In a non-interactive dbt run,
+first build the affected models with `sqb build --allow-missing-migration-origin`, or set the target
+to `allow`.
 
 ## Automatic discovery
 

@@ -31,7 +31,7 @@ sqb --project-dir <path> load [flags]
 | `--json` | Output results as JSON |
 | `--json-output` | Write JSON results to a file path |
 | `--vars` | Override project variables with a JSON object (`--vars '{"key": "value"}'`) |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Examples
 

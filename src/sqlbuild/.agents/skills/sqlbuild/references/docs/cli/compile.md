@@ -78,7 +78,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 2. **Graph.** Resolves `__ref()`, `__source()` and `__seed()`, expands macros, and orders models
    by dependency.
 3. **SQL checks.** Parses and checks SQL, when SQL analysis is on. See
-   [Semantic Compilation](../concepts/semantic-compilation.md).
+   [What `sqb compile` checks](../concepts/semantic-compilation.md).
 4. **Column lineage.** Traces column-level dependencies across models.
 5. **Contracts.** Checks declared columns against the inferred query output.
 6. **Rules.** Runs the selected built-in Rules, then the selected custom Rules.
@@ -89,8 +89,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 Rules that need inferred types, such as `SQBRCONTRACT105`, are skipped when SQL analysis is off,
 and compile prints one note naming them.
 
-`sqb compile` is authoritative for correctness, contracts, lineage and configured Rules. Rule
-findings block the artifacts. To check one Rule code or family without changing project
+Rule findings block the artifacts. To check one Rule code or family without changing project
 configuration, use [`sqb rules run`](rules.md).
 
 ### When Rules fail
@@ -172,17 +171,9 @@ error[K001]: declared column 'total_cents' was not found in statically inferred 
 | `K003` | A column's type can't be proven (with `type_enforcement` on) |
 | `K013` | A string literal fills an enum-typed column of an enforced contract but isn't a member of the enum (not checked on SQL Server) |
 
-Which models are checked depends on `[settings] check_declared_columns`:
-
-- `true` (default): a model with declared columns and no `contract` setting must output every
-  declared column.
-- `false`: only models with `contract enforced` are shape-checked; declared columns elsewhere
-  are metadata and audit targets.
-
-Explicit type enforcement works with either value. Setting `false` is a project policy, not a
-way to silence an error: if a model is meant to have a contract, fix the query or the
-declaration. Errors on `contract enforced` models don't suggest changing the setting. See
-[Contracts](../concepts/models/contracts.md).
+Models without a `contract` setting are checked unless the project sets
+`[settings] check_declared_columns = false`; see [Contracts](../concepts/models/contracts.md). Don't
+turn the check off to silence one error: fix the query or the column list.
 
 ## Output
 

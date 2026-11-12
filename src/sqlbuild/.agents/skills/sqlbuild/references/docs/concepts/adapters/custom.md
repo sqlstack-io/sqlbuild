@@ -32,7 +32,7 @@ adapter = "duckdb_plus"
 
 A subclass inherits the parent's capabilities. For example, an adapter extending the Snowflake
 adapter keeps `supports_session_warehouse = True`, so it can use
-[command-group warehouses](../project-configuration.md#command-group-warehouses) and
+[command-group warehouses](snowflake.md#command-group-warehouses) and
 `--warehouse`. An adapter written from scratch that sets this attribute receives the selected
 warehouse as the connection's `warehouse` key.
 

@@ -44,10 +44,59 @@ On connect, SQLBuild applies the connection's role and warehouse, then applies t
 target's authoritative database and schema. These ensure the session context is set correctly
 regardless of the user's default settings.
 
-The warehouse can differ by command. A target's `[targets.<name>.warehouses]` section selects
-one warehouse for build-style commands and another for ad-hoc commands such as `sqb query` and
-`sqb diff`, and `--warehouse` overrides both for one invocation. See
-[command-group warehouses](/docs/concepts/project-configuration#command-group-warehouses).
+## Command-group warehouses
+
+Builds and ad-hoc queries usually need different compute. A target can set a warehouse for each
+group of commands, so `sqb build` runs on a large warehouse while `sqb query` and `sqb diff` use a
+small one:
+
+```toml
+[connections.warehouse]
+account = "my_org-my_account"
+warehouse = "ANALYTICS_WH"            # fallback for every command
+
+[targets.dev]
+connection = "warehouse"
+database = "ANALYTICS"
+schema = "DEV"
+
+[targets.dev.warehouses]
+build = "BUILD_WH"
+query = "ADHOC_WH"
+```
+
+| Group | Commands |
+|-------|----------|
+| `build` | `audit`, `build`, `check`, `clone`, `dbt` (SQLBuild's own work), `load`, `plan`, `seed` |
+| `query` | `contract`, `cost`, `debug`, `diff`, `freshness`, `janitor`, `query`, `scenario`, `test` |
+
+Each command uses the first of these that is set:
+
+1. `--warehouse <name>`, for that run only
+2. The target's warehouse for the command's group
+3. The connection's `warehouse`
+4. The Snowflake user's default warehouse
+
+Every connection a command opens uses the same warehouse. Tests and audits that run inside
+`sqb build` use the `build` warehouse. Under `sqb dbt`, dbt's own nodes use the warehouse in their
+dbt profile.
+
+A group warehouse wins over a connection `warehouse` from either file. To change one for yourself,
+set the group in `sqlbuild_local.toml`; the other group keeps its project value:
+
+```toml
+# sqlbuild_local.toml
+[targets.dev.warehouses]
+query = "ALICE_XS_WH"
+```
+
+Values accept `${ENV:...}` and `${my_var}` templates and must be Snowflake identifiers, unquoted
+(`ADHOC_WH`) or double-quoted (`"Adhoc WH"`). `sqb debug` shows each group's warehouse and where it
+came from.
+
+Groups need the Snowflake adapter or a custom adapter built on it; on other adapters they are an
+error. If you switch `adapter` locally, for example to DuckDB, the shared groups are ignored and
+`sqb debug` reports them as `not used`.
 
 ## Case-sensitive column names
 

@@ -42,9 +42,9 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 ## Correctness
 
 - [What sqb compile checks](concepts/semantic-compilation.md) (`concepts/semantic-compilation`) - Offline reference, semantic and type checks that sqb compile runs before any warehouse work.
-- [Contracts](concepts/models/contracts.md) (`concepts/models/contracts`) - Validate required or exact model output schemas.
+- [Contracts](concepts/models/contracts.md) (`concepts/models/contracts`) - Say which columns a model promises to output, and when SQLBuild checks them.
 - [Type Enforcement](concepts/models/type-enforcement.md) (`concepts/models/type-enforcement`) - Understand declared model types, static checks, and runtime casting.
-- [Schemas](concepts/models/schemas.md) (`concepts/models/schemas`) - Declare model columns inline or reuse canonical inherited schemas.
+- [Reusable column schemas](concepts/models/schemas.md) (`concepts/models/schemas`) - Declare a model's columns in its header, or once in a SCHEMA() that many models share.
 - [Overview](concepts/rules.md) (`concepts/rules`) - Turn repeated SQL and project review decisions into compiler-enforced requirements.
 - [Configuration and selection](concepts/rules/configuration-and-selection.md) (`concepts/rules/configuration-and-selection`) - Select built-in and custom Rules by exact code or family prefix.
 - [Findings and exceptions](concepts/rules/findings-and-exceptions.md) (`concepts/rules/findings-and-exceptions`) - Understand Rule diagnostics and record intentional exceptions safely.
@@ -124,7 +124,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 
 ## Reference
 
-- [Project Configuration](concepts/project-configuration.md) (`concepts/project-configuration`) - Configure your SQLBuild project with sqlbuild_project.toml and sqlbuild_local.toml.
+- [Configuration reference](concepts/project-configuration.md) (`concepts/project-configuration`) - Every key in sqlbuild_project.toml and sqlbuild_local.toml.
 - [Configuration](concepts/models/configuration.md) (`concepts/models/configuration`) - MODEL() header fields and SQL-analysis controls.
 - [Testing reference](concepts/testing-reference.md) (`concepts/testing-reference`) - Test modes, parameterized cases, cursor windows, cost guards and time limits for SQL unit tests.
 - [Naming rules](concepts/resource-identities.md) (`concepts/resource-identities`) - Names of models, tests, macros and other SQLBuild resources are lowercase snake_case.

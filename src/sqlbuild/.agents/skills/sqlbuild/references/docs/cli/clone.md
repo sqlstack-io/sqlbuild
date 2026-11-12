@@ -44,7 +44,7 @@ sqb --project-dir <path> clone --from <target> [--to <target>] [flags]
 | `--hard-copy` | Force physical table copies instead of zero-copy cloning |
 | `--select`, `-s` | Select specific models to clone |
 | `--exclude` | Exclude specific models from cloning |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Examples
 
@@ -95,4 +95,4 @@ allow_as_clone_destination = true
 The origin target must already contain the built relations being cloned. The destination
 connection's credentials must be able to read the origin namespace and create relations in the
 destination. Managed physical sources may bootstrap a destination that has not been built. See
-[Project Configuration](../concepts/project-configuration.md) for details.
+[Configuration reference](../concepts/project-configuration.md) for details.

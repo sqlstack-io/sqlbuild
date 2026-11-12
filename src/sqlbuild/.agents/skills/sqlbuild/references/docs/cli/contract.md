@@ -6,7 +6,9 @@
 
 Online: https://sqlbuild.com/docs/cli/contract/
 
-Existing-schema comparison is explicitly online and read-only with respect to the warehouse.
+`sqb contract` compares a model's or source's declared columns with the table that already exists in
+the warehouse, or writes declarations from it. It reads the warehouse and never changes it. The
+target named by `--from` supplies the database and schema to read, using the project's connection.
 
 ## diff
 
@@ -22,8 +24,22 @@ Reports declaration differences. Exit code `0` means agreement and `1` means dif
 sqb contract generate --from <target> [flags]
 ```
 
-Prints proposed declaration updates. Add `--write` to change repository files and `--overwrite` to
-replace conflicts rather than preserving authored declarations.
+Prints proposed declaration updates without changing files.
+
+```bash
+# Fill in missing types and add warehouse columns missing from code
+sqb contract generate --from prod --select tag:commerce --write
+
+# Also replace conflicting types and names, and remove columns the warehouse doesn't have
+sqb contract generate --from prod --select tag:commerce --write --overwrite
+```
+
+Without `--overwrite`, generation keeps everything you wrote: existing types where they conflict,
+columns only in code, comments, descriptions, audits, nullability, enums, tags, freshness and loader
+settings. It never adds `contract enforced`; that stays your decision.
+
+A shared `SCHEMA()` isn't changed from one model's columns; the conflict is reported instead. Writes
+are atomic, and SQLBuild recompiles the project afterwards and restores the old files if it fails.
 
 ## Flags
 
@@ -37,7 +53,7 @@ replace conflicts rather than preserving authored declarations.
 | `--vars` | both | Override project variables |
 | `--write` | generate | Apply generated repository changes |
 | `--overwrite` | generate | Replace conflicting declarations; requires `--write` |
-| `--warehouse <name>` | both | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | both | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
-See [Contracts](../concepts/models/contracts.md#adopting-an-existing-schema) for ownership and safety
-guarantees.
+Sources can be selected like models, for example `--select source:raw_orders`. See
+[Contracts](../concepts/models/contracts.md) for what a contract checks.

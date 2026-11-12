@@ -395,8 +395,8 @@ Each takes a positive fixed duration, such as `"45s"` or `"10m"`, or `"disabled"
 
 The clock starts at the test's first warehouse statement. Rendering, warehouse queueing where the
 warehouse reports it, and cleanup after the comparison don't count. See
-[Per-item time limits](project-configuration.md#per-item-time-limits) for how each
-adapter enforces the limit, and [Duration limit](project-configuration.md#duration-limit)
+[Per-item time limits](../cli/build.md#per-item-time-limits) for how each
+adapter enforces the limit, and [Duration limit](../cli/build.md#duration-limit)
 for how each adapter cancels a running statement.
 
 At the limit, SQLBuild cancels the running statement, reports the test as `TIMEOUT`, and continues

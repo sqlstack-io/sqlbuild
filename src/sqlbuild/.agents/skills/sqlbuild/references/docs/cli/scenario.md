@@ -41,7 +41,7 @@ sqb scenario test [flags]
 | `--max-snapshot-total-rows` | Override total row limit for capture |
 | `--max-snapshot-bytes` | Override per-relation byte limit for capture |
 | `--max-snapshot-total-bytes` | Override total byte limit for capture |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 | `--since <ref>` | Run only the scenarios affected by changes since the merge base of `<ref>` and `HEAD`; `@base` reads `[git] base_ref` |
 | `--explain` | With `--since`, print why each selected scenario was selected |
 
@@ -159,7 +159,7 @@ sqb scenario capture [flags]
 | `--max-snapshot-total-rows` | Override total row limit |
 | `--max-snapshot-bytes` | Override per-relation byte limit |
 | `--max-snapshot-total-bytes` | Override total byte limit |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ### Examples
 

@@ -32,7 +32,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `SELECTOR ...` | Positional selectors, the same as `--select` |
 | `--select`, `-s` | Select tests by name (`order_status_rules` or `test:order_status_rules`), or the tests targeting specific models |
 | `--exclude` | Exclude tests by name, or the tests targeting specific models |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 | `--test-timeout <duration>` | Time limit for each test in this run, such as `30s` or `2m`, or `disabled`; overrides `TEST(timeout ...)`, the target and `[settings] test_timeout` |
 | `--since <ref>` | Run only the tests affected by changes since the merge base of `<ref>` and `HEAD` (see [Run only affected tests](#run-only-affected-tests)); `@base` reads `[git] base_ref` |
 | `--explain` | With `--since`, print why each selected test was selected |
