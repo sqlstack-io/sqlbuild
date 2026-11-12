@@ -1,6 +1,6 @@
 <!-- generated-by: sqlbuild skills -->
 
-# scope
+# sqb scope
 
 > Inspect declaration visibility, usage, placement, and move impact offline.
 
@@ -20,7 +20,7 @@ Online: https://sqlbuild.com/docs/cli/scope/
 - Paths And JSON
 - Partial Projects
 - Output Safety
-- Native SQLBuild Only
+- SQLBuild declarations only
 
 `sqb scope` explains the lexical environment around native SQLBuild macros, enums, and constants. Use it to see what a resource can access, what it actually uses, why a declaration is visible or inaccessible, and whether a move would cross a scope boundary.
 
@@ -417,9 +417,9 @@ Scope reports describe declarations without exposing authored values or runtime 
 
 There is no `--show-values` option.
 
-## Native SQLBuild Only
+## SQLBuild declarations only
 
-`sqb scope` inspects native SQLBuild authored resources and declarations. It does not discover or emulate dbt models, dbt or Jinja macros, package dispatch, dbt manifests, dbt selectors, dbt tests, or dbt schema YAML visibility. An external dbt graph dependency does not contribute declarations or lexical scope.
+`sqb scope` covers SQLBuild declarations only. Models and macros in a [dbt project](../concepts/dbt-compatibility/overview.md) used through `sqb dbt` are not part of any scope.
 
 For declaration directory rules, placement checks, test access through expected output, and scoped
 macro imports, see [Declarations and Scopes](../concepts/declaration-scopes.md).

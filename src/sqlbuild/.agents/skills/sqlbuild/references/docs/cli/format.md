@@ -45,14 +45,10 @@ one-file-at-a-time run.
 
 ## Skipping unchanged files
 
-`sqb format` remembers every file it found already formatted and free of faults and warnings, in
-`target/cache/compiler-native-v1/format-results.bin`. A later run skips such a file while its text,
-its path, the `[format]` and rule threshold settings, the adapter dialect and the SQLBuild build are
-all unchanged, so `sqb format --check` on an unchanged project costs little more than reading the
-files. A file that needed changes or reported anything is always formatted again, and a damaged or
-unreadable cache is ignored. `--fix` never uses the cache, and SQL test files are not skipped
-while typed-null fixture formatting reads their models' contracts. Pass `--no-cache` to format
-every file.
+`sqb format` skips files it already found formatted and clean, as long as the file and the format
+settings haven't changed, so `sqb format --check` on an unchanged project is fast. A file that
+needed changes or reported anything is always checked again. `--fix` never skips files. Pass
+`--no-cache` to format every file.
 
 ## Line width and descriptions
 
@@ -63,16 +59,11 @@ Configure the maximum physical line width in `sqlbuild_project.toml` (the defaul
 line_width = 100
 ```
 
-`MODEL`, `SCENARIO`, `FUNCTION` and `HOOK` headers must carry a non-empty `description`;
-`sqb format --check` fails with `description-present` when one is missing, so pre-commit catches it
-before compile does (see [Descriptions](../concepts/models/configuration.md#descriptions)). A model
-described by its `model_schema`, or by the one `[path_defaults]` entry that applies to it, passes,
-exactly as it compiles. `[defaults]` does not accept `description` (`D001`), and only the nearest
-matching path default applies (see
-[Which path default applies](../concepts/project-configuration.md#which-path-default-applies)).
-Format does not render templates, so a templated description that renders empty passes format and
-is reported by `sqb compile`.
-Plain `sqb format` still formats the file and exits non-zero, like any other remaining fault.
+`MODEL`, `SCENARIO`, `FUNCTION` and `HOOK` headers need a non-empty `description`. When one is
+missing, `sqb format --check` fails with `description-present`, so pre-commit catches it before
+compile does. A model described by its `model_schema` or its `[path_defaults]` entry passes, as it
+does in compile; see [Descriptions](../concepts/models/configuration.md#descriptions). Plain
+`sqb format` still formats the file and exits non-zero.
 
 Descriptions of `MODEL`, `SCENARIO`, `SCHEMA`, `FUNCTION`, `HOOK` and `MACRO` headers have one
 canonical layout, which never changes their words, their quotes or the text they store (see
@@ -111,15 +102,11 @@ Clause layout follows a few fixed rules:
 - A broken `DECODE` puts its first argument on its own line, then one search/result pair per line,
   then any default.
 
-SQL lines longer than the width, counting any trailing alias and comma, are broken at the outermost
-structure first: before top-level `AND` and `OR` (never inside `BETWEEN ... AND`), then before
-arithmetic operators, then by putting the arguments of the widest outermost function call, `IN`
-list, or array one per line, or the branches of a `CASE` on their own lines. Inside `OVER (...)`,
-`PARTITION BY` and `ORDER BY` go on separate lines. Type parameters such as `NUMBER(38, 2)` or
-`VARCHAR(MAX)` are never split; the enclosing call breaks instead. Header `audits [...]` lists put
-each audit, and then each audit argument, on its own line. String literals, comments, and lines that
-carry a comment are never broken, so a line can stay longer than the width when nothing on it can be
-split. `sqb format --check` fails while a long line can still be shortened.
+A line longer than the width is broken at its outermost structure first: before top-level `AND`
+and `OR`, then before arithmetic operators, then one argument per line in the widest function call,
+`IN` list or array, or one `CASE` branch per line. String literals, comments, type parameters such as
+`NUMBER(38, 2)`, and lines that carry a comment are never broken, so a line can stay longer than the
+width. `sqb format --check` fails while a long line can still be shortened.
 
 ## What formatting preserves
 

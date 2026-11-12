@@ -72,4 +72,4 @@ schema = "dev"
 calls it as `pg_temp.<name>`, so tests use the current project definition without a build. Temporary
 functions belong to one server session: behind a transaction-mode pooler, run `sqb test` through a
 direct connection or a session-mode pool, or set `temporary_test_functions = false` so tests call the
-built functions. See [Functions in `sqb test`](../testing.md#functions-in-sqb-test).
+built functions. See [Functions in `sqb test`](../testing-reference.md#functions-in-sqb-test).

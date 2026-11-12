@@ -1,6 +1,6 @@
 <!-- generated-by: sqlbuild skills -->
 
-# debug
+# sqb debug
 
 > Validate project configuration and test the warehouse connection.
 

@@ -84,4 +84,4 @@ schema = "dev"
 ## Functions in unit tests
 
 SQL Server has no session-scoped functions, so `sqb test` calls the built function. Run `sqb build`
-before testing a new or changed function. See [Functions in `sqb test`](../testing.md#functions-in-sqb-test).
+before testing a new or changed function. See [Functions in `sqb test`](../testing-reference.md#functions-in-sqb-test).

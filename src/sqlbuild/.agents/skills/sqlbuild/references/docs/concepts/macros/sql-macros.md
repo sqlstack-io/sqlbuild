@@ -14,9 +14,8 @@ Online: https://sqlbuild.com/docs/concepts/macros/sql-macros/
 - Parameters in the body
 - Relation slots
 - Compose macros
-- Checks
-- Result types
 - Tools
+- Reference
 
 A SQL macro is a reusable piece of SQL with typed parameters. Unlike a
 [Python macro](python-macros.md), it holds no logic: its body is SQL, so the compiler checks
@@ -76,7 +75,7 @@ CAST(ROUND(@amount_cents / 100, @places) AS DECIMAL(18, 2))
 ```
 
 `returns` is optional for expression macros and not allowed for the other forms. See
-[Result types](#result-types) for what it does.
+[Result types](sql-macro-reference.md#result-types) for what it does.
 
 The description follows the same rules as every header string: write text that contains double
 quotes as `"""..."""`, and a wrapped description is stored folded into one flowing text (see
@@ -254,26 +253,6 @@ These fail with `P022`:
 
 Parameters may not be named `sql`, `py`, `const`, `enum`, `param` or `__cte`.
 
-### Positions that need a literal
-
-SQL needs a literal in some positions. A parameter without `CONST` there fails with `P023` when the
-macro is checked:
-
-```
-error[P023]: places is used where a literal is required; declare it places INT CONST
-```
-
-| Position | Adapters |
-|---|---|
-| `LIMIT`, `OFFSET`, `TOP` and `FETCH FIRST` counts | all |
-| `INTERVAL` and `EXTRACT` units | all |
-| `PIVOT ... IN (...)` values | all |
-| `DATE_TRUNC` unit (the first argument, or the last on BigQuery) | all |
-| `ROUND` precision | DuckDB and MotherDuck (for `DECIMAL` values), Databricks |
-
-The positions every adapter shares are checked for every macro file. `DATE_TRUNC` and `ROUND` are
-checked for the project's adapter at each call.
-
 ## Relation slots
 
 Everything a macro reads from a relation is declared in its `RELATION` type as a slot. A slot is
@@ -307,112 +286,6 @@ rated AS (
 A `COLUMNS` slot is untyped: each column passed to it keeps its own type, so the expanded SQL is
 fully typed.
 
-### Reading slots
-
-- `alias.@weekly.order_count` reads the slot from a table alias or CTE, such as `s` above. For a
-  group, the prefix applies to every column: `s.@weekly.keys` becomes `s.product_id, s.region`.
-- A plain read of a group, `@weekly.keys`, always stands as the bare column names,
-  `product_id, region`. So later CTEs, such as `rated` above, read the group from whatever
-  relation they select from, without an alias. A bare name that two joined relations share fails
-  as hand-written SQL does, with `B003`; read it as `alias.@weekly.keys` there.
-- A plain read of a single-column slot always reads through the passed relation, mapped or not:
-  `@weekly.refund_count` becomes `weekly.refund_count`, or `weekly.refunds_n` with
-  `weekly.refund_count := refunds_n`. So the same body expands the same way for every mapping.
-- Every read inside `USING (...)` stands unqualified, as `USING` needs, including
-  `USING (@weekly.week)` for a column the type does not declare.
-- In a column-list macro, `o.@weekly.keys` outputs the group's columns under their own names.
-- Rules judge a read as you wrote it. `SQLCLEAN028`, which rejects a query mixing qualified and
-  unqualified columns, judges a query the macro writes whole, such as a CTE of a CTE-list macro,
-  once, in the macro file. There every plain read counts as unqualified and every
-  `alias.@weekly...` read as qualified. A step written only in plain reads, such as
-  `SELECT @weekly.keys, @weekly.refund_count AS refunds FROM @weekly`, passes; to qualify, read
-  every slot through an alias.
-- Where a call's output joins the caller's query, as with expression and column-list macros, the
-  query is judged at the call. A read through the relation the call passes, such as `o.created_at`
-  above, fits either style; any other column counts as the macro writes it, so a bare `status`
-  beside a hand-qualified `o.order_id` fails.
-
-A plain group read inside a subquery, such as `EXISTS (SELECT @weekly.keys FROM refunds AS r ...)`,
-could bind its bare columns to the subquery's relations instead of the one the slot reads. The
-call fails with `P017` when a relation of an enclosing subquery, other than the relation passed
-for the slot, has one of the group's columns, or when its columns are not known. `LATERAL`
-subqueries in `FROM` or `JOIN` are checked the same way:
-
-```
-error[P017]: slot weekly.keys column product_id would bind to refunds in this subquery; write alias.@weekly.keys
-```
-
-Read the group through its alias there. A group read in a CTE, or in a derived table in `FROM`,
-reads that query's own relations and is not checked.
-
-`alias.@weekly.name` naming no slot, or `alias.@weekly` naming none at all, fails with `P022`.
-`@weekly.name` without an alias may still read a column the type does not declare, through the
-passed relation, as before.
-
-### Mapping slots at the call
-
-A call maps slots with `relation.slot := ...`, next to its other named arguments:
-
-```sql
-WITH weekly AS (SELECT * FROM __ref("weekly_orders")),
-@sql.weekly_rates(weekly, weekly.keys := (product_id), weekly.order_count := orders_placed, __cte := by_product)
-@sql.weekly_rates(weekly, weekly.keys := (product_id, region), weekly.order_count := orders_placed, __cte := by_product_region)
-final AS (SELECT * FROM by_product_region)
-SELECT * FROM final
-```
-
-The first call compiles to the same SQL as a macro written for `product_id`, the second groups by
-product and region. The left of `:=` is always a parameter path, and the right side is column
-names of the passed relation:
-
-- A single-column slot takes one column name. An unmapped single-column slot reads the column of
-  its own name, so `refund_count` above reads `refund_count`.
-- A group takes a parenthesised list of column names, such as `(product_id, region)`, and every
-  call must map it.
-- A slot reads a column as it is: compute an expression in the relation you pass.
-- A macro that passes its own relation on maps the inner slots to its slot names, as in
-  `@sql.weekly_rates(weekly := @src, weekly.keys := (dims), weekly.order_count := placed)`, or to
-  columns of its relation. Each inner slot keeps its kind: a group mapped to columns is still read
-  bare, or after its alias, and mapping a group to a single-column slot of the outer relation, or
-  the reverse, fails with `P017`.
-
-### Rules for groups
-
-1. A group is pasted verbatim, comma-separated. It takes no per-item expression, indexing,
-   counting or renaming, and groups are never combined.
-2. A group stands only as a whole item of a select list, `PARTITION BY`, `GROUP BY`, `ORDER BY`
-   (without `ASC`, `DESC` or `NULLS`) or `USING (...)`. Anywhere else fails with `P015` at the
-   macro file.
-3. Grouped columns keep their real names in the output.
-4. A group is never empty: `weekly.keys := ()` fails.
-5. A relation may have several groups, such as `keys COLUMNS, carried COLUMNS`. Groups of one
-   relation may not share a column, and a column that fills a single-column slot, mapped or by its
-   own name, may not also be in a group.
-
-### Checks at the call
-
-Slot errors fail with `P017` and name the slot and the caller's relation:
-
-```
-error[P017]: slot weekly.order_count needs a BIGINT column; weekly has no column orders_total
-```
-
-- Every mapped and grouped column must exist in the passed relation, and a single-column slot needs
-  a compatible type: `slot weekly.order_count needs a BIGINT column; weekly.region is VARCHAR`,
-  or `slot weekly.keys groups column channel; weekly has no column channel`. Like other argument
-  checks, these run when the relation is a CTE or table alias; the model's own column checks still
-  run on the expanded SQL.
-- Overlapping groups, or a grouped column that also fills a single-column slot, fail at the call.
-- A grouped column named like a column the macro defines, or like a bare column such as `s.week`
-  or a column read through the relation such as `@weekly.region` beside the group in the same
-  select list, fails with `P018`, naming both:
-  `column refunds of slot weekly.keys clashes with column refunds that macro weekly_rates() defines`.
-- A mapped single-column slot read in a select list needs an `AS` in the macro, so output names
-  don't depend on the caller's mapping. Groups are exempt, because they keep their real names, and
-  so is an unmapped slot, which keeps its own name. So are reads in `IN`, `EXISTS` and scalar
-  subqueries, whose column names never reach the macro's output. A `LATERAL` subquery in `FROM` or
-  `JOIN` is checked like a derived table, because its columns reach the output, as through `l.*`.
-
 ## Compose macros
 
 A SQL macro may call other SQL macros, and pass its own parameters on as `@name`:
@@ -440,78 +313,6 @@ isn't visible from there fails with `S026`; to use a caller's value, make it an 
 `@const(...)` at the call site. SQL macros a body calls resolve the same way, so a macro can call a
 folder-local macro beside it that its callers cannot see.
 
-## Checks
-
-Each macro is checked on its own when the project compiles, and each call is checked against the
-caller's column types, inferred like the rest of the model:
-
-- a `RELATION` argument must have every declared column, each of a compatible type, and every
-  column its [slots](#checks-at-the-call) are mapped to;
-- a typed argument must have a compatible type, so `@sql.cents_to_dollars(o.status)` with a
-  `VARCHAR` status fails.
-
-These fail with `P017`, naming the argument, the expected type or column and what the caller has:
-
-```
-error[P017]: argument src of macro clean_orders() needs column is_deleted BOOLEAN; orders_raw has no column is_deleted
-  --> models/marts/orders_clean.sql:2:1
-  parameter declared here:
-  --> macros/sql/clean_orders.sql:3:14
-  = help: pass a relation with these columns: order_id BIGINT, updated_at TIMESTAMP, is_deleted BOOLEAN
-```
-
-An argument whose type the compiler cannot infer passes. So do calls inside a subquery or in a
-query part with `UNION`, `INTERSECT` or `EXCEPT`, arguments built from `__ref()`, macro calls or
-parameters of a calling macro, and calls in models with runtime placeholders; the model's own
-column checks still run on the expanded SQL. All other errors also point at the call and at the
-macro file.
-
-## Result types
-
-An expression macro call is typed wherever it stands, from its expanded SQL, as if the SQL were
-written there. `returns` declares the type for when that SQL's type is unknown:
-
-```sql
-MACRO (description "Status bar", arguments (value VARCHAR), returns VARCHAR);
-
-bar(LENGTH(@value), 0, 10)
-```
-
-- The declared type applies only where the expanded SQL's type is unknown, including a list
-  literal such as `[]`, whose type analysis doesn't infer. A known type stands, even a close one such as `VARCHAR(100)` for
-  `returns VARCHAR(5)`, and contract checks report a mismatch with `K002`.
-- The type flows on as an inferred type would: through CTEs, `SELECT *`, subqueries, joins and each
-  branch of a set operation, through operators and functions around the call, to contract checks
-  (`K002`, `K003`), `SQBRCONTRACT105` and models that read the column.
-- `returns` is used only for analysis. It doesn't appear in the generated SQL, so on its own it doesn't
-  change the column's physical type. A body of `'ACTIVE'` still creates `VARCHAR(6)` on Snowflake.
-  For `SQBRCONTRACT105`, a select-list item that is one call needs no `CAST` at the call only when
-  the macro body's outermost expression is a `CAST(... AS type)` or `...::type` to the column's
-  contract type, compared as the dialect does, such as `CAST(LEFT(@value, 3) AS VARCHAR)` for a
-  `VARCHAR` column. Otherwise the rule asks for a cast in the macro or at the call, whether the
-  macro declares a fixed `returns` or `returns TYPE OF`. A call inside a larger expression always
-  needs an outer cast.
-- Without `returns`, the call is typed by inference alone. When an output is one call whose type is
-  unknown, `K003` and `SQBRCONTRACT105` suggest declaring `returns` on the macro.
-- `returns TYPE OF <argument>` declares the type of that argument at each call, under the same
-  rule: `arguments (value ANY NUMERIC, places INT CONST DEFAULT 2), returns TYPE OF value`. If the
-  argument's own type is unknown, so is the call's. The argument must be a scalar argument of the
-  macro (`P015`).
-- A fixed `returns` is checked against the body at the macro file. The body is typed from the
-  declared argument types; a known type of another family, such as `UPPER(@value)` with
-  `returns BIGINT`, fails with `P024`. A body whose type cannot be inferred, for example because it
-  reads `ANY` arguments, is a list literal, or calls a function whose type is unknown or only
-  guessed, trusts `returns`.
-- `returns` and every argument type must be a type the adapter's SQL dialect accepts, including a
-  decimal precision and scale it can hold, such as at most `DECIMAL(38, s)` on DuckDB (`P015`).
-- A call where only a keyword can stand, such as the date part of `EXTRACT`, is typed by inference
-  alone.
-- A call inside a Python macro argument, as in `@py.bracket(@sql.status_bar(o.status))`, is typed
-  by inference alone.
-- `returns` never changes the compiled SQL.
-
-A `* REPLACE` item takes its source column's type rather than the call's.
-
 ## Tools
 
 - `sqb format` formats SQL macro files, bodies of every form and the `MACRO` header, and
@@ -523,8 +324,13 @@ A `* REPLACE` item takes its source column's type rather than the call's.
   [When Rules fail](../../cli/compile.md#when-rules-fail).
 - Editing a macro recompiles its callers.
 
-Test SQL macros with [macro-mode unit tests](../testing.md#macro-tests), and replace one
+Test SQL macros with [macro-mode unit tests](../testing-reference.md#macro-tests), and replace one
 in a model test with a [`__macro__` mock](../testing.md#macro-mocking).
 
 See [Macros](../macros.md#choose-the-right-tool) for when to use a SQL macro, a Python
 macro, a SQL function or a generic audit.
+
+## Reference
+
+[SQL macro reference](sql-macro-reference.md) covers positions that need a
+literal, reading and mapping relation slots, the checks at each call and result types.

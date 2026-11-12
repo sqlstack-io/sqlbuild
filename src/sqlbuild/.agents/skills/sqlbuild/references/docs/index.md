@@ -60,9 +60,8 @@ audit results and everything it printed. Agents and people query that history wi
 | Review | [`sqb review`](cli/review.md) | Builds a branch's changes in a temporary schema, tests them and compares them with a target |
 | Investigate | [`sqb recall`](cli/recall.md) | Queries the history of past runs, then live warehouse state |
 
-SQLBuild works with DuckDB, MotherDuck, Snowflake, BigQuery, Databricks, PostgreSQL, SQL Server,
-ClickHouse and SQLite.
-DuckDB runs locally, so you can try everything without warehouse credentials. See
+SQLBuild works with Snowflake, DuckDB, MotherDuck and PostgreSQL. BigQuery, Databricks, SQL Server,
+ClickHouse and SQLite are in beta. DuckDB runs locally, so you can try everything without warehouse credentials. See
 [Adapters](concepts/adapters.md) for connection setup.
 
 ## Where to start

@@ -1,6 +1,6 @@
 <!-- generated-by: sqlbuild skills -->
 
-# diff
+# sqb diff
 
 > Compare schemas and data between targets.
 

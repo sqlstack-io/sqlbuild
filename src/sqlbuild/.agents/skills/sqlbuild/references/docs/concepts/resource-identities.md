@@ -1,64 +1,47 @@
 <!-- generated-by: sqlbuild skills -->
 
-# Resource Identities
+# Naming rules
 
-> Canonical names for SQLBuild resources, selectors, state, and integrations.
+> Names of models, tests, macros and other SQLBuild resources are lowercase snake_case.
 
 Online: https://sqlbuild.com/docs/concepts/resource-identities/
 
-SQLBuild resource identities use lowercase ASCII snake_case. A name must start with a lowercase
-letter, end with a lowercase letter or digit, and contain only lowercase letters, digits, and
-underscores. Consecutive underscores are valid, so established names such as
-`commerce__mart_v_order` remain canonical.
-
-This contract applies to models, seeds, sources, SQL and Python functions, generic and singular
-audits, attached audit definitions and instance names, SQL tests and parameterized cases,
-scenarios, SQL and Python hooks, macros, model schemas, enums, constants, materializations,
-providers, event exporters, loaders, tasks, assets, and checks. Private scoped declarations use
-exactly one leading underscore, such as `_country_codes`; public declarations must not use a
-leading underscore.
-
-Provider classes are the one conventional derivation: when `provider_name` is omitted,
-`AnalyticsApiProvider` resolves to `analytics_api_provider`. An explicit `provider_name` is an
-authored identity and must already be canonical snake_case; SQLBuild does not normalize it.
-
-Names derived from files use the filename stem. For example, `models/daily_orders.sql` defines
-the model identity `daily_orders`, while `audits/generic/expression_is_true.sql` defines the
-generic audit identity `expression_is_true`. Directories organize resources but do not change
-their names.
-
-Physical warehouse identifiers are separate from SQLBuild resource identities. Database, schema,
-table, model alias, column, tag, group, and directory names retain their existing adapter-specific
-contracts and do not need to follow this profile.
-
-## Invalid names
-
-Compilation fails during discovery with `D016` when an authored identity is not canonical:
+Names of models, tests, macros and every other SQLBuild resource are lowercase snake_case, such as
+`daily_orders`. SQLBuild never renames anything for you; it suggests the right spelling. Renaming a
+file by hand creates a new resource with no history, so use [`sqb rename`](../cli/rename.md) to
+keep it.
 
 ```text
 error[D016]: Invalid model identity 'DailyOrders' in models/DailyOrders.sql;
 use snake_case 'daily_orders'
 ```
 
-Discovery also fails with `D016` when the project directory, or a model, unit test, scenario, source
-or schema YAML file it reads, has a path that is not valid UTF-8, including a directory above the
-file. The error shows each invalid byte as a `\xNN` escape; rename the path to valid UTF-8. Other
-files with such names, such as notes or data files, and directories that hold none of those files
-are ignored. Commands that tolerate unreadable files, such as `sqb scope`, report the file and
-continue.
+A name starts with a lowercase letter, ends with a lowercase letter or digit, and contains only
+lowercase letters, digits and underscores. Double underscores are fine, as in
+`commerce__mart_v_order`.
 
-SQLBuild suggests a corrected spelling but never silently normalizes an identity. Silent
-normalization would make selectors, manifests, persisted execution state, and integration keys
-disagree about which resource ran.
+A resource named after its file takes the file name without the extension:
+`models/daily_orders.sql` is the model `daily_orders`. Folders organise files but are not part of
+the name.
 
-## Migrating existing projects
+## Renaming a resource
 
-1. Rename file-derived resources and explicit `name` values to snake_case.
-2. Update `__ref`, `__seed`, `__source`, function, hook, macro, audit, test, and dependency
-   references.
-3. Update selectors and external integrations, including Dagster asset/check keys, that use the
-   old identity.
-4. Compile before building.
+[`sqb rename`](../cli/rename.md) and `sqb mv` rename a model or column, update every reference, and
+keep the warehouse table's history. See [Refactoring](refactoring.md).
 
-A rename intentionally creates a new resource identity. Existing fingerprints, audit history,
-and other persisted state under the old name are not silently reassigned to the new resource.
+A rename you make by hand creates a new resource. Its build history, fingerprints and audit results
+start fresh, and selectors and integrations that use the old name, such as Dagster asset keys, need
+updating too. Compile before you build.
+
+## Details
+
+- A private scoped declaration starts with exactly one underscore, such as `_country_codes`. Public
+  declarations don't start with an underscore. See [Declaration scopes](declaration-scopes.md).
+- A provider class without a `provider_name` gets a snake_case name from its class name:
+  `AnalyticsApiProvider` is `analytics_api_provider`. An explicit `provider_name` must already be
+  snake_case.
+- Warehouse names are not affected: databases, schemas, tables, aliases, columns, tags and groups
+  follow the warehouse's own rules.
+- Paths SQLBuild reads, such as models, tests, scenarios and source or schema YAML files, must be
+  valid UTF-8, including the folders above them. Otherwise compilation fails with `D016`, showing
+  each invalid byte as `\xNN`. `sqb scope` reports such a file and continues.

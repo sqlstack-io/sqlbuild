@@ -108,22 +108,21 @@ MODEL (
 );
 ```
 
-A `"` inside a `"..."` string ends it, so it is an error with its line and column rather than the
-start of an escape. A description has no `\"` escape and no `""` doubling: in a `"..."`
-description a backslash is an ordinary character, so `"Files under C:\"` ends with a backslash and
-`"Path C:\\temp"` stores both backslashes. In a `'...'` description, `\'` and `''` both stand for
-one `'`, as in `'it\'s'` and `'it''s'`. `sqb format --fix` rewrites a description that escapes its
-quotes as `\"` or doubles them as `""` into a `"""..."""` string holding real quotes:
+Quotes inside strings:
+
+- A `"` inside a `"..."` string ends it, so it is an error. There is no `\"` escape and no `""`
+  doubling; use `"""..."""` instead. `sqb format --fix` rewrites such a description for you.
+- In a `"..."` string, a backslash is an ordinary character: `"Path C:\\temp"` stores both
+  backslashes.
+- In a `'...'` string, `\'` and `''` both stand for one `'`, as in `'it\'s'` and `'it''s'`.
 
 ```text
 error[D002]: MODEL(...) in 'models/customers.sql:2:34' contains invalid SQLBuild header syntax: a double quote ends this "..." string early; use """…""" for text containing double quotes
   = help: write the text between triple quotes, where quotes need no escaping: description """Matches "Miss"."""; sqb format --fix rewrites a description that escapes its quotes as \" or doubles them as ""
 ```
 
-A `"""..."""` string ends at the first three double quotes in a row. Up to two quotes just before
-them belong to the text, so the text may end with a quote, but it cannot contain three in a row.
-A `"""` inside the text and a `"""` that is never closed fail with the position of the offending
-quote or of the opening `"""`.
+- A `"""..."""` string ends at the first three double quotes in a row. The text may end with a
+  quote but can't contain three in a row.
 
 ### Folded descriptions
 

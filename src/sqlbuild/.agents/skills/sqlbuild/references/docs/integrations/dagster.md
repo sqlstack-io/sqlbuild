@@ -121,7 +121,7 @@ metadata to command-output and lifecycle records:
 
 Lifecycle events remain SQLBuild's immutable execution facts. Human stdout/stderr remains a
 correlated troubleshooting transcript; the integration does not parse terminal text to establish
-resource status. See [Execution Observability](../concepts/observability.md).
+resource status. See [Observability](../concepts/observability.md).
 
 ## Scenarios as checks
 

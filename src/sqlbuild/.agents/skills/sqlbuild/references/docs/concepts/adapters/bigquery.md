@@ -69,4 +69,4 @@ See [Collections and Rendering](../constants/collections-and-rendering.md#native
 ## Functions in unit tests
 
 BigQuery temporary functions exist only inside one script, so `sqb test` calls the built function.
-Run `sqb build` before testing a new or changed function. See [Functions in `sqb test`](../testing.md#functions-in-sqb-test).
+Run `sqb build` before testing a new or changed function. See [Functions in `sqb test`](../testing-reference.md#functions-in-sqb-test).

@@ -12,7 +12,6 @@ Online: https://sqlbuild.com/docs/concepts/rules/findings-and-exceptions/
 - Relation-level exceptions
 - Path- and resource-scoped ignores
 - No inline suppressions
-- Removed settings
 - Mandatory correctness
 - Machine-readable findings
 
@@ -132,14 +131,6 @@ error[SQBRSUPPRESSION000]: Inline Rule suppressions are not supported; declare t
 
 Copy the entry into `sqlbuild_project.toml`, adjust the reason for a reviewer, and delete the
 comment.
-
-## Removed settings
-
-`[rules] allow_exceptions` was removed. Configured exceptions are always allowed because the project
-file is the review gate, and inline suppressions no longer exist. A project that still sets
-`allow_exceptions` fails configuration loading with an error that explains the removal: delete the
-line, keep reviewed deviations as `[[rules.rule_exceptions]]` entries, and use `[rules] ignore` to
-turn a Rule off for the whole project.
 
 ## Mandatory correctness
 
