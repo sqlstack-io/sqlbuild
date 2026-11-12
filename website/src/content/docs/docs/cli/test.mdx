@@ -46,7 +46,7 @@ are strings in JSON so their scale is preserved. Each test check in JSON output 
 `duration_ms`.
 
 Each test row shows how many real (unmocked) models the test executes, such as `3 real models`. A
-test that runs past its [time limit](/docs/concepts/testing#time-limits) is reported as `TIMEOUT`,
+test that runs past its [time limit](/docs/concepts/testing-reference#time-limits) is reported as `TIMEOUT`,
 counted under `TIMEOUT=` and excluded from `FAIL=` in the summary line
 (`PASS=4  FAIL=0  TIMEOUT=1  TOTAL=5`), and the run continues with the remaining tests. In `--json`
 output, `summary.fail_count` still includes timed-out tests, and `summary.timeout_count` reports how

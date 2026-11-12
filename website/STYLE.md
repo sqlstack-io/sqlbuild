@@ -59,6 +59,6 @@ These rules apply to every page under `website/src/content/docs/`. Pages that fo
   belongs to, update tables and examples, and remove what is no longer true. Don't append a
   paragraph to the end of a section or page.
 - Don't repeat a rule that another page owns. Link to it instead, for example to
-  `concepts/testing#time-limits` for unit test timeout precedence.
+  `concepts/testing-reference#time-limits` for unit test timeout precedence.
 - After editing a page, regenerate the skill reference copies with `scripts.generate_docs_skill` and
   commit them with the page.

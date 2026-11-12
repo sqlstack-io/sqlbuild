@@ -1,0 +1,434 @@
+---
+title: "Testing reference"
+description: "Test modes, parameterized cases, cursor windows, cost guards and time limits for SQL unit tests."
+---
+
+This page lists the less common unit test features. Start with [Unit tests](/docs/concepts/testing)
+for writing and running a test.
+
+## Test modes
+
+Model tests mock inputs and compare model output. Three more modes test reusable logic directly,
+without a model chain:
+
+| Mode | Actual CTE | Expected CTE | Also allowed |
+|------|-----------|--------------|--------------|
+| `model` | none: the model chain | `__expected__<model>` | `__source__`, `__ref__`, `__seed__`, `__assert__`, `__macro__` |
+| `macro` | `__macro_actual__` | `__macro_expected__` | Helper CTEs, `@py.name()` and `@sql.name()` calls in actual, CTE-list `@sql.name()` calls in the `WITH` list |
+| `udf` | `__udf_actual__` | `__udf_expected__` | Helper CTEs, `__udf()` calls in actual |
+| `table_fn` | `__table_fn_actual__` | `__table_fn_expected__` | Helper CTEs, `__table_fn()` calls in actual |
+
+SQLBuild infers the mode from the actual CTE, so `TEST (mode ...)` is optional. An explicit mode
+that contradicts the CTEs is a compile error, and so is a prefix from another mode, such as
+`__source__` in a macro test.
+
+Only the actual CTE calls the macro, UDF or table function under test. Helpers don't call it
+either, so a helper of a macro test must not call `__udf()` or `__table_fn()`. Expected CTEs must
+not call macros, UDFs or table functions, so the expected data stays independent and easy to read.
+
+### Macro tests
+
+Call the macro in `__macro_actual__` and give the result in `__macro_expected__`:
+
+```sql
+TEST (mode macro, name "calculates_line_total_cents");
+
+WITH
+input_values AS (
+  SELECT 950 AS price_cents, 3 AS quantity
+),
+__macro_actual__ AS (
+  SELECT @py.line_total_cents("price_cents", "quantity") AS line_total_cents
+  FROM input_values
+),
+__macro_expected__ AS (
+  SELECT 2850 AS line_total_cents
+)
+```
+
+Macros expand at compile time. During `sqb build`, a macro test runs before any model that uses the
+macro.
+
+[SQL macros](/docs/concepts/macros/sql-macros) are tested the same way. Call an expression macro in
+`__macro_actual__`:
+
+```sql
+TEST (mode macro, name "cents_to_dollars_rounds");
+
+WITH
+input_values AS (SELECT CAST(1250 AS BIGINT) AS amount_cents),
+__macro_actual__ AS (
+  SELECT @sql.cents_to_dollars(amount_cents) AS dollars FROM input_values
+),
+__macro_expected__ AS (SELECT CAST(12.5 AS DECIMAL(18, 2)) AS dollars)
+```
+
+Call a column-list macro as an item of the `__macro_actual__` select list, and pass a helper CTE as
+each `RELATION` argument:
+
+```sql
+TEST (mode macro, name "audit_columns_flag_updates");
+
+WITH
+input_rows AS (
+  SELECT TIMESTAMP '2026-01-01' AS created_at, TIMESTAMP '2026-01-02' AS updated_at
+),
+__macro_actual__ AS (SELECT @sql.audit_columns(input_rows) FROM input_rows),
+__macro_expected__ AS (
+  SELECT TIMESTAMP '2026-01-01' AS created_at, TIMESTAMP '2026-01-02' AS updated_at,
+    TRUE AS was_updated
+)
+```
+
+Call a CTE-list macro in the test's `WITH` list, and select from one of its CTEs in
+`__macro_actual__`:
+
+```sql
+TEST (mode macro, name "clean_orders_keeps_latest_live");
+
+WITH
+input_orders AS (
+  SELECT 1 AS order_id, TIMESTAMP '2026-01-01' AS updated_at, FALSE AS is_deleted
+  UNION ALL SELECT 1, TIMESTAMP '2026-01-02', FALSE
+  UNION ALL SELECT 2, TIMESTAMP '2026-01-01', TRUE
+),
+@sql.clean_orders(input_orders)
+__macro_actual__ AS (SELECT order_id, updated_at FROM latest),
+__macro_expected__ AS (SELECT 1 AS order_id, TIMESTAMP '2026-01-02' AS updated_at)
+```
+
+This is the only place outside `__macro_actual__` where a macro test may call a macro. The call may
+pass `__cte := name`, as in a model, to call the macro more than once or to rename its CTEs. Other
+modes can't call a CTE-list macro in their `WITH` list.
+
+### UDF tests
+
+Call the UDF in `__udf_actual__` and give the result in `__udf_expected__`:
+
+```sql
+TEST (name "detects_completed_orders");
+
+WITH
+input_values AS (
+  SELECT 'completed' AS order_status
+  UNION ALL
+  SELECT 'pending' AS order_status
+),
+__udf_actual__ AS (
+  SELECT
+    order_status,
+    __udf("udf__is_completed_order")(order_status) AS is_completed_order
+  FROM input_values
+),
+__udf_expected__ AS (
+  SELECT 'completed' AS order_status, TRUE AS is_completed_order
+  UNION ALL
+  SELECT 'pending' AS order_status, FALSE AS is_completed_order
+)
+```
+
+During `sqb build`, a UDF test runs after the function is created and before any model that uses
+it.
+
+### Functions in `sqb test`
+
+`sqb test` tests the current version of your functions without a build. Before the tests run,
+SQLBuild creates a temporary copy of every project UDF and table function the selected tests call,
+and of the functions those call. The tests call the copies, so an edited function is tested without
+`sqb build`, and the built function in the target schema is never created, replaced or dropped. The
+copies disappear when the test connections close.
+
+| Adapter | Temporary copy |
+|---|---|
+| DuckDB, MotherDuck | `CREATE TEMP MACRO`, called as `temp.main.<name>`. Python UDFs are registered on each test connection |
+| PostgreSQL | SQL function in the session's `pg_temp` schema, called as `pg_temp.<name>` |
+| Snowflake | `CREATE TEMPORARY FUNCTION __sqb_test__<name>` in the session's current schema, for SQL and Python UDFs and table functions |
+| Databricks | `CREATE TEMPORARY FUNCTION __sqb_test__<name>` for SQL functions |
+| BigQuery, SQL Server, ClickHouse | No copy; tests call the built function (ClickHouse functions are server-wide) |
+| SQLite | Not applicable; SQLite has no SQL functions |
+
+When a copy can't be made, because the adapter doesn't support it (a Databricks Python UDF, for
+example) or the warehouse refuses (the role lacks permission, or the Snowflake session has no
+current schema), the test calls the built function. If that function isn't built either, the test
+fails with an error naming the function and the reason, and asks you to run `sqb build` first. A
+function whose callee has no copy calls the built functions too, so a test never mixes copies and
+built functions.
+
+Every test connection gets the same copies as the first one. If a later connection can't create a
+copy, `sqb test` stops with `T006`, naming the function and the connection.
+
+On PostgreSQL, the copies live in one server session. Run `sqb test` for projects with functions
+through a direct connection or a session-mode pool, not a transaction-mode connection pooler.
+
+### Table function tests
+
+Call the table function in `__table_fn_actual__` and give its rows in `__table_fn_expected__`:
+
+```sql
+TEST (name "returns_customer_orders");
+
+WITH
+__table_fn_actual__ AS (
+  SELECT order_id, order_status, is_completed_order
+  FROM __table_fn("table_fn__customer_orders")(1)
+),
+__table_fn_expected__ AS (
+  SELECT 1 AS order_id, 'completed' AS order_status, TRUE AS is_completed_order
+  UNION ALL
+  SELECT 2 AS order_id, 'completed' AS order_status, TRUE AS is_completed_order
+)
+```
+
+Table function tests run after the function is created. Models can't depend on table functions, so
+these tests check the function on its own.
+
+## Repeating test logic
+
+| Pattern | Use when | Results |
+|---------|----------|---------|
+| Several `TEST` blocks | Cases need different SQL | One per block |
+| A `VALUES` case table or macro | One comparison over all cases is enough | One for the table |
+| Parameters and cases | Cases share a template but each needs its own result | One per named case |
+
+### Native independent cases
+
+Declare typed parameters and ordered, named cases in the header:
+
+```sql
+TEST (
+  name "order_status_maps_source_states",
+  parameters (
+    source_status string,
+    expected_status string,
+  ),
+  cases (
+    completed (source_status "completed", expected_status "completed"),
+    cancelled (source_status "cancelled", expected_status "excluded"),
+    pending (source_status "pending", expected_status "open"),
+  ),
+);
+
+WITH
+__source__raw__orders AS (
+  SELECT 1 AS id, @param("source_status") AS status
+),
+__expected__stg_orders AS (
+  SELECT 1 AS id, @param("expected_status") AS status
+)
+```
+
+Each case reports on its own, in the order written: `order status: maps source states [completed]`,
+`[cancelled]` and `[pending]`. Selecting `stg_orders` runs every case. Run one case with `--case`:
+
+```bash
+sqb test --select stg_orders --case cancelled
+```
+
+An unknown case name lists the available ones.
+
+Parameter types are `string`, `integer`, `boolean`, `float` and exact `decimal`. Quote decimal
+values, such as `tax_rate "0.2000"`, so they never pass through binary floating point. Booleans and
+integers stay distinct. Raw SQL and collection parameters are rejected.
+
+A nullable parameter uses the expanded form, and works where SQL can infer the null's type:
+
+```sql
+parameters (
+  cancellation_reason (type string, nullable true),
+),
+cases (
+  completed (cancellation_reason null),
+)
+```
+
+Every case gives exactly the declared parameters, and every parameter appears as `@param("name")`
+in the test. Missing, extra, incompatible, undeclared and unused values are rejected before
+anything runs.
+
+Parameters are rendered first, as typed literals for the active adapter, then `@const` and `@enum`
+references, then macros. A parameter can therefore be a macro argument, as in
+`@py.order_fixture(@param("source_status"))`. Parameters work in every mode and keep every expected
+model of a multi-model test.
+
+Text and JSON output show the test, the case and its typed values. Compile JSON, manifests, DAG
+checks and compiled SQL record each case's source, block and fingerprint. Changing one case changes
+only that case's fingerprint.
+
+Scenarios can't be parameterized: keep one scenario per coherent business world.
+
+### Aggregate SQL case tables
+
+When cases don't need their own results, a `VALUES` table is shorter:
+
+```sql
+TEST();
+
+WITH cases(case_name, source_status, expected_status) AS (
+  VALUES
+    ('completed', 'completed', 'completed'),
+    ('cancelled', 'cancelled', 'excluded')
+),
+__expected__status_mapping AS (
+  SELECT case_name, expected_status FROM cases
+)
+```
+
+This gives one test result. Quoted strings in `VALUES` rows may contain commas, brackets and
+parentheses; escape embedded quotes as usual in SQL.
+
+## Cursor windows in tests
+
+Models that call `__cursor_start()` and `__cursor_end()` run in a test over one wide window,
+never the model's own `cursor_start` and `cursor_end`:
+
+| Cursor type | Window |
+|-------------|--------|
+| Timestamp | `1900-01-01 00:00:00` to `2999-12-31 00:00:00` |
+| Integer | `-1000000000000000` to `1000000000000000` |
+
+The bounds render as the same typed literals as in a real run, so date arithmetic such as
+`DATEADD('day', -7, __cursor_start()::DATE)` works and mocked rows aren't filtered out.
+Microbatch models run once over the whole window.
+
+To test windowing itself, set the window in the header. Either key is optional; `cursor_start` is
+inclusive and `cursor_end` exclusive:
+
+```sql
+TEST (name "daily_orders_skips_rows_outside_window", cursor_start "2026-02-01", cursor_end "2026-02-03");
+```
+
+The window applies to every model in the test that uses the cursor functions, and is checked
+against each model's `cursor_type` and `cursor_grain`. Invalid, misaligned or inverted bounds, and a
+window on a test whose models don't use the cursor functions, are compile errors. The compiled test
+SQL shows the rendered window.
+
+## Empty-input tests
+
+A test whose mocks are all empty (`WHERE FALSE`, `WHERE 1 = 0`, `LIMIT 0` or `__EMPTY_FIXTURE()`)
+and whose only checks are an empty `__expected__` CTE or a bare `SELECT ... FROM __ref("<model>")`
+assertion can't fail for a model whose rows come from its inputs. Rule `SQBRTEST203` rejects it,
+and `SQBRTEST202` doesn't count it toward `min_tests_per_model`. Mock representative rows and
+assert concrete output instead.
+
+An empty-input test is fine when it asserts concrete output, such as a global aggregate that must
+return one zero row:
+
+```sql
+TEST (name "order_summary__empty_inputs_return_zero_row");
+
+WITH
+__source__raw__orders AS (
+  SELECT CAST(NULL AS INTEGER) AS id, CAST(NULL AS INTEGER) AS amount WHERE FALSE
+),
+__expected__order_summary AS (
+  SELECT 0 AS order_count, 0 AS total_amount
+)
+```
+
+Assertions that filter for invalid rows, compare with expected rows, aggregate or limit their result
+are not bare existence checks. List reviewed exceptions by test name in the project file; see
+[Rule options](/docs/concepts/rules/configuration-and-selection#rule-options).
+
+## Cost guards
+
+A unit test runs the real SQL of every unmocked model between its mocks and the model under test as
+one warehouse statement. The warehouse compiles and optimises that whole chain at once, and the cost
+can grow much faster than the query's size. SQLBuild bounds each test in two ways.
+
+### Real-model limit
+
+`[settings] unit_test_max_real_models` (default `10`) caps how many real models one test may run,
+counting the model under test. It can also be set in `sqlbuild_local.toml`. A test over the limit
+fails compilation, in `sqb test` and in `sqb build` when it runs tests, before any warehouse
+connection opens:
+
+```text
+error[S000]: Invalid SQL test fixtures:
+- SQL unit test 'customer_totals_rollup' executes 3 real models (limit 2).
+  Test file:        tests/unit/customer_totals_rollup.sql
+  Model under test: customer_totals
+
+Real models executed, and the dependency path that pulls each one in:
+  customer_totals  model under test
+  order_totals     customer_totals -> order_totals
+  stg_orders       customer_totals -> order_totals -> stg_orders
+
+Options:
+  1. Mock the direct inputs of the model under test to cut the chain:
+       __ref__order_totals AS (SELECT ...)
+  2. If this test checks behaviour across several models, consider a scenario
+     (tests/scenarios/). A unit test inlines every real model into one statement,
+     so the warehouse compiles and optimises the whole chain at once; a scenario
+     builds each model step by step, compiling each statement separately.
+  3. Raise the limit in sqlbuild_project.toml (or sqlbuild_local.toml):
+       [settings]
+       unit_test_max_real_models = 3
+```
+
+`sqb test` shows each test's count on its row, such as `3 real models`, so a growing chain is
+visible early. Macro, UDF and table function tests run no models and aren't counted.
+
+### Time limits
+
+Each unit test has a time limit, `30s` by default. The first of these that is set applies:
+
+1. `--test-timeout` on `sqb test` or `sqb build`
+2. `TEST(timeout "45s")` in the test file
+3. `[targets.<target>.execution_limits] test_timeout`
+4. `[settings] test_timeout`, in `sqlbuild_local.toml` or `sqlbuild_project.toml`
+5. The `30s` default
+
+Each takes a positive fixed duration, such as `"45s"` or `"10m"`, or `"disabled"`.
+
+The clock starts at the test's first warehouse statement. Rendering, warehouse queueing where the
+warehouse reports it, and cleanup after the comparison don't count. See
+[Per-item time limits](/docs/concepts/project-configuration#per-item-time-limits) for how each
+adapter enforces the limit, and [Duration limit](/docs/concepts/project-configuration#duration-limit)
+for how each adapter cancels a running statement.
+
+At the limit, SQLBuild cancels the running statement, reports the test as `TIMEOUT`, and continues
+with the other tests. The report gives the elapsed time, the limit, where it was set, the
+cancellation outcome and the query IDs it saw. When the test runs real models beyond the model
+under test, it also lists them, with the same options as the real-model limit:
+
+```text
+SQL unit test 'order_scans_kept' timed out after 1.0s (limit 1s).
+  Limit set by:  TEST() timeout in tests/unit/order_scans_kept.sql
+  Cancellation:  confirmed; the running statement stopped
+
+This test inlines 1 real model beyond the model under test into one statement:
+  stg_orders
+
+Options:
+  1. Mock the inlined models closest to the model under test to cut the chain,
+     for example __ref__stg_orders AS (SELECT ...).
+  2. If this test checks behaviour across several models, consider a scenario
+     (tests/scenarios/). A unit test inlines every real model into one statement,
+     so the warehouse compiles and optimises the whole chain at once; a scenario
+     builds each model step by step, compiling each statement separately.
+  3. To allow more time, set TEST(timeout "3s") on this test, [settings] test_timeout = "3s"
+     in sqlbuild_project.toml (or sqlbuild_local.toml), or --test-timeout for one run.
+```
+
+A test that runs only the model under test reports the timeout, the limit, where it was set and how
+to change it, without the scenario advice.
+
+Scenarios have their own limit, `scenario_timeout`; see
+[Scenario timeouts](/docs/concepts/project-configuration#unit-test-and-scenario-limits).
+
+## Skipping SQL analysis
+
+Compile checks test fixtures and assertions like model SQL. For SQL the parser can't read, add
+`sql_analysis false` to the `TEST` header; the test still runs. Tests of a model with
+`sql_analysis false`, and every test in a `--no-sql-analysis` run, aren't analysed. With
+`[settings] require_sql_analysis = true`, the opt-out is accepted only on test SQL that can't be
+parsed; see [Requiring SQL analysis](/docs/concepts/models/configuration#requiring-sql-analysis).
+
+## Details
+
+- SQL tests need SQLBuild's SQL analysis for the adapter's dialect. On an adapter without it, such
+  as a custom adapter without `sql_analysis_dialect_name`, planning SQL tests fails with a message
+  that says SQL tests are unavailable for that dialect.
+- On DuckDB, MotherDuck, PostgreSQL and Snowflake, a test evaluates each compared model's full
+  output once. If that output fails, for example because a fixture value can't be converted in a
+  column the expected rows leave out, the test errors with the warehouse's message.
