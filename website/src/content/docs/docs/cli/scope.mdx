@@ -401,9 +401,9 @@ Scope reports describe declarations without exposing authored values or runtime 
 
 There is no `--show-values` option.
 
-## Native SQLBuild Only
+## SQLBuild declarations only
 
-`sqb scope` inspects native SQLBuild authored resources and declarations. It does not discover or emulate dbt models, dbt or Jinja macros, package dispatch, dbt manifests, dbt selectors, dbt tests, or dbt schema YAML visibility. An external dbt graph dependency does not contribute declarations or lexical scope.
+`sqb scope` covers SQLBuild declarations only. Models and macros in a [dbt project](/docs/concepts/dbt-compatibility/overview) used through `sqb dbt` are not part of any scope.
 
 For declaration directory rules, placement checks, test access through expected output, and scoped
 macro imports, see [Declarations and Scopes](/docs/concepts/declaration-scopes).
