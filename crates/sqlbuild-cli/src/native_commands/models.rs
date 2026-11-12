@@ -1,5 +1,6 @@
 //! Python-free commands, the invocation facts they run with and what they print.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
@@ -208,6 +209,24 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) idle: bool,
     /// Server time when the current or last synchronization began; `None` before the first.
     pub(crate) cycle_started_at: Option<DateTime<Utc>>,
+    /// Per scan index: the table's change token after its last complete read.
+    pub(crate) change_tokens: HashMap<usize, ScanToken>,
+    /// The token read before the current scan's first page, recorded once the scan completes.
+    pub(crate) scan_token: Option<String>,
+    /// Whether any page of the current scan delivered records.
+    pub(crate) scan_delivered: bool,
+    /// The server already mirrors rows of the current scan's table, per its watermark.
+    pub(crate) mirror_holds_rows: bool,
+}
+
+/// A table's change token after a complete read, and what that read proves about the mirror.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ScanToken {
+    pub(crate) token: String,
+    /// A complete reconciling read, so the mirror held exactly the table's rows.
+    pub(crate) reconciled: bool,
+    /// The read delivered rows, so an empty mirror means they were lost.
+    pub(crate) delivered: bool,
 }
 
 impl LocationMetadataSync {
@@ -239,6 +258,15 @@ impl LocationMetadataSync {
     pub(crate) fn reconciling(&self) -> bool {
         self.kind() != WarehouseHistoryKind::Statistics
             && (self.reconcile || self.kind() == WarehouseHistoryKind::Catalog)
+    }
+
+    /// A scan skips when its table still has this token: any complete read's, but only a reconciling
+    /// read's while reconciling, and never when the mirror lost the rows that read delivered.
+    pub(crate) fn unchanged_token(&self) -> Option<&str> {
+        let recorded = self.change_tokens.get(&self.index)?;
+        ((recorded.reconciled || !self.reconciling())
+            && (self.mirror_holds_rows || !recorded.delivered))
+            .then_some(recorded.token.as_str())
     }
 
     pub(crate) fn kind(&self) -> WarehouseHistoryKind {

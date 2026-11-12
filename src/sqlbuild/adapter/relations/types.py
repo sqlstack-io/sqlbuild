@@ -69,6 +69,17 @@ class SchemaScopedMetadataReader(Protocol):
         ...
 
 
+@runtime_checkable
+class RelationChangeTokenReader(Protocol):
+    """Adapter that reads a table's change token without starting warehouse compute."""
+
+    def read_relation_change_token(
+        self, *, connection: Any, database: str | None, schema: str, name: str
+    ) -> str | None:
+        """A token that differs after every write to the table, or None when unknown."""
+        ...
+
+
 class ViewDefinitionBatchReader(Protocol):
     """An adapter's ``read_view_definitions``: stored definitions of named views in one schema."""
 

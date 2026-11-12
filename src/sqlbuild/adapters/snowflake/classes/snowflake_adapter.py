@@ -2199,6 +2199,18 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
             retention_days=None if row[6] is None else int(row[6]),
         )
 
+    def read_relation_change_token(
+        self, *, connection: _SnowflakeConnection, database: str | None, schema: str, name: str
+    ) -> str | None:
+        """The last commit time, which cloud services answer without resuming a warehouse."""
+
+        qualified: str = self.render_qualified_name(database=database, schema=schema, name=name)
+        rows: list[tuple[Any, ...]] = self.execute(
+            connection=connection,
+            sql=f"SELECT SYSTEM$LAST_CHANGE_COMMIT_TIME({self._quote_sql_string(qualified)})",
+        ).fetchall()
+        return None if not rows or rows[0][0] is None else str(rows[0][0])
+
     def read_schema_relation_listing(
         self, *, connection: _SnowflakeConnection, database: str | None, schema: str
     ) -> SchemaRelationListing:
