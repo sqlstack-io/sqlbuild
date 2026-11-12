@@ -256,6 +256,7 @@ fn native_projection(
             },
             transform_code: transform,
             sources,
+            expression_range: None,
         });
     }
     let has_star: bool = has_star_projection(analysis);

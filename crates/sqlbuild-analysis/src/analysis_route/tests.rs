@@ -10,6 +10,8 @@ mod test_clickhouse_type_match;
 mod test_databricks_dialect;
 #[path = "tests/test_engine_types.rs"]
 mod test_engine_types;
+#[path = "tests/test_expression_ranges.rs"]
+mod test_expression_ranges;
 #[path = "tests/test_native_arms.rs"]
 mod test_native_arms;
 #[path = "tests/test_native_dialect.rs"]

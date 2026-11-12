@@ -22,6 +22,7 @@ pub(super) fn lineage_row(output: &str, sources: &[&str]) -> LineageRow {
                 )
             })
             .collect(),
+        expression_range: None,
     }
 }
 
