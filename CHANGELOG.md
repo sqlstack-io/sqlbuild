@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.214.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.213.0...v0.214.0) (2026-11-12)
+
+
+### Features
+
+* return column expression ranges with the node SQL read ([#1426](https://github.com/sqlstack-io/sqlbuild/issues/1426)) ([5e309cc](https://github.com/sqlstack-io/sqlbuild/commit/5e309cc6fd0028fd896dfbea8d2084cd6fd70062))
+
 ## [0.213.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.212.0...v0.213.0) (2026-11-12)
 
 
