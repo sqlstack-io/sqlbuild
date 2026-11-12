@@ -6,12 +6,12 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+from sqlbuild._native import NODE_RESULTS_TABLE_NAME
 from sqlbuild.adapter.contract.types import AdapterExecute
 from sqlbuild.executor.node_results._helpers.serialization import decode_json_b64
 from sqlbuild.executor.node_results._helpers.sql import build_read_history_sql
 from sqlbuild.executor.node_results.constants import (
     NODE_RESULT_MATERIALIZED_TRUE_VALUE,
-    NODE_RESULTS_TABLE_NAME,
 )
 from sqlbuild.executor.node_results.models import NodeResultEnvelope, NodeResultQuery
 

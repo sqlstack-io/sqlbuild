@@ -303,7 +303,6 @@ pub enum ExecutorHost {
     MicrobatchColumnTypes,
     MicrobatchDirectIndexes,
     MicrobatchGenerationWildcard,
-    MicrobatchTableName,
     MicrobatchStateError,
     MicrobatchCoverageProjection,
     MicrobatchInterval,

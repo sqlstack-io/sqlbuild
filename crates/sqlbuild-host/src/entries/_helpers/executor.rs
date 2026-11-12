@@ -505,11 +505,6 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
-        name: "MICROBATCH_TABLE_NAME",
-        kind: HostKind::Value,
-        edge: HostEdge::Executor,
-    },
-    HostEntry {
         name: "MicrobatchStateError",
         kind: HostKind::Exception,
         edge: HostEdge::Executor,

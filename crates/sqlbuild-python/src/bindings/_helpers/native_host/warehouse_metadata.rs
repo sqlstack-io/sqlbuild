@@ -9,8 +9,9 @@ use sqlbuild_config::command_connection::constants::{
     DUCKDB_ADAPTER, DUCKDB_MEMORY_DATABASE, LOCAL_DATABASE_PATH_KEYS,
 };
 use sqlbuild_core::constants::{
-    COLUMN_MIGRATION_TABLE_NAME, CONSUMPTION_TABLE_NAME, FINGERPRINT_TABLE_NAME,
-    NODE_RESULTS_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
+    AUDIT_RESULTS_TABLE_NAME, COLUMN_MIGRATION_TABLE_NAME, CONSUMPTION_TABLE_NAME,
+    FINGERPRINT_TABLE_NAME, JANITOR_EVENTS_TABLE_NAME, MICROBATCH_TABLE_NAME, MIGRATION_TABLE_NAME,
+    NODE_RESULTS_TABLE_NAME, OLD_NAME_VIEW_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
 };
 use sqlbuild_core::models::SqlValue;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
@@ -167,7 +168,7 @@ fn read_page(
             read.after.as_ref().map(|cursor| cursor.as_slice()),
             read.observed_since,
             read.limit,
-            "_sqlbuild_audit_results",
+            AUDIT_RESULTS_TABLE_NAME,
             event_columns.as_slice(),
             "occurred_at",
         ),
@@ -176,7 +177,7 @@ fn read_page(
             read.after.as_ref().map(|cursor| cursor.as_slice()),
             read.observed_since,
             read.limit,
-            "_sqlbuild_janitor_events",
+            JANITOR_EVENTS_TABLE_NAME,
             event_columns.as_slice(),
             "occurred_at",
         ),
@@ -185,7 +186,7 @@ fn read_page(
             read.after.as_ref().map(|cursor| cursor.as_slice()),
             read.observed_since,
             read.limit,
-            "_sqlbuild_migrations",
+            MIGRATION_TABLE_NAME,
             MIGRATION_COLUMNS.as_slice(),
             "created_at",
         ),
@@ -194,7 +195,7 @@ fn read_page(
             read.after.as_ref().map(|cursor| cursor.as_slice()),
             read.observed_since,
             read.limit,
-            "_sqlbuild_old_name_views",
+            OLD_NAME_VIEW_TABLE_NAME,
             OLD_NAME_VIEW_COLUMNS.as_slice(),
             "created_at",
         ),
@@ -203,7 +204,7 @@ fn read_page(
             read.after.as_ref().map(|cursor| cursor.as_slice()),
             read.observed_since,
             read.limit,
-            "_sqlbuild_microbatches",
+            MICROBATCH_TABLE_NAME,
             event_columns.as_slice(),
             "created_at",
         ),

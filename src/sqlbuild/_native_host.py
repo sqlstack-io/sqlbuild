@@ -507,7 +507,6 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.microbatches.constants",
         "MICROBATCH_GENERATION_WILDCARD",
     ),
-    "MICROBATCH_TABLE_NAME": ("sqlbuild.microbatches.constants", "MICROBATCH_TABLE_NAME"),
     "MicrobatchStateError": ("sqlbuild.microbatches.exceptions", "MicrobatchStateError"),
     "MicrobatchCoverageProjection": (
         "sqlbuild.microbatches.models",

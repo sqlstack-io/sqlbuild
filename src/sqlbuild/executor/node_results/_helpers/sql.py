@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from sqlbuild._native import render_state_sql_literal, render_state_table_create_sql
+from sqlbuild._native import (
+    NODE_RESULTS_TABLE_NAME,
+    render_state_sql_literal,
+    render_state_table_create_sql,
+)
 from sqlbuild.adapter.contract.types import FrameworkType
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.node_results.constants import (
@@ -22,7 +26,6 @@ from sqlbuild.executor.node_results.constants import (
     COLUMN_TIMESTAMP,
     NODE_RESULT_COLUMN_TYPES,
     NODE_RESULT_COLUMNS,
-    NODE_RESULTS_TABLE_NAME,
 )
 from sqlbuild.executor.node_results.models import NodeResultQuery, NodeResultRecord
 

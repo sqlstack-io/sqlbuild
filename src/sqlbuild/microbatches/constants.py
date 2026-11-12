@@ -2,7 +2,6 @@
 
 from sqlbuild._native import StateSqlValueType
 
-MICROBATCH_TABLE_NAME: str = "_sqlbuild_microbatches"
 DIRECT_MICROBATCH_SCOPE_KIND: str = "direct_logical"
 MICROBATCH_GENERATION_COMMENT_PREFIX: str = "sqlbuild-generation:"
 MICROBATCH_REPLAY_GENERATION_PREFIX: str = "replay:"

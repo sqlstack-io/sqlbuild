@@ -2,7 +2,6 @@
 
 from sqlbuild._native import StateSqlValueType
 
-JANITOR_EVENTS_TABLE_NAME: str = "_sqlbuild_janitor_events"
 JANITOR_EVENT_SCHEMA_VERSION: int = 1
 
 COLUMN_EVENT_ID: str = "event_id"

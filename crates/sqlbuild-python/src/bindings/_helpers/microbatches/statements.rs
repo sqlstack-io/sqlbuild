@@ -1,8 +1,9 @@
 //! Direct-mode microbatch state DDL, idempotent inserts, reads and event IDs.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyDict, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_core::constants::MICROBATCH_TABLE_NAME;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 use sqlbuild_state::events::main::microbatch_event_id::microbatch_event_id;
 use sqlbuild_state::microbatches::main::create_index_sqls::create_index_sqls;
@@ -81,7 +82,7 @@ fn qualified_table<'py>(
     (database, schema): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<Option<String>> {
     let py: Python<'py> = render_qualified_name.py();
-    let table_name: Bound<'py, PyAny> = host::entry(py, ExecutorHost::MicrobatchTableName)?;
+    let table_name: Bound<'py, PyAny> = PyString::new(py, MICROBATCH_TABLE_NAME).into_any();
     optional_text(&call_with(
         render_qualified_name,
         &[
@@ -236,14 +237,13 @@ fn create_indexes<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'
         &[
             ("database", request.get("database")?),
             ("schema", schema.clone()),
-            ("name", host::entry(py, ExecutorHost::MicrobatchTableName)?),
+            ("name", PyString::new(py, MICROBATCH_TABLE_NAME).into_any()),
         ],
     )?;
     let table: String = if rendered.is_truthy()? {
         rendered.extract()?
     } else {
-        let name: String = host::entry(py, ExecutorHost::MicrobatchTableName)?.extract()?;
-        format!("{}.{name}", schema.str()?)
+        format!("{}.{MICROBATCH_TABLE_NAME}", schema.str()?)
     };
     let render_identifier: Bound<'_, PyAny> = request.get("render_identifier")?;
     let identifier = |name: &Bound<'_, PyAny>| -> PyResult<String> {

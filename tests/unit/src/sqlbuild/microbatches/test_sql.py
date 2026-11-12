@@ -7,6 +7,7 @@ from dataclasses import replace
 import pytest
 
 from sqlbuild._native import (
+    MICROBATCH_TABLE_NAME,
     CursorType,
     build_microbatch_create_table_sql,
     build_microbatch_insert_many_sql,
@@ -22,7 +23,7 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.adapters.postgres.classes.postgres_adapter import PostgresAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.adapters.sqlserver.classes.sqlserver_adapter import SqlServerAdapter
-from sqlbuild.microbatches.constants import MICROBATCH_COLUMNS, MICROBATCH_TABLE_NAME
+from sqlbuild.microbatches.constants import MICROBATCH_COLUMNS
 from sqlbuild.microbatches.models import MicrobatchEvent, MicrobatchScope
 from sqlbuild.microbatches.types import MicrobatchRecordType
 from tests.unit.src.sqlbuild.microbatches._test_types import (

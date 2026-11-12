@@ -444,7 +444,6 @@ from sqlbuild.microbatches.constants import MICROBATCH_DIRECT_INDEXES as MICROBA
 from sqlbuild.microbatches.constants import (
     MICROBATCH_GENERATION_WILDCARD as MICROBATCH_GENERATION_WILDCARD,
 )
-from sqlbuild.microbatches.constants import MICROBATCH_TABLE_NAME as MICROBATCH_TABLE_NAME
 from sqlbuild.microbatches.exceptions import MicrobatchStateError as MicrobatchStateError
 from sqlbuild.microbatches.models import (
     MicrobatchCoverageProjection as MicrobatchCoverageProjection,

@@ -1,6 +1,7 @@
 //! Persist source identities; only legacy rows use a fixed observation-key fallback.
 
 use serde_json::json;
+use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_state::freshness::main::event_id::event_id as legacy_event_id;
 use sqlbuild_state::freshness::models::FreshnessEventIdentity;
 use uuid::Uuid;
@@ -53,7 +54,7 @@ pub async fn ingest_source_freshness(
             (
                 record.state_database.as_deref(),
                 &record.state_schema,
-                "_sqlbuild_source_freshness",
+                SOURCE_FRESHNESS_TABLE_NAME,
             ),
             &source_event_id,
         )?;

@@ -2,7 +2,6 @@
 
 from sqlbuild._native import StateSqlValueType
 
-AUDIT_RESULTS_TABLE_NAME: str = "_sqlbuild_audit_results"
 AUDIT_RESULT_SCHEMA_VERSION: int = 1
 
 COLUMN_RESULT_ID: str = "result_id"
