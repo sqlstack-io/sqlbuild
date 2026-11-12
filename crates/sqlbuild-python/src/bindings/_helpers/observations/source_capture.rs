@@ -2,8 +2,14 @@
 
 use std::cell::RefCell;
 
-/// Each described source's name and column names, in the order planning described them.
-pub(crate) type DescribedSources = Vec<(String, Vec<String>)>;
+use serde_json::{Map, Value};
+use sqlbuild_cache::digest::main::sha256_hex::sha256_hex;
+use sqlbuild_state::observations::constants::{
+    SOURCE_COLUMNS_NAMES_KEY, SOURCE_COLUMNS_SQL_HASH_KEY,
+};
+
+/// Each described source's name and observation value, in the order planning described them.
+pub(crate) type DescribedSources = Vec<(String, String)>;
 
 thread_local! {
     /// Per thread, since a build plans and records on the thread that runs it; `None` when not armed.
@@ -15,11 +21,20 @@ pub(crate) fn arm_source_capture() {
     CAPTURED.with(|slot| *slot.borrow_mut() = Some(Vec::new()));
 }
 
-/// Keep one source's described column names when a build armed the capture.
-pub(crate) fn capture_source_columns(source: &str, columns: &[String]) {
+/// Keep one source's described SQL hash and column names when a build armed the capture.
+pub(crate) fn capture_source_columns(source: &str, sql: &str, columns: &[String]) {
     CAPTURED.with(|slot| {
         if let Some(captured) = slot.borrow_mut().as_mut() {
-            captured.push((source.to_owned(), columns.to_vec()));
+            let mut value: Map<String, Value> = Map::new();
+            value.insert(
+                SOURCE_COLUMNS_SQL_HASH_KEY.to_owned(),
+                Value::String(sha256_hex(sql.as_bytes())),
+            );
+            value.insert(
+                SOURCE_COLUMNS_NAMES_KEY.to_owned(),
+                Value::from(columns.to_vec()),
+            );
+            captured.push((source.to_owned(), Value::Object(value).to_string()));
         }
     });
 }

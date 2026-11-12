@@ -30,7 +30,7 @@
     "kind": "source_columns",
     "node": "shop.orders_🧾",
     "cursor_type": null,
-    "value": "[\"order_id\", \"amount_€\"]",
+    "value": "{\"sql_hash\":\"928300f876a1cfe48302513f8c25ca06ec449c95f3480c06b84c694a39b6be0d\",\"columns\":[\"order_id\",\"amount_€\"]}",
     "observed_at": "2026-02-03T04:05:06.000001Z"
   },
   "last_record": {
@@ -38,7 +38,7 @@
     "kind": "source_columns",
     "node": "shop.orders_🧾",
     "cursor_type": null,
-    "value": "[\"order_id\", \"amount_€\"]",
+    "value": "{\"sql_hash\":\"928300f876a1cfe48302513f8c25ca06ec449c95f3480c06b84c694a39b6be0d\",\"columns\":[\"order_id\",\"amount_€\"]}",
     "observed_at": "2026-02-03T04:05:06.000001Z"
   },
   "record_overrides": {
@@ -46,7 +46,7 @@
       "kind": "source_columns",
       "node": "shop.orders_🧾",
       "cursor_type": null,
-      "value": "[\"order_id\", \"amount_€\"]",
+      "value": "{\"sql_hash\":\"928300f876a1cfe48302513f8c25ca06ec449c95f3480c06b84c694a39b6be0d\",\"columns\":[\"order_id\",\"amount_€\"]}",
       "observed_at": "2026-02-03T04:05:06.000001Z"
     }
   }

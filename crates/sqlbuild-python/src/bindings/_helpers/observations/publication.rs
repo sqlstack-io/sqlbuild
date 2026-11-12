@@ -3,7 +3,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use pyo3::IntoPyObject;
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_query_groups;
 use sqlbuild_analysis::planner_warehouse::models::CursorTagRequest;
@@ -84,7 +83,7 @@ fn cursor_reads(
 /// One `source_columns` row per described source, in the state schema of each model reading it.
 fn source_column_rows(
     project: &Bound<'_, PyAny>,
-    described: &BTreeMap<String, Vec<String>>,
+    described: &BTreeMap<String, String>,
     run_id: &str,
 ) -> PyResult<BTreeMap<Location, Vec<ObservationAppend>>> {
     let mut readers: BTreeMap<Location, BTreeSet<String>> = BTreeMap::new();
@@ -112,28 +111,17 @@ fn source_column_rows(
     let mut rows: BTreeMap<Location, Vec<ObservationAppend>> = BTreeMap::new();
     for (location, sources) in readers {
         for source in sources {
-            let row: ObservationAppend = source_columns_row(source, described, run_id)?;
+            let row: ObservationAppend = ObservationAppend {
+                kind: SOURCE_COLUMNS_KIND,
+                value: described[&source].clone(),
+                node: source,
+                cursor_type: None,
+                run_id: run_id.to_owned(),
+            };
             rows.entry(location.clone()).or_default().push(row);
         }
     }
     Ok(rows)
-}
-
-/// The `source_columns` observation of one described source, its column names as a JSON array.
-fn source_columns_row(
-    source: String,
-    described: &BTreeMap<String, Vec<String>>,
-    run_id: &str,
-) -> PyResult<ObservationAppend> {
-    let value: String = serde_json::to_string(&described[&source])
-        .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
-    Ok(ObservationAppend {
-        kind: SOURCE_COLUMNS_KIND,
-        node: source,
-        cursor_type: None,
-        value,
-        run_id: run_id.to_owned(),
-    })
 }
 
 /// Read each cursor `MAX`, then append it with `rows`, by state location; one warning per failure.
@@ -203,7 +191,7 @@ pub(crate) fn append_build_observations(
     (adapter, connection_config): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     run_id: &str,
 ) -> Vec<String> {
-    let described: BTreeMap<String, Vec<String>> = take_source_capture().into_iter().collect();
+    let described: BTreeMap<String, String> = take_source_capture().into_iter().collect();
     let recorded: PyResult<Vec<String>> = (|| {
         let reads: Vec<CursorRead> = cursor_reads(project, adapter, successful_models)?;
         let sources: BTreeMap<Location, Vec<ObservationAppend>> =
