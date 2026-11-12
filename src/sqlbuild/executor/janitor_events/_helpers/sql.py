@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from sqlbuild._native import render_state_sql_literal, render_state_table_create_sql
+from sqlbuild._native import (
+    JANITOR_EVENTS_TABLE_NAME,
+    render_state_sql_literal,
+    render_state_table_create_sql,
+)
 from sqlbuild.adapter.contract.types import FrameworkType
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.janitor_events.constants import (
@@ -24,7 +28,6 @@ from sqlbuild.executor.janitor_events.constants import (
     JANITOR_EVENT_COLUMN_TYPES,
     JANITOR_EVENT_COLUMNS,
     JANITOR_EVENT_REQUIRED_COLUMNS,
-    JANITOR_EVENTS_TABLE_NAME,
 )
 from sqlbuild.executor.janitor_events.models import JanitorEventRecord
 

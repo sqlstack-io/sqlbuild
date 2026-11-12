@@ -1,6 +1,7 @@
 //! Import bounded fingerprint history without conflating semantic and exact-content hashes.
 
 use serde_json::json;
+use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
@@ -37,7 +38,7 @@ pub async fn ingest_fingerprints(
             (
                 record.state_database.as_deref(),
                 &record.state_schema,
-                "_sqlbuild_fingerprints",
+                FINGERPRINT_TABLE_NAME,
             ),
             &source_event_id,
         )?;

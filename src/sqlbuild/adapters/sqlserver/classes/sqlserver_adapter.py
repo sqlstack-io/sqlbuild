@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -389,20 +390,13 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         )
 
     def render_create_microbatch_state_table_sql(self, *, database: str | None, schema: str) -> str:
-        from sqlbuild._native import build_microbatch_create_table_sql
-        from sqlbuild.microbatches.constants import MICROBATCH_TABLE_NAME
+        from sqlbuild._native import MICROBATCH_TABLE_NAME, build_microbatch_create_table_sql
 
-        create_sql: str = build_microbatch_create_table_sql(
-            database=database,
-            schema=schema,
-            render_qualified_name=self.render_qualified_name,
-            render_framework_type=self.render_framework_type,
-        ).replace("CREATE TABLE IF NOT EXISTS ", "CREATE TABLE ", 1)
-        return self._create_table_if_missing_sql(
-            create_sql=create_sql,
-            database=database,
-            schema=schema,
+        return self._create_state_table_sql(
+            build=build_microbatch_create_table_sql,
             table_name=MICROBATCH_TABLE_NAME,
+            database=database,
+            schema=schema,
         )
 
     def render_create_fingerprint_index_sqls(
@@ -580,7 +574,7 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         database: str | None,
         schema: str,
     ) -> str:
-        from sqlbuild.executor.node_results.constants import NODE_RESULTS_TABLE_NAME
+        from sqlbuild._native import NODE_RESULTS_TABLE_NAME
         from sqlbuild.executor.node_results.main.create_table_sql import (
             build_node_results_create_table_sql,
         )
@@ -614,7 +608,7 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         database: str | None,
         schema: str,
     ) -> tuple[str, ...]:
-        from sqlbuild.executor.node_results.constants import NODE_RESULTS_TABLE_NAME
+        from sqlbuild._native import NODE_RESULTS_TABLE_NAME
 
         table: tuple[str | None, str, str] = (database, schema, NODE_RESULTS_TABLE_NAME)
         return self._state_index_sqls(
@@ -629,7 +623,7 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         )
 
     def render_create_audit_result_table_sql(self, *, database: str | None, schema: str) -> str:
-        from sqlbuild.executor.audit_results.constants import AUDIT_RESULTS_TABLE_NAME
+        from sqlbuild._native import AUDIT_RESULTS_TABLE_NAME
         from sqlbuild.executor.audit_results.main.create_table_sql import (
             build_audit_results_create_table_sql,
         )
@@ -665,7 +659,7 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     def render_create_audit_result_index_sqls(
         self, *, database: str | None, schema: str
     ) -> tuple[str, ...]:
-        from sqlbuild.executor.audit_results.constants import AUDIT_RESULTS_TABLE_NAME
+        from sqlbuild._native import AUDIT_RESULTS_TABLE_NAME
 
         table_name: str | None = self.render_qualified_name(
             database=database, schema=schema, name=AUDIT_RESULTS_TABLE_NAME
@@ -692,39 +686,27 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         )
 
     def render_create_janitor_event_table_sql(self, *, database: str | None, schema: str) -> str:
-        from sqlbuild.executor.janitor_events.constants import JANITOR_EVENTS_TABLE_NAME
+        from sqlbuild._native import JANITOR_EVENTS_TABLE_NAME
         from sqlbuild.executor.janitor_events.main.create_table_sql import (
             build_janitor_events_create_table_sql,
         )
 
-        create_sql: str = build_janitor_events_create_table_sql(
-            database=database,
-            schema=schema,
-            render_qualified_name=self.render_qualified_name,
-            render_framework_type=self.render_framework_type,
-        ).replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
-        return self._create_table_if_missing_sql(
-            create_sql=create_sql,
-            database=database,
-            schema=schema,
+        return self._create_state_table_sql(
+            build=build_janitor_events_create_table_sql,
             table_name=JANITOR_EVENTS_TABLE_NAME,
+            database=database,
+            schema=schema,
         )
 
     def render_create_migration_state_table_sql(self, *, database: str | None, schema: str) -> str:
         from sqlbuild._native import MIGRATION_TABLE_NAME, render_migration_state_create_sql
 
-        create_sql: str = render_migration_state_create_sql(
-            kind="model",
-            database=database,
-            schema=schema,
-            render_qualified_name=self.render_qualified_name,
-            render_framework_type=self.render_framework_type,
-        ).replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
-        return self._create_table_if_missing_sql(
-            create_sql=create_sql,
-            database=database,
-            schema=schema,
+        return self._create_state_table_sql(
+            build=render_migration_state_create_sql,
             table_name=MIGRATION_TABLE_NAME,
+            database=database,
+            schema=schema,
+            kind="model",
         )
 
     def render_create_old_name_view_state_table_sql(
@@ -732,18 +714,12 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     ) -> str:
         from sqlbuild._native import OLD_NAME_VIEW_TABLE_NAME, render_migration_state_create_sql
 
-        create_sql: str = render_migration_state_create_sql(
-            kind="old_name",
-            database=database,
-            schema=schema,
-            render_qualified_name=self.render_qualified_name,
-            render_framework_type=self.render_framework_type,
-        ).replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
-        return self._create_table_if_missing_sql(
-            create_sql=create_sql,
-            database=database,
-            schema=schema,
+        return self._create_state_table_sql(
+            build=render_migration_state_create_sql,
             table_name=OLD_NAME_VIEW_TABLE_NAME,
+            database=database,
+            schema=schema,
+            kind="old_name",
         )
 
     def render_create_column_migration_state_table_sql(
@@ -751,18 +727,12 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     ) -> str:
         from sqlbuild._native import COLUMN_MIGRATION_TABLE_NAME, render_migration_state_create_sql
 
-        create_sql: str = render_migration_state_create_sql(
-            kind="column",
-            database=database,
-            schema=schema,
-            render_qualified_name=self.render_qualified_name,
-            render_framework_type=self.render_framework_type,
-        ).replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
-        return self._create_table_if_missing_sql(
-            create_sql=create_sql,
-            database=database,
-            schema=schema,
+        return self._create_state_table_sql(
+            build=render_migration_state_create_sql,
             table_name=COLUMN_MIGRATION_TABLE_NAME,
+            database=database,
+            schema=schema,
+            kind="column",
         )
 
     def render_read_latest_source_freshness_sql(
@@ -871,6 +841,26 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
 
     def render_rename_view(self, *, origin: str, destination: str) -> tuple[str, ...]:
         return self.render_rename(origin=origin, destination=destination)
+
+    def _create_state_table_sql(
+        self,
+        *,
+        build: Callable[..., str],
+        table_name: str,
+        database: str | None,
+        schema: str,
+        **options: str,
+    ) -> str:
+        create_sql: str = build(
+            database=database,
+            schema=schema,
+            render_qualified_name=self.render_qualified_name,
+            render_framework_type=self.render_framework_type,
+            **options,
+        ).replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
+        return self._create_table_if_missing_sql(
+            create_sql=create_sql, database=database, schema=schema, table_name=table_name
+        )
 
     def _create_table_if_missing_sql(
         self, *, create_sql: str, database: str | None, schema: str, table_name: str

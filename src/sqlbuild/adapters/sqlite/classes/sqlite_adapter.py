@@ -2549,7 +2549,7 @@ class SqliteAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAda
         database: str | None,
         schema: str,
     ) -> tuple[str, ...]:
-        from sqlbuild.executor.node_results.constants import NODE_RESULTS_TABLE_NAME
+        from sqlbuild._native import NODE_RESULTS_TABLE_NAME
 
         return self._index_sqls(
             database=database,
@@ -2583,7 +2583,7 @@ class SqliteAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAda
     def render_create_audit_result_index_sqls(
         self, *, database: str | None, schema: str
     ) -> tuple[str, ...]:
-        from sqlbuild.executor.audit_results.constants import AUDIT_RESULTS_TABLE_NAME
+        from sqlbuild._native import AUDIT_RESULTS_TABLE_NAME
 
         return self._index_sqls(
             database=database,

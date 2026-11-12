@@ -1762,7 +1762,7 @@ class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         database: str | None,
         schema: str,
     ) -> tuple[str, ...]:
-        from sqlbuild.executor.node_results.constants import NODE_RESULTS_TABLE_NAME
+        from sqlbuild._native import NODE_RESULTS_TABLE_NAME
 
         table_name: str | None = self.render_qualified_name(
             database=database,
@@ -1798,7 +1798,7 @@ class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     def render_create_audit_result_index_sqls(
         self, *, database: str | None, schema: str
     ) -> tuple[str, ...]:
-        from sqlbuild.executor.audit_results.constants import AUDIT_RESULTS_TABLE_NAME
+        from sqlbuild._native import AUDIT_RESULTS_TABLE_NAME
 
         return self._state_index_sqls(
             table=(database, schema, AUDIT_RESULTS_TABLE_NAME),

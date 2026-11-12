@@ -6,11 +6,11 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from sqlbuild._native import AUDIT_RESULTS_TABLE_NAME
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapter.contract.types import AdapterExecute, FrameworkType
 from sqlbuild.executor.audit_results._helpers.sql import build_qualified_table_name
 from sqlbuild.executor.audit_results.constants import (
-    AUDIT_RESULTS_TABLE_NAME,
     COLUMN_AUDIT_META_JSON,
 )
 from sqlbuild.executor.audit_results.models import AuditResultColumnEvolution

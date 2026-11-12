@@ -11,6 +11,7 @@ from typing import Any, ClassVar, cast
 
 from sqlbuild._native import (
     FINGERPRINT_TABLE_NAME,
+    JANITOR_EVENTS_TABLE_NAME,
     SOURCE_FRESHNESS_TABLE_NAME,
     CompiledModel,
     CompiledObjectKey,
@@ -43,7 +44,6 @@ from sqlbuild.executor.janitor.models import JanitorActionDone, JanitorProgressI
 from sqlbuild.executor.janitor.types import JanitorAction
 from sqlbuild.executor.janitor_events.constants import (
     JANITOR_EVENT_SCHEMA_VERSION,
-    JANITOR_EVENTS_TABLE_NAME,
 )
 from sqlbuild.executor.janitor_events.models import JanitorEventRecord
 from sqlbuild.executor.janitor_events.types import JanitorEventType

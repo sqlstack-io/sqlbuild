@@ -634,7 +634,7 @@ reason = "Native code resolves these through the sqlbuild._native_host name tabl
 
 [[targets.python.dead_code.roots]]
 modules = ["sqlbuild.microbatches.constants"]
-symbols = ["MICROBATCH_COLUMNS", "MICROBATCH_COLUMN_TYPES", "MICROBATCH_DIRECT_INDEXES", "MICROBATCH_GENERATION_WILDCARD", "MICROBATCH_TABLE_NAME"]
+symbols = ["MICROBATCH_COLUMNS", "MICROBATCH_COLUMN_TYPES", "MICROBATCH_DIRECT_INDEXES", "MICROBATCH_GENERATION_WILDCARD"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]

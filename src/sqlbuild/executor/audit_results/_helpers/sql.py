@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from sqlbuild._native import render_state_sql_literal, render_state_table_create_sql
+from sqlbuild._native import (
+    AUDIT_RESULTS_TABLE_NAME,
+    render_state_sql_literal,
+    render_state_table_create_sql,
+)
 from sqlbuild.adapter.contract.types import FrameworkType
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.audit_results.constants import (
     AUDIT_RESULT_COLUMN_TYPES,
     AUDIT_RESULT_COLUMNS,
-    AUDIT_RESULTS_TABLE_NAME,
     COLUMN_ATTACHED_COLUMN_NAME,
     COLUMN_ATTACHED_TARGET_KIND,
     COLUMN_ATTACHED_TARGET_NAME,

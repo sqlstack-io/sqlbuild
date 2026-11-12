@@ -6,13 +6,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from sqlbuild._native import build_janitor_plan
+from sqlbuild._native import JANITOR_EVENTS_TABLE_NAME, build_janitor_plan
 from sqlbuild.executor.janitor.main.execute import execute_janitor_plan
 from sqlbuild.executor.janitor.models import (
     JanitorExecutionResult,
     JanitorPlan,
 )
-from sqlbuild.executor.janitor_events.constants import JANITOR_EVENTS_TABLE_NAME
 from tests.unit.src.sqlbuild.executor.janitor.main._test_types import (
     JanitorArchiveEventFailureTestCase,
     JanitorArchiveExecutionTestCase,
