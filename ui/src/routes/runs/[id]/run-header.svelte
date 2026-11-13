@@ -67,7 +67,7 @@
 				{#if view.detail?.provenance}
 					{@const p = view.detail.provenance}
 					<span>·</span>
-					<a href={to(`/changes`)} title="Project version {p.snapshotGeneration}, commit {p.gitRevision}{p.gitDirty ? ' with uncommitted changes' : ''}">version {p.snapshotGeneration}</a>
+					<a href={to(`/changes`)} title="Project version {p.snapshotGeneration}{p.gitRevision ? `, commit ${p.gitRevision}` : ''}{p.gitDirty ? ' with uncommitted changes' : ''}">version {p.snapshotGeneration}</a>
 				{/if}
 				<button class="details-btn" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Version, command, image, worker and other technical details">{view.showDetails ? 'Hide details' : 'Details'}</button>
 			</div>

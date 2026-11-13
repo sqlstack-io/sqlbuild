@@ -2689,6 +2689,10 @@ export interface components {
             cancel_requested_at?: string | null;
             /** Format: date-time */
             ended_at?: string | null;
+            git_dirty?: boolean | null;
+            git_revision?: string | null;
+            /** @description The deployment image the run is pinned to, when its location publishes one. */
+            image_id?: string | null;
             job_key?: string | null;
             kind: components["schemas"]["RunKind"];
             /** Format: int64 */
@@ -2721,8 +2725,15 @@ export interface components {
             /** Format: uuid */
             run_id: string;
             selection_json: string[];
+            /**
+             * Format: int64
+             * @description The published version the run executes, read from its snapshot.
+             */
+            snapshot_generation?: number | null;
             /** Format: uuid */
             snapshot_id: string;
+            /** @description The `sqb` version that published the snapshot. */
+            sqb_version?: string | null;
             /** Format: date-time */
             started_at?: string | null;
             status: components["schemas"]["RunStatus"];

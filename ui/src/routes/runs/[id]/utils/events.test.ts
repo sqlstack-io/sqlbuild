@@ -22,7 +22,7 @@ describe('run log', () => {
 	it("interleaves a group's events and printed lines by time and keeps each line's run", () => {
 		const entries = logEntries(
 			[event('e2', '2026-11-09T08:17:38Z', { type: 'resource_attempt_failed', level: 'error', message: 'ConversionError: no', runId: 'staging' }), event('e1', '2026-11-09T08:17:35Z', { nodeKey: 'model:orders' })],
-			[{ runId: 'orders', invocationId: 'i', stream: 'stderr', at: '2026-11-09T08:17:36Z', text: 'Compiling project...' }]
+			[{ runId: 'orders', invocationId: 'i', stream: 'stderr', at: '2026-11-09T08:17:36Z', text: 'Compiling project...', error: false }]
 		);
 		expect(entries.map((e) => [e.id, e.runId, e.category, e.level])).toEqual([
 			['e1', 'staging', 'nodes', 'info'],
@@ -67,12 +67,15 @@ describe('run log', () => {
 		expect(entries[1].queries.map((q) => q.id)).toEqual(['q']);
 	});
 
-	it("pins only a failing run's last stderr block", () => {
-		const out = (runId: string, stream: 'stdout' | 'stderr', at: string) => ({ runId, invocationId: 'i', stream, at, text: `${runId} ${stream}` });
+	it("pins a failing run's last stderr block and every recorded error, and no other output", () => {
+		const out = (runId: string, stream: 'stdout' | 'stderr', at: string, error = false) => ({ runId, invocationId: 'i', stream, at, text: `${runId} ${stream}`, error });
 		const entries = logEntries(
 			[event('fail', '2026-11-09T08:00:04Z', { type: 'resource_attempt_failed', level: 'error', message: 'X: no' }), event('ok', '2026-11-09T08:00:04Z', { runId: 'orders', type: 'resource_attempt_completed' })],
-			[out('staging', 'stderr', '2026-11-09T08:00:01Z'), out('staging', 'stderr', '2026-11-09T08:00:05Z'), out('staging', 'stdout', '2026-11-09T08:00:06Z'), out('orders', 'stderr', '2026-11-09T08:00:07Z')]
+			[out('staging', 'stderr', '2026-11-09T08:00:01Z'), out('staging', 'stderr', '2026-11-09T08:00:05Z'), out('staging', 'stdout', '2026-11-09T08:00:06Z'), out('orders', 'stderr', '2026-11-09T08:00:07Z'), out('orders', 'stderr', '2026-11-09T08:00:08Z', true)]
 		);
-		expect(entries.filter((e) => e.pinned).map((e) => e.id)).toEqual(['out-staging-1']);
+		expect(entries.filter((e) => e.pinned).map((e) => [e.id, e.level])).toEqual([
+			['out-staging-1', 'info'],
+			['out-orders-4', 'error']
+		]);
 	});
 });

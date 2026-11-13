@@ -217,6 +217,19 @@ pub struct RunRecord {
     pub location_id: Uuid,
     pub target: String,
     pub snapshot_id: Uuid,
+    /// The published version the run executes, read from its snapshot.
+    #[serde(default)]
+    pub snapshot_generation: Option<i64>,
+    #[serde(default)]
+    pub git_revision: Option<String>,
+    #[serde(default)]
+    pub git_dirty: Option<bool>,
+    /// The `sqb` version that published the snapshot.
+    #[serde(default)]
+    pub sqb_version: Option<String>,
+    /// The deployment image the run is pinned to, when its location publishes one.
+    #[serde(default)]
+    pub image_id: Option<String>,
     pub job_key: Option<String>,
     pub kind: RunKind,
     pub origin: RunOrigin,
