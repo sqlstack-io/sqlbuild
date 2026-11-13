@@ -23,7 +23,7 @@ class Schedule:
 
 @dataclass(frozen=True, kw_only=True)
 class OnFailure:
-    """Rerun a failed or partial run from failure, up to `retries` times, each `retry_delay_seconds` after the last ends."""
+    """Rerun a failed or partial run from failure, `retries` times, `retry_delay_seconds` apart."""
 
     retries: int
     retry_delay_seconds: int = 0

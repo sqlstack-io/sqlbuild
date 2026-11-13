@@ -93,7 +93,7 @@ async fn apply_result(
     let mut requests = SensorRequests::default();
     let run_keys: BTreeSet<String> = run_keys.into_iter().collect();
     for key in run_keys {
-        transaction = queue_sensor_run(transaction, evaluation, &key, &mut requests).await?;
+        (transaction, requests) = queue_sensor_run(transaction, evaluation, &key, requests).await?;
     }
     Ok((
         transaction,

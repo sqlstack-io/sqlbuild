@@ -26,11 +26,11 @@ pub(crate) async fn consume_platform_events(
         .iter()
         .filter(|event| kinds.contains(&event.payload.platform.kind()))
     {
-        transaction = queue_sensor_run(
+        (transaction, requests) = queue_sensor_run(
             transaction,
             evaluation,
             &event.event_id.to_string(),
-            &mut requests,
+            requests,
         )
         .await?;
     }

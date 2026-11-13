@@ -34,8 +34,9 @@ pub(crate) struct AuthoredJob {
     pub(crate) targets: Vec<String>,
     #[pyo3(attribute("_declared_at"))]
     pub(crate) declared_at: Option<(String, u32)>,
-    #[pyo3(from_py_with = run_controls)]
-    pub(crate) controls: RunControls,
+    pub(crate) owner: Option<String>,
+    pub(crate) overlap: String,
+    pub(crate) on_failure: Option<Py<PyAny>>,
 }
 
 #[derive(FromPyObject, PartialEq, Eq, PartialOrd, Ord)]
@@ -54,8 +55,9 @@ pub(crate) struct AuthoredGroup {
     pub(crate) targets: Vec<String>,
     #[pyo3(attribute("_declared_at"))]
     pub(crate) declared_at: Option<(String, u32)>,
-    #[pyo3(from_py_with = run_controls)]
-    pub(crate) controls: RunControls,
+    pub(crate) owner: Option<String>,
+    pub(crate) overlap: String,
+    pub(crate) on_failure: Option<Py<PyAny>>,
 }
 
 /// A job's or group's owner, overlap and failure policy, validated where they enter native code.
@@ -164,9 +166,10 @@ pub(crate) fn authored_setting(value: &Bound<'_, PyAny>) -> PyResult<serde_json:
 }
 
 /// Refuse a blank owner, an unknown overlap, and retries outside 1 to 10 or delays outside 0 to 24 hours.
-pub(crate) fn run_controls(declaration: &Bound<'_, PyAny>) -> PyResult<RunControls> {
-    let name: String = declaration.getattr("name")?.extract()?;
-    let owner: Option<String> = declaration.getattr("owner")?.extract()?;
+pub(crate) fn run_controls(
+    name: &str,
+    (owner, overlap, policy): (Option<String>, &str, Option<&Bound<'_, PyAny>>),
+) -> PyResult<RunControls> {
     if owner
         .as_deref()
         .is_some_and(|owner| owner.trim().is_empty())
@@ -175,11 +178,7 @@ pub(crate) fn run_controls(declaration: &Bound<'_, PyAny>) -> PyResult<RunContro
             "job {name} owner must not be blank"
         )));
     }
-    let overlap = match declaration
-        .getattr("overlap")?
-        .extract::<String>()?
-        .as_str()
-    {
+    let overlap = match overlap {
         "queue" => Overlap::Queue,
         "skip" => Overlap::Skip,
         other => {
@@ -188,10 +187,7 @@ pub(crate) fn run_controls(declaration: &Bound<'_, PyAny>) -> PyResult<RunContro
             )));
         }
     };
-    let policy = declaration.getattr("on_failure")?;
-    let on_failure = if policy.is_none() {
-        None
-    } else {
+    let on_failure = if let Some(policy) = policy {
         let bounded = |field: &str, (low, high): (u64, u64)| -> PyResult<u64> {
             authored_setting(&policy.getattr(field)?)?
                 .as_u64()
@@ -206,6 +202,8 @@ pub(crate) fn run_controls(declaration: &Bound<'_, PyAny>) -> PyResult<RunContro
             retries: u8::try_from(bounded("retries", MAX_RETRIES)?)?,
             retry_delay_seconds: u32::try_from(bounded("retry_delay_seconds", MAX_RETRY_DELAY)?)?,
         })
+    } else {
+        None
     };
     Ok(RunControls {
         owner,

@@ -8,12 +8,13 @@ use crate::declarations::_helpers::job_detail::{
     critical_nodes, cursor_type, groups_running, members_in_order, shown_settings,
 };
 use crate::declarations::main::frozen_definitions::frozen_definitions;
-use crate::declarations::models::{JobDetailRecord, StoredJob};
+use crate::declarations::main::published_job::published_job;
+use crate::declarations::models::JobDetailRecord;
 use crate::runs::models::RunKind;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, query_records::query_records};
-use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
+use crate::store::main::{begin::begin, commit::commit};
+use crate::store::models::{ControlStore, TransactionMode};
 
 /// `None` when the target publishes no job by that name; refusal comes first either way.
 pub async fn read_person_job(
@@ -30,8 +31,8 @@ pub async fn read_person_job(
     )
     .await?;
     let (transaction, published) =
-        published_snapshot(transaction, (location_id, target, job_key)).await?;
-    let Some(snapshot_id) = published else {
+        published_job(transaction, (location_id, target, job_key)).await?;
+    let Some(snapshot_id) = published.map(|job| job.snapshot_id) else {
         commit(transaction).await?;
         return Ok(None);
     };
@@ -71,23 +72,4 @@ pub async fn read_person_job(
         overlap: job.overlap,
         on_failure: job.on_failure,
     }))
-}
-
-/// The snapshot whose job list holds `job_key`, if the target publishes it.
-async fn published_snapshot(
-    transaction: ControlTransaction,
-    (location_id, target, job_key): (Uuid, &str, &str),
-) -> Result<(ControlTransaction, Option<Uuid>), ControlError> {
-    let (transaction, stored): (_, Vec<StoredJob>) = query_records(
-        transaction,
-        "SELECT job_key, kind, snapshot_id, definition_json FROM sqb_jobs \
-         WHERE location_id=$1 AND target=$2 AND job_key=$3",
-        vec![
-            Parameter::Id(location_id),
-            Parameter::Text(target.into()),
-            Parameter::Text(job_key.into()),
-        ],
-    )
-    .await?;
-    Ok((transaction, stored.first().map(|job| job.snapshot_id)))
 }
