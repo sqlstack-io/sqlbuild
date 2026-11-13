@@ -17,6 +17,7 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/providers/
 - Configuration from environment variables
 - Discovery rules
 - Plan output
+- Providers in the web UI
 - Project layout
 
 Providers are shared runtime services that SQLBuild discovers, configures, and injects into your Python nodes and hooks. Use them for external connections, API clients, or any stateful service that multiple nodes need access to.
@@ -201,6 +202,18 @@ Providers
 ```
 
 Use `--verbose` to see which specific nodes consume each provider.
+
+## Providers in the web UI
+
+When a location publishes to [`sqb server`](../../cli/server.md), the **Providers** page lists each
+provider with its class and docstring. A provider's page shows:
+
+| Tab | Shows |
+| --- | --- |
+| Settings | Each setting's type, environment variable and whether it is required; secret settings are marked |
+| Used by | The loaders, tasks, hooks and other code that take the provider, and the jobs that run that code |
+
+Setting values, defaults included, are never published.
 
 ## Project layout
 

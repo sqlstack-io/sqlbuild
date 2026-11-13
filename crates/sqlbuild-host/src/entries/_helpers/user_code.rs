@@ -90,6 +90,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::UserCode,
     },
     HostEntry {
+        name: "provider_settings",
+        kind: HostKind::Function,
+        edge: HostEdge::UserCode,
+    },
+    HostEntry {
         name: "requires_arguments",
         kind: HostKind::Function,
         edge: HostEdge::UserCode,

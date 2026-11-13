@@ -145,6 +145,7 @@ pub enum UserCodeHost {
     ModuleProviderClasses,
     ParameterAnnotations,
     ProviderUsages,
+    ProviderSettings,
     RequiresArguments,
     RestorePythonRootModules,
     SourceLine,

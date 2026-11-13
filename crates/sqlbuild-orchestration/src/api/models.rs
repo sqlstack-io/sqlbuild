@@ -38,6 +38,7 @@ use crate::api::_helpers::resources::{
     person_reads::run_node_error,
     person_reads::jobs,
     person_reads::job,
+    person_reads::providers,
     person_reads::triggers,
     person_reads::ticks,
     person_reads::trigger_changes,

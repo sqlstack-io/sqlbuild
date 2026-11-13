@@ -14,8 +14,9 @@ use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_trigger_changes::list_person_trigger_changes;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
 use crate::declarations::main::read_person_job::read_person_job;
+use crate::declarations::main::read_person_providers::read_person_providers;
 use crate::declarations::models::{
-    JobDetailRecord, JobRecord, PersonTriggerChange, PersonTriggerRecord,
+    JobDetailRecord, JobRecord, PersonTriggerChange, PersonTriggerRecord, ProvidersRead,
 };
 use crate::platform::main::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::read_person_location_health::read_person_location_health;
@@ -283,6 +284,27 @@ pub(crate) async fn jobs(
 ) -> Result<Json<Vec<JobRecord>>, ApiError> {
     Ok(Json(
         list_person_jobs(
+            &store,
+            (&context, principal),
+            (location_id, &target),
+            default_role,
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/providers", operation_id = "readPersonProviders",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = ProvidersRead, description = "Declared providers without setting values"), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn providers(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<ProvidersRead>, ApiError> {
+    Ok(Json(
+        read_person_providers(
             &store,
             (&context, principal),
             (location_id, &target),

@@ -5,12 +5,11 @@
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import ConfigForm from '$lib/config/config-form.svelte';
 	import KeyValues from '$lib/components/platform/key-values.svelte';
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
-	import { usedCount } from '../utils';
+	import { consumerKindLabel, usedCount } from '../utils';
 
 	const name = $derived(page.params.name ?? '');
 	const providers = createResource((client, scope) => client.listProviders(scope));
@@ -28,7 +27,7 @@
 	<div class="flex items-center gap-3 border-b border-border px-6 py-3.5">
 		<a href={to(`/providers`)} class="text-muted-foreground hover:text-foreground text-[13px]">← Providers</a>
 		<span class="font-display text-[17px] font-semibold">{name}</span>
-		{#if provider}<span class="text-muted-foreground text-[12px]">{provider.type}</span>{/if}
+		{#if provider}<span class="text-muted-foreground font-mono text-[12px]">{provider.className}</span>{/if}
 	</div>
 
 	{#if providers.error}
@@ -46,44 +45,55 @@
 					]}
 				/>
 				{#if tab === 'settings'}
-					<div class="flex max-w-[680px] flex-col p-6">
-						<div class="text-[var(--sb-text-faint)] mb-4 flex items-center gap-2 rounded-[2px] border border-[var(--border-subtle)] bg-[var(--sb-surface-low)] px-3 py-2 text-[11.5px]">
+					<div class="flex flex-col p-6">
+						<div class="text-[var(--sb-text-faint)] mb-4 flex max-w-[760px] items-center gap-2 rounded-[2px] border border-[var(--border-subtle)] bg-[var(--sb-surface-low)] px-3 py-2 text-[11.5px]">
 							<LockIcon size={12} />
-							<span>Read-only. Declared in <code>{provider.sourceFile}</code>; secrets show only where they come from.</span>
+							<span>Values come from each location's environment and never reach the server. Declared in <code>{provider.sourceFile}</code>.</span>
 						</div>
-						<ConfigForm schema={provider.settings} values={provider.values} readOnly />
+						{#if provider.settings.length}
+							<table class="sb-list settings">
+								<thead>
+									<tr><th>Setting</th><th>Type</th><th>Environment variable</th><th>Required</th></tr>
+								</thead>
+								<tbody>
+									{#each provider.settings as f (f.name)}
+										<tr>
+											<td>
+												<div class="flex items-center gap-1.5"><code>{f.name}</code>{#if f.secret}<span class="secret" title="A secret type; its value is never shown"><LockIcon size={11} /> secret</span>{/if}</div>
+												{#if f.description}<div class="cell-desc">{f.description}</div>{/if}
+											</td>
+											<td class="muted"><code>{f.type}</code></td>
+											<td><code>{f.env}</code></td>
+											<td class="muted">{f.required ? 'Required' : 'Optional'}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						{:else}
+							<p class="text-muted-foreground text-[12.5px]">This provider declares no settings.</p>
+						{/if}
 					</div>
 				{:else}
 					<div class="flex flex-col gap-6 p-6">
 						{#if !usedCount(provider)}
 							<p class="text-muted-foreground text-[12.5px]">Nothing uses this provider yet.</p>
 						{/if}
-						{#if provider.usedBy.nodes.length}
+						{#if provider.usedBy.length}
 							<div>
-								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Nodes · {provider.usedBy.nodes.length}</div>
-								<div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-1.5">
-									{#each provider.usedBy.nodes as m (m)}
-										<a href={to(`/catalog/${m}`)} class="bg-secondary hover:bg-[var(--sb-hover)] flex items-center gap-2 rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{m}</a>
+								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Code · {provider.usedBy.length}</div>
+								<div class="flex flex-wrap gap-1.5">
+									{#each provider.usedBy as c (c.kind + c.name)}
+										<span class="flex items-center gap-2 rounded-[2px] border border-border px-2.5 py-1.5 font-mono text-[12px]">{c.name}<span class="text-muted-foreground font-sans text-[11px]">{consumerKindLabel[c.kind]}</span></span>
 									{/each}
 								</div>
 							</div>
 						{/if}
-						{#if provider.usedBy.jobs.length}
+						{#if provider.jobs.length}
 							<div>
-								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Jobs · {provider.usedBy.jobs.length}</div>
+								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Jobs that run this code · {provider.jobs.length}</div>
 								<div class="flex flex-wrap gap-1.5">
-									{#each provider.usedBy.jobs as j (j)}
+									{#each provider.jobs as j (j)}
 										<a href={to(`/jobs/${j}`)} class="bg-secondary hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{j}</a>
-									{/each}
-								</div>
-							</div>
-						{/if}
-						{#if provider.usedBy.triggers.length}
-							<div>
-								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Sensors · {provider.usedBy.triggers.length}</div>
-								<div class="flex flex-wrap gap-1.5">
-									{#each provider.usedBy.triggers as t (t.id)}
-										<a href={to(`/triggers/${t.id}`)} class="bg-secondary hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{t.name}</a>
 									{/each}
 								</div>
 							</div>
@@ -96,14 +106,26 @@
 				<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Provider</div>
 				<KeyValues
 					rows={[
-						{ label: 'Type', value: provider.type },
 						{ label: 'Defined in', value: provider.sourceFile, mono: true }
 					]}
 				/>
-				<p class="text-muted-foreground mt-5 text-[12.5px] leading-relaxed">{provider.description}</p>
+				<p class="text-muted-foreground mt-5 whitespace-pre-line text-[12.5px] leading-relaxed">{provider.description}</p>
 			</aside>
 		</div>
 	{:else}
 		<div class="px-6 py-4"><Loading /></div>
 	{/if}
 </div>
+
+<style>
+	.settings {
+		max-width: 960px;
+	}
+	.secret {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		color: var(--muted-foreground);
+		font-size: 11px;
+	}
+</style>

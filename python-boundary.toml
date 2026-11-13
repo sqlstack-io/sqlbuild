@@ -490,7 +490,7 @@ note = "Reads loaded user node functions: identities over live functions and dec
 [[stays]]
 path = "compiler/discovery/_helpers/filesystem/project_modules.py"
 rule = 2
-note = "Rule 2 shim: imports project Python node, hook, provider, sink and materialization modules and reads live members, signatures, provider parameter annotations and source lines; record building, provider naming and validation, settings errors, factory results and duplicate checks are native."
+note = "Rule 2 shim: imports project Python node, hook, provider, sink and materialization modules and reads live members, signatures, provider parameter annotations, provider class setting declarations and source lines; record building, provider naming and validation, settings errors, factory results and duplicate checks are native."
 
 [[stays]]
 path = "compiler/discovery/_helpers/validation/discovery.py"
