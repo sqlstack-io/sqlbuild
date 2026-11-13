@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { to } from '$lib/paths';
-	import { goto } from '$app/navigation';
+	import { openRow, to } from '$lib/paths';
 	import type { CatalogNodeDetail } from '$lib/api';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
@@ -18,7 +17,7 @@
 	<tbody>
 		{#each node.checkResults as c (c.id)}
 			{@const o = c.latest?.outcome ?? 'skipped'}
-			<tr onclick={() => goto(to(`/checks/${c.id}`))}>
+			<tr onclick={(e) => openRow(e, `/checks/${c.id}`)}>
 				<td><a class="mono" href={to(`/checks/${c.id}`)}>{c.name}</a>{#if c.column}<div class="cell-desc">column {c.column}</div>{/if}</td>
 				<td><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /></td>
 				<td class="muted capitalize">{c.severity}</td>

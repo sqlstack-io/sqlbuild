@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { to } from '$lib/paths';
-	import { goto } from '$app/navigation';
+	import { openRow, to } from '$lib/paths';
 	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -78,12 +77,12 @@
 			{#each filtered as l (l.id)}
 				{@const test = tested[l.id] ?? l.connectionTest}
 				{@const opens = opensDetail && l.health !== null}
-				<tr class:static={!opens} onclick={() => opens && goto(to(`/locations/${l.id}`))}>
+				<tr class:static={!opens} onclick={(e) => opens && openRow(e, `/locations/${l.id}`)}>
 					<td>
 						<div class="cell-name">
 							<MapPinIcon size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								{#if opens}<a href={to(`/locations/${l.id}`)} onclick={(e) => e.stopPropagation()}>{l.name}</a>{:else}{l.name}{/if}
+								{#if opens}<a href={to(`/locations/${l.id}`)}>{l.name}</a>{:else}{l.name}{/if}
 								<div class="cell-desc" title={l.target.connectionSummary}>{targetWords(l.target)}</div>
 							</div>
 						</div>
@@ -95,7 +94,7 @@
 							<span title={partialTitle}><StatusLabel tone="var(--sb-text-faint)" label="Unknown" muted /></span>
 						{/if}
 						{#if l.activeProblems}
-							<div class="cell-desc"><a class="link" href={to(`/locations/${l.id}#problems`)} onclick={(e) => e.stopPropagation()}>{l.activeProblems} open problem{l.activeProblems === 1 ? '' : 's'}</a></div>
+							<div class="cell-desc"><a class="link" href={to(`/locations/${l.id}#problems`)}>{l.activeProblems} open problem{l.activeProblems === 1 ? '' : 's'}</a></div>
 						{/if}
 					</td>
 					<td>

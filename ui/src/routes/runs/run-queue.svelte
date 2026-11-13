@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { to } from '$lib/paths';
-	import { goto } from '$app/navigation';
+	import { openRow, to } from '$lib/paths';
 	import type { QueueEntry } from '$lib/api';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
@@ -48,22 +47,22 @@
 		</thead>
 		<tbody>
 			{#each entries as q (q.run.id)}
-				<tr onclick={() => goto(to(`/runs/${q.run.id}`))}>
+				<tr onclick={(e) => openRow(e, `/runs/${q.run.id}`)}>
 					<td class="num muted">{q.position}</td>
 					<td>
-						<a class="code" href={to(`/runs/${q.run.id}`)} title={q.run.id} onclick={(e) => e.stopPropagation()}>{shortRunId(q.run.id)}</a>
+						<a class="code" href={to(`/runs/${q.run.id}`)} title={q.run.id}>{shortRunId(q.run.id)}</a>
 						<div class="cell-desc">{runKindOriginLabel(q.run)} · {q.run.requestedBy.name}</div>
 					</td>
 					<td>
-						{#if q.run.jobKey}<a class="link" href={to(`/jobs/${q.run.jobKey}`)} onclick={(e) => e.stopPropagation()}>{q.run.jobKey}</a>{:else}<span class="muted">Ad hoc</span>{/if}
-						{#if q.run.parentRunId}<div class="cell-desc">in group run <a class="link code" href={to(`/runs/${q.run.parentRunId}`)} onclick={(e) => e.stopPropagation()}>{shortRunId(q.run.parentRunId)}</a></div>{/if}
+						{#if q.run.jobKey}<a class="link" href={to(`/jobs/${q.run.jobKey}`)}>{q.run.jobKey}</a>{:else}<span class="muted">Ad hoc</span>{/if}
+						{#if q.run.parentRunId}<div class="cell-desc">in group run <a class="link code" href={to(`/runs/${q.run.parentRunId}`)}>{shortRunId(q.run.parentRunId)}</a></div>{/if}
 					</td>
 					<td class="num">{q.run.priority}</td>
 					<td class="muted" title={formatStamp(q.run.queuedAt)}>{formatAgo(q.run.queuedAt, app.now)}</td>
 					<td class="waits">
 						{#each q.waits as w, i (i)}
 							<div class="wait" title={waitTechnical(w)}>
-								{#each describeWait(w) as part, j (j)}{#if part.href}<a class="link" class:code={part.code} href={to(part.href)} onclick={(e) => e.stopPropagation()}>{part.text}</a>{:else if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}
+								{#each describeWait(w) as part, j (j)}{#if part.href}<a class="link" class:code={part.code} href={to(part.href)}>{part.text}</a>{:else if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}
 							</div>
 						{:else}
 							<span class="muted">Nothing in the way; it starts on the next scheduler pass</span>

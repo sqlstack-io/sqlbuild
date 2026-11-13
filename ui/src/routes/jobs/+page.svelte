@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { to } from '$lib/paths';
+	import { openRow, to } from '$lib/paths';
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
 	import LayersIcon from '@lucide/svelte/icons/layers';
-	import { goto } from '$app/navigation';
 	import type { JobKind, Trigger } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
@@ -113,12 +112,12 @@
 		<tbody>
 			{#each filtered as j (j.key)}
 				{@const jobTriggers = j.triggerIds.map((id) => triggerById.get(id)).filter((t) => t !== undefined)}
-				<tr onclick={() => goto(to(`/jobs/${j.key}`))}>
+				<tr onclick={(e) => openRow(e, `/jobs/${j.key}`)}>
 					<td>
 						<div class="cell-name">
 							{#if j.kind === 'group'}<LayersIcon size={15} strokeWidth={1.75} />{:else}<WorkflowIcon size={15} strokeWidth={1.75} />{/if}
 							<div class="min-w-0">
-								<a href={to(`/jobs/${j.key}`)} onclick={(e) => e.stopPropagation()}>{j.key}</a>
+								<a href={to(`/jobs/${j.key}`)}>{j.key}</a>
 								<div class="cell-desc">{j.description}</div>
 							</div>
 						</div>
@@ -153,7 +152,7 @@
 												aria-label="{t.state === 'running' ? 'Pause' : 'Turn on'} {t.name}"
 											></button>
 										</span>
-										<a class:muted={t.state === 'paused'} href={to(`/triggers/${t.id}`)} title={t.cadence} onclick={(e) => e.stopPropagation()}>{t.name}</a>
+										<a class:muted={t.state === 'paused'} href={to(`/triggers/${t.id}`)} title={t.cadence}>{t.name}</a>
 									</div>
 								{/each}
 							</div>
@@ -162,7 +161,7 @@
 					{#if showOwner}<td class="muted">{j.owner ?? '—'}</td>{/if}
 					<td>
 						{#if j.lastRun}
-							<a class="last-run" href={to(`/runs/${j.lastRun.id}`)} onclick={(e) => e.stopPropagation()}>
+							<a class="last-run" href={to(`/runs/${j.lastRun.id}`)}>
 								<StatusLabel tone={runStatusTone[j.lastRun.status]} label={runStatusLabel[j.lastRun.status]} />
 								{#if j.lastRun.startedAt}<RelativeTime value={formatAgo(j.lastRun.startedAt, app.now)} exact={formatStamp(j.lastRun.startedAt)} />{/if}
 							</a>
