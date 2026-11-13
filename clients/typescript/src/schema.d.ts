@@ -1010,6 +1010,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/preview-copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["preview_copy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/statistics-due": {
         parameters: {
             query?: never;
@@ -2308,6 +2324,30 @@ export interface components {
              */
             scheduler_lease_expires_at?: string | null;
         };
+        /** @description What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly. */
+        PreviewCopy: {
+            fingerprints: components["schemas"]["WarehouseFingerprintRecord"][];
+            latest_runs: components["schemas"]["PreviewLatestRun"][];
+            observations: components["schemas"]["WarehouseObservationRecord"][];
+            relations: components["schemas"]["WarehouseCatalogRecord"][];
+            /** Format: date-time */
+            synced_at?: string | null;
+        };
+        /** @description A location asks for the mirrored copy a plan preview plans from, as its fenced reader. */
+        PreviewCopyRead: {
+            /** Format: int64 */
+            generation: number;
+            /** Format: uuid */
+            session_id: string;
+        };
+        /** @description The newest successful build of a node, which a `cursor_max` observation must come from. */
+        PreviewLatestRun: {
+            node_name: string;
+            node_type: string;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+        };
         /** @description A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles). */
         PublishedChange: {
             change_kind: string;
@@ -3078,6 +3118,25 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
         };
+        /** @description Fingerprints remain history here; latest-row selection belongs to the existing planner reader. */
+        WarehouseFingerprintRecord: {
+            definition: string;
+            definition_hash: string;
+            event_id?: string | null;
+            metadata_json: string;
+            node_name: string;
+            node_type: string;
+            run_id: string;
+            schema_fingerprint: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_database?: string | null;
+            target_name?: string | null;
+            target_schema?: string | null;
+            /** Format: date-time */
+            ts: string;
+            version_hash: string;
+        };
         /**
          * @description Catalog observations require full scans; only immutable history supports a watermark.
          * @enum {string}
@@ -3130,6 +3189,19 @@ export interface components {
             event_id: string;
             /** Format: date-time */
             observed_at: string;
+        };
+        /** @description A display-only value a build observed, such as a cursor `MAX`; planning never reads it. */
+        WarehouseObservationRecord: {
+            cursor_type?: string | null;
+            kind: string;
+            node: string;
+            observation_id: string;
+            /** Format: date-time */
+            observed_at: string;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+            value: string;
         };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
@@ -5856,6 +5928,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_copy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewCopyRead"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewCopy"];
                 };
             };
             400: {

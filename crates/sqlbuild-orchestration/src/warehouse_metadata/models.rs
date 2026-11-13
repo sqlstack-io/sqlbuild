@@ -429,6 +429,36 @@ pub struct WarehouseSyncDue {
     pub now: DateTime<Utc>,
 }
 
+/// A location asks for the mirrored copy a plan preview plans from, as its fenced reader.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PreviewCopyRead {
+    pub session_id: Uuid,
+    pub generation: i64,
+}
+
+/// The newest successful build of a node, which a `cursor_max` observation must come from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PreviewLatestRun {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub node_type: String,
+    pub node_name: String,
+    pub run_id: String,
+}
+
+/// What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PreviewCopy {
+    pub synced_at: Option<DateTime<Utc>>,
+    pub relations: Vec<WarehouseCatalogRecord>,
+    pub fingerprints: Vec<WarehouseFingerprintRecord>,
+    pub latest_runs: Vec<PreviewLatestRun>,
+    pub observations: Vec<WarehouseObservationRecord>,
+}
+
 /// Private interpreter input; cursor values are data and receive adapter literal rendering.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
