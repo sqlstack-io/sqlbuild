@@ -11,7 +11,7 @@ use crate::schema::models::{DdlOptions, Dialect};
 #[must_use]
 pub fn view_statements(dialect: Dialect, options: &DdlOptions) -> Vec<(&'static str, String)> {
     match dialect {
-        Dialect::Sqlite => relational_view_bodies(false)
+        Dialect::Sqlite => relational_view_bodies(false, false)
             .into_iter()
             .map(|(name, body)| {
                 (

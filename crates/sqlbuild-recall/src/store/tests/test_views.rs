@@ -463,3 +463,33 @@ fn given_the_same_sql_in_two_invocations_when_written_then_artifacts_are_shared_
         );
     }
 }
+
+#[test]
+fn given_lifecycle_payloads_when_stored_then_promoted_fields_are_kept_once_and_read_back_whole() {
+    let env = envelope("strip", NOW);
+    let written = r#"{"intent":"execute","statement_kind":"SELECT","duration_ms":12.5,"affected_rows":3,"query_id":null,"attempt_number":2}"#;
+    let rows = projected(
+        &[vec![event(
+            &env,
+            ("e0", "statement_completed", 0),
+            r#","statement_id":"s1""#,
+            written,
+        )]],
+        "SELECT recall_events.payload, events.payload FROM recall_events \
+         JOIN events ON events.event_id = recall_events.event_id",
+    );
+    let parsed = |value: &RecallValue| match value {
+        RecallValue::Text(json) => serde_json::from_str::<serde_json::Value>(json).expect("JSON"),
+        other => panic!("payload is text, got {other:?}"),
+    };
+    assert_eq!(
+        parsed(&rows[0][0]),
+        serde_json::json!({"query_id": null, "attempt_number": 2}),
+        "the table keeps only fields without a column of their own"
+    );
+    assert_eq!(
+        parsed(&rows[0][1]),
+        serde_json::from_str::<serde_json::Value>(written).expect("JSON"),
+        "the events view returns the payload as written, explicit nulls included"
+    );
+}

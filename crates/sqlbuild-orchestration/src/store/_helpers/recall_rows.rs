@@ -9,6 +9,7 @@ use sqlbuild_recall::schema::models::{ColumnType, Table};
 use sqlbuild_recall::store::main::conflict_evidence::conflict_evidence;
 use sqlbuild_recall::store::main::relational_insert::relational_insert;
 use sqlbuild_recall::store::main::relational_lookup::relational_lookup;
+use sqlbuild_recall::store::main::relational_row::relational_row;
 
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -58,7 +59,8 @@ pub(crate) async fn write_row(
         .into_iter()
         .map(|column| column.name.to_owned())
         .collect();
-    let insert = relational_insert((row, &columns), &ingested, postgres);
+    let stored = relational_row(row);
+    let insert = relational_insert((&stored, &columns), &ingested, postgres);
     let returning = if row.table == Table::Events {
         "storage_id"
     } else {
