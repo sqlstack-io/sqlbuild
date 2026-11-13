@@ -106,28 +106,38 @@ fn build_consumption_create_table_sql(
     render_qualified_name: &Bound<'_, PyAny>,
     render_framework_type: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
-    let py: Python<'_> = database.py();
-    let Some(table) = state_table_name(
-        render_qualified_name,
+    fixed_state_table_sql(
         (database, schema),
-        CONSUMPTION_TABLE_NAME,
-    )?
+        (render_qualified_name, render_framework_type),
+        (
+            CONSUMPTION_TABLE_NAME,
+            &CONSUMPTION_COLUMN_TYPES,
+            &NULLABLE_COLUMNS,
+        ),
+    )
+}
+
+/// Create-if-missing DDL for a state table with fixed columns, typed by the adapter.
+pub(crate) fn fixed_state_table_sql(
+    (database, schema): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    (render_qualified_name, render_framework_type): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    (table_name, column_types, nullable): (&str, &[(&str, &str)], &[&str]),
+) -> PyResult<String> {
+    let py: Python<'_> = database.py();
+    let Some(table) = state_table_name(render_qualified_name, (database, schema), table_name)?
     else {
         return Ok(String::new());
     };
-    let columns: Bound<'_, PyAny> = PyTuple::new(
-        py,
-        CONSUMPTION_COLUMN_TYPES.iter().map(|(column, _)| *column),
-    )?
-    .into_any();
+    let columns: Bound<'_, PyAny> =
+        PyTuple::new(py, column_types.iter().map(|(column, _)| *column))?.into_any();
     let types: Bound<'_, PyDict> = PyDict::new(py);
-    for (column, declared) in CONSUMPTION_COLUMN_TYPES {
+    for (column, declared) in column_types {
         types.set_item(column, declared)?;
     }
-    let required: Vec<&str> = CONSUMPTION_COLUMN_TYPES
+    let required: Vec<&str> = column_types
         .iter()
         .map(|(column, _)| *column)
-        .filter(|column| !NULLABLE_COLUMNS.contains(column))
+        .filter(|column| !nullable.contains(column))
         .collect();
     state_table_create_sql(
         &table,
