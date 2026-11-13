@@ -31,3 +31,22 @@ regenerate the extract; `check:command-table` fails when it is stale.
 npm run gen:command-table
 npm run check:command-table
 ```
+
+## Static demo
+
+`sqlbuild.com/demo` is this UI with no server behind it: the server client replays
+`demo/recording.json.gz`, a recording of DuckShop on `sqb dev`, and refuses every write.
+The website workflow builds it:
+
+```sh
+SQB_UI_BASE=/demo VITE_SQB_DEMO=1 npm run build
+node scripts/demo-pages.mjs build demo/recording.json.gz ../website/dist/demo
+```
+
+To record it again, run DuckShop under `sqb dev`, click through the pages with the
+browser saving a HAR, then ask the server for every read the pages made:
+
+```sh
+node scripts/record-demo.mjs demo/recording.json.gz --server http://127.0.0.1:<port> \
+  --replace <project path>=/home/demo/duckshop --replace <location name>=duckshop session.har
+```

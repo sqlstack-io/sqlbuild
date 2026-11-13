@@ -9,6 +9,7 @@
 	import { SERVER_DOCS } from '$lib/boot-failure';
 	import { app } from '$lib/state/app.svelte';
 	import { appPath } from '$lib/paths';
+	import { DEMO } from '$lib/api';
 	import favicon from '$website/public/favicon.png';
 
 	let { children } = $props();
@@ -48,7 +49,12 @@
 {:else if !app.scope}
 	<div class="grid h-screen place-items-center"><div class="w-60"><Loading /></div></div>
 {:else}
-	<div class="flex h-screen overflow-hidden">
+	{#if DEMO}
+		<div class="bg-primary fixed inset-x-0 top-0 z-50 h-8 truncate px-4 text-center text-[12.5px] leading-8 text-white">
+			A read-only demo: DuckShop recorded on <code>sqb dev</code>. Run <code>sqb dev</code> in your own project to start runs and change settings.
+		</div>
+	{/if}
+	<div class="flex overflow-hidden {DEMO ? 'mt-8 h-[calc(100vh-2rem)]' : 'h-screen'}">
 		<AppSidebar />
 		<div class="flex min-w-0 flex-1 flex-col">
 			{#if pageAvailable(app.client, appPath(page.url.pathname))}
