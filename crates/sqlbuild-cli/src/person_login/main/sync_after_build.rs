@@ -1,6 +1,7 @@
 //! A signed-in `sqb build` asks its configured location to refresh the warehouse copy, best-effort.
 
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
 
 use sqlbuild_config::project::main::load_control_config::load_control_config;
@@ -20,7 +21,25 @@ fn setting(name: &str, configured: Option<String>) -> Option<String> {
 }
 
 /// One stderr line about the sync, or `None` when no location is configured or nobody is signed in.
+///
+/// The request runs on its own thread, so a slow keyring, resolver or server cannot hold the build's
+/// exit past the bound; an abandoned request ends with the process.
 pub(crate) fn sync_after_build(project_dir: &Path, target: &str) -> Option<String> {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let (project_dir, target) = (project_dir.to_path_buf(), target.to_owned());
+    drop(std::thread::spawn(move || {
+        drop(sender.send(request_sync(&project_dir, &target)));
+    }));
+    match receiver.recv_timeout(Duration::from_secs(BUILD_SYNC_SECONDS)) {
+        Ok(line) => line,
+        Err(RecvTimeoutError::Timeout) => Some(format!(
+            "Warehouse sync skipped: the request did not finish within {BUILD_SYNC_SECONDS} seconds.\n"
+        )),
+        Err(RecvTimeoutError::Disconnected) => None,
+    }
+}
+
+fn request_sync(project_dir: &Path, target: &str) -> Option<String> {
     let configured = load_control_config(&project_config_paths(project_dir)).ok()?;
     let server = setting(CONTROL_SERVER_ENV, configured.server);
     let location = setting(CONTROL_LOCATION_ENV, configured.location);
@@ -81,17 +100,7 @@ pub(crate) fn sync_after_build(project_dir: &Path, target: &str) -> Option<Strin
         .enable_all()
         .build()
         .map_err(std::io::Error::other)
-        .and_then(|runtime| {
-            runtime.block_on(async {
-                tokio::time::timeout(Duration::from_secs(BUILD_SYNC_SECONDS), request)
-                    .await
-                    .unwrap_or_else(|_| {
-                        Err(std::io::Error::other(format!(
-                            "the server did not answer within {BUILD_SYNC_SECONDS} seconds"
-                        )))
-                    })
-            })
-        });
+        .and_then(|runtime| runtime.block_on(request));
     match outcome {
         Ok(line) => Some(line),
         Err(error) => skipped(error),

@@ -702,7 +702,7 @@ export class MockPlatformApi implements PlatformApi {
 					target: c.target,
 					stateLocation: { database: typeof c.values.database === 'string' ? c.values.database : null, schema: 'sqlbuild' },
 					lastTest: this.#connectionTests.get(`${l.id}/${c.name}`) ?? c.lastTest,
-					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, lastSyncedAt: synced }))
+					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, waiting: false, lastSyncedAt: synced }))
 				}))
 		);
 		return this.#ctx.reply(structuredClone(connections));

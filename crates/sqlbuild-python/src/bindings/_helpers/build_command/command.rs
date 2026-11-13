@@ -120,7 +120,7 @@ fn run_within_limits(
     )?;
     let exit_code: i32 = within(&deadline, |_| run_with_providers(&context))?;
     if context.worker.is_none() {
-        request_location_sync(&context)?;
+        let _ = request_location_sync(&context);
     }
     Ok(exit_code)
 }

@@ -149,6 +149,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 			recordsSent: health.records_sent,
 			elapsedMs: health.elapsed_millis,
 			failure: health.failure ? syncProblemOf(health.failure) : null,
+			waiting: health.failure === 'busy',
 			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null
 		}))
 		.sort((a, b) => a.table.localeCompare(b.table));

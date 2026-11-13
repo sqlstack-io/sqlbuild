@@ -1186,6 +1186,7 @@ pub(crate) async fn read_metadata_page(
     mut state: LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationMetadataSync, Option<WarehouseHistoryPage>)>, ControlError> {
+    state.busy = false;
     if let Some(statistics) = &state.statistics
         && statistics.names.is_empty()
     {
@@ -1216,7 +1217,6 @@ pub(crate) async fn read_metadata_page(
             exchange_metadata_read(reader, request),
         ) => match result {
             Ok((reader, Ok(MetadataReply::Page(page)))) => {
-                state.busy = false;
                 state.reader = Some(reader);
                 Ok(Some((state, page)))
             }

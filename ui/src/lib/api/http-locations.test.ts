@@ -94,7 +94,7 @@ describe('warehouseSyncOf', () => {
 	it('shows a build holding the warehouse file as a wait, not a failure', () => {
 		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
 		const observations = [sync('2026-11-08T12:03:00Z', 'catalog', 'busy'), sync('2026-11-08T12:01:00Z', 'catalog', null)];
-		expect(toWarehouseConnection(location, observations).tables.map((t) => [t.failure, t.lastSyncedAt])).toEqual([['Waiting for a build that holds the warehouse file', '2026-11-08T12:01:00Z']]);
+		expect(toWarehouseConnection(location, observations).tables.map((t) => [t.failure, t.waiting, t.lastSyncedAt])).toEqual([['Waiting for a build that holds the warehouse file', true, '2026-11-08T12:01:00Z']]);
 		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z' });
 	});
 
