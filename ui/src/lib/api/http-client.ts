@@ -251,14 +251,18 @@ export type HttpClientOptions = {
 	baseUrl?: string;
 	/** Called when the session is missing or rejected, before the request fails. */
 	onUnauthorized: () => void;
+	/** Answers the requests instead of the network; the static demo replays a recording through it. */
+	fetch?: (request: Request) => Promise<Response>;
+	/** The change feed; by default the server's, followed with `EventSource`. */
+	changes?: ChangeSubscription;
 };
 
 /**
  * The server-backed client. Methods without an endpoint throw, and `supports`
  * reports them so the shell never shows a page it cannot load.
  */
-export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOptions): ApiClient {
-	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
+export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, changes }: HttpClientOptions): ApiClient {
+	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin', fetch: answer });
 	// Locations whose bootstrap actions include view.sql, which may hold on only some nodes, and the
 	// nodes there whose SQL was refused; each refused read is audited, so neither is asked again until reload.
 	let sqlLocations = new Set<string>();
@@ -303,7 +307,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	}
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
-		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
+		changes: changes ?? new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
 		async bootstrap(): Promise<Bootstrap> {
 			const { data, error, response } = await http.GET('/api/control/bootstrap');
 			if (response.status === 401) onUnauthorized();
