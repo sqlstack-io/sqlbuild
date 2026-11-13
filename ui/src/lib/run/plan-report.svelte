@@ -3,6 +3,8 @@
 	// then the routine models.
 	import { to } from '$lib/paths';
 	import type { PlanDocument } from '$lib/api';
+	import { formatAgo } from '$lib/format/time';
+	import { app } from '$lib/state/app.svelte';
 	import { planSections, type PlanEntry } from './plan-text';
 
 	let { plan }: { plan: PlanDocument } = $props();
@@ -17,6 +19,21 @@
 </script>
 
 <div class="report">
+	{#if plan.synced_copy}
+		{@const copy = plan.synced_copy}
+		<section class="preview">
+			<p>
+				Planned from warehouse metadata {#if copy.synced_at}synced <time datetime={copy.synced_at} title={copy.synced_at}>{formatAgo(copy.synced_at, app.now)}</time>{:else}that has not fully synced yet{/if}.
+				The run plans again against the warehouse.
+			</p>
+			{#if copy.unknown_until_run.length}
+				<div class="unknown">
+					<span>Unknown until the run</span>
+					<ul>{#each copy.unknown_until_run as item (item)}<li>{item}</li>{/each}</ul>
+				</div>
+			{/if}
+		</section>
+	{/if}
 	{#each sections as s (s.title)}
 		{@const shown = expanded[s.title] ? s.entries : s.entries.slice(0, limit)}
 		<section>
@@ -171,6 +188,37 @@
 	}
 	.warning.err {
 		border-left-color: var(--sb-error);
+	}
+	.preview {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 8px 10px;
+		border: 1px solid var(--border);
+		border-left: 2px solid var(--primary);
+		border-radius: 2px;
+		background: var(--sb-inset);
+		color: var(--muted-foreground);
+	}
+	.preview p {
+		margin: 0;
+	}
+	.preview time {
+		color: var(--foreground);
+	}
+	.unknown span {
+		color: var(--sb-text-faint);
+		font-size: 11.5px;
+	}
+	.unknown ul {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 14px;
+		margin: 2px 0 0;
+		padding: 0;
+		list-style: none;
+		font-family: var(--font-mono);
+		font-size: 11px;
 	}
 	code {
 		color: var(--sb-text-faint);

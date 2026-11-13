@@ -1,3 +1,4 @@
+pub mod base64_text;
 pub mod bytes_digest;
 pub mod compiled_code_identity;
 pub mod content_digest;

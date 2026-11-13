@@ -10,8 +10,8 @@ use crate::platform::models::{
     LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
-    MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseSyncDue, WarehouseSyncDueRead,
-    WarehouseSyncResponse, WarehouseWatermarkRead,
+    MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
+    WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
@@ -51,6 +51,16 @@ impl LocationWorkClient {
         request: &WarehouseSyncDueRead,
     ) -> Result<WarehouseSyncDue, ClientError> {
         self.post_metadata((target, Some("sync-due")), request)
+            .await
+    }
+
+    /// The mirrored copy a plan preview plans from, so previewing never opens the warehouse.
+    pub async fn preview_copy(
+        &self,
+        target: &str,
+        request: &PreviewCopyRead,
+    ) -> Result<PreviewCopy, ClientError> {
+        self.post_metadata((target, Some("preview-copy")), request)
             .await
     }
 

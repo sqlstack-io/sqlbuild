@@ -374,3 +374,13 @@ class AdhocRunTestCase:
     job_settings: str = ""
     expected_scheduled_status: str = "success"
     expected_worker_log: str = ""
+
+
+@dataclass(frozen=True)
+class PlanPreviewTestCase:
+    description: str
+    edited_files: dict[str, str]
+    injected_sql: tuple[str, ...]
+    expected_window_models: tuple[str, ...]
+    expected_unplanned_cursor_models: tuple[str, ...]
+    expected_added_unknowns: tuple[str, ...]

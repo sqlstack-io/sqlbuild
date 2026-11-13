@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { appPath, to } from '$lib/paths';
-	// Every Run button opens this page with its command. A build is planned by the location against the
-	// warehouse (`sqb plan`); other verbs show the server's dry run. Nothing is queued until Run is pressed.
+	// Every Run button opens this page with its command. A build is planned by the location (`sqb plan`)
+	// from the server's synced copy of the warehouse metadata; other verbs show the server's dry run.
+	// Nothing is queued until Run is pressed.
 	// With a job, the command only narrows that job: Run starts a run of the job, not an ad-hoc command.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';

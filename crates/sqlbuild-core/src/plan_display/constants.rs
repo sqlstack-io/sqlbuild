@@ -35,3 +35,11 @@ pub(crate) const MIGRATION_INCOMPATIBLE: &str = "incompatible";
 pub(crate) const WATERMARK_STRATEGY: &str = "watermark";
 pub(crate) const QUERY_DIFF_INDENT: &str = "      ";
 pub(crate) const UNIFIED_DIFF_HEADER_PREFIXES: [&str; 3] = ["---", "+++", "@@"];
+/// Names the synced-copy file a location writes for a plan preview; set, `sqb plan` never connects.
+pub const PLAN_SYNCED_COPY_ENV: &str = "SQLBUILD_PLAN_SYNCED_COPY";
+/// The plan JSON key describing the synced copy a preview planned from.
+pub const SYNCED_COPY_KEY: &str = "synced_copy";
+/// Why a preview refuses `--defer-to`: deferral reads another target's live state.
+pub const SYNCED_COPY_DEFER_REFUSAL: &str =
+    "plan previews from the synced copy cannot use --defer-to";
+pub const SYNCED_COPY_DEFER_HELP: &str = "Run re-plans live, including deferral.";

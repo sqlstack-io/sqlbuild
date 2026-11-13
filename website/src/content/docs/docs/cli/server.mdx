@@ -250,9 +250,23 @@ checked this way.
 
 Anyone with `view` on every node of a target can see what a `build` command would do before it
 runs. The web UI's plan page does this for every Run button: the location serving the target runs
-[`sqb plan --json`](/docs/cli/plan/) on the command's nodes against the warehouse, and the page
-shows each model's action and reason, backfills, migrations and warnings. Running the command
-still needs `run.adhoc`.
+[`sqb plan --json`](/docs/cli/plan/) on the command's nodes, and the page shows each model's action
+and reason, backfills, migrations and warnings. Running the command still needs `run.adhoc`.
+
+A plan reads the server's synced copy of the target's warehouse metadata, not the warehouse, so
+planning never resumes a suspended warehouse. The page shows when that copy synced, or that it
+hasn't fully synced yet. Each incremental model's range starts where its last successful build
+ended and runs to the latest data when the run starts. The run plans again against the warehouse.
+These stay unknown until it does:
+
+- source freshness, retention, table types and column rename support;
+- sources outside the schemas the server syncs;
+- the cursor position of an incremental model with no successful build;
+- the range start of an incremental model with lookback, a replay on change, a start override,
+  microbatches or a `cursor_start` past its last build;
+- whether a start set with `cursor_start_max_ahead` sits too far ahead;
+- the columns of an expression source whose SQL changed since it was last described, which the
+  plan takes as declared.
 
 Over the API, queue a plan, then read it until `result_json` is set:
 
@@ -265,7 +279,9 @@ GET /api/control/locations/{location_id}/targets/{target}/plans/{request_id}
 
 `result_json.outcome.kind` is `plan`, with the `sqb plan --json` document in `document`, or
 `superseded` when the location's project files changed while it planned; plan again. A plan never
-appears in Runs and changes nothing in the warehouse.
+appears in Runs and never connects to the warehouse. In `document`, `synced_copy` holds
+`synced_at` (`null` until the copy has fully synced), `cursor_window_starts` and
+`unknown_until_run`.
 
 | Limit | Value |
 | --- | --- |

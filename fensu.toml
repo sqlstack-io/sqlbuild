@@ -1630,9 +1630,10 @@ tooling = []
 rule_packs = ["rust"]
 rule_modules = [
     "scripts.fensu_policy.rules.native_boundary",
+    "scripts.fensu_policy.rules.observation_boundary",
     "scripts.fensu_policy.rules.unused_state",
 ]
-select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077"]
+select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078", "XSB079"]
 
 [targets.rust.rule_options.XSB076]
 schema_paths = ["crates/sqlbuild-orchestration/src/store"]
@@ -1644,6 +1645,35 @@ allowed = [
     "sqb_warehouse_microbatches.execution_run_id=Reader comes with the UI epic (D132), which filters on it: the run that executed the batch.",
     "sqb_warehouse_microbatches.record_type=Reader comes with the UI epic (D132), which filters on it: the batch state.",
     "sqb_warehouse_migrations.decision=Reader comes with the UI epic (D132), which filters on it.",
+]
+
+[targets.rust.rule_options.XSB078]
+allowed_paths = [
+    "crates/sqlbuild-core/src/constants.rs=Names the observation state table.",
+    "crates/sqlbuild-orchestration=Mirrors observations into the control store and serves them for display.",
+    "crates/sqlbuild-python/src/bindings/_helpers/cli/registration.rs=Registers the observation state bindings.",
+    "crates/sqlbuild-python/src/bindings/_helpers/exported_constants=Exports the table name to Python adapters, which create it.",
+    "crates/sqlbuild-python/src/bindings/_helpers/janitor=Prunes observation history.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/mod.rs=Declares the observation state bindings module.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/observations_state.rs=Renders observation state SQL for adapters.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/warehouse_metadata.rs=Reads observations for the control-store mirror.",
+    "crates/sqlbuild-python/src/bindings/_helpers/observations=Writes observations after a build.",
+]
+
+[targets.rust.rule_options.XSB079]
+allowed_paths = [
+    "crates/sqlbuild-cli/src/native_commands/main/_location_plan.rs=A location's requested plan names the synced copy for its sqb plan child.",
+    "crates/sqlbuild-core/src/plan_display/constants.rs=Names the synced-copy environment variable.",
+    "crates/sqlbuild-python/src/bindings/_helpers/freshness/planning.rs=Preview branch: a refused freshness observation leaves the source unknown.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/registration.rs=Registers the synced copy's refusal error with Python.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/synced_copy.rs=Defines the synced-copy adapter.",
+    "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=Only sqb plan activates the synced copy and reports what it could not know.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/cursors.rs=Preview branch: target MAX from the copy, watermark inputs read when the run starts.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_phases/retention.rs=Preview branch: table types and retention stay unknown.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_resolution/orchestration.rs=Preview branch: cursor intrinsics bind to bounds the run resolves.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_columns.rs=Preview branch: expression columns from the copy instead of DESCRIBE.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_freshness.rs=Preview branch: the copy has no source freshness state to read.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_tables.rs=Preview branch: sources outside the copy are not probed.",
 ]
 
 [targets.rust.rule_options.XSB077]
@@ -1816,6 +1846,18 @@ paths = ["src/sqlbuild/adapter/contract/classes/*", "src/sqlbuild/adapters/*/cla
 reason = "tests/unit/src/sqlbuild/adapter/contract/classes/strict_adapter/test_strict_adapter.py requires every first-class adapter to define each StrictAdapter method itself instead of inheriting it from BaseAdapter."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/observations_state.rs"]
+reason = "Each state table has its own Python-facing create and prune bindings. The DDL and table naming live in the shared fixed_state_table_sql and state_table_name; each prune keeps its own retention rule."
+
+[[dupes.allowlist]]
+paths = ["src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"]
+reason = "SQL Server overrides each state table's create SQL to add that table's own key index; the keyed DDL lives in _keyed_state_table_sql."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/microbatches/projection.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/synced_copy.rs", "crates/sqlbuild-python/src/bindings/_helpers/rules/dsl_headers.rs"]
+reason = "Each turns its own record type into its own Python objects; only the loop that collects them is alike."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers/result_output/assets.rs"]
 reason = "Resource asset projections intentionally mirror their public JSON schemas: seeds include planning reasons, functions include warnings and their function kind, and loads include loader and skip metadata."
 
@@ -1828,7 +1870,7 @@ paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/_helpers/fingerpr
 reason = "Typed observation field projections intentionally mirror provenance checks while preserving different required identity fields and timestamp names. Bounds, rejection rules and reconciliation completion share the ingestion owner."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_audit_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_column_migrations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_consumption.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_janitor_events.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_microbatches.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_migrations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_node_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_old_name_views.rs"]
+paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_audit_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_column_migrations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_consumption.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_janitor_events.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_microbatches.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_migrations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_node_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_observations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest/ingest_old_name_views.rs"]
 reason = "Typed event projections retain distinct required identities and indexed payload columns. Event persistence, fencing, atomic retries and reconciliation share the events ingestion owner; no per-table lifecycle is copied."
 
 [[targets.python.rule_exceptions]]
@@ -2832,10 +2874,12 @@ module_layers = [
     "native_host=infra",
     "native_host/consumption_state=front",
     "native_host/model_lookup=project",
+    "native_host/observations_state=front",
     "native_host/orchestration_sensors=commands",
     "native_host/orchestration_triggers=project",
     "native_host/warehouse_metadata=commands",
     "native_threads=infra",
+    "observations=plan",
     "output_capture=output",
     "plan_command=commands",
     "plan_output=plan",

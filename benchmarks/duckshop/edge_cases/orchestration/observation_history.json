@@ -1,0 +1,53 @@
+{
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "observation_id": "observation-000",
+    "kind": "cursor_max",
+    "node": "orders_🧾",
+    "cursor_type": "timestamp",
+    "value": "2026-02-03 04:05:06.123456",
+    "run_id": "external-run",
+    "observed_at": "2026-02-03T04:05:06Z"
+  },
+  "source_rows": 104,
+  "duplicate_rows": 3,
+  "later_time": "2026-02-03T04:05:06.000001Z",
+  "page_lengths": [
+    100,
+    7
+  ],
+  "later_index": 106,
+  "source_count": 107,
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 1 AS order_id",
+  "retained_result": "observation-103",
+  "kind": "observations",
+  "source_key": "observation_id",
+  "timestamp_key": "observed_at",
+  "id_prefix": "observation",
+  "later_record": {
+    "observation_id": "observation-103",
+    "kind": "source_columns",
+    "node": "shop.orders_🧾",
+    "cursor_type": null,
+    "value": "{\"sql_hash\":\"928300f876a1cfe48302513f8c25ca06ec449c95f3480c06b84c694a39b6be0d\",\"columns\":[\"order_id\",\"amount_€\"]}",
+    "observed_at": "2026-02-03T04:05:06.000001Z"
+  },
+  "last_record": {
+    "observation_id": "observation-103",
+    "kind": "source_columns",
+    "node": "shop.orders_🧾",
+    "cursor_type": null,
+    "value": "{\"sql_hash\":\"928300f876a1cfe48302513f8c25ca06ec449c95f3480c06b84c694a39b6be0d\",\"columns\":[\"order_id\",\"amount_€\"]}",
+    "observed_at": "2026-02-03T04:05:06.000001Z"
+  },
+  "record_overrides": {
+    "observation-103": {
+      "kind": "source_columns",
+      "node": "shop.orders_🧾",
+      "cursor_type": null,
+      "value": "{\"sql_hash\":\"928300f876a1cfe48302513f8c25ca06ec449c95f3480c06b84c694a39b6be0d\",\"columns\":[\"order_id\",\"amount_€\"]}",
+      "observed_at": "2026-02-03T04:05:06.000001Z"
+    }
+  }
+}

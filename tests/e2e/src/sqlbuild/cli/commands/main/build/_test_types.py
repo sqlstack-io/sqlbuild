@@ -364,6 +364,37 @@ class ModelBackedCursorBuildE2ETestCase:
 
 
 @dataclass(frozen=True)
+class CursorObservationBuildE2ETestCase:
+    """Builds whose successful incremental models must record their cursor MAX as observations."""
+
+    description: str
+    builds: int
+    expected_observations: tuple[tuple[str, str, str, int], ...]
+
+
+@dataclass(frozen=True)
+class DisplayOnlyObservationE2ETestCase:
+    """A wrong cursor observation that plan and build must ignore in favour of the live MAX.
+
+    A misled build would append nothing; the live bound is inclusive, so it re-reads the MAX row.
+    """
+
+    description: str
+    injected_observations: tuple[tuple[str, str, str], ...]
+    added_seed_rows: str
+    expected_row_counts: tuple[tuple[str, int], ...]
+
+
+@dataclass(frozen=True)
+class SourceColumnObservationE2ETestCase:
+    """Commands after which each build, and no plan, must have recorded described source columns."""
+
+    description: str
+    commands: tuple[tuple[str, ...], ...]
+    expected_observations: tuple[tuple[str, str, int], ...]
+
+
+@dataclass(frozen=True)
 class AppendCursorBuildE2ETestCase:
     """Test case for append cursor lower-bound behavior across reruns."""
 

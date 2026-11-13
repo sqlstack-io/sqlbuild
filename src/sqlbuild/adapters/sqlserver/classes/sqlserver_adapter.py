@@ -40,6 +40,7 @@ from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import 
     HistoricalTimestampSnapshotSql,
 )
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
+from sqlbuild.adapter.contract.classes.observations import ObservationsMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.classes.unkeyed_diff import UnkeyedDiffMixin
@@ -133,7 +134,9 @@ def _render_tsql_distinct_condition(*, left: str, right: str) -> str:
     )
 
 
-class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
+class SqlServerAdapter(
+    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+):
     """Microsoft SQL Server adapter backed by pymssql."""
 
     def get_columns_for_relations(
@@ -502,6 +505,17 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
             ),
             table=(database, schema, CONSUMPTION_TABLE_NAME),
             key_columns=("target_schema", "target_name"),
+        )
+
+    def render_create_observations_table_sql(self, *, database: str | None, schema: str) -> str:
+        from sqlbuild._native import OBSERVATIONS_TABLE_NAME
+
+        return self._keyed_state_table_sql(
+            create_sql=super().render_create_observations_table_sql(
+                database=database, schema=schema
+            ),
+            table=(database, schema, OBSERVATIONS_TABLE_NAME),
+            key_columns=("kind", "node"),
         )
 
     def render_create_consumption_index_sqls(

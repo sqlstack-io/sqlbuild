@@ -13,6 +13,7 @@ use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::cursor::scalars::to_inclusive;
 use crate::bindings::_helpers::model_config::typed_config::{config_cursor_bound, model_values};
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
     by_name, config_str, model_key, native_member, optional_text, planner_error, planner_model,
@@ -40,6 +41,7 @@ use pyo3::IntoPyObject;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyFloat, PyTuple};
+use sqlbuild_analysis::planner_changes::constants::FORWARD_ONLY_POLICY;
 use sqlbuild_analysis::planner_warehouse::main::cursor_bounds::cursor_bounds;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_query_groups;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_identity::cursor_query_identity;
@@ -90,6 +92,10 @@ struct CursorModel<'py> {
     effective_grain: Bound<'py, PyAny>,
     start_cursor_config: Bound<'py, PyAny>,
     has_start_override: bool,
+    /// Lookback, a replay on change, a start override or microbatches move the start off the last cursor.
+    replays: bool,
+    /// The `cursor_start` floor's text, which lifts the start when it lies past the last cursor.
+    floor: Option<String>,
     watermark_mode: Bound<'py, PyAny>,
     watermark_all: bool,
     watermark_strategy: bool,
@@ -312,6 +318,29 @@ fn input_grain(reference: &Bound<'_, PyAny>, maps: &ModelMaps<'_>) -> PyResult<O
     }
 }
 
+/// The `cursor_start` floor of a timestamp or integer cursor, the types the replay policy floors.
+fn cursor_floor(model: &Bound<'_, PyAny>, cursor_type: Option<&str>) -> PyResult<Option<String>> {
+    if !cursor_type.is_some_and(|kind| [CURSOR_TYPE_TIMESTAMP, CURSOR_TYPE_INTEGER].contains(&kind))
+    {
+        return Ok(None);
+    }
+    config_cursor_bound(model.py(), &model_values(model)?, "cursor_start")?
+        .map(|raw| raw.str()?.extract())
+        .transpose()
+}
+
+/// Whether a `cursor_start` floor lifts the run's start past the last build's cursor.
+fn floor_lifts(info: &CursorModel<'_>, observed: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let py = observed.py();
+    let (Some(floor), Some(cursor_type)) = (&info.floor, &info.cursor_type) else {
+        return Ok(false);
+    };
+    match scalars::try_parse(&text(py, floor), &text(py, cursor_type))? {
+        Some(floor) => Ok(compare_values(&floor, observed)? > 0),
+        None => Ok(false),
+    }
+}
+
 fn start_override_set(model: &Bound<'_, PyAny>, overrides: &Bound<'_, PyAny>) -> PyResult<bool> {
     if overrides.is_none() {
         return Ok(false);
@@ -471,6 +500,7 @@ fn collect_models<'py>(
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| "all".to_owned());
         let watermark_mode = native_member(py, RecordId::CursorWatermarkMode, &mode)?;
+        let has_start_override = start_override_set(&model, &inputs.cursor_overrides)?;
         models.push(CursorModel {
             target_tag,
             target_relation,
@@ -485,7 +515,13 @@ fn collect_models<'py>(
             upstreams,
             effective_grain,
             start_cursor_config: resolve_start_cursor_config(&model, &inputs.start_cursor_config)?,
-            has_start_override: start_override_set(&model, &inputs.cursor_overrides)?,
+            has_start_override,
+            replays: config_str(&model, "lookback")?.is_some()
+                || config_str(&model, "batch_size")?.is_some()
+                || config_str(&model, "replay_on_change")?
+                    .is_some_and(|policy| policy != FORWARD_ONLY_POLICY)
+                || has_start_override,
+            floor: cursor_floor(&model, cursor_type.as_deref())?,
             watermark_all: watermark_mode.eq("all")?,
             watermark_mode,
             watermark_strategy: strategy.as_deref() == Some("watermark"),
@@ -620,7 +656,7 @@ fn report_cursor_query(
     )
 }
 
-fn bound_task<'py>(
+pub(crate) fn bound_task<'py>(
     py: Python<'py>,
     sql: String,
     (connection, execute): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -697,12 +733,12 @@ fn fan_out<'py>(query: &PhysicalCursorQuery, row: &Bound<'py, PyAny>) -> PyResul
 }
 
 /// The query's MIN/MAX statement, each bound read as text the way the adapter renders it.
-fn adapter_cursor_sql(
-    request: &SnapshotRequest<'_>,
+pub(crate) fn adapter_cursor_sql(
+    adapter: &Bound<'_, PyAny>,
     query: &PhysicalCursorQuery,
 ) -> PyResult<String> {
-    let py = request.adapter.py();
-    let render = native_field(&request.adapter, CURSOR_TEXT_METHOD)?;
+    let py = adapter.py();
+    let render = native_field(adapter, CURSOR_TEXT_METHOD)?;
     let failure: RefCell<Option<PyErr>> = RefCell::new(None);
     let sql: String = cursor_query_sql(query, &|expression: &str| {
         call_with(
@@ -740,7 +776,8 @@ fn execute_queries<'py>(
             if !on_progress.is_none() {
                 on_progress.call1((format!("Inspecting cursor bounds {identity}..."),))?;
             }
-            let outcome = read_cursor_query(py, &adapter_cursor_sql(request, query)?, handles)?;
+            let outcome =
+                read_cursor_query(py, &adapter_cursor_sql(&request.adapter, query)?, handles)?;
             report_cursor_query(py, query, (&outcome, &identity), on_progress)?;
             outcomes.push(outcome);
         }
@@ -756,7 +793,7 @@ fn execute_queries<'py>(
         for query in queries {
             tasks.push(bound_task(
                 py,
-                adapter_cursor_sql(request, query)?,
+                adapter_cursor_sql(&request.adapter, query)?,
                 handles,
             )?);
         }
@@ -1149,6 +1186,51 @@ fn assemble<'py>(
     Ok(snapshots)
 }
 
+/// Plan previews: target `MAX` values from the synced copy; inputs are read when the run starts.
+fn synced_copy_values<'py>(
+    facade: &SyncedCopyAdapter,
+    models: &mut [CursorModel<'py>],
+) -> PyResult<Values<'py>> {
+    let mut values = Values::new();
+    for info in models {
+        let reads_inputs: bool = !info.upstreams.is_empty();
+        info.upstreams.clear();
+        let observed: Option<&str> = info
+            .target_tag
+            .as_ref()
+            .and_then(|_| facade.target_max(&info.model_name));
+        match (&info.target_tag, observed) {
+            (Some(tag), Some(observed)) => {
+                let value = parse_warehouse_cursor(&text(info.effective_grain.py(), observed))?;
+                let lifted = floor_lifts(info, &value)?;
+                values.insert(tag.clone(), value);
+                if reads_inputs && (info.replays || lifted) {
+                    facade.mark_unknown(format!(
+                        "cursor window of {} (the run starts it away from the last build's cursor)",
+                        info.model_name
+                    ));
+                } else if reads_inputs {
+                    facade.mark_window(&info.model_name, observed);
+                }
+                if !info.start_cursor_config.is_none()
+                    && !native_field(&info.start_cursor_config, "max_ahead")?.is_none()
+                {
+                    facade.mark_unknown(format!("future-cursor safety of {}", info.model_name));
+                }
+            }
+            (Some(_), None) => facade.mark_unknown(format!(
+                "cursor position of {} (no successful build recorded it)",
+                info.model_name
+            )),
+            (None, _) if reads_inputs => {
+                facade.mark_unknown(format!("cursor window of {}", info.model_name));
+            }
+            (None, _) => {}
+        }
+    }
+    Ok(values)
+}
+
 /// Cursor MIN/MAX values of the selected incremental models, by model name.
 pub(crate) fn cursor_snapshots<'py>(
     request: &SnapshotRequest<'py>,
@@ -1162,9 +1244,13 @@ pub(crate) fn cursor_snapshots<'py>(
         seeds: by_name(&request.project, "seeds")?,
         functions: by_name(&request.project, "functions")?,
     };
-    let models = collect_models(request, existing_relations, inputs, &maps)?;
+    let mut models = collect_models(request, existing_relations, inputs, &maps)?;
     if models.is_empty() {
         return Ok(PyDict::new(py));
+    }
+    if let Ok(facade) = request.adapter.downcast::<SyncedCopyAdapter>() {
+        let values = synced_copy_values(facade.get(), &mut models)?;
+        return assemble(py, &models, (&values, &HashSet::new()));
     }
     let queries = physical_queries(&models);
     let started = Instant::now();

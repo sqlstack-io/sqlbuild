@@ -502,6 +502,21 @@ CREATE TABLE sqb_warehouse_consumption (
     scan_id {uuid}
 );
 CREATE INDEX sqb_consumption_namespace ON sqb_warehouse_consumption (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE TABLE sqb_warehouse_observations (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    node TEXT NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL,
+    scan_id {uuid}
+);
+CREATE INDEX sqb_observations_namespace ON sqb_warehouse_observations (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_observations_latest ON sqb_warehouse_observations (location_id,target,kind,node,observed_at,event_id);
 CREATE INDEX sqb_freshness_source_latest ON sqb_warehouse_freshness (
     location_id, target, (record_json ->> 'source_name'),
     (record_json ->> 'target_database'), (record_json ->> 'target_schema'),

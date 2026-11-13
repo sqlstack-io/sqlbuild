@@ -11,6 +11,7 @@ use sqlbuild_orchestration::platform::models::{
 };
 use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::time::Instant;
+use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::check_location_connection;
@@ -56,7 +57,8 @@ pub(super) async fn run_location_work(
                 () = tokio::time::sleep_until(deadline) => Ok(()),
             }
         };
-        let checked = perform_work((options, script), claim.request.work, expires).await?;
+        let copy = (client, poll.session_id, claim.generation);
+        let checked = perform_work((options, script), claim.request.work, copy, expires).await?;
         let Some((outcome, local_files)) = checked else {
             drop(write_output(&[(
                 Stream::Stderr,
@@ -122,6 +124,7 @@ pub(super) async fn run_location_work(
 async fn perform_work(
     (options, script): (&LocationServe, &Path),
     work: LocationWork,
+    copy: (&LocationWorkClient, Uuid, i64),
     expires: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationWorkOutcome, Vec<PathBuf>)>, ControlError> {
     let message = match &work {
@@ -150,7 +153,7 @@ async fn perform_work(
             selection,
             settings,
             ..
-        } => plan_location((options, script), (&selection, &settings), expires)
+        } => plan_location((options, script), (&selection, &settings), copy, expires)
             .await?
             .map(|document| (LocationWorkOutcome::Plan { document }, Vec::new())),
     })

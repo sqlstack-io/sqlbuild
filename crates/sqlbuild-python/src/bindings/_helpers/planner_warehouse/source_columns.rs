@@ -4,6 +4,8 @@ use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
+use crate::bindings::_helpers::observations::source_capture::capture_source_columns;
 use crate::bindings::_helpers::planner_phases::objects::{frozenset, text, tuple};
 use crate::bindings::_helpers::planner_warehouse::constants::{
     COLUMN_INFO, METADATA_NAME_FILTER_LIMIT, RELATION_LOOKUP,
@@ -92,18 +94,43 @@ pub(crate) fn source_inspection<'py>(
         let expression = native_field(entry, "expression")?;
         if !expression.is_none() {
             if native_field(entry, "type_enforcement")?.is_truthy()? {
-                let names = call_with(
-                    &native_field(adapter, "query_column_names")?,
-                    &[("connection", connection.clone()), ("sql", expression)],
-                )?;
+                let sql: String = expression.extract()?;
+                let source: Bound<'py, PyAny> = native_field(entry, "name")?;
+                let source_name: String = source.extract()?;
+                let described: Vec<String> = match adapter.downcast::<SyncedCopyAdapter>() {
+                    Ok(facade) => match facade.get().described_columns(&source_name, &sql)? {
+                        Some(described) => described,
+                        None => {
+                            facade.get().mark_unknown(format!(
+                                "query columns of expression source {source_name} (planned as declared)"
+                            ));
+                            native_field(entry, "columns")?
+                                .try_iter()?
+                                .map(|column| native_field(&column?, "name")?.extract())
+                                .collect::<PyResult<_>>()?
+                        }
+                    },
+                    Err(_) => {
+                        let names = call_with(
+                            &native_field(adapter, "query_column_names")?,
+                            &[("connection", connection.clone()), ("sql", expression)],
+                        )?;
+                        let described: Vec<String> = names
+                            .try_iter()?
+                            .map(|name| name?.extract())
+                            .collect::<PyResult<_>>()?;
+                        capture_source_columns(&source_name, &sql, &described);
+                        described
+                    }
+                };
                 let mut columns: Vec<_> = Vec::new();
-                for name in names.try_iter()? {
+                for name in &described {
                     columns.push(call_with(
                         &column_info,
-                        &[("name", name?), ("type", text(py, ""))],
+                        &[("name", text(py, name)), ("type", text(py, ""))],
                     )?);
                 }
-                result.set_item(native_field(entry, "name")?, tuple(py, columns)?)?;
+                result.set_item(source, tuple(py, columns)?)?;
             }
             continue;
         }

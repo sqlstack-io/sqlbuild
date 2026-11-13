@@ -3,7 +3,7 @@
 use sqlbuild_core::constants::STATE_TABLE_NAMES;
 
 /// SQLBuild state tables the janitor never acts on.
-pub const BUILT_IN_EXCLUDE_PATTERNS: [&str; 10] = STATE_TABLE_NAMES;
+pub const BUILT_IN_EXCLUDE_PATTERNS: [&str; 11] = STATE_TABLE_NAMES;
 /// Prefix of every strict janitor archive name.
 pub const ARCHIVE_NAME_PREFIX: &str = "_SQB_ARCHIVE__";
 /// Separator between archive name segments.

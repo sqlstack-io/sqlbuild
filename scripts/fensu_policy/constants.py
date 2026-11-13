@@ -476,3 +476,27 @@ CONTROL_STORE_ALLOWED: RuleOption[tuple[str, ...]] = RuleOption.string_list(
     description="`table.column=reason` entries for state read outside production code.",
 )
 POLICY_CONFIG_FILE: str = "fensu.toml"
+OBSERVATION_ALLOWED_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="allowed_paths",
+    default=(),
+    description=(
+        "`path=reason` entries for the Rust files or directories that may name observation state."
+    ),
+)
+OBSERVATION_STATE_PATTERN: str = (
+    r"\b(?:observations_state|OBSERVATIONS_TABLE_NAME|WarehouseObservationRecord"
+    r"|WarehouseHistoryKind::Observations|_sqlbuild_observations|sqb_warehouse_observations)\b"
+)
+SYNCED_COPY_ALLOWED_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="allowed_paths",
+    default=(),
+    description=(
+        "`path=reason` entries for the Rust files or directories that may name the plan "
+        "preview's synced-copy adapter."
+    ),
+)
+SYNCED_COPY_PATTERN: str = (
+    r"\b(?:SyncedCopyAdapter|SyncedCopyConnection|PLAN_SYNCED_COPY_ENV|"
+    r"WarehouseAccessRefusedError)\b"
+)
+RUST_LINE_COMMENT: str = "//"

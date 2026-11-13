@@ -22,6 +22,7 @@ use crate::bindings::_helpers::freshness::observation::{
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
 use crate::bindings::_helpers::freshness::support::text;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::synced_copy::WarehouseAccessRefusedError;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -32,9 +33,14 @@ use crate::bindings::_helpers::state_rows::freshness::{age_policy, equivalent};
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavailable";
+/// Why a plan preview leaves a source's freshness unknown; its plan lists freshness as unknown.
+pub(crate) const PREVIEW_MESSAGE: &str = "a plan preview does not observe source freshness";
 
-/// The message of an `AdapterUserError` or a source freshness observation error, if it is one.
+/// The message of an adapter, freshness observation or preview access error, if it is one.
 fn handled_message<'py>(py: Python<'py>, error: &PyErr) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if error.is_instance_of::<WarehouseAccessRefusedError>(py) {
+        return Ok(Some(text(py, PREVIEW_MESSAGE)));
+    }
     let value: Bound<'py, PyAny> = error.value(py).clone().into_any();
     if value.is_instance(&host::entry(py, AdapterHost::AdapterUserError)?)? {
         return native_field(&value, "message").map(Some);

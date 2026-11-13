@@ -529,6 +529,18 @@ export type PlanDocument = {
 	column_migrations: { model: string; origin_column: string; destination_column: string; decision: string }[];
 	table_type_conversions: { model: string; actual_type?: string; desired_type?: string }[];
 	retention: { model: string; action?: string }[];
+	/** What a location's preview planned from instead of the warehouse; `null` for a live plan. */
+	synced_copy: PlanSyncedCopy | null;
+};
+
+/** The server's synced copy of warehouse metadata a location's plan preview planned from. */
+export type PlanSyncedCopy = {
+	/** When every table the preview reads last synced; `null` until all of them have. */
+	synced_at: string | null;
+	/** Each incremental model's window start; its end is the latest data when the run starts. */
+	cursor_window_starts: Record<string, string>;
+	/** What the preview could not know, which the run plans live. */
+	unknown_until_run: string[];
 };
 
 /** The location's plan of a build command, or why it could not plan it. */

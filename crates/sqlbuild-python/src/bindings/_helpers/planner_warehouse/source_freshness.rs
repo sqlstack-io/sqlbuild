@@ -4,10 +4,12 @@ use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
+use crate::bindings::_helpers::freshness::planning::PREVIEW_MESSAGE;
 use crate::bindings::_helpers::freshness::planning::{
     build_direct_source_freshness_planning_result, build_direct_source_freshness_propagation_result,
 };
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::planner_phases::objects::{native, replace, text, tuple};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_SCOPE;
@@ -35,7 +37,9 @@ pub(crate) fn source_freshness_unknown_warnings<'py>(
     {
         let unknown = unknown?;
         let reason: String = native_field(&unknown, "reason")?.str()?.extract()?;
-        if freshness_unknown_message(&reason, &[]).is_none() {
+        if freshness_unknown_message(&reason, &[]).is_none()
+            || native_field(&unknown, "message")?.eq(PREVIEW_MESSAGE)?
+        {
             continue;
         }
         let name: String = native_field(&unknown, "source_name")?.extract()?;
@@ -142,11 +146,15 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
             lowered_state.insert(schema?.extract()?);
         }
     }
+    let synced_copy = adapter.is_instance_of::<SyncedCopyAdapter>();
     let exists = PyDict::new(py);
     for schema in &schemas {
         exists.set_item(
             schema,
-            PyBool::new(py, lowered_state.contains(&lower(&text(py, schema))?)),
+            PyBool::new(
+                py,
+                !synced_copy && lowered_state.contains(&lower(&text(py, schema))?),
+            ),
         )?;
     }
     let sources = tuple(
