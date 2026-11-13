@@ -118,7 +118,7 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 /** The queue in claim order; a run the read sent without queue state (it started meanwhile) is left out. */
 export function queueEntriesOf(wires: Wire['RunRecord'][], locationId: string): QueueEntry[] {
 	const runs = toRuns(wires, locationId);
-	return wires.flatMap((wire, i) => (wire.queue ? [{ run: runs[i], position: wire.queue.position, waits: shownWaits(wire.queue.waits.map(toQueueWait)), overlap: null }] : []));
+	return wires.flatMap((wire, i) => (wire.queue ? [{ run: runs[i], position: wire.queue.position, waits: shownWaits(wire.queue.waits.map(toQueueWait)) }] : []));
 }
 
 /** A running run of the same job also holds the job's write claims; name it once. */
@@ -140,6 +140,8 @@ function toQueueWait(wait: Wire['QueueWait']): QueueWait {
 		case 'job_running':
 		case 'group_parent':
 			return { kind: wait.kind, runId: wait.run_id };
+		case 'retry_delay':
+			return { kind: wait.kind, attempt: wait.attempt, dueAt: wait.due_at };
 	}
 }
 

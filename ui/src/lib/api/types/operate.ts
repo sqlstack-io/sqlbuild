@@ -406,20 +406,14 @@ export type QueueWait =
 	| { kind: 'job_running'; runId: string }
 	| { kind: 'upstream_job'; runId: string; jobKey: string }
 	/** A child run waits for its group run to start. */
-	| { kind: 'group_parent'; runId: string };
-
-export type OverlapOutcome = {
-	policy: OverlapPolicy;
-	/** Ticks merged into this waiting run (`coalesce`). */
-	coveredTicks: number;
-	detail: string;
-};
+	| { kind: 'group_parent'; runId: string }
+	/** A retry of a failed run waits out the job's `on_failure` delay. */
+	| { kind: 'retry_delay'; attempt: number; dueAt: Iso };
 
 export type QueueEntry = {
 	run: Run;
 	position: number;
 	waits: QueueWait[];
-	overlap: OverlapOutcome | null;
 };
 
 // ---- timeline ----
@@ -571,8 +565,10 @@ export type RerunMode = 'all' | 'from_failure' | 'selected';
 
 // ---- jobs and job groups ----
 
-export type OverlapPolicy = 'coalesce' | 'queue' | 'allow';
-export type OnFailure = 'skip_dependents' | 'skip_downstream_jobs' | 'stop_group';
+/** What a schedule tick or sensor request does while a run of the job is active; people's runs always queue. */
+export type OverlapPolicy = 'queue' | 'skip';
+/** A failed or partial run reruns from failure up to `retries` times, `retryDelaySeconds` after the last ended. */
+export type OnFailure = { retries: number; retryDelaySeconds: number };
 export type JobKind = 'job' | 'group';
 
 export type RunRef = Pick<Run, 'id' | 'status' | 'startedAt' | 'endedAt'>;
@@ -656,6 +652,8 @@ export type Tick = {
 	outcome: TickOutcome;
 	runId: string | null;
 	coveredByRunId: string | null;
+	/** The run a `skipped` tick yielded to, because the job's overlap is `skip`. */
+	activeRunId: string | null;
 	reason: string | null;
 	/** Evaluated after the grace period (scheduler down or behind). */
 	lateBySeconds: number;
@@ -713,6 +711,8 @@ export type SensorEvaluation = {
 	cursorAfter: string | null;
 	runRequests: number;
 	skipReason: string | null;
+	/** Active runs that matching requests yielded to, because the job's overlap is `skip`. */
+	skippedFor: string[];
 	error: string | null;
 	definitionFingerprint: string;
 };

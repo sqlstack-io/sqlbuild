@@ -7,10 +7,9 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { runKindOriginLabel } from '$lib/status';
-	import { describeWait, overlapHelp, overlapPlain, shortRunId, waitTechnical } from '$lib/operate/labels';
+	import { describeWait, shortRunId, waitTechnical } from '$lib/operate/labels';
 
 	let { entries, resource }: { entries: QueueEntry[]; resource: Resource<unknown> } = $props();
-	const showOverlap = $derived(entries.some((q) => q.overlap));
 
 	let error = $state<string | null>(null);
 	let cancelling = $state<Set<string>>(new Set());
@@ -41,7 +40,6 @@
 				<th class="num" title="Higher priority runs go first; equal priority runs go in queue order">Priority</th>
 				<th>Waiting since</th>
 				<th>Why it waits</th>
-				{#if showOverlap}<th>If more requests arrive</th>{/if}
 				<th></th>
 			</tr>
 		</thead>
@@ -68,11 +66,6 @@
 							<span class="muted">Nothing in the way; it starts on the next scheduler pass</span>
 						{/each}
 					</td>
-					{#if showOverlap}
-						<td class="muted" title={q.overlap ? overlapHelp[q.overlap.policy] : undefined}>
-							{#if q.overlap}<span title="Overlap policy: {q.overlap.policy}">{overlapPlain[q.overlap.policy]}</span><div class="cell-desc">{q.overlap.detail}</div>{:else}—{/if}
-						</td>
-					{/if}
 					<td class="num">
 						<!-- svelte-ignore a11y_click_events_have_key_events -->
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -82,7 +75,7 @@
 					</td>
 				</tr>
 			{:else}
-				<LoadRow colspan={showOverlap ? 8 : 7} {resource} empty="Nothing is waiting. Runs wait here while another run is updating the same data, all slots are in use, or an earlier job hasn't finished." />
+				<LoadRow colspan={7} {resource} empty="Nothing is waiting. Runs wait here while another run is updating the same data, all slots are in use, or an earlier job hasn't finished." />
 			{/each}
 		</tbody>
 	</table>

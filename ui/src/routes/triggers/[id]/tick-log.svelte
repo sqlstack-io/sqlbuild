@@ -41,6 +41,7 @@
 				<td class="mono">
 					{#if t.runId}<a href={to(`/runs/${t.runId}`)} title={t.runId}>{shortRunId(t.runId)}</a>
 					{:else if t.coveredByRunId}<span class="sans">Merged into run <a href={to(`/runs/${t.coveredByRunId}`)} title={t.coveredByRunId}>{shortRunId(t.coveredByRunId)}</a> (already waiting)</span>
+					{:else if t.activeRunId}<span class="sans">Run <a href={to(`/runs/${t.activeRunId}`)} title={t.activeRunId}>{shortRunId(t.activeRunId)}</a> was still active</span>
 					{:else}<span class="faint">—</span>{/if}
 				</td>
 				<td class="faint nowrap">{t.lateBySeconds > LATE_AFTER_SECONDS ? formatSeconds(t.lateBySeconds) : '—'}</td>

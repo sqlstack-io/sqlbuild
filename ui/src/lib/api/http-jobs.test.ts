@@ -61,7 +61,9 @@ describe('trigger mapping', () => {
 
 	it('reports lateness from evaluation time and hides sensor parts the server lacks', () => {
 		const tick = toTick({ tick_id: 'k1', trigger_id: 't-daily', epoch: 1, scheduled_for: '2026-11-07T06:00:00Z', evaluated_at: '2026-11-07T06:02:30Z', outcome: 'requested', run_id: 'r-new' });
-		expect(tick.lateBySeconds).toBe(150);
+		expect([tick.lateBySeconds, tick.activeRunId]).toEqual([150, null]);
+		const skipped = toTick({ tick_id: 'k2', trigger_id: 't-daily', epoch: 1, scheduled_for: '2026-11-07T07:00:00Z', evaluated_at: '2026-11-07T07:00:01Z', outcome: 'skipped', active_run_id: 'r-busy' });
+		expect([skipped.outcome, skipped.runId, skipped.activeRunId]).toEqual(['skipped', null, 'r-busy']);
 		const detail = triggerDetailOf(toTrigger(onInventory, [], tick), onInventory, [tick], []);
 		expect(detail.sensor).toMatchObject({ minimumIntervalSeconds: 60, cursorKnown: false });
 		expect([detail.declaration, detail.upcoming, detail.catchUp, detail.evaluations, detail.stateHistory]).toEqual([null, null, null, null, []]);
@@ -79,6 +81,7 @@ describe('trigger mapping', () => {
 			cursor_after: after,
 			run_count: after ? 2 : 0,
 			failure_code: after ? null : 'location_unreachable',
+			skipped_for: after ? ['r-busy', 'r-busy'] : [],
 			definition_fingerprint: fingerprint
 		});
 		const state: W['PersonSensorState'] = {
@@ -94,9 +97,9 @@ describe('trigger mapping', () => {
 		const detail = triggerDetailOf(toTrigger(onInventory, [], null), onInventory, [], [reset], state);
 		expect(detail.sensor).toMatchObject({ cursor: 'feed/page-[REDACTED]', cursorKnown: true, cursorUpdatedAt: '2026-11-07T06:00:05Z', currentFingerprint: 'v2', lastEvaluatedFingerprint: 'v1' });
 		expect(detail.definitionChanged).toBe(true);
-		expect(detail.evaluations?.map((e) => [e.id, e.outcome, e.cursorBefore, e.cursorAfter, e.error])).toEqual([
-			['e-new', 'failed', 'event 40', null, 'location_unreachable'],
-			['e-old', 'completed', null, 'event 40', null]
+		expect(detail.evaluations?.map((e) => [e.id, e.outcome, e.cursorBefore, e.cursorAfter, e.error, e.skippedFor])).toEqual([
+			['e-new', 'failed', 'event 40', null, 'location_unreachable', []],
+			['e-old', 'completed', null, 'event 40', null, ['r-busy', 'r-busy']]
 		]);
 		expect(detail.runRequests).toEqual([{ runKey: 'stock-7', runId: 'r-7', evaluationId: 'e-old', requestedAt: '2026-11-07T06:00:05Z', runStatus: 'success' }]);
 		const fresh = triggerDetailOf(toTrigger(onInventory, [], null), onInventory, [], [], { ...state, cursor: null, evaluations: [] });
@@ -105,7 +108,7 @@ describe('trigger mapping', () => {
 });
 
 describe('job mapping', () => {
-	it('links a job to its triggers and newest run, shows where it is declared, and leaves unreported policy null', () => {
+	it('links a job to its triggers and newest run, and shows where it is declared, its owner, overlap and retries', () => {
 		const wire: W['JobRecord'] = {
 			job_key: 'orders',
 			kind: 'job',
@@ -114,11 +117,15 @@ describe('job mapping', () => {
 			concurrency_groups: ['warehouse_heavy'],
 			snapshot_id: SNAPSHOT,
 			select: '+orders',
-			declared_at: { path: 'orchestration/jobs.py', line: 12 }
+			declared_at: { path: 'orchestration/jobs.py', line: 12 },
+			owner: '  Orders team ',
+			overlap: 'skip',
+			on_failure: { retries: 2, retry_delay_seconds: 300 }
 		};
 		const triggers = [toTrigger(daily, [], null), toTrigger(onInventory, [], null)];
 		const job = toJob(wire, triggers, [run('r-inv', 'inventory', null), run('r-ord', 'orders', null)]);
-		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrencyGroups: ['warehouse_heavy'], select: '+orders', sourceFile: 'orchestration/jobs.py:12', overlap: null, priority: null });
+		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrencyGroups: ['warehouse_heavy'], select: '+orders', sourceFile: 'orchestration/jobs.py:12', owner: 'Orders team', overlap: 'skip', onFailure: { retries: 2, retryDelaySeconds: 300 }, priority: null });
+		expect(toJob({ ...wire, owner: ' ', overlap: 'queue', on_failure: null }, triggers, [])).toMatchObject({ owner: null, overlap: 'queue', onFailure: null });
 		expect(job.lastRun?.id).toBe('r-ord');
 		const detail = jobDetailOf(job, { ...wire, settings: { vars: '[REDACTED]', concurrency: 4, empty_ok: true, models: ['a', 'b'] }, members: [], member_of: ['nightly'], critical_nodes: ['model:orders'], exclude: ' stg_orders  audit_orders', targets: ['production'], cursor_type: 'integer' });
 		expect(detail.resolvedNodes).toEqual(['model:customers', 'model:orders']);
@@ -145,6 +152,7 @@ describe('job mapping', () => {
 			targets: [],
 			declared_at: null,
 			cursor_type: null,
+			overlap: 'queue',
 			members: [
 				{ job_key: 'stock', waits_for: [] },
 				{ job_key: 'orders', waits_for: [] },

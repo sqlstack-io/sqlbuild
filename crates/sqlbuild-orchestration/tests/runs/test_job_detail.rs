@@ -10,6 +10,7 @@ use crate::credentials::models::{BuiltinRole, DefaultRole, RoleAssignmentRequest
 use crate::credentials::tests::role_helpers::{
     SUPPORT_ROLE, assign, credentials, orders_grant, role_fixture,
 };
+use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::read_person_job::read_person_job;
 use crate::runs::_helpers::requests::job::frozen_group_children;
 use crate::runs::main::{
@@ -65,7 +66,9 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     "warehouse": "postgres://orders:orders-db-pass@warehouse.example.test/orders",
                     "concurrency": 4},
                     "select": "orders", "targets": ["development"],
-                    "declared_at": {"path": "orchestration/jobs.py", "line": 7}},
+                    "declared_at": {"path": "orchestration/jobs.py", "line": 7},
+                    "owner": "Orders team", "overlap": "skip",
+                    "on_failure": {"retries": 2, "retry_delay_seconds": 300}},
                 "customers": {"description": "Build customers", "selection": ["customers"]},
             }));
             input.documents.insert(
@@ -136,6 +139,41 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     Some("integer")
                 ),
                 "{}: the selector as written, its targets, where it is declared and its nodes' cursor type",
+                test_case.description
+            );
+            let listed = list_person_jobs(
+                store,
+                administrator,
+                (location, "development"),
+                DefaultRole::None,
+            )
+            .await
+            .expect("administrator lists jobs");
+            let policies =
+                |owner: &Option<String>, overlap, on_failure| json!([owner, overlap, on_failure]);
+            assert_eq!(
+                (
+                    policies(&job.owner, job.overlap, job.on_failure),
+                    listed
+                        .iter()
+                        .map(|record| (
+                            record.job_key.as_str(),
+                            policies(&record.owner, record.overlap, record.on_failure)
+                        ))
+                        .collect::<Vec<_>>()
+                ),
+                (
+                    json!(["Orders team", "skip", {"retries": 2, "retry_delay_seconds": 300}]),
+                    vec![
+                        ("customers", json!([null, "queue", null])),
+                        (
+                            "daily_orders",
+                            json!(["Orders team", "skip", {"retries": 2, "retry_delay_seconds": 300}])
+                        ),
+                        ("orders_group", json!([null, "queue", null]))
+                    ]
+                ),
+                "{}: owner, overlap and retries read as declared, and an undeclared job queues without retries",
                 test_case.description
             );
             let group = read(administrator, "orders_group")

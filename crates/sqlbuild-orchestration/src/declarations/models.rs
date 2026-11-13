@@ -155,6 +155,8 @@ pub struct JobRecord {
     pub select: Option<String>,
     pub declared_at: Option<DeclaredAt>,
     pub owner: Option<String>,
+    pub overlap: Overlap,
+    pub on_failure: Option<OnFailure>,
 }
 
 /// A `sqb_jobs` row as stored.
