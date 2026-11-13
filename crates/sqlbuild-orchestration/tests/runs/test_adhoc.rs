@@ -286,7 +286,8 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             );
             let audit = rows(
                 store,
-                "SELECT after_json FROM sqb_security_audit WHERE action='run.adhoc_requested'",
+                "SELECT after_json FROM sqb_security_audit WHERE action='run.adhoc_requested' \
+                 ORDER BY occurred_at, event_id",
                 Vec::new(),
             )
             .await;
