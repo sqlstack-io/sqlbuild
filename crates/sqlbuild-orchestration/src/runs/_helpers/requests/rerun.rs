@@ -9,7 +9,9 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
-use crate::runs::models::{RerunRequest, RunOrigin, RunRequest, RunStatus};
+use crate::runs::models::{RerunRequest, RunCommand, RunKind, RunOrigin, RunRequest, RunStatus};
+use crate::snapshots::constants::SOURCE_KEY_PREFIX;
+use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -58,9 +60,6 @@ pub(crate) async fn frozen_rerun(
             .await?;
         }
         frozen.selection.retain(|key| named.contains(key.as_str()));
-        frozen
-            .write_set
-            .retain(|key| frozen.selection.contains(key));
     }
     if request.from_failure {
         let rows;
@@ -75,9 +74,21 @@ pub(crate) async fn frozen_rerun(
             .filter_map(|row| row["node_key"].as_str())
             .collect();
         frozen.selection.retain(|key| failed.contains(key.as_str()));
-        frozen
-            .write_set
-            .retain(|key| frozen.selection.contains(key));
+    }
+    let writers;
+    (transaction, writers) = job_write_set(
+        transaction,
+        frozen.snapshot_id,
+        (&frozen.selection, &frozen.settings),
+    )
+    .await?;
+    frozen.write_set.retain(|key| writers.contains(key));
+    if frozen.command == RunCommand::Build && frozen.kind != RunKind::Group {
+        frozen.write_set.extend(
+            writers
+                .into_iter()
+                .filter(|key| key.starts_with(SOURCE_KEY_PREFIX)),
+        );
     }
     frozen.run_id = request.run_id;
     frozen.origin = RunOrigin::Rerun;

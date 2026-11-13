@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::credentials::models::AuditContext;
 use crate::runs::main::queue_run::queue_run;
 use crate::runs::models::RunRequest;
+use crate::snapshots::constants::SOURCE_KEY_PREFIX;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -59,10 +60,13 @@ pub(crate) async fn publish_request(
 ) -> Result<(ControlTransaction, bool), ControlError> {
     if request.requested_by.trim().is_empty()
         || request.selection.is_empty()
-        || !request.write_set.is_subset(&request.selection)
+        || request
+            .write_set
+            .iter()
+            .any(|key| !request.selection.contains(key) && !key.starts_with(SOURCE_KEY_PREFIX))
     {
         return Err(ControlError::Invalid(
-            "run needs an actor, selection and a contained write set".into(),
+            "run needs an actor, selection and a write set within it or its loaded sources".into(),
         ));
     }
     let (transaction, previous) = query(

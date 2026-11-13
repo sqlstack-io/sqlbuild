@@ -59,6 +59,15 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 ip_address: None,
             };
             let mut input = snapshot(location);
+            let mut managed = input.nodes["orders"].clone();
+            managed.kind = "source".into();
+            managed.definition = json!({"entry": {"loader": "load_raw_orders"}});
+            input.nodes.insert("source:raw_orders".into(), managed);
+            input
+                .nodes
+                .get_mut("orders")
+                .expect("orders model")
+                .definition = json!({"materialization": "table", "deps": ["source:raw_orders"]});
             input.documents.insert("jobs".into(), json!({
                 "staging": {"description": "Stage orders", "selection": ["orders", "customers"], "concurrency_groups": ["warehouse"], "settings": {"vars": {"batch": 23}}},
                 "marts": {"description": "Build inventory", "selection": ["inventory"], "concurrency_groups": ["inventory_limit"]},

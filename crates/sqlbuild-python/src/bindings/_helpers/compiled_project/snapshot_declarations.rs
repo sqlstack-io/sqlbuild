@@ -163,7 +163,7 @@ pub(crate) fn compile_declarations(
                     .collect(),
             );
         }
-        let dependencies = group_dependencies(&input, &jobs, (&members, &after))
+        let dependencies = group_dependencies((&group.name, &input), &jobs, (&members, &after))
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         let selection: BTreeSet<String> = members
             .iter()
