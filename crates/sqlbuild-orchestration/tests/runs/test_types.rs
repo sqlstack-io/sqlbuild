@@ -265,3 +265,13 @@ pub(crate) struct JobDetailTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_order: [&'static str; 2],
 }
+
+#[derive(Debug)]
+pub(crate) struct RetryChainTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Attempt numbers of the retries claimed, in order, while every run fails.
+    pub(crate) expected_attempts: Vec<u8>,
+    /// The wait a one-hour retry delay shows while the retry is queued.
+    pub(crate) expected_delayed_attempt: u8,
+}

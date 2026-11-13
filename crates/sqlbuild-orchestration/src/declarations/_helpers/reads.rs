@@ -88,6 +88,7 @@ pub(crate) async fn jobs_in(
             snapshot_id: job.snapshot_id,
             select: job.definition_json.select,
             declared_at: job.definition_json.declared_at,
+            owner: job.definition_json.owner,
         })
         .collect();
     Ok((transaction, jobs))
@@ -99,7 +100,7 @@ pub(crate) async fn latest_ticks_in(
     (location_id, target): (Uuid, &str),
 ) -> Result<(ControlTransaction, Vec<TickRecord>), ControlError> {
     query_records(transaction,
-        "SELECT k.tick_id, k.trigger_id, k.scheduled_for, k.evaluated_at, k.epoch, k.outcome, k.run_id, k.covered_by_run_id \
+        "SELECT k.tick_id, k.trigger_id, k.scheduled_for, k.evaluated_at, k.epoch, k.outcome, k.run_id, k.covered_by_run_id, k.active_run_id \
          FROM sqb_triggers t JOIN sqb_ticks k ON k.tick_id=(SELECT x.tick_id FROM sqb_ticks x WHERE x.trigger_id=t.trigger_id \
          ORDER BY x.scheduled_for DESC LIMIT 1) \
          WHERE t.location_id=$1 AND t.target=$2 AND t.removed_in_snapshot_id IS NULL",

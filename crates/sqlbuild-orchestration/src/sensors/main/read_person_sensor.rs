@@ -118,6 +118,7 @@ async fn evaluations(
                 cursor_after: None,
                 run_count: 0,
                 failure_code: None,
+                skipped_for: Vec::new(),
                 definition_fingerprint: request.definition_fingerprint.clone(),
             });
         let outcome = event.fact_json.outcome;
@@ -127,9 +128,14 @@ async fn evaluations(
         check.phase = outcome.phase().into();
         check.finished_at = Some(event.occurred_at);
         match outcome {
-            SensorEvaluationOutcome::Completed { cursor, run_ids } => {
+            SensorEvaluationOutcome::Completed {
+                cursor,
+                run_ids,
+                skipped,
+            } => {
                 check.cursor_after = Some(shown_cursor(&cursor, evidence));
                 check.run_count = run_ids.len();
+                check.skipped_for = skipped.iter().map(|skip| skip.active_run_id).collect();
             }
             SensorEvaluationOutcome::Failed { code } => check.failure_code = Some(code),
             _ => {}

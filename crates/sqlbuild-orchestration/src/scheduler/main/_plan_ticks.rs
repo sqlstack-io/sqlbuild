@@ -9,7 +9,7 @@ use crate::scheduler::main::next_schedule_time::next_schedule_time;
 use crate::scheduler::models::{TickPlan, TickState};
 use crate::store::errors::ControlError;
 
-/// Only the latest missed occurrence ticks; a waiting unclaimed run covers it instead of queueing another.
+/// Only the latest missed occurrence ticks; a waiting unclaimed run covers it, and an active run skips it unless earlier occurrences were missed.
 pub(in crate::scheduler) fn plan_ticks(
     trigger: &TriggerDefinition,
     state: &TickState,
@@ -23,9 +23,16 @@ pub(in crate::scheduler) fn plan_ticks(
             .ok_or_else(|| ControlError::Invalid("trigger start is out of range".into()))?,
     };
     let latest = latest_occurrence(trigger, now)?.filter(|time| *time > after);
+    let catching_up = match latest {
+        Some(time) => {
+            next_schedule_time(&trigger.schedule, after)?.is_some_and(|first| first < time)
+        }
+        None => false,
+    };
+    let active_run = state.active_run.filter(|_| !catching_up);
     Ok(TickPlan {
         actions: latest
-            .map(|time| action(state.trigger_id, time, state.waiting_run))
+            .map(|time| action(state.trigger_id, time, (state.waiting_run, active_run)))
             .into_iter()
             .collect(),
         last_tick_for: latest.or(state.last_tick_for),

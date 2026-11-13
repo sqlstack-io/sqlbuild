@@ -67,6 +67,9 @@ pub async fn read_person_job(
         exclude: job.exclude,
         targets: job.targets,
         declared_at: job.declared_at,
+        owner: job.owner,
+        overlap: job.overlap,
+        on_failure: job.on_failure,
     }))
 }
 

@@ -58,6 +58,10 @@ pub async fn claim_next_run<'a>(
         }
         for row in rows {
             let candidate: QueueCandidate = decode_row(row)?;
+            if !candidate.request_json.due(transaction.now) {
+                after = Some(candidate);
+                continue;
+            }
             let ready;
             (transaction, ready) = child_ready(transaction, &candidate.request_json).await?;
             if !ready {

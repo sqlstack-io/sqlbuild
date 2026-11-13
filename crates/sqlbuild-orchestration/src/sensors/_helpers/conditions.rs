@@ -1,20 +1,20 @@
 //! Each native condition consumes its bounded page inside the evaluation transaction.
 
-use uuid::Uuid;
-
 use crate::sensors::_helpers::nodes::{
     consume_node_events, consume_source_events, consume_stale_sources,
 };
 use crate::sensors::_helpers::platform::consume_platform_events;
 use crate::sensors::_helpers::runs::consume_run_events;
-use crate::sensors::models::{SensorCondition, SensorCursor, SensorEvaluationRequest};
+use crate::sensors::models::{
+    SensorCondition, SensorCursor, SensorEvaluationRequest, SensorRequests,
+};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 
 pub(crate) async fn consume_condition(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
-) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
+) -> Result<(ControlTransaction, (SensorCursor, SensorRequests)), ControlError> {
     match &evaluation.definition.when {
         SensorCondition::Custom { .. } => Err(ControlError::Invalid(
             "custom sensors require a location result".into(),

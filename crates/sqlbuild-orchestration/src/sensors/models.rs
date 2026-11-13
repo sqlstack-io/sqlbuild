@@ -158,12 +158,29 @@ pub enum SensorEvaluationOutcome {
     Completed {
         cursor: SensorCursor,
         run_ids: Vec<Uuid>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        skipped: Vec<SkippedRequest>,
     },
     Failed {
         code: String,
     },
     TimedOut,
     Abandoned,
+}
+
+/// A run key the sensor matched but did not queue: the job's overlap is `skip` and `active_run_id` was active.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SkippedRequest {
+    pub run_key: String,
+    pub active_run_id: Uuid,
+}
+
+/// The runs one evaluation queued and the requests it skipped, in match order.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SensorRequests {
+    pub run_ids: Vec<Uuid>,
+    pub skipped: Vec<SkippedRequest>,
 }
 
 impl SensorEvaluationOutcome {
@@ -229,6 +246,8 @@ pub struct PersonSensorEvaluation {
     pub run_count: usize,
     /// The failure code of a failed check.
     pub failure_code: Option<String>,
+    /// For each matched request the job's `skip` overlap dropped, the run that was active.
+    pub skipped_for: Vec<Uuid>,
     pub definition_fingerprint: String,
 }
 
