@@ -3,6 +3,7 @@
 use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
+use crate::runs::main::active_job_run::active_job_run;
 use crate::scheduler::_helpers::persistence::persist_ticks;
 use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::main::check_lease::check_lease;
@@ -42,9 +43,9 @@ pub(crate) async fn evaluate_trigger(
     let now = transaction.now;
     let (transaction, rows) = query(
         transaction,
-        "SELECT r.run_id FROM sqb_runs r WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \
+        "SELECT r.run_id, r.request_json FROM sqb_runs r WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \
          AND r.status='queued' AND r.cancel_requested_at IS NULL \
-         AND r.worker_instance IS NULL ORDER BY r.queued_at, r.run_id LIMIT 1",
+         AND r.worker_instance IS NULL ORDER BY r.queued_at, r.run_id",
         vec![
             Parameter::Id(trigger.location_id),
             Parameter::Text(trigger.target.clone()),
@@ -52,13 +53,25 @@ pub(crate) async fn evaluate_trigger(
         ],
     )
     .await?;
-    let waiting_run = rows
-        .first()
-        .and_then(|row| row.get("run_id"))
-        .and_then(serde_json::Value::as_str)
-        .map(Uuid::parse_str)
-        .transpose()
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
+    let covering: Vec<_> = rows
+        .into_iter()
+        .filter(|row| {
+            row["request_json"]
+                .get("retry")
+                .is_none_or(serde_json::Value::is_null)
+        })
+        .take(1)
+        .collect();
+    let waiting_run = first_run(&covering)?;
+    let (transaction, active_run) = if trigger.job_json.overlap.is_queue() {
+        (transaction, None)
+    } else {
+        active_job_run(
+            transaction,
+            (trigger.location_id, &trigger.target, &trigger.job_key),
+        )
+        .await?
+    };
     let plan = plan_ticks(
         &trigger.definition_json,
         &TickState {
@@ -66,6 +79,7 @@ pub(crate) async fn evaluate_trigger(
             started_at: trigger.started_at,
             last_tick_for: trigger.last_tick_for,
             waiting_run,
+            active_run,
         },
         now,
     )?;
@@ -73,4 +87,13 @@ pub(crate) async fn evaluate_trigger(
     let transaction = check_lease(transaction, lease).await?;
     commit(transaction).await?;
     Ok(Some(plan))
+}
+
+fn first_run(rows: &[crate::store::types::Row]) -> Result<Option<Uuid>, ControlError> {
+    rows.first()
+        .and_then(|row| row.get("run_id"))
+        .and_then(serde_json::Value::as_str)
+        .map(Uuid::parse_str)
+        .transpose()
+        .map_err(|error| ControlError::Invalid(error.to_string()))
 }

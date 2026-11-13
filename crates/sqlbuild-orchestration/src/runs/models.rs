@@ -163,6 +163,25 @@ pub struct RunRequest {
     /// The selectors a person narrowed a job run with; reruns copy it with the rest of the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub narrowing: Option<RunNarrowing>,
+    /// Set on an automatic retry of a failed run, which is not claimed before `not_before`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry: Option<RunRetry>,
+}
+
+/// Which retry of the job's `on_failure` policy a run is, and when it may start.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RunRetry {
+    pub attempt: u8,
+    pub not_before: DateTime<Utc>,
+}
+
+impl RunRequest {
+    /// Whether a queued run may start at `now`: only a retry still waiting out its delay may not.
+    #[must_use]
+    pub fn due(&self, now: DateTime<Utc>) -> bool {
+        self.retry.is_none_or(|retry| retry.not_before <= now)
+    }
 }
 
 /// A trusted operator names a published job; execution inputs are never supplied by the caller.
@@ -307,6 +326,8 @@ pub enum QueueWait {
     },
     /// An earlier queued run takes the same concurrency limit, so it goes first.
     EarlierRun { run_id: Option<Uuid>, limit: String },
+    /// An automatic retry waits out the job's retry delay.
+    RetryDelay { attempt: u8, due_at: DateTime<Utc> },
 }
 
 /// The `sqb build` selectors one run of a job was narrowed with.

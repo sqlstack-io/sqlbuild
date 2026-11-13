@@ -17,8 +17,11 @@ pub(super) struct TickTestCase {
     pub(super) last_second: Option<i64>,
     pub(super) now_second: i64,
     pub(super) active: bool,
+    /// Another run of the job is running and the job's overlap is `skip`.
+    pub(super) running: bool,
     pub(super) expected_requests: Vec<i64>,
     pub(super) expected_covered: Vec<i64>,
+    pub(super) expected_skipped: Vec<i64>,
     pub(super) expected_last: Option<i64>,
     pub(super) expected_next: Option<i64>,
 }

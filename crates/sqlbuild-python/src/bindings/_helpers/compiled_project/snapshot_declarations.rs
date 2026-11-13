@@ -141,6 +141,9 @@ pub(crate) fn compile_declarations(
                 exclude: Some(job.exclude).filter(|exclude| !exclude.trim().is_empty()),
                 targets,
                 declared_at,
+                owner: job.controls.owner,
+                overlap: job.controls.overlap,
+                on_failure: job.controls.on_failure,
             },
         );
     }
@@ -193,6 +196,9 @@ pub(crate) fn compile_declarations(
                     exclude: None,
                     targets,
                     declared_at,
+                    owner: group.controls.owner,
+                    overlap: group.controls.overlap,
+                    on_failure: group.controls.on_failure,
                 },
                 jobs: dependencies,
             },
