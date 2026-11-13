@@ -538,16 +538,28 @@ export class MockOperate {
 		if (check.error) return this.#ctx.reply({ plan: null, error: check.error });
 		if (check.verb !== 'build') return this.#ctx.reply({ plan: null, error: `sqb plan previews builds; sqb ${check.verb} cannot be planned` });
 		const reason = command.includes('--full-refresh') ? 'full_refresh' : 'no_change';
-		const models = check.selection.filter((key) => key.startsWith('model:')).map((key) => ({
-			name: key.slice('model:'.length),
-			materialization_type: 'table',
-			action: 'create_table',
-			reason,
-			backfill: { action: reason === 'full_refresh' ? 'full' : 'forward', duration: null },
-			qualified_name: `main.${key.slice('model:'.length)}`
-		}));
+		const modelKinds = new Set(['view', 'table', 'incremental']);
+		const models = check.selection.filter((key) => modelKinds.has(snapshotNode(key)?.kind ?? '')).map((key) => {
+			const incremental = snapshotNode(key)?.kind === 'incremental';
+			return {
+				name: key,
+				materialization_type: incremental ? 'incremental' : 'table',
+				action: incremental ? 'incremental_append' : 'create_table',
+				reason: incremental && reason === 'no_change' ? 'normal_incremental' : reason,
+				backfill: { action: reason === 'full_refresh' ? 'full' : 'forward', duration: null },
+				qualified_name: `main.${key}`,
+				...(incremental ? { incremental_strategy: 'append', cursor_column: 'updated_at', cursor_type: 'timestamp' } : {})
+			};
+		});
+		// Locations plan from the server's synced copy: incremental windows start at the synced cursor.
+		const windowStart = new Date(Date.now() - 3_600_000).toISOString().slice(0, 19).replace('T', ' ');
+		const synced_copy = {
+			synced_at: new Date(Date.now() - 300_000).toISOString(),
+			cursor_window_starts: Object.fromEntries(models.filter((m) => m.materialization_type === 'incremental' && reason !== 'full_refresh').map((m) => [m.name, windowStart])),
+			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas']
+		};
 		return this.#ctx.reply({
-			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [] },
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy },
 			error: null
 		});
 	}
