@@ -37,7 +37,8 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 
 /**
  * A `fetch` for the server client that replays `load()`'s recording. A GET matches its path and
- * query; failing that, its path with the same non-time query values; failing that, its path alone.
+ * query; failing that, the same non-time query values; failing that, the same values apart from
+ * page size. Anything else, such as a node the recording doesn't hold, has no recording.
  * A read sent as POST matches its path and body apart from ids, and later reads of the ids it
  * chose are answered for the recorded ones.
  */
@@ -70,12 +71,15 @@ export function replayFetch(load: () => Promise<Recording>, now: () => number = 
 
 		// Query times were moved forward with the data, so move them back before comparing.
 		const query = sortedQuery(url).map(([key, value]): [string, string] => [key, isTime(value) ? shiftTimes(value, -shift) : value]);
+		// Page sizes may differ from the recording's, but every other value names what is asked for:
+		// a different node_key is a different item and must not borrow another item's answer.
 		const timeless = (q: [string, string][]) => JSON.stringify(q.filter(([, value]) => !isTime(value)));
+		const sizeless = (q: [string, string][]) => JSON.stringify(q.filter(([key, value]) => key !== 'limit' && !isTime(value)));
 		const gets = responses.filter((r) => r.method === 'GET' && r.parsed.pathname === path);
 		const found =
 			gets.find((r) => JSON.stringify(sortedQuery(r.parsed)) === JSON.stringify(query)) ??
 			gets.find((r) => timeless(sortedQuery(r.parsed)) === timeless(query)) ??
-			gets[0];
+			gets.find((r) => sizeless(sortedQuery(r.parsed)) === sizeless(query));
 		return found ? answer(found) : json(404, { message: 'This demo has no recording of this page.' });
 	};
 }

@@ -34,14 +34,17 @@ const ITEM_LISTS = [
 	[/\/targets\/[^/]+\/runs\?/, 'runs', (item) => item.run_id],
 	[/\/targets\/[^/]+\/triggers$/, 'triggers', (item) => item.trigger_id],
 ];
-/** Catalog pages only for the nodes the recording holds, since there are hundreds of nodes. */
+/** Catalog and check pages only for the items the recording holds, since there are hundreds. */
 const RECORDED_NODE = /\/targets\/[^/]+\/nodes\/([^/?]+)\/sql$/;
+const RECORDED_CHECK = /\/targets\/[^/]+\/checks\/([^/?]+)$/;
 
 const recording = JSON.parse(gunzipSync(readFileSync(recordingPath)).toString('utf8'));
 const items = new Set();
 for (const { url, text } of recording.responses) {
 	const node = url.match(RECORDED_NODE);
 	if (node) items.add(`catalog/${decodeURIComponent(node[1])}`);
+	const check = url.match(RECORDED_CHECK);
+	if (check) items.add(`checks/${decodeURIComponent(check[1])}`);
 	for (const [pattern, page, key] of ITEM_LISTS) {
 		if (!pattern.test(url)) continue;
 		const list = JSON.parse(text);

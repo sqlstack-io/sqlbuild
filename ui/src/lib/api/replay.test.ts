@@ -31,9 +31,12 @@ describe('demo replay', () => {
 		expect(await response.json()).toEqual([{ id: 'older', queued_at: '2026-11-29T09:30:00.000Z' }]);
 	});
 
-	it('ignores times worked out from the clock, but not other query values', async () => {
+	it('ignores times worked out from the clock and page sizes, but not other query values', async () => {
 		const fetch = replay();
 		expect((await get(fetch, '/api/stats?name=orders&after_observed_at=2026-11-23T13:05:00.000Z')).status).toBe(200);
+		expect(await (await get(fetch, '/api/runs?limit=1')).json()).toEqual([{ id: 'newest', queued_at: '2026-11-30T11:00:00.000Z' }]);
+		// Another node's statistics are not this node's.
+		expect((await get(fetch, '/api/stats?name=customers&after_observed_at=2026-11-23T13:05:00.000Z')).status).toBe(404);
 		expect(await (await get(fetch, '/api/nothing-recorded')).json()).toEqual({ message: 'This demo has no recording of this page.' });
 	});
 
