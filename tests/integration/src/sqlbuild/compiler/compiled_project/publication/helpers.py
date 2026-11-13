@@ -525,6 +525,18 @@ def wait_for_log(
         time.sleep(0.02)
 
 
+def wait_for_idle_sync(process: subprocess.Popen[bytes], log: Path) -> None:
+    """Wait until the latest synchronization has completed, so a held lock meets the next one."""
+
+    deadline: float = time.monotonic() + 45
+    text: str = log.read_text()
+    while text.rfind("synchronization completed.") < text.rfind("Reading warehouse history"):
+        assert process.poll() is None, text
+        assert time.monotonic() < deadline, text
+        time.sleep(0.05)
+        text = log.read_text()
+
+
 def location_health_reports(api: SnapshotApi) -> list[dict[str, Any]]:
     request: Request = Request(
         f"{api.url}/api/locations/{api.location_id}/health",

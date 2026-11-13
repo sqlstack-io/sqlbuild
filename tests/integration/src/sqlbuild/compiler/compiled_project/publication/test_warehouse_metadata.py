@@ -69,6 +69,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     snapshot_api,
     sync_warehouse_history,
     wait_for_generation,
+    wait_for_idle_sync,
     wait_for_location_work,
     wait_for_warehouse_sync_health,
     warehouse_history_page,
@@ -1164,6 +1165,7 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                 assert (project / "warehouse.db").exists() == availability["available"]
             held_locks: list[dict[str, Any]] = fixture["held_write_lock"][test_case.adapter_name]
             for held_lock in held_locks:
+                wait_for_idle_sync(location, log)
                 lock: duckdb.DuckDBPyConnection = hold_write_lock(project / "warehouse.db")
                 record_finished_run(control)
                 reports = wait_for_warehouse_sync_health(
