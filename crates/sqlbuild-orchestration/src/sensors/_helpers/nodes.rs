@@ -5,11 +5,11 @@ use std::num::NonZeroU32;
 
 use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
-use uuid::Uuid;
 
 use crate::sensors::_helpers::requests::queue_sensor_run;
 use crate::sensors::_helpers::transitions::matches_transition;
 use crate::sensors::constants::TIMESTAMP_VALUE_KIND;
+use crate::sensors::models::SensorRequests;
 use crate::sensors::models::{
     NodeEventKind, NodeSensorEvent, SensorCursor, SensorEvaluationRequest,
 };
@@ -26,7 +26,7 @@ pub(crate) async fn consume_node_events(
     evaluation: &SensorEvaluationRequest,
     selection: &BTreeSet<String>,
     kinds: &BTreeSet<NodeEventKind>,
-) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
+) -> Result<(ControlTransaction, (SensorCursor, SensorRequests)), ControlError> {
     let (mut transaction, rows) = query(
         transaction,
         "SELECT n.run_id,n.node_key,n.status,n.finished_storage_id FROM sqb_run_nodes n \
@@ -42,7 +42,7 @@ pub(crate) async fn consume_node_events(
     )
     .await?;
     let mut cursor = evaluation.cursor.clone();
-    let mut run_ids: Vec<Uuid> = Vec::new();
+    let mut requests = SensorRequests::default();
     for row in rows {
         let node: NodeSensorEvent = decode_row(row)?;
         cursor.event_storage_id = node.finished_storage_id;
@@ -52,17 +52,16 @@ pub(crate) async fn consume_node_events(
         let matches;
         (transaction, matches) = matches_transition(transaction, evaluation, &node, kinds).await?;
         if matches {
-            let run_id;
-            (transaction, run_id) = queue_sensor_run(
+            (transaction, requests) = queue_sensor_run(
                 transaction,
                 evaluation,
                 &format!("{}/{}", node.run_id, node.node_key),
+                requests,
             )
             .await?;
-            run_ids.push(run_id);
         }
     }
-    Ok((transaction, (cursor, run_ids)))
+    Ok((transaction, (cursor, requests)))
 }
 
 /// A source's newest version queues one run per streak, keyed on the streak's first row so pruning never reuses a key.
@@ -70,9 +69,9 @@ pub(crate) async fn consume_source_events(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
     selection: &BTreeSet<String>,
-) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
+) -> Result<(ControlTransaction, (SensorCursor, SensorRequests)), ControlError> {
     let (mut transaction, (nodes, next)) = source_page(transaction, evaluation, selection).await?;
-    let mut run_ids: Vec<Uuid> = Vec::new();
+    let mut requests = SensorRequests::default();
     for (key, definition) in nodes {
         let (parameters, predicate) = source_scope(evaluation, &key, &definition);
         let rows;
@@ -121,13 +120,12 @@ pub(crate) async fn consume_source_events(
         if !requested.is_empty() {
             continue;
         }
-        let run_id;
-        (transaction, run_id) = queue_sensor_run(transaction, evaluation, &run_key).await?;
-        run_ids.push(run_id);
+        (transaction, requests) =
+            queue_sensor_run(transaction, evaluation, &run_key, requests).await?;
     }
     let mut cursor = evaluation.cursor.clone();
     cursor.custom = next;
-    Ok((transaction, (cursor, run_ids)))
+    Ok((transaction, (cursor, requests)))
 }
 
 /// One page of selected source definitions after the cursor's last key, and the next page's start.
@@ -235,9 +233,9 @@ pub(crate) async fn consume_stale_sources(
     evaluation: &SensorEvaluationRequest,
     selection: &BTreeSet<String>,
     after_seconds: NonZeroU32,
-) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
+) -> Result<(ControlTransaction, (SensorCursor, SensorRequests)), ControlError> {
     let (mut transaction, (nodes, next)) = source_page(transaction, evaluation, selection).await?;
-    let mut run_ids: Vec<Uuid> = Vec::new();
+    let mut requests = SensorRequests::default();
     for (key, definition) in nodes {
         let (parameters, predicate) = source_scope(evaluation, &key, &definition);
         let rows;
@@ -261,12 +259,10 @@ pub(crate) async fn consume_stale_sources(
             after_seconds,
         ))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        let run_id;
-        (transaction, run_id) =
-            queue_sensor_run(transaction, evaluation, &sha256_hex(&identity)).await?;
-        run_ids.push(run_id);
+        (transaction, requests) =
+            queue_sensor_run(transaction, evaluation, &sha256_hex(&identity), requests).await?;
     }
     let mut cursor = evaluation.cursor.clone();
     cursor.custom = next;
-    Ok((transaction, (cursor, run_ids)))
+    Ok((transaction, (cursor, requests)))
 }

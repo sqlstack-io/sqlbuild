@@ -57,6 +57,8 @@ pub struct TickState {
     pub last_tick_for: Option<DateTime<Utc>>,
     /// Only unclaimed waiting work can cover a later tick; executing work cannot cover future data.
     pub waiting_run: Option<Uuid>,
+    /// An active run of the job when its overlap is `skip`; a tick that missed earlier occurrences still queues.
+    pub active_run: Option<Uuid>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,6 +66,7 @@ pub struct TickState {
 pub enum TickDecision {
     Requested { run_id: Uuid },
     Covered { covered_by_run_id: Uuid },
+    Skipped { active_run_id: Uuid },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,6 +104,8 @@ pub(crate) struct DueTrigger {
 pub enum TickOutcome {
     Requested,
     Covered,
+    /// The job's overlap is `skip` and `active_run_id` was still active.
+    Skipped,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -113,4 +118,5 @@ pub struct TickRecord {
     pub outcome: TickOutcome,
     pub run_id: Option<Uuid>,
     pub covered_by_run_id: Option<Uuid>,
+    pub active_run_id: Option<Uuid>,
 }

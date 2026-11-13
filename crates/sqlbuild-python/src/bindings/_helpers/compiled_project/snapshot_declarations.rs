@@ -22,6 +22,7 @@ use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, declared_at, module_jobs,
+    run_controls,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     compile_calendars, compile_cron, compile_sensors,
@@ -119,6 +120,14 @@ pub(crate) fn compile_declarations(
                 .map(|(kind, name)| format!("{kind}:{name}"))
                 .collect();
         let declared_at: Option<DeclaredAt> = declared_at(project_dir, job.declared_at)?;
+        let controls = run_controls(
+            &job.name,
+            (
+                job.owner,
+                &job.overlap,
+                job.on_failure.as_ref().map(|policy| policy.bind(py)),
+            ),
+        )?;
         let targets: BTreeSet<String> = job.targets.into_iter().collect();
         if let Some(schedule) = job.schedule {
             triggers.insert(
@@ -141,6 +150,9 @@ pub(crate) fn compile_declarations(
                 exclude: Some(job.exclude).filter(|exclude| !exclude.trim().is_empty()),
                 targets,
                 declared_at,
+                owner: controls.owner,
+                overlap: controls.overlap,
+                on_failure: controls.on_failure,
             },
         );
     }
@@ -170,6 +182,14 @@ pub(crate) fn compile_declarations(
             .flat_map(|name| jobs[name].selection.iter().cloned())
             .collect();
         let declared_at: Option<DeclaredAt> = declared_at(project_dir, group.declared_at)?;
+        let controls = run_controls(
+            &group.name,
+            (
+                group.owner,
+                &group.overlap,
+                group.on_failure.as_ref().map(|policy| policy.bind(py)),
+            ),
+        )?;
         let targets: BTreeSet<String> = group.targets.into_iter().collect();
         if let Some(schedule) = group.schedule {
             triggers.insert(
@@ -193,6 +213,9 @@ pub(crate) fn compile_declarations(
                     exclude: None,
                     targets,
                     declared_at,
+                    owner: controls.owner,
+                    overlap: controls.overlap,
+                    on_failure: controls.on_failure,
                 },
                 jobs: dependencies,
             },

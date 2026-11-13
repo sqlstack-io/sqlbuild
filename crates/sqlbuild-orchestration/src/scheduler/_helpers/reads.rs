@@ -13,7 +13,7 @@ pub(crate) async fn ticks_in(
     limit: u32,
 ) -> Result<(ControlTransaction, Vec<TickRecord>), ControlError> {
     query_records(transaction,
-        "SELECT tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id \
+        "SELECT tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id, active_run_id \
          FROM sqb_ticks WHERE trigger_id=$1 ORDER BY scheduled_for DESC LIMIT $2",
         vec![Parameter::Id(trigger_id), Parameter::Integer(i64::from(limit.min(1000)))]).await
 }

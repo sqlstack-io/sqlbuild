@@ -88,6 +88,7 @@
 					<td class="num">{e.runRequests}</td>
 					<td class:err={!!e.error} class:faint={!e.error}>
 						{e.error ?? e.skipReason ?? ''}
+						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped while {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each} ran</span>{/if}
 						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="tag" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
 					</td>
 				</tr>

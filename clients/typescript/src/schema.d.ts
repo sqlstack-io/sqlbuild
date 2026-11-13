@@ -1743,6 +1743,9 @@ export interface components {
             member_of: string[];
             /** @description A group's member jobs in run order; empty for a job. */
             members: components["schemas"]["JobMember"][];
+            on_failure?: null | components["schemas"]["OnFailure"];
+            overlap: components["schemas"]["Overlap"];
+            owner?: string | null;
             select?: string | null;
             selection: string[];
             /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
@@ -1767,6 +1770,9 @@ export interface components {
             job_key: string;
             /** @description `job` or `group`; a group's selection is the union of its member jobs' selections. */
             kind: components["schemas"]["RunKind"];
+            on_failure?: null | components["schemas"]["OnFailure"];
+            overlap: components["schemas"]["Overlap"];
+            owner?: string | null;
             /** @description A job's selectors as written; absent for a group and for snapshots published before they were recorded. */
             select?: string | null;
             selection: string[];
@@ -2090,6 +2096,13 @@ export interface components {
              */
             sequences: number;
         };
+        /** @description A failed or partial run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended. */
+        OnFailure: {
+            /** Format: int32 */
+            retries: number;
+            /** Format: int32 */
+            retry_delay_seconds: number;
+        };
         /** @description One exact-byte output chunk. */
         OutputChunk: {
             /**
@@ -2138,6 +2151,11 @@ export interface components {
             /** Format: uuid */
             trigger_id: string;
         };
+        /**
+         * @description What a schedule tick or sensor request does while a run of the same job is active; people's requests always queue.
+         * @enum {string}
+         */
+        Overlap: "queue" | "skip";
         PasswordChangeRequest: {
             current_password: string;
             new_password: string;
@@ -2213,6 +2231,8 @@ export interface components {
             /** Format: date-time */
             requested_at: string;
             run_count: number;
+            /** @description For each matched request the job's `skip` overlap dropped, the run that was active. */
+            skipped_for: string[];
         };
         /** @description A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence. */
         PersonSensorRunRequest: {
@@ -2500,6 +2520,13 @@ export interface components {
             limit: string;
             /** Format: uuid */
             run_id?: string | null;
+        } | {
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            due_at: string;
+            /** @enum {string} */
+            kind: "retry_delay";
         };
         /** @description One invocation's records; the server owns its claim namespace, start time and version. */
         RecallBatch: {
@@ -2856,6 +2883,7 @@ export interface components {
             requested_by: string;
             /** Format: uuid */
             rerun_of_run_id?: string | null;
+            retry?: null | components["schemas"]["RunRetry"];
             /** Format: uuid */
             root_run_id: string;
             /** Format: uuid */
@@ -2873,6 +2901,13 @@ export interface components {
             trigger_id?: string | null;
             window?: null | components["schemas"]["RunWindow"];
             write_set: string[];
+        };
+        /** @description Which retry of the job's `on_failure` policy a run is, and when it may start. */
+        RunRetry: {
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            not_before: string;
         };
         /** @description Warehouse statement metadata of a run: kind, timing, counts and outcome, never the SQL text. */
         RunStatementRecord: {
@@ -3129,8 +3164,10 @@ export interface components {
          */
         Table: "invocations" | "output" | "events" | "diagnostics" | "artifacts" | "artifact_refs" | "heartbeats" | "delivery" | "meta" | "conflicts";
         /** @enum {string} */
-        TickOutcome: "requested" | "covered";
+        TickOutcome: "requested" | "covered" | "skipped";
         TickRecord: {
+            /** Format: uuid */
+            active_run_id?: string | null;
             /** Format: uuid */
             covered_by_run_id?: string | null;
             /** Format: int64 */

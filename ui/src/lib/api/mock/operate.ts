@@ -36,7 +36,7 @@ type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> 
 
 type JobDef = Known<
 	Omit<JobDetail, 'nodeCount' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'memberOf' | 'cursorType' | 'groupMembers'>,
-	'members' | 'overlap' | 'onFailure' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
+	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
 > & {
 	after: Record<string, string[]>;
 };
@@ -54,7 +54,7 @@ export const JOB_DEFS: JobDef[] = [
 		exclude: [],
 		members: [],
 		overlap: 'queue',
-		onFailure: 'skip_dependents',
+		onFailure: { retries: 1, retryDelaySeconds: 300 },
 		concurrencyGroups: [],
 		priority: 5,
 		sourceFile: 'orchestration/jobs.py',
@@ -70,7 +70,6 @@ export const JOB_DEFS: JobDef[] = [
     "load_sources",
     description="Ingest partner order files into raw__orders",
     select="tag:ingest",
-    overlap="queue",
     priority=5,
     owner="ingest",
 )`
@@ -83,8 +82,8 @@ export const JOB_DEFS: JobDef[] = [
 		select: 'group:staging group:marts',
 		exclude: [],
 		members: [],
-		overlap: 'coalesce',
-		onFailure: 'skip_dependents',
+		overlap: 'skip',
+		onFailure: { retries: 2, retryDelaySeconds: 600 },
 		concurrencyGroups: ['warehouse_heavy'],
 		priority: 0,
 		sourceFile: 'orchestration/jobs.py',
@@ -100,8 +99,8 @@ export const JOB_DEFS: JobDef[] = [
     "core_build",
     description="Staging and marts models",
     select=["group:staging", "group:marts"],
-    overlap="coalesce",
-    on_failure="skip_dependents",
+    overlap="skip",
+    on_failure=on_failure(retries=2, retry_delay_seconds=600),
     concurrency_groups=[warehouse_heavy],
     settings={"--concurrency": 8},
     owner="data-platform",
@@ -116,8 +115,8 @@ export const JOB_DEFS: JobDef[] = [
 		select: 'group:marts',
 		exclude: [],
 		members: [],
-		overlap: 'coalesce',
-		onFailure: 'skip_dependents',
+		overlap: 'queue',
+		onFailure: null,
 		concurrencyGroups: [],
 		priority: 0,
 		sourceFile: 'orchestration/jobs.py',
@@ -145,8 +144,8 @@ export const JOB_DEFS: JobDef[] = [
 		select: 'group:activity',
 		exclude: [],
 		members: [],
-		overlap: 'coalesce',
-		onFailure: 'skip_dependents',
+		overlap: 'queue',
+		onFailure: null,
 		concurrencyGroups: [],
 		priority: 0,
 		sourceFile: 'orchestration/activity.py',
@@ -176,8 +175,8 @@ export const JOB_DEFS: JobDef[] = [
 		select: 'daily_revenue revenue_report export_revenue_csv',
 		exclude: [],
 		members: [],
-		overlap: 'coalesce',
-		onFailure: 'skip_dependents',
+		overlap: 'queue',
+		onFailure: null,
 		concurrencyGroups: [],
 		priority: 0,
 		sourceFile: 'orchestration/finance.py',
@@ -207,8 +206,8 @@ export const JOB_DEFS: JobDef[] = [
 		select: 'customer_status',
 		exclude: [],
 		members: [],
-		overlap: 'allow',
-		onFailure: 'skip_dependents',
+		overlap: 'queue',
+		onFailure: null,
 		concurrencyGroups: [],
 		priority: 0,
 		sourceFile: 'orchestration/finance.py',
@@ -224,7 +223,6 @@ export const JOB_DEFS: JobDef[] = [
     "customer_segments",
     description="Customer status segments; hourly and in the close-of-business group",
     select="customer_status",
-    overlap="allow",
     owner="analytics",
 )`
 		)
@@ -237,7 +235,7 @@ export const JOB_DEFS: JobDef[] = [
 		exclude: [],
 		members: [],
 		overlap: 'queue',
-		onFailure: 'skip_dependents',
+		onFailure: null,
 		concurrencyGroups: ['warehouse_heavy'],
 		priority: 10,
 		sourceFile: 'orchestration/reporting.py',
@@ -253,7 +251,6 @@ export const JOB_DEFS: JobDef[] = [
     "reporting_exports",
     description="Reporting tables and the revenue export",
     select=["group:reporting", "group:exports"],
-    overlap="queue",
     concurrency_groups=[warehouse_heavy],
     priority=10,
     targets=["prod"],
@@ -267,8 +264,8 @@ export const JOB_DEFS: JobDef[] = [
 		select: null,
 		exclude: [],
 		members: ['load_sources', 'core_build', 'activity_microbatch', 'reporting_exports'],
-		overlap: 'coalesce',
-		onFailure: 'skip_dependents',
+		overlap: 'queue',
+		onFailure: null,
 		concurrencyGroups: [],
 		priority: 0,
 		sourceFile: 'orchestration/groups.py',
@@ -297,8 +294,8 @@ export const JOB_DEFS: JobDef[] = [
 		select: null,
 		exclude: [],
 		members: ['revenue_refresh', 'activity_microbatch', 'customer_segments'],
-		overlap: 'coalesce',
-		onFailure: 'stop_group',
+		overlap: 'queue',
+		onFailure: { retries: 1, retryDelaySeconds: 900 },
 		concurrencyGroups: ['warehouse_heavy'],
 		priority: 20,
 		sourceFile: 'orchestration/groups.py',
@@ -316,7 +313,7 @@ export const JOB_DEFS: JobDef[] = [
     jobs=[revenue_refresh, activity_microbatch, customer_segments],
     # Segments read closed revenue through an external lookup lineage can't see.
     after={customer_segments: [revenue_refresh]},
-    on_failure="stop_group",
+    on_failure=on_failure(retries=1, retry_delay_seconds=900),
     critical=["daily_revenue"],
     concurrency_groups=[warehouse_heavy],
     priority=20,
@@ -903,6 +900,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			outcome,
 			runId: null,
 			coveredByRunId: null,
+			activeRunId: null,
 			reason: null,
 			lateBySeconds: 0,
 			catchUp: false,
@@ -945,10 +943,8 @@ export function createOperateFixtures(now: number): OperateFixtures {
 				continue;
 			}
 			if (missed.length && t.name === 'activity_microbatch') {
-				// Catch-up after downtime: `all` with max 3; older missed times are skipped.
-				const cap = t.catchUp?.max ?? 1;
-				const caught = missed.slice(-cap);
-				for (const m of missed.slice(0, -cap)) tick(t.name, m, 'skipped', { evaluatedAt: new Date(downtime.to + 2000).toISOString(), lateBySeconds: Math.round((downtime.to - m) / 1000), catchUp: true, reason: `Beyond the catch-up limit of ${cap} missed times` });
+				// Catch-up after downtime: the first missed time starts one run and the rest merge into it.
+				const caught = missed;
 				const runId = genId(rand);
 				const startAgo = (now - downtime.to) / MIN - 0.1;
 				record({ id: runId, origin: 'schedule', job: t.jobKey, trigger: t.name, by: SCHEDULER, queuedAgo: startAgo + 0.05, startedAgo: startAgo, durationMin: 6, reason: 'Made up after the scheduler was down' }, { queued: downtime.to + 1000, started: downtime.to + 5000 });
@@ -956,7 +952,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 				rec.run.tickScheduledFor = new Date(caught[0]).toISOString();
 				rec.run.tickId = tickId(t.name, caught[0]);
 				tick(t.name, caught[0], 'requested', { runId, evaluatedAt: new Date(downtime.to + 1000).toISOString(), lateBySeconds: Math.round((downtime.to - caught[0]) / 1000), catchUp: true, reason: 'Missed while no server was running the scheduler' });
-				for (const c of caught.slice(1)) tick(t.name, c, 'covered', { coveredByRunId: runId, evaluatedAt: new Date(downtime.to + 1000).toISOString(), lateBySeconds: Math.round((downtime.to - c) / 1000), catchUp: true, reason: 'Missed time merged into the make-up run (overlap = coalesce)' });
+				for (const c of caught.slice(1)) tick(t.name, c, 'covered', { coveredByRunId: runId, evaluatedAt: new Date(downtime.to + 1000).toISOString(), lateBySeconds: Math.round((downtime.to - c) / 1000), catchUp: true, reason: 'Missed time merged into the make-up run' });
 				missed.length = 0;
 			}
 			if (skip.has(due)) {
@@ -965,7 +961,12 @@ export function createOperateFixtures(now: number): OperateFixtures {
 				continue;
 			}
 			if (t.name === 'activity_microbatch' && i === 0) {
-				tick(t.name, due, 'covered', { coveredByRunId: 'run-5f31', reason: 'A run is already waiting (overlap = coalesce)' });
+				tick(t.name, due, 'covered', { coveredByRunId: 'run-5f31', reason: 'A run of this job was already waiting' });
+				continue;
+			}
+			const active = t.jobKey === 'core_build' && i === 3 ? records.findLast((r) => r.run.jobKey === 'core_build' && !r.run.parentRunId) : undefined;
+			if (active) {
+				tick(t.name, due, 'skipped', { activeRunId: active.run.id, reason: 'A run of core_build was still active (overlap = skip)' });
 				continue;
 			}
 			if (t.name === 'nightly_all' && i === 4) {
@@ -1012,6 +1013,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 		cursorAfter: null,
 		runRequests: 0,
 		skipReason: null,
+		skippedFor: [],
 		error: null,
 		definitionFingerprint: fingerprint(name),
 		...extra

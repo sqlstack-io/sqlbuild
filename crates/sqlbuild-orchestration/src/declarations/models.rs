@@ -45,6 +45,37 @@ pub struct JobDefinition {
     pub targets: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub declared_at: Option<DeclaredAt>,
+    /// Who answers for the job, as written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    #[serde(default, skip_serializing_if = "Overlap::is_queue")]
+    pub overlap: Overlap,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_failure: Option<OnFailure>,
+}
+
+/// What a schedule tick or sensor request does while a run of the same job is active; people's requests always queue.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Overlap {
+    #[default]
+    Queue,
+    Skip,
+}
+
+impl Overlap {
+    #[must_use]
+    pub const fn is_queue(&self) -> bool {
+        matches!(self, Self::Queue)
+    }
+}
+
+/// A failed or partial run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OnFailure {
+    pub retries: u8,
+    pub retry_delay_seconds: u32,
 }
 
 /// Where a declaration was written, relative to the project root.
@@ -123,6 +154,9 @@ pub struct JobRecord {
     /// A job's selectors as written; absent for a group and for snapshots published before they were recorded.
     pub select: Option<String>,
     pub declared_at: Option<DeclaredAt>,
+    pub owner: Option<String>,
+    pub overlap: Overlap,
+    pub on_failure: Option<OnFailure>,
 }
 
 /// A `sqb_jobs` row as stored.
@@ -158,6 +192,10 @@ pub struct JobDetailRecord {
     pub declared_at: Option<DeclaredAt>,
     /// The cursor type every selected cursor node shares; absent when none has a cursor or types differ.
     pub cursor_type: Option<String>,
+    pub owner: Option<String>,
+    pub overlap: Overlap,
+    /// A member job's own policy applies only when it runs alone; inside a group run the group's applies.
+    pub on_failure: Option<OnFailure>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

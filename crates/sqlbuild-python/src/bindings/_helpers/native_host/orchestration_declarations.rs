@@ -11,11 +11,11 @@ use serde_json::Value;
 use sqlbuild_analysis::graph::models::JobSelection;
 use sqlbuild_discovery::project_validation::models::OrchestrationNameFact;
 use sqlbuild_host::entries::models::UserCodeHost;
-use sqlbuild_orchestration::declarations::models::DeclaredAt;
+use sqlbuild_orchestration::declarations::models::{DeclaredAt, OnFailure, Overlap};
 
 use crate::bindings::_helpers::native_host::constants::{
-    AUTHORING_MODULE, CALENDAR_LABEL, CONSTRUCTING_MODULES, GROUP_LABEL, JOB_LABEL,
-    RUN_EVENT_CONDITION, SENSOR_LABEL,
+    AUTHORING_MODULE, CALENDAR_LABEL, CONSTRUCTING_MODULES, GROUP_LABEL, JOB_LABEL, MAX_RETRIES,
+    MAX_RETRY_DELAY, RUN_EVENT_CONDITION, SENSOR_LABEL,
 };
 use crate::bindings::_helpers::native_host::host::entry;
 
@@ -34,6 +34,9 @@ pub(crate) struct AuthoredJob {
     pub(crate) targets: Vec<String>,
     #[pyo3(attribute("_declared_at"))]
     pub(crate) declared_at: Option<(String, u32)>,
+    pub(crate) owner: Option<String>,
+    pub(crate) overlap: String,
+    pub(crate) on_failure: Option<Py<PyAny>>,
 }
 
 #[derive(FromPyObject, PartialEq, Eq, PartialOrd, Ord)]
@@ -52,6 +55,16 @@ pub(crate) struct AuthoredGroup {
     pub(crate) targets: Vec<String>,
     #[pyo3(attribute("_declared_at"))]
     pub(crate) declared_at: Option<(String, u32)>,
+    pub(crate) owner: Option<String>,
+    pub(crate) overlap: String,
+    pub(crate) on_failure: Option<Py<PyAny>>,
+}
+
+/// A job's or group's owner, overlap and failure policy, validated where they enter native code.
+pub(crate) struct RunControls {
+    pub(crate) owner: Option<String>,
+    pub(crate) overlap: Overlap,
+    pub(crate) on_failure: Option<OnFailure>,
 }
 
 #[derive(FromPyObject)]
@@ -150,6 +163,53 @@ pub(crate) fn authored_setting(value: &Bound<'_, PyAny>) -> PyResult<serde_json:
         .call_method1("dumps", (value,))?
         .extract()?;
     serde_json::from_str(&text).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+/// Refuse a blank owner, an unknown overlap, and retries outside 1 to 10 or delays outside 0 to 24 hours.
+pub(crate) fn run_controls(
+    name: &str,
+    (owner, overlap, policy): (Option<String>, &str, Option<&Bound<'_, PyAny>>),
+) -> PyResult<RunControls> {
+    if owner
+        .as_deref()
+        .is_some_and(|owner| owner.trim().is_empty())
+    {
+        return Err(PyValueError::new_err(format!(
+            "job {name} owner must not be blank"
+        )));
+    }
+    let overlap = match overlap {
+        "queue" => Overlap::Queue,
+        "skip" => Overlap::Skip,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "job {name} overlap must be queue or skip, not {other}"
+            )));
+        }
+    };
+    let on_failure = if let Some(policy) = policy {
+        let bounded = |field: &str, (low, high): (u64, u64)| -> PyResult<u64> {
+            authored_setting(&policy.getattr(field)?)?
+                .as_u64()
+                .filter(|value| (low..=high).contains(value))
+                .ok_or_else(|| {
+                    PyValueError::new_err(format!(
+                        "job {name} on_failure {field} must be a whole number from {low} to {high}"
+                    ))
+                })
+        };
+        Some(OnFailure {
+            retries: u8::try_from(bounded("retries", MAX_RETRIES)?)?,
+            retry_delay_seconds: u32::try_from(bounded("retry_delay_seconds", MAX_RETRY_DELAY)?)?,
+        })
+    } else {
+        None
+    };
+    Ok(RunControls {
+        owner,
+        overlap,
+        on_failure,
+    })
 }
 
 /// Only module execution crosses into Python; discovery and collection stay native.

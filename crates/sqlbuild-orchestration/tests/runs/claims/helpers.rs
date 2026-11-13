@@ -33,6 +33,15 @@ pub(crate) async fn slot_counts(store: &ControlStore) -> BTreeMap<String, i64> {
 }
 
 pub(crate) async fn succeed(store: &ControlStore, claim: &RunClaim) {
+    finish(store, claim, (NodeOutcome::Success, RunOutcome::Success)).await;
+}
+
+/// Every selected node and the run end with the given outcomes.
+pub(crate) async fn finish(
+    store: &ControlStore,
+    claim: &RunClaim,
+    (node_outcome, run_outcome): (NodeOutcome, RunOutcome),
+) {
     let mut changes = vec![RunChange::Started];
     changes.extend(
         claim
@@ -41,7 +50,7 @@ pub(crate) async fn succeed(store: &ControlStore, claim: &RunClaim) {
             .iter()
             .map(|node| RunChange::NodeFinished {
                 node_key: node.clone(),
-                outcome: NodeOutcome::Success,
+                outcome: node_outcome,
                 rows_affected: Some(1),
                 error_code: None,
                 skipped_because_of: None,
@@ -49,7 +58,7 @@ pub(crate) async fn succeed(store: &ControlStore, claim: &RunClaim) {
             }),
     );
     changes.push(RunChange::Finished {
-        outcome: RunOutcome::Success,
+        outcome: run_outcome,
         reason: "synthetic child completed".into(),
         exit_code: Some(0),
     });

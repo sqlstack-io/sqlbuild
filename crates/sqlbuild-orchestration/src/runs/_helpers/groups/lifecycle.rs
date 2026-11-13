@@ -82,7 +82,7 @@ pub(crate) async fn advance_group(
                 .await?;
             }
         }
-    } else if parent.state.status == RunStatus::Queued {
+    } else if parent.state.status == RunStatus::Queued && parent.request_json.due(transaction.now) {
         let admission = RunRequest {
             concurrency_groups: admission_limits(
                 &parent.request_json,

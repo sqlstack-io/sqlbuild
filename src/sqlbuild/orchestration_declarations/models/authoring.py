@@ -21,6 +21,14 @@ class Schedule:
     default_status: Literal["running", "paused"] = "running"
 
 
+@dataclass(frozen=True, kw_only=True)
+class OnFailure:
+    """Rerun a failed or partial run from failure, `retries` times, `retry_delay_seconds` apart."""
+
+    retries: int
+    retry_delay_seconds: int = 0
+
+
 @dataclass(frozen=True, eq=False)
 class Job:
     """A named selection to execute, optionally on a wall-clock schedule."""
@@ -34,6 +42,9 @@ class Job:
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
+    owner: str | None = field(default=None, kw_only=True)
+    overlap: Literal["queue", "skip"] = field(default="queue", kw_only=True)
+    on_failure: OnFailure | None = field(default=None, kw_only=True)
     _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -51,6 +62,9 @@ class JobGroup:
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
+    owner: str | None = field(default=None, kw_only=True)
+    overlap: Literal["queue", "skip"] = field(default="queue", kw_only=True)
+    on_failure: OnFailure | None = field(default=None, kw_only=True)
     _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:

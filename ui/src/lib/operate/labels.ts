@@ -1,5 +1,7 @@
 // Labels and tones for the OPERATE area's vocabulary. Pure; no side effects.
 
+import { formatStamp } from '$lib/format/time';
+
 import type {
 	LivenessState,
 	NodeCounts,
@@ -61,43 +63,36 @@ export function formatCost(cost: RunCost | null): string {
 	return `${cost.value < 0.01 ? cost.value.toFixed(4) : cost.value.toFixed(3)} cr`;
 }
 
-export const overlapLabel: Record<OverlapPolicy, string> = {
-	coalesce: 'coalesce',
-	queue: 'queue',
-	allow: 'allow'
-};
-
 export const overlapHelp: Record<OverlapPolicy, string> = {
-	coalesce: 'At most one run waits; new requests merge into it instead of starting another run',
-	queue: 'Every request gets its own run; they run one after another, in order',
-	allow: 'Can run alongside other runs of this job, as long as they don’t update the same data'
+	queue: 'A schedule tick or sensor request while a run of this job is active queues another run after it',
+	skip: 'A schedule tick or sensor request while a run of this job is active is skipped and recorded on the tick or check'
 };
 
 /** Short plain wording of an overlap policy; the policy name goes in a tooltip. */
 export const overlapPlain: Record<OverlapPolicy, string> = {
-	coalesce: 'Merge new requests',
-	queue: 'One run per request, in order',
-	allow: 'Can run side by side'
+	queue: 'Queue another run',
+	skip: 'Skip if running'
 };
 
-export const onFailureLabel: Record<OnFailure, string> = {
-	skip_dependents: 'skip_dependents',
-	skip_downstream_jobs: 'skip_downstream_jobs',
-	stop_group: 'stop_group'
-};
+/** A whole delay in its largest exact unit, e.g. 300 → `5 min`, 5400 → `90 min`, 7200 → `2 h`. */
+function delayText(seconds: number): string {
+	if (seconds && seconds % 3600 === 0) return `${seconds / 3600} h`;
+	if (seconds && seconds % 60 === 0) return `${seconds / 60} min`;
+	return `${seconds} s`;
+}
 
-export const onFailureHelp: Record<OnFailure, string> = {
-	skip_dependents: 'When a node fails, only what depends on it is skipped, even in other jobs',
-	skip_downstream_jobs: 'When a job fails, the jobs after it are skipped',
-	stop_group: 'Any failure stops the whole group'
-};
+/** An `on_failure` policy in words, e.g. "Retry twice, 5 min apart" or "Retry once after 15 min". */
+export function onFailureText(policy: OnFailure): string {
+	const times = policy.retries === 1 ? 'once' : policy.retries === 2 ? 'twice' : `${policy.retries} times`;
+	if (!policy.retryDelaySeconds) return `Retry ${times} at once`;
+	const delay = delayText(policy.retryDelaySeconds);
+	return policy.retries === 1 ? `Retry once after ${delay}` : `Retry ${times}, ${delay} apart`;
+}
 
-/** Short plain wording of an on-failure policy. */
-export const onFailurePlain: Record<OnFailure, string> = {
-	skip_dependents: 'Skip what depends on a failure',
-	skip_downstream_jobs: 'Skip later jobs',
-	stop_group: 'Stop the group'
-};
+/** A job's overlap, retries and priority for a list cell; empty when it uses the defaults. */
+export function jobPolicyText(job: { overlap: OverlapPolicy | null; onFailure: OnFailure | null; priority: number | null }): string {
+	return [job.overlap === 'skip' ? overlapPlain.skip : null, job.onFailure ? onFailureText(job.onFailure) : null, job.priority ? `priority ${job.priority}` : null].filter(Boolean).join(' · ');
+}
 
 export type WaitPart = { text: string; href?: string; code?: boolean };
 
@@ -145,6 +140,8 @@ export function describeWait(wait: QueueWait): WaitPart[] {
 			return [{ text: 'Waiting for ' }, { text: wait.jobKey || shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' to finish first' }];
 		case 'group_parent':
 			return [{ text: 'Waiting for its group run ' }, { text: shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' to start' }];
+		case 'retry_delay':
+			return [{ text: `Waiting: retry ${wait.attempt} is due at ${formatStamp(wait.dueAt)}` }];
 	}
 }
 
@@ -170,6 +167,8 @@ export function waitTechnical(wait: QueueWait): string {
 			return `upstream job ${wait.jobKey} (${wait.runId}) still active`;
 		case 'group_parent':
 			return `group run ${wait.runId} not running yet`;
+		case 'retry_delay':
+			return `on_failure retry ${wait.attempt}, not before ${wait.dueAt}`;
 	}
 }
 
@@ -190,7 +189,7 @@ export const tickOutcomeText: Record<TickOutcome, string> = {
 /** What each tick outcome means, with the scheduler's own name for debugging. */
 export const tickOutcomeHelp: Record<TickOutcome, string> = {
 	requested: 'It was due and started a run (requested)',
-	skipped: 'It was due but didn’t start a run, e.g. it was paused or caught up (skipped)',
+	skipped: 'It was due while a run of this job was still active, and the job’s overlap is skip (skipped)',
 	covered: 'A run of this job was already waiting, so this one merged into it (covered)',
 	failed: 'The scheduler couldn’t start a run for it (failed)'
 };

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.orchestration_declarations.models.authoring import (
     CalendarSchedule,
     Job,
     JobGroup,
+    OnFailure,
     Schedule,
     Sensor,
 )
@@ -285,6 +287,9 @@ class SnapshotDeclarationRejectionTestCase:
     copies: int = 1
     expected_message: str = ""
     schedule: Schedule | None = None
+    owner: str | None = None
+    overlap: Any = "queue"
+    on_failure: OnFailure | None = None
 
 
 @dataclass(frozen=True)
