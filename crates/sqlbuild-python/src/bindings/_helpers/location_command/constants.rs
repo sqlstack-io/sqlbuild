@@ -25,3 +25,11 @@ pub(crate) const ALL_PREFIX_TARGET: &str = "all";
 
 /// DuckDB's message when another process, such as a running build, holds the database file.
 pub(crate) const DUCKDB_LOCK_CONFLICT: &str = "Conflicting lock is held";
+
+/// The build settings a job run's `--changed` reach reads, and the reach every job run uses.
+pub(crate) const CHANGED_SETTING: &str = "changed";
+pub(crate) const REACH_SETTING: &str = "reach";
+/// A job run reaches its whole selection: `reach` only stops builds that are not a job's run.
+pub(crate) const JOB_RUN_REACH: &str = "all";
+/// What a job run with `changed: True` counts when `[changes] counts` is not set: every change.
+pub(crate) const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];

@@ -4,6 +4,8 @@ use serde_json::{Value, json};
 use std::cell::Cell;
 use uuid::Uuid;
 
+use sqlbuild_core::fingerprint_identity::main::recorded_model_local_hash::recorded_model_local_hash;
+
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::tests::helpers::{request, request_run, snapshot};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -270,6 +272,8 @@ pub(crate) async fn node_status_reads(
         (location, input.clone()),
     )
     .await;
+    fingerprint_scheme_change_reads(store, credentials, (location, session_id), input.clone())
+        .await;
     assert!(matches!(
         read_person_node_status(
             store,
@@ -611,4 +615,130 @@ async fn list_wide_target(
         })
         .await;
     (timings[1], statements)
+}
+
+/// A build recorded under an earlier fingerprint scheme reads as unchanged until its SQL changes.
+async fn fingerprint_scheme_change_reads(
+    store: &ControlStore,
+    credentials: (&AuditContext, Uuid),
+    (location, session_id): (Uuid, Uuid),
+    input: SnapshotInput,
+) {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../benchmarks/duckshop/edge_cases/orchestration");
+    let data: Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join("fingerprint_scheme_change.json")).expect("fixture"),
+    )
+    .expect("scheme change inputs");
+    let text = |key: &str| data[key].as_str().expect(key).to_owned();
+    let metadata: String = data["metadata"].to_string();
+    let current_hash: String = recorded_model_local_hash(
+        &sqlquack_fingerprint::query_fingerprint(
+            &text("definition"),
+            sqlquack_fingerprint::FingerprintDialect::DuckDB,
+        )
+        .expect("current fingerprint"),
+        &metadata,
+    )
+    .expect("current local hash");
+    let with_dialect: Value = json!({"local_hash": current_hash, "dialect": data["dialect"]});
+    let without_dialect: Value = json!({"local_hash": current_hash});
+    let publish = |identity: &Value, generation: i64| {
+        let mut input = input.clone();
+        input.generation = generation;
+        input.nodes.insert("model:scheme_orders".into(), SnapshotNode {
+            kind: "model".into(),
+            definition: json!({"name":"scheme_orders","destination":{"database":null,"schema":"main","name":"scheme_orders"},
+                "planner_identity":identity,"deps":[]}),
+            raw_sql: None, compiled_sql: None, python_source: None,
+        });
+        input
+    };
+    publish_snapshot(store, &publish(&with_dialect, 50))
+        .await
+        .expect("snapshot with dialect");
+    let build = |generation: i64, event: &str, definition: &str, ts: &str| -> MetadataBatch {
+        serde_json::from_value(json!({"kind":"fingerprints","session_id":session_id,"generation":generation,"records":[{
+            "event_id": event, "state_database": null, "state_schema": "build_history", "node_type": "model",
+            "node_name": "scheme_orders", "target_database": null, "target_schema": "main", "target_name": "scheme_orders",
+            "run_id": event, "definition_hash": data["old_scheme_hash"], "version_hash": "scheme-version",
+            "schema_fingerprint": "scheme-schema", "definition": definition, "metadata_json": metadata, "ts": ts}]}))
+        .expect("scheme build")
+    };
+    ingest_fingerprints(
+        store,
+        (location, "development"),
+        &build(
+            50,
+            "scheme-built",
+            &text("definition"),
+            "2026-01-06T10:00:00Z",
+        ),
+    )
+    .await
+    .expect("pre-upgrade build");
+    let options = NodeStatusQuery {
+        node_key: "model:scheme_orders".into(),
+    };
+    let status = || async {
+        let status = json!(
+            read_person_node_status(
+                store,
+                credentials,
+                (location, "development", &options),
+                DefaultRole::None
+            )
+            .await
+            .expect("scheme status")
+        );
+        let listed = list_person_catalog_nodes(
+            store,
+            credentials,
+            (location, "development"),
+            DefaultRole::None,
+        )
+        .await
+        .expect("scheme listing")
+        .into_iter()
+        .map(|node| json!(node))
+        .find(|node| node["node_key"] == "model:scheme_orders")
+        .expect("scheme node listed");
+        (
+            status["definition"]["status"].clone(),
+            listed["definition_changed"].clone(),
+        )
+    };
+    assert_eq!(
+        status().await,
+        (json!("matched"), json!(false)),
+        "the recorded SQL fingerprints like the current SQL under the snapshot's dialect"
+    );
+    publish_snapshot(store, &publish(&without_dialect, 51))
+        .await
+        .expect("snapshot without dialect");
+    assert_eq!(
+        status().await,
+        (json!("changed"), json!(true)),
+        "without a dialect the recorded hash is compared as stored"
+    );
+    publish_snapshot(store, &publish(&with_dialect, 52))
+        .await
+        .expect("snapshot with dialect again");
+    ingest_fingerprints(
+        store,
+        (location, "development"),
+        &build(
+            52,
+            "scheme-edited",
+            &text("edited_definition"),
+            "2026-01-07T10:00:00Z",
+        ),
+    )
+    .await
+    .expect("build of edited SQL");
+    assert_eq!(
+        status().await,
+        (json!("changed"), json!(true)),
+        "a recorded build of different SQL still reads as changed"
+    );
 }

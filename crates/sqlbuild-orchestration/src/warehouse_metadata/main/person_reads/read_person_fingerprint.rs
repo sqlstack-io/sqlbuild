@@ -31,5 +31,5 @@ pub async fn read_person_fingerprint(
     let (transaction, evidence) =
         latest_fingerprint(transaction, (location_id, target, options)).await?;
     commit(transaction).await?;
-    Ok(evidence.map(|(record, _)| record))
+    Ok(evidence.map(|(record, _, _)| record))
 }

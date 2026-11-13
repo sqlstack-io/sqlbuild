@@ -110,7 +110,7 @@ pub(crate) const DAG_ROUTE: Route = routed(
     },
 );
 
-const PLAN_FIELDS: [Field; 19] = [
+const PLAN_FIELDS: [Field; 22] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -121,6 +121,9 @@ const PLAN_FIELDS: [Field; 19] = [
     CURSOR_OVERRIDES,
     JSON_OUTPUT,
     same("full_refresh"),
+    same("changed"),
+    same("changed_counts"),
+    same("reach"),
     same("load_sources"),
     same("include_python"),
     NO_COLOR,
@@ -139,7 +142,7 @@ pub(crate) const PLAN_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const BUILD_FIELDS: [Field; 36] = [
+const BUILD_FIELDS: [Field; 38] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -152,6 +155,8 @@ const BUILD_FIELDS: [Field; 36] = [
     same("fail_fast"),
     same("full_refresh"),
     same("changed"),
+    same("changed_counts"),
+    same("reach"),
     same("load_sources"),
     attr("reload_sources", "reload"),
     same("include_python"),

@@ -43,9 +43,15 @@ export function parseCommand(text: string): CommandParts {
 				continue;
 			}
 			mode = 'select';
-			const spec = flagSpec(verb, token);
+			const equals = token.indexOf('=');
+			const name = equals > 0 ? token.slice(0, equals) : token;
+			const spec = flagSpec(verb, name);
+			if (equals > 0) {
+				flags[spec?.flag ?? name] = token.slice(equals + 1);
+				continue;
+			}
 			const value = tokens[i + 1];
-			if (!spec || spec.type === 'bool' || value === undefined || value.startsWith('-')) flags[spec?.flag ?? token] = true;
+			if (!spec || spec.type === 'bool' || spec.type === 'attached' || value === undefined || value.startsWith('-')) flags[spec?.flag ?? token] = true;
 			else {
 				flags[spec.flag] = value;
 				i++;
@@ -62,7 +68,10 @@ export function buildCommand(parts: CommandParts): string {
 	const out = ['sqb', parts.verb];
 	if (parts.select.length) out.push('--select', ...parts.select);
 	if (parts.exclude.length) out.push('--exclude', ...parts.exclude);
-	for (const [flag, value] of Object.entries(parts.flags)) out.push(value === true ? flag : `${flag} ${value}`);
+	for (const [flag, value] of Object.entries(parts.flags)) {
+		if (value === true) out.push(flag);
+		else out.push(flagSpec(parts.verb, flag)?.type === 'attached' ? `${flag}=${value}` : `${flag} ${value}`);
+	}
 	return out.join(' ');
 }
 
@@ -206,7 +215,7 @@ export function suggest(text: string, caret: number, nodes: SnapshotNode[]): Sug
 	}
 	const spec: FlagSpec | undefined = ctx.previousFlag ? flagSpec(parts.verb, ctx.previousFlag) : undefined;
 	const prevToken = tokenize(text.slice(0, ctx.start)).at(-1) ?? '';
-	if (spec && spec.type !== 'selector' && prevToken === ctx.previousFlag) {
+	if (spec && spec.type !== 'selector' && spec.type !== 'attached' && prevToken === ctx.previousFlag) {
 		if (spec.choices) return spec.choices.filter((c) => c.startsWith(ctx.text)).map((c) => ({ value: c, label: c, hint: spec.flag }));
 		if (spec.type === 'timestamp' && !ctx.text) return [{ value: new Date().toISOString().slice(0, 10) + 'T00:00:00Z', label: 'today 00:00 UTC', hint: 'timestamp' }];
 		return [];

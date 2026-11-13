@@ -24,10 +24,13 @@ use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
+use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
+use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, preview_changed};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
-use crate::bindings::_helpers::plan_output::plan_json::format_plan_json;
+use crate::bindings::_helpers::plan_command::changed::{changed_json, changed_text};
+use crate::bindings::_helpers::plan_output::plan_json::{CHANGED_KEY, format_plan_json};
 use crate::bindings::_helpers::plan_output::plan_text::format_plan;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::new_record;
@@ -60,6 +63,13 @@ fn flag(py: Python<'_>, value: bool) -> Bound<'_, PyAny> {
 
 fn print_line(py: Python<'_>, text: &str) -> PyResult<()> {
     imported(py, "builtins", "print")?.call1((text,))?;
+    Ok(())
+}
+
+/// Write `text` to the progress stream and flush it, so it shows before slow work starts.
+fn write_progress(stream: &Bound<'_, PyAny>, text: &str) -> PyResult<()> {
+    stream.call_method1("write", (text,))?;
+    stream.call_method0("flush")?;
     Ok(())
 }
 
@@ -227,14 +237,13 @@ fn compile_pipeline<'py>(
     )?;
     let as_target: Bound<'py, PyAny> = native_field(request, "as_target")?;
     if !as_target.is_none() {
-        invocation.stream.call_method1(
-            "write",
-            (format!(
+        write_progress(
+            &invocation.stream,
+            &format!(
                 "Previewing plan as target '{}' through the active target's connection (inspection only).\n",
                 as_target.str()?
-            ),),
+            ),
         )?;
-        invocation.stream.call_method0("flush")?;
     }
     let options: Bound<'py, PyDict> = PyDict::new(py);
     options.set_item(
@@ -281,10 +290,39 @@ fn compile_pipeline<'py>(
     )
 }
 
+/// What `--changed` would run now, or None without `--changed`; read warnings go to the stream.
+fn changed_preview(
+    request: &Bound<'_, PyAny>,
+    invocation: &PlanInvocation<'_>,
+    pipeline: &Bound<'_, PyAny>,
+) -> PyResult<Option<ChangedDecision>> {
+    let project: Bound<'_, PyAny> = native_field(pipeline, "project")?;
+    let Some(policy) = changed_policy(&invocation.project_dir, request, &project)? else {
+        return Ok(None);
+    };
+    let adapter: Bound<'_, PyAny> = match &invocation.synced_copy {
+        Some(facade) => facade.clone().into_any(),
+        None => native_field(&invocation.context, "adapter")?,
+    };
+    let (decision, warnings) = preview_changed(
+        (&native_field(pipeline, "plan_output")?, &project),
+        (
+            &adapter,
+            &native_field(&invocation.context, "connection_config")?,
+        ),
+        (&policy, native_field(request, "full_refresh")?.is_truthy()?),
+    )?;
+    for warning in warnings {
+        write_progress(&invocation.stream, &format!("warning: {warning}\n"))?;
+    }
+    Ok(Some(decision))
+}
+
 fn write_output(
     request: &Bound<'_, PyAny>,
     invocation: &PlanInvocation<'_>,
     pipeline: &Bound<'_, PyAny>,
+    changed: Option<&ChangedDecision>,
 ) -> PyResult<()> {
     let py: Python<'_> = request.py();
     let plan: Bound<'_, PyAny> = native_field(pipeline, "plan_output")?;
@@ -297,6 +335,9 @@ fn write_output(
                 SYNCED_COPY_KEY,
                 synced_copy_json(py, facade.get())?.into_any(),
             ));
+        }
+        if let Some(decision) = changed {
+            options.push((CHANGED_KEY, changed_json(py, decision)?.into_any()));
         }
         let text: String = format_plan_json(py, Some(keywords(py, &options)?))?;
         imported(py, "builtins", "print")?.call1((text,))?;
@@ -311,24 +352,27 @@ fn write_output(
             Some(DEFAULT_SECTION_ENTRIES)
         },
     )?;
-    let text: String = format_plan(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("plan", plan),
-                ("full_refresh", native_field(request, "full_refresh")?),
-                ("use_color", flag(py, invocation.use_color)),
-                (
-                    "display_options",
-                    new_record(py, RecordId::DisplayOptions, (), Some(&display))?,
-                ),
-                ("python_plan_entries", python_entries),
-                ("include_direct_freshness_diagnostics", flag(py, false)),
-                ("include_completion", flag(py, true)),
-            ],
-        )?),
-    )?;
+    let mut options: Vec<(&str, Bound<'_, PyAny>)> = vec![
+        ("plan", plan),
+        ("full_refresh", native_field(request, "full_refresh")?),
+        ("use_color", flag(py, invocation.use_color)),
+        (
+            "display_options",
+            new_record(py, RecordId::DisplayOptions, (), Some(&display))?,
+        ),
+        ("python_plan_entries", python_entries),
+        ("include_direct_freshness_diagnostics", flag(py, false)),
+        ("include_completion", flag(py, true)),
+    ];
+    if let Some(decision) = changed {
+        print_line(py, &policy_line(&decision.policy))?;
+        options.push((
+            "changed_sections",
+            pyo3::types::PyString::new(py, &changed_text(decision, invocation.use_color))
+                .into_any(),
+        ));
+    }
+    let text: String = format_plan(py, Some(keywords(py, &options)?))?;
     print_line(py, &format!("\n{text}"))?;
     if let Some(facade) = &invocation.synced_copy {
         print_line(py, &synced_copy_text(facade.get()))?;
@@ -383,13 +427,13 @@ pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
     let py: Python<'_> = request.py();
     let invocation: PlanInvocation<'_> = resolve_invocation(request)?;
     if !native_field(request, "json_output")?.is_truthy()? {
-        invocation.stream.call_method1("write", ("\n",))?;
-        invocation.stream.call_method0("flush")?;
+        write_progress(&invocation.stream, "\n")?;
     }
     let verbose: bool = native_field(request, "verbose")?.is_truthy()?;
     let pipeline: Bound<'_, PyAny> =
         with_verbose_inspection(py, verbose, || compile_pipeline(request, &invocation))?;
-    write_output(request, &invocation, &pipeline)?;
+    let changed: Option<ChangedDecision> = changed_preview(request, &invocation, &pipeline)?;
+    write_output(request, &invocation, &pipeline, changed.as_ref())?;
     Ok(i32::from(plan_has_errors(&native_field(
         &pipeline,
         "plan_output",

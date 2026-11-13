@@ -21,6 +21,8 @@ use crate::bindings::_helpers::plan_output::values::{
 };
 use crate::bindings::_helpers::records::fields::field as native_field;
 
+/// The plan JSON key of what `--changed` would run, hold back and skip.
+pub(crate) const CHANGED_KEY: &str = "changed";
 const MICROBATCH_MODE: &str = "microbatch";
 const RENAMED_REASON: &str = "renamed";
 const RENAMED_DECISION: &str = "renamed";
@@ -749,7 +751,10 @@ pub(crate) fn format_plan_json(
         py,
         "format_plan_json",
         options,
-        (&["plan"], &["python_plan_entries", SYNCED_COPY_KEY]),
+        (
+            &["plan"],
+            &["python_plan_entries", SYNCED_COPY_KEY, CHANGED_KEY],
+        ),
     )?;
     let plan: Bound<'_, PyAny> = arguments.value("plan")?;
     let python_entries: Vec<Bound<'_, PyAny>> = if arguments.passed("python_plan_entries")? {
@@ -824,6 +829,9 @@ pub(crate) fn format_plan_json(
     let synced_copy: Bound<'_, PyAny> = arguments.value(SYNCED_COPY_KEY)?;
     if !synced_copy.is_none() {
         result.set_item(SYNCED_COPY_KEY, synced_copy)?;
+    }
+    if arguments.passed(CHANGED_KEY)? {
+        result.set_item(CHANGED_KEY, arguments.value(CHANGED_KEY)?)?;
     }
     indented_json(result.as_any())
 }

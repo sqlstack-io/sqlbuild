@@ -22,6 +22,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     WorkerExecutionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    create_raw_orders,
     location_process,
     scheduled_worker,
     wait_for_generation,
@@ -69,6 +70,23 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     "benchmarks/duckshop/edge_cases/orchestration/source_stale_journey.json"
                 ).read_text(),
             },
+        ),
+        WorkerExecutionTestCase(
+            "a changed: True job still rebuilds on new source data",
+            'SELECT 73 AS amount FROM __source("raw_orders") LIMIT 1',
+            "SELECT amount FROM orders",
+            "success",
+            [(73,)],
+            expected_origin="sensor",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/changed_source_orders.py"
+                ).read_text(),
+                "sources/orders.yml": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
+                ).read_text(),
+            },
+            warehouse_setup=create_raw_orders,
         ),
     ],
     ids=lambda case: case.description,
@@ -183,3 +201,8 @@ def test_given_external_source_versions_when_a_location_resyncs_then_only_change
                 )
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT COUNT(*) FROM sqb_run_requests").fetchone() == (2,)
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.execute(
+                "SELECT COUNT(DISTINCT execution_id) FROM main._sqlbuild_consumption "
+                "WHERE node_name = 'orders' AND phase = 'succeeded'"
+            ).fetchall() == [(2,)], "each sensor run builds orders again"

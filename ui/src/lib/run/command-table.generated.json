@@ -132,6 +132,27 @@
 					"description": "Rebuild incremental models and snapshots from scratch"
 				},
 				{
+					"flag": "--changed",
+					"aliases": [],
+					"type": "attached",
+					"choices": null,
+					"repeatable": false,
+					"requires": null,
+					"description": "run only what changed, and what it reaches downstream; COUNTS lists what counts as a change, such as --changed=definition,source_data (default: [changes] counts, else definition)"
+				},
+				{
+					"flag": "--reach",
+					"aliases": [],
+					"type": "string",
+					"choices": [
+						"job",
+						"all"
+					],
+					"repeatable": false,
+					"requires": null,
+					"description": "with --changed: job stops at nodes another triggered job refreshes; all runs everything downstream (default: [changes] reach, else job)"
+				},
+				{
 					"flag": "--allow-snapshot-full-refresh",
 					"aliases": [],
 					"type": "bool",

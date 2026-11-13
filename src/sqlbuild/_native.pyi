@@ -6524,6 +6524,8 @@ class BuildCommandRequest(NativeRecord):
     fail_fast: bool
     full_refresh: bool
     changed: bool
+    changed_counts: tuple[str, ...] | None
+    reach: str | None
     load_sources: bool | None
     reload_sources: bool
     include_python: bool
@@ -6563,6 +6565,8 @@ class BuildCommandRequest(NativeRecord):
         fail_fast: bool = False,
         full_refresh: bool = False,
         changed: bool = False,
+        changed_counts: tuple[str, ...] | None = None,
+        reach: str | None = None,
         load_sources: bool | None = None,
         reload_sources: bool = False,
         include_python: bool = True,
@@ -6926,6 +6930,9 @@ class PlanCommandRequest(NativeRecord):
     cursor_overrides: CursorOverrides | None
     json_output: bool
     full_refresh: bool
+    changed: bool
+    changed_counts: tuple[str, ...] | None
+    reach: str | None
     load_sources: bool | None
     include_python: bool
     no_color: bool
@@ -6947,6 +6954,9 @@ class PlanCommandRequest(NativeRecord):
         cursor_overrides: CursorOverrides | None = None,
         json_output: bool = False,
         full_refresh: bool = False,
+        changed: bool = False,
+        changed_counts: tuple[str, ...] | None = None,
+        reach: str | None = None,
         load_sources: bool | None = None,
         include_python: bool = True,
         no_color: bool = False,

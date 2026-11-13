@@ -229,6 +229,7 @@ fn format_args(action: &ActionSpec, default: &str) -> String {
     match action.nargs {
         Nargs::Single => name,
         Nargs::Optional => format!("[{name}]"),
+        Nargs::Attached => format!("[={name}]"),
         Nargs::ZeroOrMore => format!("[{name} ...]"),
         Nargs::OneOrMore => format!("{name} [{name} ...]"),
         Nargs::Parser => format!("{name} ..."),
@@ -251,6 +252,12 @@ fn invocation(action: &ActionSpec) -> String {
     let options: String = action.option_strings.join(", ");
     if action.nargs == Nargs::Zero {
         return options;
+    }
+    if action.nargs == Nargs::Attached {
+        return format!(
+            "{options}{}",
+            format_args(action, &dest(action).to_uppercase())
+        );
     }
     format!(
         "{options} {}",
@@ -438,6 +445,11 @@ fn usage_part(action: &ActionSpec, grouped: bool) -> Option<String> {
     let option: &str = &action.option_strings[0];
     let part: String = if action.nargs == Nargs::Zero {
         option.to_owned()
+    } else if action.nargs == Nargs::Attached {
+        format!(
+            "{option}{}",
+            format_args(action, &dest(action).to_uppercase())
+        )
     } else {
         format!(
             "{option} {}",

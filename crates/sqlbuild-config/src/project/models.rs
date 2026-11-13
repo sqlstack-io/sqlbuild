@@ -67,6 +67,15 @@ pub struct ControlConfig {
     pub sync_at_least_every_seconds: Option<u64>,
 }
 
+/// `[changes]` of `sqlbuild_project.toml`: what `--changed` counts and how far a change reaches.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ChangesConfig {
+    /// Non-empty, each one of `CHANGE_COUNTS`.
+    pub counts: Option<Vec<String>>,
+    /// One of `CHANGE_REACHES`.
+    pub reach: Option<String>,
+}
+
 /// `[review]` of `sqlbuild_project.toml`: the defaults `sqb review` uses when flags are omitted.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReviewConfig {

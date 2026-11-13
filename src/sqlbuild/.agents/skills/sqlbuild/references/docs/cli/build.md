@@ -57,7 +57,8 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--no-cache` | Bypass the reusable compile-analysis cache for this invocation |
 | `--full-refresh` | Drop and rebuild selected models unless a model sets `full_refresh false`; `full_refresh true` forces a model even without this flag |
-| `--changed` | Build only the selected models and seeds whose definition or inputs changed since they last succeeded; see [Building only what changed](#building-only-what-changed) |
+| `--changed` | Build only the selected models and seeds that changed, and what they reach downstream; `--changed=definition,source_data` picks what counts. See [Building only what changed](#building-only-what-changed) |
+| `--reach` | With `--changed`: `job` stops at models another scheduled job refreshes, `all` builds everything downstream |
 | `--defer-to` | Resolve unselected model references against another target |
 | `--defer-sources-to` | Read managed source data from another target |
 | `--fail-fast` | Stop on first failure and skip remaining nodes |
@@ -92,39 +93,100 @@ This replaces the former `sqb run` command. The full lifecycle (tests + audits) 
 
 ## Building only what changed
 
-`--changed` skips each selected model or seed that would read exactly what it read the last time
-it built successfully:
+`--changed` builds the selected models and seeds that changed since they last built, and what
+they reach downstream. From the command line only definition changes count by default, and a change
+stops at models that another scheduled job refreshes:
 
 ```bash
 sqb build --changed
 ```
 
 ```
-Changed: 2 of 3 selected models and seeds run; 1 unchanged are skipped.
+Counting: definition (source data not counted) · reach: job
+Changed: 4 of 8 selected models and seeds run; 1 unchanged and 3 held back are skipped.
 ```
 
-Add `--verbose` to print why each one runs, such as `input raw_orders changed`.
+Preview it with `sqb plan --changed`, which lists each node under Changed, Downstream of changes or
+Held back with the reason. Add `--verbose` to a build to print the same reasons.
 
-A selected model or seed runs when any of these is true:
+### What counts as a change
+
+| Kind | Counts when | Example |
+|------|-------------|---------|
+| `definition` | Its SQL, config, hooks, contract or a function it calls changed, or an upstream was rebuilt with such a change | Edited `stg_orders.sql` |
+| `source_data` | A source it reads has a different [freshness](../concepts/sources.md#source-freshness) value, or an upstream was rebuilt with new data only | New rows raise `MAX(loaded_at)` |
+
+Pick the kinds on the command line or in `sqlbuild_project.toml`:
+
+```bash
+sqb build --changed=definition               # the default
+sqb build --changed=source_data              # new source data only
+sqb build --changed=definition,source_data   # both
+```
+
+```toml
+[changes]
+counts = ["definition"]   # add "source_data" to count new source data
+reach = "job"             # or "all"
+```
+
+Without `[changes] counts`, the default depends on how the build starts:
+
+| Build | Counts by default |
+|-------|-------------------|
+| `sqb build --changed` and `sqb plan --changed` | `definition` |
+| A job's run with `settings={'changed': True}`, started by a schedule, a sensor or by hand | `definition` and `source_data` |
+
+`[changes] counts` sets both, and a list after `--changed=` or in the job's settings overrides it.
+
+Write the kinds with `=`: `sqb build --changed definition` reads `definition` as a selector.
+
+A model or seed always runs, whatever counts, when:
 
 | Reason | Example |
 |--------|---------|
 | It has no successful build on record | A new model |
 | Its last build did not finish | The build was killed or failed after the model started writing |
 | Its relation is missing, or `--full-refresh` or a cursor override applies | `sqb build --changed --full-refresh` |
-| Its definition changed | Edited SQL, config, hooks, contract or a function it calls |
-| A source it reads has a different [freshness](../concepts/sources.md#source-freshness) value | New rows raise `MAX(loaded_at)` |
-| An upstream model or seed was rebuilt since, or runs in this build | `stg_orders` ran, so `customer_orders` runs |
-| An upstream model or seed needs to run, even when it is not selected | `sqb build customer_orders --changed` runs `customer_orders` on every build until a changed `stg_orders` is built |
+| The planner must rebuild it for a reason other than an edit to its definition | A renamed model |
 | What it reads can't be listed | SQL that reads relations not declared as sources or models, or a Python task or asset upstream |
+| An upstream needs to run, even when it is not selected | `sqb build customer_orders --changed` runs `customer_orders` until a changed `stg_orders` is built |
+
+### How far a change reaches
+
+With `--reach job`, the default, a change runs everything downstream until it reaches a model that
+belongs to a scheduled job without the changed model. That job's next run refreshes it, so the
+model is held back:
+
+```
+ staging_daily (schedule)               finance_daily (schedule)
+ stg_orders* ─▶ int_orders ✓ ──────────▶ fct_revenue ⏸ ─▶ rpt_pnl ⏸
+      │
+      └──▶ orders_export ✓  (in no scheduled job)
+```
+
+- A job counts when a schedule, calendar schedule or sensor starts it, directly or through its
+  group, for the target you build. A job nothing starts counts as no job.
+- A model held back by one job runs if another job that holds the change also contains it.
+- A model that reads a held-back model is held back too. Unchanged parents never hold a model back.
+- A job never holds back its own models while it runs: a scheduled run, or a build that selects the
+  job, such as `sqb build finance_daily --changed`.
+- With no scheduled jobs, everything downstream runs.
+
+`--reach all` builds everything downstream of a change. `--reach` without `--changed` is refused.
+
+### In a scheduled job
+
+Set `settings={'changed': True}` to count definition and source data changes, or what
+`[changes] counts` sets, or name the kinds, such as `settings={'changed': ['definition']}`. A
+sensor on new source data therefore still rebuilds its job's models. A job's run builds every
+changed model it selects, whatever its `reach` setting. Skipped models count as successful nodes
+of the run.
 
 A model that runs under `--changed` plans exactly as in a plain build: its
 [`replay_on_change`](../concepts/planning/replay-decisions.md) policy still decides how much
 history an incremental model reprocesses. A model that runs only because an upstream was rebuilt
 takes its normal incremental step.
-
-In a scheduled job, set `settings={'changed': True}`. Skipped models count as successful nodes of
-the run.
 
 Every build, with or without `--changed`, records what each model and seed read in
 `_sqlbuild_consumption` in its target schema, so the build needs permission to create and insert
@@ -134,12 +196,14 @@ into that table. [`sqb janitor`](janitor.md) keeps the newest
 Limitations:
 
 - A source is compared only through its freshness value. A change that doesn't move it, such as an
-  update that keeps the old `loaded_at`, isn't seen. A source without freshness configuration counts
-  as changed on every build.
+  update that keeps the old `loaded_at`, isn't seen. With `source_data` counted, a source without
+  freshness configuration counts as changed on every build.
 - SQL that depends on the time, such as `current_date`, or on random values never counts as changed.
   Build those models without `--changed`.
 - Two builds of one model less than 5 seconds apart can't be ordered, so its downstream models run
   on the next `--changed` build.
+- When the record of an upstream's earlier build has been pruned, SQLBuild can't tell a definition
+  change from new data, so the upstream counts as changed.
 
 ## Execution order
 

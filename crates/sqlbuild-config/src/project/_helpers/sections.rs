@@ -23,14 +23,15 @@ use crate::project::constants::{
     USD_PER_CREDIT_KEY, ZERO_FIXED_DURATION, ZERO_FLOAT,
 };
 use crate::project::constants::{
-    CONTROL_KEYS, MIN_SYNC_INTERVAL_SECONDS, SYNC_INTERVAL_HELP, SYNC_INTERVAL_OFF,
+    CHANGE_COUNTS, CHANGE_REACHES, CHANGES_KEYS, CONTROL_KEYS, MIN_SYNC_INTERVAL_SECONDS,
+    SYNC_INTERVAL_HELP, SYNC_INTERVAL_OFF,
 };
 use crate::project::constants::{
     DEFAULT_TEST_TIMEOUT, DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE,
     SCENARIO_TIMEOUT_KEY, TEST_TIMEOUT_KEY, UNIT_TEST_MAX_REAL_MODELS_KEY,
 };
 use crate::project::errors::ConfigFailure;
-use crate::project::models::{Built, ConfigFile, ControlConfig, ReviewConfig};
+use crate::project::models::{Built, ChangesConfig, ConfigFile, ControlConfig, ReviewConfig};
 use crate::project::types::{Entries, Fields, Loaded};
 use sqlbuild_core::constants::ZERO_DAY_DURATION;
 
@@ -622,6 +623,51 @@ pub(crate) fn load_control(
         location,
         sync_at_least_every_seconds,
     })
+}
+
+/// `[changes]`: what `--changed` counts as a change and how far a change reaches downstream.
+pub(crate) fn load_changes(
+    payload: Option<&ConfigValue>,
+    file: ConfigFile,
+) -> Loaded<ChangesConfig> {
+    let mapping = coerce_mapping(payload, place(file, "changes"))?;
+    validate_allowed_keys(mapping, &CHANGES_KEYS, place(file, "changes"))?;
+    let counts: Option<Vec<String>> = match get(mapping, "counts") {
+        None => None,
+        payload => {
+            let counts: Vec<String> = string_sequence(payload, place(file, "changes.counts"))?;
+            if counts.is_empty()
+                || counts
+                    .iter()
+                    .any(|count| !CHANGE_COUNTS.contains(&count.as_str()))
+            {
+                return Err(ConfigFailure::at(
+                    file,
+                    format!(
+                        "changes.counts must list one or more of: {}",
+                        CHANGE_COUNTS.join(", ")
+                    ),
+                ));
+            }
+            Some(counts)
+        }
+    };
+    let reach: Option<String> = match get(mapping, "reach") {
+        None => None,
+        Some(ConfigValue::String(text)) if CHANGE_REACHES.contains(&text.as_str()) => {
+            Some(text.clone())
+        }
+        Some(_) => {
+            return Err(ConfigFailure::at(
+                file,
+                format!(
+                    "changes.reach must be one of: {}",
+                    CHANGE_REACHES.join(", ")
+                ),
+            ));
+        }
+    };
+    Ok(ChangesConfig { counts, reach })
 }
 
 /// `[review]`: the defaults of `sqb review`, validated so a typo fails like any other section.

@@ -15,6 +15,12 @@ pub(crate) const FRESHNESS_VERB: &str = "freshness";
 /// The parser destination holding the verb itself, which is not a setting.
 pub(crate) const COMMAND_DEST: &str = "command";
 
+/// The destination holding the kinds `--changed=` counts; the job setting carries them as `changed`.
+pub(crate) const CHANGED_COUNTS_DEST: &str = "changed_counts";
+
+/// The job setting `--changed` becomes.
+pub(crate) const CHANGED_DEST: &str = "changed";
+
 /// The destination `--load` and `--no-load` share; only `--no-load` is accepted.
 pub(crate) const LOAD_SOURCES_DEST: &str = "load_sources";
 
@@ -22,8 +28,10 @@ pub(crate) const LOAD_SOURCES_DEST: &str = "load_sources";
 pub(crate) const SELECTOR_DESTS: [&str; 3] = ["select", "exclude", "positional_select"];
 
 /// Destinations an ad-hoc run may set; the control plane gates history rewrites and warehouses.
-pub(crate) const ALLOWED_DESTS: [&str; 27] = [
+pub(crate) const ALLOWED_DESTS: [&str; 29] = [
     "max_microbatches",
+    "changed",
+    "reach",
     "run_tests",
     "run_audits",
     "include_python",

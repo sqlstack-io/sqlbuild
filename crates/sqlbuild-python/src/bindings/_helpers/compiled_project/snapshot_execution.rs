@@ -158,6 +158,22 @@ impl WorkerBuild {
         Ok(())
     }
 
+    /// Nodes `build --changed` holds back wait for the job that refreshes them, with why.
+    pub(crate) fn held_back(&self, py: Python<'_>, nodes: &[(String, String)]) -> PyResult<()> {
+        for (key, why) in nodes {
+            self.complete(
+                py,
+                key,
+                (
+                    NodeOutcome::Skipped,
+                    None,
+                    (None, Some(format!("held back: {why}"))),
+                ),
+            )?;
+        }
+        Ok(())
+    }
+
     fn complete(
         &self,
         py: Python<'_>,

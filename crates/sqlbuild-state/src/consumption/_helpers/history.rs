@@ -20,6 +20,28 @@ type RowIdentity<'a> = (&'a str, &'a str, Option<(&'a str, &'a str, &'a str)>);
 
 /// Recent executions per relation, from rows read newest first with at most `limit` per relation.
 pub(crate) fn build_history(rows: &[ConsumptionRow], limit: usize) -> ConsumptionHistory {
+    let mut relations: HashMap<RelationKey, RelationHistory> = HashMap::new();
+    for (relation, execution) in executions_of(rows) {
+        relations
+            .entry(relation)
+            .or_default()
+            .executions
+            .push(execution);
+    }
+    for history in relations.values_mut() {
+        history.executions.sort_by(|left, right| {
+            (right.started_at, &right.execution_id).cmp(&(left.started_at, &left.execution_id))
+        });
+        history.truncated = history.executions.len() >= limit;
+    }
+    ConsumptionHistory {
+        relations,
+        referenced: HashMap::new(),
+    }
+}
+
+/// Each execution in `rows` with its relation, its duplicated rows counted once.
+pub(crate) fn executions_of(rows: &[ConsumptionRow]) -> Vec<(RelationKey, Execution)> {
     let mut events: HashMap<RowIdentity<'_>, (&ConsumptionRow, i64, i64)> = HashMap::new();
     for row in rows {
         let input = row.row.input.as_ref();
@@ -54,21 +76,12 @@ pub(crate) fn build_history(rows: &[ConsumptionRow], limit: usize) -> Consumptio
         execution.latest = execution.latest.max(latest);
         execution.rows.push(row);
     }
-    let mut relations: HashMap<RelationKey, RelationHistory> = HashMap::new();
-    for ((relation, execution_id), execution_rows) in grouped {
-        relations
-            .entry(relation.clone())
-            .or_default()
-            .executions
-            .push(execution(execution_id, &execution_rows));
-    }
-    for history in relations.values_mut() {
-        history.executions.sort_by(|left, right| {
-            (right.started_at, &right.execution_id).cmp(&(left.started_at, &left.execution_id))
-        });
-        history.truncated = history.executions.len() >= limit;
-    }
-    ConsumptionHistory { relations }
+    grouped
+        .into_iter()
+        .map(|((relation, execution_id), execution_rows)| {
+            (relation.clone(), execution(execution_id, &execution_rows))
+        })
+        .collect()
 }
 
 fn execution(execution_id: &str, rows: &ExecutionRows<'_>) -> Execution {
@@ -142,6 +155,34 @@ pub(crate) struct Window<'a> {
 }
 
 impl ConsumptionHistory {
+    /// The execution `execution_id` of `relation`, recent or read back because a build read it.
+    pub(crate) fn execution(
+        &self,
+        relation: &RelationKey,
+        execution_id: &str,
+    ) -> Option<&Execution> {
+        self.relations
+            .get(relation)
+            .and_then(|history| {
+                history
+                    .executions
+                    .iter()
+                    .find(|execution| execution.execution_id == execution_id)
+            })
+            .or_else(|| {
+                self.referenced
+                    .get(&(relation.clone(), execution_id.to_owned()))
+            })
+    }
+
+    /// Every execution read, recent or read back.
+    pub(crate) fn all_executions(&self) -> impl Iterator<Item = &Execution> {
+        self.relations
+            .values()
+            .flat_map(|history| history.executions.iter())
+            .chain(self.referenced.values())
+    }
+
     /// The newest executions of `relation` within the skew, or None when it has none.
     pub(crate) fn window(&self, relation: &RelationKey) -> Option<Window<'_>> {
         let history: &RelationHistory = self.relations.get(relation)?;

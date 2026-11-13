@@ -1252,6 +1252,14 @@ CHANGED_BUILDS_UDF_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/c
 CHANGED_BUILDS_UNQUALIFIED_FIXTURE: Path = (
     REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_unqualified"
 )
+CHANGED_BUILDS_REACH_FIXTURE: Path = (
+    REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_reach"
+)
+CHANGED_BUILDS_TWO_UP_FIXTURE: Path = (
+    REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_two_up"
+)
+# Counts new source data too, so a build follows consumed inputs alone, whatever the defaults.
+CHANGED_ANY: str = "--changed=definition,source_data"
 CHANGED_ORDER_SKEW_SECONDS: float = 5.2
 _CHANGED_PROGRESS_PATTERN: re.Pattern[str] = re.compile(
     r"^\s+\d+/\d+\s+\S+\s+(\S+)\s+OK\b", re.MULTILINE
@@ -1336,7 +1344,7 @@ def prepare_changed_project(*, tmp_path: Path, warehouse: ChangedWarehouse) -> P
 def add_changed_overlay(project_dir: Path, fixture: Path) -> None:
     """Overlay one of the DuckShop changed-builds cases on the base case."""
 
-    for path in fixture.rglob("*.sql"):
+    for path in (*fixture.rglob("*.sql"), *fixture.rglob("*.py")):
         destination: Path = project_dir / path.relative_to(fixture)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
@@ -1345,12 +1353,20 @@ def add_changed_overlay(project_dir: Path, fixture: Path) -> None:
 def run_changed_build(project_dir: Path, arguments: tuple[str, ...]) -> frozenset[str]:
     """Wait out the order skew, build successfully, and return the models and seeds written."""
 
+    return changed_build_output(project_dir, arguments)[0]
+
+
+def changed_build_output(
+    project_dir: Path, arguments: tuple[str, ...]
+) -> tuple[frozenset[str], str]:
+    """Wait out the order skew, build successfully, and return what it wrote and its output."""
+
     time.sleep(CHANGED_ORDER_SKEW_SECONDS)
     result: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build", *arguments), project_dir=project_dir
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    return frozenset(_CHANGED_PROGRESS_PATTERN.findall(result.stdout))
+    return frozenset(_CHANGED_PROGRESS_PATTERN.findall(result.stdout)), result.stdout
 
 
 def apply_changed_step(
@@ -1408,13 +1424,13 @@ def changed_build_steps(warehouse: ChangedWarehouse) -> tuple[ChangedBuildStep, 
     """Mutations and builds whose `--changed` run sets follow from consumed inputs alone."""
 
     return (
-        ChangedBuildStep("first --changed build", (), {}, ("--changed",)),
-        ChangedBuildStep("nothing changed", (), {}, ("--changed",)),
+        ChangedBuildStep("first --changed build", (), {}, (CHANGED_ANY,)),
+        ChangedBuildStep("nothing changed", (), {}, (CHANGED_ANY,)),
         ChangedBuildStep(
             "a new order",
             (f"INSERT INTO {warehouse.orders_table} VALUES (2, 1, 2)",),
             {},
-            ("--changed",),
+            (CHANGED_ANY,),
         ),
         ChangedBuildStep(
             "a definition change",
@@ -1425,19 +1441,19 @@ def changed_build_steps(warehouse: ChangedWarehouse) -> tuple[ChangedBuildStep, 
                     'SELECT customer_id FROM __source("raw_customers") WHERE customer_id > 0\n'
                 )
             },
-            ("--changed",),
+            (CHANGED_ANY,),
         ),
         ChangedBuildStep(
             "a stale unselected upstream",
             (f"INSERT INTO {warehouse.customers_table} VALUES (2, 2)",),
             {},
-            ("--changed", "--select", "customer_orders"),
+            (CHANGED_ANY, "--select", "customer_orders"),
         ),
         ChangedBuildStep(
-            "the upstream is still stale", (), {}, ("--changed", "--select", "customer_orders")
+            "the upstream is still stale", (), {}, (CHANGED_ANY, "--select", "customer_orders")
         ),
-        ChangedBuildStep("building the whole selection", (), {}, ("--changed",)),
+        ChangedBuildStep("building the whole selection", (), {}, (CHANGED_ANY,)),
         ChangedBuildStep("a plain build", (), {}, ()),
-        ChangedBuildStep("after the plain build", (), {}, ("--changed",)),
-        ChangedBuildStep("full refresh", (), {}, ("--changed", "--full-refresh")),
+        ChangedBuildStep("after the plain build", (), {}, (CHANGED_ANY,)),
+        ChangedBuildStep("full refresh", (), {}, (CHANGED_ANY, "--full-refresh")),
     )

@@ -2,6 +2,8 @@
 
 use crate::argv::models::NamespaceDefault;
 
+/// What `--changed=COUNTS` may list.
+pub(crate) const CHANGE_COUNTS: [&str; 2] = ["definition", "source_data"];
 /// The exported `sqb` parser tree: every parser, group and action in `add_argument` order.
 pub(crate) const COMMAND_TABLE: &str = include_str!("command_table.json");
 /// The exported `sqb dbt plan|run|build` execution parser, its command name a placeholder.
@@ -71,7 +73,7 @@ pub(crate) const INT_CONVERTER: &str = "int";
 pub(crate) const PATH_CONVERTER: &str = "Path";
 
 /// Every `CliNamespace` attribute with a default, in declaration order.
-pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 185] = [
+pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 187] = [
     ("command", NamespaceDefault::None),
     ("project_dir", NamespaceDefault::None),
     ("dbt_project_dir", NamespaceDefault::None),
@@ -127,6 +129,8 @@ pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 185] = [
     ("fail_fast", NamespaceDefault::Bool(false)),
     ("full_refresh", NamespaceDefault::Bool(false)),
     ("changed", NamespaceDefault::Bool(false)),
+    ("changed_counts", NamespaceDefault::None),
+    ("reach", NamespaceDefault::None),
     ("as_target", NamespaceDefault::None),
     ("include_python", NamespaceDefault::Bool(true)),
     ("load_sources", NamespaceDefault::None),

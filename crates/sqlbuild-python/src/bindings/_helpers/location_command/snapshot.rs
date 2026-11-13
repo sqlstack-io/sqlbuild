@@ -159,9 +159,10 @@ fn identity_nodes(
     let options = PyDict::new(py);
     options.set_item("project", project)?;
     let scope = build_planner_scope(py, Some(options))?;
+    let dialect: Option<String> = field(project, "sql_analysis_dialect")?.extract()?;
     let identities = direct_model_version_identities(
         (&field(project, "functions")?, &scope),
-        field(project, "sql_analysis_dialect")?.extract()?,
+        dialect.clone(),
         (
             &field(project, "seeds")?,
             &py.None().into_bound(py),
@@ -170,15 +171,19 @@ fn identity_nodes(
         &py.None().into_bound(py),
     )?;
     for node in nodes.values_mut() {
-        let hashes = match node.kind.as_str() {
-            "model" => "model_local_hashes",
-            "udf" | "table_fn" => "function_local_hashes",
-            "seed" => "seed_version_hashes",
+        let (hashes, with_dialect) = match node.kind.as_str() {
+            "model" => ("model_local_hashes", true),
+            "udf" | "table_fn" => ("function_local_hashes", false),
+            "seed" => ("seed_version_hashes", false),
             _ => continue,
         };
         let name = node.definition["name"].as_str().unwrap_or_default();
         let hash: String = field(&identities, hashes)?.get_item(name)?.extract()?;
-        node.definition["planner_identity"] = json!({"local_hash": hash});
+        node.definition["planner_identity"] = if with_dialect {
+            json!({"local_hash": hash, "dialect": dialect})
+        } else {
+            json!({"local_hash": hash})
+        };
     }
     Ok(nodes)
 }

@@ -1753,6 +1753,33 @@
         "group": 1
        },
        {
+        "kind": "store",
+        "options": [
+         "--changed"
+        ],
+        "dest": "changed",
+        "nargs": "=?",
+        "const": true,
+        "default": false,
+        "metavar": "COUNTS",
+        "help": "run only what changed, and what it reaches downstream; COUNTS lists what counts as a change, such as --changed=definition,source_data (default: [changes] counts, else definition)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--reach"
+        ],
+        "dest": "reach",
+        "choices": [
+         "job",
+         "all"
+        ],
+        "default": null,
+        "help": "with --changed: job stops at nodes another triggered job refreshes; all runs everything downstream (default: [changes] reach, else job)",
+        "group": 1
+       },
+       {
         "kind": "store_true",
         "options": [
          "--selection-diagnostics"
@@ -2309,14 +2336,30 @@
         "group": 1
        },
        {
-        "kind": "store_true",
+        "kind": "store",
         "options": [
          "--changed"
         ],
         "dest": "changed",
-        "nargs": 0,
+        "nargs": "=?",
         "const": true,
         "default": false,
+        "metavar": "COUNTS",
+        "help": "run only what changed, and what it reaches downstream; COUNTS lists what counts as a change, such as --changed=definition,source_data (default: [changes] counts, else definition)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--reach"
+        ],
+        "dest": "reach",
+        "choices": [
+         "job",
+         "all"
+        ],
+        "default": null,
+        "help": "with --changed: job stops at nodes another triggered job refreshes; all runs everything downstream (default: [changes] reach, else job)",
         "group": 1
        },
        {

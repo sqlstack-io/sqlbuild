@@ -27,6 +27,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--json` | Output the plan as JSON |
 | `--selection-diagnostics` | Warn when a selected model will build on changed upstream models that are not selected; see [Selection and staleness](/docs/concepts/planning/selection-and-staleness) |
 | `--full-refresh` | Plan a full rebuild for selected models unless a model sets `full_refresh false`; `full_refresh true` forces a model without this flag |
+| `--changed` | Show what `sqb build --changed` would run, which nodes it holds back and why; takes `--changed=definition,source_data` and `--reach` like [`sqb build`](/docs/cli/build#building-only-what-changed). In `--json`, the `changed` object lists `runs`, `held_back` and `unchanged` |
 | `--start-cursor` | Override the start cursor, typed from the selected incremental models' cursor type; fails with `S303` if the selection mixes timestamp and integer cursors. With no cursor model selected, an integer value is read as an integer cursor and anything else as an ISO timestamp |
 | `--end-cursor` | Override the end cursor, typed the same way as `--start-cursor` |
 | `--start-cursor-ts` | Override start cursor for timestamp incremental models (ISO format) |

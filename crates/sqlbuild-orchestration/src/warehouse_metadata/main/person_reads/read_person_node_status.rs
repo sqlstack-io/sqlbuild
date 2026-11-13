@@ -11,10 +11,10 @@ use crate::store::main::commit::commit;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprint;
 use crate::warehouse_metadata::_helpers::node_status::{
-    definition_evidence, destination, physical_evidence,
+    destination, node_definition_evidence, physical_evidence,
 };
 use crate::warehouse_metadata::models::{
-    NodeStatus, NodeStatusQuery, PhysicalEvidence, SourceDataStatus,
+    DefinitionEvidence, NodeStatus, NodeStatusQuery, PhysicalEvidence, SourceDataStatus,
 };
 
 pub async fn read_person_node_status(
@@ -75,12 +75,15 @@ pub async fn read_person_node_status(
             reason: "node has no physical relation destination".into(),
         }
     };
+    let definition: DefinitionEvidence;
+    (transaction, definition) =
+        node_definition_evidence(transaction, &node, build.as_ref()).await?;
     let status = NodeStatus {
         snapshot_id: snapshot.snapshot_id,
         node_key: options.node_key.clone(),
         physical,
-        definition: definition_evidence(&node, build.as_ref()),
-        build: build.map(|(record, _)| record),
+        definition,
+        build: build.map(|(record, _, _)| record),
         source_data: SourceDataStatus::Unknown {
             reason: "consumed-input provenance is not recorded".into(),
         },

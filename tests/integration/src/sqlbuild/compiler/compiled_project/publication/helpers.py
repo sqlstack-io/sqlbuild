@@ -1591,3 +1591,11 @@ def run_write_set(control_store: Path, run_id: str) -> frozenset[str]:
             "SELECT request_json FROM sqb_runs WHERE run_id=?", (run_id,)
         ).fetchone()
     return frozenset(json.loads(request)["write_set"])
+
+
+def create_raw_orders(warehouse: Path) -> None:
+    """The source table a changed job's model reads."""
+    with duckdb.connect(str(warehouse)) as connection:
+        _ = connection.execute(
+            "CREATE TABLE main.raw_orders AS SELECT CAST(1 AS BIGINT) AS order_id"
+        )

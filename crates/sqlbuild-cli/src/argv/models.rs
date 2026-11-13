@@ -13,6 +13,8 @@ pub enum Nargs {
     Zero,
     /// `nargs='?'`.
     Optional,
+    /// `nargs='=?'`: an option whose value is given only as `--option=value`, never as the next string.
+    Attached,
     /// `nargs='*'`.
     ZeroOrMore,
     /// `nargs='+'`.

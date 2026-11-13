@@ -54,7 +54,8 @@ fn nargs_pattern(action: &ActionSpec) -> Vec<Element> {
             element("A", 1, 1),
             element("-AO", 0, UNBOUNDED),
         ],
-        (Nargs::Zero, true) => Vec::new(),
+        (Nargs::Zero | Nargs::Attached, true) => Vec::new(),
+        (Nargs::Attached, false) => vec![element("-", 0, UNBOUNDED)],
         (Nargs::Zero, false) => vec![element("-", 0, UNBOUNDED)],
     }
 }

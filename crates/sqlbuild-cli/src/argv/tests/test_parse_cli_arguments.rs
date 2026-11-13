@@ -20,6 +20,36 @@ fn given_accepted_arguments_when_parsing_then_attributes_hold_the_parsed_values(
             expected_value: strings(&["orders", "customers", "products"]),
         },
         ParsedValueTestCase {
+            description: "a bare --changed leaves the next string as a selector",
+            argv: &["build", "--changed", "definition"],
+            attribute: "select",
+            expected_value: strings(&["definition"]),
+        },
+        ParsedValueTestCase {
+            description: "a bare --changed uses the configured counts",
+            argv: &["build", "--changed", "tag:finance"],
+            attribute: "changed_counts",
+            expected_value: Value::None,
+        },
+        ParsedValueTestCase {
+            description: "--changed=COUNTS turns --changed on",
+            argv: &["build", "--changed=source_data"],
+            attribute: "changed",
+            expected_value: Value::Bool(true),
+        },
+        ParsedValueTestCase {
+            description: "--changed=COUNTS lists the counts in canonical order",
+            argv: &["plan", "--changed=source_data,definition"],
+            attribute: "changed_counts",
+            expected_value: strings(&["definition", "source_data"]),
+        },
+        ParsedValueTestCase {
+            description: "--reach takes its value as the next string",
+            argv: &["build", "--changed", "--reach", "all", "orders"],
+            attribute: "reach",
+            expected_value: Value::Str("all".to_owned()),
+        },
+        ParsedValueTestCase {
             description: "an unset concurrency stays None",
             argv: &["build"],
             attribute: "concurrency",
@@ -132,6 +162,24 @@ fn given_help_version_or_rejected_arguments_when_parsing_then_exits_after_writin
             expected_last_write: "sqb: error[C900]: --concurrency must be >= 1\n\n",
         },
         ExitTestCase {
+            description: "--reach without --changed is refused",
+            argv: &["build", "--reach", "all"],
+            expected_exit: 2,
+            expected_last_write: "sqb: error[C900]: --reach needs --changed\n\n",
+        },
+        ExitTestCase {
+            description: "--changed lists only known kinds of change",
+            argv: &["build", "--changed=definition,schedule"],
+            expected_exit: 2,
+            expected_last_write: "sqb: error[C900]: --changed lists what counts as a change: one or more of definition, source_data, separated by commas, not \"definition,schedule\"\n\n",
+        },
+        ExitTestCase {
+            description: "--reach accepts job or all",
+            argv: &["build", "--changed", "--reach", "group"],
+            expected_exit: 2,
+            expected_last_write: "sqb build: error[C900]: argument --reach: invalid choice: 'group' (choose from 'job', 'all')\n\n",
+        },
+        ExitTestCase {
             description: "a missing required sub-command is named",
             argv: &["rules"],
             expected_exit: 2,
@@ -242,6 +290,28 @@ fn given_job_settings_when_validating_then_values_survive_the_build_parser() {
                 ("run_tests", Value::Bool(false)),
                 ("full_refresh", Value::Bool(true)),
                 ("warehouse", Value::Str("--full-refresh".into())),
+            ],
+            expected_empty: false,
+        },
+        JobSettingsTestCase {
+            description: "changed as true or as a list of counts, with a reach",
+            settings: BTreeMap::from([
+                ("changed".into(), json!(["source_data", "definition"])),
+                ("reach".into(), json!("all")),
+            ]),
+            expected_values: vec![
+                ("changed", Value::Bool(true)),
+                ("changed_counts", strings(&["definition", "source_data"])),
+                ("reach", Value::Str("all".into())),
+            ],
+            expected_empty: false,
+        },
+        JobSettingsTestCase {
+            description: "changed as true uses the configured counts",
+            settings: BTreeMap::from([("changed".into(), json!(true))]),
+            expected_values: vec![
+                ("changed", Value::Bool(true)),
+                ("changed_counts", Value::None),
             ],
             expected_empty: false,
         },
