@@ -96,11 +96,14 @@ make verify
 
 In CI, every push to a pull request runs a fast Linux core: static checks, unit and integration
 tests and native workspace checks, plus the UI checks for UI changes. A change confined to the web
-UI and documentation runs only the UI checks. The full matrix (wheels, Compose, Windows, macOS,
-DuckDB end-to-end, warehouse, compiler-golden and timing jobs) runs once a maintainer labels a
-pull request that is not a draft `full-verify`, normally when it is next to merge. The required
-`Verify` check only reports after every suite the change needs has passed, so a pull request that
-needs the full matrix cannot merge until it has run.
+UI and documentation runs only the UI checks. The full matrix (the Linux wheel and Compose,
+Windows, macOS, DuckDB end-to-end, warehouse, compiler-golden and 3,000-model timing jobs) runs on
+every merge group in the merge queue before the change merges. Label a pull request that is not a
+draft `full-verify` to run it on the pull request itself; until the merge queue verifies groups
+(`SQLBUILD_MERGE_QUEUE`), a change that needs the heavy suites reports `Verify` only after that
+label's run. The 5,000 and 10,000-model
+timing jobs and every wheel platform run nightly on `main`, and a failed nightly run opens or
+updates a `nightly-verify` issue. Each release builds and checks every wheel platform.
 
 For focused iteration, run the narrowest relevant pytest target, for example:
 
