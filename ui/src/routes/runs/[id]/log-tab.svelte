@@ -162,8 +162,9 @@
 		top: 0;
 		z-index: 2;
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 8px;
+		gap: 6px 8px;
 		padding: 6px 16px;
 		border-bottom: 1px solid var(--border);
 		background: var(--background);

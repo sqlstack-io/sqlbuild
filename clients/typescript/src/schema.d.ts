@@ -1439,15 +1439,26 @@ export interface components {
             run_id: string;
             version_hash: string;
         };
+        /** @description `success`, `warn` or `failed`; `run_id` is the scheduler run, null for a newer build outside the scheduler. */
+        CatalogNodeOutcome: {
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            run_id?: string | null;
+            status: string;
+        };
         /** @description A current snapshot node's declared metadata and latest build, without SQL, source or config. */
         CatalogNodeRecord: {
             column_count?: number | null;
+            /** @description The current definition differs from the one `last_build` recorded; false when either is unknown. */
+            definition_changed: boolean;
             /** @description Keys of the nodes this node reads. */
             dependencies: string[];
             description?: string | null;
             /** @description The snapshot node kind, such as `model`, `seed`, `source` or `audit`. */
             kind: string;
             last_build?: null | components["schemas"]["CatalogNodeBuild"];
+            last_outcome?: null | components["schemas"]["CatalogNodeOutcome"];
             materialization?: string | null;
             name: string;
             node_key: string;
@@ -2689,6 +2700,10 @@ export interface components {
             cancel_requested_at?: string | null;
             /** Format: date-time */
             ended_at?: string | null;
+            git_dirty?: boolean | null;
+            git_revision?: string | null;
+            /** @description The deployment image the run is pinned to, when its location publishes one. */
+            image_id?: string | null;
             job_key?: string | null;
             kind: components["schemas"]["RunKind"];
             /** Format: int64 */
@@ -2721,8 +2736,15 @@ export interface components {
             /** Format: uuid */
             run_id: string;
             selection_json: string[];
+            /**
+             * Format: int64
+             * @description The published version the run executes, read from its snapshot.
+             */
+            snapshot_generation?: number | null;
             /** Format: uuid */
             snapshot_id: string;
+            /** @description The `sqb` version that published the snapshot. */
+            sqb_version?: string | null;
             /** Format: date-time */
             started_at?: string | null;
             status: components["schemas"]["RunStatus"];

@@ -38,7 +38,8 @@ export function createRunDetailState(runId: string) {
 	const nodes = $derived(detail?.nodes ?? []);
 	const active = $derived(!!run && isActiveRun(run.status));
 	const progress = $derived(progressOf(nodes));
-	const banners = $derived(detail ? bannersFor(detail, app.now) : []);
+	const cause = $derived(outputRes.data?.find((l) => l.error)?.text ?? null);
+	const banners = $derived(detail ? bannersFor(detail, app.now, cause) : []);
 	const statements = $derived(statementsRes.data ?? []);
 	// Progress reported by a run with no signal is stale, so the live card only shows while it's running.
 	const runningStatements = $derived(run?.status === 'running' ? statements.filter((s) => s.status === 'running') : []);

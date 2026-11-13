@@ -878,7 +878,19 @@ pub struct CatalogNodeRecord {
     pub column_count: Option<usize>,
     /// The newest fingerprint recorded for the node at its current relation, from any build.
     pub last_build: Option<CatalogNodeBuild>,
+    /// The newest decisive build attempt in the target's newest scheduler runs and newest failed runs, or a newer build outside them.
+    pub last_outcome: Option<CatalogNodeOutcome>,
+    /// The current definition differs from the one `last_build` recorded; false when either is unknown.
+    pub definition_changed: bool,
     pub snapshot_id: Uuid,
+}
+
+/// `success`, `warn` or `failed`; `run_id` is the scheduler run, null for a newer build outside the scheduler.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CatalogNodeOutcome {
+    pub status: String,
+    pub at: DateTime<Utc>,
+    pub run_id: Option<Uuid>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

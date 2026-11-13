@@ -13,3 +13,8 @@ pub(crate) const PREVIEW_REQUIRED_TABLES: [WarehouseHistoryKind; 3] = [
     WarehouseHistoryKind::Fingerprints,
     WarehouseHistoryKind::Consumption,
 ];
+
+/// The target's newest runs read for node outcomes, and as many newest failed or warned runs; never other targets'.
+pub(crate) const OUTCOME_RECENT_RUNS: i64 = 25;
+/// How far back, in runs, the newest failed or warned runs are looked for.
+pub(crate) const OUTCOME_FAILURE_WINDOW: i64 = 500;
