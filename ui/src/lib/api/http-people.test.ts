@@ -43,12 +43,14 @@ describe('toServerSettings', () => {
 			version: '0.205.1',
 			login_mode: 'password',
 			scheduler: false,
-			installation: { storage: 'sqlite', installed_at: '2026-11-01T00:00:00Z', schema_checksum: 'abc', schema_applied_at: '2026-11-01T00:00:00Z' },
-			retention: { audit_days: 400, snapshots_kept: 10, statistics_days: 90, platform_alert_days: 30, location_health_days: 7, sensor_evaluation_days: 6, heartbeat_days: 1 }
+			installation: { storage: 'sqlite', installed_at: '2026-11-01T00:00:00Z', schema_checksum: 'abc', schema_applied_at: '2026-11-01T00:00:00Z', store_bytes: 52428800 },
+			retention: { audit_days: 400, run_log_days: 14, run_logs_kept: 200, snapshots_kept: 10, statistics_days: 90, platform_alert_days: 30, location_health_days: 7, sensor_evaluation_days: 6, heartbeat_days: 1 }
 		});
-		expect([settings.authMode, settings.schedulerEnabled, settings.storage]).toEqual(['password', false, 'sqlite']);
+		expect([settings.authMode, settings.schedulerEnabled, settings.storage, settings.storeBytes]).toEqual(['password', false, 'sqlite', 52428800]);
 		expect(settings.retention.map((r) => [r.name, r.value])).toEqual([
 			['Security audit log', '400 days'],
+			['Run logs', '14 days'],
+			['Logged runs', '200'],
 			['Published versions', '10'],
 			['Warehouse row counts', '90 days'],
 			['Platform problems', '30 days'],

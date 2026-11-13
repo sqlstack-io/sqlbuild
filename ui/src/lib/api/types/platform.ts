@@ -532,6 +532,8 @@ export type ServerSettings = {
 	/** A server starts only on the exact schema it creates, so a running server's schema is always current. */
 	schemaChecksum: string;
 	schemaAppliedAt: Iso;
+	/** The control store's database size on disk. */
+	storeBytes: number;
 	authMode: AuthMode;
 	/** Whether this server runs the scheduler; another server may hold the lease. */
 	schedulerEnabled: boolean;
