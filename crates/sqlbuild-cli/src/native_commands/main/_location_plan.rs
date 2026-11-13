@@ -1,14 +1,18 @@
-//! A requested plan runs as an ordinary `sqb plan --json` child on the server-frozen node keys.
+//! A requested plan runs as a `sqb plan --json` child on frozen node keys, from the synced copy.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use serde_json::Value;
+use sqlbuild_core::plan_display::constants::PLAN_SYNCED_COPY_ENV;
+use sqlbuild_orchestration::platform::models::LocationWorkClient;
 use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::warehouse_metadata::models::PreviewCopyRead;
 use tokio::io::AsyncReadExt;
 use tokio::process::Child;
+use uuid::Uuid;
 
 use crate::argv::main::accepted_settings_arguments::accepted_settings_arguments;
 use crate::native_commands::_helpers::execution::location_child;
@@ -21,9 +25,39 @@ use crate::native_commands::models::LocationServe;
 pub(super) async fn plan_location(
     (options, script): (&LocationServe, &Path),
     (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
+    (client, session_id, generation): (&LocationWorkClient, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Value>, ControlError> {
-    let mut child = match plan_child((options, script), (selection, settings)) {
+    let read = PreviewCopyRead {
+        session_id,
+        generation,
+    };
+    let copy = match client.preview_copy(&options.target, &read).await {
+        Ok(copy) => copy,
+        Err(error) => {
+            return Ok(Some(plan_failure(&format!(
+                "the synced warehouse copy is unavailable: {error}"
+            ))));
+        }
+    };
+    let path: PathBuf =
+        std::env::temp_dir().join(format!("sqlbuild-plan-copy-{}.json", Uuid::now_v7()));
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&copy).map_err(std::io::Error::other)?,
+    )?;
+    let planned = run_plan((options, script), (selection, settings), &path, stopped).await;
+    drop(std::fs::remove_file(&path));
+    planned
+}
+
+async fn run_plan(
+    (options, script): (&LocationServe, &Path),
+    (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
+    copy: &Path,
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<Value>, ControlError> {
+    let mut child = match plan_child((options, script), (selection, settings), copy) {
         Ok(child) => child?,
         Err(message) => return Ok(Some(plan_failure(&message))),
     };
@@ -57,6 +91,7 @@ pub(super) async fn plan_location(
 fn plan_child(
     (options, script): (&LocationServe, &Path),
     (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
+    copy: &Path,
 ) -> Result<std::io::Result<Child>, String> {
     let flags = accepted_settings_arguments(PLAN_COMMAND, settings)?;
     let mut command = location_child(options, script);
@@ -78,6 +113,7 @@ fn plan_child(
     Ok(command
         .env_remove("SQLBUILD_LOCATION_TOKEN")
         .env_remove("SQLBUILD_RUN_TOKEN")
+        .env(PLAN_SYNCED_COPY_ENV, copy)
         .stdout(Stdio::piped())
         .spawn())
 }

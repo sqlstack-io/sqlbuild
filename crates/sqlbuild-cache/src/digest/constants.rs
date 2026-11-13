@@ -51,3 +51,6 @@ pub(crate) const DIRECT_URL_FILE: &str = "direct_url.json";
 
 /// Inputs at least this large are hashed across the rayon pool; the digest is the same either way.
 pub(crate) const PARALLEL_HASH_BYTES: usize = 1 << 20;
+/// The standard base64 alphabet.
+pub const BASE64_ALPHABET: &[u8; 64] =
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

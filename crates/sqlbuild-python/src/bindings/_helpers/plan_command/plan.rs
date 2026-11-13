@@ -5,6 +5,10 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
 use pyo3::wrap_pyfunction;
+use sqlbuild_config::command_connection::errors::CommandConnectionError;
+use sqlbuild_core::plan_display::constants::{
+    PLAN_SYNCED_COPY_ENV, SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY,
+};
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
@@ -16,11 +20,13 @@ use crate::bindings::_helpers::build_progress::progress_reporters::{
 use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspection;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
+use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::plan_output::plan_json::format_plan_json;
 use crate::bindings::_helpers::plan_output::plan_text::format_plan;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
@@ -67,6 +73,33 @@ struct PlanInvocation<'py> {
     connection_progress: Bound<'py, PyAny>,
     planning_progress: Bound<'py, PyAny>,
     load_sources: Bound<'py, PyAny>,
+    /// Set for a location's plan preview: the adapter that answers from the synced copy.
+    synced_copy: Option<Bound<'py, SyncedCopyAdapter>>,
+}
+
+/// The synced-copy adapter when a location asked for a preview; a preview never defers.
+fn synced_copy<'py>(
+    request: &Bound<'py, PyAny>,
+    adapter: Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, SyncedCopyAdapter>>> {
+    let py: Python<'py> = request.py();
+    let Ok(path) = std::env::var(PLAN_SYNCED_COPY_ENV) else {
+        return Ok(None);
+    };
+    if native_field(request, "defer_to")?.is_truthy()? {
+        return Err(raised(
+            py,
+            CommandConnectionError::User {
+                code: None,
+                message: SYNCED_COPY_DEFER_REFUSAL.to_owned(),
+                help: Some(SYNCED_COPY_DEFER_HELP.to_owned()),
+            },
+        ));
+    }
+    Ok(Some(Bound::new(
+        py,
+        SyncedCopyAdapter::load(py, adapter, &path)?,
+    )?))
 }
 
 fn resolve_invocation<'py>(request: &Bound<'py, PyAny>) -> PyResult<PlanInvocation<'py>> {
@@ -135,6 +168,8 @@ fn resolve_invocation<'py>(request: &Bound<'py, PyAny>) -> PyResult<PlanInvocati
     } else {
         requested_load
     };
+    let synced_copy: Option<Bound<'py, SyncedCopyAdapter>> =
+        synced_copy(request, native_field(&context, "adapter")?)?;
     Ok(PlanInvocation {
         project_dir,
         discovered,
@@ -144,6 +179,7 @@ fn resolve_invocation<'py>(request: &Bound<'py, PyAny>) -> PyResult<PlanInvocati
         connection_progress,
         planning_progress,
         load_sources,
+        synced_copy,
     })
 }
 
@@ -231,7 +267,13 @@ fn compile_pipeline<'py>(
             py,
             &[
                 ("discovered_inputs", invocation.discovered.clone()),
-                ("adapter", native_field(&invocation.context, "adapter")?),
+                (
+                    "adapter",
+                    match &invocation.synced_copy {
+                        Some(facade) => facade.clone().into_any(),
+                        None => native_field(&invocation.context, "adapter")?,
+                    },
+                ),
                 ("options", pipeline_options),
                 ("hooks", connection_hooks(invocation)?),
             ],
@@ -248,13 +290,15 @@ fn write_output(
     let plan: Bound<'_, PyAny> = native_field(pipeline, "plan_output")?;
     let python_entries: Bound<'_, PyAny> = native_field(pipeline, "python_plan_entries")?;
     if native_field(request, "json_output")?.is_truthy()? {
-        let text: String = format_plan_json(
-            py,
-            Some(keywords(
-                py,
-                &[("plan", plan), ("python_plan_entries", python_entries)],
-            )?),
-        )?;
+        let mut options: Vec<(&str, Bound<'_, PyAny>)> =
+            vec![("plan", plan), ("python_plan_entries", python_entries)];
+        if let Some(facade) = &invocation.synced_copy {
+            options.push((
+                SYNCED_COPY_KEY,
+                synced_copy_json(py, facade.get())?.into_any(),
+            ));
+        }
+        let text: String = format_plan_json(py, Some(keywords(py, &options)?))?;
         imported(py, "builtins", "print")?.call1((text,))?;
         return Ok(());
     }
@@ -285,7 +329,51 @@ fn write_output(
             ],
         )?),
     )?;
-    print_line(py, &format!("\n{text}"))
+    print_line(py, &format!("\n{text}"))?;
+    if let Some(facade) = &invocation.synced_copy {
+        print_line(py, &synced_copy_text(facade.get()))?;
+    }
+    Ok(())
+}
+
+/// The plan JSON's account of the synced copy: when it synced, window starts and unknowns.
+fn synced_copy_json<'py>(
+    py: Python<'py>,
+    facade: &SyncedCopyAdapter,
+) -> PyResult<Bound<'py, PyDict>> {
+    let synced: Bound<'py, PyDict> = PyDict::new(py);
+    synced.set_item("synced_at", facade.synced_at())?;
+    synced.set_item("cursor_window_starts", facade.windows())?;
+    synced.set_item("unknown_until_run", facade.unknowns())?;
+    Ok(synced)
+}
+
+/// The preview footer: when the copy was synced and what stays unknown until the run.
+fn synced_copy_text(facade: &SyncedCopyAdapter) -> String {
+    let mut lines: Vec<String> = vec![format!(
+        "Planned from the synced copy ({}); the run re-plans live.",
+        facade.synced_at().map_or_else(
+            || "not fully synced yet".to_owned(),
+            |at| format!("synced {at}")
+        )
+    )];
+    let windows = facade.windows();
+    if !windows.is_empty() {
+        lines.push("Cursor windows (up to the latest data when the run starts):".to_owned());
+        lines.extend(
+            windows
+                .iter()
+                .map(|(model, start)| format!("  - {model}: from {start}")),
+        );
+    }
+    lines.push("Unknown until run:".to_owned());
+    lines.extend(
+        facade
+            .unknowns()
+            .into_iter()
+            .map(|item| format!("  - {item}")),
+    );
+    lines.join("\n")
 }
 
 /// Run one `sqb plan` request.

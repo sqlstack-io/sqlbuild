@@ -13,6 +13,7 @@ class NativeBoundaryTestCase:
 @dataclass(frozen=True)
 class ObservationBoundaryTestCase:
     description: str
+    rule: str
     allowed: tuple[str, ...]
     planner: str
     expected_returncode: int

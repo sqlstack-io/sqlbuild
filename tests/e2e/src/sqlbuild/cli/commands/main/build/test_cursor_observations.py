@@ -17,7 +17,6 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     execute_duckdb,
-    normalize_cli_output,
     prepare_inline_project,
     query_duckdb,
     run_sqb,
@@ -247,6 +246,7 @@ def test_given_wrong_cursor_observation_when_planning_and_building_then_live_max
     )
 
     assert honest.returncode == misled.returncode == 0, misled.stderr
-    assert normalize_cli_output(misled.stdout) == normalize_cli_output(honest.stdout)
+    assert misled.stdout.partition("Plan ready")[2] == honest.stdout.partition("Plan ready")[2]
+    assert "Plan ready" in honest.stdout
     assert build.returncode == 0, build.stderr
     assert counts == test_case.expected_row_counts

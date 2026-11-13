@@ -13,6 +13,7 @@ use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::cursor::scalars::to_inclusive;
 use crate::bindings::_helpers::model_config::typed_config::{config_cursor_bound, model_values};
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
     by_name, config_str, model_key, native_member, optional_text, planner_error, planner_model,
@@ -1150,6 +1151,45 @@ fn assemble<'py>(
     Ok(snapshots)
 }
 
+/// Plan previews: target `MAX` values from the synced copy; inputs are read when the run starts.
+fn synced_copy_values<'py>(
+    facade: &SyncedCopyAdapter,
+    models: &mut [CursorModel<'py>],
+) -> PyResult<Values<'py>> {
+    let mut values = Values::new();
+    for info in models {
+        let reads_inputs: bool = !info.upstreams.is_empty();
+        info.upstreams.clear();
+        let observed: Option<&str> = info
+            .target_tag
+            .as_ref()
+            .and_then(|_| facade.target_max(&info.model_name));
+        match (&info.target_tag, observed) {
+            (Some(tag), Some(observed)) => {
+                let value = text(info.effective_grain.py(), observed);
+                values.insert(tag.clone(), parse_warehouse_cursor(&value)?);
+                if reads_inputs {
+                    facade.mark_window(&info.model_name, observed);
+                }
+                if !info.start_cursor_config.is_none()
+                    && !native_field(&info.start_cursor_config, "max_ahead")?.is_none()
+                {
+                    facade.mark_unknown(format!("future-cursor safety of {}", info.model_name));
+                }
+            }
+            (Some(_), None) => facade.mark_unknown(format!(
+                "cursor position of {} (no successful build recorded it)",
+                info.model_name
+            )),
+            (None, _) if reads_inputs => {
+                facade.mark_unknown(format!("cursor window of {}", info.model_name));
+            }
+            (None, _) => {}
+        }
+    }
+    Ok(values)
+}
+
 /// Cursor MIN/MAX values of the selected incremental models, by model name.
 pub(crate) fn cursor_snapshots<'py>(
     request: &SnapshotRequest<'py>,
@@ -1163,9 +1203,13 @@ pub(crate) fn cursor_snapshots<'py>(
         seeds: by_name(&request.project, "seeds")?,
         functions: by_name(&request.project, "functions")?,
     };
-    let models = collect_models(request, existing_relations, inputs, &maps)?;
+    let mut models = collect_models(request, existing_relations, inputs, &maps)?;
     if models.is_empty() {
         return Ok(PyDict::new(py));
+    }
+    if let Ok(facade) = request.adapter.downcast::<SyncedCopyAdapter>() {
+        let values = synced_copy_values(facade.get(), &mut models)?;
+        return assemble(py, &models, (&values, &HashSet::new()));
     }
     let queries = physical_queries(&models);
     let started = Instant::now();
