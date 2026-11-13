@@ -201,6 +201,13 @@ class StateEventsTestCase(CatalogConnectionTestCase):
 
 
 @dataclass(frozen=True)
+class KeyPageTestCase(StateEventsTestCase):
+    """`key_width` counts a key page's projected columns, its trailing event ID included."""
+
+    key_width: int = 0
+
+
+@dataclass(frozen=True)
 class AutomaticHistoryTestCase:
     description: str
     adapter_name: str
