@@ -41,6 +41,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     AutomaticHistoryTestCase,
     CatalogConnectionTestCase,
     FingerprintHistoryTestCase,
+    KeyPageTestCase,
     StateEventsTestCase,
     WarehouseHistoryTestCase,
 )
@@ -457,6 +458,178 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
                 _ = adapter.execute(connection=connection, sql=warehouse_sql)
                 adapter.close(connection)
                 record_finished_run(control)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        KeyPageTestCase(
+            "duckdb audit results",
+            "duckdb",
+            "database",
+            "",
+            "audit_result_history",
+            append_audit_history,
+            key_width=3,
+        ),
+        KeyPageTestCase(
+            "duckdb node results",
+            "duckdb",
+            "database",
+            "external-run",
+            "node_result_history",
+            append_node_result_history,
+            key_width=9,
+        ),
+        KeyPageTestCase(
+            "duckdb consumption",
+            "duckdb",
+            "database",
+            "external-run",
+            "consumption_history",
+            append_consumption_history,
+            key_width=7,
+        ),
+        KeyPageTestCase(
+            "sqlite observations",
+            "sqlite",
+            "path",
+            "external-run",
+            "observation_history",
+            append_observation_history,
+            key_width=3,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_mirrored_location_when_a_reconcile_scan_runs_then_only_keys_and_missing_rows_are_read(
+    test_case: KeyPageTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    fixture: dict[str, Any] = json.loads(
+        Path(
+            f"benchmarks/duckshop/edge_cases/orchestration/{test_case.fixture_name}.json"
+        ).read_text()
+    )
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    test_case.append_history(adapter, connection, fixture)
+    adapter.close(connection)
+    (project / "orchestration/orders.py").write_text("")
+    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    table: str = f"_sqlbuild_{fixture['kind']}"
+    hook: Path = tmp_path / "read-hook"
+    hook.mkdir()
+    reads: Path = hook / "reads.jsonl"
+    reads.write_text("")
+    (hook / "sitecustomize.py").write_text(
+        "import json, re\n"
+        "from pathlib import Path\n"
+        "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n"
+        "from sqlbuild.adapters.sqlite.classes.sqlite_adapter import SqliteAdapter\n"
+        "def logged(original):\n"
+        "    def execute(self, *, connection, sql):\n"
+        f"        if re.search(r'FROM\\s+\\S*{table}\\b', sql):\n"
+        f"            with Path({str(reads)!r}).open('a') as log:\n"
+        "                log.write(json.dumps(sql) + '\\n')\n"
+        "        return original(self, connection=connection, sql=sql)\n"
+        "    return execute\n"
+        "for adapter in (DuckDbAdapter, SqliteAdapter):\n"
+        "    adapter.execute = logged(adapter.execute)\n"
+    )
+    mirror_table: str = f"sqb_warehouse_{fixture['kind']}"
+    with snapshot_api(tmp_path / "control") as api:
+        log: Path = tmp_path / "location.log"
+        control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ
+            | {
+                "SQLBUILD_LOCATION_TOKEN": api.bearer,
+                "SQLBUILD_METADATA_RECONCILE_SECONDS": "1",
+                "PYTHONPATH": str(hook),
+            },
+        ) as location:
+            _ = wait_for_generation(api, "development", 1, location, log)
+
+            def mirrored() -> list[tuple[str, str]]:
+                with closing(sqlite3.connect(control)) as database:
+                    rows: list[tuple[str, str]] = database.execute(
+                        f"SELECT event_id,record_json FROM {mirror_table} ORDER BY event_id"
+                    ).fetchall()
+                return rows
+
+            def reconcile() -> list[tuple[bool, int]]:
+                """One reconcile scan after a run; each read is (keyset-ordered, projected width)."""
+                time.sleep(1.2)
+                completed: int = log.read_text().count("synchronization completed")
+                reads.write_text("")
+                record_finished_run(control)
+                deadline: float = time.monotonic() + 45
+                while log.read_text().count("synchronization completed") == completed:
+                    assert location.poll() is None, log.read_text()
+                    assert time.monotonic() < deadline, log.read_text()
+                    time.sleep(0.2)
+                statements: list[str] = [
+                    json.loads(line) for line in reads.read_text().splitlines()
+                ]
+                return [
+                    (
+                        " ORDER BY " in sql,
+                        len(sql.split(" FROM ")[0].removeprefix("SELECT ").split(", ")),
+                    )
+                    for sql in statements
+                ]
+
+            deadline: float = time.monotonic() + 45
+            while log.read_text().count("synchronization completed") == 0 or not mirrored():
+                assert location.poll() is None, log.read_text()
+                assert time.monotonic() < deadline, log.read_text()
+                time.sleep(0.2)
+            initial: list[tuple[str, str]] = mirrored()
+            assert {json.loads(row)[fixture["source_key"]] for _, row in initial} == {
+                f"{fixture['id_prefix']}-{index:03}" for index in range(fixture["source_rows"])
+            }
+
+            unchanged: list[tuple[bool, int]] = reconcile()
+            assert unchanged, "a reconcile scan reads the warehouse"
+            assert set(unchanged) == {(True, test_case.key_width)}, (
+                "a mirror that holds every row is reconciled from key pages alone"
+            )
+            assert mirrored() == initial
+
+            lost: int = 3
+            with closing(sqlite3.connect(control)) as database:
+                _ = database.execute(
+                    f"DELETE FROM {mirror_table} WHERE event_id IN "
+                    f"(SELECT event_id FROM {mirror_table} ORDER BY event_id LIMIT {lost})"
+                )
+                database.commit()
+            repaired: list[tuple[bool, int]] = reconcile()
+            assert {read for read in repaired if read[0]} == {(True, test_case.key_width)}, (
+                "no page is read in full"
+            )
+            assert 1 <= sum(not ordered for ordered, _ in repaired) <= lost, (
+                "only the rows the mirror lost are fetched, by key"
+            )
+            assert mirrored() == initial, "refetched rows keep their identities and payloads"
 
 
 @pytest.mark.parametrize(
