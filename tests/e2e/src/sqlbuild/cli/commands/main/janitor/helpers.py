@@ -20,6 +20,8 @@ from sqlbuild._native import (
     write_source_freshness_records,
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.executor.audit_results.main._write import write_audit_result_records
+from sqlbuild.executor.audit_results.models import AuditResultRecord
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     execute_duckdb,
     prepare_inline_project,
@@ -143,6 +145,55 @@ def create_janitor_scenario_relations(*, db_path: Path) -> None:
         connection.close()
 
 
+JANITOR_AUDIT_BINDING_KEYS: tuple[str, ...] = ("orders.valid_orders", "customers.unique_ids")
+
+
+def audit_record(*, binding_key: str, run_id: str, occurred_at: datetime) -> AuditResultRecord:
+    """One passing final audit result for `binding_key` in `run_id`."""
+
+    audit_name: str = binding_key.split(".")[-1]
+    return AuditResultRecord(
+        result_id=f"{binding_key}:{run_id}",
+        schema_version=1,
+        occurred_at=occurred_at,
+        invocation_id=f"invocation_{run_id}",
+        run_id=run_id,
+        audit_name=audit_name,
+        audit_definition_name=audit_name,
+        binding_key=binding_key,
+        definition_fingerprint="definition-fingerprint",
+        execution_fingerprint=f"execution_{run_id}",
+        evaluation_mode="violations",
+        run_scope_phase="final",
+        attachment_kind="model",
+        attached_target_kind="model",
+        attached_target_name="orders",
+        attached_column_name=None,
+        target_database=None,
+        target_schema="main",
+        target_name="orders",
+        severity="error",
+        outcome="pass",
+        execution_error=None,
+        violation_count=0,
+        measured_value=None,
+        sample_count=None,
+        sample_unit=None,
+        minimum_samples=None,
+        thresholds_json=None,
+        evidence_json=None,
+        evidence_count=None,
+        evidence_truncated=None,
+        evidence_error=None,
+        measurement_sql=None,
+        evidence_sql=None,
+        executed_sql="SELECT 1 WHERE FALSE",
+        sql_digest="digest",
+        metadata_json=None,
+        reused=False,
+    )
+
+
 def create_direct_state_history(*, db_path: Path, schema: str = "main") -> None:
     import duckdb
 
@@ -174,6 +225,22 @@ def create_direct_state_history(*, db_path: Path, schema: str = "main") -> None:
                     schema_fingerprint=f"schema_{run_id}",
                     definition=f"SELECT '{run_id}'",
                     ts=datetime(2026, 1, 15, observed_hour, 0, 0),
+                ),
+                render_qualified_name=adapter.render_qualified_name,
+                render_framework_type=adapter.render_framework_type,
+            )
+            write_audit_result_records(
+                connection=connection,
+                execute=lambda *, connection, sql: connection.execute(sql),
+                database=None,
+                schema=schema,
+                records=tuple(
+                    audit_record(
+                        binding_key=binding_key,
+                        run_id=run_id,
+                        occurred_at=datetime(2026, 1, 15, observed_hour, 10, 0, tzinfo=UTC),
+                    )
+                    for binding_key in JANITOR_AUDIT_BINDING_KEYS
                 ),
                 render_qualified_name=adapter.render_qualified_name,
                 render_framework_type=adapter.render_framework_type,

@@ -18,6 +18,7 @@ from sqlbuild._native import (
     SqlValueKind,
     render_insert_source_freshness_records_sql,
 )
+from sqlbuild.adapter.contract.classes.audit_results import AuditResultsMixin
 from sqlbuild.adapter.contract.classes.base_adapter import (
     _COLLECTION_SQL_VALUE_KINDS,
     BaseAdapter,
@@ -153,7 +154,12 @@ from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
 class BigQueryAdapter(
-    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+    MicrobatchMixin,
+    ConsumptionMixin,
+    ObservationsMixin,
+    AuditResultsMixin,
+    UnkeyedDiffMixin,
+    BaseAdapter,
 ):
     """BigQuery adapter backed by google-cloud-bigquery."""
 

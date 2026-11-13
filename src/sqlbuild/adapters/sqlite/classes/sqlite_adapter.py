@@ -25,6 +25,7 @@ from sqlbuild._native import (
     SqlValue,
     render_insert_source_freshness_records_sql,
 )
+from sqlbuild.adapter.contract.classes.audit_results import AuditResultsMixin
 from sqlbuild.adapter.contract.classes.base_adapter import (
     BaseAdapter,
     _encode_typed_json,
@@ -168,7 +169,12 @@ _FALSE_SEED_VALUES: frozenset[str] = frozenset({"false", "f", "no", "n", "0"})
 
 
 class SqliteAdapter(
-    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+    MicrobatchMixin,
+    ConsumptionMixin,
+    ObservationsMixin,
+    AuditResultsMixin,
+    UnkeyedDiffMixin,
+    BaseAdapter,
 ):
     """SQLite adapter: one database file, SQLBuild schemas stored as `schema__name` tables."""
 

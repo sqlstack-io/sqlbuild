@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod audit_results;
 pub mod consumption;
 pub mod events;
 pub mod execution_history;

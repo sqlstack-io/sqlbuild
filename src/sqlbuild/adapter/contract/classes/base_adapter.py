@@ -2500,6 +2500,18 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         del database, schema, retain_versions
         raise AdapterUserError(message="direct-state history pruning is adapter-specific")
 
+    def render_prune_audit_results_history_sql(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+        retain_versions: int,
+    ) -> str:
+        """Render SQL that prunes old audit results."""
+
+        del database, schema, retain_versions
+        raise AdapterUserError(message="direct-state history pruning is adapter-specific")
+
     def sql_analysis_dialect(self) -> str | None:
         """Return the configured SQL analysis dialect name, if any."""
 

@@ -26,7 +26,8 @@ use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_core::constants::{
-    CONSUMPTION_TABLE_NAME, OBSERVATIONS_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
+    AUDIT_RESULTS_TABLE_NAME, CONSUMPTION_TABLE_NAME, OBSERVATIONS_TABLE_NAME,
+    SOURCE_FRESHNESS_TABLE_NAME,
 };
 
 /// The adapter and its open connection.
@@ -477,7 +478,7 @@ pub(crate) fn gather_warehouse_facts<'py>(
     })
 }
 
-/// Fingerprint, source freshness, consumption and observation history prune candidates for target schemas.
+/// Fingerprint, source freshness, consumption, observation and audit result history prune candidates for target schemas.
 pub(crate) fn direct_state_prune_candidates<'py>(
     warehouse: &Warehouse<'py>,
     target_schemas: &[SchemaKey],
@@ -498,6 +499,7 @@ pub(crate) fn direct_state_prune_candidates<'py>(
         ));
         locations.push((database.clone(), schema.clone(), CONSUMPTION_TABLE_NAME));
         locations.push((database.clone(), schema.clone(), OBSERVATIONS_TABLE_NAME));
+        locations.push((database.clone(), schema.clone(), AUDIT_RESULTS_TABLE_NAME));
     }
     let lookup: HashSet<Folded> = relation_lookup(warehouse, &locations)?;
     let mut candidates: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -518,6 +520,10 @@ pub(crate) fn direct_state_prune_candidates<'py>(
             (
                 OBSERVATIONS_TABLE_NAME,
                 "render_prune_observations_history_sql",
+            ),
+            (
+                AUDIT_RESULTS_TABLE_NAME,
+                "render_prune_audit_results_history_sql",
             ),
         ] {
             if !lookup_exists(&lookup, (database.as_deref(), schema, table_name)) {

@@ -23,6 +23,7 @@ from sqlbuild._native import (
     collect_snowflake_cost,
     render_insert_source_freshness_records_sql,
 )
+from sqlbuild.adapter.contract.classes.audit_results import AuditResultsMixin
 from sqlbuild.adapter.contract.classes.base_adapter import (
     BaseAdapter,
     _encode_typed_json,
@@ -199,7 +200,12 @@ _BULK_COLUMN_RELATION_CHUNK_SIZE: int = 2_000
 
 
 class SnowflakeAdapter(
-    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+    MicrobatchMixin,
+    ConsumptionMixin,
+    ObservationsMixin,
+    AuditResultsMixin,
+    UnkeyedDiffMixin,
+    BaseAdapter,
 ):
     """Snowflake adapter backed by snowflake-connector-python."""
 

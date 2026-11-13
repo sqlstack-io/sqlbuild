@@ -65,6 +65,7 @@ class JanitorDirectStatePruningE2ETestCase:
     expected_source_freshness_count_after: int
     expected_fingerprint_run_ids_after: tuple[str, ...]
     expected_source_freshness_run_ids_after: tuple[str, ...]
+    expected_audit_results_after: tuple[tuple[str, str], ...]
 
 
 @dataclass(frozen=True)

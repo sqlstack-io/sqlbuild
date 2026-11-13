@@ -22,6 +22,7 @@ from sqlbuild._native import (
     SqlValueKind,
     render_insert_source_freshness_records_sql,
 )
+from sqlbuild.adapter.contract.classes.audit_results import AuditResultsMixin
 from sqlbuild.adapter.contract.classes.base_adapter import (
     BaseAdapter,
     _encode_typed_json,
@@ -156,7 +157,12 @@ _NOT_NULL_COLUMN_PATTERN: re.Pattern[str] = re.compile(
 
 
 class ClickHouseAdapter(
-    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+    MicrobatchMixin,
+    ConsumptionMixin,
+    ObservationsMixin,
+    AuditResultsMixin,
+    UnkeyedDiffMixin,
+    BaseAdapter,
 ):
     """ClickHouse adapter that builds tables aside and rewrites whole partitions."""
 

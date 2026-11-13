@@ -6,6 +6,7 @@ import base64
 from typing import Any, ClassVar
 from uuid import uuid4
 
+from sqlbuild.adapter.contract.classes.audit_results import AuditResultsMixin
 from sqlbuild.adapter.contract.classes.base_adapter import _quote_sql_string
 from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.duckdb_backed_adapter import DuckDbBackedAdapter
@@ -15,7 +16,9 @@ from sqlbuild.adapter.contract.types import BuiltinAdapter
 from sqlbuild.microbatches.constants import MICROBATCH_GENERATION_COMMENT_PREFIX
 
 
-class DuckDbAdapter(MicrobatchMixin, ConsumptionMixin, ObservationsMixin, DuckDbBackedAdapter):
+class DuckDbAdapter(
+    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, AuditResultsMixin, DuckDbBackedAdapter
+):
     """DuckDB adapter allowing implicit main for targetless and named local targets."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.DUCKDB.value

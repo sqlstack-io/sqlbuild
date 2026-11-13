@@ -30,6 +30,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     freshness::registration::register(module)?;
     crate::bindings::_helpers::native_host::consumption_state::register(module)?;
     crate::bindings::_helpers::native_host::observations_state::register(module)?;
+    crate::bindings::_helpers::native_host::audit_results_state::register(module)?;
     clone::registration::register(module)?;
     compute_logs::registration::register(module)?;
     execution_history::registration::register(module)?;
