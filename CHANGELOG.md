@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.219.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.218.0...v0.219.0) (2026-11-13)
+
+
+### Features
+
+* **ui:** a static click-through DuckShop demo for the website ([#1448](https://github.com/sqlstack-io/sqlbuild/issues/1448)) ([6251280](https://github.com/sqlstack-io/sqlbuild/commit/6251280e9354adc48739a6111bf77949ca824d2e))
+
 ## [0.218.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.217.0...v0.218.0) (2026-11-13)
 
 
