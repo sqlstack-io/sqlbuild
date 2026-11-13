@@ -13,19 +13,46 @@ pub(crate) fn schema_digest(store: &ControlStore) -> String {
     sha256_hex(format!("{}\n{SCHEMA}", recall_schema(store).join(";\n")).as_bytes())
 }
 
-/// Accept only the exact schema this server creates.
-pub(crate) fn verify_schema(rows: &[Row], digest: &str) -> Result<(), ControlError> {
+/// Accept only the exact schema this server creates, or say how to start a new store.
+pub(crate) fn verify_schema(
+    store: &ControlStore,
+    rows: &[Row],
+    digest: &str,
+) -> Result<(), ControlError> {
     if rows
         .iter()
-        .any(|row| row.get("checksum").and_then(|value| value.as_str()) != Some(digest))
+        .all(|row| row.get("checksum").and_then(|value| value.as_str()) == Some(digest))
     {
-        return Err(ControlError::Schema(
-            "control store schema checksum mismatch; recreate the control store, because \
-             pre-release schemas are not upgraded"
-                .into(),
-        ));
+        return Ok(());
     }
-    Ok(())
+    let quote = |text: &str| format!("'{}'", text.replace('\'', r"'\''"));
+    let command = match store {
+        ControlStore::Sqlite(path) => {
+            let path = path.to_string_lossy();
+            format!(
+                "rm -f {} {} {}",
+                quote(&path),
+                quote(&format!("{path}-wal")),
+                quote(&format!("{path}-shm"))
+            )
+        }
+        ControlStore::Postgres(pool) => {
+            let options = pool.connect_options();
+            let target = format!(
+                "-h {} -p {} -U {} {}",
+                quote(options.get_host()),
+                options.get_port(),
+                quote(options.get_username()),
+                quote(options.get_database().unwrap_or(options.get_username()))
+            );
+            format!("dropdb {target} && createdb {target}")
+        }
+    };
+    Err(ControlError::Schema(format!(
+        "this control store was created by an earlier sqb release and cannot be upgraded; \
+         to start a new, empty store, which discards its run history, stop every server \
+         using it and run: {command}"
+    )))
 }
 
 pub(crate) fn render(store: &ControlStore, sql: &str) -> String {

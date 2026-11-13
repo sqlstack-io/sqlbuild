@@ -310,9 +310,14 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
         connection
             .execute_batch(case.update_sql)
             .expect("apply synthetic schema incompatibility");
+        let ControlStore::Sqlite(path) = &store else {
+            unreachable!("snapshot recovery runs on SQLite")
+        };
+        let path = path.to_string_lossy();
         assert!(
             matches!(migrate_store(&store).await,
-                Err(ControlError::Schema(message)) if message.contains("recreate the control store")),
+                Err(ControlError::Schema(message))
+                    if message.contains(&format!("run: rm -f '{path}' '{path}-wal' '{path}-shm'"))),
             "{}",
             case.description
         );
