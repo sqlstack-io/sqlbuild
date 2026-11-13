@@ -62,7 +62,7 @@ replaces anything:
 | Materialization | Runtime check |
 |-----------------|---------------|
 | Table (staged, the default) | Before the new table replaces the old one |
-| Table or incremental with `table_promotion_mode = "immediate"` | Not allowed: a `K011` compile error. Use staged promotion |
+| Table or non-microbatch incremental with `table_promotion_mode = "immediate"` | Not allowed: a `K011` compile error. Use staged promotion |
 | Incremental | On each delta, before it is written |
 | Microbatch incremental | None; compile time only |
 | Snapshot | On each delta |
@@ -86,8 +86,8 @@ decision. See [`sqb contract`](/docs/cli/contract) for `--overwrite` and what ge
 ## Models that read an enforced contract
 
 When a model reads a model or source with `contract enforced`, SQLBuild knows its exact columns. A
-reference to a column it doesn't have, or to an ambiguous one, fails at compile time, wherever it appears: the select list, a
-join, a filter, grouping, a window or `ORDER BY`. When an upstream's columns aren't fully known,
+reference to a column it doesn't have, or to an ambiguous one, fails at compile time, wherever it
+appears: the select list, a join, a filter, grouping, a window or `ORDER BY`. When an upstream's columns aren't fully known,
 nothing is reported. To see where a model uses each upstream column, run
 `sqb lineage <model> --include-uses --format json`.
 

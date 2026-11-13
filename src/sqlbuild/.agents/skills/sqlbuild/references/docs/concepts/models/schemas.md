@@ -142,9 +142,10 @@ Inheritance may be transitive. Parent columns resolve before child columns. An i
 A model's [contract](contracts.md) covers its full column list: the schema's
 columns plus the ones the model adds.
 
-Changing a column's name, type, nullability or enum members in a schema changes every model bound
-to it, or to a schema that extends it, so those models show as changed in the plan; see
-[Replay decisions](../planning/replay-decisions.md). Changing a description doesn't.
+Changing a column's name or type in a schema changes every model bound to it, or to a schema that
+extends it. The plan shows those models as `Schema changed` and replays them as described in
+[Replay decisions](../planning/replay-decisions.md). Changing nullability or a description
+doesn't change the plan.
 Changing an audit reruns that audit without changing the model.
 
 ## Limitations
