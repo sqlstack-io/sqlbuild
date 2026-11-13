@@ -27,6 +27,7 @@ from sqlbuild.orchestration import (
     compile_snapshot,
     job,
     job_group,
+    on_failure,
     run_event,
     schedule,
     sensor,
@@ -41,6 +42,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotExpressionRangeTestCase,
     SnapshotIdentityTestCase,
     SnapshotLineageTestCase,
+    SnapshotProvidersTestCase,
     SnapshotRejectionTestCase,
     SnapshotScheduleTestCase,
 )
@@ -61,6 +63,12 @@ ORCHESTRATION_NAME_CONFLICT: str = (
 )
 
 _DUCKSHOP: Path = Path("benchmarks/duckshop/project")
+_PROVIDER_PROJECT: dict[str, str] = {
+    "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
+    "models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n",
+}
+
+
 _PRICE_MODELS: dict[str, str] = {
     "models/stg_prices.sql": (
         'MODEL (description "Staged prices");\n'
@@ -414,6 +422,195 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
 @pytest.mark.parametrize(
     "test_case",
     [
+        SnapshotProvidersTestCase(
+            description="a provider is published with its fields and consumers but no values",
+            files=_PROVIDER_PROJECT
+            | {
+                "providers/fulfillment.py": (
+                    "from typing import Literal\n\n"
+                    "from pydantic import AliasChoices, Field, SecretStr\n"
+                    "from pydantic_settings import SettingsConfigDict\n"
+                    "from sqlbuild.providers import Provider\n\n\n"
+                    "class FulfillmentApi(Provider):\n"
+                    '    """Client for the fulfillment service.\n\n    Sends shipped orders.\n    """\n\n'
+                    "    model_config = SettingsConfigDict(env_prefix='FULFILLMENT_')\n"
+                    "    api_key: SecretStr\n"
+                    "    backup_key: SecretStr | None = None\n"
+                    "    regions: list[str] = ['eu']\n"
+                    "    compression: Literal['none', 'gzip'] = 'gzip'\n"
+                    "    endpoint: str = Field('https://fulfillment.example.com', description='Base URL')\n"
+                    "    timeout_seconds: int | None = Field(\n"
+                    "        None, validation_alias=AliasChoices('SHIP_TIMEOUT', 'TIMEOUT')\n"
+                    "    )\n"
+                ),
+                "python/tasks/publish_orders.py": (
+                    "from providers.fulfillment import FulfillmentApi\n"
+                    "from sqlbuild.tasks import task\n\n\n"
+                    "@task\n"
+                    "def publish_orders(fulfillment_api: FulfillmentApi):\n"
+                    '    """Send orders to fulfillment."""\n'
+                ),
+                "models/orders.sql": (
+                    "MODEL (description 'Orders.', post_hooks [python(\"notify_fulfillment\")]);\n\n"
+                    "SELECT 1 AS order_id\n"
+                ),
+                "hooks/python/notify_fulfillment.py": (
+                    "from sqlbuild.hooks import hook\n\n\n"
+                    "@hook\n"
+                    "def notify_fulfillment(ctx, fulfillment_api):\n"
+                    '    """Tell fulfillment a model changed."""\n'
+                ),
+            },
+            environment={"FULFILLMENT_API_KEY": "synthetic-fulfillment-key"},
+            expected_providers={
+                "providers": [
+                    {
+                        "name": "fulfillment_api",
+                        "class": "providers.fulfillment.FulfillmentApi",
+                        "description": "Client for the fulfillment service.\n\nSends shipped orders.",
+                        "path": "providers/fulfillment.py",
+                        "settings": [
+                            {
+                                "name": "api_key",
+                                "type": "SecretStr",
+                                "required": True,
+                                "secret": True,
+                                "env": "FULFILLMENT_API_KEY",
+                                "description": None,
+                            },
+                            {
+                                "name": "backup_key",
+                                "type": "SecretStr | None",
+                                "required": False,
+                                "secret": True,
+                                "env": "FULFILLMENT_BACKUP_KEY",
+                                "description": None,
+                            },
+                            {
+                                "name": "regions",
+                                "type": "list[str]",
+                                "required": False,
+                                "secret": False,
+                                "env": "FULFILLMENT_REGIONS",
+                                "description": None,
+                            },
+                            {
+                                "name": "compression",
+                                "type": "Literal['none', 'gzip']",
+                                "required": False,
+                                "secret": False,
+                                "env": "FULFILLMENT_COMPRESSION",
+                                "description": None,
+                            },
+                            {
+                                "name": "endpoint",
+                                "type": "str",
+                                "required": False,
+                                "secret": False,
+                                "env": "FULFILLMENT_ENDPOINT",
+                                "description": "Base URL",
+                            },
+                            {
+                                "name": "timeout_seconds",
+                                "type": "int | None",
+                                "required": False,
+                                "secret": False,
+                                "env": "SHIP_TIMEOUT",
+                                "description": None,
+                            },
+                        ],
+                        "used_by": [
+                            {"kind": "task", "name": "publish_orders"},
+                            {"kind": "hook", "name": "notify_fulfillment"},
+                        ],
+                        "nodes": ["hook:notify_fulfillment", "model:orders", "task:publish_orders"],
+                    }
+                ]
+            },
+        ),
+        SnapshotProvidersTestCase(
+            description="a prefix that applies only to aliases leaves plain field names unprefixed",
+            files=_PROVIDER_PROJECT
+            | {
+                "providers/inventory.py": (
+                    "from pydantic import Field\n"
+                    "from pydantic_settings import SettingsConfigDict\n"
+                    "from sqlbuild.providers import Provider\n\n\n"
+                    "class InventoryApi(Provider):\n"
+                    '    """Client for the inventory service."""\n\n'
+                    "    model_config = SettingsConfigDict(\n"
+                    "        env_prefix='INVENTORY_', env_prefix_target='alias'\n"
+                    "    )\n"
+                    "    region: str = 'eu'\n"
+                    "    token: str = Field('unset', alias='TOKEN')\n"
+                ),
+            },
+            environment={},
+            expected_providers={
+                "providers": [
+                    {
+                        "name": "inventory_api",
+                        "class": "providers.inventory.InventoryApi",
+                        "description": "Client for the inventory service.",
+                        "path": "providers/inventory.py",
+                        "settings": [
+                            {
+                                "name": "region",
+                                "type": "str",
+                                "required": False,
+                                "secret": False,
+                                "env": "REGION",
+                                "description": None,
+                            },
+                            {
+                                "name": "token",
+                                "type": "str",
+                                "required": False,
+                                "secret": False,
+                                "env": "INVENTORY_TOKEN",
+                                "description": None,
+                            },
+                        ],
+                        "used_by": [],
+                        "nodes": [],
+                    }
+                ]
+            },
+        ),
+        SnapshotProvidersTestCase(
+            description="a project without providers publishes no providers document",
+            files=_PROVIDER_PROJECT,
+            environment={},
+            expected_providers=None,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_project_providers_when_publishing_then_they_are_a_snapshot_document_without_values(
+    test_case: SnapshotProvidersTestCase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name, value in test_case.environment.items():
+        monkeypatch.setenv(name, value)
+    write_files(project_dir=tmp_path, files=test_case.files)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discovered,
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+    published: str = build_orchestration_snapshot(
+        project, json.dumps(METADATA), tmp_path, discovered_inputs=discovered
+    ).to_json()
+    assert json.loads(published)["documents"].get("providers") == test_case.expected_providers
+    assert "synthetic-fulfillment-key" not in published
+    assert "fulfillment.example.com" not in published
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         SnapshotExpressionRangeTestCase(
             description="SQL and Python macros, a variable and cursor bounds rewrite the SQL",
             adapter=DuckDbAdapter,
@@ -676,6 +873,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         concurrency_groups=("order_reporting",),
         schedule=test_case.schedule,
         targets=("development",),
+        owner="Orders team",
+        overlap="skip",
+        on_failure=on_failure(retries=2, retry_delay_seconds=600),
     )
     excluded: Job = replace(nightly, name="other_target", targets=("production",))
     first: dict[str, Any] = json.loads(
@@ -701,6 +901,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             "select": "+orders",
             "exclude": "stg_orders",
             "targets": ["development"],
+            "owner": "Orders team",
+            "overlap": "skip",
+            "on_failure": {"retries": 2, "retry_delay_seconds": 600},
         }
     }
     trigger: dict[str, Any] = first["documents"]["triggers"]["nightly_orders"]
@@ -803,6 +1006,29 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             expected_message="cannot be combined",
         ),
         SnapshotDeclarationRejectionTestCase(
+            description="blank owner", owner=" ", expected_message="owner must not be blank"
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="unknown overlap",
+            overlap="coalesce",
+            expected_message="overlap must be queue or skip, not coalesce",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="no retries",
+            on_failure=on_failure(retries=0),
+            expected_message="retries must be a whole number from 1 to 10",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="too many retries",
+            on_failure=on_failure(retries=11),
+            expected_message="retries must be a whole number from 1 to 10",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="retry delay over a day",
+            on_failure=on_failure(retries=1, retry_delay_seconds=86_401),
+            expected_message="retry_delay_seconds must be a whole number from 0 to 86400",
+        ),
+        SnapshotDeclarationRejectionTestCase(
             description="duplicate concurrency declarations",
             concurrency=3,
             settings={"concurrency": 4},
@@ -830,6 +1056,9 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             concurrency=test_case.concurrency,
             schedule=test_case.schedule
             or schedule(cron=test_case.cron, timezone=test_case.timezone),
+            owner=test_case.owner,
+            overlap=test_case.overlap,
+            on_failure=test_case.on_failure,
         )
     ] * test_case.copies
     with pytest.raises(ValueError, match=test_case.expected_message):

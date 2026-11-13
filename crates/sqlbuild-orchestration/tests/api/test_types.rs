@@ -254,3 +254,9 @@ pub(crate) struct AcknowledgementTestCase {
     pub(crate) expected_applied: [bool; 3],
     pub(crate) expected_acknowledged_by: &'static str,
 }
+
+pub(crate) struct ProvidersTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_jobs: Vec<&'static str>,
+}

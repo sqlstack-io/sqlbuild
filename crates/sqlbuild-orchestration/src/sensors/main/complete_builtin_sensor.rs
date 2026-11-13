@@ -15,13 +15,17 @@ pub async fn complete_builtin_sensor(
     let Some(transaction) = pending_evaluation(store, lease, evaluation).await? else {
         return Ok(0);
     };
-    let (transaction, (cursor, run_ids)) = consume_condition(transaction, evaluation).await?;
-    let count = run_ids.len();
+    let (transaction, (cursor, requests)) = consume_condition(transaction, evaluation).await?;
+    let count = requests.run_ids.len();
     finish_evaluation(
         transaction,
         lease,
         evaluation,
-        SensorEvaluationOutcome::Completed { cursor, run_ids },
+        SensorEvaluationOutcome::Completed {
+            cursor,
+            run_ids: requests.run_ids,
+            skipped: requests.skipped,
+        },
     )
     .await?;
     Ok(count)

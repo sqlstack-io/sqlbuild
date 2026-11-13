@@ -10,6 +10,7 @@ import { toSnapshotChanges } from './http-changes';
 import { manualConnectionTest, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments, toServerSettings } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
+import { toProviders } from './http-providers';
 import { overviewOf } from './http-overview';
 import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
@@ -18,7 +19,7 @@ import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
@@ -85,6 +86,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'maintenanceHistory',
 	'testConnection',
 	'listWarehouseConnections',
+	'listProviders',
 	'serverSettings',
 	'listSnapshotNodes',
 	'checkAdhocRun',
@@ -596,6 +598,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				if (data) expiresAt = Math.min(expiresAt, Date.parse(data.expires_at));
 			}
 			throw new ApiError('The location did not answer the connection test in time; check that it is running', 504);
+		},
+		async listProviders(scope: Scope): Promise<ProviderConnection[]> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/providers', { params: { path: { location_id: locationId, target } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toProviders(data);
 		},
 		async maintenanceHistory(scope: Scope): Promise<MaintenanceHistory> {
 			const { locationId, target } = parseLocationKey(scope.locationId);

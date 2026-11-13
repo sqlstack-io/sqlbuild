@@ -19,7 +19,6 @@ import type {
 	JobGroupMember,
 	JobLaunchOptions,
 	LaunchVerb,
-	OverlapOutcome,
 	Principal,
 	QueueEntry,
 	QueueWait,
@@ -337,8 +336,7 @@ export class MockOperate {
 			queued.map((rec, i) => ({
 				run: this.#view(rec, scope),
 				position: i + 1,
-				waits: waits.get(rec.run.id) ?? [],
-				overlap: this.#overlap(rec, queued)
+				waits: waits.get(rec.run.id) ?? []
 			}))
 		);
 	}
@@ -882,23 +880,6 @@ export class MockOperate {
 			ahead.push(rec);
 		}
 		return out;
-	}
-
-	#overlap(rec: RunRecord, queued: RunRecord[]): OverlapOutcome | null {
-		const job = jobDef(rec.run.jobKey);
-		if (!job || rec.run.parentRunId) return null;
-		const covered = this.#fx.ticks.filter((t) => t.coveredByRunId === rec.run.id).length;
-		if (job.overlap === 'coalesce')
-			return {
-				policy: 'coalesce',
-				coveredTicks: covered,
-				detail: covered ? `${covered} later request${covered === 1 ? '' : 's'} merged into this run` : 'New requests merge into this run while it waits'
-			};
-		if (job.overlap === 'queue') {
-			const before = queued.filter((q) => q.run.jobKey === job.key && q.run.queuedAt < rec.run.queuedAt);
-			return { policy: 'queue', coveredTicks: 0, detail: before.length ? `Goes after ${before.map((b) => b.run.id.replace(/^run-/, '')).join(', ')}` : 'Next in line for this job' };
-		}
-		return { policy: 'allow', coveredTicks: 0, detail: 'Waits only for runs updating the same data' };
 	}
 
 	#newId(): string {

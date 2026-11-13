@@ -241,16 +241,35 @@ export type WarehouseTableSync = {
 	lastSyncedAt: Iso | null;
 };
 
-/** A connection to something other than the warehouse (an API, object storage, a chat webhook), declared in project code. */
+/** One setting a provider declares. Its value stays in the location's environment and never reaches the server. */
+export type ProviderSetting = {
+	name: string;
+	/** The annotation as written, e.g. `str` or `SecretStr | None`. */
+	type: string;
+	required: boolean;
+	secret: boolean;
+	/** The environment variable the setting is read from. */
+	env: string;
+	description: string | null;
+};
+
+/** Python code that injects a provider. None of it is a catalog node, so it has no page to open. */
+export type ProviderConsumer = {
+	kind: 'loader' | 'task' | 'asset' | 'check' | 'hook' | 'materialization' | 'event_exporter' | 'sink';
+	name: string;
+};
+
+/** A provider declared in project code (an API client, object storage, a chat webhook), as the location published it. */
 export type ProviderConnection = {
 	name: string;
-	type: string;
+	/** The class as `module.Class`. */
+	className: string;
 	description: string;
 	sourceFile: string;
-	settings: SettingField[];
-	values: Record<string, string | number | boolean>;
-	/** `triggers` are sensors whose code uses the provider, by trigger ID and name. */
-	usedBy: { nodes: string[]; jobs: string[]; triggers: { id: string; name: string }[] };
+	settings: ProviderSetting[];
+	usedBy: ProviderConsumer[];
+	/** Jobs whose selection includes a node that uses the provider. */
+	jobs: string[];
 };
 
 // ---- maintenance (synced warehouse state tables) ----

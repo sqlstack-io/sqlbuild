@@ -24,3 +24,7 @@ pub(crate) const CALENDAR_LABEL: &str = "calendar schedule";
 
 /// Pages one bounded state-history SELECT streams before the scan continues from its cursor.
 pub(crate) const HISTORY_STREAM_PAGES: usize = 50;
+/// Inclusive bounds on a job's `on_failure` retries.
+pub(crate) const MAX_RETRIES: (u64, u64) = (1, 10);
+/// Inclusive bounds on a job's `on_failure` retry delay, in seconds: up to 24 hours.
+pub(crate) const MAX_RETRY_DELAY: (u64, u64) = (0, 86_400);

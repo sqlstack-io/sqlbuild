@@ -18,15 +18,17 @@ pub(crate) fn requested_run(tick_id: Uuid) -> Uuid {
     Uuid::new_v5(&tick_id, b"run")
 }
 
+/// A waiting run covers the tick before an active one skips it.
 pub(crate) fn action(
     trigger_id: Uuid,
     scheduled_for: DateTime<Utc>,
-    covering_run: Option<Uuid>,
+    (covering_run, active_run): (Option<Uuid>, Option<Uuid>),
 ) -> TickAction {
     let tick_id = tick_id(trigger_id, scheduled_for);
-    let decision = match covering_run {
-        Some(covered_by_run_id) => TickDecision::Covered { covered_by_run_id },
-        None => TickDecision::Requested {
+    let decision = match (covering_run, active_run) {
+        (Some(covered_by_run_id), _) => TickDecision::Covered { covered_by_run_id },
+        (None, Some(active_run_id)) => TickDecision::Skipped { active_run_id },
+        (None, None) => TickDecision::Requested {
             run_id: requested_run(tick_id),
         },
     };

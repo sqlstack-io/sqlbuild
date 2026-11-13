@@ -10,6 +10,7 @@
 	import type { OldNameView } from '$lib/api';
 	import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
 	import { formatRelation } from '$lib/platform/labels';
+	import { shortRunId } from '$lib/build-area/labels';
 	import {
 		decisionLabel,
 		migrationKind,
@@ -112,7 +113,7 @@
 							<div class="cell-desc"><code>{formatRelation(m.destination)}</code></div>
 						</td>
 						<td class="muted" title="decision = {m.decision}">{decisionLabel[m.decision]}</td>
-						<td class="nowrap"><code class="muted" title="The run that did it: {m.runId}">{m.runId.replace(/^run-/, '')}</code></td>
+						<td class="nowrap"><code class="muted" title="The sqb run that did it: {m.runId}">{shortRunId(m.runId.replace(/^run-/, ''))}</code></td>
 					</tr>
 				{:else}
 					<LoadRow colspan={6} resource={history} empty={migrations.length ? 'Nothing matches the search.' : 'No models have been renamed or moved in this location.'} />
@@ -191,7 +192,7 @@
 						<td>{#if j.originalQualifiedName}<code>{j.originalQualifiedName}</code>{:else}<span class="muted" title="A temporary table SQLBuild used while building">Temporary build table</span>{/if}</td>
 						<td><code class="muted">{j.archiveQualifiedName}</code></td>
 						<td><RelativeTime value={formatAgo(j.archivedAt, app.now)} exact={formatStamp(j.archivedAt)} /></td>
-						<td class="nowrap"><code class="muted" title={j.runId}>{j.runId.replace(/^run-/, '')}</code></td>
+						<td class="nowrap"><code class="muted" title="The sqb run that did it: {j.runId}">{shortRunId(j.runId.replace(/^run-/, ''))}</code></td>
 					</tr>
 				{:else}
 					<LoadRow colspan={6} resource={history} empty={janitor.length ? 'Nothing matches the search.' : 'Nothing has been archived or deleted by clean-up in this location.'} />

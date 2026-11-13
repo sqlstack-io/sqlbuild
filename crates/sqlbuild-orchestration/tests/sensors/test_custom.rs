@@ -291,8 +291,9 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 );
             }
             let facts = evaluations(store).await;
-            let SensorEvaluationOutcome::Completed { cursor, run_ids } =
-                &facts.last().expect("completed").outcome
+            let SensorEvaluationOutcome::Completed {
+                cursor, run_ids, ..
+            } = &facts.last().expect("completed").outcome
             else {
                 panic!("completed phase required");
             };

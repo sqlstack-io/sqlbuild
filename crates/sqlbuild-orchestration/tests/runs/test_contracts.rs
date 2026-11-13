@@ -36,6 +36,8 @@ mod test_permissions;
 mod test_requests;
 #[path = "test_reruns.rs"]
 mod test_reruns;
+#[path = "test_retries.rs"]
+mod test_retries;
 #[path = "test_run_logs.rs"]
 mod test_run_logs;
 #[path = "test_types.rs"]

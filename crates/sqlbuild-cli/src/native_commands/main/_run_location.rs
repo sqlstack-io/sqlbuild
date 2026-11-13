@@ -10,13 +10,14 @@ use sqlbuild_orchestration::platform::models::{
 };
 use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::sync::mpsc;
-use tokio::time::{Instant, MissedTickBehavior};
+use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
-    check_published_location, close_metadata_reader, compile_generation, location_generation,
-    location_heartbeats, metadata_sync, report_location_health, shutdown_signal,
+    check_published_location, close_metadata_reader, compile_generation, location_clock,
+    location_generation, location_heartbeats, metadata_sync, next_turn, report_location_health,
+    shutdown_signal,
 };
 use crate::native_commands::_helpers::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
@@ -63,8 +64,7 @@ async fn watch_location(
     let mut work_at = Instant::now() + Duration::from_secs(2);
     let mut published_generation = None;
     let mut metadata = None;
-    let mut clock = tokio::time::interval(Duration::from_millis(250));
-    clock.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    let mut clock = location_clock();
     let stopped = shutdown_signal();
     tokio::pin!(stopped);
     drop(write_output(&[(
@@ -72,9 +72,14 @@ async fn watch_location(
         "Starting code location; watching project inputs...\n",
     )]));
     loop {
-        tokio::select! {
-            result = &mut stopped => return result,
-            _ = clock.tick() => {},
+        if let Some(result) = next_turn(
+            &mut clock,
+            (published_generation, &watch, &metadata),
+            stopped.as_mut(),
+        )
+        .await
+        {
+            return result;
         }
         let ready;
         (watch, ready) = observe_location_inputs(&options.project_dir, watch);

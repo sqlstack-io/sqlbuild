@@ -120,9 +120,10 @@ CREATE TABLE sqb_ticks (
     scheduled_for {time} NOT NULL,
     evaluated_at {time} NOT NULL,
     epoch BIGINT NOT NULL,
-    outcome TEXT NOT NULL CHECK (outcome IN ('requested', 'covered')),
+    outcome TEXT NOT NULL CHECK (outcome IN ('requested', 'covered', 'skipped')),
     run_id {uuid},
     covered_by_run_id {uuid},
+    active_run_id {uuid},
     UNIQUE (trigger_id, scheduled_for)
 );
 CREATE INDEX sqb_ticks_trigger_time ON sqb_ticks(trigger_id, scheduled_for);

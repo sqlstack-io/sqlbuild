@@ -187,6 +187,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
         "provider_usages",
     ),
+    "provider_settings": (
+        "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
+        "provider_settings",
+    ),
     "requires_arguments": (
         "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
         "requires_arguments",

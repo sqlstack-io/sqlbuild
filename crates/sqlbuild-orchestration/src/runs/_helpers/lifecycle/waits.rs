@@ -52,6 +52,12 @@ pub(crate) async fn queue_states(
         let request = &candidate.request_json;
         let mut waits;
         (transaction, waits) = child_waits(transaction, request).await?;
+        if let Some(retry) = request.retry.filter(|_| !request.due(transaction.now)) {
+            waits.push(QueueWait::RetryDelay {
+                attempt: retry.attempt,
+                due_at: retry.not_before,
+            });
+        }
         waits.extend(
             running
                 .iter()

@@ -419,10 +419,10 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     let expected_jobs = [
                         json!({"job_key": "nightly", "kind": "group", "description": "Nightly orders",
                             "selection": ["orders"], "concurrency_groups": [], "snapshot_id": published.snapshot_id,
-                            "select": null, "declared_at": null}),
+                            "select": null, "declared_at": null, "owner": null, "overlap": "queue", "on_failure": null}),
                         json!({"job_key": "orders", "kind": "job", "description": "Refresh orders",
                             "selection": ["orders"], "concurrency_groups": ["warehouse_heavy"], "snapshot_id": published.snapshot_id,
-                            "select": null, "declared_at": null}),
+                            "select": null, "declared_at": null, "owner": null, "overlap": "queue", "on_failure": null}),
                     ];
                     assert_eq!(
                         listed_jobs,

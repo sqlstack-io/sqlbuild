@@ -110,6 +110,7 @@ pub(crate) async fn frozen_adhoc_request(
                 window: None,
                 concurrency_groups: BTreeSet::new(),
                 narrowing: None,
+                retry: None,
             },
         )),
     ))

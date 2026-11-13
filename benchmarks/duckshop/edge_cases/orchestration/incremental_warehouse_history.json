@@ -18,7 +18,7 @@
   "held_write_lock": {
     "duckdb": [
       {
-        "held": {"failure": "busy", "tables": ["source_freshness"]},
+        "held": {"failure": "busy", "tables": ["fingerprints"]},
         "released": {"failure": null, "tables": ["fingerprints", "source_freshness"]}
       }
     ],

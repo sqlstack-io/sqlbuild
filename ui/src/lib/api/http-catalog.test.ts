@@ -7,7 +7,7 @@ type W = components['schemas'];
 
 function node(key: string, extra: Partial<W['CatalogNodeRecord']> = {}): W['CatalogNodeRecord'] {
 	const [kind, name] = key.split(':');
-	return { node_key: key, kind, name, tags: [], dependencies: [], definition_changed: false, snapshot_id: '01a1b000-0000-7000-8000-000000000001', ...extra };
+	return { node_key: key, kind, name, tags: [], dependencies: [], definition_changed: false, checks: { total: 0, passing: 0, warning: 0, failing: 0 }, snapshot_id: '01a1b000-0000-7000-8000-000000000001', ...extra };
 }
 
 describe('catalog node mapping', () => {
@@ -52,7 +52,7 @@ describe('catalog node mapping', () => {
 		]);
 		expect(orders.lastBuild).toEqual({ fingerprintRunId: 'sqb-run-1', runId: null, jobKey: null, builtAt: '2026-11-07T06:00:00Z', fingerprint: 'v1' });
 		expect([orders.description, orders.tags, orders.columnCount, orders.relation]).toEqual(['One row per order', ['marts'], 4, { database: null, schema: 'main', name: 'orders' }]);
-		expect([orders.stale, orders.checks, orders.lastOutcome, orders.group, orders.owner]).toEqual([[], null, null, null, []]);
+		expect([orders.stale, orders.lastOutcome, orders.group]).toEqual([[], null, null]);
 	});
 
 	it('marks a changed definition, and a built table older than the data upstream of it, even through a view, as stale', () => {
@@ -157,7 +157,7 @@ describe('catalog node detail', () => {
 
 describe('catalog node runs and jobs', () => {
 	const snapshot = '01a1b000-0000-7000-8000-000000000001';
-	const job = (key: string, kind: 'job' | 'group', selection: string[]): W['JobRecord'] => ({ job_key: key, kind, description: key, selection, concurrency_groups: [], snapshot_id: snapshot });
+	const job = (key: string, kind: 'job' | 'group', selection: string[]): W['JobRecord'] => ({ job_key: key, kind, description: key, selection, concurrency_groups: [], snapshot_id: snapshot, overlap: 'queue' });
 	const trigger = (id: string, jobKey: string) => ({ trigger_id: id, job_key: jobKey }) as W['TriggerRecord'];
 	const run = (id: string, status: string, extra: Partial<W['NodeRunRecord']> = {}): W['NodeRunRecord'] => ({ run_id: id, job_key: 'orders', queued_at: '2026-11-08T05:59:00Z', status, ...extra });
 

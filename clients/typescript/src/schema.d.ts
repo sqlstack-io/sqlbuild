@@ -610,6 +610,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -1439,6 +1455,14 @@ export interface components {
             run_id: string;
             version_hash: string;
         };
+        /** @description Checks without a result yet are not known to the server, so they are not counted. */
+        CatalogNodeChecks: {
+            /** @description Failed or errored. */
+            failing: number;
+            passing: number;
+            total: number;
+            warning: number;
+        };
         /** @description `success`, `warn` or `failed`; `run_id` is the scheduler run, null for a newer build outside the scheduler. */
         CatalogNodeOutcome: {
             /** Format: date-time */
@@ -1449,6 +1473,8 @@ export interface components {
         };
         /** @description A current snapshot node's declared metadata and latest build, without SQL, source or config. */
         CatalogNodeRecord: {
+            /** @description The checks on the node by their newest result. */
+            checks: components["schemas"]["CatalogNodeChecks"];
             column_count?: number | null;
             /** @description The current definition differs from the one `last_build` recorded; false when either is unknown. */
             definition_changed: boolean;
@@ -1722,6 +1748,9 @@ export interface components {
             member_of: string[];
             /** @description A group's member jobs in run order; empty for a job. */
             members: components["schemas"]["JobMember"][];
+            on_failure?: null | components["schemas"]["OnFailure"];
+            overlap: components["schemas"]["Overlap"];
+            owner?: string | null;
             select?: string | null;
             selection: string[];
             /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
@@ -1746,6 +1775,9 @@ export interface components {
             job_key: string;
             /** @description `job` or `group`; a group's selection is the union of its member jobs' selections. */
             kind: components["schemas"]["RunKind"];
+            on_failure?: null | components["schemas"]["OnFailure"];
+            overlap: components["schemas"]["Overlap"];
+            owner?: string | null;
             /** @description A job's selectors as written; absent for a group and for snapshots published before they were recorded. */
             select?: string | null;
             selection: string[];
@@ -2069,6 +2101,13 @@ export interface components {
              */
             sequences: number;
         };
+        /** @description A failed or partial run reruns from failure up to `retries` times, each `retry_delay_seconds` after the last ended. */
+        OnFailure: {
+            /** Format: int32 */
+            retries: number;
+            /** Format: int32 */
+            retry_delay_seconds: number;
+        };
         /** @description One exact-byte output chunk. */
         OutputChunk: {
             /**
@@ -2117,6 +2156,11 @@ export interface components {
             /** Format: uuid */
             trigger_id: string;
         };
+        /**
+         * @description What a schedule tick or sensor request does while a run of the same job is active; people's requests always queue.
+         * @enum {string}
+         */
+        Overlap: "queue" | "skip";
         PasswordChangeRequest: {
             current_password: string;
             new_password: string;
@@ -2192,6 +2236,8 @@ export interface components {
             /** Format: date-time */
             requested_at: string;
             run_count: number;
+            /** @description For each matched request the job's `skip` overlap dropped, the run that was active. */
+            skipped_for: string[];
         };
         /** @description A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence. */
         PersonSensorRunRequest: {
@@ -2384,6 +2430,46 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
         };
+        /** @description Code that injects a provider: a node (`loader`, `task`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`. */
+        ProviderConsumer: {
+            kind: string;
+            name: string;
+        };
+        /** @description A provider as its location published it, from the class alone: never a setting value. */
+        ProviderRecord: {
+            /** @description The class as `module.qualname`. */
+            class: string;
+            /** @description The class docstring. */
+            description: string;
+            /** @description Jobs whose selection includes one of those nodes. */
+            jobs?: string[];
+            name: string;
+            /** @description Snapshot nodes that run that code: Python nodes, models calling a hook or using a materialization, and sources a loader fills. */
+            nodes?: string[];
+            /** @description The file declaring the class, relative to the project. */
+            path: string;
+            settings: components["schemas"]["ProviderSetting"][];
+            /** @description Code that injects the provider, in discovery order. */
+            used_by: components["schemas"]["ProviderConsumer"][];
+        };
+        /** @description One declared setting field; its value stays in the location's environment. */
+        ProviderSetting: {
+            description?: string | null;
+            /** @description The environment variable the setting is read from. */
+            env: string;
+            name: string;
+            required: boolean;
+            /** @description Whether the annotation is a pydantic secret type. */
+            secret: boolean;
+            /** @description The annotation as written, such as `str` or `SecretStr | None`. */
+            type: string;
+        };
+        /** @description Providers the current snapshot declares; empty before a publish or when the project has none. */
+        ProvidersRead: {
+            providers: components["schemas"]["ProviderRecord"][];
+            /** Format: uuid */
+            snapshot_id?: string | null;
+        };
         /** @description A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles). */
         PublishedChange: {
             change_kind: string;
@@ -2444,6 +2530,13 @@ export interface components {
             limit: string;
             /** Format: uuid */
             run_id?: string | null;
+        } | {
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            due_at: string;
+            /** @enum {string} */
+            kind: "retry_delay";
         };
         /** @description One invocation's records; the server owns its claim namespace, start time and version. */
         RecallBatch: {
@@ -2800,6 +2893,7 @@ export interface components {
             requested_by: string;
             /** Format: uuid */
             rerun_of_run_id?: string | null;
+            retry?: null | components["schemas"]["RunRetry"];
             /** Format: uuid */
             root_run_id: string;
             /** Format: uuid */
@@ -2817,6 +2911,13 @@ export interface components {
             trigger_id?: string | null;
             window?: null | components["schemas"]["RunWindow"];
             write_set: string[];
+        };
+        /** @description Which retry of the job's `on_failure` policy a run is, and when it may start. */
+        RunRetry: {
+            /** Format: int32 */
+            attempt: number;
+            /** Format: date-time */
+            not_before: string;
         };
         /** @description Warehouse statement metadata of a run: kind, timing, counts and outcome, never the SQL text. */
         RunStatementRecord: {
@@ -3083,8 +3184,10 @@ export interface components {
          */
         Table: "invocations" | "output" | "events" | "diagnostics" | "artifacts" | "artifact_refs" | "heartbeats" | "delivery" | "meta" | "conflicts";
         /** @enum {string} */
-        TickOutcome: "requested" | "covered";
+        TickOutcome: "requested" | "covered" | "skipped";
         TickRecord: {
+            /** Format: uuid */
+            active_run_id?: string | null;
             /** Format: uuid */
             covered_by_run_id?: string | null;
             /** Format: int64 */
@@ -4858,6 +4961,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["LocationWorkRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Declared providers without setting values */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvidersRead"];
                 };
             };
             /** @description Session rejected */

@@ -13,7 +13,7 @@
 	let query = $state('');
 	const all = $derived(providers.data ?? []);
 	const q = $derived(query.trim().toLowerCase());
-	const shown = $derived(all.filter((p) => !q || `${p.name} ${p.type} ${p.description}`.toLowerCase().includes(q)));
+	const shown = $derived(all.filter((p) => !q || `${p.name} ${p.className} ${p.description}`.toLowerCase().includes(q)));
 </script>
 
 <AppTopbar title="Providers">
@@ -28,7 +28,7 @@
 		<thead>
 			<tr>
 				<th>Provider</th>
-				<th>Type</th>
+				<th>Class</th>
 				<th>Used by</th>
 				<th>Defined in</th>
 			</tr>
@@ -45,7 +45,7 @@
 							</div>
 						</div>
 					</td>
-					<td><code>{p.type}</code></td>
+					<td class="muted"><code>{p.className}</code></td>
 					<td class="muted">{usedBySummary(p)}</td>
 					<td class="muted"><code>{p.sourceFile}</code></td>
 				</tr>
