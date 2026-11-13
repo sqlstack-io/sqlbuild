@@ -14,6 +14,10 @@ use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
+use sqlbuild_config::project::main::load_control_config::load_control_config;
+use sqlbuild_config::project::main::project_config_paths::project_config_paths;
+use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
+use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
@@ -73,8 +77,8 @@ use crate::native_commands::_helpers::terminal::{
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
     METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS, METADATA_RECONCILE_SECONDS,
-    METADATA_REPLY_BYTES, METADATA_SYNC_CHECK_SECONDS, SCHEDULER_COMMAND,
-    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS, METADATA_SYNC_CHECK_SECONDS,
+    SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -335,7 +339,7 @@ pub(crate) fn location_result<T: serde::de::DeserializeOwned>(
 
 pub(crate) fn metadata_sync(
     (locations, generation): (Vec<WarehouseStateLocation>, i64),
-    reconcile_seconds: u32,
+    (reconcile_seconds, safety_seconds): (u32, u64),
 ) -> LocationMetadataSync {
     LocationMetadataSync {
         locations,
@@ -355,6 +359,8 @@ pub(crate) fn metadata_sync(
         next_at: Instant::now(),
         idle: true,
         cycle_started_at: None,
+        safety_seconds,
+        safety_at: Instant::now() + Duration::from_secs(safety_seconds),
         change_tokens: HashMap::new(),
         scan_token: None,
         scan_delivered: false,
@@ -483,15 +489,9 @@ pub(crate) async fn begin_after_run(
         Ok(due) => due,
         Err(error) => return (state, Err(error)),
     };
-    let ran = match (state.cycle_started_at, due.runs_ended_at) {
-        (None, _) => true,
-        (Some(started_at), Some(ended_at)) => ended_at >= started_at,
-        (Some(_), None) => false,
-    };
+    let ran = state.sync_due(due.runs_ended_at);
     if ran {
-        state.idle = false;
-        state.cycle_started_at = Some(due.now);
-        state.next_at = Instant::now();
+        state.begin_sync(due.now);
     }
     (state, Ok(ran))
 }
@@ -589,6 +589,7 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
         }
         state.idle = true;
         state.next_at = Instant::now();
+        state.safety_at = Instant::now() + Duration::from_secs(state.safety_seconds);
         drop(write_output(&[(
             Stream::Stderr,
             "Warehouse history synchronization completed.\n",
@@ -699,6 +700,19 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
                 "SQLBUILD_METADATA_RECONCILE_SECONDS must be a positive integer".into(),
             )
         })?;
+    let safety_sync_seconds = safety_sync_seconds(
+        text(namespace, "location_sync_at_least_every").as_deref(),
+        std::env::var(SAFETY_SYNC_ENV).ok().as_deref(),
+        || {
+            load_control_config(&project_config_paths(&project_dir)).map_err(|failure| {
+                failure.into_config_failure().map_or_else(
+                    || "sqlbuild_project.toml could not be read".to_owned(),
+                    |failure| failure.render(|_| "sqlbuild_project.toml".to_owned()),
+                )
+            })
+        },
+    )
+    .map_err(ControlError::Invalid)?;
     Ok(LocationServe {
         project_dir,
         server_url: text(namespace, "location_server_url").unwrap_or_default(),
@@ -706,7 +720,26 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
         target,
         image_id: text(namespace, "location_image_id"),
         metadata_reconcile_seconds,
+        safety_sync_seconds,
     })
+}
+
+/// The safety sync interval: `--sync-at-least-every`, then the environment, then
+/// `[control] sync_at_least_every`, then thirty minutes; the project is read only when needed.
+pub(crate) fn safety_sync_seconds(
+    flag: Option<&str>,
+    environment: Option<&str>,
+    project: impl FnOnce() -> Result<ControlConfig, String>,
+) -> Result<u64, String> {
+    if let Some(text) = flag {
+        return sync_interval_seconds(text).map_err(|help| format!("--sync-at-least-every {help}"));
+    }
+    if let Some(text) = environment.filter(|text| !text.trim().is_empty()) {
+        return sync_interval_seconds(text).map_err(|help| format!("{SAFETY_SYNC_ENV} {help}"));
+    }
+    Ok(project()?
+        .sync_at_least_every_seconds
+        .unwrap_or(METADATA_SAFETY_SYNC_SECONDS))
 }
 
 /// Reconcile from the server after restarts or lost acknowledgements; transient outages retry.

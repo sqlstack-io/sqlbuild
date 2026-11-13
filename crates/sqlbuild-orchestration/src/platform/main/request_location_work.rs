@@ -1,4 +1,5 @@
 //! Named work requires a trusted owner or live person authority; retries preserve the original pin.
+//! A sync request while one is still pending for the target is already applied: one sync covers both.
 
 use chrono::Duration;
 use uuid::Uuid;
@@ -11,7 +12,8 @@ use crate::platform::models::{LocationWork, LocationWorkRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::main::query::query;
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn request_location_work(
     store: &ControlStore,
@@ -56,6 +58,20 @@ pub async fn request_location_work(
         commit(transaction).await?;
         return Ok(false);
     }
+    let transaction = if matches!(request.work, LocationWork::SyncWarehouse {}) {
+        let now = transaction.now;
+        let (transaction, pending) = query(transaction,
+            "SELECT request_id FROM sqb_location_work WHERE location_id=$1 AND target=$2 \
+             AND completed_at IS NULL AND expires_at>$3 AND request_json->'work'->>'kind'='sync_warehouse' LIMIT 1",
+            vec![Parameter::Id(request.location_id), Parameter::Text(request.target.clone()), Parameter::Time(now)]).await?;
+        if !pending.is_empty() {
+            commit(transaction).await?;
+            return Ok(false);
+        }
+        transaction
+    } else {
+        transaction
+    };
     commit(enqueue_location_work(transaction, &context, request, Duration::minutes(5)).await?)
         .await?;
     Ok(true)

@@ -149,6 +149,8 @@ pub(crate) struct LocationServe {
     pub(crate) target: String,
     pub(crate) image_id: Option<String>,
     pub(crate) metadata_reconcile_seconds: u32,
+    /// Seconds between safety syncs of an idle location; `0` turns them off.
+    pub(crate) safety_sync_seconds: u64,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -209,6 +211,10 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) idle: bool,
     /// Server time when the current or last synchronization began; `None` before the first.
     pub(crate) cycle_started_at: Option<DateTime<Utc>>,
+    /// Seconds between safety syncs; `0` turns them off.
+    pub(crate) safety_seconds: u64,
+    /// When an idle location syncs even though no run ended and nobody asked.
+    pub(crate) safety_at: tokio::time::Instant,
     /// Per scan index: the table's change token after its last complete read.
     pub(crate) change_tokens: HashMap<usize, ScanToken>,
     /// The token read before the current scan's first page, recorded once the scan completes.
@@ -238,6 +244,24 @@ impl LocationMetadataSync {
         if self.idle {
             self.next_at = tokio::time::Instant::now();
         }
+    }
+
+    /// Whether an idle location starts a sync: never synced, asked to, a run ended since the last
+    /// one began, or the safety interval passed. Each is one outstanding sync, never a second one.
+    pub(crate) fn sync_due(&self, runs_ended_at: Option<DateTime<Utc>>) -> bool {
+        let ran = match (self.cycle_started_at, runs_ended_at) {
+            (None, _) => true,
+            (Some(started_at), Some(ended_at)) => ended_at >= started_at,
+            (Some(_), None) => false,
+        };
+        ran || (self.safety_seconds > 0 && tokio::time::Instant::now() >= self.safety_at)
+    }
+
+    /// Start the sync `sync_due` asked for, at server time `now`.
+    pub(crate) fn begin_sync(&mut self, now: DateTime<Utc>) {
+        self.idle = false;
+        self.cycle_started_at = Some(now);
+        self.next_at = tokio::time::Instant::now();
     }
 
     /// Failed samples revisit catalog before retrying; no frozen delivery is discarded.

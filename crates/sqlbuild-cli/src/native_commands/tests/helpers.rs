@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use sqlbuild_orchestration::warehouse_metadata::models::MetadataBatch;
+use sqlbuild_orchestration::warehouse_metadata::models::{MetadataBatch, WarehouseStateLocation};
 use uuid::Uuid;
 
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
@@ -59,4 +59,12 @@ pub(super) fn acknowledge_complete_pages(
         });
         acknowledge_metadata_page(state)
     })
+}
+
+/// One state location, for metadata sync tests.
+pub(super) fn one_location() -> Vec<WarehouseStateLocation> {
+    vec![WarehouseStateLocation {
+        database: Some("analytics".into()),
+        schema: "state".into(),
+    }]
 }
