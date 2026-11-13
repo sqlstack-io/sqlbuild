@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.215.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.214.1...v0.215.0) (2026-11-13)
+
+
+### Features
+
+* **config:** rename column_contract_mode to check_declared_columns ([#1434](https://github.com/sqlstack-io/sqlbuild/issues/1434)) ([3b7cbe3](https://github.com/sqlstack-io/sqlbuild/commit/3b7cbe30a373970e8a59b39944d5c3a0436b5378))
+
+
+### Bug Fixes
+
+* **deps:** pin SQLClean 0.9.2 and SQLQuack 0.10.0 ([#1432](https://github.com/sqlstack-io/sqlbuild/issues/1432)) ([8287e67](https://github.com/sqlstack-io/sqlbuild/commit/8287e678d176d28d0ba7abf9d591ccf50fd20c2b))
+
 ## [0.214.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.214.0...v0.214.1) (2026-11-12)
 
 
