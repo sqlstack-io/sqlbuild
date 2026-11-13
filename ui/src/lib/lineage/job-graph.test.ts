@@ -72,6 +72,63 @@ describe('job graph', () => {
 		expect(laid.find((n) => n.id === boxId('staging'))!.height).toBeLessThan(61);
 	});
 
+	it('wraps a tall column into several, keeping every node right of what it reads', () => {
+		// 40 marts with no lineage inside the job, and 30 models off one source: 71 cards, at most 15 to a column.
+		const wide = [
+			...Array.from({ length: 40 }, (_, i) => node(`model:mart_${i}`)),
+			node('model:src'),
+			...Array.from({ length: 30 }, (_, i) => node(`model:stg_${i}`, ['model:src']))
+		];
+		const { nodes, edges } = jobGraph(wide.map((n) => n.key), wide);
+		const laid = layoutJobGraph(measured(nodes), edges);
+		const columns = Map.groupBy(laid, (n) => Math.round(n.position.x));
+		expect(Math.max(...[...columns.values()].map((c) => c.length))).toBeLessThanOrEqual(15);
+		// The wrapped columns sit side by side rather than staggered: the graph is no taller than one full column.
+		const ys = laid.map((n) => n.position.y);
+		expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(15 * (61 + 24));
+		const x = (id: string) => laid.find((n) => n.id === id)!.position.x;
+		for (let i = 0; i < 30; i++) expect(x(`model:stg_${i}`)).toBeGreaterThan(x('model:src'));
+	});
+
+	it('leaves a graph that needs no wrapping as dagre lays it out', () => {
+		// `extra` only feeds the end of a long chain, so it sits just before it, not back at the start.
+		const chain = [node('model:a'), node('model:b', ['model:a']), node('model:c', ['model:b']), node('model:d', ['model:c']), node('model:extra'), node('model:end', ['model:d', 'model:extra'])];
+		const { nodes, edges } = jobGraph(chain.map((n) => n.key), chain);
+		const x = new Map(layoutJobGraph(measured(nodes), edges).map((n) => [n.id, n.position.x]));
+		expect(x.get('model:extra')).toBe(x.get('model:d'));
+	});
+
+	it('keeps every box right of the boxes it runs after when their columns wrap', () => {
+		const many = (job: string) => Array.from({ length: 30 }, (_, i) => node(`model:${job}_${i}`));
+		const wide = [...many('a'), ...many('b')];
+		const groupBoxes = [
+			{ jobKey: 'a', nodes: wide.slice(0, 30).map((n) => n.key) },
+			{ jobKey: 'b', nodes: wide.slice(30).map((n) => n.key) },
+			{ jobKey: 'empty', nodes: [] }
+		];
+		const after = (jobKey: string) => ({ jobKey, upstream: [{ jobKey: 'a', source: 'after' as const }], stage: 1 });
+		const { nodes, edges } = jobGraph(wide.map((n) => n.key), wide, groupBoxes, [{ jobKey: 'a', upstream: [], stage: 0 }, after('b'), after('empty')]);
+		const laid = layoutJobGraph(measured(nodes), edges);
+		const box = (k: string) => laid.find((n) => n.id === boxId(k))!;
+		expect(box('a').height).toBeLessThan(15 * (61 + 24) + 60);
+		expect(box('b').position.x).toBeGreaterThan(box('a').position.x + box('a').width!);
+		expect(box('empty').position.x).toBeGreaterThan(box('a').position.x + box('a').width!);
+	});
+
+	it('keeps lineage left to right when it leaves a box and comes back', () => {
+		// `broad` builds raw → stg → mart, but `narrow` builds only stg, so stg sits in narrow's box.
+		const chain = [node('model:raw'), node('model:stg', ['model:raw']), node('model:mart', ['model:stg'])];
+		const nested = [{ jobKey: 'broad', nodes: chain.map((n) => n.key) }, { jobKey: 'narrow', nodes: ['model:stg'] }];
+		const { nodes, edges } = jobGraph(chain.map((n) => n.key), chain, nested);
+		const laid = layoutJobGraph(measured(nodes), edges);
+		const x = (id: string) => {
+			const card = laid.find((n) => n.id === id)!;
+			return card.position.x + (laid.find((n) => n.id === card.parentId)?.position.x ?? 0);
+		};
+		expect(x('model:raw')).toBeLessThan(x('model:stg'));
+		expect(x('model:stg')).toBeLessThan(x('model:mart'));
+	});
+
 	it('draws a plain job without boxes', () => {
 		const { nodes } = jobGraph(['model:raw', 'model:stg'], catalog);
 		expect(nodes.map((n) => [n.id, n.type, n.parentId])).toEqual([

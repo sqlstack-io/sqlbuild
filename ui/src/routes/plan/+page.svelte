@@ -14,17 +14,19 @@
 	import { kindLine } from '$lib/build-area/labels';
 	import { formatAgo } from '$lib/format/time';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
-	import { PERMISSIONS } from '$lib/platform/permission-catalog';
 	import { VERBS } from '$lib/run/command-table';
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
 	import PlanReport from '$lib/run/plan-report.svelte';
-	import { changedModelKeys, readySummary } from '$lib/run/plan-text';
+	import StatusLabel from '$lib/components/list/status-label.svelte';
+	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
+	import { changedModelKeys, planSentence } from '$lib/run/plan-text';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
 	const snapshotNodes = createResource((client, scope) => client.listSnapshotNodes(scope), ['snapshot']);
 	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs', 'node_status']);
+	const checkList = createResource((client, scope) => client.listChecks(scope), ['checks']);
 
 	let cmd = $state(page.url.searchParams.get('cmd') ?? 'sqb build');
 	let cmdEl = $state<HTMLInputElement>();
@@ -139,7 +141,15 @@
 	// ---- what a non-build verb picks, from the catalog ----
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const picked = $derived(shown?.selection ?? []);
-	let view = $state<'plan' | 'graph'>('plan');
+	let view = $state<'plan' | 'graph' | 'checks'>('plan');
+	/** The recorded checks on the models and seeds the plan builds, which run after them. */
+	const planChecks = $derived.by(() => {
+		if (!plan) return [];
+		const built = new Set([...plan.models.filter((m) => m.action !== 'skip').map((m) => m.name), ...plan.seeds.map((s) => s.name)]);
+		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && built.has(c.node.slice(c.node.indexOf(':') + 1)));
+	});
+	/** The tab shown: a replan with no checks leaves the Checks tab for the plan. */
+	const tab = $derived(view === 'checks' && !(shown?.verb === 'build' && planChecks.length) ? 'plan' : view);
 	/** A large selection draws only what the plan changes; the whole of it would be unreadable. */
 	const GRAPH_LIMIT = 150;
 	const graphKeys = $derived(picked.length > GRAPH_LIMIT && plan ? changedModelKeys(plan) : picked);
@@ -306,26 +316,42 @@
 			{#if shown?.verb}
 				<div class="summary">
 					{#if shown.verb === 'build'}
-						{#if plan}<b>{readySummary(plan)}</b>{/if}
+						{#if plan}<span class="sentence">{planSentence(plan)}</span>{/if}
 					{:else}
 						<b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
+					{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code" title="Option">{value === true ? name : `${name}=${value}`}</span>{/each}
 					<div class="tabs" role="tablist">
-						<button role="tab" aria-selected={view === 'plan'} onclick={() => (view = 'plan')}>{shown.verb === 'build' ? 'Plan' : 'Nodes'}</button>
-						<button role="tab" aria-selected={view === 'graph'} onclick={() => (view = 'graph')}>Graph</button>
+						<button role="tab" aria-selected={tab === 'plan'} onclick={() => (view = 'plan')}>{shown.verb === 'build' ? 'Plan' : 'Nodes'}</button>
+						<button role="tab" aria-selected={tab === 'graph'} onclick={() => (view = 'graph')}>Graph</button>
+						{#if shown.verb === 'build' && planChecks.length}<button role="tab" aria-selected={tab === 'checks'} onclick={() => (view = 'checks')}>Checks · {planChecks.length}</button>{/if}
 					</div>
 					{#if shown.verb === 'build' && plan}
 						<button class="replan" onclick={replan} disabled={planning}><RotateCwIcon size={11} class={planning ? 'animate-spin' : ''} /> {planning ? 'Planning…' : 'Plan again'}</button>
 					{/if}
 				</div>
 			{/if}
-			{#if view === 'graph' && shown?.verb && catalog.data && (shown.verb !== 'build' || plan)}
+			{#if tab === 'graph' && shown?.verb && catalog.data && (shown.verb !== 'build' || plan)}
 				{#if graphKeys.length < picked.length}
 					<p class="faint graph-note">{picked.length} nodes are too many to draw, so the graph shows only the {graphKeys.length === 1 ? 'model' : `${graphKeys.length} models`} this plan changes.</p>
 				{/if}
 				{#if graphKeys.length}
 					<div class="graph"><ScopeGraph keys={graphKeys} catalog={catalog.data} onselect={() => {}} /></div>
 				{/if}
+			{:else if tab === 'checks' && shown?.verb === 'build' && plan}
+				<p class="faint graph-note">These checks run after the models they check, and a failing error check stops what depends on it.</p>
+				<table class="nodes">
+					<tbody>
+						{#each planChecks as c (c.id)}
+							<tr>
+								<td><a href={to(`/checks/${encodeURIComponent(c.id)}`)} class="mono">{c.name}</a></td>
+								<td class="faint mono">{c.node ? c.node.slice(c.node.indexOf(':') + 1) : ''}{c.column ? `.${c.column}` : ''}</td>
+								<td class="faint">{c.severity}</td>
+								<td class="right">{#if c.latest}<StatusLabel tone={checkOutcomeTone[c.latest.outcome]} label="last {checkOutcomeLabel[c.latest.outcome].toLowerCase()}" />{/if}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			{:else if shown?.verb === 'build' && plan}
 				<PlanReport {plan} />
 			{:else if shown?.verb && shown.verb !== 'build'}
@@ -357,25 +383,6 @@
 		{/if}
 		</div>
 
-		<!-- Always present, so the result never changes width when the check returns. -->
-		<aside class="rail sb-scroll" class:stale={!fresh || !!problem}>
-		{#if shown?.verb}
-				<h3>Permissions</h3>
-				{#each job ? jobPermissions : shown.permissions as p (p.action)}
-					<p class="decision" data-testid="adhoc-permission">
-						<span class={p.allowed ? 'ok-text' : 'bad-text'}>{p.allowed ? '✓' : '✕'}</span>
-						<span title={p.action}>{PERMISSIONS[p.action].label}</span>
-					</p>
-					{#if p.reason}<p class="bad-text reason">{p.reason}</p>{/if}
-				{/each}
-				{#if Object.keys(shown.settings).length}
-					<h3>Options</h3>
-					<div class="chips">
-						{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code">{value === true ? name : `${name}=${value}`}</span>{/each}
-					</div>
-				{/if}
-		{/if}
-		</aside>
 	</div>
 
 	<div class="foot">
@@ -523,8 +530,7 @@
 		padding: 14px 24px;
 		transition: opacity 0.15s;
 	}
-	.main.stale,
-	.rail.stale {
+	.main.stale {
 		opacity: 0.55;
 	}
 	.problem-bar {
@@ -580,6 +586,16 @@
 		color: var(--foreground);
 		font-weight: 600;
 	}
+	.sentence {
+		flex-basis: 100%;
+		margin-bottom: 6px;
+		color: var(--foreground);
+		font-size: 13px;
+		text-wrap: pretty;
+	}
+	.sentence + .tabs {
+		margin-left: 0;
+	}
 	.summary span {
 		color: var(--sb-text-faint);
 	}
@@ -630,38 +646,6 @@
 	.right {
 		text-align: right;
 	}
-	.rail {
-		width: 280px;
-		flex-shrink: 0;
-		overflow: auto;
-		padding: 14px 18px;
-		border-left: 1px solid var(--border);
-	}
-	.rail h3 {
-		margin: 16px 0 6px;
-		color: var(--sb-text-faint);
-		font-size: 12px;
-		font-weight: 500;
-	}
-	.rail h3:first-child {
-		margin-top: 0;
-	}
-	.decision {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		margin: 3px 0;
-		font-size: 12.5px;
-	}
-	.reason {
-		margin: 0 0 6px 18px;
-		font-size: 11.5px;
-	}
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 5px;
-	}
 	.foot {
 		display: flex;
 		align-items: center;
@@ -683,12 +667,6 @@
 	.faint {
 		color: var(--sb-text-faint);
 		font-size: 12px;
-	}
-	.ok-text {
-		color: var(--sb-success);
-	}
-	.bad-text {
-		color: var(--sb-error);
 	}
 	.problem {
 		color: var(--sb-error);

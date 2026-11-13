@@ -132,12 +132,43 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	return sections;
 }
 
-/** `N selected`, as the CLI's `Plan ready` line counts it. */
-export function readySummary(plan: PlanDocument): string {
-	const parts = [isFullRefresh(plan) ? 'full refresh' : '', `${plan.selected_count} selected`];
-	const loads = plan.source_loads.length;
-	if (loads) parts.push(`${loads} source${loads === 1 ? '' : 's'} to load`);
-	return parts.filter(Boolean).join(', ');
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** Names a few models, or counts them when there are more than two. */
+const few = (models: PlanModel[], noun: string) => (models.length <= 2 ? models.map((m) => m.name).join(' and ') : count(models.length, noun));
+
+/**
+ * What the run does: how many models build, which changed since their last build, which build for the
+ * first time, which take new rows and that the rest are recreated as usual, then what else happens.
+ */
+export function planSentence(plan: PlanDocument): string {
+	const active = plan.models.filter((m) => m.action !== 'skip');
+	// The planner skips only disabled models; seeds it reports as current don't load.
+	const skipped = plan.models.length - active.length;
+	const seeds = plan.seeds.filter((s) => s.reason !== 'no_change').length;
+	const functions = plan.functions.filter((f) => f.reason && f.reason !== 'no_change').length;
+	const runs = [
+		plan.source_loads.length && count(plan.source_loads.length, 'source loads first', 'sources load first'),
+		seeds && count(seeds, 'seed loads', 'seeds load'),
+		functions && count(functions, 'changed function is recreated', 'changed functions are recreated'),
+		plan.python_nodes.length && count(plan.python_nodes.length, 'Python node runs', 'Python nodes run')
+	].filter((p): p is string => !!p);
+	const after = [...runs, ...(skipped ? [count(skipped, 'disabled model is skipped', 'disabled models are skipped')] : [])].map((p) => ` ${p}.`).join('');
+	if (!active.length) return `${runs.length ? 'No models build.' : 'Nothing to build.'}${after}`;
+	const builds = count(active.length, 'model builds', 'models build');
+	if (isFullRefresh(plan)) return `${builds} from scratch, replacing what was built.${after}`;
+	const changed = active.filter((m) => !ROUTINE.has(m.reason) && m.reason !== 'first_run');
+	const fresh = active.filter((m) => m.reason === 'first_run');
+	const rows = active.filter((m) => m.reason === 'normal_incremental');
+	const usual = active.filter((m) => m.reason === 'no_change');
+	const parts = [
+		changed.length && `${few(changed, 'model')} changed since ${changed.length === 1 ? 'its' : 'their'} last build`,
+		fresh.length && `${few(fresh, 'model')} ${fresh.length === 1 ? 'builds' : 'build'} for the first time`,
+		rows.length && `${count(rows.length, 'incremental model takes', 'incremental models take')} new rows`
+	].filter((p): p is string => !!p);
+	if (usual.length) parts.push(parts.length ? `the other ${usual.length} ${usual.length === 1 ? 'is' : 'are'} recreated as usual` : `none changed since ${usual.length === 1 ? 'its' : 'their'} last build`);
+	const detail = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
+	return `${builds}: ${detail}.${after}`;
 }
 
 /** The models a plan changes, as catalog keys, for drawing just the part of a large selection that matters. */

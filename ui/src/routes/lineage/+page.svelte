@@ -5,6 +5,8 @@
 	import '@xyflow/svelte/dist/style.css';
 	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
+	import FolderNode from '$lib/components/lineage/folder-node.svelte';
+	import FolderIcon from '@lucide/svelte/icons/folder';
 	import NodeFieldsPopover from '$lib/components/lineage/node-fields-popover.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -43,14 +45,14 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
-	import { catalogGraph, cardData } from '$lib/lineage/catalog-graph';
+	import { GROUPED_ABOVE, catalogGraph, cardData, cardStatus, folderOf, groupedGraph, withFoldersOpen } from '$lib/lineage/catalog-graph';
 
 	let browserOpen = $state(false);
 	let inspectorOpen = $state(true);
 	let neighbourhoodOnly = $state(false);
 	let modelQuery = $state('');
 
-	const nodeTypes = { asset: AssetNode };
+	const nodeTypes = { asset: AssetNode, folder: FolderNode };
 	// Automatic fits stop at a zoom where cards stay readable; the fit button and the wheel go further, to the whole graph.
 	const FIT_FLOOR = 0.3;
 
@@ -66,6 +68,10 @@
 	// paint before the cards are created and laid out, which takes a moment on a large project.
 	let building = false;
 	let fitted = $state(false);
+	// A large project opens with each folder as one card; opening a folder draws its nodes.
+	let grouped = $state(false);
+	let expanded = $state<ReadonlySet<string>>(new Set());
+	const graphOf = (data: CatalogNode[]) => (grouped ? groupedGraph(data, expanded) : catalogGraph(data));
 	$effect(() => {
 		const data = catalog.data;
 		if (!data || scaleMode) return;
@@ -78,21 +84,42 @@
 						building = false;
 						const latest = catalog.data;
 						if (!latest || nodes.length) return;
-						const graph = catalogGraph(latest);
-						const focus = latest.some((n) => n.key === initialFocus) ? initialFocus : null;
-						nodes = graph.nodes.map((n) => (n.id === focus ? { ...n, selected: true } : n));
+						const focus = latest.find((n) => n.key === initialFocus) ?? null;
+						grouped = latest.length > GROUPED_ABOVE;
+						if (focus) expanded = withFoldersOpen(focus, expanded);
+						const graph = graphOf(latest);
+						nodes = graph.nodes.map((n) => (n.id === focus?.key ? { ...n, selected: true } : n));
 						edges = graph.edges;
 					})
 				);
 				return;
 			}
-			const byKey = new Map(data.map((n) => [n.key, n]));
+			const fresh = new Map(graphOf(data).nodes.map((n) => [n.id, n.data]));
 			nodes = nodes.map((n) => {
-				const fresh = byKey.get(n.id);
-				return fresh ? { ...n, data: { ...cardData(fresh), dimmed: n.data.dimmed } } : n;
+				const card = fresh.get(n.id);
+				return card ? { ...n, data: { ...card, dimmed: n.data.dimmed } } : n;
 			});
 		});
 	});
+
+	/** Redraws the graph after folders open or close, keeping the selection; the layout effect then places it. */
+	function regroup(next: { grouped?: boolean; expanded?: ReadonlySet<string> }) {
+		const data = catalog.data;
+		if (!data) return;
+		grouped = next.grouped ?? grouped;
+		expanded = next.expanded ?? expanded;
+		const selected = new Set(nodes.filter((n) => n.selected).map((n) => n.id));
+		const graph = graphOf(data);
+		neighbourhoodOnly = false;
+		// The card under the pointer may be gone, and it never reports the pointer leaving.
+		hoveredId = null;
+		lastLayoutKey = '';
+		nodes = graph.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n));
+		edges = graph.edges;
+	}
+	function openFolder(group: string) {
+		regroup({ expanded: new Set([...expanded, group]) });
+	}
 
 	// Scale testing: /lineage?models=2000 swaps in a synthetic warehouse-shaped graph.
 	// Positions are precomputed (stand-in for `sqb compile` output) instead of
@@ -290,8 +317,11 @@
 	let statusFilter = $state<'' | 'stale' | 'changed' | 'behind' | 'failed'>('');
 	const filterActive = $derived(!!(kindFilter || groupFilter || ownerFilter || statusFilter));
 	function matchesFilter(n: Node): boolean {
+		if (n.type === 'folder') return catalogNodes.some((c) => `${folderOf(c)}/`.startsWith(`${n.data.group}/`) && matchesCatalog(c));
 		const c = catalogByKey.get(n.id);
-		if (!c) return !filterActive;
+		return c ? matchesCatalog(c) : !filterActive;
+	}
+	function matchesCatalog(c: CatalogNode): boolean {
 		if (kindFilter && c.kind !== kindFilter) return false;
 		if (groupFilter && c.group !== groupFilter) return false;
 		if (ownerFilter && !c.owner.includes(ownerFilter)) return false;
@@ -315,15 +345,20 @@
 		{ value: 'failed' as const, label: 'Last build failed' }
 	];
 
-	const groupOf = (node: Node) => String(node.data.group ?? (String(node.data.kind).startsWith('source') ? 'sources' : 'models'));
+	const groupOf = (node: Pick<Node, 'id' | 'data'>) => {
+		const listed = catalogByKey.get(node.id);
+		return listed ? folderOf(listed) : String(node.data.group ?? (String(node.data.kind).startsWith('source') ? 'sources' : 'models'));
+	};
 	let collapsedGroups = $state<Set<string>>(new Set());
 	function toggleGroup(g: string) {
 		const next = new Set(collapsedGroups);
 		next.has(g) ? next.delete(g) : next.add(g);
 		collapsedGroups = next;
 	}
+	// The list names every node, including those inside closed folders.
+	const listNodes = $derived<Pick<Node, 'id' | 'data'>[]>(scaleMode ? nodes : catalogNodes.map((n) => ({ id: n.key, data: cardData(n) })));
 	const browserNodes = $derived(
-		[...nodes]
+		[...listNodes]
 			.filter((node) => String(node.data.name ?? '').toLowerCase().includes(modelQuery.trim().toLowerCase()))
 			.sort((left, right) => String(left.data.name).localeCompare(String(right.data.name)))
 	);
@@ -334,10 +369,19 @@
 			.filter((g) => g.nodes.length)
 	);
 
-	// immediate upstream/downstream of the selected model (for the Lineage tab)
+	// immediate upstream/downstream of the selected model (for the Lineage tab); with folders drawn,
+	// from the catalog, as an edge to a closed folder doesn't name the node it reaches
 	const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id;
-	const upstream = $derived(primary ? edges.filter((e) => e.target === primary.id).map((e) => nameOf(e.source)) : []);
-	const downstream = $derived(primary ? edges.filter((e) => e.source === primary.id).map((e) => nameOf(e.target)) : []);
+	const upstream = $derived(
+		!primary ? [] : grouped ? (catalogByKey.get(primary.id)?.upstream ?? []) : edges.filter((e) => e.target === primary.id).map((e) => nameOf(e.source))
+	);
+	const downstream = $derived(
+		!primary
+			? []
+			: grouped
+				? catalogNodes.filter((n) => n.upstream.includes(primary.id)).map((n) => n.key)
+				: edges.filter((e) => e.source === primary.id).map((e) => nameOf(e.target))
+	);
 
 	let sqlMode = $state<'raw' | 'compiled'>('raw');
 	const sqlRaw = $derived(d?.sql?.raw ?? '');
@@ -363,7 +407,8 @@
 		sqlOpen = true;
 	}
 	function selectByName(name: string) {
-		const id = nodes.find((node) => node.data.name === name)?.id;
+		// A node inside a closed folder isn't drawn; selecting it opens the folders around it.
+		const id = nodes.find((node) => node.data.name === name)?.id ?? (grouped && catalogByKey.has(name) ? name : undefined);
 		if (id) selectModel(id);
 	}
 
@@ -376,6 +421,8 @@
 			if (g && setFlowViewport) setFlowViewport({ zoom: 1, x: panelSize.w / 2 - (g.x + 118), y: panelSize.h / 2 - (g.y + 30) });
 			return;
 		}
+		const listed = catalogByKey.get(id);
+		if (grouped && listed && !nodes.some((n) => n.id === id)) regroup({ expanded: withFoldersOpen(listed, expanded) });
 		nodes = nodes.map((node) => ({ ...node, hidden: false, selected: node.id === id }));
 		edges = edges.map((edge) => ({ ...edge, hidden: false }));
 		await tick();
@@ -493,6 +540,7 @@
 			fitScaleGraph();
 			return;
 		}
+		if (grouped && expanded.size) regroup({ expanded: new Set() });
 		nodes = nodes.map((node) => ({ ...node, hidden: false }));
 		edges = edges.map((edge) => ({ ...edge, hidden: false }));
 		nodes = layoutGraph(nodes, edges);
@@ -547,6 +595,16 @@
 		</div>
 	{/if}
 	<span class="toolbar-sep"></span>
+	{#if !scaleMode}
+		<button
+			onclick={() => regroup({ grouped: !grouped, expanded: new Set() })}
+			class="toolbar-action"
+			class:focus-active={grouped}
+			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
+		>
+			<FolderIcon size={13} /> Folders
+		</button>
+	{/if}
 	<NodeFieldsPopover />
 	<button
 		onclick={toggleNeighbourhood}
@@ -560,7 +618,7 @@
 	<button onclick={resetLayout} class="toolbar-action" title="Reset layout"><RotateCcwIcon size={13} /> Reset</button>
 	<div class="status-summary ml-auto">
 		{#each [['ok', 'var(--sb-success)', 'last build succeeded'], ['warn', 'var(--sb-warning)', 'last build warned'], ['stale', 'var(--sb-stale)', 'stale'], ['fail', 'var(--sb-error)', 'last build failed']] as [st, c, label] (st)}
-			{@const n = nodes.filter((x) => (st === 'stale' ? !!x.data.stale : x.data.status === st)).length}
+			{@const n = scaleMode ? nodes.filter((x) => (st === 'stale' ? !!x.data.stale : x.data.status === st)).length : catalogNodes.filter((c) => (st === 'stale' ? !!c.stale?.length : cardStatus(c) === st)).length}
 			{#if n}<span title="{n} {label}"><i style:background={c}></i>{n}</span>{/if}
 		{/each}
 	</div>
@@ -622,6 +680,7 @@
 			multiSelectionKey={['Shift', 'Meta', 'Control']}
 			selectionKey="Shift"
 			proOptions={{ hideAttribution: true }}
+			onnodeclick={({ node }) => node.type === 'folder' && openFolder(String(node.data.group))}
 			onnodepointerenter={({ node }) => (hoveredId = node.id)}
 			onnodepointerleave={() => (hoveredId = null)}
 		>
