@@ -33,6 +33,16 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             expected_launch: Ok(true),
         },
         AdhocCommandTestCase {
+            description: "a build claims the managed source it loads for a selected model",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:customers"],
+            priority: 0,
+            reason: "Refresh customers",
+            expected_check: json!({"selection": ["model:customers"], "write_set": ["model:customers", "source:shop.customers"],
+                "permissions": [["run.adhoc", true]], "error": null, "launchable": true}),
+            expected_launch: Ok(true),
+        },
+        AdhocCommandTestCase {
             description: "every gated flag is its own permission, and Developer holds none of them",
             person: AdhocPerson::Developer,
             command: &[
@@ -272,6 +282,7 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                     .collect::<Vec<Value>>(),
                 vec![
                     json!(["build", {}, "Refresh orders"]),
+                    json!(["build", {}, "Refresh customers"]),
                     json!(["build", {"full_refresh": true, "warehouse": "BUILD_XS"}, "Rebuild orders now"]),
                     json!(["test", {}, "Check orders"]),
                 ],

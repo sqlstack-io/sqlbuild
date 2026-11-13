@@ -13,6 +13,19 @@ sqb server
 
 Use `sqb server --help` for service, authentication and launcher options.
 
+## Serve over HTTPS
+
+Code locations and workers send their bearer token with every request to the `--server` URL.
+`sqb server` serves plain HTTP, so put TLS or an HTTPS reverse proxy in front of it and give
+locations and workers its `https://` URL. When a location or worker connects to an `http://` URL
+on another host, it prints this warning once and keeps running:
+
+```text
+warning: the bearer token for http://control.example.com travels unencrypted over HTTP; put TLS or an HTTPS reverse proxy in front of the server
+```
+
+Connections to `localhost`, `127.0.0.1` or `::1` print no warning.
+
 ## Upgrade
 
 Upgrade the server first, then the locations and workers that connect to it. Don't downgrade the

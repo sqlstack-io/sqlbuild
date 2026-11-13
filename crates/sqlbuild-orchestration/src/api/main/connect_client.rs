@@ -1,8 +1,9 @@
-//! Validate the API origin before attaching a sensitive bearer credential.
+//! Validate the API origin, and warn about plain HTTP, before attaching a sensitive bearer credential.
 
 use reqwest::header::HeaderValue;
 
 use crate::api::_helpers::resources::client::http_client;
+use crate::api::_helpers::resources::plain_http::warn_plain_http;
 use crate::api::errors::ClientError;
 use crate::api::models::ControlClient;
 
@@ -20,6 +21,7 @@ pub(crate) fn connect_client(server_url: &str, bearer: &str) -> Result<ControlCl
             "server URL must use HTTP or HTTPS without credentials, query or fragment",
         ));
     }
+    warn_plain_http(&base_url);
     let mut authorization = HeaderValue::from_str(&format!("Bearer {bearer}"))
         .map_err(|_| ClientError::Configuration("bearer is not a valid HTTP credential"))?;
     authorization.set_sensitive(true);

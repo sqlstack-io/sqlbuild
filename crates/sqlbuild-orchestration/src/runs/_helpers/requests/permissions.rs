@@ -58,7 +58,11 @@ pub(crate) fn execution_scopes(
     action: Action,
 ) -> Vec<PermissionScope> {
     let nodes: BTreeSet<String> = if request.kind == RunKind::Adhoc {
-        request.selection.clone()
+        request
+            .selection
+            .union(&request.write_set)
+            .cloned()
+            .collect()
     } else {
         executions
             .iter()

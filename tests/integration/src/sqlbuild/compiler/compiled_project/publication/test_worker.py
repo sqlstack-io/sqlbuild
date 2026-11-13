@@ -457,6 +457,21 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(23,)],
         ),
         WorkerExecutionTestCase(
+            "a scheduled build loads the managed source its model reads",
+            'SELECT CAST(order_id AS BIGINT) AS amount FROM __source("raw_orders")',
+            "SELECT amount FROM orders",
+            "success",
+            [(1,)],
+            files={
+                "sources/orders.yml": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/managed_orders.yml"
+                ).read_text(),
+                "python/loaders/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
+                ).read_text(),
+            },
+        ),
+        WorkerExecutionTestCase(
             "a platform sensor catches up retained events through a real worker",
             "SELECT 47 AS amount",
             "SELECT amount FROM orders",

@@ -55,6 +55,13 @@ class SnapshotPublicationTestCase:
 
 
 @dataclass(frozen=True)
+class PlainHttpWarningTestCase:
+    description: str
+    host: str
+    expected_warnings: int
+
+
+@dataclass(frozen=True)
 class SnapshotWorkerTestCase:
     description: str
     model_file: str

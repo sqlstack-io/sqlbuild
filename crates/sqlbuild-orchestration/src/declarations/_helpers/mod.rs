@@ -1,5 +1,6 @@
 pub(crate) mod development;
 pub(crate) mod documents;
+pub(crate) mod group_waits;
 pub(crate) mod job_detail;
 pub(crate) mod operator_change;
 pub(crate) mod operator_state;
