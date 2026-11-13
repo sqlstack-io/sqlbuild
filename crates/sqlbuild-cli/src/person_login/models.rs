@@ -55,3 +55,21 @@ pub(super) struct PersonClient {
     pub(super) client: reqwest::Client,
     pub(super) origin: String,
 }
+
+/// The parts of `GET /api/control/bootstrap` that name the location targets a person can view.
+#[derive(Debug, Deserialize)]
+pub(super) struct Bootstrap {
+    pub(super) access: BootstrapAccess,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct BootstrapAccess {
+    pub(super) locations: Vec<LocationTarget>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct LocationTarget {
+    pub(super) location_id: uuid::Uuid,
+    pub(super) name: String,
+    pub(super) target: String,
+}

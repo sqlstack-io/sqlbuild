@@ -1,10 +1,8 @@
 """An installed CLI inspects actual published SQL through a bounded live person session."""
 
 import json
-import sqlite3
 import subprocess
 import sys
-from contextlib import closing
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -28,7 +26,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.login.
     sign_in,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person.helpers import (
+    assert_build_syncs_coalesce,
     provision_person,
+    quiet_builds,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.cli.helpers import (
     administer,
@@ -124,6 +124,12 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
             )
         absent: subprocess.CompletedProcess[str] = invoke(command)
         assert absent.returncode != 0 and not absent.stdout and "not signed in" in absent.stderr
+        build, unconfigured = quiet_builds(
+            invoke,
+            (binary, worker.project / "sqlbuild_project.toml"),
+            client_environment | {"SQLBUILD_CONTROL_CA_CERT": str(certificate)},
+            origin,
+        )
         with pending_login(
             [binary, "login", *common, "--no-browser"],
             client_environment,
@@ -168,12 +174,11 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
         requested: subprocess.CompletedProcess[str] = invoke(sync)
         assert requested.returncode == 0, requested.stderr
         assert json.loads(requested.stdout) == {"applied": True}
-        with closing(sqlite3.connect(tmp_path / "control/.sqlbuild/control.sqlite3")) as store:
-            queued: list[tuple[str]] = store.execute(
-                "SELECT requested_by FROM sqb_location_work "
-                "WHERE json_extract(request_json,'$.work.kind')='sync_warehouse'"
-            ).fetchall()
-        assert queued == [("principal:" + person["principal_id"],)]
+        assert_build_syncs_coalesce(
+            build,
+            (unconfigured, origin, "principal:" + person["principal_id"]),
+            tmp_path / "control/.sqlbuild/control.sqlite3",
+        )
         inspected: subprocess.CompletedProcess[str] = invoke(command)
         assert inspected.returncode == 0 and "Published SQL read successfully" in inspected.stderr
         sql: dict[str, Any] = json.loads(inspected.stdout)

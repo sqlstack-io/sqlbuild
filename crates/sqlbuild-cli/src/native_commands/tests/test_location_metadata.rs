@@ -3,9 +3,17 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseStateLocation,
 };
 
-use crate::native_commands::_helpers::execution::metadata_sync;
-use crate::native_commands::tests::helpers::acknowledge_complete_pages;
-use crate::native_commands::tests::test_types::{MetadataRetryTestCase, UnchangedScanTestCase};
+use chrono::Utc;
+use sqlbuild_config::project::models::ControlConfig;
+use std::time::Duration;
+use tokio::time::Instant;
+
+use crate::native_commands::_helpers::execution::{metadata_sync, safety_sync_seconds};
+use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
+use crate::native_commands::tests::test_types::{
+    MetadataRetryTestCase, SafetySyncIdleTestCase, SafetySyncSettingTestCase,
+    SyncCoalescingTestCase, UnchangedScanTestCase,
+};
 
 #[test]
 fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_scan_completes() {
@@ -34,7 +42,7 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             database: Some("analytics".into()),
             schema: "state".into(),
         };
-        let mut state = metadata_sync((vec![location], 1), 3600);
+        let mut state = metadata_sync((vec![location], 1), (3600, 0));
         state.index = WarehouseHistoryKind::ALL
             .iter()
             .position(|kind| *kind == test_case.failed_kind)
@@ -133,7 +141,7 @@ fn given_recorded_change_token_when_scanning_again_then_only_proven_unchanged_re
             database: Some("analytics".into()),
             schema: "state".into(),
         };
-        let mut state = metadata_sync((vec![location], 1), 3600);
+        let mut state = metadata_sync((vec![location], 1), (3600, 0));
         state.reconcile = test_case.read_reconciled;
         state.scan_token = Some("t1".into());
         state.scan_delivered = test_case.read_delivered;
@@ -158,6 +166,195 @@ fn given_recorded_change_token_when_scanning_again_then_only_proven_unchanged_re
             test_case.expected_token,
             "{description}",
             description = test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_signals_during_a_sync_when_it_completes_then_exactly_one_follow_up_sync_runs() {
+    let test_cases = [
+        SyncCoalescingTestCase {
+            description: "four build requests and a run ending share one follow-up",
+            requests: 4,
+            run_ends_during_sync: true,
+            safety_seconds: 1800,
+            safety_due_after_seconds: 3600,
+            expected_follow_ups: 1,
+        },
+        SyncCoalescingTestCase {
+            description: "a passed safety interval joins pending requests instead of adding a sync",
+            requests: 2,
+            run_ends_during_sync: false,
+            safety_seconds: 1800,
+            safety_due_after_seconds: 0,
+            expected_follow_ups: 1,
+        },
+        SyncCoalescingTestCase {
+            description: "a safety interval that passes during a sync adds no extra one",
+            requests: 0,
+            run_ends_during_sync: false,
+            safety_seconds: 1800,
+            safety_due_after_seconds: 0,
+            expected_follow_ups: 0,
+        },
+        SyncCoalescingTestCase {
+            description: "no signal leaves the location idle",
+            requests: 0,
+            run_ends_during_sync: false,
+            safety_seconds: 1800,
+            safety_due_after_seconds: 3600,
+            expected_follow_ups: 0,
+        },
+    ];
+    for test_case in test_cases {
+        let started = Utc::now();
+        let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
+        assert!(
+            state.sync_due(None),
+            "{}: the first sync is due",
+            test_case.description
+        );
+        state.begin_sync(started);
+        for _ in 0..test_case.requests {
+            state.request_sync();
+        }
+        let runs_ended_at = test_case
+            .run_ends_during_sync
+            .then(|| started + chrono::Duration::seconds(1));
+        state.safety_at = Instant::now() + Duration::from_secs(test_case.safety_due_after_seconds);
+        state = acknowledge_complete_pages(state, WarehouseHistoryKind::ALL.len());
+        assert!(
+            state.idle,
+            "{}: the first sync completed",
+            test_case.description
+        );
+        let mut polled = Some(state);
+        let follow_ups = (1..=5)
+            .take_while(|poll| {
+                let mut current = polled.take().expect("one state between polls");
+                let due = current.sync_due(runs_ended_at);
+                current.begin_sync(started + chrono::Duration::seconds(10 * poll));
+                polled = Some(acknowledge_complete_pages(
+                    current,
+                    WarehouseHistoryKind::ALL.len(),
+                ));
+                due
+            })
+            .count();
+        assert_eq!(
+            follow_ups, test_case.expected_follow_ups,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_an_idle_location_when_the_safety_interval_passes_then_it_syncs_unless_turned_off() {
+    let test_cases = [
+        SafetySyncIdleTestCase {
+            description: "the interval passed while idle",
+            safety_seconds: 1800,
+            safety_due_after_seconds: 0,
+            expected_sync_due: true,
+        },
+        SafetySyncIdleTestCase {
+            description: "the interval has not passed",
+            safety_seconds: 1800,
+            safety_due_after_seconds: 3600,
+            expected_sync_due: false,
+        },
+        SafetySyncIdleTestCase {
+            description: "0 turns safety syncs off",
+            safety_seconds: 0,
+            safety_due_after_seconds: 0,
+            expected_sync_due: false,
+        },
+    ];
+    let started = Utc::now();
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
+        state.begin_sync(started);
+        state = acknowledge_complete_pages(state, WarehouseHistoryKind::ALL.len());
+        state.safety_at = Instant::now() + Duration::from_secs(test_case.safety_due_after_seconds);
+        assert_eq!(
+            state.sync_due(None),
+            test_case.expected_sync_due,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_safety_sync_settings_when_resolving_then_flag_beats_environment_beats_project() {
+    let test_cases = [
+        SafetySyncSettingTestCase {
+            description: "nothing set uses thirty minutes",
+            flag: None,
+            environment: None,
+            project: None,
+            expected_seconds: Ok(1800),
+        },
+        SafetySyncSettingTestCase {
+            description: "the project file sets it",
+            flag: None,
+            environment: None,
+            project: Some(3600),
+            expected_seconds: Ok(3600),
+        },
+        SafetySyncSettingTestCase {
+            description: "the environment overrides the project file",
+            flag: None,
+            environment: Some("2h"),
+            project: Some(3600),
+            expected_seconds: Ok(7200),
+        },
+        SafetySyncSettingTestCase {
+            description: "a blank environment value falls through to the project file",
+            flag: None,
+            environment: Some(" "),
+            project: Some(3600),
+            expected_seconds: Ok(3600),
+        },
+        SafetySyncSettingTestCase {
+            description: "the flag overrides the environment",
+            flag: Some("off"),
+            environment: Some("2h"),
+            project: Some(3600),
+            expected_seconds: Ok(0),
+        },
+        SafetySyncSettingTestCase {
+            description: "a flag under a minute is refused",
+            flag: Some("30s"),
+            environment: None,
+            project: None,
+            expected_seconds: Err(
+                "--sync-at-least-every must be a duration of at least '1m' such as '30m', or '0' or 'off' to turn safety syncs off",
+            ),
+        },
+        SafetySyncSettingTestCase {
+            description: "an unparseable environment value is refused",
+            flag: None,
+            environment: Some("-5m"),
+            project: None,
+            expected_seconds: Err(
+                "SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY must be a duration of at least '1m' such as '30m', or '0' or 'off' to turn safety syncs off",
+            ),
+        },
+    ];
+    for test_case in test_cases {
+        let resolved = safety_sync_seconds(test_case.flag, test_case.environment, || {
+            Ok(ControlConfig {
+                sync_at_least_every_seconds: test_case.project,
+                ..ControlConfig::default()
+            })
+        });
+        assert_eq!(
+            resolved,
+            test_case.expected_seconds.map_err(str::to_owned),
+            "{}",
+            test_case.description
         );
     }
 }

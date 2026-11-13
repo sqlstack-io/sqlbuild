@@ -1,5 +1,6 @@
 pub mod deprecated_setting_warnings;
 pub mod explicit_references_help;
+pub mod load_control_config;
 pub mod load_git_base_ref;
 pub mod load_local_config;
 pub mod load_project_config;
@@ -11,4 +12,5 @@ pub mod resolve_config_file;
 pub mod setting_help_text;
 pub mod snippet_help_text;
 pub mod sql_analysis_off_guidance;
+pub mod sync_interval_seconds;
 pub mod unsupported_target_warehouse;

@@ -1,0 +1,5 @@
+{
+  "description": "Direct state history for janitor pruning that keeps the newest two rows per key. run_001 and run_002 share an hour at the keep boundary, so the tie breaks on the newer run or result id.",
+  "runs": [["run_000", 10], ["run_001", 12], ["run_002", 12], ["run_003", 13]],
+  "audit_binding_keys": ["orders.valid_orders", "customers.unique_ids"]
+}

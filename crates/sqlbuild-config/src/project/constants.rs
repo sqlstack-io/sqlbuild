@@ -200,6 +200,12 @@ pub(crate) const TARGET_KEYS: [&str; 21] = [
     "recall",
     "concurrency",
 ];
+pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
+/// Shortest safety sync interval, so a typo cannot bring back aggressive warehouse polling.
+pub(crate) const MIN_SYNC_INTERVAL_SECONDS: u64 = 60;
+pub(crate) const SYNC_INTERVAL_OFF: [&str; 3] = ["0", "0s", "off"];
+pub(crate) const SYNC_INTERVAL_HELP: &str =
+    "must be a duration of at least '1m' such as '30m', or '0' or 'off' to turn safety syncs off";
 pub(crate) const REVIEW_KEYS: [&str; 4] =
     ["against", "critical_tags", "downstream", "schema_prefix"];
 pub(crate) const REVIEW_DOWNSTREAM_POLICIES: [&str; 3] = ["critical", "all", "none"];

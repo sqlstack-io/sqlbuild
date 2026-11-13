@@ -44,7 +44,7 @@
 									<td><code>{t.table}</code></td>
 									<td>
 										<span title={formatStamp(t.at)}>
-											{#if t.failure}<StatusLabel tone="var(--sb-error)" label={t.failure} />{:else}<StatusLabel tone="var(--sb-success)" label="synced {formatAgo(t.at, app.now)}" />{/if}
+											{#if t.failure}<StatusLabel tone={t.waiting ? 'var(--sb-warning)' : 'var(--sb-error)'} label={t.failure} />{:else}<StatusLabel tone="var(--sb-success)" label="synced {formatAgo(t.at, app.now)}" />{/if}
 										</span>
 									</td>
 									<td>{formatNumber(t.recordsSent)}</td>

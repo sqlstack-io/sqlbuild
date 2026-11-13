@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_cli::person_login::main::sync_after_build::sync_after_build;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
@@ -24,6 +25,7 @@ use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::observations::source_capture::{
     arm_source_capture, take_source_capture,
 };
+use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 fn run_with_providers(context: &BuildContext<'_>) -> PyResult<i32> {
@@ -116,7 +118,26 @@ fn run_within_limits(
             ("remediation", native_field(&limits, "remediation")?),
         ],
     )?;
-    within(&deadline, |_| run_with_providers(&context))
+    let exit_code: i32 = within(&deadline, |_| run_with_providers(&context))?;
+    if context.worker.is_none() {
+        let _ = request_location_sync(&context);
+    }
+    Ok(exit_code)
+}
+
+/// A signed-in person's build refreshes its configured location's warehouse copy; never fails it.
+fn request_location_sync(context: &BuildContext<'_>) -> PyResult<()> {
+    let py: Python<'_> = context.py();
+    let target: Bound<'_, PyAny> = context.get("effective_target_name")?;
+    if target.is_none() {
+        return Ok(());
+    }
+    let target: String = target.extract()?;
+    let project_dir: std::path::PathBuf = context.get("effective_project_dir")?.extract()?;
+    if let Some(line) = py.detach(|| sync_after_build(&project_dir, &target)) {
+        write_stderr(py, &line)?;
+    }
+    Ok(())
 }
 
 /// Run one `sqb build` request.

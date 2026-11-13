@@ -11,6 +11,12 @@ pub(crate) fn request_warehouse_sync(
     (location, target): (Uuid, &str),
 ) -> Result<bool, std::io::Error> {
     transport::with_person_session(server, async |client, credential| {
-        transport::warehouse_sync(client, credential, (location, target)).await
+        transport::warehouse_sync(
+            client,
+            credential,
+            (location, target),
+            "Requested from the CLI",
+        )
+        .await
     })
 }

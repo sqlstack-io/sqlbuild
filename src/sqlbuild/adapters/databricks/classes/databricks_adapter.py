@@ -21,6 +21,7 @@ from sqlbuild._native import (
     SqlValueKind,
     render_insert_source_freshness_records_sql,
 )
+from sqlbuild.adapter.contract.classes.audit_results import AuditResultsMixin
 from sqlbuild.adapter.contract.classes.base_adapter import (
     BaseAdapter,
     _encode_typed_json,
@@ -146,7 +147,12 @@ from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
 class DatabricksAdapter(
-    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+    MicrobatchMixin,
+    ConsumptionMixin,
+    ObservationsMixin,
+    AuditResultsMixin,
+    UnkeyedDiffMixin,
+    BaseAdapter,
 ):
     """Databricks adapter backed by databricks-sql-connector."""
 

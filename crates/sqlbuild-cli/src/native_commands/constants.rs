@@ -98,6 +98,10 @@ pub(crate) const METADATA_READER_CLOSE_SECONDS: u64 = 5;
 pub(crate) const METADATA_SYNC_CHECK_SECONDS: u64 = 5;
 /// Full key-set reconciliation is independent of the incremental poll and overlap window.
 pub(crate) const METADATA_RECONCILE_SECONDS: u32 = 300;
+/// An idle location syncs at least this often, so a lost run or request signal cannot leave drift.
+pub(crate) const METADATA_SAFETY_SYNC_SECONDS: u64 = 1800;
+/// Overrides `[control] sync_at_least_every`; `--sync-at-least-every` overrides both.
+pub(crate) const SAFETY_SYNC_ENV: &str = "SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY";
 pub(crate) const METADATA_OVERLAP_SECONDS: i64 = 300;
 /// A source-key cursor can repeat the last row's base64-encoded definition beside the records.
 pub(crate) const METADATA_REPLY_BYTES: u64 =

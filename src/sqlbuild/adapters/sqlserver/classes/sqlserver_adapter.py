@@ -19,6 +19,7 @@ from sqlbuild._native import (
     SqlValueKind,
     render_insert_source_freshness_records_sql,
 )
+from sqlbuild.adapter.contract.classes.audit_results import AuditResultsMixin
 from sqlbuild.adapter.contract.classes.base_adapter import (
     BaseAdapter,
     _build_names_filter,
@@ -135,7 +136,12 @@ def _render_tsql_distinct_condition(*, left: str, right: str) -> str:
 
 
 class SqlServerAdapter(
-    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, UnkeyedDiffMixin, BaseAdapter
+    MicrobatchMixin,
+    ConsumptionMixin,
+    ObservationsMixin,
+    AuditResultsMixin,
+    UnkeyedDiffMixin,
+    BaseAdapter,
 ):
     """Microsoft SQL Server adapter backed by pymssql."""
 

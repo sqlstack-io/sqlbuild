@@ -121,7 +121,10 @@ async fn watch_location(
             published_generation = Some(generation);
             metadata = Some(metadata_sync(
                 (locations, generation),
-                options.metadata_reconcile_seconds,
+                (
+                    options.metadata_reconcile_seconds,
+                    options.safety_sync_seconds,
+                ),
             ));
             let Some(files) = check_published_location(
                 options,

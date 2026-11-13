@@ -3333,7 +3333,7 @@ export interface components {
          * @description Closed failure stages keep warehouse errors and credentials out of health observations.
          * @enum {string}
          */
-        WarehouseSyncFailure: "watermark" | "read" | "delivery";
+        WarehouseSyncFailure: "watermark" | "read" | "delivery" | "busy";
         WarehouseSyncResponse: {
             applied: boolean;
         };

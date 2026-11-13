@@ -22,3 +22,6 @@ pub(crate) const SOURCE_NODE_KIND: &str = "source";
 /// `env_prefix_target` values under which pydantic-settings prefixes alias names too.
 pub(crate) const ALIAS_PREFIX_TARGET: &str = "alias";
 pub(crate) const ALL_PREFIX_TARGET: &str = "all";
+
+/// DuckDB's message when another process, such as a running build, holds the database file.
+pub(crate) const DUCKDB_LOCK_CONFLICT: &str = "Conflicting lock is held";

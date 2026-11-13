@@ -10,6 +10,6 @@ pub mod diff_report;
 pub mod dispatch;
 pub mod launcher;
 pub mod native_commands;
-pub(crate) mod person_login;
+pub mod person_login;
 pub mod replay;
 pub(crate) mod workers;

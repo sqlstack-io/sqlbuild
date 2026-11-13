@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::person_login::_helpers::credentials;
 use crate::person_login::constants::REQUEST_SECONDS;
-use crate::person_login::models::{PersonClient, PersonCredential};
+use crate::person_login::models::{Bootstrap, LocationTarget, PersonClient, PersonCredential};
 
 pub(crate) fn connect(origin: &str, ca: Option<&Path>) -> Result<PersonClient, std::io::Error> {
     let mut builder = reqwest::Client::builder()
@@ -139,11 +139,12 @@ pub(crate) async fn warehouse_sync(
     client: &PersonClient,
     credential: &PersonCredential,
     (location, target): (Uuid, &str),
+    reason: &str,
 ) -> Result<bool, std::io::Error> {
     let path = target_path(client, (location, target), &["warehouse-syncs"])?;
     let request = PersonWorkRequest {
         request_id: Uuid::now_v7(),
-        reason: "Requested from the CLI".into(),
+        reason: reason.into(),
     };
     send_json::<MutationResponse>(
         authorized(client, reqwest::Method::POST, &path, credential)?.json(&request),
@@ -155,6 +156,24 @@ pub(crate) async fn warehouse_sync(
     )
     .await
     .map(|response| response.applied)
+}
+
+/// The location targets the signed-in person can view.
+pub(crate) async fn location_targets(
+    client: &PersonClient,
+    credential: &PersonCredential,
+) -> Result<Vec<LocationTarget>, std::io::Error> {
+    send_json::<Bootstrap>(
+        authorized(
+            client,
+            reqwest::Method::GET,
+            "/api/control/bootstrap",
+            credential,
+        )?,
+        ("read locations from", "Location lookup", "location list"),
+    )
+    .await
+    .map(|bootstrap| bootstrap.access.locations)
 }
 
 /// Each failure names the action, e.g. "could not read published SQL from the server".
