@@ -12,7 +12,6 @@
 		GitMerge,
 		Repeat,
 		Columns3,
-		User,
 		Workflow,
 		type Icon as IconType
 	} from '@lucide/svelte';
@@ -36,7 +35,6 @@
 		/** When the node was last built, or a source last loaded. */
 		lastBuiltAt?: string;
 		description?: string;
-		owner?: string[];
 		tags?: string[];
 		columnCount?: number;
 	};
@@ -88,7 +86,6 @@
 	const hasDetail = $derived(
 		!!(
 			(f.description && d.description) ||
-			(f.owner && d.owner?.length) ||
 			(f.tags && d.tags?.length) ||
 			(f.columns && d.columnCount != null)
 		)
@@ -107,7 +104,6 @@
 	{#if hasDetail}
 		<div class="detail">
 			{#if f.description && d.description}<p>{d.description}</p>{/if}
-			{#if f.owner && d.owner?.length}<span><User size={11} /> {d.owner.join(', ')}</span>{/if}
 			{#if f.columns && d.columnCount != null}<span><Columns3 size={11} /> {d.columnCount} columns</span>{/if}
 			{#if f.tags && d.tags?.length}<span>{d.tags.join(', ')}</span>{/if}
 		</div>

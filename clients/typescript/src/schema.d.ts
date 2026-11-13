@@ -1439,6 +1439,14 @@ export interface components {
             run_id: string;
             version_hash: string;
         };
+        /** @description Checks without a result yet are not known to the server, so they are not counted. */
+        CatalogNodeChecks: {
+            /** @description Failed or errored. */
+            failing: number;
+            passing: number;
+            total: number;
+            warning: number;
+        };
         /** @description `success`, `warn` or `failed`; `run_id` is the scheduler run, null for a newer build outside the scheduler. */
         CatalogNodeOutcome: {
             /** Format: date-time */
@@ -1449,6 +1457,8 @@ export interface components {
         };
         /** @description A current snapshot node's declared metadata and latest build, without SQL, source or config. */
         CatalogNodeRecord: {
+            /** @description The checks on the node by their newest result. */
+            checks: components["schemas"]["CatalogNodeChecks"];
             column_count?: number | null;
             /** @description The current definition differs from the one `last_build` recorded; false when either is unknown. */
             definition_changed: boolean;

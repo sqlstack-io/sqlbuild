@@ -16,8 +16,8 @@ function kindOf(wire: Wire['CatalogNodeRecord']): NodeKind | null {
 
 /**
  * One node of the current snapshot. The server reports declared metadata, the newest fingerprint,
- * the newest decisive outcome and whether the definition changed since that fingerprint, not
- * check counts, owners or groups, so those stay null or empty and the pages hide them. The
+ * the newest decisive outcome, whether the definition changed since that fingerprint, and its
+ * checks by their newest results. It reports no groups, so pages group by folder instead. The
  * fingerprint's run is a `sqb` run, not a scheduler run. Staleness from upstream builds needs the
  * whole listing, so `toCatalogNodes` adds it.
  */
@@ -31,7 +31,6 @@ export function toCatalogNode(wire: Wire['CatalogNodeRecord']): CatalogNode | nu
 		materialization: kind === 'source' || kind === 'seed' ? null : (wire.materialization ?? null),
 		group: null,
 		tags: wire.tags,
-		owner: [],
 		description: wire.description ?? '',
 		path: wire.path ?? '',
 		upstream: wire.dependencies,
@@ -46,7 +45,7 @@ export function toCatalogNode(wire: Wire['CatalogNodeRecord']): CatalogNode | nu
 				? [{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: wire.last_build.observed_at }]
 				: [],
 		sourceFreshness: null,
-		checks: null
+		checks: wire.checks
 	};
 }
 

@@ -44,7 +44,6 @@ export function cardData(node: CatalogNode): Record<string, unknown> {
 		icon: nodeIconKey(node),
 		lastBuiltAt: node.kind === 'source' ? (node.sourceFreshness?.loadedAt ?? undefined) : node.lastBuild?.builtAt,
 		description: node.description || undefined,
-		owner: node.owner,
 		tags: node.tags,
 		columnCount: node.columnCount || undefined,
 		...checksBadge(node)
@@ -72,6 +71,9 @@ export function folderOf(node: CatalogNode): string {
 	const slash = path.lastIndexOf('/');
 	return slash > 0 ? path.slice(0, slash) : node.kind === 'seed' ? 'seeds' : 'models';
 }
+
+/** The outermost folder around a node, such as `marts`, which the catalog filters and Overview counts by. */
+export const topFolder = (node: CatalogNode): string => folderOf(node).split('/')[0];
 
 export type GroupCard = { group: string; count: number; ok: number; stale: number; failed: number; dimmed?: boolean };
 
