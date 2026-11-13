@@ -53,7 +53,7 @@ export function manualConnectionTest(record: Wire['LocationWorkRecord'] | null):
 	};
 }
 
-function snapshotOf(published: Wire['PublishedSnapshot'] | null): Snapshot | null {
+export function snapshotOf(published: Wire['PublishedSnapshot'] | null): Snapshot | null {
 	return published
 		? {
 				id: published.snapshot_id,
