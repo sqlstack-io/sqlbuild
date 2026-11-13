@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.220.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.219.0...v0.220.0) (2026-11-13)
+
+
+### Features
+
+* **ui:** checks in the catalog, build status by folder, and no owner field ([#1451](https://github.com/sqlstack-io/sqlbuild/issues/1451)) ([a047997](https://github.com/sqlstack-io/sqlbuild/commit/a047997887b1e3eda5dc8d9657b756ef68ceea27))
+
 ## [0.219.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.218.0...v0.219.0) (2026-11-13)
 
 
