@@ -5,7 +5,9 @@ use crate::planner_scope::constants::{MODEL, SOURCE};
 use crate::planner_scope::models::LoaderGraph;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Managed sources each model's execution deps read, and each managed source's loader chain keyed as `expand_loaders` keys it; nodes with none are absent.
+/// Managed sources each model's execution deps read, and each managed source's loader chain keyed as
+/// `expand_loaders` keys it; nodes with none are absent. Intermediate loaders, which no source declares,
+/// are left out: they have no snapshot node a role can grant, so a run needing one still fails in the worker.
 pub fn node_loads(
     graph: &LoaderGraph,
     upstream: &[(ObjectKey, Vec<ObjectKey>)],
@@ -24,6 +26,7 @@ pub fn node_loads(
             graph
                 .upstream(chain)
                 .iter()
+                .filter(|name| !graph.intermediate(name))
                 .map(|name| graph.key(name))
                 .collect()
         } else {

@@ -123,7 +123,7 @@ fn given_deep_loader_chain_when_expanding_then_uses_iterative_traversal() {
 }
 
 #[test]
-fn given_loader_chains_and_unmanaged_reads_when_listing_node_loads_then_only_planned_source_writers_appear()
+fn given_loader_chains_and_unmanaged_reads_when_listing_node_loads_then_only_declared_source_writers_appear()
  {
     let graph = LoaderGraph {
         loaders: [
@@ -151,7 +151,10 @@ fn given_loader_chains_and_unmanaged_reads_when_listing_node_loads_then_only_pla
                 key("model", "stg_orders"),
             ],
         ),
-        (key("model", "stg_orders"), vec![key("source", "raw_products")]),
+        (
+            key("model", "stg_orders"),
+            vec![key("source", "raw_products")],
+        ),
         (key("source", "raw_orders"), Vec::new()),
         (key("source", "raw_customers"), Vec::new()),
         (key("source", "raw_products"), Vec::new()),
@@ -167,9 +170,9 @@ fn given_loader_chains_and_unmanaged_reads_when_listing_node_loads_then_only_pla
             .collect::<Vec<_>>(),
         vec![
             ("orders", vec!["raw_returns"]),
-            // The intermediate loader keys as itself; the loader that backs a source keys as it.
-            ("raw_orders", vec!["raw_customers", "stage_orders"]),
+            // The chain reaches raw_customers through stage_orders, an intermediate loader no source
+            // declares. It is left out on purpose, so a run that loads it still fails in the worker.
+            ("raw_orders", vec!["raw_customers"]),
         ]
     );
 }
-

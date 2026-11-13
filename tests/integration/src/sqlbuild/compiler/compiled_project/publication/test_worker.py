@@ -34,6 +34,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ClaimedWorker,
     GroupExecutionTestCase,
     SnapshotWorkerTestCase,
+    UnclaimedLoadTestCase,
     WorkerExecutionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
@@ -647,35 +648,69 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
             assert frozenset(json.loads(request)["write_set"]) == test_case.expected_write_set
 
 
-def test_given_a_job_without_its_loads_claim_when_a_worker_plans_then_the_unclaimed_source_is_refused(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UnclaimedLoadTestCase(
+            "the hook-read source is loaded only when the published model claims it",
+            files=LOADED_ORDER_FILES,
+            store_edit=lambda control: without_loads(control, "model:orders"),
+            refused_writer="source:raw_returns",
+            expected_write_set=frozenset(
+                {"model:orders", "source:raw_orders", "source:raw_customers"}
+            ),
+        ),
+        UnclaimedLoadTestCase(
+            # A known gap: no snapshot node exists for an intermediate loader, so `loads` leaves it out.
+            "an intermediate loader no source declares is never claimed, so the run still fails",
+            files={
+                "sources/shipments.yml": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.yml"
+                ).read_text(),
+                "python/loaders/shipments.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.py"
+                ).read_text(),
+                "models/orders.sql": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_orders.sql"
+                ).read_text(),
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.py"
+                ).read_text(),
+            },
+            store_edit=lambda _: None,
+            refused_writer="source:stage_shipments",
+            expected_write_set=frozenset({"model:orders", "source:raw_shipments"}),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_load_the_job_does_not_claim_when_a_worker_plans_then_the_run_is_refused(
+    test_case: UnclaimedLoadTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    test_case = WorkerExecutionTestCase(
-        "the hook-read source is loaded only when the published model claims it",
+    worker_case = WorkerExecutionTestCase(
+        test_case.description,
         "",
         "",
         "failed",
         [],
-        files=LOADED_ORDER_FILES,
-        store_edit=lambda control: without_loads(control, "model:orders"),
+        files=test_case.files,
+        store_edit=test_case.store_edit,
     )
-    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+    with scheduled_worker(tmp_path, monkeypatch, worker_case) as worker:
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
         log: str = worker.log.read_text()
         assert (run["status"], run["node_counts_json"]) == ("failed", {"skipped": 1}), log
-        assert "planned writer source:raw_returns is outside the frozen run write set" in log
+        assert (
+            f"planned writer {test_case.refused_writer} is outside the frozen run write set" in log
+        )
         with sqlite3.connect(worker.control_store) as control:
             (request,) = control.execute(
                 "SELECT request_json FROM sqb_runs WHERE run_id=?", (run["run_id"],)
             ).fetchone()
-        assert frozenset(json.loads(request)["write_set"]) == {
-            "model:orders",
-            "source:raw_orders",
-            "source:raw_customers",
-        }
+        assert frozenset(json.loads(request)["write_set"]) == test_case.expected_write_set
     with duckdb.connect(str(worker.project / "warehouse.duckdb")) as warehouse:
         assert warehouse.execute(
-            "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('orders', 'raw_returns')"
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'"
         ).fetchone() == (0,)
 
 

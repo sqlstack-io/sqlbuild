@@ -1,0 +1,9 @@
+sources:
+  - name: raw_shipments
+    description: Shipments loaded after an intermediate loader that no source declares.
+    managed: true
+    write_strategy: table
+    table: raw_shipments
+    columns:
+      - name: order_id
+        type: BIGINT

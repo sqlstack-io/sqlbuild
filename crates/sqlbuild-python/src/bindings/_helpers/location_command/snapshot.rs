@@ -8,8 +8,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{IntoPyObject, pyfunction};
 use serde_json::{Value, json};
-use sqlbuild_core::models::DiagnosticSeverity;
 use sqlbuild_analysis::planner_scope::main::node_loads::node_loads;
+use sqlbuild_core::models::DiagnosticSeverity;
 use sqlbuild_discovery::project_validation::main::validate_orchestration_names::validate_orchestration_names;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 

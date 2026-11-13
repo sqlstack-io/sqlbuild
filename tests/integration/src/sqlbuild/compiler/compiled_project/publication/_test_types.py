@@ -128,6 +128,15 @@ class WorkerExecutionTestCase:
 
 
 @dataclass(frozen=True)
+class UnclaimedLoadTestCase:
+    description: str
+    files: dict[str, str]
+    store_edit: Callable[[sqlite3.Connection], None]
+    refused_writer: str
+    expected_write_set: frozenset[str]
+
+
+@dataclass(frozen=True)
 class CheckExecutionTestCase(WorkerExecutionTestCase):
     description: str
     expected_check_outcome: str = "success"
