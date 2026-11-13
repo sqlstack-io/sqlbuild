@@ -13,12 +13,13 @@ use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
 use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
+use crate::warehouse_history::_helpers::checks::AuditRow;
 use crate::warehouse_metadata::constants::{
     LINEAGE_DEFINITION_BATCH, OUTCOME_FAILURE_WINDOW, OUTCOME_RECENT_RUNS,
 };
 use crate::warehouse_metadata::models::{
-    CatalogNodeBuild, CatalogNodeOutcome, CatalogNodeRecord, CatalogRelation, ColumnLineageEdge,
-    LineageColumn, LineageNodeColumns,
+    CatalogNodeBuild, CatalogNodeChecks, CatalogNodeOutcome, CatalogNodeRecord, CatalogRelation,
+    ColumnLineageEdge, LineageColumn, LineageNodeColumns,
 };
 
 /// A declared value from the definition itself, its schema entry or its config, in that order.
@@ -65,10 +66,11 @@ fn relation(node: &SnapshotNode) -> Option<CatalogRelation> {
 pub(crate) fn catalog_node(
     (node_key, node): (&str, &SnapshotNode),
     snapshot_id: Uuid,
-    (last_build, last_outcome, definition_changed): (
+    (last_build, last_outcome, definition_changed, checks): (
         Option<CatalogNodeBuild>,
         Option<CatalogNodeOutcome>,
         bool,
+        CatalogNodeChecks,
     ),
 ) -> CatalogNodeRecord {
     let definition = &node.definition;
@@ -95,8 +97,30 @@ pub(crate) fn catalog_node(
         last_build,
         last_outcome,
         definition_changed,
+        checks,
         snapshot_id,
     }
+}
+
+/// Each node's checks, keyed `kind:name` like the node keys, from every check's newest result.
+pub(crate) fn node_checks(latest: Vec<AuditRow>) -> HashMap<String, CatalogNodeChecks> {
+    let mut counts: HashMap<String, CatalogNodeChecks> = HashMap::new();
+    for row in latest {
+        let record = row.record;
+        let (Some(kind), Some(name)) = (record.attached_target_kind, record.attached_target_name)
+        else {
+            continue;
+        };
+        let checks = counts.entry(format!("{kind}:{name}")).or_default();
+        checks.total += 1;
+        match record.outcome.as_str() {
+            "pass" => checks.passing += 1,
+            "warn" => checks.warning += 1,
+            "fail" | "error" => checks.failing += 1,
+            _ => {}
+        }
+    }
+    counts
 }
 
 #[derive(Deserialize)]

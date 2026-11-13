@@ -3,7 +3,7 @@ import type { Edge, Node } from '@xyflow/svelte';
 // Synthetic warehouse-shaped lineage for scale testing (?models=N on /lineage).
 // Deterministic: the same N always produces the same graph. Models carry the
 // same fields as the catalog-backed lineage cards (kind, icon, checks, stale,
-// owner, tags, ...) so the real cards render in full.
+// tags, ...) so the real cards render in full.
 
 const LAYERS = ['raw', 'stg', 'int', 'int', 'fct', 'dim', 'mart', 'rpt'] as const;
 // share of models per layer (sums to 1)
@@ -14,7 +14,6 @@ const DOMAIN_NAMES = [
 	'loyalty', 'marketing', 'finance', 'pricing', 'reviews', 'support', 'ops', 'forecasting', 'logistics',
 	'events', 'web', 'mobile', 'franchise', 'quality', 'audit'
 ];
-const OWNERS = ['analytics', 'finance-data', 'growth', 'platform', 'ops'];
 const TAGS = ['core', 'finance', 'pii', 'daily', 'hourly', 'reporting'];
 
 export const domainName = (i: number) =>
@@ -105,7 +104,6 @@ export function scaleGraph(total: number): { nodes: Node[]; edges: Edge[] } {
 						? {}
 						: {
 								columnCount: 3 + Math.floor(rand() * 20),
-								owner: rand() < 0.6 ? [pick(OWNERS)] : undefined,
 								tags: rand() < 0.4 ? [pick(TAGS)] : undefined,
 								description: rand() < 0.5 ? `${layer} model for ${domainName(domain)}.` : undefined
 							})

@@ -3,7 +3,7 @@ import type { Node } from '@xyflow/svelte';
 import type { CatalogNode } from '$lib/api';
 import { boxId, jobGraph, layoutJobGraph } from './job-graph';
 
-const node = (key: string, upstream: string[] = []) => ({ key, kind: 'table', upstream, owner: [], tags: [], stale: null, checks: null }) as unknown as CatalogNode;
+const node = (key: string, upstream: string[] = []) => ({ key, kind: 'table', upstream, tags: [], stale: null, checks: null }) as unknown as CatalogNode;
 const measured = (nodes: Node[]) => nodes.map((n) => (n.type === 'job' ? n : { ...n, measured: { width: 236, height: 61 } }));
 
 // staging builds raw → stg; orders reads stg; reports waits for orders only through `after`.

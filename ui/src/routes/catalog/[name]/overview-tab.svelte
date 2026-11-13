@@ -126,7 +126,6 @@
 				<div><dt>Kind</dt><dd>{kindLine(node)}</dd></div>
 				{#if unique}<div><dt>Unique key</dt><dd class="mono">{unique}</dd></div>{/if}
 				{#if node.group}<div><dt>Group</dt><dd>{node.group}</dd></div>{/if}
-				<div><dt>Owner</dt><dd>{node.owner.join(', ') || '—'}</dd></div>
 				<div><dt>Path</dt><dd class="mono" title={node.path}>{node.path}</dd></div>
 				<div><dt>Relation</dt><dd class="mono" title={relationName(node.relation)}>{relationName(node.relation)}</dd></div>
 				{#if node.lastBuild}<div><dt>Build version</dt><dd class="mono" title="Fingerprint of the last build in this location">{node.lastBuild.fingerprint.slice(0, 12)}</dd></div>{/if}

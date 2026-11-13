@@ -30,7 +30,6 @@ export type ColumnSpec = { name: string; type: string; description: string; audi
 
 export type NodeSpec = {
 	materialization: string | null;
-	owner: string[];
 	description: string;
 	schema: string | null;
 	columns: ColumnSpec[];
@@ -47,56 +46,48 @@ const c = (name: string, type: string, description: string, audits: string[] = [
 export const NODE_SPECS: Record<string, NodeSpec> = {
 	raw__customers: {
 		materialization: null,
-		owner: ['platform'],
 		description: 'Customer records replicated from the shop database.',
 		schema: 'RAW',
 		columns: [c('id', 'bigint', 'Customer ID'), c('first_name', 'varchar', 'Given name'), c('last_name', 'varchar', 'Family name'), c('email', 'varchar', 'Contact email'), c('created_at', 'timestamp', 'Sign-up time (UTC)')]
 	},
 	raw__payments: {
 		materialization: null,
-		owner: ['platform'],
 		description: 'Payment events replicated from the payments service.',
 		schema: 'RAW',
 		columns: [c('id', 'bigint', 'Payment ID'), c('order_id', 'bigint', 'Order paid for'), c('payment_method', 'varchar', 'card | cash | voucher', ['accepted_values']), c('amount_cents', 'integer', 'Amount in cents'), c('status', 'varchar', 'success | failed'), c('created_at', 'timestamp', 'Payment time (UTC)')]
 	},
 	raw__orders: {
 		materialization: 'loader · delete_insert',
-		owner: ['ingest'],
 		description: 'Partner order files, loaded incrementally by the order loader.',
 		schema: 'RAW',
 		columns: [c('id', 'bigint', 'Order ID'), c('user_id', 'bigint', 'Customer ID'), c('order_date', 'timestamp', 'Order time (UTC)'), c('status', 'varchar', 'Order status'), c('total_cents', 'integer', 'Order total in cents'), c('_loaded_at', 'timestamp', 'Load time')]
 	},
 	country_codes: {
 		materialization: 'seed',
-		owner: ['analytics'],
 		description: 'ISO country codes and sales regions.',
 		schema: 'STAGING',
 		columns: [c('code', 'varchar', 'ISO 3166 alpha-2 code', ['unique']), c('name', 'varchar', 'Country name'), c('region', 'varchar', 'Sales region')]
 	},
 	stg_customers: {
 		materialization: 'view',
-		owner: ['analytics'],
 		description: 'Cleaned customers from the raw replica.',
 		schema: 'STAGING',
 		columns: [c('customer_id', 'bigint', 'Customer ID', ['not_null'], 'id AS customer_id'), c('first_name', 'varchar', 'Given name'), c('last_name', 'varchar', 'Family name'), c('email_domain', 'varchar', 'Domain of the contact email', [], "split_part(email, '@', 2) AS email_domain"), c('country_code', 'varchar', 'ISO country code', [], "'GB' AS country_code"), c('first_order_at', 'timestamp', 'Sign-up time (UTC)', [], 'created_at AS first_order_at')]
 	},
 	stg_orders: {
 		materialization: 'view',
-		owner: ['analytics'],
 		description: 'Cleaned orders from the order loader.',
 		schema: 'STAGING',
 		columns: [c('order_id', 'bigint', 'Order ID', ['not_null'], 'id AS order_id'), c('customer_id', 'bigint', 'Customer ID', [], 'user_id AS customer_id'), c('order_status', 'varchar', 'completed | pending | cancelled', ['accepted_values'], 'status AS order_status'), c('total_cents', 'integer', 'Order total in cents'), c('ordered_at', 'timestamp', 'Order time (UTC)', [], 'order_date AS ordered_at')]
 	},
 	stg_payments: {
 		materialization: 'view',
-		owner: ['analytics'],
 		description: 'Cleaned payments from the payments replica.',
 		schema: 'STAGING',
 		columns: [c('payment_id', 'bigint', 'Payment ID', ['not_null'], 'id AS payment_id'), c('order_id', 'bigint', 'Order paid for'), c('payment_method', 'varchar', 'card | cash | voucher'), c('amount_cents', 'integer', 'Amount in cents'), c('status', 'varchar', 'success | failed')]
 	},
 	fact_orders: {
 		materialization: 'table',
-		owner: ['analytics', 'finance-data'],
 		description: 'One row per order with payment and customer attributes.',
 		schema: 'MARTS',
 		columns: [
@@ -111,7 +102,6 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 	},
 	dim_customers: {
 		materialization: 'table',
-		owner: ['analytics'],
 		description: 'Customer dimension with first and last order and lifetime value.',
 		schema: 'MARTS',
 		from: '__ref("stg_customers")\nLEFT JOIN __ref("fact_orders") USING (customer_id)\nLEFT JOIN __ref("country_codes") ON country_code = code',
@@ -128,7 +118,6 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 	},
 	daily_revenue: {
 		materialization: 'table',
-		owner: ['finance-data'],
 		description: 'Daily revenue from completed orders.',
 		schema: 'MARTS',
 		where: "order_status = 'completed'",
@@ -137,14 +126,12 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 	},
 	customer_status: {
 		materialization: 'incremental · merge',
-		owner: ['growth'],
 		description: 'Active or lapsed status per customer, merged on change.',
 		schema: 'MARTS',
 		columns: [c('customer_id', 'bigint', 'Customer ID'), c('status', 'varchar', 'active | lapsed', ['not_null'], "CASE WHEN last_order_at > now() - INTERVAL 90 DAY THEN 'active' ELSE 'lapsed' END AS status"), c('status_changed_at', 'timestamp', 'When the status last changed', [], 'last_order_at AS status_changed_at')]
 	},
 	hourly_order_activity: {
 		materialization: 'incremental · microbatch',
-		owner: ['analytics'],
 		description: 'Orders and revenue per hour, built in hourly microbatches.',
 		schema: 'ANALYTICS',
 		groupBy: true,
@@ -153,7 +140,6 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 	},
 	hourly_activity_ctx: {
 		materialization: 'incremental · microbatch',
-		owner: ['analytics'],
 		description: 'Hourly activity with the day’s revenue for context.',
 		schema: 'ANALYTICS',
 		from: `__ref("hourly_order_activity")\nJOIN __ref("daily_revenue") ON date_trunc('day', activity_hour) = revenue_date`,
@@ -162,7 +148,6 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 	},
 	daily_activity_rollup: {
 		materialization: 'incremental · microbatch',
-		owner: ['analytics'],
 		description: 'Daily rollup of hourly activity with the peak hour.',
 		schema: 'ANALYTICS',
 		groupBy: true,
@@ -171,21 +156,18 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 	},
 	revenue_report: {
 		materialization: 'table',
-		owner: ['finance-data'],
 		description: 'Revenue report for the finance dashboard.',
 		schema: 'REPORTING',
 		columns: [c('revenue_date', 'date', 'Order date'), c('total_revenue', 'decimal(18,2)', 'Revenue in dollars', [], 'cents_to_dollars(total_revenue_cents) AS total_revenue'), c('order_count', 'bigint', 'Completed orders'), c('avg_order_value', 'decimal(18,2)', 'Average order value in dollars', [], 'cents_to_dollars(total_revenue_cents / nullif(order_count, 0)) AS avg_order_value')]
 	},
 	activity_report: {
 		materialization: 'view',
-		owner: ['analytics'],
 		description: 'Hourly activity for the operations dashboard.',
 		schema: 'REPORTING',
 		columns: [c('activity_hour', 'timestamp', 'Hour (UTC)'), c('order_count', 'bigint', 'Orders in the hour'), c('share_of_day', 'double', 'Share of the day’s revenue, in percent', [], 'pct(share_of_day) AS share_of_day')]
 	},
 	export_revenue_csv: {
 		materialization: null,
-		owner: ['finance-data'],
 		description: 'Exports the revenue report as CSV to the finance file drop.',
 		schema: null,
 		columns: []

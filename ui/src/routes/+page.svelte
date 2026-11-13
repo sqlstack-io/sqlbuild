@@ -224,11 +224,11 @@
 			<div class="lower-grid" class:single={!showGroups}>
 				{#if showGroups}<section class="surface-panel">
 					<div class="panel-heading">
-						<div><h2>Build status by group</h2><span>Current, stale and failed nodes · {app.location?.name}</span></div>
+						<div><h2>Build status by folder</h2><span>Current, stale and failed nodes in each top-level folder</span></div>
 						<a href={to(`/catalog`)}>Open catalog →</a>
 					</div>
 					<div class="groups">
-						<div class="group-row head"><span>Group</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
+						<div class="group-row head"><span>Folder</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
 						{#each groups as g (g.group)}
 							<a class="group-row" href={to(`/catalog?group=${g.group}`)}>
 								<span>{g.group}</span>
@@ -321,7 +321,7 @@
 	.health-facts { display: flex; gap: 20px; margin-left: 44px; color: var(--muted-foreground); font: 12px var(--font-sans); }
 	.health-facts span { display: flex; align-items: center; gap: 6px; }
 	.health-facts b { color: var(--foreground); font-weight: 500; }
-	.health-head > a, .panel-heading > a { margin-left: auto; color: var(--primary); font: 500 12.5px var(--font-sans); }
+	.health-head > a, .panel-heading > a { margin-left: auto; color: var(--primary); font: 500 12.5px var(--font-sans); white-space: nowrap; }
 	.metric-strip { display: grid; min-height: 98px; grid-template-columns: repeat(var(--metrics), minmax(0, 1fr)); overflow: hidden; }
 	.metric { min-width: 0; padding: 15px 16px 14px; border-right: 1px solid var(--border); }
 	.metric:last-child { border-right: 0; }

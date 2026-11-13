@@ -101,6 +101,36 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
                 ],
                 "one entry per binding key, each its newest result"
             );
+            let (status, nodes) = get(
+                &client,
+                (&api.url, &viewer),
+                &format!("/api/control/locations/{location}/targets/development/nodes"),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            let checks_of = |key: &str| {
+                nodes
+                    .as_array()
+                    .expect("nodes")
+                    .iter()
+                    .find(|node| node["node_key"] == key)
+                    .map(|node| node["checks"].clone())
+                    .unwrap_or_else(|| panic!("{key} listed"))
+            };
+            assert_eq!(
+                checks_of("orders"),
+                json!({"total": 1, "passing": 1, "warning": 0, "failing": 0}),
+                "a node counts each check by its newest result"
+            );
+            assert_eq!(
+                checks_of("customers"),
+                json!({"total": 1, "passing": 0, "warning": 0, "failing": 1}),
+                "an errored check is failing"
+            );
+            assert_eq!(
+                checks_of("products"),
+                json!({"total": 0, "passing": 0, "warning": 0, "failing": 0})
+            );
             for disclosed in ["SELECT", "private@example.com"] {
                 assert!(
                     !list.to_string().contains(disclosed),

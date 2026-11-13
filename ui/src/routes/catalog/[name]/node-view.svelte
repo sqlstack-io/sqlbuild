@@ -110,7 +110,7 @@
 		</div>
 		{#if n}
 			<div class="meta-row">
-				<span>{kindLine(n)}</span>{#if n.group}<span>{n.group}</span>{/if}{#if n.owner.length}<span>{n.owner.join(', ')}</span>{/if}
+				<span>{kindLine(n)}</span>{#if n.group}<span>{n.group}</span>{/if}
 				{#if n.kind === 'source'}<span>{n.sourceFreshness?.loadedAt ? `Loaded ${formatAgo(n.sourceFreshness.loadedAt, app.now)}` : 'No freshness data'}</span>
 				{:else}<span>{n.lastBuild ? `Last built ${formatAgo(n.lastBuild.builtAt, app.now)}` : 'Never built'}</span>{/if}
 			</div>
