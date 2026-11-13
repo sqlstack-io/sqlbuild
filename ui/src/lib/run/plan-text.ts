@@ -45,7 +45,8 @@ export function actionText(m: PlanModel): string {
 	return 'continue forward';
 }
 
-function cursorLines(m: PlanModel, showRange: boolean): string[] {
+/** The cursor lines; a preview's `windowStart` stands in for a range it could not bound. */
+function cursorLines(m: PlanModel, showRange: boolean, windowStart?: string): string[] {
 	const column = m.cursor_column;
 	if (!column) return [];
 	const lines = [`cursor: ${column}${m.cursor_type ? ` (${m.cursor_type})` : ''}`];
@@ -53,6 +54,7 @@ function cursorLines(m: PlanModel, showRange: boolean): string[] {
 	if (requested && (requested.start || requested.end)) lines.push(`requested: ${requested.start ?? 'earliest available'} → ${requested.end ?? 'latest available'}`);
 	const range = m.cursor?.resolved_bounds ?? m.cursor_bounds;
 	if (showRange && range && (range.start || range.end)) lines.push(`range: ${range.start ?? '…'} → ${range.end ?? '…'}`);
+	else if (showRange && windowStart) lines.push(`range: ${windowStart} → latest data when the run starts`);
 	return lines;
 }
 
@@ -68,13 +70,13 @@ const SCHEMA_SIGNS: Record<string, { sign: '+' | '-' | '~'; label: string }> = {
 	column_type_changed: { sign: '~', label: 'type changed' }
 };
 
-function changedEntry(m: PlanModel, reason: string): PlanEntry {
-	if (reason === 'first_run') return { name: m.name, value: materializationLabel(m), detail: cursorLines(m, true) };
+function changedEntry(m: PlanModel, reason: string, windowStart?: string): PlanEntry {
+	if (reason === 'first_run') return { name: m.name, value: materializationLabel(m), detail: cursorLines(m, true, windowStart) };
 	return {
 		name: m.name,
 		value: actionText(m),
 		detail: [
-			...cursorLines(m, reason !== 'full_refresh'),
+			...cursorLines(m, reason !== 'full_refresh', windowStart),
 			...policyLine(m),
 			...(m.changed_functions?.length ? [`cause: function ${m.changed_functions.join(', ')} changed`] : [])
 		],
@@ -119,8 +121,9 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 		for (const m of active) counts.set(m.materialization_type, (counts.get(m.materialization_type) ?? 0) + 1);
 		add('Full refresh', [...counts].map(([kind, n]) => ({ name: kind, value: `${n} ${n === 1 ? 'model' : 'models'}`, detail: [] })), true);
 	} else {
-		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason)), true);
-		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => ({ name: m.name, value: materializationLabel(m), detail: cursorLines(m, true) })));
+		const starts = plan.synced_copy?.cursor_window_starts ?? {};
+		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason, starts[m.name])), true);
+		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => ({ name: m.name, value: materializationLabel(m), detail: cursorLines(m, true, starts[m.name]) })));
 	}
 	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry));
 	const seedLabel: Record<string, string> = { first_run: 'first_run', config_changed: 'seed_changed', no_change: 'current' };

@@ -22,6 +22,7 @@ const plan = (models: PlanModel[], over: Partial<PlanDocument> = {}): PlanDocume
 	column_migrations: [],
 	table_type_conversions: [],
 	retention: [],
+	synced_copy: null,
 	...over
 });
 
@@ -54,6 +55,18 @@ describe('plan text, as sqb plan prints it', () => {
 		expect(routine.entries).toEqual([
 			{ name: 'lines', value: 'merge (timestamp)', detail: ['cursor: placed_at (timestamp)'] },
 			{ name: 'customers', value: 'table', detail: [] }
+		]);
+	});
+
+	it('shows a preview window from the synced cursor to the run, and keeps a range the plan resolved', () => {
+		const incremental = { materialization_type: 'incremental', incremental_strategy: 'append', cursor_type: 'timestamp', cursor_column: 'placed_at', action: 'incremental_append', reason: 'normal_incremental' } as const;
+		const resolved = { start: '2026-01-02 00:00:00', end: '2026-01-03 00:00:00' };
+		const preview = plan([model('lines', incremental), model('events', { ...incremental, cursor_bounds: resolved })], {
+			synced_copy: { synced_at: '2026-01-03T00:05:00Z', cursor_window_starts: { lines: '2026-01-01 01:00:00', events: '2025-12-31 00:00:00' }, unknown_until_run: ['retention'] }
+		});
+		expect(planSections(preview)[0].entries.map((e) => e.detail)).toEqual([
+			['cursor: placed_at (timestamp)', 'range: 2026-01-01 01:00:00 → latest data when the run starts'],
+			['cursor: placed_at (timestamp)', 'range: 2026-01-02 00:00:00 → 2026-01-03 00:00:00']
 		]);
 	});
 
