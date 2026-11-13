@@ -60,6 +60,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     append_observation_history,
     append_old_name_history,
     append_retried_fingerprints,
+    hold_write_lock,
     location_process,
     open_legacy_warehouse,
     snapshot_api,
@@ -1140,8 +1141,21 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                 assert location.poll() is None, log.read_text()
                 assert time.monotonic() < deadline, log.read_text()
                 time.sleep(0.05)
+            lock: Any = None
             for availability in fixture["availability"]:
-                _ = (project / availability["source"]).rename(project / availability["destination"])
+                if test_case.adapter_name not in availability.get(
+                    "adapters", [test_case.adapter_name]
+                ):
+                    continue
+                if lock is not None:
+                    lock.close()
+                    lock = None
+                if "source" in availability:
+                    _ = (project / availability["source"]).rename(
+                        project / availability["destination"]
+                    )
+                if availability.get("hold_write_lock"):
+                    lock = hold_write_lock(project / "warehouse.db")
                 record_finished_run(control)
                 reports = wait_for_warehouse_sync_health(
                     api, availability, location, log, after=observed_health_at
@@ -1150,6 +1164,8 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                     datetime.fromisoformat(report["received_at"]) for report in reports
                 )
                 assert (project / "warehouse.db").exists() == availability["available"]
+            if test_case.adapter_name == "duckdb":
+                assert log.read_text().count("Warehouse file is in use by another process") == 1
 
 
 @pytest.mark.parametrize(

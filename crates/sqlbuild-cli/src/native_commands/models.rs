@@ -10,7 +10,8 @@ use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseStateLocation,
+    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
+    WarehouseStateLocation,
 };
 use uuid::Uuid;
 
@@ -215,6 +216,8 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) safety_seconds: u64,
     /// When an idle location syncs even though no run ended and nobody asked.
     pub(crate) safety_at: tokio::time::Instant,
+    /// The last read found the warehouse file held by another process, such as a DuckDB build.
+    pub(crate) busy: bool,
     /// Per scan index: the table's change token after its last complete read.
     pub(crate) change_tokens: HashMap<usize, ScanToken>,
     /// The token read before the current scan's first page, recorded once the scan completes.
@@ -225,6 +228,15 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) mirror_holds_rows: bool,
     /// One warm runtime interpreter and warehouse session serve every page of a synchronization.
     pub(crate) reader: Option<LocationCompiler>,
+}
+
+/// The metadata reader's answer to one read.
+#[derive(Debug)]
+pub(crate) enum MetadataReply {
+    /// A page, or `None` when the read failed.
+    Page(Option<WarehouseHistoryPage>),
+    /// Another process holds the warehouse file; nothing was read.
+    Busy,
 }
 
 /// A table's change token after a complete read, and what that read proves about the mirror.

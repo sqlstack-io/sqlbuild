@@ -78,9 +78,18 @@ pub(super) async fn sync_location_metadata(
         };
         state = read;
         let Some(page) = page else {
+            let failure = if state.busy {
+                WarehouseSyncFailure::Busy
+            } else {
+                WarehouseSyncFailure::Read
+            };
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },
-                () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Read))) => {},
+                () = metadata_health(&state, (client, poll), (started, Some(failure))) => {},
+            }
+            if state.busy {
+                state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+                return Ok(Some(state));
             }
             state.retry_read();
             drop(write_output(&[(

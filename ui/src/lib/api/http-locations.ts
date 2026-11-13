@@ -120,11 +120,14 @@ export function toLocationDetail(location: Location, observations: Wire['Locatio
 	};
 }
 
-const SYNC_STAGE: Record<Wire['WarehouseSyncFailure'], string> = {
+const SYNC_STAGE: Record<Exclude<Wire['WarehouseSyncFailure'], 'busy'>, string> = {
 	watermark: 'reading where the last sync stopped',
 	read: 'reading the warehouse',
 	delivery: 'sending results to the server'
 };
+
+/** What held up a table's newest sync; a build holding the warehouse file is a wait, not a failure. */
+const syncProblemOf = (failure: Wire['WarehouseSyncFailure']) => (failure === 'busy' ? 'Waiting for a build that holds the warehouse file' : `Failed while ${SYNC_STAGE[failure]}`);
 
 type Sync = Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: 'warehouse_sync' }> } };
 
@@ -145,7 +148,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 			at: received_at,
 			recordsSent: health.records_sent,
 			elapsedMs: health.elapsed_millis,
-			failure: health.failure ? `Failed while ${SYNC_STAGE[health.failure]}` : null,
+			failure: health.failure ? syncProblemOf(health.failure) : null,
 			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null
 		}))
 		.sort((a, b) => a.table.localeCompare(b.table));
@@ -164,7 +167,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][]): WarehouseSync | null {
 	const { syncs, newest } = syncsOf(observations);
 	if (!syncs.length) return null;
-	const failing = [...newest.values()].flatMap((s) => (s.report.health.failure ? [`${s.report.health.table}: failed while ${SYNC_STAGE[s.report.health.failure]}`] : []));
+	const failing = [...newest.values()].flatMap(({ report: { health } }) => (health.failure && health.failure !== 'busy' ? [`${health.table}: failed while ${SYNC_STAGE[health.failure]}`] : []));
 	return {
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,
 		lastError: failing.length ? failing.sort().join('\n') : null,

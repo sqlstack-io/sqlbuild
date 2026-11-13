@@ -86,8 +86,8 @@ use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
-    LocationMetadataPage, LocationMetadataSync, LocationServe, LostStdout, NativeCommand,
-    NativeInvocation, ProjectLocation, ScanToken,
+    LocationMetadataPage, LocationMetadataSync, LocationServe, LostStdout, MetadataReply,
+    NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
 };
 use crate::native_commands::types::LocationPublication;
 use crate::workers::main::docker_image_sources::docker_image_sources;
@@ -361,6 +361,7 @@ pub(crate) fn metadata_sync(
         cycle_started_at: None,
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
+        busy: false,
         change_tokens: HashMap::new(),
         scan_token: None,
         scan_delivered: false,
@@ -1214,9 +1215,15 @@ pub(crate) async fn read_metadata_page(
             Duration::from_secs(METADATA_POLL_SECONDS),
             exchange_metadata_read(reader, request),
         ) => match result {
-            Ok((reader, Ok(page))) => {
+            Ok((reader, Ok(MetadataReply::Page(page)))) => {
+                state.busy = false;
                 state.reader = Some(reader);
                 Ok(Some((state, page)))
+            }
+            Ok((reader, Ok(MetadataReply::Busy))) => {
+                state.busy = true;
+                state.reader = Some(reader);
+                Ok(Some((state, None)))
             }
             Ok((reader, Err(_))) => {
                 stop_location_runtime(Some(reader)).await?;
@@ -1263,10 +1270,7 @@ pub(crate) async fn close_metadata_reader(
 async fn exchange_metadata_read(
     mut reader: LocationCompiler,
     request: Vec<u8>,
-) -> (
-    LocationCompiler,
-    Result<Option<WarehouseHistoryPage>, ControlError>,
-) {
+) -> (LocationCompiler, Result<MetadataReply, ControlError>) {
     let result = async {
         reader.stdin.write_all(&request).await?;
         reader.stdin.write_all(b"\n").await?;
@@ -1286,7 +1290,13 @@ async fn exchange_metadata_read(
                 "location reply exceeds its byte limit".into(),
             ));
         }
-        serde_json::from_str(&line)
+        let reply: serde_json::Value = serde_json::from_str(&line)
+            .map_err(|_| ControlError::Invalid("invalid location reply".into()))?;
+        if reply.get("busy") == Some(&serde_json::Value::Bool(true)) {
+            return Ok(MetadataReply::Busy);
+        }
+        serde_json::from_value(reply)
+            .map(MetadataReply::Page)
             .map_err(|_| ControlError::Invalid("invalid location reply".into()))
     }
     .await;

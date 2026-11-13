@@ -47,6 +47,8 @@ pub enum WarehouseSyncFailure {
     Watermark,
     Read,
     Delivery,
+    /// Another process, such as a DuckDB build, holds the warehouse file; the sync waits for it.
+    Busy,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

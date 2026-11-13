@@ -14,3 +14,6 @@ pub(crate) const COMMAND_IMPLEMENTATIONS: [(RunCommand, &str); 5] = [
     (RunCommand::Audit, "run_audit_command"),
     (RunCommand::Freshness, "run_freshness_command"),
 ];
+
+/// DuckDB's message when another process, such as a running build, holds the database file.
+pub(crate) const DUCKDB_LOCK_CONFLICT: &str = "Conflicting lock is held";

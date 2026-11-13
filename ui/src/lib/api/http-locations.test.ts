@@ -57,7 +57,7 @@ describe('toLocationDetail', () => {
 });
 
 describe('warehouseSyncOf', () => {
-	const sync = (at: string, table: 'catalog' | 'statistics', failure: 'read' | 'delivery' | null) => ({
+	const sync = (at: string, table: 'catalog' | 'statistics', failure: 'read' | 'delivery' | 'busy' | null) => ({
 		received_at: at,
 		report: { event_id: at, session_id: 's1', target: 'development', health: { kind: 'warehouse_sync' as const, generation: 1, location: { schema: 'main' }, table, failure, records_sent: 0, elapsed_millis: 5 } }
 	});
@@ -89,6 +89,13 @@ describe('warehouseSyncOf', () => {
 			['catalog', '2026-11-08T12:02:00Z', null, '2026-11-08T12:02:00Z'],
 			['statistics', '2026-11-08T12:03:00Z', 'Failed while reading the warehouse', '2026-11-08T12:01:00Z']
 		]);
+	});
+
+	it('shows a build holding the warehouse file as a wait, not a failure', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const observations = [sync('2026-11-08T12:03:00Z', 'catalog', 'busy'), sync('2026-11-08T12:01:00Z', 'catalog', null)];
+		expect(toWarehouseConnection(location, observations).tables.map((t) => [t.failure, t.lastSyncedAt])).toEqual([['Waiting for a build that holds the warehouse file', '2026-11-08T12:01:00Z']]);
+		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z' });
 	});
 
 	it('clears the error once the failing table syncs again', () => {
