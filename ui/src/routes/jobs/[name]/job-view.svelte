@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Loading from '$lib/components/loading.svelte';
-	import { to } from '$lib/paths';
+	import { openRow, to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { Trigger } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -256,7 +256,7 @@
 						</thead>
 						<tbody>
 							{#each runs as r (r.id)}
-								<tr onclick={() => goto(to(`/runs/${r.id}`))}>
+								<tr onclick={(e) => openRow(e, `/runs/${r.id}`)}>
 									<td><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
 									<td><a href={to(`/runs/${r.id}`)} class="mono" title={r.id}>{shortRunId(r.id)}</a>{#if r.narrowing}<span class="part" title="Ran part of the job: sqb build {narrowingText(r.narrowing)}">part</span>{/if}</td>
 									<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>

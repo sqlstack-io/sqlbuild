@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { to } from '$lib/paths';
+	import { openRow, to } from '$lib/paths';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -108,19 +108,19 @@
 		<tbody>
 			{#each filtered as c (c.id)}
 				{@const o = outcomeOf(c)}
-				<tr onclick={() => goto(to(`/checks/${c.id}`))}>
+				<tr onclick={(e) => openRow(e, `/checks/${c.id}`)}>
 					<td>
 						<div class="cell-name">
 							<ShieldCheckIcon size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								<a href={to(`/checks/${c.id}`)} class="check-name" onclick={(e) => e.stopPropagation()}>{c.name}</a>
+								<a href={to(`/checks/${c.id}`)} class="check-name">{c.name}</a>
 								<div class="cell-desc">{kindLabel(c)}</div>
 							</div>
 						</div>
 					</td>
 					<td><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /></td>
 					<td>
-						{#if c.node}{#if linksNodes}<a href={to(`/catalog/${c.node}`)} class="link" onclick={(e) => e.stopPropagation()}>{c.node}</a>{:else}<span>{c.node}</span>{/if}{#if c.column}<span class="muted">.{c.column}</span>{/if}
+						{#if c.node}{#if linksNodes}<a href={to(`/catalog/${c.node}`)} class="link">{c.node}</a>{:else}<span>{c.node}</span>{/if}{#if c.column}<span class="muted">.{c.column}</span>{/if}
 						{:else}<span class="muted">{attachmentLabel[c.attachment]}</span>{/if}
 					</td>
 					<td class="muted capitalize">{c.severity}</td>
