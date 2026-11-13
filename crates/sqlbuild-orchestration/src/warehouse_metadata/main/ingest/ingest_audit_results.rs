@@ -26,7 +26,6 @@ pub async fn ingest_audit_results(
             records
                 .iter()
                 .map(|record| StateEventImport {
-                    source_id: record.result_id.clone(),
                     location: WarehouseStateLocation {
                         database: record.state_database.clone(),
                         schema: record.state_schema.clone(),

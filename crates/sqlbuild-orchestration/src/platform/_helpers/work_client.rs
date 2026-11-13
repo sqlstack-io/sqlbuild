@@ -10,8 +10,9 @@ use crate::platform::models::{
     LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
-    MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
-    WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse, WarehouseWatermarkRead,
+    MetadataBatch, MetadataKeyPage, MetadataKeyPageResponse, PreviewCopy, PreviewCopyRead,
+    StatisticsDueRead, StatisticsRead, WarehouseSyncDue, WarehouseSyncDueRead,
+    WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
@@ -71,6 +72,15 @@ impl LocationWorkClient {
         batch: &MetadataBatch,
     ) -> Result<WarehouseSyncResponse, ClientError> {
         self.post_metadata((target, None), batch).await
+    }
+
+    /// Marks the scan's rows the mirror holds and returns the positions of those it lacks.
+    pub async fn match_metadata_keys(
+        &self,
+        target: &str,
+        page: &MetadataKeyPage,
+    ) -> Result<MetadataKeyPageResponse, ClientError> {
+        self.post_metadata((target, Some("keys")), page).await
     }
 
     async fn post_metadata<T: serde::de::DeserializeOwned>(

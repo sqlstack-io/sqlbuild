@@ -21,14 +21,15 @@ use crate::warehouse_metadata::main::ingest::ingest_observations::ingest_observa
 use crate::warehouse_metadata::main::ingest::ingest_old_name_views::ingest_old_name_views;
 use crate::warehouse_metadata::main::ingest::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::main::ingest::ingest_statistics::ingest_statistics;
+use crate::warehouse_metadata::main::ingest::match_keys::match_keys;
 use crate::warehouse_metadata::main::location_reads::read_preview_copy::read_preview_copy;
 use crate::warehouse_metadata::main::location_reads::read_statistics_due::read_statistics_due;
 use crate::warehouse_metadata::main::location_reads::read_sync_due::read_sync_due;
 use crate::warehouse_metadata::main::location_reads::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
-    MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
-    WarehouseHistoryKind, WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse,
-    WarehouseWatermarkRead,
+    MetadataBatch, MetadataKeyPage, MetadataKeyPageResponse, PreviewCopy, PreviewCopyRead,
+    StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseSyncDue,
+    WarehouseSyncDueRead, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata", operation_id = "report_metadata",
@@ -64,6 +65,23 @@ pub(crate) async fn report(
         WarehouseHistoryKind::Statistics => ingest_statistics(&store, scope, &batch).await,
     }?;
     Ok(Json(response))
+}
+
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/keys", operation_id = "match_metadata_keys",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = MetadataKeyPage,
+    responses((status = 200, body = MetadataKeyPageResponse), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized"),
+        (status = 409, description = "Reader generation fenced")), security(("bearer" = [])))]
+pub(crate) async fn keys(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Json(page): Json<MetadataKeyPage>,
+) -> Result<Json<MetadataKeyPageResponse>, ApiError> {
+    require_location(&identity, location_id)?;
+    Ok(Json(
+        match_keys(&store, (location_id, &target), &page).await?,
+    ))
 }
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/statistics-due",

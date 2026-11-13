@@ -1,7 +1,6 @@
 //! Mirror node outcomes; rows carry no event identity, so their identity columns derive one.
 
 use serde_json::json;
-use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::store::errors::ControlError;
@@ -27,20 +26,6 @@ pub async fn ingest_node_results(
             records
                 .iter()
                 .map(|record| StateEventImport {
-                    source_id: sha256_hex(
-                        json!([
-                            record.node_type,
-                            record.node_name,
-                            record.target_database,
-                            record.target_schema,
-                            record.target_name,
-                            record.run_id,
-                            record.status,
-                            record.ts,
-                        ])
-                        .to_string()
-                        .as_bytes(),
-                    ),
                     location: WarehouseStateLocation {
                         database: record.state_database.clone(),
                         schema: record.state_schema.clone(),

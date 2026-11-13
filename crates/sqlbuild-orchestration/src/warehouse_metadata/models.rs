@@ -528,6 +528,26 @@ pub struct MetadataBatch {
     pub scan: Option<MetadataScan>,
 }
 
+/// One page of a reconcile scan's row keys: the mirror marks the rows it holds as seen by the scan.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MetadataKeyPage {
+    pub kind: WarehouseHistoryKind,
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub scan: MetadataScan,
+    /// Each row's key columns, as the full record carries them.
+    #[schema(value_type = Vec<Object>)]
+    pub keys: Vec<serde_json::Value>,
+}
+
+/// The positions in a key page of the rows the mirror lacks; the location sends those rows in full.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MetadataKeyPageResponse {
+    pub missing: Vec<usize>,
+}
+
 /// A full scan's complete page removes the namespace's rows that the scan did not deliver.
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -641,7 +661,6 @@ pub struct WarehouseHistoryPage {
 /// Typed import columns are selected by code, never from location-supplied field names.
 #[derive(Debug)]
 pub(crate) struct StateEventImport {
-    pub source_id: String,
     pub location: WarehouseStateLocation,
     pub observed_at: DateTime<Utc>,
     pub columns: Vec<(&'static str, crate::store::models::Parameter)>,
