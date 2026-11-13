@@ -15,6 +15,7 @@ from typing import Any
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
+import duckdb
 import pytest
 
 from sqlbuild._native import (
@@ -1141,21 +1142,8 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                 assert location.poll() is None, log.read_text()
                 assert time.monotonic() < deadline, log.read_text()
                 time.sleep(0.05)
-            lock: Any = None
             for availability in fixture["availability"]:
-                if test_case.adapter_name not in availability.get(
-                    "adapters", [test_case.adapter_name]
-                ):
-                    continue
-                if lock is not None:
-                    lock.close()
-                    lock = None
-                if "source" in availability:
-                    _ = (project / availability["source"]).rename(
-                        project / availability["destination"]
-                    )
-                if availability.get("hold_write_lock"):
-                    lock = hold_write_lock(project / "warehouse.db")
+                _ = (project / availability["source"]).rename(project / availability["destination"])
                 record_finished_run(control)
                 reports = wait_for_warehouse_sync_health(
                     api, availability, location, log, after=observed_health_at
@@ -1164,8 +1152,27 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                     datetime.fromisoformat(report["received_at"]) for report in reports
                 )
                 assert (project / "warehouse.db").exists() == availability["available"]
-            if test_case.adapter_name == "duckdb":
-                assert log.read_text().count("Warehouse file is in use by another process") == 1
+            held_locks: list[dict[str, Any]] = fixture["held_write_lock"][test_case.adapter_name]
+            for held_lock in held_locks:
+                lock: duckdb.DuckDBPyConnection = hold_write_lock(project / "warehouse.db")
+                record_finished_run(control)
+                reports = wait_for_warehouse_sync_health(
+                    api, held_lock["held"], location, log, after=observed_health_at
+                )
+                observed_health_at = max(
+                    datetime.fromisoformat(report["received_at"]) for report in reports
+                )
+                lock.close()
+                record_finished_run(control)
+                reports = wait_for_warehouse_sync_health(
+                    api, held_lock["released"], location, log, after=observed_health_at
+                )
+                observed_health_at = max(
+                    datetime.fromisoformat(report["received_at"]) for report in reports
+                )
+            assert log.read_text().count("Warehouse file is in use by another process") == len(
+                held_locks
+            )
 
 
 @pytest.mark.parametrize(

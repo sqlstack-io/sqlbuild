@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_cli::native_commands::main::sync_after_build::sync_after_build;
+use sqlbuild_cli::person_login::main::sync_after_build::sync_after_build;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, within};

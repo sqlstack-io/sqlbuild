@@ -5,12 +5,14 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 
 use chrono::Utc;
 use sqlbuild_config::project::models::ControlConfig;
+use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::native_commands::_helpers::execution::{metadata_sync, safety_sync_seconds};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
-    MetadataRetryTestCase, SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
+    MetadataRetryTestCase, SafetySyncIdleTestCase, SafetySyncSettingTestCase,
+    SyncCoalescingTestCase, UnchangedScanTestCase,
 };
 
 #[test]
@@ -176,7 +178,7 @@ fn given_signals_during_a_sync_when_it_completes_then_exactly_one_follow_up_sync
             requests: 4,
             run_ends_during_sync: true,
             safety_seconds: 1800,
-            safety_passes_during_sync: false,
+            safety_due_after_seconds: 3600,
             expected_follow_ups: 1,
         },
         SyncCoalescingTestCase {
@@ -184,7 +186,7 @@ fn given_signals_during_a_sync_when_it_completes_then_exactly_one_follow_up_sync
             requests: 2,
             run_ends_during_sync: false,
             safety_seconds: 1800,
-            safety_passes_during_sync: true,
+            safety_due_after_seconds: 0,
             expected_follow_ups: 1,
         },
         SyncCoalescingTestCase {
@@ -192,7 +194,7 @@ fn given_signals_during_a_sync_when_it_completes_then_exactly_one_follow_up_sync
             requests: 0,
             run_ends_during_sync: false,
             safety_seconds: 1800,
-            safety_passes_during_sync: true,
+            safety_due_after_seconds: 0,
             expected_follow_ups: 0,
         },
         SyncCoalescingTestCase {
@@ -200,7 +202,7 @@ fn given_signals_during_a_sync_when_it_completes_then_exactly_one_follow_up_sync
             requests: 0,
             run_ends_during_sync: false,
             safety_seconds: 1800,
-            safety_passes_during_sync: false,
+            safety_due_after_seconds: 3600,
             expected_follow_ups: 0,
         },
     ];
@@ -219,23 +221,26 @@ fn given_signals_during_a_sync_when_it_completes_then_exactly_one_follow_up_sync
         let runs_ended_at = test_case
             .run_ends_during_sync
             .then(|| started + chrono::Duration::seconds(1));
-        if test_case.safety_passes_during_sync {
-            state.safety_at = Instant::now();
-        }
+        state.safety_at = Instant::now() + Duration::from_secs(test_case.safety_due_after_seconds);
         state = acknowledge_complete_pages(state, WarehouseHistoryKind::ALL.len());
         assert!(
             state.idle,
             "{}: the first sync completed",
             test_case.description
         );
-        let mut follow_ups = 0;
-        for poll in 1..=5 {
-            if state.sync_due(runs_ended_at) {
-                follow_ups += 1;
-                state.begin_sync(started + chrono::Duration::seconds(10 * poll));
-                state = acknowledge_complete_pages(state, WarehouseHistoryKind::ALL.len());
-            }
-        }
+        let mut polled = Some(state);
+        let follow_ups = (1..=5)
+            .take_while(|poll| {
+                let mut current = polled.take().expect("one state between polls");
+                let due = current.sync_due(runs_ended_at);
+                current.begin_sync(started + chrono::Duration::seconds(10 * poll));
+                polled = Some(acknowledge_complete_pages(
+                    current,
+                    WarehouseHistoryKind::ALL.len(),
+                ));
+                due
+            })
+            .count();
         assert_eq!(
             follow_ups, test_case.expected_follow_ups,
             "{}",
@@ -246,19 +251,38 @@ fn given_signals_during_a_sync_when_it_completes_then_exactly_one_follow_up_sync
 
 #[test]
 fn given_an_idle_location_when_the_safety_interval_passes_then_it_syncs_unless_turned_off() {
+    let test_cases = [
+        SafetySyncIdleTestCase {
+            description: "the interval passed while idle",
+            safety_seconds: 1800,
+            safety_due_after_seconds: 0,
+            expected_sync_due: true,
+        },
+        SafetySyncIdleTestCase {
+            description: "the interval has not passed",
+            safety_seconds: 1800,
+            safety_due_after_seconds: 3600,
+            expected_sync_due: false,
+        },
+        SafetySyncIdleTestCase {
+            description: "0 turns safety syncs off",
+            safety_seconds: 0,
+            safety_due_after_seconds: 0,
+            expected_sync_due: false,
+        },
+    ];
     let started = Utc::now();
-    for (description, safety_seconds, passed, expected) in [
-        ("the interval passed while idle", 1800, true, true),
-        ("the interval has not passed", 1800, false, false),
-        ("0 turns safety syncs off", 0, true, false),
-    ] {
-        let mut state = metadata_sync((one_location(), 1), (3600, safety_seconds));
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
         state.begin_sync(started);
         state = acknowledge_complete_pages(state, WarehouseHistoryKind::ALL.len());
-        if passed {
-            state.safety_at = Instant::now();
-        }
-        assert_eq!(state.sync_due(None), expected, "{description}");
+        state.safety_at = Instant::now() + Duration::from_secs(test_case.safety_due_after_seconds);
+        assert_eq!(
+            state.sync_due(None),
+            test_case.expected_sync_due,
+            "{}",
+            test_case.description
+        );
     }
 }
 
@@ -270,50 +294,52 @@ fn given_safety_sync_settings_when_resolving_then_flag_beats_environment_beats_p
             flag: None,
             environment: None,
             project: None,
-            expected: Ok(1800),
+            expected_seconds: Ok(1800),
         },
         SafetySyncSettingTestCase {
             description: "the project file sets it",
             flag: None,
             environment: None,
             project: Some(3600),
-            expected: Ok(3600),
+            expected_seconds: Ok(3600),
         },
         SafetySyncSettingTestCase {
             description: "the environment overrides the project file",
             flag: None,
             environment: Some("2h"),
             project: Some(3600),
-            expected: Ok(7200),
+            expected_seconds: Ok(7200),
         },
         SafetySyncSettingTestCase {
             description: "a blank environment value falls through to the project file",
             flag: None,
             environment: Some(" "),
             project: Some(3600),
-            expected: Ok(3600),
+            expected_seconds: Ok(3600),
         },
         SafetySyncSettingTestCase {
             description: "the flag overrides the environment",
             flag: Some("off"),
             environment: Some("2h"),
             project: Some(3600),
-            expected: Ok(0),
+            expected_seconds: Ok(0),
         },
         SafetySyncSettingTestCase {
             description: "a flag under a minute is refused",
             flag: Some("30s"),
             environment: None,
             project: None,
-            expected: Err("--sync-at-least-every must be a duration of at least '1m'"),
+            expected_seconds: Err(
+                "--sync-at-least-every must be a duration of at least '1m' such as '30m', or '0' or 'off' to turn safety syncs off",
+            ),
         },
         SafetySyncSettingTestCase {
             description: "an unparseable environment value is refused",
             flag: None,
             environment: Some("-5m"),
             project: None,
-            expected: Err(
-                "SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY must be a duration of at least '1m'",
+            expected_seconds: Err(
+                "SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY must be a duration of at least '1m' such as '30m', or '0' or 'off' to turn safety syncs off",
             ),
         },
     ];
@@ -324,19 +350,11 @@ fn given_safety_sync_settings_when_resolving_then_flag_beats_environment_beats_p
                 ..ControlConfig::default()
             })
         });
-        match (resolved, test_case.expected) {
-            (Ok(seconds), Ok(expected)) => {
-                assert_eq!(seconds, expected, "{}", test_case.description);
-            }
-            (Err(message), Err(fragment)) => assert!(
-                message.starts_with(fragment),
-                "{}: {message}",
-                test_case.description
-            ),
-            (resolved, expected) => panic!(
-                "{}: resolved {resolved:?}, expected {expected:?}",
-                test_case.description
-            ),
-        }
+        assert_eq!(
+            resolved,
+            test_case.expected_seconds.map_err(str::to_owned),
+            "{}",
+            test_case.description
+        );
     }
 }

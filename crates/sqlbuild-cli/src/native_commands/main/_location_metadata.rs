@@ -78,25 +78,7 @@ pub(super) async fn sync_location_metadata(
         };
         state = read;
         let Some(page) = page else {
-            let failure = if state.busy {
-                WarehouseSyncFailure::Busy
-            } else {
-                WarehouseSyncFailure::Read
-            };
-            tokio::select! {
-                result = &mut stopped => { result?; return Ok(None); },
-                () = metadata_health(&state, (client, poll), (started, Some(failure))) => {},
-            }
-            if state.busy {
-                state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
-                return Ok(Some(state));
-            }
-            state.retry_read();
-            drop(write_output(&[(
-                Stream::Stderr,
-                "Warehouse history read failed; retaining mirror and retrying a bounded page.\n",
-            )]));
-            return Ok(Some(state));
+            return failed_read(state, (client, poll), started, stopped.as_mut()).await;
         };
         if location_inputs(&options.project_dir, &watch.rules, &watch.local_files) != watch.observed
         {
@@ -130,6 +112,34 @@ pub(super) async fn sync_location_metadata(
         () = metadata_health(&state, (client, poll), (started, None)) => {},
     }
     finish_metadata_page(acknowledge_metadata_page(state)).await
+}
+
+/// A busy warehouse file waits a poll interval; any other failed read retries a smaller page.
+async fn failed_read(
+    mut state: LocationMetadataSync,
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    started: Instant,
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<LocationMetadataSync>, ControlError> {
+    let failure = if state.busy {
+        WarehouseSyncFailure::Busy
+    } else {
+        WarehouseSyncFailure::Read
+    };
+    tokio::select! {
+        result = stopped => { result?; return Ok(None); },
+        () = metadata_health(&state, (client, poll), (started, Some(failure))) => {},
+    }
+    if state.busy {
+        state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+        return Ok(Some(state));
+    }
+    state.retry_read();
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Warehouse history read failed; retaining mirror and retrying a bounded page.\n",
+    )]));
+    Ok(Some(state))
 }
 
 fn retry_metadata(

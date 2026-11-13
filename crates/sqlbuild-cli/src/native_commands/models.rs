@@ -258,8 +258,7 @@ impl LocationMetadataSync {
         }
     }
 
-    /// Whether an idle location starts a sync: never synced, asked to, a run ended since the last
-    /// one began, or the safety interval passed. Each is one outstanding sync, never a second one.
+    /// Whether an idle location starts its one outstanding sync: first, requested, after a run, or safety.
     pub(crate) fn sync_due(&self, runs_ended_at: Option<DateTime<Utc>>) -> bool {
         let ran = match (self.cycle_started_at, runs_ended_at) {
             (None, _) => true,

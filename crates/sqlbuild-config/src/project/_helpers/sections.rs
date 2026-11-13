@@ -579,11 +579,10 @@ pub(crate) fn sync_interval(text: &str) -> Result<u64, &'static str> {
     if SYNC_INTERVAL_OFF.contains(&text) {
         return Ok(0);
     }
-    let seconds: u64 = fixed_duration_seconds(text, false)
-        .ok()
-        .flatten()
-        .and_then(|seconds| seconds.parse().ok())
-        .ok_or(SYNC_INTERVAL_HELP)?;
+    let seconds: u64 = match fixed_duration_seconds(text, false) {
+        Ok(Some(seconds)) => seconds.parse().map_err(|_| SYNC_INTERVAL_HELP)?,
+        Ok(None) | Err(_) => return Err(SYNC_INTERVAL_HELP),
+    };
     if seconds < MIN_SYNC_INTERVAL_SECONDS {
         return Err(SYNC_INTERVAL_HELP);
     }

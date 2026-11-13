@@ -13,10 +13,17 @@
   "health": {"failure": null, "tables": ["fingerprints", "source_freshness"]},
   "availability": [
     {"available": false, "source": "warehouse.db", "destination": "../retained-warehouse.db", "failure": "read", "tables": ["fingerprints"]},
-    {"available": true, "source": "../retained-warehouse.db", "destination": "warehouse.db", "failure": null, "tables": ["fingerprints", "source_freshness"]},
-    {"available": true, "hold_write_lock": true, "adapters": ["duckdb"], "failure": "busy", "tables": ["source_freshness"]},
-    {"available": true, "adapters": ["duckdb"], "failure": null, "tables": ["fingerprints", "source_freshness"]}
+    {"available": true, "source": "../retained-warehouse.db", "destination": "warehouse.db", "failure": null, "tables": ["fingerprints", "source_freshness"]}
   ],
+  "held_write_lock": {
+    "duckdb": [
+      {
+        "held": {"failure": "busy", "tables": ["source_freshness"]},
+        "released": {"failure": null, "tables": ["fingerprints", "source_freshness"]}
+      }
+    ],
+    "sqlite": []
+  },
   "insert_sql": [
     "INSERT INTO _sqlbuild_fingerprints SELECT node_type,node_name,target_database,target_schema,target_name,'{run_id}',definition_hash,version_hash,schema_fingerprint,definition_b64,metadata_json_b64,'{observed_at}' FROM _sqlbuild_fingerprints WHERE run_id='legacy-run'",
     "INSERT INTO _sqlbuild_source_freshness SELECT source_name,target_database,target_schema,target_name,'{run_id}',strategy,value_kind,data_version,data_version_hash,'{observed_at}' FROM _sqlbuild_source_freshness WHERE run_id='legacy-run'"

@@ -1,5 +1,4 @@
-//! Named work requires a trusted owner or live person authority; retries preserve the original pin.
-//! A sync request while one is still pending for the target is already applied: one sync covers both.
+//! Named work requires a trusted owner or live person authority; a pending sync covers a repeated one.
 
 use chrono::Duration;
 use uuid::Uuid;

@@ -57,17 +57,17 @@ pub(super) struct PersonClient {
 }
 
 /// The parts of `GET /api/control/bootstrap` that name the location targets a person can view.
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub(super) struct Bootstrap {
     pub(super) access: BootstrapAccess,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub(super) struct BootstrapAccess {
     pub(super) locations: Vec<LocationTarget>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub(super) struct LocationTarget {
     pub(super) location_id: uuid::Uuid,
     pub(super) name: String,

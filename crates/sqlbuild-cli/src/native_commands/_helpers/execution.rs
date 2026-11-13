@@ -701,9 +701,18 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
                 "SQLBUILD_METADATA_RECONCILE_SECONDS must be a positive integer".into(),
             )
         })?;
+    let environment = match std::env::var(SAFETY_SYNC_ENV) {
+        Ok(value) => Some(value),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(std::env::VarError::NotUnicode(_)) => {
+            return Err(ControlError::Invalid(format!(
+                "{SAFETY_SYNC_ENV} must be text"
+            )));
+        }
+    };
     let safety_sync_seconds = safety_sync_seconds(
         text(namespace, "location_sync_at_least_every").as_deref(),
-        std::env::var(SAFETY_SYNC_ENV).ok().as_deref(),
+        environment.as_deref(),
         || {
             load_control_config(&project_config_paths(&project_dir)).map_err(|failure| {
                 failure.into_config_failure().map_or_else(
@@ -725,8 +734,7 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
     })
 }
 
-/// The safety sync interval: `--sync-at-least-every`, then the environment, then
-/// `[control] sync_at_least_every`, then thirty minutes; the project is read only when needed.
+/// The safety sync interval from the flag, then the environment, then the project, then thirty minutes.
 pub(crate) fn safety_sync_seconds(
     flag: Option<&str>,
     environment: Option<&str>,
