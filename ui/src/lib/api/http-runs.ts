@@ -103,7 +103,7 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		locationId,
 		target: wire.target,
 		snapshotId: wire.snapshot_id,
-		gitRevision: null,
+		gitRevision: wire.git_revision ?? null,
 		queuedAt: wire.queued_at,
 		launchedAt: wire.launched_at ?? null,
 		startedAt: wire.started_at ?? null,
@@ -292,7 +292,20 @@ export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], no
 		invocations: [],
 		liveness: null,
 		cancel: null,
-		provenance: null,
+		provenance:
+			wire.snapshot_generation != null
+				? {
+						snapshotId: wire.snapshot_id,
+						snapshotGeneration: wire.snapshot_generation,
+						gitRevision: wire.git_revision ?? null,
+						gitDirty: wire.git_dirty ?? false,
+						imageId: wire.image_id ?? null,
+						sqbVersion: wire.sqb_version ?? '',
+						selection: wire.selection_json,
+						exclude: [],
+						command: null
+					}
+				: null,
 		selection: wire.selection_json,
 		waits: [],
 		rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped').map((n) => n.nodeKey),
@@ -387,8 +400,8 @@ export function toRunStatements(wire: Wire['RunStatementRecord'][], runId: strin
 
 /** Captured lines and error text in time order; error text reads as stderr of its invocation. */
 export function toRunOutput(wire: Wire['RunOutput']): RunOutputLine[] {
-	const lines: RunOutputLine[] = wire.lines.map((l) => ({ invocationId: l.invocation_id, stream: l.stream === 'stderr' ? 'stderr' : 'stdout', at: l.occurred_at, text: l.text }));
-	const errors: RunOutputLine[] = wire.errors.map((e) => ({ invocationId: e.invocation_id, stream: 'stderr', at: e.occurred_at ?? '', text: e.message }));
+	const lines: RunOutputLine[] = wire.lines.map((l) => ({ invocationId: l.invocation_id, stream: l.stream === 'stderr' ? 'stderr' : 'stdout', at: l.occurred_at, text: l.text, error: false }));
+	const errors: RunOutputLine[] = wire.errors.map((e) => ({ invocationId: e.invocation_id, stream: 'stderr', at: e.occurred_at ?? '', text: e.message, error: true }));
 	return [...lines, ...errors].sort((a, b) => a.at.localeCompare(b.at));
 }
 

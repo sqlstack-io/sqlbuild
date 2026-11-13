@@ -43,19 +43,28 @@
 			</ul>
 		</div>
 	{/if}
-	{#if view.showDetails}
+	<!-- A long selection folds behind its count, so the rest of the details stay in view. -->
+{#snippet selection(keys: string[])}
+	{#if keys.length > 12}
+		<details><summary>{keys.length} nodes</summary><code>{keys.join(' ')}</code></details>
+	{:else}
+		<code>{keys.join(' ') || '—'}</code>
+	{/if}
+{/snippet}
+
+{#if view.showDetails}
 		{@const p = d.provenance}
 		<div class="details">
 			<dl>
 				{#if p}
-				<div><dt>Project version</dt><dd>Version {p.snapshotGeneration} · commit <code>{p.gitRevision}</code>{p.gitDirty ? ' (with uncommitted changes)' : ''} <span class="faint">· snapshot <code>{p.snapshotId}</code></span></dd></div>
-				<div><dt>Command</dt><dd><code>{p.command}</code> <CopyButton value={p.command} label="Copy command" /></dd></div>
+				<div><dt>Project version</dt><dd>Version {p.snapshotGeneration}{#if p.gitRevision} · commit <code>{p.gitRevision}</code>{/if}{p.gitDirty ? ' (with uncommitted changes)' : ''} <span class="faint">· snapshot <code>{p.snapshotId}</code></span></dd></div>
+				{#if p.command}<div><dt>Command</dt><dd><code>{p.command}</code> <CopyButton value={p.command} label="Copy command" /></dd></div>{/if}
 				{#if p.selection.length || p.exclude.length}
-					<div><dt>Selection</dt><dd><code>{p.selection.join(' ') || '—'}</code>{#if p.exclude.length} excluding <code>{p.exclude.join(' ')}</code>{/if}</dd></div>
+					<div><dt>Selection</dt><dd>{@render selection(p.selection)}{#if p.exclude.length} excluding <code>{p.exclude.join(' ')}</code>{/if}</dd></div>
 				{/if}
-				<div><dt>Image</dt><dd><code title={p.imageId}>{shortImage(p.imageId)}</code> · sqb {p.sqbVersion}</dd></div>
+				<div><dt>{p.imageId ? 'Image' : 'Published by'}</dt><dd>{#if p.imageId}<code title={p.imageId}>{shortImage(p.imageId)}</code> · {/if}sqb {p.sqbVersion}</dd></div>
 				{:else if d.selection.length}
-				<div><dt>Selection</dt><dd><code>{d.selection.join(' ')}</code></dd></div>
+				<div><dt>Selection</dt><dd>{@render selection(d.selection)}</dd></div>
 				{/if}
 				<div><dt>Rebuilds history</dt><dd>{d.run.rewriteHistory ? 'Yes: a full refresh or a set time window, so it needs extra permission to rerun' : 'No'}</dd></div>
 				<div><dt>Priority</dt><dd>{d.run.priority}</dd></div>
@@ -156,6 +165,11 @@
 	}
 	dt {
 		color: var(--muted-foreground);
+	}
+	summary {
+		width: fit-content;
+		color: var(--primary);
+		cursor: pointer;
 	}
 	table {
 		margin-top: 10px;
