@@ -15,6 +15,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Grant roles to OIDC groups (beta)
 - Inspect published SQL
 - Sync from the warehouse now
+- Skip overlapping runs and retry failures
 - Run ad-hoc commands
 - Plan builds
 - Define project roles
@@ -147,7 +148,7 @@ snapshot only when no retained run, job, trigger, trigger change or location req
 deletes its node definitions and SQL text when no other snapshot shares them. Repeating or
 interrupting this cleanup is safe.
 
-The scheduler deletes covered ticks older than 30 days. It keeps each trigger's latest tick and
+The scheduler deletes covered and skipped ticks older than 30 days. It keeps each trigger's latest tick and
 every tick that started a run. A new schedule, a resumed trigger or a cursor reset catches up only
 on the latest missed time, so deleted ticks never come back.
 
@@ -286,6 +287,45 @@ Details:
 - A sync reads the warehouse and never writes to it. On Snowflake, it skips state tables that
   haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
+
+## Skip overlapping runs and retry failures
+
+Declare who owns a job, whether scheduled requests wait for a running copy, and how often a failed
+run retries:
+
+```python
+from sqlbuild.orchestration import job, on_failure, schedule
+
+nightly_orders = job(
+    "nightly_orders",
+    description="Orders and their daily totals",
+    select="+order_totals",
+    owner="Orders team",
+    overlap="skip",
+    on_failure=on_failure(retries=2, retry_delay_seconds=600),
+    schedule=schedule(cron="0 2 * * *", timezone="UTC"),
+)
+```
+
+| Setting | Values | Default | Effect |
+| --- | --- | --- | --- |
+| `owner` | Any non-blank text | None | Shown on the job's page and in the job list |
+| `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
+| `on_failure` | `retries` from 1 to 10, `retry_delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or the retries run out |
+
+A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to. A sensor
+check lists the requests it skipped the same way. Neither creates a run.
+
+Details:
+
+- Runs people start, reruns and backfills always queue, whatever the job's `overlap`.
+- A tick that makes up for missed times while the scheduler was down still queues.
+- A retry waits in the queue until its delay ends, and the run list shows it as a rerun of the run
+  that failed. Cancelling a run stops its retries.
+- A group retries as a whole with the group's own `on_failure`. A member job's `on_failure`
+  applies only when that job runs on its own.
+- An invalid value fails publication with the job's name, such as
+  `job nightly_orders overlap must be queue or skip, not coalesce`.
 
 ## Run ad-hoc commands
 

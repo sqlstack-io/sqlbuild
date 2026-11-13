@@ -71,7 +71,7 @@ export const overlapHelp: Record<OverlapPolicy, string> = {
 /** Short plain wording of an overlap policy; the policy name goes in a tooltip. */
 export const overlapPlain: Record<OverlapPolicy, string> = {
 	queue: 'Queue another run',
-	skip: 'Skip scheduled requests'
+	skip: 'Skip if running'
 };
 
 /** A whole delay in its largest exact unit, e.g. 300 → `5 min`, 5400 → `90 min`, 7200 → `2 h`. */
@@ -81,10 +81,17 @@ function delayText(seconds: number): string {
 	return `${seconds} s`;
 }
 
-/** An `on_failure` policy in words, e.g. "Retry twice, 5 min apart". */
+/** An `on_failure` policy in words, e.g. "Retry twice, 5 min apart" or "Retry once after 15 min". */
 export function onFailureText(policy: OnFailure): string {
 	const times = policy.retries === 1 ? 'once' : policy.retries === 2 ? 'twice' : `${policy.retries} times`;
-	return `Retry ${times}, ${policy.retryDelaySeconds ? `${delayText(policy.retryDelaySeconds)} after each failure` : 'straight away'}`;
+	if (!policy.retryDelaySeconds) return `Retry ${times} at once`;
+	const delay = delayText(policy.retryDelaySeconds);
+	return policy.retries === 1 ? `Retry once after ${delay}` : `Retry ${times}, ${delay} apart`;
+}
+
+/** A job's overlap, retries and priority for a list cell; empty when it uses the defaults. */
+export function jobPolicyText(job: { overlap: OverlapPolicy | null; onFailure: OnFailure | null; priority: number | null }): string {
+	return [job.overlap === 'skip' ? overlapPlain.skip : null, job.onFailure ? onFailureText(job.onFailure) : null, job.priority ? `priority ${job.priority}` : null].filter(Boolean).join(' · ');
 }
 
 export type WaitPart = { text: string; href?: string; code?: boolean };

@@ -15,7 +15,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { isActiveRun, isProblemRun, runStatusLabel, runStatusTone } from '$lib/status';
-	import { onFailureText, overlapHelp, overlapPlain } from '$lib/operate/labels';
+	import { jobPolicyText, overlapHelp } from '$lib/operate/labels';
 
 	const jobs = createResource((client, scope) => client.listJobs(scope), ['jobs', 'runs', 'snapshot']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
@@ -51,7 +51,7 @@
 	);
 	const scheduledCount = $derived(all.filter((j) => j.triggerIds.some((id) => triggerById.get(id)?.state === 'running')).length);
 	// Columns the server doesn't report stay hidden rather than showing dashes.
-	const showPolicy = $derived(all.some((j) => j.overlap === 'skip' || j.onFailure !== null));
+	const showPolicy = $derived(all.some((j) => jobPolicyText(j) !== ''));
 	const showOwner = $derived(all.some((j) => j.owner !== null));
 	const showSelection = $derived(all.some((j) => j.select !== null || j.members !== null));
 	const failingCount = $derived(all.filter((j) => j.lastRun && isProblemRun(j.lastRun.status)).length);
@@ -132,7 +132,7 @@
 						</td>
 					{/if}
 					<td class="num muted">{j.nodeCount}</td>
-					{#if showPolicy}<td class="muted nowrap">{#if j.overlap === 'skip'}<span title="{overlapHelp.skip} (overlap = skip)">{overlapPlain.skip}</span>{/if}{#if j.overlap === 'skip' && j.onFailure}<span> · </span>{/if}{#if j.onFailure}<span title="on_failure: up to {j.onFailure.retries} reruns from failure">{onFailureText(j.onFailure)}</span>{/if}{#if !j.onFailure && j.overlap !== 'skip'}—{/if}{#if j.priority}<span title="Higher priority runs go first when they wait for the same slot"> · priority {j.priority}</span>{/if}</td>{/if}
+					{#if showPolicy}<td class="muted nowrap" title={[j.overlap ? `overlap = ${j.overlap}: ${overlapHelp[j.overlap]}` : '', j.onFailure ? `on_failure: retries = ${j.onFailure.retries}, retry_delay = ${j.onFailure.retryDelaySeconds}s` : '', j.priority ? 'Higher priority runs go first when they wait for the same slot' : ''].filter(Boolean).join('\n') || undefined}>{jobPolicyText(j) || '—'}</td>{/if}
 					<td>
 						{#if jobTriggers.length === 0}
 							<span class="muted" title="No schedule or sensor starts it; start it from its page">Only by hand</span>
