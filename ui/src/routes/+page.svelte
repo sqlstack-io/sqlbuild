@@ -198,7 +198,7 @@
 						<div class="metric">
 							<span class="metric-label">Stale</span>
 							<div><strong class="stale-value">{m.stale.nodes}</strong><small>nodes</small></div>
-							<span>{m.stale.changed} changed · {m.stale.behind} behind · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late</span>
+							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late{/if}</span>
 						</div>
 					{/if}
 					{#if m.cost}

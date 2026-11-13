@@ -1439,15 +1439,26 @@ export interface components {
             run_id: string;
             version_hash: string;
         };
+        /** @description `success`, `warn` or `failed`; `run_id` is the scheduler run, null for a newer build outside the scheduler. */
+        CatalogNodeOutcome: {
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            run_id?: string | null;
+            status: string;
+        };
         /** @description A current snapshot node's declared metadata and latest build, without SQL, source or config. */
         CatalogNodeRecord: {
             column_count?: number | null;
+            /** @description The current definition differs from the one `last_build` recorded; false when either is unknown. */
+            definition_changed: boolean;
             /** @description Keys of the nodes this node reads. */
             dependencies: string[];
             description?: string | null;
             /** @description The snapshot node kind, such as `model`, `seed`, `source` or `audit`. */
             kind: string;
             last_build?: null | components["schemas"]["CatalogNodeBuild"];
+            last_outcome?: null | components["schemas"]["CatalogNodeOutcome"];
             materialization?: string | null;
             name: string;
             node_key: string;

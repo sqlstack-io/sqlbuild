@@ -42,8 +42,9 @@ export function problemRunsOf(topLevel: Run[], now: number): Run[] {
 const attentionRun = ({ id, jobKey, kind, status, statusReason, nodeCounts, startedAt, endedAt }: Run): AttentionRun => ({ id, jobKey, kind, status, statusReason, nodeCounts, startedAt, endedAt });
 
 /**
- * The overview from reads the person already has. The server has no project-wide build state, cost
- * or group read yet, so stale counts and group status are null and cost is left out; the page hides them.
+ * The overview from reads the person already has. Staleness comes from the catalog listing, which
+ * does not check source freshness, so late sources stay unknown. The server has no cost or group
+ * read yet, so group status is null and cost is left out; the page hides them.
  */
 export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, now }: OverviewInputs): Overview {
 	const acknowledged = (r: Run) => acknowledgements.get(r.id) ?? null;
@@ -57,6 +58,11 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 			.map((r): AttentionItem => ({ kind: 'run_unresponsive', run: attentionRun(r), lastHeartbeatAt: null, acknowledged: acknowledged(r) })),
 		...events.filter((e) => e.active).map((event): AttentionItem => ({ kind: 'platform_event', event }))
 	];
+	const staleKeys = (test: (reason: string) => boolean) => nodes.filter((n) => n.stale?.some((r) => test(r.reason))).map((n) => n.key);
+	const changed = staleKeys((reason) => reason !== 'behind');
+	const behind = staleKeys((reason) => reason === 'behind');
+	const staleNodes = new Set([...changed, ...behind]).size;
+	if (staleNodes) attention.push({ kind: 'stale_models', changed, behind });
 	const thisWeek = changes.filter((c) => Date.parse(c.publishedAt) >= now - 7 * DAY).flatMap((c) => c.nodes);
 	const latest = topLevel.filter((r) => r.endedAt).sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!))[0];
 	return {
@@ -75,7 +81,7 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 				active: recent.filter((r) => ACTIVE_STATUSES.has(r.status)).length
 			},
 			checks: checkCountsOf(checks),
-			stale: null,
+			stale: { nodes: staleNodes, changed: changed.length, behind: behind.length, sources: null },
 			cost: null
 		},
 		attention,
