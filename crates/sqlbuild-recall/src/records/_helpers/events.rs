@@ -7,6 +7,7 @@ use sqlbuild_core::lifecycle_events::main::catalog::catalog;
 use crate::records::_helpers::rows::{optional_text, text};
 use crate::records::constants::{
     CORRELATION_FIELDS, PROMOTED_INTEGER_FIELDS, PROMOTED_REAL_FIELDS, PROMOTED_TEXT_FIELDS,
+    STARTED_AT_FIELD,
 };
 use crate::records::errors::RecordError;
 use crate::records::models::RecallValue;
@@ -76,6 +77,10 @@ pub(crate) fn envelope_columns(event: &Map<String, Value>) -> Result<Vec<Column>
         ("severity", text(policy.severity.value())),
         ("producer", text(required_text(event, "producer")?)),
         ("event_schema_version", RecallValue::Integer(schema_version)),
+        (
+            STARTED_AT_FIELD,
+            optional_text(event.get(STARTED_AT_FIELD).and_then(Value::as_str)),
+        ),
     ];
     columns.extend(CORRELATION_FIELDS.iter().map(|field| {
         (

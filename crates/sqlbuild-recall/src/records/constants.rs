@@ -16,6 +16,12 @@ pub const AUDIT_EVIDENCE_MEDIA_TYPE: &str = "application/json";
 pub const AUDIT_EVIDENCE_ROLE: &str = "audit_evidence";
 /// The event whose payload may carry evidence rows.
 pub const AUDIT_COMPLETED_EVENT: &str = "audit_completed";
+/// A statement's start, folded into its end's row when both reach the same batch.
+pub const STATEMENT_STARTED_EVENT: &str = "statement_started";
+/// The events that end a statement.
+pub const STATEMENT_TERMINAL_EVENTS: [&str; 2] = ["statement_completed", "statement_failed"];
+/// The event field of a folded end that keeps its statement's start time.
+pub const STARTED_AT_FIELD: &str = "started_at";
 /// The payload field holding evidence rows, which Recall stores as an artifact instead.
 pub const EVIDENCE_PAYLOAD_FIELD: &str = "evidence";
 /// The payload field naming the evidence artifact's digest, without its `sha256:` prefix.

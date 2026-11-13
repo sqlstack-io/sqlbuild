@@ -23,8 +23,13 @@ firsts AS (
     FROM facts
 ),
 started AS (
-    SELECT statement_id, MIN(occurred_at) AS started_at
-    FROM facts WHERE event_type = 'statement_started' GROUP BY statement_id
+    SELECT statement_id, MIN(started_at) AS started_at
+    FROM (
+        SELECT statement_id, occurred_at AS started_at FROM facts WHERE event_type = 'statement_started'
+        UNION ALL
+        SELECT statement_id, started_at FROM facts WHERE started_at IS NOT NULL
+    ) AS starts
+    GROUP BY statement_id
 ),
 submitted AS (
     SELECT statement_id, MIN(occurred_at) AS submitted_at

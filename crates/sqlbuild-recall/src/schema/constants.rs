@@ -3,7 +3,7 @@
 use crate::schema::models::{ColumnSpec, ColumnType, Table, TableSpec};
 
 /// The Recall schema version this build writes. Raise it when a column or view is added.
-pub const RECALL_SCHEMA_VERSION: i64 = 5;
+pub const RECALL_SCHEMA_VERSION: i64 = 6;
 /// Text that only older schema versions wrote into ClickHouse view definitions, with the last version that wrote it. Version 3 changed only view bodies, so view columns cannot tell version 2 views, which set `join_use_nulls`, from current ones.
 pub const SUPERSEDED_CLICKHOUSE_VIEW_MARKERS: [(&str, i64); 1] = [("join_use_nulls", 2)];
 /// The oldest SQLite library the store's views run on (ordered `group_concat`).
@@ -83,7 +83,7 @@ const OUTPUT_COLUMNS: [ColumnSpec; 11] = [
     ColumnSpec::optional("omitted_sequences", ColumnType::Integer),
 ];
 
-const EVENT_COLUMNS: [ColumnSpec; 29] = [
+const EVENT_COLUMNS: [ColumnSpec; 30] = [
     ColumnSpec::required("event_id", ColumnType::Text),
     ColumnSpec::optional("invocation_sequence", ColumnType::Integer),
     ColumnSpec::required("occurred_at", ColumnType::Timestamp),
@@ -113,6 +113,8 @@ const EVENT_COLUMNS: [ColumnSpec; 29] = [
     ColumnSpec::optional("row_count", ColumnType::Integer),
     ColumnSpec::optional("affected_rows", ColumnType::Integer),
     ColumnSpec::required("payload", ColumnType::Json),
+    // A statement end whose start was written with it keeps the start time here instead of a start row.
+    ColumnSpec::optional("started_at", ColumnType::Timestamp),
 ];
 
 const DIAGNOSTIC_COLUMNS: [ColumnSpec; 14] = [

@@ -49,7 +49,7 @@ const INVOCATION_SOURCE_COLUMNS: [(&str, &str, &str); 35] = [
 ];
 
 /// The statement columns each statement event carries into the second fold, in tuple order.
-const STATEMENT_FACT_COLUMNS: [&str; 18] = [
+const STATEMENT_FACT_COLUMNS: [&str; 19] = [
     "statement_id",
     "event_type",
     "occurred_at",
@@ -68,6 +68,7 @@ const STATEMENT_FACT_COLUMNS: [&str; 18] = [
     "row_count",
     "affected_rows",
     "outcome",
+    "started_at",
 ];
 
 /// The columns the `output_invocations` pass reads: the chunk's own values default to what adds nothing to a sum, and the delivery and context values to NULL.
@@ -386,7 +387,8 @@ folded AS (
         argMin(statement_kind, {order}) AS first_statement_kind,
         argMin(purpose, {order}) AS first_purpose,
         argMin(sql_digest, {order}) AS first_sql_digest,
-        minIf(occurred_at, event_type = 'statement_started') AS started_at,
+        coalesce(min(started_at), minIf(occurred_at, event_type = 'statement_started'))
+            AS statement_started_at,
         minIf(occurred_at, event_type = 'statement_submitted') AS submitted_at,
         max(query_id) AS any_query_id,
         countIf({terminal}) > 0 AS has_terminal,
@@ -415,7 +417,7 @@ SELECT
     first_statement_kind AS statement_kind,
     first_purpose AS purpose,
     if(has_terminal, coalesce(last_query_id, any_query_id), any_query_id) AS query_id,
-    started_at,
+    statement_started_at AS started_at,
     submitted_at,
     if(has_terminal, last_ended_at, NULL) AS ended_at,
     multiIf(

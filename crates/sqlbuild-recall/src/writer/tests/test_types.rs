@@ -357,6 +357,11 @@ pub(crate) struct AuditEvidenceTestCase {
     pub(crate) expected_rows: Vec<Vec<RecallValue>>,
 }
 
+pub(crate) struct StatementFoldTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_rows: Vec<Vec<RecallValue>>,
+}
+
 pub(crate) struct FailedStatementTestCase {
     pub(crate) description: &'static str,
     pub(crate) expected_rows: Vec<Vec<RecallValue>>,

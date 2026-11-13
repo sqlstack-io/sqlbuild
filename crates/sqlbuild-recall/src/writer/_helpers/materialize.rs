@@ -1,13 +1,14 @@
 //! Rows of queued input, built on the delivery thread so producers only enqueue.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::{Map, Value};
 
 use crate::records::constants::{
     ARTIFACT_DIGEST_PREFIX, AUDIT_COMPLETED_EVENT, AUDIT_EVIDENCE_KIND, AUDIT_EVIDENCE_MEDIA_TYPE,
     AUDIT_EVIDENCE_ROLE, EVIDENCE_PAYLOAD_FIELD, EXECUTED_SQL_ROLE, SAMPLE_DIGEST_PAYLOAD_FIELD,
-    SQL_ARTIFACT_KIND, SQL_MEDIA_TYPE,
+    SQL_ARTIFACT_KIND, SQL_MEDIA_TYPE, STARTED_AT_FIELD, STATEMENT_STARTED_EVENT,
+    STATEMENT_TERMINAL_EVENTS,
 };
 use crate::records::main::artifact_rows::artifact_rows;
 use crate::records::main::event_object_row::event_object_row;
@@ -228,9 +229,18 @@ impl Materializer {
     ) -> Built {
         let mut built = Built::default();
         let mut pending_events: Vec<(u64, Box<dyn PendingLifecycleEvent>)> = Vec::new();
+        let starts: HashMap<String, String> = ended_starts(&batch);
         for record in batch {
             let stream: DeliveryStream = record.stream;
             match record.payload {
+                Payload::Event(event) if starts.contains_key(statement_of(&event, true)) => {
+                    built.settled.push(stream);
+                }
+                Payload::Event(mut event) if starts.contains_key(statement_of(&event, false)) => {
+                    let started_at = starts[statement_of(&event, false)].clone();
+                    event.insert(STARTED_AT_FIELD.to_owned(), Value::from(started_at));
+                    built.add_event(stream, self.event_rows(event));
+                }
                 Payload::Rows(rows) if stream == DeliveryStream::Output => {
                     match self.output_rows(rows, replacement) {
                         Ok(rows) => {
@@ -274,6 +284,51 @@ impl Materializer {
         }
         built
     }
+}
+
+/// The statement an event starts (`start`) or ends; empty for any other event.
+fn statement_of(event: &Map<String, Value>, start: bool) -> &str {
+    let text = |field: &str| event.get(field).and_then(Value::as_str);
+    let event_type: &str = text("event_type").unwrap_or_default();
+    let matches: bool = if start {
+        event_type == STATEMENT_STARTED_EVENT
+    } else {
+        STATEMENT_TERMINAL_EVENTS.contains(&event_type)
+    };
+    if matches {
+        text("statement_id").unwrap_or_default()
+    } else {
+        ""
+    }
+}
+
+/// Start times of the statements that both start and end in `batch`, by statement ID: one row records each. A batch takes higher priorities first, so an end may precede its start.
+fn ended_starts(batch: &[Queued]) -> HashMap<String, String> {
+    let events = || {
+        batch.iter().filter_map(|record| match &record.payload {
+            Payload::Event(event) => Some(event),
+            _ => None,
+        })
+    };
+    let mut starts: HashMap<&str, &str> = HashMap::new();
+    for event in events() {
+        let started: &str = statement_of(event, true);
+        let at: &str = event
+            .get("occurred_at")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !started.is_empty() && !at.is_empty() {
+            starts.entry(started).or_insert(at);
+        }
+    }
+    events()
+        .filter_map(|event| {
+            let ending: &str = statement_of(event, false);
+            starts
+                .get(ending)
+                .map(|at| (ending.to_owned(), (*at).to_owned()))
+        })
+        .collect()
 }
 
 /// An artifact of `content`, referenced by its statement or, without one, by its digest.
