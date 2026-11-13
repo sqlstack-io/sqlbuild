@@ -4,9 +4,9 @@ use uuid::Uuid;
 
 use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::platform::_helpers::watchdog::store_bytes;
 use crate::platform::models::{InstallationRecord, StorageKind, StoredInstallation};
 use crate::store::errors::ControlError;
-use crate::store::main::store_bytes::store_bytes;
 use crate::store::main::{commit::commit, query_records::query_records};
 use crate::store::models::{ControlStore, ControlTransaction};
 

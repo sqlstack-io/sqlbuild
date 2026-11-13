@@ -6,12 +6,12 @@ use crate::records::constants::{
     PROMOTED_INTEGER_FIELDS, PROMOTED_REAL_FIELDS, PROMOTED_TEXT_FIELDS,
 };
 use crate::schema::_helpers::rendering::{all_columns, json_field, relational_cast};
-use crate::schema::constants::{EVENTS_TABLE, OUTPUT_TAIL_RECORDS};
+use crate::schema::constants::{EVENTS_TABLE, OUTPUT_TAIL_RECORDS, PAYLOAD_COLUMN};
 
 const DIAGNOSTICS: &str = "SELECT * FROM recall_diagnostics";
 const CONFLICTS: &str = "SELECT * FROM recall_conflicts";
 
-/// Relational stores leave promoted fields out of lifecycle payloads; the view merges them back from their columns. A null column adds nothing, so a field the event wrote as null stays null. Control stores also expose their `storage_id` cursor.
+/// Relational stores leave promoted fields out of lifecycle payloads; the view merges them back from their columns. A null column adds nothing, so a field the event wrote as null stays null; on SQLite, `json_remove` drops each null column's key, and a present column removes an absent key instead. Control stores also expose their `storage_id` cursor.
 fn events(postgres: bool, control: bool) -> String {
     let promoted: Vec<&str> = PROMOTED_TEXT_FIELDS
         .iter()
@@ -27,7 +27,6 @@ fn events(postgres: bool, control: bool) -> String {
     let merged: String = if postgres {
         format!("payload || jsonb_strip_nulls(jsonb_build_object({pairs}))")
     } else {
-        // `json_remove` drops each null column's key; a present column removes an absent key instead.
         let absent: String = promoted
             .iter()
             .map(|field| {
@@ -39,7 +38,7 @@ fn events(postgres: bool, control: bool) -> String {
     let mut columns: Vec<String> = all_columns(&EVENTS_TABLE)
         .iter()
         .map(|column| {
-            if column.name == "payload" {
+            if column.name == PAYLOAD_COLUMN {
                 format!("CASE WHEN producer = '{DEFAULT_PRODUCER}' THEN {merged} ELSE payload END AS payload")
             } else {
                 column.name.to_owned()

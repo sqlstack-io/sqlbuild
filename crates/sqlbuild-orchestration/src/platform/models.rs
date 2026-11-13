@@ -5,10 +5,23 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::models::ControlClient;
+use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
-use crate::runs::models::{RunKind, RunNodeFailure, RunOutcome};
+use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
-use crate::warehouse_metadata::models::{WarehouseHistoryKind, WarehouseStateLocation};
+use crate::snapshots::models::SnapshotRetention;
+use crate::warehouse_metadata::models::{
+    StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
+};
+
+/// Every retention horizon one server's maintenance role enforces.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RetentionPolicies {
+    pub audit: AuditRetention,
+    pub statistics: StatisticsRetention,
+    pub snapshots: SnapshotRetention,
+    pub run_logs: RunLogRetention,
+}
 
 /// One pooled outbound connection; the location never receives a store handle.
 #[derive(Clone, Debug)]

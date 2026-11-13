@@ -5,28 +5,17 @@ use std::time::{Duration, Instant};
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::credentials::models::AuditRetention;
 use crate::platform::_helpers::retention::retain;
 use crate::platform::_helpers::watchdog::scan_health;
-use crate::runs::models::RunLogRetention;
-use crate::snapshots::models::SnapshotRetention;
+use crate::platform::models::RetentionPolicies;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::warehouse_metadata::models::StatisticsRetention;
 use crate::webhooks::models::{Webhook, WebhookSource};
 
 /// Only this server's security-audit sinks acknowledge; `report` hears each new retained count.
 pub async fn run_maintenance(
     (store, replica_id): (&ControlStore, Uuid),
-    (retention, sinks): (
-        (
-            AuditRetention,
-            StatisticsRetention,
-            SnapshotRetention,
-            RunLogRetention,
-        ),
-        &[Webhook],
-    ),
+    (retention, sinks): (RetentionPolicies, &[Webhook]),
     (report, mut shutdown): (impl Fn(i64), watch::Receiver<bool>),
 ) -> Result<(), ControlError> {
     let sinks: Vec<String> = sinks

@@ -15,7 +15,6 @@ pub mod read_recall_view;
 pub(crate) mod read_records;
 pub(crate) mod refresh_clock;
 pub mod set_release_version;
-pub(crate) mod store_bytes;
 pub(crate) mod store_source_text;
 pub(crate) mod subscribe_changes;
 pub(crate) mod write;

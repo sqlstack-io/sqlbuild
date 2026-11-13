@@ -265,3 +265,10 @@ pub(crate) struct JobDetailTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_order: [&'static str; 2],
 }
+
+pub(crate) struct RunLogRetentionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_artifacts: i64,
+    pub(crate) expected_runs: i64,
+}

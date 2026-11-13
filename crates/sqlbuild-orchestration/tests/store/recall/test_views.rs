@@ -161,11 +161,10 @@ fn given_native_context_output_and_audits_when_reading_views_then_both_databases
                 .expect("invocation projection");
             assert_eq!(invocation[0]["status"], "completed");
             assert_eq!(invocation[0]["duration_ms"], json!(12.75));
-            let payload = |value: &serde_json::Value| match value {
-                serde_json::Value::String(text) => {
+            let payload = |value: &serde_json::Value| {
+                value.as_str().map_or(value.clone(), |text| {
                     serde_json::from_str(text).expect("JSON payload")
-                }
-                other => other.clone(),
+                })
             };
             let events = read_recall_view(store, ("events", &envelope.invocation_id), 100)
                 .await

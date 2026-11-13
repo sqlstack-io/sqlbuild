@@ -9,6 +9,12 @@ pub(crate) struct ProjectionTestCase {
     pub(crate) expected_rows: Vec<Vec<RecallValue>>,
 }
 
+pub(crate) struct PayloadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_payload: &'static str,
+}
+
 pub(crate) struct ResolveInvocationTestCase {
     pub(crate) description: &'static str,
     pub(crate) selector: &'static str,

@@ -11,7 +11,6 @@ pub mod list_run_nodes;
 pub mod list_runs;
 pub mod monitor_runs;
 pub mod observe_run;
-pub(crate) mod prune_run_logs;
 pub mod publish_run_output;
 pub mod publish_run_recall;
 pub(crate) mod queue_run;

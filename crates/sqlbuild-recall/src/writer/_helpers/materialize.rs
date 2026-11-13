@@ -311,13 +311,18 @@ fn ended_starts(batch: &[Queued]) -> HashMap<String, String> {
         }
     }
     events()
-        .filter_map(|event| {
-            let ending: &str = statement_of(event, false);
-            starts
-                .get(ending)
-                .map(|at| (ending.to_owned(), (*at).to_owned()))
-        })
+        .filter_map(|event| start_of_end(&starts, event))
         .collect()
+}
+
+/// The statement ID and start time of `event` when it ends a statement that started in the same batch.
+fn start_of_end(
+    starts: &HashMap<&str, &str>,
+    event: &Map<String, Value>,
+) -> Option<(String, String)> {
+    let ending: &str = statement_of(event, false);
+    let at: &str = starts.get(ending)?;
+    Some((ending.to_owned(), at.to_owned()))
 }
 
 /// An artifact of `content`, referenced by its statement or, without one, by its digest.

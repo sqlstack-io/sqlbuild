@@ -20,8 +20,18 @@ use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use chrono::TimeDelta;
 use serde_json::{Value, json};
+use sqlbuild_recall::records::main::artifact_rows::artifact_rows;
+use sqlbuild_recall::records::main::event_object_row::event_object_row;
+use sqlbuild_recall::records::main::output_row::output_row;
+use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
+use sqlbuild_recall::records::models::{
+    ArtifactInput, OutputChunk, OutputStream, RecallRow, RowEnvelope,
+};
 use uuid::Uuid;
+
+use crate::store::main::append_recall::append_recall;
 
 pub(crate) async fn request_run(
     store: &ControlStore,
@@ -285,4 +295,120 @@ pub(crate) fn check_projection(check: &AdhocCheck) -> Value {
 /// Whether a launch applied, or the HTTP status its refusal reaches people with.
 pub(crate) fn launch_outcome(result: Result<bool, ControlError>) -> Result<bool, u16> {
     result.map_err(|error| ApiError::from(error).status.as_u16())
+}
+
+/// One SQL text every logged run shares.
+const SHARED_LOG_SQL: &str = "select order_id from orders";
+
+fn log_envelope(invocation_id: String) -> RowEnvelope {
+    RowEnvelope {
+        invocation_id,
+        invocation_started_at: "2026-01-02T03:04:05Z".into(),
+        producer_version: "test".into(),
+    }
+}
+
+fn log_sql_rows(envelope: &RowEnvelope, sql: &str) -> [RecallRow; 2] {
+    artifact_rows(
+        envelope,
+        &ArtifactInput {
+            digest: format!("sha256:{}", sha256_hex(sql.as_bytes())),
+            kind: "sql".into(),
+            media_type: "text/x-sql".into(),
+            content: sql.as_bytes().to_vec(),
+            seen_at: "2026-01-02T03:04:05Z".into(),
+            ref_id: "statement".into(),
+            role: "executed_sql".into(),
+            statement_id: Some("statement".into()),
+            resource_id: None,
+        },
+    )
+}
+
+/// The claim's output, and a nested session's event and SQL: one text shared by every run, one its own.
+fn worker_log(claim: Uuid, index: u128) -> Vec<RecallRow> {
+    let worker = log_envelope(format!("worker/{claim}"));
+    let session = log_envelope(format!("worker/{claim}/session"));
+    let mut rows = vec![output_row(
+        &worker,
+        &OutputChunk {
+            sequence: 0,
+            stream: OutputStream::Stdout,
+            occurred_at: "2026-01-02T03:04:05Z".into(),
+            data: b"building orders\n".to_vec(),
+            byte_offset: 0,
+            dropped_before: 0,
+            omitted: None,
+        },
+    )];
+    rows.push(
+        event_object_row(
+            &session,
+            json!({"event_id": "completed", "event_type": "statement_completed", "schema_version": 1,
+                "occurred_at": "2026-01-02T03:04:05Z", "producer": "sqlbuild", "invocation_sequence": 1,
+                "statement_id": "statement", "payload": {"duration_ms": 1.5}})
+            .as_object()
+            .expect("event object"),
+        )
+        .expect("statement event"),
+    );
+    rows.extend(log_sql_rows(&session, SHARED_LOG_SQL));
+    rows.extend(log_sql_rows(
+        &session,
+        &format!("select {index} as order_id"),
+    ));
+    rows
+}
+
+/// The worker invocation of run `index`, claimed by the claim ID `seed_logged_runs` gives it.
+pub(crate) fn logged_worker(index: u128) -> String {
+    format!(
+        "worker/{}",
+        Uuid::new_v5(&Uuid::from_u128(index), b"run_claimed")
+    )
+}
+
+/// Ad-hoc runs 1, 2, ... of `location`, each ended the given hours ago or, for null, still running, with a worker log and a scheduler event.
+pub(crate) async fn seed_logged_runs(
+    store: &ControlStore,
+    (location, snapshot_id): (Uuid, Uuid),
+    ended_hours_ago: &[Value],
+) {
+    for (position, hours) in ended_hours_ago.iter().enumerate() {
+        let index = position as u128 + 1;
+        let run_request = request((location, snapshot_id), index, 0, &["orders"]);
+        let run_id = run_request.run_id;
+        assert!(request_run(store, &run_request).await.expect("request"));
+        let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+        let claim = Uuid::new_v5(&run_id, b"run_claimed");
+        let ended_at = hours
+            .as_i64()
+            .map(|hours| transaction.now - TimeDelta::hours(hours));
+        let status = ended_at.map_or("running", |_| "success");
+        let (mut transaction, _) = query(
+            transaction,
+            "UPDATE sqb_runs SET status=$1, worker_instance=$2, ended_at=$3 WHERE run_id=$4",
+            vec![
+                Parameter::Text(status.into()),
+                Parameter::Id(claim),
+                Parameter::OptionalTime(ended_at),
+                Parameter::Id(run_id),
+            ],
+        )
+        .await
+        .expect("finish run");
+        let scheduler = event_object_row(
+            &log_envelope(format!("scheduler/{run_id}")),
+            json!({"event_id": format!("queued-{index}"), "event_type": "run_queued", "schema_version": 1,
+                "occurred_at": "2026-01-02T03:04:05Z", "producer": "scheduler", "invocation_sequence": 1,
+                "payload": {}})
+            .as_object()
+            .expect("event object"),
+        )
+        .expect("scheduler event");
+        for row in worker_log(claim, index).iter().chain([&scheduler]) {
+            (transaction, _) = append_recall(transaction, row).await.expect("append");
+        }
+        commit(transaction).await.expect("commit");
+    }
 }

@@ -7,7 +7,7 @@ use crate::records::models::{ArtifactInput, InvocationContext, OutputStream, Rec
 use crate::store::tests::helpers::{
     NOW, artifact, chunk, chunks, delivered, envelope, event, integer, projected, text, wall_clock,
 };
-use crate::store::tests::test_types::ProjectionTestCase;
+use crate::store::tests::test_types::{PayloadTestCase, ProjectionTestCase};
 
 const BINARY_PIECES: [(OutputStream, &[u8]); 4] = [
     (OutputStream::Stdout, b"line one\n\x00\xff"),
@@ -140,13 +140,16 @@ fn given_duplicates_and_conflicts_when_written_then_first_row_is_kept_and_confli
     ];
     // An earlier version stored the full 64-digit digest, of which today's is the prefix.
     let mut legacy = original.clone();
-    for (name, value) in &mut legacy.values {
-        if *name == "content_hash"
-            && let RecallValue::Text(hash) = value
-        {
-            hash.push_str(&"0".repeat(32));
-        }
-    }
+    let full_hash = RecallValue::Text(format!(
+        "{}{}",
+        original.content_hash().expect("content hash"),
+        "0".repeat(32)
+    ));
+    legacy
+        .values
+        .iter_mut()
+        .filter(|(name, _)| *name == "content_hash")
+        .for_each(|(_, value)| *value = full_hash.clone());
     let test_cases = [
         ProjectionTestCase {
             description: "the first row wins",
@@ -485,30 +488,33 @@ fn given_the_same_sql_in_two_invocations_when_written_then_artifacts_are_shared_
 
 #[test]
 fn given_lifecycle_payloads_when_stored_then_promoted_fields_are_kept_once_and_read_back_whole() {
-    let env = envelope("strip", NOW);
     let written = r#"{"intent":"execute","statement_kind":"SELECT","duration_ms":12.5,"affected_rows":3,"query_id":null,"attempt_number":2}"#;
-    let rows = projected(
-        &[vec![event(
-            &env,
-            ("e0", "statement_completed", 0),
-            r#","statement_id":"s1""#,
-            written,
-        )]],
-        "SELECT recall_events.payload, events.payload FROM recall_events \
-         JOIN events ON events.event_id = recall_events.event_id",
-    );
-    let parsed = |value: &RecallValue| match value {
-        RecallValue::Text(json) => serde_json::from_str::<serde_json::Value>(json).expect("JSON"),
-        other => panic!("payload is text, got {other:?}"),
-    };
-    assert_eq!(
-        parsed(&rows[0][0]),
-        serde_json::json!({"query_id": null, "attempt_number": 2}),
-        "the table keeps only fields without a column of their own"
-    );
-    assert_eq!(
-        parsed(&rows[0][1]),
-        serde_json::from_str::<serde_json::Value>(written).expect("JSON"),
-        "the events view returns the payload as written, explicit nulls included"
-    );
+    let test_cases = [
+        PayloadTestCase {
+            description: "the table keeps only fields without a column of their own",
+            sql: "SELECT payload FROM recall_events",
+            expected_payload: r#"{"query_id":null,"attempt_number":2}"#,
+        },
+        PayloadTestCase {
+            description: "the events view returns the payload as written, explicit nulls included",
+            sql: "SELECT payload FROM events",
+            expected_payload: written,
+        },
+    ];
+    let env = envelope("strip", NOW);
+    let batches = [vec![event(
+        &env,
+        ("e0", "statement_completed", 0),
+        r#","statement_id":"s1""#,
+        written,
+    )]];
+    for test_case in test_cases {
+        let rows = projected(&batches, test_case.sql);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&rows[0][0].key_text()).expect("JSON"),
+            serde_json::from_str::<serde_json::Value>(test_case.expected_payload).expect("JSON"),
+            "{}",
+            test_case.description
+        );
+    }
 }

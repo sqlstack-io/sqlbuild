@@ -195,6 +195,7 @@ pub(crate) async fn run_statements_in(
     Ok((transaction, records))
 }
 
+/// One artifact reference names each digest per invocation, so a statement finds its SQL by digest.
 pub(crate) async fn statement_sql_in(
     transaction: ControlTransaction,
     scope: &RunRecallScope,
@@ -212,7 +213,6 @@ pub(crate) async fn statement_sql_in(
     let Some(statement) = statements.first() else {
         return Ok((transaction, None));
     };
-    // One reference names each digest per invocation, so a statement finds its SQL by digest.
     parameters[next - 1] = Parameter::Text(format!(
         "sha256:{}",
         statement["sql_digest"].as_str().unwrap_or_default()

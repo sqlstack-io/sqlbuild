@@ -31,6 +31,9 @@ pub const COMMON_COLUMNS: [ColumnSpec; 6] = [
 ];
 /// The artifact columns its content digest covers: what it is, not who saw it when.
 pub const ARTIFACT_CONTENT_COLUMNS: [&str; 5] = ["digest", "kind", "media_type", "size", "content"];
+/// The event column holding the lifecycle payload.
+pub const PAYLOAD_COLUMN: &str = "payload";
+
 /// Common columns left out of a row's content digest.
 pub const UNHASHED_COLUMNS: [&str; 2] = ["ingested_at", "content_hash"];
 
@@ -83,6 +86,7 @@ const OUTPUT_COLUMNS: [ColumnSpec; 11] = [
     ColumnSpec::optional("omitted_sequences", ColumnType::Integer),
 ];
 
+/// `started_at` holds the start time of a statement end whose start was written with it, instead of a start row.
 const EVENT_COLUMNS: [ColumnSpec; 30] = [
     ColumnSpec::required("event_id", ColumnType::Text),
     ColumnSpec::optional("invocation_sequence", ColumnType::Integer),
@@ -113,7 +117,6 @@ const EVENT_COLUMNS: [ColumnSpec; 30] = [
     ColumnSpec::optional("row_count", ColumnType::Integer),
     ColumnSpec::optional("affected_rows", ColumnType::Integer),
     ColumnSpec::required("payload", ColumnType::Json),
-    // A statement end whose start was written with it keeps the start time here instead of a start row.
     ColumnSpec::optional("started_at", ColumnType::Timestamp),
 ];
 
