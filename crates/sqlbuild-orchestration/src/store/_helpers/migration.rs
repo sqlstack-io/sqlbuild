@@ -26,32 +26,41 @@ pub(crate) fn verify_schema(
         return Ok(());
     }
     let quote = |text: &str| format!("'{}'", text.replace('\'', r"'\''"));
-    let command = match store {
+    let (scope, command) = match store {
         ControlStore::Sqlite(path) => {
             let path = path.to_string_lossy();
-            format!(
+            let command = format!(
                 "rm -f {} {} {}",
                 quote(&path),
                 quote(&format!("{path}-wal")),
                 quote(&format!("{path}-shm"))
-            )
+            );
+            ("", command)
         }
         ControlStore::Postgres(pool) => {
             let options = pool.connect_options();
+            let host = options.get_socket().map_or_else(
+                || options.get_host().to_owned(),
+                |socket| socket.to_string_lossy().into_owned(),
+            );
             let target = format!(
                 "-h {} -p {} -U {} {}",
-                quote(options.get_host()),
+                quote(&host),
                 options.get_port(),
                 quote(options.get_username()),
                 quote(options.get_database().unwrap_or(options.get_username()))
             );
-            format!("dropdb {target} && createdb {target}")
+            (
+                " and everything else in that database",
+                format!("dropdb {target} && createdb {target}"),
+            )
         }
     };
     Err(ControlError::Schema(format!(
-        "this control store was created by an earlier sqb release and cannot be upgraded; \
-         to start a new, empty store, which discards its run history, stop every server \
-         using it and run: {command}"
+        "this control store was created by a different sqb release and cannot be upgraded; \
+         if a newer release created it, upgrade this server instead. To start a new, empty \
+         store, which discards its run history{scope}, stop every server using it and run: \
+         {command}"
     )))
 }
 

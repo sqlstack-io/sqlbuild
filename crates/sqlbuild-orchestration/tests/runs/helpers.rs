@@ -31,6 +31,11 @@ use sqlbuild_recall::records::models::{
 };
 use uuid::Uuid;
 
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::models::RunClaim;
+use crate::runs::tests::claim_helpers::succeed;
+use crate::scheduler::models::SchedulerLease;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::store::main::append_recall::append_recall;
 
 pub(crate) async fn request_run(
@@ -360,7 +365,7 @@ fn worker_log(claim: Uuid, index: u128) -> Vec<RecallRow> {
     rows
 }
 
-/// The worker invocation of run `index`, claimed by the claim ID `seed_logged_runs` gives it.
+/// The worker invocation of run `index`, which its claim names.
 pub(crate) fn logged_worker(index: u128) -> String {
     format!(
         "worker/{}",
@@ -368,47 +373,61 @@ pub(crate) fn logged_worker(index: u128) -> String {
     )
 }
 
-/// Ad-hoc runs 1, 2, ... of `location`, each ended the given hours ago or, for null, still running, with a worker log and a scheduler event.
-pub(crate) async fn seed_logged_runs(
+/// Claims ad-hoc run `index` through the scheduler and stores its worker log.
+async fn claim_logged_run(
     store: &ControlStore,
     (location, snapshot_id): (Uuid, Uuid),
+    lease: &SchedulerLease,
+    index: u128,
+) -> RunClaim {
+    let run_request = request((location, snapshot_id), index, 0, &["orders"]);
+    assert!(request_run(store, &run_request).await.expect("request"));
+    let claim = claim_next_run(
+        store,
+        lease,
+        &BTreeMap::new(),
+        Some((location, "development")),
+    )
+    .await
+    .expect("claim")
+    .expect("queued run");
+    let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    for row in worker_log(claim.claim_id, index) {
+        (transaction, _) = append_recall(transaction, &row).await.expect("append");
+    }
+    commit(transaction).await.expect("commit");
+    claim
+}
+
+/// Ad-hoc runs 1, 2, ... of `location`, each claimed through the scheduler with a worker log. Runs with hours finish through the worker lifecycle, one at a time because each writes `orders`, and are then dated that many hours ago; the null entries, which come last, keep running.
+pub(crate) async fn seed_logged_runs(
+    store: &ControlStore,
+    scope: (Uuid, Uuid),
     ended_hours_ago: &[Value],
 ) {
-    for (position, hours) in ended_hours_ago.iter().enumerate() {
-        let index = position as u128 + 1;
-        let run_request = request((location, snapshot_id), index, 0, &["orders"]);
-        let run_id = run_request.run_id;
-        assert!(request_run(store, &run_request).await.expect("request"));
+    let lease = acquire_lease(store, Uuid::now_v7())
+        .await
+        .expect("elect")
+        .expect("leader");
+    let finished: Vec<i64> = ended_hours_ago.iter().filter_map(Value::as_i64).collect();
+    for (position, hours) in finished.iter().enumerate() {
+        let claim = claim_logged_run(store, scope, &lease, position as u128 + 1).await;
+        succeed(store, &claim).await;
         let transaction = begin(store, TransactionMode::Write).await.expect("begin");
-        let claim = Uuid::new_v5(&run_id, b"run_claimed");
-        let ended_at = hours
-            .as_i64()
-            .map(|hours| transaction.now - TimeDelta::hours(hours));
-        let status = ended_at.map_or("running", |_| "success");
-        let (mut transaction, _) = query(
+        let ended_at = transaction.now - TimeDelta::hours(*hours);
+        let (transaction, _) = query(
             transaction,
-            "UPDATE sqb_runs SET status=$1, worker_instance=$2, ended_at=$3 WHERE run_id=$4",
+            "UPDATE sqb_runs SET ended_at=$1 WHERE run_id=$2",
             vec![
-                Parameter::Text(status.into()),
-                Parameter::Id(claim),
-                Parameter::OptionalTime(ended_at),
-                Parameter::Id(run_id),
+                Parameter::Time(ended_at),
+                Parameter::Id(claim.request.run_id),
             ],
         )
         .await
-        .expect("finish run");
-        let scheduler = event_object_row(
-            &log_envelope(format!("scheduler/{run_id}")),
-            json!({"event_id": format!("queued-{index}"), "event_type": "run_queued", "schema_version": 1,
-                "occurred_at": "2026-01-02T03:04:05Z", "producer": "scheduler", "invocation_sequence": 1,
-                "payload": {}})
-            .as_object()
-            .expect("event object"),
-        )
-        .expect("scheduler event");
-        for row in worker_log(claim, index).iter().chain([&scheduler]) {
-            (transaction, _) = append_recall(transaction, row).await.expect("append");
-        }
+        .expect("date run");
         commit(transaction).await.expect("commit");
+    }
+    for position in finished.len()..ended_hours_ago.len() {
+        claim_logged_run(store, scope, &lease, position as u128 + 1).await;
     }
 }

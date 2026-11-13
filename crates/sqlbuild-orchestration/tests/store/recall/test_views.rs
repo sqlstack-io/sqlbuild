@@ -187,8 +187,8 @@ fn given_native_context_output_and_audits_when_reading_views_then_both_databases
                 .expect("stored statement");
             assert_eq!(
                 payload(&stored["payload"]),
-                json!({"query_id": null, "adapter": "duckdb"}),
-                "the table keeps only fields without a column"
+                json!({"duration_ms": 1.5, "query_id": null, "adapter": "duckdb"}),
+                "the table keeps real fields and fields without a column"
             );
             assert_eq!(invocation[0]["integration_retry"], json!(2));
             let audit = read_recall_view(store, ("audit_results", &envelope.invocation_id), 100)

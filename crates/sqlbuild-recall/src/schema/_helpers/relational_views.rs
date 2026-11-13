@@ -2,9 +2,7 @@
 
 use sqlbuild_core::lifecycle_events::constants::DEFAULT_PRODUCER;
 
-use crate::records::constants::{
-    PROMOTED_INTEGER_FIELDS, PROMOTED_REAL_FIELDS, PROMOTED_TEXT_FIELDS,
-};
+use crate::records::constants::{PROMOTED_INTEGER_FIELDS, PROMOTED_TEXT_FIELDS};
 use crate::schema::_helpers::rendering::{all_columns, json_field, relational_cast};
 use crate::schema::constants::{EVENTS_TABLE, OUTPUT_TAIL_RECORDS, PAYLOAD_COLUMN};
 
@@ -16,7 +14,6 @@ fn events(postgres: bool, control: bool) -> String {
     let promoted: Vec<&str> = PROMOTED_TEXT_FIELDS
         .iter()
         .chain(&PROMOTED_INTEGER_FIELDS)
-        .chain(&PROMOTED_REAL_FIELDS)
         .copied()
         .collect();
     let pairs: String = promoted

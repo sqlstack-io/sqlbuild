@@ -41,14 +41,21 @@ const LOCATION_INSTANCES: &str = "DELETE FROM sqb_location_instances WHERE insta
     FROM sqb_location_work w WHERE w.session_id=i.instance_id) \
     ORDER BY i.last_seen_at LIMIT $2) RETURNING instance_id";
 
-/// Claims of finished runs past either limit whose worker log is still stored, oldest first. Worker invocations are `worker/<claim>` and `worker/<claim>/<session>`; the stored logs, not every run ever finished, bound the join.
+/// Claims of finished runs past either limit whose worker log is still stored, oldest first. Worker invocations are `worker/<claim>` and `worker/<claim>/<session>`; the stored logs, not every run ever finished, bound the join. A finished run no longer names its worker, so the scheduler's `run_claimed` event, whose ID is the claim, links the two.
 const EXPIRED_CLAIMS: &str = "WITH logged AS (\
-    SELECT DISTINCT substr(invocation_id, 8, 36) AS claim FROM recall_invocations WHERE invocation_id LIKE 'worker/%' \
-    UNION SELECT DISTINCT substr(invocation_id, 8, 36) AS claim FROM recall_output WHERE invocation_id LIKE 'worker/%'), \
-    ranked AS (SELECT worker_instance, ended_at, ROW_NUMBER() OVER (PARTITION BY location_id, target \
+    SELECT DISTINCT substr(invocation_id, 8, 36) AS claim FROM recall_invocations \
+    WHERE invocation_id > 'worker/' AND invocation_id < 'worker0' \
+    AND (length(invocation_id) = 43 OR substr(invocation_id, 44, 1) = '/') \
+    UNION SELECT DISTINCT substr(invocation_id, 8, 36) AS claim FROM recall_output \
+    WHERE invocation_id > 'worker/' AND invocation_id < 'worker0' \
+    AND (length(invocation_id) = 43 OR substr(invocation_id, 44, 1) = '/')), \
+    claimed AS (SELECT DISTINCT event_id AS claim, run_id FROM recall_events \
+    WHERE event_type = 'run_claimed' AND producer = 'scheduler'), \
+    ranked AS (SELECT CAST(run_id AS TEXT) AS run_id, ended_at, ROW_NUMBER() OVER (PARTITION BY location_id, target \
     ORDER BY ended_at DESC, run_id DESC) AS newest FROM sqb_runs \
     WHERE ended_at IS NOT NULL AND status IN ('success', 'warn', 'partial', 'failed', 'cancelled')) \
-    SELECT logged.claim FROM ranked JOIN logged ON logged.claim = CAST(ranked.worker_instance AS TEXT) \
+    SELECT logged.claim FROM ranked JOIN claimed ON claimed.run_id = ranked.run_id \
+    JOIN logged ON logged.claim = claimed.claim \
     WHERE ranked.newest > $1 OR ranked.ended_at < $2 ORDER BY ranked.ended_at LIMIT $3";
 
 /// Returns how many audit rows outlive their horizon because a sink has not acknowledged them.
@@ -144,39 +151,51 @@ pub(crate) async fn prune_run_logs(
     }
 }
 
-/// Every Recall row of the claims' invocations, then stored artifacts no remaining reference names. `worker/<claim>/<session>` sorts between `worker/<claim>/` and `worker/<claim>0`, so a key range finds nested invocations by index.
+/// Every Recall row of the claims' invocations, then stored artifacts no remaining reference names. `worker/<claim>/<session>` sorts between `worker/<claim>/` and `worker/<claim>0` in byte order, which SQLite uses and PostgreSQL control stores declare for `invocation_id`, so each range reads the index.
 async fn delete_logs(
     mut transaction: ControlTransaction,
     claims: &[String],
 ) -> Result<ControlTransaction, ControlError> {
-    let mut digests: BTreeSet<String> = BTreeSet::new();
-    for claim in claims {
-        let namespace = format!("worker/{claim}");
-        let bounds = vec![
-            Parameter::Text(namespace.clone()),
-            Parameter::Text(format!("{namespace}/")),
-            Parameter::Text(format!("{namespace}0")),
-        ];
-        let owned = "(invocation_id=$1 OR (invocation_id>$2 AND invocation_id<$3))";
-        let rows;
-        (transaction, rows) = query(
+    let parameters: Vec<Parameter> = claims
+        .iter()
+        .flat_map(|claim| {
+            let namespace = format!("worker/{claim}");
+            [format!("{namespace}/"), format!("{namespace}0"), namespace]
+        })
+        .map(Parameter::Text)
+        .collect();
+    let ranges: Vec<String> = (0..claims.len())
+        .map(|index| {
+            let first = 3 * index + 1;
+            format!(
+                "invocation_id=${} OR (invocation_id>${first} AND invocation_id<${})",
+                first + 2,
+                first + 1
+            )
+        })
+        .collect();
+    if ranges.is_empty() {
+        return Ok(transaction);
+    }
+    let owned = format!("({})", ranges.join(" OR "));
+    let rows;
+    (transaction, rows) = query(
+        transaction,
+        &format!("SELECT DISTINCT digest FROM recall_artifact_refs WHERE {owned}"),
+        parameters.clone(),
+    )
+    .await?;
+    let digests: BTreeSet<String> = rows
+        .iter()
+        .filter_map(|row| row["digest"].as_str().map(str::to_owned))
+        .collect();
+    for table in INVOCATION_TABLES {
+        (transaction, _) = query(
             transaction,
-            &format!("SELECT DISTINCT digest FROM recall_artifact_refs WHERE {owned}"),
-            bounds.clone(),
+            &format!("DELETE FROM {} WHERE {owned}", table_spec(table).name),
+            parameters.clone(),
         )
         .await?;
-        digests.extend(
-            rows.iter()
-                .filter_map(|row| row["digest"].as_str().map(str::to_owned)),
-        );
-        for table in INVOCATION_TABLES {
-            (transaction, _) = query(
-                transaction,
-                &format!("DELETE FROM {} WHERE {owned}", table_spec(table).name),
-                bounds.clone(),
-            )
-            .await?;
-        }
     }
     let digests: Vec<String> = digests.into_iter().collect();
     for chunk in digests.chunks(RUN_LOG_DIGEST_CHUNK) {

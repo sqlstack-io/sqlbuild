@@ -31,6 +31,9 @@ pub const COMMON_COLUMNS: [ColumnSpec; 6] = [
 ];
 /// The artifact columns its content digest covers: what it is, not who saw it when.
 pub const ARTIFACT_CONTENT_COLUMNS: [&str; 5] = ["digest", "kind", "media_type", "size", "content"];
+/// PostgreSQL control stores order this column by bytes, so a `worker/<claim>/` prefix range finds a claim's nested invocations through the index under any database collation.
+pub const BYTE_ORDERED_COLUMN: &str = "invocation_id";
+
 /// The event column holding the lifecycle payload.
 pub const PAYLOAD_COLUMN: &str = "payload";
 

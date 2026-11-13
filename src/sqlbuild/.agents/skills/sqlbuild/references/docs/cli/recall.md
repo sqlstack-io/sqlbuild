@@ -72,7 +72,8 @@ The slowest statements of past builds, with their SQL:
 ```bash
 sqb recall query --max-cell-bytes 60 \
   "SELECT s.resource_name, round(s.duration_ms, 1) AS ms, a.text AS sql
-   FROM statements s JOIN artifacts a USING (invocation_id, statement_id)
+   FROM statements s JOIN artifacts a
+     ON a.invocation_id = s.invocation_id AND a.digest = 'sha256:' || s.sql_digest
    WHERE s.statement_kind = 'CREATE' ORDER BY s.duration_ms DESC LIMIT 2"
 ```
 

@@ -491,9 +491,9 @@ fn given_lifecycle_payloads_when_stored_then_promoted_fields_are_kept_once_and_r
     let written = r#"{"intent":"execute","statement_kind":"SELECT","duration_ms":12.5,"affected_rows":3,"query_id":null,"attempt_number":2}"#;
     let test_cases = [
         PayloadTestCase {
-            description: "the table keeps only fields without a column of their own",
+            description: "the table keeps real fields and fields without a column of their own",
             sql: "SELECT payload FROM recall_events",
-            expected_payload: r#"{"query_id":null,"attempt_number":2}"#,
+            expected_payload: r#"{"duration_ms":12.5,"query_id":null,"attempt_number":2}"#,
         },
         PayloadTestCase {
             description: "the events view returns the payload as written, explicit nulls included",

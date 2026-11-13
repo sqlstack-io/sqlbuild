@@ -5,14 +5,12 @@ use std::borrow::Cow;
 use serde_json::{Map, Value};
 use sqlbuild_core::lifecycle_events::constants::DEFAULT_PRODUCER;
 
-use crate::records::constants::{
-    PROMOTED_INTEGER_FIELDS, PROMOTED_REAL_FIELDS, PROMOTED_TEXT_FIELDS,
-};
+use crate::records::constants::{PROMOTED_INTEGER_FIELDS, PROMOTED_TEXT_FIELDS};
 use crate::records::models::{RecallRow, RecallValue};
 use crate::schema::constants::PAYLOAD_COLUMN;
 use crate::schema::models::Table;
 
-/// The views put the left-out fields back from their columns, so a payload reads as written; the content digest still covers the whole event. Server-owned events keep their payloads, which the server reads back whole.
+/// Real fields stay, because a database's JSON functions would not print them back digit for digit. The views put the left-out fields back from their columns, so a payload reads as written; the content digest still covers the whole event. Server-owned events keep their payloads, which the server reads back whole.
 #[must_use]
 pub fn relational_row(row: &RecallRow) -> Cow<'_, RecallRow> {
     let lifecycle = row.value("producer") == Some(&RecallValue::Text(DEFAULT_PRODUCER.to_owned()));
@@ -28,7 +26,6 @@ pub fn relational_row(row: &RecallRow) -> Cow<'_, RecallRow> {
     let held: Vec<&'static str> = PROMOTED_TEXT_FIELDS
         .iter()
         .chain(&PROMOTED_INTEGER_FIELDS)
-        .chain(&PROMOTED_REAL_FIELDS)
         .copied()
         .filter(|name| column_holds(row, name, &fields))
         .collect();
@@ -54,7 +51,6 @@ fn column_holds(row: &RecallRow, name: &str, fields: &Map<String, Value>) -> boo
     match row.value(name) {
         Some(RecallValue::Text(text)) => field.and_then(Value::as_str) == Some(text.as_str()),
         Some(RecallValue::Integer(number)) => field.and_then(Value::as_i64) == Some(*number),
-        Some(RecallValue::Real(number)) => field.and_then(Value::as_f64) == Some(*number),
         _ => false,
     }
 }

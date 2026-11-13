@@ -80,7 +80,7 @@ seconds, stops delivery and retries the same event. Deduplicate by `event_id`, w
 
 | `kind` | Sent when | Fields |
 | --- | --- | --- |
-| `heartbeat` | Each server replica is alive, periodically | `replica_id` |
+| `heartbeat` | Each server replica is alive, periodically | `replica_id`, `store_bytes` (the control database size on disk) |
 | `scheduler_no_leader` | No server holds the scheduler lease | None |
 | `tick_overdue` | A schedule tick is late | `trigger_id`, `scheduled_for` |
 | `calendar_horizon_low` | A running calendar schedule has a day or less of dates left | `trigger_id`, `refresh_at`, `horizon_end` |
@@ -118,7 +118,8 @@ the control server is older than this worker and refused its run report; upgrade
 Set how much history the server keeps:
 
 ```bash
-sqb server --statistics-retention-days 30 --audit-retention-days 730 --snapshot-retention-count 20
+sqb server --statistics-retention-days 30 --audit-retention-days 730 --snapshot-retention-count 20 \
+  --run-log-retention-days 7 --run-log-retention-count 100
 ```
 
 | Data | Option | Default | Range |
@@ -126,6 +127,8 @@ sqb server --statistics-retention-days 30 --audit-retention-days 730 --snapshot-
 | Hourly warehouse statistics | `--statistics-retention-days` | `90` | `1`–`65535` |
 | Security audit records | `--audit-retention-days` | `400` | `1`–`65535` |
 | Published snapshots per location and target | `--snapshot-retention-count` | `10` | `1`–`65535` |
+| Logs of finished runs | `--run-log-retention-days` | `14` | `1`–`65535` |
+| Finished runs per location and target that keep their logs | `--run-log-retention-count` | `200` | `1`–`65535` |
 | Skipped and covered schedule ticks | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
@@ -146,6 +149,16 @@ The server keeps the newest published snapshots for each location and target. It
 snapshot only when no retained run, job, trigger, trigger change or location request uses it, and
 deletes its node definitions and SQL text when no other snapshot shares them. Repeating or
 interrupting this cleanup is safe.
+
+A finished run loses its log, the events, statements, SQL and output its worker recorded, when it
+is older than `--run-log-retention-days` or when more than `--run-log-retention-count` newer runs
+have finished in its location and target, whichever comes first. The run itself, its node results,
+and the run history the scheduler recorded stay, so run lists, node status and history are
+unchanged; only the run's log, statements and SQL are no longer shown. A running run keeps its log.
+
+The **Server** panel on the **Settings** page shows the control database's size on disk and both
+run log limits, and each `heartbeat` [platform event](#receive-platform-events) carries the size as
+`store_bytes`.
 
 The scheduler deletes covered ticks older than 30 days. It keeps each trigger's latest tick and
 every tick that started a run. A new schedule, a resumed trigger or a cursor reset catches up only
