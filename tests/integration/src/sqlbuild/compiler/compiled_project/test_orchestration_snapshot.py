@@ -27,6 +27,7 @@ from sqlbuild.orchestration import (
     compile_snapshot,
     job,
     job_group,
+    on_failure,
     run_event,
     schedule,
     sensor,
@@ -676,6 +677,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         concurrency_groups=("order_reporting",),
         schedule=test_case.schedule,
         targets=("development",),
+        owner="Orders team",
+        overlap="skip",
+        on_failure=on_failure(retries=2, retry_delay_seconds=600),
     )
     excluded: Job = replace(nightly, name="other_target", targets=("production",))
     first: dict[str, Any] = json.loads(
@@ -701,6 +705,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             "select": "+orders",
             "exclude": "stg_orders",
             "targets": ["development"],
+            "owner": "Orders team",
+            "overlap": "skip",
+            "on_failure": {"retries": 2, "retry_delay_seconds": 600},
         }
     }
     trigger: dict[str, Any] = first["documents"]["triggers"]["nightly_orders"]
@@ -803,6 +810,29 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             expected_message="cannot be combined",
         ),
         SnapshotDeclarationRejectionTestCase(
+            description="blank owner", owner=" ", expected_message="owner must not be blank"
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="unknown overlap",
+            overlap="coalesce",
+            expected_message="overlap must be queue or skip, not coalesce",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="no retries",
+            on_failure=on_failure(retries=0),
+            expected_message="retries must be a whole number from 1 to 10",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="too many retries",
+            on_failure=on_failure(retries=11),
+            expected_message="retries must be a whole number from 1 to 10",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="retry delay over a day",
+            on_failure=on_failure(retries=1, retry_delay_seconds=86_401),
+            expected_message="retry_delay_seconds must be a whole number from 0 to 86400",
+        ),
+        SnapshotDeclarationRejectionTestCase(
             description="duplicate concurrency declarations",
             concurrency=3,
             settings={"concurrency": 4},
@@ -830,6 +860,9 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             concurrency=test_case.concurrency,
             schedule=test_case.schedule
             or schedule(cron=test_case.cron, timezone=test_case.timezone),
+            owner=test_case.owner,
+            overlap=test_case.overlap,
+            on_failure=test_case.on_failure,
         )
     ] * test_case.copies
     with pytest.raises(ValueError, match=test_case.expected_message):
