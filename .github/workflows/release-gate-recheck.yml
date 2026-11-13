@@ -1,0 +1,40 @@
+name: Release gate re-check
+
+# Closing the last open nightly-verify issue starts Release Please on main when the release pull
+# request is held, so its checks run again and it merges without a manual re-run.
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  actions: write
+  issues: read
+  pull-requests: read
+  statuses: read
+
+jobs:
+  recheck:
+    if: contains(github.event.issue.labels.*.name, 'nightly-verify')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Start Release Please for a held release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          still_open="$(gh issue list --label nightly-verify --state open --json number --jq length)"
+          if [[ "${still_open}" != "0" ]]; then
+            echo "Another nightly-verify issue is still open; releases stay held" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          head_sha="$(gh pr list --state open --label "autorelease: pending" \
+            --json headRefOid --jq '.[0].headRefOid // empty')"
+          [[ -n "${head_sha}" ]] || exit 0
+          held="$(gh api "repos/${GH_REPO}/commits/${head_sha}/status" \
+            --jq '[.statuses[] | select(.context == "Verify")][0].description // "" | startswith("Held by nightly Verify")')"
+          if [[ "${held}" != "true" ]]; then
+            echo "The release pull request is not held by nightly Verify" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          gh workflow run release-please.yml --ref main
+          echo "Started Release Please on main to re-check the held release" >> "${GITHUB_STEP_SUMMARY}"
