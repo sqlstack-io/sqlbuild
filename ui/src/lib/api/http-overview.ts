@@ -1,5 +1,6 @@
+import { topFolder } from '$lib/lineage/catalog-graph';
 import { checkCountsOf } from './http-catalog';
-import type { Acknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, Overview, PlatformEvent, Run, SnapshotChange } from './types';
+import type { Acknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, GroupStatus, Overview, PlatformEvent, Run, SnapshotChange } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
 const MODEL_KINDS = new Set(['view', 'table', 'incremental']);
@@ -41,10 +42,28 @@ export function problemRunsOf(topLevel: Run[], now: number): Run[] {
 
 const attentionRun = ({ id, jobKey, kind, status, statusReason, nodeCounts, startedAt, endedAt }: Run): AttentionRun => ({ id, jobKey, kind, status, statusReason, nodeCounts, startedAt, endedAt });
 
+/** Build state per top-level folder, for the nodes SQLBuild builds; a node can be both changed and behind. */
+export function groupStatusOf(nodes: CatalogNode[]): GroupStatus[] {
+	const groups = new Map<string, GroupStatus>();
+	for (const n of nodes) {
+		if (n.kind === 'source') continue;
+		const group = topFolder(n);
+		const g = groups.get(group) ?? { group, total: 0, current: 0, changed: 0, behind: 0, failed: 0 };
+		const stale = n.stale ?? [];
+		g.total += 1;
+		if (n.lastOutcome === 'failed') g.failed += 1;
+		if (stale.some((s) => s.reason !== 'behind')) g.changed += 1;
+		if (stale.some((s) => s.reason === 'behind')) g.behind += 1;
+		if (!stale.length && n.lastOutcome !== 'failed' && n.lastBuild) g.current += 1;
+		groups.set(group, g);
+	}
+	return [...groups.values()].sort((a, b) => a.group.localeCompare(b.group));
+}
+
 /**
  * The overview from reads the person already has. Staleness comes from the catalog listing, which
- * does not check source freshness, so late sources stay unknown. The server has no cost or group
- * read yet, so group status is null and cost is left out; the page hides them.
+ * does not check source freshness, so late sources stay unknown. Groups are top-level folders, and
+ * group status is null when the server reports no build state. There is no cost read, so the page hides cost.
  */
 export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, now }: OverviewInputs): Overview {
 	const acknowledged = (r: Run) => acknowledgements.get(r.id) ?? null;
@@ -85,7 +104,7 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 			cost: null
 		},
 		attention,
-		groups: null,
+		groups: nodes.some((n) => n.stale !== null) ? groupStatusOf(nodes) : null,
 		recentChanges: changes.slice(0, RECENT_CHANGES),
 		latestRun: latest ? { id: latest.id, status: latest.status, endedAt: latest.endedAt } : null
 	};

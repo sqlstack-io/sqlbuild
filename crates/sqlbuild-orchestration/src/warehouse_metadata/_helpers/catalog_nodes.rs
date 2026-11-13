@@ -17,8 +17,8 @@ use crate::warehouse_metadata::constants::{
     LINEAGE_DEFINITION_BATCH, OUTCOME_FAILURE_WINDOW, OUTCOME_RECENT_RUNS,
 };
 use crate::warehouse_metadata::models::{
-    CatalogNodeBuild, CatalogNodeOutcome, CatalogNodeRecord, CatalogRelation, ColumnLineageEdge,
-    LineageColumn, LineageNodeColumns,
+    CatalogNodeBuild, CatalogNodeChecks, CatalogNodeOutcome, CatalogNodeRecord, CatalogRelation,
+    ColumnLineageEdge, LineageColumn, LineageNodeColumns,
 };
 
 /// A declared value from the definition itself, its schema entry or its config, in that order.
@@ -70,6 +70,7 @@ pub(crate) fn catalog_node(
         Option<CatalogNodeOutcome>,
         bool,
     ),
+    checks: CatalogNodeChecks,
 ) -> CatalogNodeRecord {
     let definition = &node.definition;
     CatalogNodeRecord {
@@ -95,6 +96,7 @@ pub(crate) fn catalog_node(
         last_build,
         last_outcome,
         definition_changed,
+        checks,
         snapshot_id,
     }
 }

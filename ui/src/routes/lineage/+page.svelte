@@ -313,9 +313,8 @@
 	// ---- toolbar filters: non-matching nodes are dimmed ----
 	let kindFilter = $state('');
 	let groupFilter = $state('');
-	let ownerFilter = $state('');
 	let statusFilter = $state<'' | 'stale' | 'changed' | 'behind' | 'failed'>('');
-	const filterActive = $derived(!!(kindFilter || groupFilter || ownerFilter || statusFilter));
+	const filterActive = $derived(!!(kindFilter || groupFilter || statusFilter));
 	function matchesFilter(n: Node): boolean {
 		if (n.type === 'folder') return catalogNodes.some((c) => `${folderOf(c)}/`.startsWith(`${n.data.group}/`) && matchesCatalog(c));
 		const c = catalogByKey.get(n.id);
@@ -324,7 +323,6 @@
 	function matchesCatalog(c: CatalogNode): boolean {
 		if (kindFilter && c.kind !== kindFilter) return false;
 		if (groupFilter && c.group !== groupFilter) return false;
-		if (ownerFilter && !c.owner.includes(ownerFilter)) return false;
 		return matchesFilterStatus(c, statusFilter);
 	}
 	function matchesFilterStatus(c: CatalogNode, f: typeof statusFilter): boolean {
@@ -337,7 +335,6 @@
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
 	const kindOptions = $derived(NODE_KINDS.filter((k) => catalogNodes.some((n) => n.kind === k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: catalogNodes.filter((n) => n.kind === k).length })));
 	const groupOptions = $derived([...new Set(catalogNodes.flatMap((n) => (n.group === null ? [] : [n.group])))].map((g) => ({ value: g, label: g, count: catalogNodes.filter((n) => n.group === g).length })));
-	const ownerOptions = $derived([...new Set(catalogNodes.flatMap((n) => n.owner))].sort().map((o) => ({ value: o, label: o, count: catalogNodes.filter((n) => n.owner.includes(o)).length })));
 	const statusOptions = [
 		{ value: 'stale' as const, label: 'Stale' },
 		{ value: 'changed' as const, label: 'Stale · changed' },
@@ -590,7 +587,6 @@
 		<div class="toolbar-group">
 			<ChoiceFilter label="Kind" bind:value={kindFilter} options={kindOptions} />
 			{#if groupOptions.length}<ChoiceFilter label="Group" bind:value={groupFilter} options={groupOptions} />{/if}
-			{#if ownerOptions.length}<ChoiceFilter label="Owner" bind:value={ownerFilter} options={ownerOptions} />{/if}
 			<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: catalogNodes.filter((c) => matchesFilterStatus(c, o.value)).length }))} />
 		</div>
 	{/if}
@@ -735,7 +731,6 @@
 					<!-- From the selected card, so the header names the node at once, before its detail arrives. -->
 					<span>{primary?.data.kind}</span>
 					{#if primary?.data.group}<span>{primary.data.group}</span>{/if}
-					{#if (primary?.data.owner as string[] | undefined)?.length}<span>{(primary?.data.owner as string[]).join(', ')}</span>{/if}
 				</div>
 			</div>
 		{/if}
@@ -898,7 +893,6 @@
 						<div><dt>Kind</dt><dd>{kindLine(d)}</dd></div>
 						<div><dt>Unique key</dt><dd class="mono">{sqlOutline.config.find((c) => c.key === 'unique_key')?.value ?? '—'}</dd></div>
 						<div><dt>Group</dt><dd>{d.group ?? '—'}</dd></div>
-						<div><dt>Owner</dt><dd>{d.owner.join(', ') || '—'}</dd></div>
 						<div><dt>Tags</dt><dd>{d.tags.join(', ') || '—'}</dd></div>
 						<div><dt>Build version</dt><dd class="mono" title="Fingerprint of the last build in this location">{d.lastBuild?.fingerprint.slice(0, 12) ?? '—'}</dd></div>
 					</dl>

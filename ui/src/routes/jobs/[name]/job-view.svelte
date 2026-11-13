@@ -166,7 +166,6 @@
 						<dl>
 							{#if n.lastOutcome || n.lastBuild}<div><dt>Last build</dt><dd><i style:background={nodeOutcomeTone[n.lastOutcome ?? 'success']}></i>{n.lastOutcome ? nodeOutcomeLabel[n.lastOutcome] : 'Built'}{n.lastBuild ? ` · ${formatAgo(n.lastBuild.builtAt, app.now)}` : ''}</dd></div>{/if}
 							{#if n.relation}<div><dt>Writes</dt><dd class="mono">{[n.relation.database, n.relation.schema, n.relation.name].filter(Boolean).join('.')}</dd></div>{/if}
-							{#if n.owner.length}<div><dt>Owner</dt><dd>{n.owner.join(', ')}</dd></div>{/if}
 							{#if n.path}<div><dt>Defined in</dt><dd class="mono">{n.path}</dd></div>{/if}
 						</dl>
 					{:else if pickedNodes.length > 1}

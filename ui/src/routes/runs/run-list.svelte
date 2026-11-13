@@ -55,10 +55,10 @@
 	<table class="sb-list runs">
 		<colgroup>
 			<col style:width="40px" />
-			<col style:width="150px" />
+			<col style:width="140px" />
 			<col />
-			<col style:width="230px" />
-			<col style:width="280px" />
+			<col style:width="180px" />
+			<col style:width="220px" />
 			<col style:width="150px" />
 			<col style:width="90px" />
 		</colgroup>
@@ -178,6 +178,7 @@
 		overflow: auto;
 	}
 	.runs {
+		min-width: 1000px;
 		table-layout: fixed;
 	}
 	.runs thead th {
@@ -272,6 +273,7 @@
 		background: var(--sb-hover);
 	}
 	.what .chip + .chip {
+		flex-shrink: 0;
 		color: var(--muted-foreground);
 		font-size: 11.5px;
 	}

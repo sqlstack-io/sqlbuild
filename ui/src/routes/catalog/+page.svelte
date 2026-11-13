@@ -14,6 +14,7 @@
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
 	import { planHref } from '$lib/run/command';
+	import { topFolder } from '$lib/lineage/catalog-graph';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -28,7 +29,6 @@
 	const params = page.url.searchParams;
 	let query = $state(params.get('q') ?? '');
 	let kindFilter = $state<'all' | NodeKind>((NODE_KINDS as string[]).includes(params.get('kind') ?? '') ? (params.get('kind') as NodeKind) : 'all');
-	let ownerFilter = $state(params.get('owner') ?? '');
 	let groupFilter = $state(params.get('group') ?? '');
 	let statusFilter = $state<StatusFilter | ''>(params.get('stale') ? 'stale' : '');
 
@@ -41,8 +41,7 @@
 		(f === 'warn' && n.lastOutcome === 'warn');
 
 	const kinds = $derived(NODE_KINDS.filter((k) => all.some((n) => n.kind === k)));
-	const owners = $derived([...new Set(all.flatMap((n) => n.owner))].sort());
-	const groups = $derived([...new Set(all.flatMap((n) => (n.group === null ? [] : [n.group])))]);
+	const groups = $derived([...new Set(all.map(topFolder))].sort());
 	/** Outcome and staleness come together; a server that reports neither leaves them unknown. */
 	const showBuildState = $derived(all.some((n) => n.stale !== null));
 	const showChecks = $derived(all.some((n) => n.checks !== null));
@@ -53,15 +52,14 @@
 		all.filter((n) => {
 			if (kindFilter !== 'all' && n.kind !== kindFilter) return false;
 			// A filter whose control is hidden, for example from a shared link, never narrows the list.
-			if (owners.length && ownerFilter && !n.owner.includes(ownerFilter)) return false;
-			if (groups.length && groupFilter && n.group !== groupFilter) return false;
+			if (groups.length > 1 && groupFilter && topFolder(n) !== groupFilter) return false;
 			if (showBuildState && !matchesStatus(n, statusFilter)) return false;
 			const q = query.trim().toLowerCase();
-			return !q || [n.key, n.description, kindLine(n), ...n.tags, ...n.owner].some((s) => s.toLowerCase().includes(q));
+			return !q || [n.key, n.description, kindLine(n), ...n.tags].some((s) => s.toLowerCase().includes(q));
 		})
 	);
 
-	const columns = $derived(3 + (owners.length ? 1 : 0) + (showBuildState ? 2 : 0) + (showChecks ? 1 : 0));
+	const columns = $derived(3 + (showBuildState ? 2 : 0) + (showChecks ? 1 : 0));
 	const counts = $derived({
 		failed: all.filter((n) => n.lastOutcome === 'failed').length,
 		warn: all.filter((n) => n.lastOutcome === 'warn').length,
@@ -105,8 +103,7 @@
 			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: nodeKindPlural[k], count: all.filter((n) => n.kind === k).length }))]}
 		/>
 		{#if showBuildState}<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: all.filter((n) => matchesStatus(n, o.value)).length }))} />{/if}
-		{#if owners.length}<ChoiceFilter label="Owner" bind:value={ownerFilter} options={owners.map((o) => ({ value: o, label: o, count: all.filter((n) => n.owner.includes(o)).length }))} />{/if}
-		{#if groups.length}<ChoiceFilter label="Group" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: all.filter((n) => n.group === g).length }))} />{/if}
+		{#if groups.length > 1}<ChoiceFilter label="Folder" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: all.filter((n) => topFolder(n) === g).length }))} />{/if}
 	{/snippet}
 </ListToolbar>
 
@@ -116,7 +113,6 @@
 			<tr>
 				<th>Name</th>
 				<th>Kind</th>
-				{#if owners.length}<th>Owner</th>{/if}
 				{#if showBuildState}<th>Last outcome</th><th>Stale</th>{/if}
 				{#if showChecks}<th class="num">Checks</th>{/if}
 				<th>Last built</th>
@@ -136,12 +132,6 @@
 						</div>
 					</td>
 					<td class="muted">{kindLine(n)}{#if n.group}<div class="cell-desc">{n.group}</div>{/if}</td>
-					{#if owners.length}
-					<td>
-						{#if n.owner.length}<div class="flex flex-wrap gap-1">{#each n.owner as o (o)}<span class="sb-tag">{o}</span>{/each}</div>
-						{:else}<span class="muted">—</span>{/if}
-					</td>
-					{/if}
 					{#if showBuildState}
 					<td>
 						{#if n.kind === 'source'}
