@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use sqlbuild_orchestration::api::models::DevelopmentScope;
+use sqlbuild_orchestration::credentials::main::identities::development_person::development_person;
 use sqlbuild_orchestration::credentials::main::locations::development_location::development_location;
 use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::declarations::main::pause_development_triggers::pause_development_triggers;
@@ -76,6 +77,7 @@ async fn development_store(
         location_id,
         target: target.into(),
         triggers: flag(namespace, "development_triggers"),
+        principal_id: development_person(&store, &context).await?,
     };
     if !scope.triggers {
         pause_development_triggers(&store, (location_id, target)).await?;
