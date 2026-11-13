@@ -226,7 +226,10 @@ pub(crate) fn resolve_model_sql<'py>(
         };
         let bounds = match bounds {
             bounds if !bounds.is_none() => bounds,
-            _ if cause.is_none() && resolution.adapter.is_instance_of::<SyncedCopyAdapter>() => {
+            _ if cause.is_none()
+                && resolution.adapter.is_instance_of::<SyncedCopyAdapter>()
+                && native_field(&roles, "watermark_inputs")?.is_truthy()? =>
+            {
                 unbounded(py)?
             }
             _ => return Err(unresolved_bounds_error(py, &name, cause.as_deref())?),
