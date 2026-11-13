@@ -4,11 +4,11 @@ use std::collections::BTreeSet;
 
 use chrono::TimeDelta;
 use serde_json::json;
-use uuid::Uuid;
 
 use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkRequest};
 use crate::sensors::_helpers::requests::queue_sensor_run;
+use crate::sensors::models::SensorRequests;
 use crate::sensors::models::{
     CustomSensorOutcome, SensorCondition, SensorEvaluationOutcome, SensorEvaluationRequest,
 };
@@ -90,15 +90,17 @@ async fn apply_result(
     };
     let mut cursor = evaluation.cursor.clone();
     cursor.custom = custom;
-    let mut run_ids: Vec<Uuid> = Vec::new();
+    let mut requests = SensorRequests::default();
     let run_keys: BTreeSet<String> = run_keys.into_iter().collect();
     for key in run_keys {
-        let run_id;
-        (transaction, run_id) = queue_sensor_run(transaction, evaluation, &key).await?;
-        run_ids.push(run_id);
+        transaction = queue_sensor_run(transaction, evaluation, &key, &mut requests).await?;
     }
     Ok((
         transaction,
-        Some(SensorEvaluationOutcome::Completed { cursor, run_ids }),
+        Some(SensorEvaluationOutcome::Completed {
+            cursor,
+            run_ids: requests.run_ids,
+            skipped: requests.skipped,
+        }),
     ))
 }

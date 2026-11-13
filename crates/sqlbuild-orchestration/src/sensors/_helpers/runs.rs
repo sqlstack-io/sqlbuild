@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::sensors::_helpers::requests::queue_sensor_run;
 use crate::sensors::constants::EXECUTION_NODE_BATCH_SIZE;
+use crate::sensors::models::SensorRequests;
 use crate::sensors::models::{
     RunEventKind, SensorCursor, SensorEvaluationRequest, TerminalSensorRun,
 };
@@ -19,7 +20,7 @@ pub(crate) async fn consume_run_events(
     evaluation: &SensorEvaluationRequest,
     (job_key, kinds): (&str, &BTreeSet<RunEventKind>),
     executed_successfully: Option<&BTreeSet<String>>,
-) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
+) -> Result<(ControlTransaction, (SensorCursor, SensorRequests)), ControlError> {
     let (mut transaction, rows) = query(
         transaction,
         "SELECT run_id,status,last_event_storage_id FROM sqb_runs \
@@ -41,17 +42,20 @@ pub(crate) async fn consume_run_events(
         (transaction, eligible) = matching_executions(transaction, eligible, nodes).await?;
     }
     let mut cursor = evaluation.cursor.clone();
-    let mut run_ids: Vec<Uuid> = Vec::new();
+    let mut requests = SensorRequests::default();
     for run in runs {
         cursor.event_storage_id = run.last_event_storage_id;
         if eligible.contains(&run.run_id) && kinds.iter().any(|kind| kind.matches(run.status)) {
-            let run_id;
-            (transaction, run_id) =
-                queue_sensor_run(transaction, evaluation, &run.run_id.to_string()).await?;
-            run_ids.push(run_id);
+            transaction = queue_sensor_run(
+                transaction,
+                evaluation,
+                &run.run_id.to_string(),
+                &mut requests,
+            )
+            .await?;
         }
     }
-    Ok((transaction, (cursor, run_ids)))
+    Ok((transaction, (cursor, requests)))
 }
 
 /// Each chunk intersects the previous matches: every selected node must qualify.

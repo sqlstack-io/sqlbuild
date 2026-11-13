@@ -37,7 +37,7 @@ pub(crate) async fn prune_ticks_when_due(
     }
 }
 
-/// One bounded pass; requested ticks stay, as does any tick a run points at.
+/// One bounded pass over covered and skipped ticks; requested ticks stay, as does any tick a run points at.
 pub(crate) async fn prune_ticks(
     store: &ControlStore,
     lease: &SchedulerLease,
@@ -51,7 +51,7 @@ pub(crate) async fn prune_ticks(
         (transaction, rows) = query(
             transaction,
             "DELETE FROM sqb_ticks WHERE tick_id IN (SELECT k.tick_id FROM sqb_ticks k \
-             WHERE k.outcome='covered' AND k.scheduled_for<$1 \
+             WHERE k.outcome IN ('covered','skipped') AND k.scheduled_for<$1 \
              AND k.scheduled_for<(SELECT MAX(l.scheduled_for) FROM sqb_ticks l WHERE l.trigger_id=k.trigger_id) \
              AND NOT EXISTS (SELECT 1 FROM sqb_runs r WHERE r.tick_id=k.tick_id) \
              ORDER BY k.scheduled_for, k.tick_id LIMIT $2) RETURNING trigger_id",

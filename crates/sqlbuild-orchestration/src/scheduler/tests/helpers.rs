@@ -25,6 +25,7 @@ pub(super) fn state(test_case: &TickTestCase) -> (TriggerDefinition, TickState) 
             started_at: time(0),
             last_tick_for: test_case.last_second.map(time),
             waiting_run: test_case.active.then_some(Uuid::from_u128(31)),
+            active_run: test_case.running.then_some(Uuid::from_u128(41)),
         },
     )
 }
@@ -60,6 +61,14 @@ pub(super) fn covered_seconds(plan: &TickPlan) -> Vec<i64> {
         .collect()
 }
 
+pub(super) fn skipped_seconds(plan: &TickPlan) -> Vec<i64> {
+    plan.actions
+        .iter()
+        .filter(|action| matches!(action.decision, TickDecision::Skipped { .. }))
+        .map(|action| action.scheduled_for.timestamp())
+        .collect()
+}
+
 /// Under crashes and clock jumps a tick is never early, repeated or invented, and the latest due time always ticks.
 fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>) -> TestCaseResult {
     let expected: BTreeSet<i64> = due.iter().copied().collect();
@@ -69,6 +78,7 @@ fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>) -> TestCaseResult 
         started_at: time(0),
         last_tick_for: None,
         waiting_run: None,
+        active_run: None,
     };
     let mut committed: BTreeMap<i64, TickAction> = BTreeMap::new();
     let final_step = std::iter::once((1001, true));
@@ -163,6 +173,7 @@ fn cron_ticks(
         started_at: start,
         last_tick_for: None,
         waiting_run: None,
+        active_run: None,
     };
     let mut committed: BTreeSet<DateTime<Utc>> = BTreeSet::new();
     let mut clock = start;

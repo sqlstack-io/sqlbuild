@@ -2,12 +2,16 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use chrono::{TimeDelta, Utc};
+use serde_json::json;
 use uuid::Uuid;
 
+use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::TriggerChange;
 use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::request_job_run::request_job_run;
+use crate::runs::models::JobRunRequest;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor;
@@ -176,6 +180,119 @@ fn given_paged_platform_events_when_sensor_publication_fails_then_retry_is_atomi
                 SensorEvaluationOutcome::Requested | SensorEvaluationOutcome::Completed { .. }
             )));
             close_store(replica).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_skip_overlap_job_with_an_active_run_when_a_sensor_matches_then_it_records_skips_instead_of_queueing()
+ {
+    let test_cases = [
+        SensorTestCase {
+            description: "SQLite sensor skip",
+            backend: Backend::Sqlite,
+            expected_runs: 1,
+        },
+        SensorTestCase {
+            description: "PostgreSQL sensor skip",
+            backend: Backend::Postgres,
+            expected_runs: 1,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = snapshot(location);
+            input.documents.insert(
+                "jobs".into(),
+                json!({"orders": {"description": "Refresh orders", "selection": ["orders"], "overlap": "skip"}}),
+            );
+            publish_snapshot(store, &input)
+                .await
+                .expect("publish sensor");
+            let trigger = list_triggers(store, location, "development")
+                .await
+                .expect("triggers")
+                .remove(0);
+            let active = Uuid::now_v7();
+            request_job_run(
+                store,
+                (
+                    &AuditContext {
+                        actor: "test-operator".into(),
+                        granting_role: "control-store-owner".into(),
+                        request_id: Uuid::now_v7(),
+                        ip_address: None,
+                    },
+                    None,
+                ),
+                &JobRunRequest {
+                    run_id: active,
+                    location_id: location,
+                    target: "development".into(),
+                    job_key: "orders".into(),
+                    reason: "Refresh by hand".into(),
+                    priority: 0,
+                    window: None,
+                    full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
+                },
+            )
+            .await
+            .expect("a person's run queues regardless of overlap");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            // The first fixture event is a tick-overdue event, which the sensor matches.
+            append_events(store, 0..1, Utc::now()).await;
+            let requested = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                .await
+                .expect("request")
+                .expect("due");
+            assert_eq!(
+                complete_builtin_sensor(store, &lease, &requested)
+                    .await
+                    .expect("complete"),
+                0,
+                "{}",
+                test_case.description
+            );
+            let facts = evaluations(store).await;
+            let Some(SensorEvaluationOutcome::Completed {
+                run_ids, skipped, ..
+            }) = facts.last().map(|fact| fact.outcome.clone())
+            else {
+                panic!("a completed evaluation, not {facts:?}");
+            };
+            assert!(run_ids.is_empty(), "{}", test_case.description);
+            assert_eq!(
+                skipped
+                    .iter()
+                    .map(|skip| skip.active_run_id)
+                    .collect::<Vec<_>>(),
+                vec![active],
+                "{}: the matched event names the active run",
+                test_case.description
+            );
+            assert_eq!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("runs")
+                    .len(),
+                test_case.expected_runs,
+                "{}",
+                test_case.description
+            );
             close_test_store(fixture).await;
         });
     }

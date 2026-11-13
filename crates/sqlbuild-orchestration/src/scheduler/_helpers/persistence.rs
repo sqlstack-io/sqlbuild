@@ -21,18 +21,19 @@ pub(crate) async fn persist_ticks(
     )
     .await?;
     for action in &plan.actions {
-        let (outcome, run, covered) = match action.decision {
-            TickDecision::Requested { run_id } => ("requested", Some(run_id), None),
+        let (outcome, run, covered, active) = match action.decision {
+            TickDecision::Requested { run_id } => ("requested", Some(run_id), None, None),
             TickDecision::Covered { covered_by_run_id } => {
-                ("covered", None, Some(covered_by_run_id))
+                ("covered", None, Some(covered_by_run_id), None)
             }
+            TickDecision::Skipped { active_run_id } => ("skipped", None, None, Some(active_run_id)),
         };
         let inserted;
         (transaction, inserted) = query(transaction,
-            "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (trigger_id, scheduled_for) DO NOTHING RETURNING tick_id",
+            "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id, active_run_id) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (trigger_id, scheduled_for) DO NOTHING RETURNING tick_id",
             vec![Parameter::Id(action.tick_id), Parameter::Id(trigger.trigger_id), Parameter::Time(action.scheduled_for), Parameter::Time(now), Parameter::Integer(lease.epoch),
-                Parameter::Text(outcome.into()), Parameter::OptionalId(run), Parameter::OptionalId(covered)]).await?;
+                Parameter::Text(outcome.into()), Parameter::OptionalId(run), Parameter::OptionalId(covered), Parameter::OptionalId(active)]).await?;
         if !inserted.is_empty() {
             transaction
                 .changes
@@ -68,6 +69,7 @@ pub(crate) async fn persist_ticks(
                 window: None,
                 concurrency_groups: trigger.job_json.concurrency_groups.clone(),
                 narrowing: None,
+                retry: None,
             };
             transaction = queue_run(transaction, &request).await?;
         }

@@ -30,6 +30,7 @@ pub(crate) async fn limit_waiters(
     transaction: ControlTransaction,
     eligible: Option<&BTreeSet<(Uuid, String)>>,
 ) -> Result<(ControlTransaction, Vec<LimitWaiter>), ControlError> {
+    let now = transaction.now;
     let (transaction, rows) = query(transaction,
         "SELECT r.request_json, r.queued_at FROM sqb_runs r WHERE r.status='queued' AND r.parent_run_id IS NULL \
          AND r.cancel_requested_at IS NULL AND r.worker_instance IS NULL",
@@ -39,6 +40,7 @@ pub(crate) async fn limit_waiters(
         .map(decode_row)
         .collect::<Result<Vec<QueueCandidate>, _>>()?
         .into_iter()
+        .filter(|run| run.request_json.due(now))
         .filter(|run| {
             eligible.is_none_or(|scopes| {
                 scopes.contains(&(
