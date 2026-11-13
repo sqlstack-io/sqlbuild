@@ -271,9 +271,10 @@ hasn't fully synced yet. Each incremental model's range starts where its last su
 ended and runs to the latest data when the run starts. The run plans again against the warehouse.
 These stay unknown until it does:
 
-- source freshness, retention and column rename support;
+- source freshness, retention, table types and column rename support;
 - sources outside the schemas the server syncs;
 - the cursor position of an incremental model with no successful build;
+- the range start of an incremental model with lookback, a backfill duration or microbatches;
 - whether a start set with `cursor_start_max_ahead` sits too far ahead;
 - the columns of an expression source whose SQL changed since it was last described, which the
   plan takes as declared.

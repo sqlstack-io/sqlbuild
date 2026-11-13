@@ -7,15 +7,19 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::platform::models::{LocationHealth, LocationHealthObservation};
+use crate::authorization::models::CurrentSnapshotId;
+use crate::platform::constants::LOCATION_RETENTION_DAYS;
+use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
+use crate::store::main::decode_row::decode_row;
 use crate::store::main::decompress::decompress;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
+use crate::warehouse_metadata::constants::PREVIEW_REQUIRED_TABLES;
 use crate::warehouse_metadata::models::{
-    PreviewLatestRun, WarehouseCatalogRecord, WarehouseConsumptionRecord,
-    WarehouseFingerprintRecord, WarehouseHistoryKind, WarehouseObservationRecord,
+    CleanSync, PreviewLatestRun, WarehouseCatalogRecord, WarehouseConsumptionRecord,
+    WarehouseFingerprintRecord, WarehouseObservationRecord,
 };
 
 const RELATIONS_SQL: &str = "SELECT record_json FROM sqb_warehouse_catalog \
@@ -151,34 +155,81 @@ pub(crate) async fn preview_observations(
     mirrored(transaction, OBSERVATIONS_SQL, scope).await
 }
 
-/// The oldest of each required table's newest clean sync; `None` until every table synced cleanly.
-pub(crate) fn synced_at(
-    health: &[LocationHealthObservation],
-    tables: &[WarehouseHistoryKind],
-) -> Option<DateTime<Utc>> {
-    let mut newest: BTreeMap<(Option<&str>, &str, &str), DateTime<Utc>> = BTreeMap::new();
-    for observation in health {
-        let LocationHealth::WarehouseSync {
-            location,
-            table,
-            failure: None,
-            ..
-        } = &observation.report.health
-        else {
-            continue;
-        };
-        if !tables.contains(table) {
-            continue;
+/// When every schema the current snapshot builds into last synced each required table cleanly.
+pub(crate) async fn preview_synced_at(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, Option<DateTime<Utc>>), ControlError> {
+    let (transaction, current) = query(
+        transaction,
+        "SELECT snapshot_id FROM sqb_current_snapshots WHERE location_id=$1 AND target=$2",
+        vec![Parameter::Id(location_id), Parameter::Text(target.into())],
+    )
+    .await?;
+    let current: Option<CurrentSnapshotId> =
+        current.into_iter().next().map(decode_row).transpose()?;
+    let Some(current) = current else {
+        return Ok((transaction, None));
+    };
+    let (transaction, nodes) = read_snapshot_nodes(transaction, current.snapshot_id, None).await?;
+    let schemas: BTreeSet<(Option<String>, String)> = nodes
+        .values()
+        .filter_map(|node| {
+            let destination = &node.definition["destination"];
+            Some((
+                destination["database"].as_str().map(str::to_owned),
+                destination["schema"].as_str()?.to_owned(),
+            ))
+        })
+        .collect();
+    let today = transaction.now.date_naive();
+    let days = 0..=LOCATION_RETENTION_DAYS;
+    let invocations: Vec<Parameter> = days
+        .map(|day| {
+            Parameter::Text(format!(
+                "location/{location_id}/{}",
+                today - chrono::TimeDelta::days(day)
+            ))
+        })
+        .collect();
+    let target_placeholder = invocations.len() + 1;
+    let placeholders = Parameter::placeholders(1..=invocations.len());
+    let mut parameters = invocations;
+    parameters.push(Parameter::Text(target.into()));
+    let (transaction, rows) = query(
+        transaction,
+        &format!(
+            "SELECT payload->'report'->'health'->'location'->>'database' AS state_database, \
+             payload->'report'->'health'->'location'->>'schema' AS state_schema, \
+             payload->'report'->'health'->>'table' AS state_table, MAX(occurred_at) AS synced_at \
+             FROM recall_events WHERE invocation_id IN ({placeholders}) AND event_type='location_health' \
+             AND payload->'report'->>'target'=${target_placeholder} \
+             AND payload->'report'->'health'->>'kind'='warehouse_sync' \
+             AND payload->'report'->'health'->>'failure' IS NULL GROUP BY 1, 2, 3"
+        ),
+        parameters,
+    )
+    .await?;
+    let newest: BTreeMap<(Option<String>, String, String), DateTime<Utc>> = rows
+        .into_iter()
+        .map(|row| decode_row::<CleanSync>(row).map(clean_sync_entry))
+        .collect::<Result<_, _>>()?;
+    let mut oldest: Option<DateTime<Utc>> = None;
+    for (database, schema) in &schemas {
+        for table in PREVIEW_REQUIRED_TABLES {
+            let Some(at) = newest.get(&(database.clone(), schema.clone(), table.as_str().into()))
+            else {
+                return Ok((transaction, None));
+            };
+            oldest = Some(oldest.map_or(*at, |oldest| oldest.min(*at)));
         }
-        let key = (
-            location.database.as_deref(),
-            location.schema.as_str(),
-            table.as_str(),
-        );
-        let at = newest.entry(key).or_insert(observation.received_at);
-        *at = (*at).max(observation.received_at);
     }
-    let synced: BTreeSet<&str> = newest.keys().map(|(_, _, table)| *table).collect();
-    let complete: bool = tables.iter().all(|table| synced.contains(table.as_str()));
-    complete.then(|| newest.values().min().copied()).flatten()
+    Ok((transaction, oldest))
+}
+
+fn clean_sync_entry(sync: CleanSync) -> ((Option<String>, String, String), DateTime<Utc>) {
+    (
+        (sync.state_database, sync.state_schema, sync.state_table),
+        sync.synced_at,
+    )
 }
