@@ -103,7 +103,9 @@ draft `full-verify` to run it on the pull request itself; until the merge queue 
 (`SQLBUILD_MERGE_QUEUE`), a change that needs the heavy suites reports `Verify` only after that
 label's run. The 5,000 and 10,000-model
 timing jobs and every wheel platform run nightly on `main`, and a failed nightly run opens or
-updates a `nightly-verify` issue. Each release builds and checks every wheel platform.
+updates a `nightly-verify` issue. While that issue is open, release pull requests fail `Verify`;
+closing it after a fix or a confirmed flake re-runs their checks. Each release builds and checks
+every wheel platform.
 
 For focused iteration, run the narrowest relevant pytest target, for example:
 

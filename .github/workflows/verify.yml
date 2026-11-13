@@ -1407,6 +1407,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       issues: write
+      pull-requests: write
     steps:
       - name: Open or update the nightly Verify issue
         env:
@@ -1432,4 +1433,11 @@ jobs:
           else
             gh issue create --title "Nightly Verify failed on main" \
               --label "${LABEL}" --body-file report.md
+          fi
+          # The open issue holds releases (release-please.yml); stop a release pull request that
+          # already passed its checks from merging before Release Please runs again.
+          release_pr="$(gh pr list --state open --label "autorelease: pending" \
+            --json number --jq '.[0].number // empty')"
+          if [[ -n "${release_pr}" ]]; then
+            gh pr merge "${release_pr}" --disable-auto 2>/dev/null || true
           fi

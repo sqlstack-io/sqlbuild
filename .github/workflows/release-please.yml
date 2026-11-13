@@ -9,6 +9,7 @@ on:
 permissions:
   actions: write
   contents: write
+  issues: read
   pull-requests: write
   statuses: write
 
@@ -21,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       prs_created: ${{ steps.release.outputs.prs_created }}
-      release_branch: ${{ steps.release_branch.outputs.name }}
+      release_branch: ${{ steps.release_branch.outputs.name || steps.open_release.outputs.branch }}
       release_pr: ${{ steps.release_branch.outputs.pr || steps.open_release.outputs.pr }}
     steps:
       - name: Create delivery token
@@ -55,6 +56,8 @@ jobs:
 
       # A push that changes nothing in the release pull request, such as a docs commit, leaves it
       # as checked; the merge job re-enables auto-merge that an earlier run handed to this one.
+      # While a nightly-verify issue is open, or after one held this pull request, the release
+      # checks run again on its branch so the hold applies, or lifts, on every run.
       - name: Find the unchanged release pull request
         id: open_release
         if: steps.release.outputs.prs_created != 'true' && steps.release.outputs.release_created != 'true'
@@ -64,6 +67,16 @@ jobs:
           release_pr="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
             --label "autorelease: pending" --json number --jq '.[0].number // empty')"
           echo "pr=${release_pr}" >> "${GITHUB_OUTPUT}"
+          [[ -n "${release_pr}" ]] || exit 0
+          read -r release_branch head_sha < <(gh pr view "${release_pr}" --repo "${GITHUB_REPOSITORY}" \
+            --json headRefName,headRefOid --jq '"\(.headRefName) \(.headRefOid)"')
+          held="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${head_sha}/status" \
+            --jq '[.statuses[] | select(.context == "Verify")][0].description // "" | startswith("Held by nightly Verify")')"
+          open="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label nightly-verify --state open \
+            --json number --jq length)" || open=unknown
+          if [[ "${held}" == "true" || "${open}" != "0" ]]; then
+            echo "branch=${release_branch}" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Resolve release branch
         id: release_branch
@@ -126,12 +139,44 @@ jobs:
   release-checks:
     name: Release pull request checks
     needs: release-please
-    if: needs.release-please.outputs.prs_created == 'true'
+    if: needs.release-please.outputs.release_branch != ''
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.release-please.outputs.release_branch }}
+
+      # A failed nightly Verify opens an issue labelled nightly-verify. It holds every release
+      # until someone closes it after a fix or a confirmed flake; closing the last one starts
+      # Release Please again (release-gate-recheck.yml), which re-runs these checks.
+      - name: Check for open nightly Verify issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ needs.release-please.outputs.release_pr }}
+        run: |
+          head_sha="$(git rev-parse HEAD)"
+          block() {
+            gh pr merge "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --disable-auto 2>/dev/null || true
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${head_sha}" \
+              -f state=failure -f context=Verify -f "description=Held by nightly Verify: $1" \
+              ${2:+-f "target_url=$2"} >/dev/null
+            echo "### Held by nightly Verify: $1" >> "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          }
+          if ! open="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label nightly-verify \
+            --state open --json url --jq '.[].url')"; then
+            block "could not list nightly-verify issues; rerun the failed Release Please job"
+          fi
+          if [[ -n "${open}" ]]; then
+            echo "${open}" >> "${GITHUB_STEP_SUMMARY}"
+            # An issue closed while the hold was posted found no hold to lift; lift it here.
+            ( block "close the open nightly-verify issue after a fix or a confirmed flake" \
+              "$(head -n 1 <<< "${open}")" ) || true
+            still_open="$(gh issue list --repo "${GITHUB_REPOSITORY}" --label nightly-verify \
+              --state open --json number --jq length)" || still_open=unknown
+            [[ "${still_open}" == "0" ]] || exit 1
+            echo "The nightly-verify issue closed during this check; continuing" >> "${GITHUB_STEP_SUMMARY}"
+          fi
 
       - name: Run release pull request checks
         env:
