@@ -13,7 +13,7 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { changeOpLabel, changeOpTone, formatCredits } from '$lib/build-area/labels';
-	import { summarizeChange } from '$lib/build-area/changes';
+	import { NODE_LIST_LIMIT, nodeChangeGroups, summarizeChange } from '$lib/build-area/changes';
 	import { nodeHref, orchestrationHref, percentChange } from './utils';
 
 	type Area = 'all' | 'nodes' | 'orchestration' | 'roles' | 'environment';
@@ -37,6 +37,8 @@
 			return [c.gitRevision ?? '', c.gitAuthor ?? '', String(c.generation), ...c.nodes.map((n) => n.key), ...c.nodes.map((n) => n.formerKey ?? ''), ...c.orchestration.map((o) => o.key), ...c.roles.map((r) => r.role)].some((s) => s.toLowerCase().includes(q));
 		})
 	);
+	/** Deploys, by snapshot, whose long node list is shown in full. */
+	let listed = $state<Record<string, boolean>>({});
 	const areaOptions: { value: Area; label: string }[] = [
 		{ value: 'all', label: 'All' },
 		{ value: 'nodes', label: 'Nodes' },
@@ -75,9 +77,19 @@
 
 			<div class="body">
 				{#if c.nodes.length}
+					{@const grouped = c.nodes.length > NODE_LIST_LIMIT && !listed[c.snapshotId] && !query.trim()}
 					<section>
-						<h3>Nodes <span>{c.nodes.length}</span></h3>
-						{#each c.nodes as n (n.key + n.op)}
+						<h3>Nodes <span>{c.nodes.length.toLocaleString('en')}</span></h3>
+						{#if grouped}
+							{#each nodeChangeGroups(c.nodes) as g (g.op + g.noun)}
+								<div class="row">
+									<span class="op" style:--tone={changeOpTone[g.op]}>{changeOpLabel[g.op]}</span>
+									<span>{g.count.toLocaleString('en')} {g.noun}</span>
+								</div>
+							{/each}
+							<button class="more" onclick={() => (listed[c.snapshotId] = true)}>Show all {c.nodes.length.toLocaleString('en')} nodes</button>
+						{/if}
+						{#each grouped ? [] : c.nodes as n (n.key + n.op)}
 							{@const href = nodeHref(n, app.client.supports('getCatalogNode'))}
 							<div class="row">
 								<span class="op" style:--tone={changeOpTone[n.op]}>{changeOpLabel[n.op]}</span>
@@ -246,6 +258,14 @@
 		gap: 10px;
 		padding: 4px 0;
 		font-size: 12.5px;
+	}
+	.more {
+		margin-top: 4px;
+		color: var(--primary);
+		font-size: 12.5px;
+	}
+	.more:hover {
+		text-decoration: underline;
 	}
 	.row.sub {
 		padding-left: 22px;
