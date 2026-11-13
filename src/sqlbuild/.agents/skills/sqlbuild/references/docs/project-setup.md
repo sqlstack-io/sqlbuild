@@ -1,0 +1,89 @@
+<!-- generated-by: sqlbuild skills -->
+
+# Set up a project
+
+> Connect a SQLBuild project to your warehouse with dev and prod targets and a personal local file.
+
+Online: https://sqlbuild.com/docs/project-setup/
+
+A project is configured by `sqlbuild_project.toml`, which you commit, and an optional
+`sqlbuild_local.toml`, which each developer keeps to themselves. Start a project with
+[`sqb init`](cli/init.md), or explore one with [`sqb playground`](cli/playground.md).
+
+```text
+project/
+  sqlbuild_project.toml   # committed: shared targets and settings
+  sqlbuild_local.toml     # gitignored: your own target, schema and credentials
+  models/
+  sources/
+  tests/
+```
+
+## Connect to the warehouse
+
+A connection holds how to reach the warehouse. A target names where models are built: a database
+and schema, such as `dev` or `prod`. Several targets can share one connection.
+
+```toml
+name = "shop"
+adapter = "snowflake"
+default_target = "dev"
+
+[connections.warehouse]
+account = "my_org-my_account"
+user = "${ENV:SNOWFLAKE_USER}"
+password = "${ENV:SNOWFLAKE_PASSWORD}"
+warehouse = "TRANSFORM_WH"
+
+[targets.dev]
+connection = "warehouse"
+database = "ANALYTICS"
+schema = "DEV"
+
+[targets.prod]
+connection = "warehouse"
+database = "ANALYTICS"
+schema = "PROD"
+```
+
+`${ENV:NAME}` reads an environment variable, so passwords and tokens stay out of the file. Each
+adapter page lists its connection fields; see [Adapters](concepts/adapters.md).
+
+Check the setup with [`sqb debug`](cli/debug.md), which validates the config and opens a
+connection. Commands that don't need the warehouse, such as `sqb compile`, `sqb test --inspect` and
+`sqb lineage`, work without one.
+
+## Choose a target
+
+Commands build into the target given by `--target`, then the `target` in `sqlbuild_local.toml`, then
+`default_target`:
+
+```bash
+sqb build                 # default_target, or your local target
+sqb build --target prod
+```
+
+## Keep your own settings local
+
+Put what differs for you in `sqlbuild_local.toml` and add it to `.gitignore`. It merges over the
+shared file, key by key, so it holds only what you change:
+
+```toml
+# sqlbuild_local.toml
+target = "dev"
+
+[targets.dev]
+schema = "DEV_ALICE"
+
+[connections.warehouse]
+user = "alice"
+```
+
+The local file can also switch `adapter`, for example to build on DuckDB while the team uses
+Snowflake.
+
+## Next steps
+
+- [Models](concepts/models.md) - write your first model.
+- [Configuration reference](concepts/project-configuration.md) - every project setting, including
+  defaults, path defaults, clone policies and execution limits.

@@ -6,6 +6,16 @@
 
 Online: https://sqlbuild.com/docs/cli/dbt/
 
+## Contents
+
+- sqb dbt plan
+- sqb dbt run
+- sqb dbt build
+- Flags
+- sqb dbt debug
+- Selectors
+- Configuration
+
 Orchestrate dbt and SQLBuild together. Each subcommand runs dbt first, then SQLBuild, with selection logic across both project graphs. dbt remains responsible for dbt-owned models; SQLBuild validates and executes SQLBuild-owned models downstream. See [Using SQLBuild with dbt](../concepts/dbt-compatibility/overview.md) for scope and selection behavior.
 
 ## sqb dbt plan
@@ -47,6 +57,40 @@ snapshot full-refresh policy, `table_type_downgrade`, `time_travel_retention_dec
 confirmation asks for the typed confirmation on an interactive terminal and refuses otherwise;
 build the affected models with `sqb build` and its allow flag instead, or relax the policy. A
 refusal at this point leaves completed dbt work in place and builds no SQLBuild models.
+
+## Flags
+
+`sqb dbt plan/run/build` declare the common flags directly. Anything declared goes **before** a `--` separator; any other raw dbt flag goes **after** it and is forwarded verbatim. A flag placed on the wrong side errors rather than silently reaching dbt.
+
+```bash
+sqb dbt build --select path:models/marts --full-refresh
+```
+
+Declared flags are routed to the right place automatically:
+
+| Flag | Routed to | Notes |
+| ---- | --------- | ----- |
+| `--select` / `--exclude` | dbt | dbt resolves selection (see [Selection](../concepts/dbt-compatibility/selection.md)). |
+| `--vars` | dbt **and** SQLBuild | The same vars feed dbt's compile and SQLBuild's own variable resolution, so both sides see identical values. |
+| `--full-refresh` | dbt **and** SQLBuild | Requests a full rebuild on both sides. dbt and native SQLBuild models independently apply their model-level `full_refresh` setting, including `false` opt-outs. |
+| `--threads` | dbt (`--threads`) and SQLBuild (`--concurrency`) | |
+| `--target` / `--project-dir` / `--profiles-dir` / `--profile` / `--target-path` | dbt | Standard dbt locators. |
+
+### `--vars`
+
+`--vars` accepts the same JSON object dbt accepts, and SQLBuild passes it to **both** the underlying `dbt` invocation and its own variable resolution. That means a value referenced as `@@my_var` in SQLBuild model SQL (see [Variables and placeholders](../concepts/interpolation.md)) and as `{{ var('my_var') }}` in a dbt model both resolve to the value you passed. CLI vars take precedence over project and local config vars. You do not need to declare vars twice.
+
+```bash
+sqb dbt build --select path:models/marts --vars '{"my_var": 1}'
+```
+
+### Forwarding other dbt flags
+
+For any native dbt flag SQLBuild does not declare, put it after `--` and it is passed straight to the `dbt` invocation untouched:
+
+```bash
+sqb dbt build -- --log-level debug
+```
 
 ## sqb dbt debug
 
@@ -93,9 +137,9 @@ profiles_dir = "../profiles"
 target_path = "../dbt_project/target"
 ```
 
-See [Project Configuration](../concepts/project-configuration.md#dbt) for all fields.
+See [Using SQLBuild with dbt](../concepts/dbt-compatibility/overview.md#configuration) for all fields.
 
 SQLBuild-owned work in `sqb dbt plan`, `run` and `build` connects with the target's `build`
-[warehouse group](../concepts/project-configuration.md#command-group-warehouses). dbt itself
+[warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses). dbt itself
 keeps using the warehouse from its profile. These commands do not accept `--warehouse`, because
 their remaining arguments pass through to dbt.

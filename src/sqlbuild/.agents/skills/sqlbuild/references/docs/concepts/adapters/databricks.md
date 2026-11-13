@@ -50,4 +50,4 @@ the authoritative session namespace.
 
 `sqb test` creates each SQL UDF and table function the selected tests call as a session
 `TEMPORARY FUNCTION __sqb_test__<name>`. Python UDFs cannot be temporary, so tests call the built
-Python function. See [Functions in `sqb test`](../testing.md#functions-in-sqb-test).
+Python function. See [Functions in `sqb test`](../testing-reference.md#functions-in-sqb-test).

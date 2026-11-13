@@ -1,6 +1,6 @@
 <!-- generated-by: sqlbuild skills -->
 
-# debug
+# sqb debug
 
 > Validate project configuration and test the warehouse connection.
 
@@ -22,7 +22,7 @@ The command reports four groups of checks:
 
 **Runtime** - SQLBuild version, Python version, Python path, OS info.
 
-**Configuration** - Finds and validates `sqlbuild_project.toml`, loads `sqlbuild_local.toml` if present, resolves the adapter, active target, connection, database, and schema. For Snowflake it also shows the warehouse each [command group](../concepts/project-configuration.md#command-group-warehouses) connects with and where that value came from.
+**Configuration** - Finds and validates `sqlbuild_project.toml`, loads `sqlbuild_local.toml` if present, resolves the adapter, active target, connection, database, and schema. For Snowflake it also shows the warehouse each [command group](../concepts/adapters/snowflake.md#command-group-warehouses) connects with and where that value came from.
 
 **Providers** - Lists the [providers](../concepts/python-nodes/providers.md) the project defines.
 
@@ -34,7 +34,7 @@ The command reports four groups of checks:
 |------|-------------|
 | `--no-connection` | Skip the connection and query tests. Useful for validating config without warehouse access. |
 | `--json` | Output results as JSON instead of formatted text. |
-| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/project-configuration.md#command-group-warehouses) and the connection warehouse |
+| `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Example
 

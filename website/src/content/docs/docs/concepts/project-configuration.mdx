@@ -1,34 +1,13 @@
 ---
-title: "Project Configuration"
-description: "Configure your SQLBuild project with sqlbuild_project.toml and sqlbuild_local.toml."
+title: "Configuration reference"
+description: "Every key in sqlbuild_project.toml and sqlbuild_local.toml."
 ---
 
-SQLBuild projects are configured with two files in the project root:
+Every key in `sqlbuild_project.toml`, which you commit, and `sqlbuild_local.toml`, which each
+developer keeps out of Git. For a walkthrough, see [Set up a project](/docs/project-setup).
 
-- **`sqlbuild_project.toml`** - shared project configuration, committed to version control
-- **`sqlbuild_local.toml`** - local developer overrides, gitignored
-
-Macro, constant, and enum visibility is not configured in either file. Declaration scopes use filesystem conventions; see [Declaration Scopes](/docs/concepts/declaration-scopes).
-
-Most projects need only one committed `sqlbuild_project.toml`. Define shared targets such
-as `dev` and `prod` there, including clone policies and team-wide defaults. Do not maintain
-separate complete project files for each environment.
-
-Create `sqlbuild_local.toml` only when a developer or execution environment needs different
-target selection, credentials, schemas, adapter settings, or variables. SQLBuild loads it
-automatically and merges its explicitly configured values over the shared project config.
-
-```text
-project/
-  sqlbuild_project.toml   # committed: shared targets and behavior
-  sqlbuild_local.toml     # gitignored: this developer's overrides
-```
-
-Add the local file to `.gitignore`:
-
-```gitignore
-sqlbuild_local.toml
-```
+Where macros, constants and enums are visible is set by folders, not in these files; see
+[Declaration Scopes](/docs/concepts/declaration-scopes).
 
 ## sqlbuild_project.toml
 
@@ -67,7 +46,7 @@ materialized = "view"
 
 | Field | Description |
 |-------|-------------|
-| `name` | Project name. Used in fingerprint tracking and manifest generation. |
+| `name` | Project name |
 | `adapter` | Database adapter: `duckdb`, `motherduck`, `snowflake`, `bigquery`, `databricks`, `postgres`, `sqlite`, `sqlserver`, or `clickhouse`. See [Adapters](/docs/concepts/adapters). |
 
 ### Optional fields
@@ -136,11 +115,9 @@ explicitly:
 database = ":memory:"
 ```
 
-A `database` or `schema` present in a named connection is connection/session metadata only;
-it does not satisfy the mandatory namespace strategy for a named target. Put the target's
-authoritative database and schema on `[targets.<name>]`. SQLBuild validates connection
-references while loading configuration, without opening a warehouse connection, and reports
-an unknown `targets.<name>.connection` name as an offline configuration error.
+A `database` or `schema` on a connection doesn't decide where models are built; set them on the
+target. A target that names an unknown connection fails when the configuration loads, before
+anything connects.
 
 ## Targets
 
@@ -155,8 +132,8 @@ A target is a named build context - the database and schema you build into, plus
 | `vars` | Target-specific project variables |
 | `defer_sources_to` | Target name to read managed source data from (see [Loaders](/docs/concepts/python-nodes/loaders#source-deferral)) |
 | `clone` | Clone policy (see below) |
-| `missing_migration_origin` | What a build does when a declared `migrate_from` origin does not exist in this target: `allow` (default), `require_confirmation`, or `deny` (see below) |
-| `warehouses` | Default Snowflake warehouse per command group, `build` and `query` (see below) |
+| `missing_migration_origin` | What a build does when a declared `migrate_from` origin does not exist in this target: `allow` (default), `require_confirmation`, or `deny`. See [Missing migration origins](/docs/concepts/models/migrations#missing-migration-origins) |
+| `warehouses` | Snowflake warehouse per command group, `build` and `query`. See [Command-group warehouses](/docs/concepts/adapters/snowflake#command-group-warehouses) |
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
 
 ```toml
@@ -251,97 +228,6 @@ The value must be an integer of at least `1`; anything else fails with `D001`. `
 `8 configured limit (targets.prod.concurrency)`. `sqb scenario test` has no `--target` option and
 uses the active target's value.
 
-### Command-group warehouses
-
-Builds and ad-hoc inspection usually need different compute. A Snowflake target can choose a
-default warehouse for each command group, so `sqb build` runs on a large warehouse while
-`sqb query` and `sqb diff` stay on a small one:
-
-```toml
-[connections.warehouse]
-account = "my_org-my_account"
-warehouse = "ANALYTICS_WH"            # fallback for every command
-
-[targets.dev]
-connection = "warehouse"
-database = "ANALYTICS"
-schema = "DEV"
-
-[targets.dev.warehouses]
-build = "BUILD_WH"                    # commands in the build group
-query = "ADHOC_WH"                    # commands in the query group
-```
-
-Each command connects with the first warehouse set in this order:
-
-1. `--warehouse <name>` on the command line, for that invocation only
-2. The target's group warehouse, `[targets.<name>.warehouses] build` or `query`
-3. The connection's `warehouse`
-4. The Snowflake user's default warehouse
-
-Both groups are optional; a target without `warehouses` uses the connection's `warehouse`. A group
-warehouse takes precedence over the connection `warehouse` in every file. In particular, a
-shared group overrides a connection `warehouse` you set in `sqlbuild_local.toml`; to change a
-group locally, set the group itself, or pass `--warehouse` for one invocation. Group values
-accept the same `${ENV:...}` and project-variable (`${my_var}`) templates as connection values.
-Group values and `--warehouse` must be Snowflake identifiers: unquoted (`ADHOC_WH`) or
-double-quoted (`"Adhoc WH"`).
-
-Every connection a command opens uses its group, so one invocation never mixes warehouses:
-`sqb build` plans, inspects, and executes on the `build` warehouse, and `sqb diff` creates its
-temporary comparison tables on the `query` warehouse. The exception is `sqb dbt`: it applies the
-`build` group to SQLBuild-owned work, while dbt nodes keep the warehouse from their dbt profile.
-
-| Group | Commands |
-|-------|----------|
-| `build` | `audit`, `build`, `check`, `clone`, `dbt` (SQLBuild-owned work), `load`, `plan`, `seed` |
-| `query` | `contract`, `cost`, `debug`, `diff`, `freshness`, `janitor`, `query`, `scenario`, `test` |
-
-Other commands, such as `compile`, `lineage`, and `format`, never connect to a warehouse.
-Integrations that run builds, such as Dagster, invoke `sqb build` and use the `build` group.
-Standalone `sqb test`, `sqb scenario` and `sqb janitor` use the `query` group because they work on
-fixture data or catalogue metadata; tests and audits that run inside `sqb build` use the `build` group.
-
-Each developer can point ad-hoc commands at their own warehouse without editing shared
-configuration:
-
-```toml
-# sqlbuild_local.toml
-[targets.dev.warehouses]
-query = "ALICE_XS_WH"
-```
-
-Local group values override the project value for the same group only; the other group keeps
-its project value. `sqb debug` shows the resolved warehouse for each group and where it came
-from, and `sqb build --verbose` shows it in the execution header.
-
-Groups need an adapter with a session warehouse: the Snowflake adapter, or a custom adapter
-that extends it. `warehouses` in `sqlbuild_project.toml` is checked against the project's
-adapter, and `warehouses` in `sqlbuild_local.toml` against the adapter you actually run. Setting
-them for an adapter without a session warehouse, or passing `--warehouse`, is an error rather
-than a silently ignored setting. The one exception is a local `adapter` override, for example a
-developer running a Snowflake project on DuckDB: shared groups then don't apply, and
-`sqb debug` reports them as `not used (adapter duckdb)`.
-
-### Missing migration origins
-
-A `migrate_from` declaration, on a model or a column, names a relation or column that exists in the targets where the rename is pending. A target that never built the old name, such as a fresh development schema, has nothing to migrate. `missing_migration_origin` decides what happens there:
-
-| Value | Behavior |
-|-------|----------|
-| `allow` | Default. The plan warns (`M102` for models, `M109` for columns), nothing is migrated, and the model builds as if `migrate_from` were absent. |
-| `require_confirmation` | The build asks for confirmation on a terminal, and stops otherwise; pass `--allow-missing-migration-origin` to confirm in non-interactive runs. |
-| `deny` | The build stops with `M102` or `M109`. Use it for targets where a missing origin means the wrong target or a lost relation. |
-
-```toml
-[targets.prod]
-missing_migration_origin = "deny"
-```
-
-`sqlbuild_local.toml` can override the value for a target.
-
-The policy covers only origins with no build history in the target. A model origin that SQLBuild built in this target but can no longer see, because of permissions or because it was dropped outside SQLBuild, always stops the build with `M102`. Column origins have no such history, so `M109` always follows the policy. `sqb dbt run` and `sqb dbt build` apply the policy too, but have no confirmation flag: they ask on a terminal and stop otherwise. In non-interactive dbt runs, build the affected models with `sqb build --allow-missing-migration-origin` and leave them out of the dbt selection, or set the target's `missing_migration_origin` to `allow`.
-
 ### Clone policies
 
 Targets can declare whether they allow cloning to or from:
@@ -366,9 +252,8 @@ Both policies default to `false`. `sqb clone --from prod --to dev` requires `all
 
 ### Execution limits
 
-Named targets can set optional limits for `sqb build`, and per-item time limits for unit tests and
-scenarios. Limits are useful for development targets where an unexpectedly broad selector or
-long-running command should stop instead of consuming an unbounded amount of warehouse compute.
+A target can cap what one `sqb build` runs, so a broad selector on a development target stops
+instead of running up warehouse cost. A target without this section has no limits.
 
 ```toml
 [targets.dev]
@@ -387,93 +272,16 @@ Automated tools must request approval before changing this policy.
 """
 ```
 
-All fields are optional. A target without an `execution_limits` section has no limits, so
-production or orchestrated targets need no placeholder values.
+| Field | Description |
+|-------|-------------|
+| `max_models` | Most models one build may run. A larger selection stops before anything runs; `sqb plan` has no limit |
+| `max_duration` | Longest one build may run, such as `"45m"`. At the deadline SQLBuild cancels the statements still running |
+| `test_timeout` | Time limit for each unit test on this target, or `"disabled"`; replaces `[settings] test_timeout` |
+| `scenario_timeout` | Time limit for each scenario on this target, or `"disabled"`; replaces `[settings] scenario_timeout` |
+| `remediation` | Text added to limit errors, such as how your team approves a larger build |
 
-#### Model limit
-
-`max_models` is a positive integer. SQLBuild expands selectors and counts model entries that would
-execute. When the count exceeds the target limit, the build exits before clone, load, or model
-execution begins. The error reports the target, selected count, configured maximum, configuration
-key, and confirms that no warehouse changes were made.
-
-`sqb plan` remains unrestricted and can be used to inspect a broad selection safely.
-
-#### Duration limit
-
-`max_duration` is a positive fixed duration such as `30m`, `2h`, or `90s`. It covers planning and
-warehouse-mutating build phases after target resolution. SQLBuild stops dispatching work at the
-deadline, bounds each warehouse statement by the remaining time where the warehouse supports a
-statement limit, and cancels statements still running at the deadline.
-
-Every built-in adapter enforces the limit:
-
-| Adapter | Warehouse statement limit | Cancellation at the deadline | Longest accepted duration |
-|---------|---------------------------|------------------------------|---------------------------|
-| Snowflake | `STATEMENT_TIMEOUT_IN_SECONDS` per statement | Driver cancel request for the running query | 7 days |
-| DuckDB, MotherDuck | None | Connection interrupt | About 24 days |
-| PostgreSQL | `SET LOCAL statement_timeout` inside transactions; statements outside a transaction rely on cancellation | Driver cancel (`cancel_safe`) | About 24 days |
-| BigQuery | Job timeout (`job_timeout_ms`) on each query job | `jobs.cancel`; reported as requested, not confirmed | About 24 days |
-| Databricks | `STATEMENT_TIMEOUT` session setting, capped at 48 hours | Cursor cancel; reported as requested, not confirmed | About 24 days |
-| SQL Server | None; the driver's query timeout is process-wide | Driver cancel | About 24 days |
-| SQLite | None | Connection interrupt | About 24 days |
-
-A project adapter that can't cancel a running statement is rejected for `max_duration`, rather than
-showing a limit that may leave warehouse work running. Under a per-item timeout, its items stop
-before their next statement and report the cancellation as not supported.
-
-A duration failure may come after earlier models completed. Its error therefore says it is a
-timeout, unlike a model-limit failure before execution, and that warehouse changes may already
-have happened.
-
-#### Per-item time limits
-
-Unit test, scenario and model limits (`test_timeout`, `scenario_timeout` and a model's
-`max_duration`) count running time only. The clock starts at the item's first warehouse statement,
-so rendering and setup before it do not count, and it stops during rollback and cleanup, which always
-run even after the limit. A timeout is reported only when the limit passed before the item's work
-finished. Where a warehouse reports queueing separately, queued time is excluded:
-
-| Adapter | How the item limit is enforced | Queued time |
-|---------|--------------------------------|-------------|
-| Snowflake | `STATEMENT_TIMEOUT_IN_SECONDS` per statement, with a client-side backstop after a grace margin of half the limit (at least 30 seconds) | Excluded by the warehouse limit; the backstop counts it |
-| DuckDB, MotherDuck | Connection interrupt at the limit | Not applicable |
-| PostgreSQL | `SET LOCAL statement_timeout` inside transactions; cancellation at the limit | Lock waits count |
-| BigQuery | `jobs.cancel` at the limit; no job timeout, because a job timeout counts from job creation | Excluded: the clock stops while a job is pending |
-| Databricks | `STATEMENT_TIMEOUT` session setting and cursor cancel | May count |
-| SQL Server | Driver cancel at the limit | Lock waits count |
-| SQLite | Connection interrupt at the limit | Waits for the write lock count |
-
-When a model contains unit tests or nested work with its own limit, the earliest limit applies and
-cancels whatever is running under it. After a timeout interrupted a statement, SQLBuild checks the
-connection before giving it to the next item and replaces it if it is no longer usable.
-
-#### Unit test and scenario timeouts
-
-`test_timeout` and `scenario_timeout` set the per-test and per-scenario time limit on this target,
-replacing `[settings] test_timeout` and `[settings] scenario_timeout`. Each takes a positive fixed
-duration or `"disabled"`. See [Unit test and scenario limits](#unit-test-and-scenario-limits).
-
-#### Custom remediation
-
-`remediation` is optional project-authored text. SQLBuild appends it to model-count, duration, and
-unsupported-adapter errors after the factual error details. This lets each project define its own
-approval or recovery process without SQLBuild recommending that users weaken local policy.
-
-#### Local overrides
-
-The same section is accepted in `sqlbuild_local.toml` and follows normal field-by-field local target
-precedence:
-
-```toml
-[targets.dev.execution_limits]
-max_models = 200
-max_duration = "90m"
-```
-
-This permits an intentional developer override while keeping the shared target policy visible in
-`sqlbuild_project.toml`. Other target fields and any execution-limit fields omitted locally continue
-to inherit their project values.
+See [Limits](/docs/cli/build#limits) for how each warehouse enforces them. `sqlbuild_local.toml`
+accepts the same section: the fields it sets replace the project's, and the rest are inherited.
 
 ### Diff limits
 
@@ -645,12 +453,12 @@ delta_compile = true
 |-------|---------|-------------|
 | `sql_analysis` | `true` | Enable SQL syntax analysis, column binding, type inference, output inference, and semantic validation at compile time |
 | `require_sql_analysis` | `false` | Allow `sql_analysis false` (in a MODEL header or a `[path_defaults]` entry) only on models whose SQL the parser cannot read, and reject `[settings] sql_analysis = false` in `sqlbuild_local.toml`. Project file only. See [SQL analysis](/docs/concepts/models/configuration#sql-analysis). |
-| `query_change_tracking` | `true` | Track query fingerprints for change detection. A fingerprint covers the SQL tokens of the compiled query and ignores whitespace, comments, and the letter case of reserved keywords and built-in function names, so formatting-only edits do not rebuild. Every other word, including non-reserved keywords, identifiers, aliases, JSON path keys and user-defined function names, counts exactly, as do string literals, quoted identifiers, numbers, and optimizer hints. |
-| `check_declared_columns` | `true` | Controls whether column declarations on models without a `contract` declaration activate static shape/nullability validation. `true` checks that every declared column is in the SELECT and checks its nullability; `false` treats columns as metadata and audit attachment unless the model declares `contract enforced`. Model-level `contract enforced` and `contract none` override this setting. Explicit type enforcement remains independent. See [Contracts](/docs/concepts/models/contracts). |
+| `query_change_tracking` | `true` | Rebuild a model when its compiled query changes. Whitespace, comments, and the case of reserved keywords and built-in function names don't count as changes |
+| `check_declared_columns` | `true` | Check that models without a `contract` setting output their declared columns, and that `nullable false` columns can't be null. `false` makes those columns documentation and audit targets only. See [Contracts](/docs/concepts/models/contracts) |
 | `concurrency` | `1` | Default number of worker connections for commands that run resources in parallel, such as `sqb build`, `sqb test`, `sqb audit`, and `sqb seed`, and for `sqb janitor` actions on warehouses that run DDL concurrently; a target's `concurrency` and `--concurrency` override it (see [Target concurrency](#target-concurrency)) |
-| `microbatch_concurrency` | `false` | Explicitly permit models with `batch_concurrency > 1`; concurrent batches use immutable coordination facts |
+| `microbatch_concurrency` | `false` | Allow models with `batch_concurrency > 1` |
 | `auto_load_sources` | `true` | Automatically run source loaders before building dependent models during `sqb build`. See [Loaders](/docs/concepts/python-nodes/loaders). |
-| `table_promotion_mode` | adapter default | `staged` (CTAS to staging, audit, then promote) or `immediate` (CTAS directly to target, then audit) |
+| `table_promotion_mode` | `staged` | `staged` builds a table under a staging name and replaces the old one only after audits pass; `immediate` builds in place and audits afterwards. See [Table](/docs/concepts/models/materializations#table) |
 | `default_audit_severity` | `error` | Default severity for audits: `warn` or `error` |
 | `default_audit_run_scope` | `delta_and_final` | Default run scope for audits: `final` or `delta_and_final` |
 | `unit_test_max_real_models` | `10` | Most real (unmocked) models one SQL unit test may execute; a larger test fails compilation. See [Unit test and scenario limits](#unit-test-and-scenario-limits). |
@@ -662,21 +470,16 @@ delta_compile = true
 
 | Setting | Limits | Details |
 |---------|--------|---------|
-| `unit_test_max_real_models` | Real (unmocked) models one SQL unit test may run; a larger test fails compilation and names each model, the path that pulls it in, and the inputs to mock | [Real-model limit](/docs/concepts/testing#real-model-limit) |
-| `test_timeout` | Each unit test's warehouse time, from its first statement | [Time limits](/docs/concepts/testing#time-limits), including precedence |
+| `unit_test_max_real_models` | Real (unmocked) models one SQL unit test may run; a larger test fails compilation and names each model, the path that pulls it in, and the inputs to mock | [Real-model limit](/docs/concepts/testing-reference#real-model-limit) |
+| `test_timeout` | Each unit test's warehouse time, from its first statement | [Time limits](/docs/concepts/testing-reference#time-limits), including precedence |
 | `scenario_timeout` | Each scenario's warehouse time; no default | Below |
 
 The scenario limit that applies is the first one set of `--scenario-timeout`,
 `SCENARIO(timeout "...")`, `[targets.<target>.execution_limits] scenario_timeout`, and
 `[settings] scenario_timeout`. At the limit, SQLBuild cancels the scenario's running statement,
 reports it as `TIMEOUT`, and continues with independent items, as for
-[unit tests](/docs/concepts/testing#time-limits). Every value is a positive fixed duration such as
+[unit tests](/docs/concepts/testing-reference#time-limits). Every value is a positive fixed duration such as
 `"45s"` or `"10m"`, or `"disabled"`. `sqlbuild_local.toml` accepts all three settings.
-
-### Table promotion mode
-
-- **`staged`** (default for most adapters): Materializes into a staging table, runs audits, then swaps into the target. If audits fail, the production table is untouched.
-- **`immediate`**: Creates the table directly at the target location. Audits run after materialization. Simpler but no pre-promotion safety net.
 
 ## Rules
 
@@ -870,24 +673,8 @@ critical_tags = ["critical"]
 
 ## dbt
 
-Configuration for running SQLBuild alongside an existing dbt project:
-
-```toml
-[dbt]
-project_dir = "../dbt_project"
-profiles_dir = "../profiles"
-target_path = "../dbt_project/target"
-target = "dev"
-```
-
-| Field | Description |
-|-------|-------------|
-| `project_dir` | Path to the dbt project root (where `dbt_project.yml` lives) |
-| `profiles_dir` | Path to the directory containing `profiles.yml` |
-| `target_path` | Path to dbt's `target/` directory (where `manifest.json` is written) |
-| `target` | dbt target name override (optional) |
-
-Paths can be absolute or relative to the SQLBuild project root. See [Using SQLBuild with dbt](/docs/concepts/dbt-compatibility/overview) for setup and usage details.
+`[dbt]` points SQLBuild at an existing dbt project. See
+[Using SQLBuild with dbt](/docs/concepts/dbt-compatibility/overview#configuration) for its fields.
 
 ## Skills
 
@@ -971,7 +758,3 @@ configured fields. Target blocks merge the same way and may override the connect
 `database`, `schema`, `loader_schema`, variables, source deferral, and policy fields. Unspecified
 values continue to come from `sqlbuild_project.toml`; a local reference to an unknown merged
 connection still fails offline during configuration loading.
-
-This replaces the common dbt pattern of switching profiles or setting environment variables
-to change targets. Each developer sets their target, named connection, and preferences once in
-`sqlbuild_local.toml` and it persists across sessions.

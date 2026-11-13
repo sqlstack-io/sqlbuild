@@ -188,20 +188,11 @@ built-in Rules that did not run. `L007` never changes an exit code, including fo
 `sqb build`: it reports a gap in SQLBuild's dialect support, not a problem in your SQL. A syntax
 error in a supported dialect still fails the Rules that read it.
 
-## One definition of project validity
+## When Rules run
 
-`sqb compile` is authoritative. SQLBuild evaluates a project in this order:
-
-```text
-mandatory compiler correctness
-→ selected native built-in Rules
-→ selected custom Python Rules
-→ artifact completion
-```
-
-Build and planning commands use the same compiler path. Configured findings stop execution before a
-warehouse connection is opened. Compile artifacts are not completed from a project that failed its
-Rules.
+Rules run in every `sqb compile`, `sqb plan` and `sqb build`, after SQLBuild's own checks pass. If a
+Rule fails, nothing runs in the warehouse. See
+[Execution and caching](/docs/concepts/rules/execution-and-caching).
 
 ## Rules compared with tests, audits, and contracts
 
@@ -231,24 +222,12 @@ comments, and mandatory compiler correctness cannot be excepted at all.
 
 See [Findings and exceptions](/docs/concepts/rules/findings-and-exceptions) for configuration examples.
 
-## Performance is part of the design
+## Performance
 
-Model Rules are evaluated and cached per model. Editing one model invalidates affected subjects
-rather than every invocation. Project Rules run once over the complete project view and are the
-explicit choice for genuinely project-wide requirements, with broader invalidation. SQLBuild tracks
-the inputs each Rule depends on so cached findings are reused only while those inputs remain valid.
-
-The default SQL Rules lint every compiled model, so a cold compile without a cache costs more than
-the compiler alone: about 14% more wall time and 28% more CPU on a generated 3,000-model project.
-Warm and one-model edit compiles reuse cached findings and cost the same. Set `select = []` to
-measure or run the compiler without them.
-
-Required CI exercises custom Rule packs over generated projects, checking compilation time,
-memory, and cache invalidation. Separate 20- and 100-Rule profiles measure the cost of custom
-validation at 5,000-model scale.
-
-See [Benchmarks](/docs/benchmarks#compiler-guards-in-ci) for the benchmark profiles and reproduction commands,
-and [Execution and caching](/docs/concepts/rules/execution-and-caching) for the Rules lifecycle.
+Rules are cached per model, so editing one model re-checks only what it affects. The default SQL
+Rules add about 14% to a cold compile and nothing to a warm one. See
+[Benchmarks](/docs/benchmarks#compiler-guards-in-ci) and
+[Execution and caching](/docs/concepts/rules/execution-and-caching).
 
 ## Continue
 

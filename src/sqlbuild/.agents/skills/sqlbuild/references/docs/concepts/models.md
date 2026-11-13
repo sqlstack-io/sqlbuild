@@ -62,7 +62,7 @@ See [Functions](functions.md) for scalar UDF and table-function references.
 ## Model guide
 
 - [Materializations](models/materializations.md): views, tables, incrementals, snapshots, and custom materializations.
-- [Schemas](models/schemas.md): inline columns, reusable schemas, inheritance, audits, and model-local extensions.
+- [Reusable column schemas](models/schemas.md): inline columns, reusable schemas, inheritance, audits, and model-local extensions.
 - [Type Enforcement](models/type-enforcement.md): static type checks and runtime cast behavior by materialization.
 - [Contracts](models/contracts.md): exact and open output validation, runtime guarantees, nullability, and enum-backed columns.
 - [Hooks](models/hooks.md): SQL and Python lifecycle hooks.

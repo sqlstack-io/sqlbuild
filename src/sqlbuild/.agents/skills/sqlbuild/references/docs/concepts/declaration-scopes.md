@@ -9,7 +9,7 @@ Online: https://sqlbuild.com/docs/concepts/declaration-scopes/
 ## Contents
 
 - Example
-- Terms used in text output
+- Labels in `sqb scope` output
 - Choose a location
 - Explore the feature
 
@@ -96,11 +96,11 @@ the owner folder, or compilation fails; they never change where the declaration 
 
 Declarations do not flow upward or sideways into sibling directories.
 
-## Terms used in text output
+## Labels in `sqb scope` output
 
 The CLI's text output uses short labels for the same four rules:
 
-| Canonical label | Plain-language meaning |
+| Label | Meaning |
 |-----------------|------------------------|
 | `project` | Available throughout the project |
 | `descendant-public` | Available in this folder and folders below it |
@@ -110,11 +110,6 @@ The CLI's text output uses short labels for the same four rules:
 Here, an **owner folder** is simply the folder directly containing a model, test, hook, function, or
 other authored resource. The [Scope Explorer](declaration-scopes/explorer.md) shows the owner
 folder, its parents, and project-wide declarations separately.
-
-JSON keeps the underlying enum values for integrations. Its `scope` field uses `global`,
-`inherited`, `local`, or `private`, while derived `visibility` values use underscores, such as
-`descendant_public` and `exact_owner_private`. Consumers should use the fields documented in the
-versioned JSON schema rather than parsing text labels.
 
 ## Choose a location
 
@@ -141,5 +136,5 @@ top-level roles as a genuine project API instead of a neutral dumping ground.
 
 Learn the features themselves in [Enums](enums.md), [Constants](constants.md),
 [Macros](macros.md), [Audits](audits.md),
-[Reusable Schemas](models/schemas.md), and [Hooks](models/hooks.md). See [Interpolation](interpolation.md) for project,
+[Reusable column schemas](models/schemas.md), and [Hooks](models/hooks.md). See [Variables and placeholders](interpolation.md) for project,
 environment, and runtime context values, which are separate from declarations.

@@ -1,6 +1,8 @@
 ---
-title: "rename and mv"
+title: "sqb rename and sqb mv"
 description: "Rename or move a model, or rename a column, and update every reference in one verified step."
+sidebar:
+  label: "rename / mv"
 ---
 
 `sqb rename` and `sqb mv` change a name everywhere the compiler knows it is used, instead of leaving you to find every `__ref`, fixture, and header by hand. Every edit comes from compiled facts, not text search: a column rename follows the columns each query actually binds, so a same-named column of another table is left alone.
@@ -57,7 +59,7 @@ stg_order_cents     models/finance/
 stg_order_refunds   models/finance/
 ```
 
-The moves are planned and verified together: the project compiles once before planning and the edited project once after, whatever the number of moves. As with a single move, adding `migrate_from` to models whose relation moves takes one more compile of the edited project. Declarations and unit tests are placed for the state after every move, so a macro whose users all move goes straight to their new folder instead of up to a shared folder and back. States between the moves are never checked, which lets a batch make a change that no order of single moves could make. As with one move, nothing is written unless the whole batch compiles.
+The moves are checked together, as one change: nothing is written unless the project compiles after all of them. Declarations and unit tests go where the final state needs them, so a macro whose users all move goes straight to their new folder.
 
 A batch is refused when it moves the same model twice, moves two models to the same file, gives two models the same new name, or gives a model the name another model of the batch gives up: the old name keeps working through a compatibility view after the rename, so it must stay free. With `--dry-run`, the output lists the combined edits of every move.
 
@@ -70,7 +72,7 @@ sqb rename stg_orders stg_order_lines fact_orders fact_order_lines
 sqb rename --from-file renames.tsv --dry-run
 ```
 
-The renames are planned and verified together, with one compile before and one of the edited project after, and each renamed model gets its own `migrate_from`, so every old name keeps working through its compatibility view after the next build. The same refusals as for batch moves apply: a model renamed twice, two models given one name, or a model taking a name another model of the batch gives up. Column renames and `--cascade` take one `<model>.<column> <new_name>` per command; a batch that names a column is refused.
+The renames are checked together, and each renamed model gets its own `migrate_from`. The same refusals as for batch moves apply: a model renamed twice, two models given one name, or a model taking a name another model of the batch gives up. Column renames and `--cascade` take one `<model>.<column> <new_name>` per command; a batch that names a column is refused.
 
 ## What changes
 
@@ -123,7 +125,7 @@ By default a column rename is one step: downstream models keep their output name
 
 A renamed model keeps its warehouse history through a [model migration](/docs/concepts/models/migrations). Whenever the model's relation moves and its materialization keeps warehouse data (table, view, incremental, or snapshot), the command adds `migrate_from <old_name>` to the model header, so the move does not depend on automatic discovery finding exactly one match. The next `sqb build` migrates the relation and leaves a compatibility view at the old name. A move that keeps the relation, such as a folder change in the same schema, adds nothing.
 
-On a target that never built the old name, the origin is missing. By default the plan warns and the model builds fresh; set [`missing_migration_origin`](/docs/concepts/project-configuration#missing-migration-origins) on a target to require confirmation or stop the build instead.
+On a target that never built the old name, the origin is missing. By default the plan warns and the model builds fresh; set [`missing_migration_origin`](/docs/concepts/models/migrations#missing-migration-origins) on a target to require confirmation or stop the build instead.
 
 A renamed column of an incremental or snapshot model gets `<new> (migrate_from <old>)` in its `columns` block, so the next build renames it in place as a [column migration](/docs/concepts/models/column-migrations). Table and view models are rebuilt with the new column anyway; they get the declaration only when the model itself declares `migrate_from`.
 
@@ -133,9 +135,9 @@ The command refuses a rename while the model, or the column, still declares `mig
 
 A project that already fails some project rules, such as a folder holding more models than a layout rule allows, can still be refactored, so that a move can repair it. Only rule failures are tolerated: a project with syntax, binding, or reference errors is refused before planning, as is any project `sqb compile` cannot load.
 
-The command compiles the project as `sqb compile` does, including SQL test planning, records its rule failures before planning, and compares the edited project with them. A rule failure of the edited project is existing when the project already had one with the same code, at the same place (a moved file keeps its identity), and with the same message. It is also existing when only its numbers changed and none grew, such as a folder that now holds 41 models instead of 44. Any other change, new numbers, larger numbers, or different words, makes it new or worse, and it blocks the write, as do all errors that are not rule failures. Rules stay enabled throughout; nothing is ignored.
+A rule failure that the project already had, at the same place and with the same message, doesn't block the change. Neither does one whose numbers only went down, such as a folder that now holds 41 models instead of 44. A new or worse failure blocks the write. Rules stay enabled throughout.
 
-The output, including `--dry-run`, lists the existing failures under `Existing rule failures`, with how many the change resolved and how many remain. Some rules report a failure at one sample file of a group, so moving part of the group can change the reported place or message and block the move even when it helps. Move the whole group in one batch instead: moving the direct models of a folder into a sub-folder at once, so that it turns from a leaf into a branch, is `sqb mv a models/entry/records/ b models/entry/records/ c models/entry/records/`.
+The output, including `--dry-run`, lists them under `Existing rule failures`, with how many the change resolved. Some rules report a failure at one sample file of a group, so moving part of the group can block the move even when it helps. Move the whole group in one batch instead: moving the direct models of a folder into a sub-folder at once, so that it turns from a leaf into a branch, is `sqb mv a models/entry/records/ b models/entry/records/ c models/entry/records/`.
 
 ## Refusals
 

@@ -14,11 +14,24 @@ Online: https://sqlbuild.com/docs/concepts/incremental/
 - Microbatch execution
 - Replay on change
 
-Incremental models process only new or changed data instead of rebuilding the entire table. In the
-default sequential path, SQLBuild works out where to resume from the current target and input
-relations with no separate checkpoint store. A retry recomputes its interval from current warehouse
-state rather than reusing the exact interval of a failed attempt. Opt-in concurrent microbatching
-adds immutable coordination facts as described below.
+An incremental model processes only new or changed rows on each build instead of rebuilding the
+whole table. Pick a strategy and a cursor column, and SQLBuild works out where to resume from the
+table itself, with no separate checkpoint store:
+
+```sql
+MODEL (
+  description "Order activity per hour",
+  materialized incremental,
+  incremental_strategy delete_insert,
+  cursor activity_hour,
+  cursor_type timestamp,
+  cursor_grain hour,
+  unique_key [activity_hour],
+);
+```
+
+A retry works out its range again from the warehouse. [Concurrent microbatches](#concurrent-batches) are the exception:
+they record each batch to coordinate.
 
 ## Strategies
 

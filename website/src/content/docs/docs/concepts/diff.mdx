@@ -388,4 +388,5 @@ reconciliation, inspection, materialization, comparison, cleanup, and total dura
 
 ## Exit codes
 
-In model mode, `sqb diff` returns exit code `0` when all selected models have no differences, `1` when any model has schema or row differences, and `2` when the size guard stopped a default full diff before reading data. Raw-query mode uses the exit codes in [Query output and exit codes](#query-output-and-exit-codes). This makes it usable in CI pipelines as a validation gate.
+`sqb diff` exits `1` when it finds differences, so it works as a CI gate. See
+[`sqb diff`](/docs/cli/diff#exit-codes) for every exit code.

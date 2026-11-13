@@ -1,8 +1,8 @@
 <!-- generated-by: sqlbuild skills -->
 
-# Schemas
+# Reusable column schemas
 
-> Declare model columns inline or reuse canonical inherited schemas.
+> Declare a model's columns in its header, or once in a SCHEMA() that many models share.
 
 Online: https://sqlbuild.com/docs/concepts/models/schemas/
 
@@ -13,10 +13,12 @@ Online: https://sqlbuild.com/docs/concepts/models/schemas/
 - Model-local columns
 - Model-specific column audits
 - Inheritance
-- Contracts and planning
+- Contracts and rebuilds
 - Limitations
 
-Schema metadata defines column names, types, nullability, descriptions, and column audits. It can live inline in one `MODEL()` header or in a reusable `SCHEMA()` declaration.
+A model's columns, with their types, nullability, descriptions and audits, are declared in its
+`MODEL()` header. When several models output the same columns, declare them once in a `SCHEMA()` and
+bind each model to it.
 
 ## Inline columns
 
@@ -135,13 +137,16 @@ binding a schema. Enum column types must likewise be visible from the schema's o
 
 Inheritance may be transitive. Parent columns resolve before child columns. An inherited column cannot be redeclared or overridden in a child schema. SQLBuild rejects unknown parents, cycles, case-insensitive duplicates, and multiple parents.
 
-Physical SQL output order is not currently enforced. Static contract analysis matches names and checks declared types and proven non-nullability. Runtime exact-contract validation matches names and types but does not validate nullability.
+## Contracts and rebuilds
 
-## Contracts and planning
+A model's [contract](contracts.md) covers its full column list: the schema's
+columns plus the ones the model adds.
 
-`contract enforced` treats the complete named-plus-local declaration as the exact output shape. An unspecified model follows the project's `check_declared_columns` setting; `contract none` explicitly keeps the resolved columns as metadata, audit attachment, and type-enforcement inputs without activating shape validation. See [Contracts](contracts.md).
-
-For models bound to a reusable schema, effective column names, types, nullability, and enum members participate in model version identity. Changing those fields on a parent therefore affects models bound through descendants. Descriptions do not change model identity. Audits have their own audit-gate identities, so audit changes invalidate reusable audit results without changing the model version itself.
+Changing a column's name or type in a schema changes every model bound to it, or to a schema that
+extends it. The plan shows those models as `Schema changed` and replays them as described in
+[Replay decisions](../planning/replay-decisions.md). Changing nullability or a description
+doesn't change the plan.
+Changing an audit reruns that audit without changing the model.
 
 ## Limitations
 

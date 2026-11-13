@@ -66,7 +66,7 @@ allowed_tests = ["customers__reviewed_empty_input"]
 `SQBRTEST203` (`empty-input-only-test`) accepts `allowed_tests`, a list of SQL test names that are
 reviewed exceptions. Listed tests are not flagged and still count toward `SQBRTEST202`'s
 `min_tests_per_model`. Entries that name no existing test are reported as stale. See
-[Empty-input tests](/docs/concepts/testing#empty-input-tests).
+[Empty-input tests](/docs/concepts/testing-reference#empty-input-tests).
 
 `SQBRGRAPH103` and `SQBRPROJECT107` accept `published_layers`, and `SQBRPROJECT107` accepts
 `allowed_qualifiers`, a list of `{ qualifier, reason }` or `{ paths, reason }` tables with an
@@ -137,19 +137,19 @@ final AS (
 SELECT event_id, order_id, status FROM final
 ```
 
-Each `SELECT` is checked on its own: its select list, `FROM`, `JOIN ... ON`, `WHERE`, `GROUP BY`,
-`HAVING`, `QUALIFY` and `ORDER BY`. A nested `SELECT`, subquery, CTE body or set-operation branch is
-a separate scope. Calls are grouped by function and by the column reference as written, with names
-compared the way the warehouse resolves them: on Snowflake unquoted names fold to upper case and
-quoted names compare exactly, so `"VALUE"` matches `value` but `"Value"` does not; on DuckDB,
-BigQuery and Databricks names compare case-insensitively whether or not they are quoted. References
-are not resolved, so `value` and `e.value`, or `events.value` and
-`e.value`, are different groups. The argument may be wrapped in parentheses, `LOWER`, `UPPER`,
-`TRIM` without trim characters, `CAST`, `TRY_CAST` or a single-argument `COALESCE`; a wrapper with
-more arguments, such as `COALESCE(e.value, e.backup)`, is not a plain column and is not counted. One
-finding is reported at the second call and names the count with the column as written, for example
-`TRY_PARSE_JSON(e.value) is parsed 3 times in one SELECT`. Different parse functions, such as
-`PARSE_JSON` and `TRY_PARSE_JSON`, are counted separately. There is no automatic fix.
+The finding is reported at the second call, for example
+`TRY_PARSE_JSON(e.value) is parsed 3 times in one SELECT`. There is no automatic fix.
+
+Details:
+
+- Each `SELECT` is checked on its own. A subquery, CTE body or set-operation branch is a separate
+  `SELECT`.
+- Calls count as the same when they use the same function on the same column as written: `value`
+  and `e.value` are different. Names compare as the warehouse compares them: on Snowflake,
+  unquoted names fold to upper case; on DuckDB, BigQuery and Databricks, case never matters.
+- The column may be wrapped in parentheses, `LOWER`, `UPPER`, `TRIM`, `CAST`, `TRY_CAST` or a
+  one-argument `COALESCE`. `COALESCE(e.value, e.backup)` is not a plain column and isn't counted.
+- `PARSE_JSON` and `TRY_PARSE_JSON` are counted separately.
 
 Known limitations:
 

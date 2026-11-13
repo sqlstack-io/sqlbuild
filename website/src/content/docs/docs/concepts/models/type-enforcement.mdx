@@ -3,7 +3,7 @@ title: "Type Enforcement"
 description: "Understand declared model types, static checks, and runtime casting."
 ---
 
-Type enforcement makes authored column types operational. It is a model feature as well as a related source feature, and it is separate from whether a model uses an exact contract.
+Declare a column's type and SQLBuild checks it at compile time and, on staged tables and incremental models, casts the column to it at runtime. You don't switch it on: any declared type enables it.
 
 ## Enabling it
 
@@ -55,17 +55,10 @@ Runtime cast support currently depends on materialization:
 
 Staged promotion is the default table mode. If a project selects immediate table promotion, a typed model fails with guidance to use staged promotion because SQLBuild cannot inspect and reconstruct output before mutating the destination.
 
-## Type enforcement versus contracts
+## Type enforcement and contracts
 
-These controls answer different questions:
-
-| Feature | Question |
-|---------|----------|
-| Type enforcement | Should typed columns be checked and, on supported paths, cast to their declared physical types? |
-| `contract none` | Which declared columns can SQLBuild verify statically while still allowing additional output columns? |
-| `contract enforced` | Must the output have exactly the complete declared shape? |
-
-Type enforcement can be active with `contract none`. Conversely, an enforced contract may contain untyped columns: exact shape validation still checks their names, but there is no declared physical type to cast or compare.
+Type enforcement works whatever the model's `contract` setting, including `contract none`. A
+contract decides which columns must exist; see [Contracts](/docs/concepts/models/contracts).
 
 ## Schema changes
 

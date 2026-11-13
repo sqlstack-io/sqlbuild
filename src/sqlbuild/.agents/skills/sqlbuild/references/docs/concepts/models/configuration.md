@@ -108,22 +108,21 @@ MODEL (
 );
 ```
 
-A `"` inside a `"..."` string ends it, so it is an error with its line and column rather than the
-start of an escape. A description has no `\"` escape and no `""` doubling: in a `"..."`
-description a backslash is an ordinary character, so `"Files under C:\"` ends with a backslash and
-`"Path C:\\temp"` stores both backslashes. In a `'...'` description, `\'` and `''` both stand for
-one `'`, as in `'it\'s'` and `'it''s'`. `sqb format --fix` rewrites a description that escapes its
-quotes as `\"` or doubles them as `""` into a `"""..."""` string holding real quotes:
+Quotes inside strings:
+
+- A `"` inside a `"..."` string ends it, so it is an error. There is no `\"` escape and no `""`
+  doubling; use `"""..."""` instead. `sqb format --fix` rewrites such a description for you.
+- In a `"..."` string, a backslash is an ordinary character: `"Path C:\\temp"` stores both
+  backslashes.
+- In a `'...'` string, `\'` and `''` both stand for one `'`, as in `'it\'s'` and `'it''s'`.
 
 ```text
 error[D002]: MODEL(...) in 'models/customers.sql:2:34' contains invalid SQLBuild header syntax: a double quote ends this "..." string early; use """…""" for text containing double quotes
   = help: write the text between triple quotes, where quotes need no escaping: description """Matches "Miss"."""; sqb format --fix rewrites a description that escapes its quotes as \" or doubles them as ""
 ```
 
-A `"""..."""` string ends at the first three double quotes in a row. Up to two quotes just before
-them belong to the text, so the text may end with a quote, but it cannot contain three in a row.
-A `"""` inside the text and a `"""` that is never closed fail with the position of the offending
-quote or of the opening `"""`.
+- A `"""..."""` string ends at the first three double quotes in a row. The text may end with a
+  quote but can't contain three in a row.
 
 ### Folded descriptions
 
@@ -329,7 +328,7 @@ whole attempt, starting when the model begins executing: its hooks, statements, 
 every microbatch. Time spent waiting for upstream models or for a free worker does not count.
 
 At the deadline SQLBuild cancels the model's running statements through the adapter (see the
-[adapter table](../project-configuration.md#duration-limit)), runs no further statements
+[adapter table](../../cli/build.md#duration-limit)), runs no further statements
 for the attempt, and reports the model as timed out with the elapsed time, the limit, where it was
 set, the cancellation outcome and the query IDs it saw. Statements that already completed are not
 undone, but the attempt stops before any later promotion or swap, so a staged table is not
@@ -337,5 +336,5 @@ published. Models that depend on it are skipped as for any failure, and independ
 A model that finishes successfully just after its limit keeps its successful result.
 
 The per-model limit is separate from the target's whole-build
-[`max_duration`](../project-configuration.md#duration-limit). When both apply, each
+[`max_duration`](../../cli/build.md#duration-limit). When both apply, each
 statement is bounded by whichever deadline comes first.

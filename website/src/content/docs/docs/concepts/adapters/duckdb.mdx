@@ -3,33 +3,8 @@ title: "DuckDB"
 description: "DuckDB adapter configuration for SQLBuild."
 ---
 
-DuckDB is included as a core dependency. No extra installation needed.
-
-SQLBuild requires DuckDB 2.0 or later. DuckDB 2.0 writes new database files in a storage format
-that DuckDB 1.x cannot open, so a database file SQLBuild creates can only be read by DuckDB 2.0
-clients. A file that already exists keeps its storage version, so a file created by DuckDB 1.x
-stays readable by 1.x. To create a new file that 1.x can read, create it before the first build
-with an explicit storage version, for example
-`duckdb my_project.duckdb -storage-version v1.5.0 -c "SELECT 1"`.
-
-## SQL that behaves differently on DuckDB 2.0
-
-DuckDB 2.0 changes how some SQL runs. SQLBuild runs model SQL as written, so check models for
-these before upgrading:
-
-- Arrow lambdas such as `list_filter(xs, x -> x > 0)` are rejected by default. Write
-  `list_filter(xs, lambda x: x > 0)` instead. DuckDB 2.1 removes the arrow syntax.
-- `~` and `!~` match a regular expression anywhere in the string, as in PostgreSQL, so
-  `'abc' ~ 'b'` is now true. Use `regexp_full_match` for a match of the whole string.
-- `MERGE` fails when one target row matches several source rows, instead of picking one. Keep
-  an incremental model's new rows unique on its `unique_key`.
-- An untyped `NULL`, as in `SELECT NULL AS discount`, creates a column of type `"NULL"` that
-  rejects later non-null values. Cast it, for example `CAST(NULL AS DECIMAL(18, 2)) AS discount`.
-- Integer division `//` and modulo `%` by zero raise an error instead of returning `NULL`. Wrap
-  the expression in `TRY(...)` to get `NULL`.
-
-dlt's dataset read API calls a DuckDB method that DuckDB 2.0 removed when it reads a loaded table
-back as one whole Arrow table, so that read fails. Dataframe and chunked Arrow reads still work. Loading data with dlt is not affected.
+DuckDB is included as a core dependency. No extra installation needed. SQLBuild requires DuckDB 2.0
+or later; see [Upgrading from DuckDB 1.x](#upgrading-from-duckdb-1x).
 
 ## Connection config
 
@@ -82,17 +57,34 @@ the dbt project or the working directory.
 Every connection of a command attaches it once: connections to the same project database share the
 attachment.
 
-## Table promotion mode
-
-DuckDB defaults to `staged` promotion: tables are materialized into a staging table, audited, then swapped into the target. This is configurable in `settings`:
-
-```toml
-[settings]
-table_promotion_mode = "staged"
-```
-
 ## Functions in unit tests
 
 `sqb test` copies each SQL UDF and table function the selected tests call into a `CREATE TEMP
 MACRO` on every test connection, called as `temp.main.<name>`, so tests use the current project
-definition without a build. Python UDFs are registered on each test connection. See [Functions in `sqb test`](/docs/concepts/testing#functions-in-sqb-test).
+definition without a build. Python UDFs are registered on each test connection. See [Functions in `sqb test`](/docs/concepts/testing-reference#functions-in-sqb-test).
+
+## Upgrading from DuckDB 1.x
+
+DuckDB 2.0 writes new database files in a storage format
+that DuckDB 1.x cannot open, so a database file SQLBuild creates can only be read by DuckDB 2.0
+clients. A file that already exists keeps its storage version, so a file created by DuckDB 1.x
+stays readable by 1.x. To create a new file that 1.x can read, create it before the first build
+with an explicit storage version, for example
+`duckdb my_project.duckdb -storage-version v1.5.0 -c "SELECT 1"`.
+
+When you upgrade from DuckDB 1.x, check models for SQL that runs differently on 2.0. SQLBuild runs
+model SQL as written:
+
+- Arrow lambdas such as `list_filter(xs, x -> x > 0)` are rejected by default. Write
+  `list_filter(xs, lambda x: x > 0)` instead. DuckDB 2.1 removes the arrow syntax.
+- `~` and `!~` match a regular expression anywhere in the string, as in PostgreSQL, so
+  `'abc' ~ 'b'` is true. Use `regexp_full_match` for a match of the whole string.
+- `MERGE` fails when one target row matches several source rows, instead of picking one. Keep
+  an incremental model's new rows unique on its `unique_key`.
+- An untyped `NULL`, as in `SELECT NULL AS discount`, creates a column of type `"NULL"` that
+  rejects later non-null values. Cast it, for example `CAST(NULL AS DECIMAL(18, 2)) AS discount`.
+- Integer division `//` and modulo `%` by zero raise an error instead of returning `NULL`. Wrap
+  the expression in `TRY(...)` to get `NULL`.
+
+dlt's dataset read API calls a DuckDB method that DuckDB 2.0 removed when it reads a loaded table
+back as one whole Arrow table, so that read fails. Dataframe and chunked Arrow reads still work. Loading data with dlt is not affected.
