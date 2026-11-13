@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.217.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.216.0...v0.217.0) (2026-11-13)
+
+
+### Features
+
+* **ui:** plan page in tabs, folder lineage and readable job graphs ([#1442](https://github.com/sqlstack-io/sqlbuild/issues/1442)) ([f242cb2](https://github.com/sqlstack-io/sqlbuild/commit/f242cb280fdb832e316fba7b3df86ef3c5255d49))
+* **ui:** show why runs fail and which nodes are stale ([#1440](https://github.com/sqlstack-io/sqlbuild/issues/1440)) ([6730e20](https://github.com/sqlstack-io/sqlbuild/commit/6730e20ffe10059e2a98b609707969231f279257))
+
 ## [0.216.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.215.0...v0.216.0) (2026-11-13)
 
 
