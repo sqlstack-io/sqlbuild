@@ -45,9 +45,17 @@ fn observation(
 }
 
 fn sync_report(session: Uuid, table: &str, failure: Option<&str>) -> LocationHealthReport {
+    schema_sync_report(session, ("main", table), failure)
+}
+
+fn schema_sync_report(
+    session: Uuid,
+    (schema, table): (&str, &str),
+    failure: Option<&str>,
+) -> LocationHealthReport {
     serde_json::from_value(json!({
         "event_id": Uuid::now_v7(), "session_id": session, "target": "preview",
-        "health": {"kind": "warehouse_sync", "generation": 1, "location": {"database": null, "schema": "main"},
+        "health": {"kind": "warehouse_sync", "generation": 1, "location": {"database": null, "schema": schema},
             "table": table, "failure": failure, "records_sent": 1, "elapsed_millis": 1},
     }))
     .expect("sync health")
@@ -208,6 +216,23 @@ pub(crate) async fn preview_copy_scope(
         assert!(
             outbound
                 .report_health(&report)
+                .await
+                .expect("report health")
+        );
+    }
+    assert_eq!(
+        copy().await.synced_at,
+        None,
+        "every table of main synced, but products builds into reporting, which never synced"
+    );
+    for table in ["catalog", "fingerprints", "consumption"] {
+        assert!(
+            outbound
+                .report_health(&schema_sync_report(
+                    preview_session,
+                    ("reporting", table),
+                    None
+                ))
                 .await
                 .expect("report health")
         );

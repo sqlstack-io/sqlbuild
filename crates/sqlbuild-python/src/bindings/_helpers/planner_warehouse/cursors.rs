@@ -91,6 +91,8 @@ struct CursorModel<'py> {
     effective_grain: Bound<'py, PyAny>,
     start_cursor_config: Bound<'py, PyAny>,
     has_start_override: bool,
+    /// Lookback, a backfill duration or microbatches move the run's start off the last cursor.
+    replays: bool,
     watermark_mode: Bound<'py, PyAny>,
     watermark_all: bool,
     watermark_strategy: bool,
@@ -487,6 +489,9 @@ fn collect_models<'py>(
             effective_grain,
             start_cursor_config: resolve_start_cursor_config(&model, &inputs.start_cursor_config)?,
             has_start_override: start_override_set(&model, &inputs.cursor_overrides)?,
+            replays: config_str(&model, "lookback")?.is_some()
+                || config_str(&model, "backfill_duration")?.is_some()
+                || config_str(&model, "batch_size")?.is_some(),
             watermark_all: watermark_mode.eq("all")?,
             watermark_mode,
             watermark_strategy: strategy.as_deref() == Some("watermark"),
@@ -1168,7 +1173,12 @@ fn synced_copy_values<'py>(
             (Some(tag), Some(observed)) => {
                 let value = text(info.effective_grain.py(), observed);
                 values.insert(tag.clone(), parse_warehouse_cursor(&value)?);
-                if reads_inputs {
+                if reads_inputs && info.replays {
+                    facade.mark_unknown(format!(
+                        "cursor window of {} (lookback or backfill starts it before the last build's cursor)",
+                        info.model_name
+                    ));
+                } else if reads_inputs {
                     facade.mark_window(&info.model_name, observed);
                 }
                 if !info.start_cursor_config.is_none()

@@ -448,6 +448,15 @@ pub struct PreviewLatestRun {
     pub run_id: String,
 }
 
+/// One state table's newest clean sync in one schema, from location health.
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct CleanSync {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub state_table: String,
+    pub synced_at: DateTime<Utc>,
+}
+
 /// What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

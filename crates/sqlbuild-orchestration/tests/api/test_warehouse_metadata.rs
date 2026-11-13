@@ -304,6 +304,16 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             let preview_session = Uuid::now_v7();
             let mut preview = input.clone();
             preview.target = "preview".into();
+            // A plan preview's copy counts as synced only once every schema the snapshot builds into has.
+            for (name, node) in &mut preview.nodes {
+                node.definition["destination"] =
+                    json!({"database": null, "schema": "main", "name": name});
+            }
+            preview
+                .nodes
+                .get_mut("products")
+                .expect("products node")
+                .definition["destination"]["schema"] = json!("reporting");
             publish_snapshot(store, &preview)
                 .await
                 .expect("preview snapshot");
