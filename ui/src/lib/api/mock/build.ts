@@ -4,7 +4,7 @@
 // (synced fingerprints), compared against the snapshot change feed.
 
 import { ApiError } from '../client';
-import { problemRunsOf } from '../http-overview';
+import { groupStatusOf, problemRunsOf } from '../http-overview';
 import type {
 	AttentionItem,
 	BuiltDefinition,
@@ -20,7 +20,6 @@ import type {
 	CheckOutcome,
 	ColumnLineage,
 	CostChange,
-	GroupStatus,
 	MicrobatchCoverage,
 	NodeBuild,
 	NodeOutcome,
@@ -257,19 +256,6 @@ export class MockBuild {
 		}
 
 		const cost = this.#hasCost(scope) ? recent.reduce((s, r) => s + (r.cost?.value ?? 0), 0) : null;
-		const groups = new Map<string, GroupStatus>();
-		for (const n of nodes) {
-			if (n.kind === 'source') continue;
-			const group = n.group ?? '';
-			const g = groups.get(group) ?? { group, total: 0, current: 0, changed: 0, behind: 0, failed: 0 };
-			g.total += 1;
-			if (n.lastOutcome === 'failed') g.failed += 1;
-			const stale = n.stale ?? [];
-			if (stale.some((s) => s.reason !== 'behind')) g.changed += 1;
-			if (stale.some((s) => s.reason === 'behind')) g.behind += 1;
-			if (!stale.length && n.lastOutcome !== 'failed' && n.lastBuild) g.current += 1;
-			groups.set(group, g);
-		}
 		const latest = runs.find((r) => r.endedAt);
 		return this.#ctx.reply({
 			metrics: {
@@ -292,7 +278,7 @@ export class MockBuild {
 				cost: cost === null ? null : { last24h: round(cost), baseline: round(cost * 0.78), baselineDays: 7, unit: 'credits' }
 			},
 			attention,
-			groups: [...groups.values()],
+			groups: groupStatusOf(nodes),
 			recentChanges: this.#changes(scope).slice(0, 4),
 			latestRun: latest ? { id: latest.id, status: latest.status, endedAt: latest.endedAt } : null
 		});
@@ -408,7 +394,6 @@ export class MockBuild {
 			materialization: spec?.materialization ?? null,
 			group: sn.group,
 			tags: [...sn.tags],
-			owner: [...(spec?.owner ?? [])],
 			description: spec?.description ?? '',
 			path: sn.path,
 			upstream: [...sn.upstream],

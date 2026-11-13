@@ -8,7 +8,6 @@ export type NodeFieldKey =
 	| 'checks'
 	| 'lastBuilt'
 	| 'description'
-	| 'owner'
 	| 'tags'
 	| 'columns';
 
@@ -20,7 +19,6 @@ export const NODE_FIELDS: NodeField[] = [
 	{ key: 'checks', label: 'Checks' },
 	{ key: 'lastBuilt', label: 'Last built' },
 	{ key: 'description', label: 'Description' },
-	{ key: 'owner', label: 'Owner' },
 	{ key: 'tags', label: 'Tags' },
 	{ key: 'columns', label: 'Column count' }
 ];
@@ -31,7 +29,6 @@ const DEFAULTS: Record<NodeFieldKey, boolean> = {
 	checks: true,
 	lastBuilt: true,
 	description: false,
-	owner: false,
 	tags: false,
 	columns: false
 };

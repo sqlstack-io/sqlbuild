@@ -1,4 +1,4 @@
-//! A person lists the current nodes with view on all of them; builds are batched indexed seeks, attempts one bounded read.
+//! A person lists the current nodes with view on all of them; builds are batched indexed seeks, attempts and check results one read each.
 
 use uuid::Uuid;
 
@@ -9,8 +9,9 @@ use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
+use crate::warehouse_history::_helpers::checks::latest_results;
 use crate::warehouse_metadata::_helpers::catalog_nodes::{
-    catalog_node, last_outcome, latest_attempts,
+    catalog_node, last_outcome, latest_attempts, node_checks,
 };
 use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprints;
 use crate::warehouse_metadata::_helpers::node_status::{definition_evidence, destination};
@@ -49,6 +50,8 @@ pub async fn list_person_catalog_nodes(
     let (transaction, found) =
         latest_fingerprints(transaction, (location_id, target, &queries)).await?;
     let (transaction, mut attempts) = latest_attempts(transaction, (location_id, target)).await?;
+    let (transaction, latest) = latest_results(transaction, (location_id, target)).await?;
+    let mut checks = node_checks(latest);
     let mut builds: Vec<Option<CatalogNodeBuild>> = vec![None; nodes.len()];
     let mut changed: Vec<bool> = vec![false; nodes.len()];
     for (position, build) in positions.iter().zip(found) {
@@ -67,7 +70,16 @@ pub async fn list_person_catalog_nodes(
         .zip(builds.into_iter().zip(changed))
         .map(|((key, node), (build, changed))| {
             let outcome = last_outcome(attempts.remove(key.as_str()), build.as_ref());
-            catalog_node((key, node), snapshot.snapshot_id, (build, outcome, changed))
+            // A check names its node `kind:name`, which is the node key unless the key is the bare name.
+            let node_checks = checks
+                .remove(key.as_str())
+                .or_else(|| checks.remove(&format!("{}:{key}", node.kind)))
+                .unwrap_or_default();
+            catalog_node(
+                (key, node),
+                snapshot.snapshot_id,
+                (build, outcome, changed, node_checks),
+            )
         })
         .collect();
     commit(transaction).await?;
