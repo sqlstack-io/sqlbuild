@@ -3,6 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_core::plan_display::constants::SYNCED_COPY_KEY;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_outputs::json_report::indented_json;
@@ -748,7 +749,7 @@ pub(crate) fn format_plan_json(
         py,
         "format_plan_json",
         options,
-        (&["plan"], &["python_plan_entries"]),
+        (&["plan"], &["python_plan_entries", SYNCED_COPY_KEY]),
     )?;
     let plan: Bound<'_, PyAny> = arguments.value("plan")?;
     let python_entries: Vec<Bound<'_, PyAny>> = if arguments.passed("python_plan_entries")? {
@@ -819,6 +820,10 @@ pub(crate) fn format_plan_json(
     let metadata: Bound<'_, PyAny> = native_field(&plan, "metadata")?;
     if metadata.is_truthy()? {
         result.set_item("metadata", metadata)?;
+    }
+    let synced_copy: Bound<'_, PyAny> = arguments.value(SYNCED_COPY_KEY)?;
+    if !synced_copy.is_none() {
+        result.set_item(SYNCED_COPY_KEY, synced_copy)?;
     }
     indented_json(result.as_any())
 }

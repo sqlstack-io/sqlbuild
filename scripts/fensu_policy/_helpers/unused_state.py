@@ -65,10 +65,12 @@ from scripts.fensu_policy.constants import (
     SQL_VIEW_PREFIX_PATTERN,
     SQL_WORD_PATTERN,
     SQL_WRITE_WORDS,
+    SYNCED_COPY_PATTERN,
 )
 from scripts.fensu_policy.models import EnumVariant, StateDefinition, StateReads
 
 _OBSERVATION_STATE: re.Pattern[str] = re.compile(OBSERVATION_STATE_PATTERN)
+_SYNCED_COPY: re.Pattern[str] = re.compile(SYNCED_COPY_PATTERN)
 _LEXEMES: re.Pattern[str] = re.compile(RUST_LITERAL_PATTERN, re.DOTALL)
 _CONTINUATION: re.Pattern[str] = re.compile(RUST_LINE_CONTINUATION)
 _TEST_MODULE: re.Pattern[str] = re.compile(RUST_TEST_MODULE_PATTERN)
@@ -597,10 +599,20 @@ def _state_key(*, definition: StateDefinition) -> str:
 def observation_reference_lines(*, source: str) -> list[int]:
     """One-based lines whose code, not a line comment, names display-only observation state."""
 
+    return _reference_lines(source=source, pattern=_OBSERVATION_STATE)
+
+
+def synced_copy_reference_lines(*, source: str) -> list[int]:
+    """One-based lines whose code, not a line comment, names the plan preview's synced copy."""
+
+    return _reference_lines(source=source, pattern=_SYNCED_COPY)
+
+
+def _reference_lines(*, source: str, pattern: re.Pattern[str]) -> list[int]:
     lines: list[int] = []
     number: int
     line: str
     for number, line in enumerate(source.splitlines(), start=1):
-        if _OBSERVATION_STATE.search(line.partition(RUST_LINE_COMMENT)[0]):
+        if pattern.search(line.partition(RUST_LINE_COMMENT)[0]):
             lines.append(number)
     return lines

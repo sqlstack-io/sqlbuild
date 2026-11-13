@@ -1633,7 +1633,7 @@ rule_modules = [
     "scripts.fensu_policy.rules.observation_boundary",
     "scripts.fensu_policy.rules.unused_state",
 ]
-select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078"]
+select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078", "XSB079"]
 
 [targets.rust.rule_options.XSB076]
 schema_paths = ["crates/sqlbuild-orchestration/src/store"]
@@ -1658,6 +1658,16 @@ allowed_paths = [
     "crates/sqlbuild-python/src/bindings/_helpers/native_host/observations_state.rs=Renders observation state SQL for adapters.",
     "crates/sqlbuild-python/src/bindings/_helpers/native_host/warehouse_metadata.rs=Reads observations for the control-store mirror.",
     "crates/sqlbuild-python/src/bindings/_helpers/observations=Writes observations after a build.",
+]
+
+[targets.rust.rule_options.XSB079]
+allowed_paths = [
+    "crates/sqlbuild-cli/src/native_commands/main/_location_plan.rs=A location's requested plan names the synced copy for its sqb plan child.",
+    "crates/sqlbuild-core/src/plan_display/constants.rs=Names the synced-copy environment variable.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/synced_copy.rs=Defines the synced-copy adapter.",
+    "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=Only sqb plan activates the synced copy and reports what it could not know.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/cursors.rs=Preview branch: target MAX from the copy, watermark inputs read when the run starts.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_columns.rs=Preview branch: expression columns from the copy instead of DESCRIBE.",
 ]
 
 [targets.rust.rule_options.XSB077]

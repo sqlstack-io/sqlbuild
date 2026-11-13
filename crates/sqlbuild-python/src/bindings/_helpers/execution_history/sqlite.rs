@@ -52,8 +52,9 @@ use crate::bindings::_helpers::execution_history::statements::{
     column, execute, execute_plain, execute_query, fetch_one, tuple_of,
 };
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, sqlite_params};
-use crate::bindings::_helpers::native_host::sqlite_cursor::SqliteCursor;
+use crate::bindings::_helpers::native_host::sqlite_connection::{
+    SqliteConnection, SqliteCursor, sqlite_params,
+};
 use crate::bindings::_helpers::native_threads::reentrant_lock::ReentrantLock;
 use crate::bindings::_helpers::records::fields::field as native_field;
 

@@ -35,9 +35,6 @@ pub(crate) const DEFAULT_MAX_CELL_BYTES: usize = 4096;
 pub(crate) const JSON_FORMAT: &str = "json";
 /// How text output shows SQL NULL.
 pub(crate) const NULL_TEXT: &str = "NULL";
-/// The standard base64 alphabet binary JSON cells are encoded with.
-pub(crate) const BASE64_ALPHABET: &[u8; 64] =
-    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 /// Join keys `sqb recall schema` points out.
 pub(crate) const JOIN_KEYS: [&str; 5] = [
     "invocation_id",

@@ -2,6 +2,7 @@
 
 use pyo3::prelude::{PyResult, Python};
 use serde_json::{Map, Value, json};
+use sqlbuild_cache::digest::main::base64_text::base64_text;
 use sqlbuild_core::query_command::models::QueryDisplay;
 use sqlbuild_recall::records::models::RecallValue;
 use sqlbuild_recall::schema::models::Dialect;
@@ -9,31 +10,7 @@ use sqlbuild_recall::store::models::{DescribedColumn, DescribedRelation, QueryRe
 
 use crate::bindings::_helpers::query_command::text_output::render_text;
 use crate::bindings::_helpers::recall::clickhouse_calls::QueryStatistics;
-use crate::bindings::_helpers::recall::constants::{
-    BASE64_ALPHABET, JOIN_KEYS, JSON_FORMAT, NULL_TEXT,
-};
-
-fn base64(data: &[u8]) -> String {
-    let mut encoded = String::with_capacity(data.len().div_ceil(3) * 4);
-    for chunk in data.chunks(3) {
-        let bytes = [
-            chunk[0],
-            *chunk.get(1).unwrap_or(&0),
-            *chunk.get(2).unwrap_or(&0),
-        ];
-        let triple = u32::from(bytes[0]) << 16 | u32::from(bytes[1]) << 8 | u32::from(bytes[2]);
-        for index in 0..4 {
-            if index <= chunk.len() {
-                encoded.push(char::from(
-                    BASE64_ALPHABET[(triple >> (18 - 6 * index) & 63) as usize],
-                ));
-            } else {
-                encoded.push('=');
-            }
-        }
-    }
-    encoded
-}
+use crate::bindings::_helpers::recall::constants::{JOIN_KEYS, JSON_FORMAT, NULL_TEXT};
 
 fn truncated(text: &str, max_bytes: Option<usize>) -> String {
     let Some(limit) = max_bytes.filter(|limit| text.len() > *limit) else {
@@ -84,7 +61,7 @@ fn json_cell(value: &RecallValue) -> Value {
         RecallValue::Text(text) => json!(text),
         RecallValue::Blob(data) => match std::str::from_utf8(data) {
             Ok(text) => json!(text),
-            Err(_) => json!({ "base64": base64(data) }),
+            Err(_) => json!({ "base64": base64_text(data) }),
         },
     }
 }
