@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.218.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.217.0...v0.218.0) (2026-11-13)
+
+
+### Features
+
+* **ui:** clearer audit, change and trigger pages, and a signed-in sqb dev UI ([#1445](https://github.com/sqlstack-io/sqlbuild/issues/1445)) ([ec80deb](https://github.com/sqlstack-io/sqlbuild/commit/ec80deb26d4483b96ad5e44fd3483c5f37816b10))
+
 ## [0.217.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.216.0...v0.217.0) (2026-11-13)
 
 
