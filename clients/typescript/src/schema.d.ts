@@ -1010,6 +1010,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["match_metadata_keys"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/preview-copy": {
         parameters: {
             query?: never;
@@ -1982,6 +1998,21 @@ export interface components {
             scan?: null | components["schemas"]["MetadataScan"];
             /** Format: uuid */
             session_id: string;
+        };
+        /** @description One page of a reconcile scan's row keys: the mirror marks the rows it holds as seen by the scan. */
+        MetadataKeyPage: {
+            /** Format: int64 */
+            generation: number;
+            /** @description Each row's key columns, as the full record carries them. */
+            keys: Record<string, never>[];
+            kind: components["schemas"]["WarehouseHistoryKind"];
+            scan: components["schemas"]["MetadataScan"];
+            /** Format: uuid */
+            session_id: string;
+        };
+        /** @description The positions in a key page of the rows the mirror lacks; the location sends those rows in full. */
+        MetadataKeyPageResponse: {
+            missing: number[];
         };
         /** @description A full scan's complete page removes the namespace's rows that the scan did not deliver. */
         MetadataScan: {
@@ -5965,6 +5996,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    match_metadata_keys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetadataKeyPage"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataKeyPageResponse"];
                 };
             };
             400: {
