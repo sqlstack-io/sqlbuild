@@ -6,14 +6,15 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::snapshots::constants::{
-    LOAD_SOURCES_SETTING, LOADER_POINTER, MODEL_NODE_KIND, SOURCE_KEY_PREFIX, SOURCE_NODE_KIND,
+    LOAD_SOURCES_SETTING, LOADER_POINTER, LOADS_FIELD, MODEL_NODE_KIND, SOURCE_KEY_PREFIX, SOURCE_NODE_KIND,
     WRITER_NODE_KINDS,
 };
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 
-/// Selected writers plus the managed sources a build loads: selected ones, and parents of selected models unless loading is off.
+/// Selected writers plus the managed sources a build loads: selected ones, and unless loading is off, those
+/// selected models read or list in `loads`, and each loaded source's `loads` loader chain.
 pub(crate) async fn job_write_set(
     transaction: ControlTransaction,
     snapshot_id: Uuid,
@@ -41,21 +42,34 @@ pub(crate) async fn job_write_set(
                     .filter(|key| key.starts_with(SOURCE_KEY_PREFIX))
                     .map(str::to_owned),
             );
+            sources.extend(loads(&node.definition));
         }
     }
     let (transaction, sources) =
         read_snapshot_nodes(transaction, snapshot_id, Some(&sources)).await?;
-    writers.extend(
-        sources
-            .into_iter()
-            .filter(|(_, node)| {
-                node.kind == SOURCE_NODE_KIND
-                    && node
-                        .definition
-                        .pointer(LOADER_POINTER)
-                        .is_some_and(|loader| !loader.is_null())
-            })
-            .map(|(key, _)| key),
-    );
+    for (key, node) in sources {
+        if node.kind == SOURCE_NODE_KIND
+            && node
+                .definition
+                .pointer(LOADER_POINTER)
+                .is_some_and(|loader| !loader.is_null())
+        {
+            writers.insert(key);
+            if loads_model_sources {
+                writers.extend(loads(&node.definition));
+            }
+        }
+    }
     Ok((transaction, writers))
+}
+
+/// The keys a node's definition lists in `loads`; snapshots published before it have none.
+fn loads(definition: &Value) -> impl Iterator<Item = String> + '_ {
+    definition
+        .get(LOADS_FIELD)
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
 }

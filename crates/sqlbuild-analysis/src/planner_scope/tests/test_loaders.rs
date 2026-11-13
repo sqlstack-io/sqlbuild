@@ -2,6 +2,7 @@
 
 use crate::assembly::project::types::ObjectKey;
 use crate::planner_scope::main::expand_loaders::expand_loaders;
+use crate::planner_scope::main::node_loads::node_loads;
 use crate::planner_scope::models::LoaderGraph;
 use crate::planner_scope::tests::test_types::{DeepLoaderTestCase, LoaderTestCase};
 use std::collections::HashSet;
@@ -120,3 +121,55 @@ fn given_deep_loader_chain_when_expanding_then_uses_iterative_traversal() {
         );
     }
 }
+
+#[test]
+fn given_loader_chains_and_unmanaged_reads_when_listing_node_loads_then_only_planned_source_writers_appear()
+ {
+    let graph = LoaderGraph {
+        loaders: [
+            ("raw_orders".to_owned(), vec!["stage_orders".to_owned()]),
+            ("stage_orders".to_owned(), vec!["raw_customers".to_owned()]),
+            ("raw_customers".to_owned(), Vec::new()),
+            ("raw_returns".to_owned(), Vec::new()),
+        ]
+        .into_iter()
+        .collect(),
+        sources: vec![
+            ("raw_orders".to_owned(), Some("raw_orders".to_owned())),
+            ("raw_customers".to_owned(), Some("raw_customers".to_owned())),
+            ("raw_returns".to_owned(), Some("raw_returns".to_owned())),
+            ("raw_products".to_owned(), None),
+        ],
+    };
+    let key = |kind: &str, name: &str| (kind.to_owned(), name.to_owned());
+    let upstream = vec![
+        (
+            key("model", "orders"),
+            vec![
+                key("source", "raw_returns"),
+                key("source", "raw_products"),
+                key("model", "stg_orders"),
+            ],
+        ),
+        (key("model", "stg_orders"), vec![key("source", "raw_products")]),
+        (key("source", "raw_orders"), Vec::new()),
+        (key("source", "raw_customers"), Vec::new()),
+        (key("source", "raw_products"), Vec::new()),
+    ];
+    let loads = node_loads(&graph, &upstream);
+    assert_eq!(
+        loads
+            .iter()
+            .map(|(node, writers)| (
+                node.1.as_str(),
+                writers.iter().map(|w| w.1.as_str()).collect::<Vec<_>>()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            ("orders", vec!["raw_returns"]),
+            // The intermediate loader keys as itself; the loader that backs a source keys as it.
+            ("raw_orders", vec!["raw_customers", "stage_orders"]),
+        ]
+    );
+}
+

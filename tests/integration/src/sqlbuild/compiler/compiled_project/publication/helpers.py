@@ -792,6 +792,7 @@ def scheduled_worker(
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:
             _ = control.executescript(test_case.store_setup)
+            test_case.store_edit(control)
         monkeypatch.setenv("SQLBUILD_SCHEDULER_TEST_STORE", f"sqlite://{control_store}")
         monkeypatch.setenv(
             "SQLBUILD_PLATFORM_WEBHOOK_URL",

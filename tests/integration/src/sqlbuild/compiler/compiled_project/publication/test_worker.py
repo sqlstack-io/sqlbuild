@@ -1,5 +1,6 @@
 """Retained compiler baselines cross the native worker boundary before lifecycle writes."""
 
+import gzip
 import json
 import os
 import signal
@@ -446,6 +447,37 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
         assert result["node_counts_json"] == {"success": 1}
 
 
+LOADED_ORDER_FILES: dict[str, str] = {
+    "sources/loaded.yml": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/loaded_sources.yml"
+    ).read_text(),
+    "python/loaders/loaded.py": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/loaded_sources.py"
+    ).read_text(),
+    "models/orders.sql": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.sql"
+    ).read_text(),
+    "orchestration/orders.py": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.py"
+    ).read_text(),
+}
+
+
+def without_loads(control: sqlite3.Connection, node_key: str) -> None:
+    """Drop a published node's `loads` in place; its content address and the worker's check stay."""
+    for node_hash, body in control.execute(
+        "SELECT d.node_hash, d.body FROM sqb_node_definitions d JOIN sqb_snapshot_nodes n "
+        "ON n.node_hash = d.node_hash WHERE n.node_key = ?",
+        (node_key,),
+    ).fetchall():
+        content: dict[str, Any] = json.loads(gzip.decompress(body))
+        del content["definition"]["loads"]
+        _ = control.execute(
+            "UPDATE sqb_node_definitions SET body = ? WHERE node_hash = ?",
+            (gzip.compress(json.dumps(content).encode()), node_hash),
+        )
+
+
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -508,6 +540,17 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                     "starts_at='2000-01-01T00:00:00Z'))\n"
                 ),
             },
+        ),
+        WorkerExecutionTestCase(
+            "a tag-selected job claims its loader chain and hook-read source, not unread ones",
+            "",
+            "SELECT amount FROM orders",
+            "success",
+            [(7,)],
+            files=LOADED_ORDER_FILES,
+            expected_write_set=frozenset(
+                {"model:orders", "source:raw_orders", "source:raw_customers", "source:raw_returns"}
+            ),
         ),
         WorkerExecutionTestCase(
             "a selected upstream source succeeds once the build returns",
@@ -596,6 +639,44 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = worker_result(worker, test_case)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
+        if test_case.expected_write_set is not None:
+            with sqlite3.connect(worker.control_store) as control:
+                (request,) = control.execute(
+                    "SELECT request_json FROM sqb_runs WHERE run_id=?", (run["run_id"],)
+                ).fetchone()
+            assert frozenset(json.loads(request)["write_set"]) == test_case.expected_write_set
+
+
+def test_given_a_job_without_its_loads_claim_when_a_worker_plans_then_the_unclaimed_source_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    test_case = WorkerExecutionTestCase(
+        "the hook-read source is loaded only when the published model claims it",
+        "",
+        "",
+        "failed",
+        [],
+        files=LOADED_ORDER_FILES,
+        store_edit=lambda control: without_loads(control, "model:orders"),
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        log: str = worker.log.read_text()
+        assert (run["status"], run["node_counts_json"]) == ("failed", {"skipped": 1}), log
+        assert "planned writer source:raw_returns is outside the frozen run write set" in log
+        with sqlite3.connect(worker.control_store) as control:
+            (request,) = control.execute(
+                "SELECT request_json FROM sqb_runs WHERE run_id=?", (run["run_id"],)
+            ).fetchone()
+        assert frozenset(json.loads(request)["write_set"]) == {
+            "model:orders",
+            "source:raw_orders",
+            "source:raw_customers",
+        }
+    with duckdb.connect(str(worker.project / "warehouse.duckdb")) as warehouse:
+        assert warehouse.execute(
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('orders', 'raw_returns')"
+        ).fetchone() == (0,)
 
 
 @pytest.mark.parametrize(
