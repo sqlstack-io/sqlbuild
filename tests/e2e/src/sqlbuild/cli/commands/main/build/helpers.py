@@ -1255,6 +1255,9 @@ CHANGED_BUILDS_UNQUALIFIED_FIXTURE: Path = (
 CHANGED_BUILDS_REACH_FIXTURE: Path = (
     REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_reach"
 )
+CHANGED_BUILDS_TWO_UP_FIXTURE: Path = (
+    REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_two_up"
+)
 # Counts new source data too, so a build follows consumed inputs alone, whatever the defaults.
 CHANGED_ANY: str = "--changed=definition,source_data"
 CHANGED_ORDER_SKEW_SECONDS: float = 5.2

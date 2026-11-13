@@ -11,11 +11,13 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     ChangedBuildE2ETestCase,
     ChangedCrashE2ETestCase,
     ChangedReachE2ETestCase,
+    ChangedTwoUpE2ETestCase,
     ChangedWarehouse,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     CHANGED_ANY,
     CHANGED_BUILDS_REACH_FIXTURE,
+    CHANGED_BUILDS_TWO_UP_FIXTURE,
     CHANGED_BUILDS_UDF_FIXTURE,
     CHANGED_BUILDS_UNQUALIFIED_FIXTURE,
     DUCKDB_CHANGED,
@@ -277,3 +279,43 @@ def test_given_scheduled_jobs_when_building_with_changed_then_a_change_stops_at_
     assert reach_all == test_case.expected_reach_all
     assert refused.returncode != 0
     assert "--reach needs --changed" in refused.stdout + refused.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ChangedTwoUpE2ETestCase(
+            description=DUCKDB_CHANGED.name,
+            warehouse=DUCKDB_CHANGED,
+            expected_crm_run=frozenset({"stg_customers", "customer_orders"}),
+            expected_downstream=frozenset({"customer_sales"}),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_two_jobs_each_holding_a_redefined_upstream_when_building_changed_then_a_model_two_levels_down_runs(
+    test_case: ChangedTwoUpE2ETestCase, tmp_path: Path
+) -> None:
+    warehouse: ChangedWarehouse = test_case.warehouse
+    project_dir: Path = prepare_changed_project(tmp_path=tmp_path, warehouse=warehouse)
+    add_changed_overlay(project_dir, CHANGED_BUILDS_TWO_UP_FIXTURE)
+    first: frozenset[str] = run_changed_build(project_dir, (CHANGED_ANY,))
+    (project_dir / "models/stg_orders.sql").write_text(STG_ORDERS_REDEFINED, encoding="utf-8")
+    (project_dir / "models/stg_customers.sql").write_text(
+        'MODEL (description "Staged customers.", materialized table);\n'
+        'SELECT customer_id FROM __source("raw_customers") WHERE customer_id > 0\n',
+        encoding="utf-8",
+    )
+    sales_staged: frozenset[str] = run_changed_build(
+        project_dir, ("--changed", "--select", "stg_orders")
+    )
+    crm_run: frozenset[str] = run_changed_build(project_dir, ("--changed", "--select", "crm_daily"))
+    downstream: frozenset[str] = run_changed_build(project_dir, ("--changed",))
+
+    assert first == {"stg_customers", "stg_orders", "customer_orders", "customer_sales"}
+    assert sales_staged == {"stg_orders"}
+    assert crm_run == test_case.expected_crm_run
+    assert downstream == test_case.expected_downstream, (
+        "sales_daily holds the stg_orders change that reached customer_orders, so customer_sales "
+        "runs even though crm_daily holds the stg_customers change too"
+    )

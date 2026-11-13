@@ -1606,3 +1606,11 @@ class ChangedReachE2ETestCase:
     expected_plan_lines: tuple[str, ...]
     expected_job_run: frozenset[str]
     expected_reach_all: frozenset[str]
+
+
+@dataclass(frozen=True)
+class ChangedTwoUpE2ETestCase:
+    description: str
+    warehouse: ChangedWarehouse
+    expected_crm_run: frozenset[str]
+    expected_downstream: frozenset[str]

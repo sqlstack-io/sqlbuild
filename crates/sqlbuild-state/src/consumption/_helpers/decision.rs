@@ -58,8 +58,8 @@ struct Context<'a> {
     moved: RefCell<HashMap<(RelationKey, String, String), Moved>>,
 }
 
-/// The relation where a rebuild's definition changed (inner None: none did; outer None: unknown).
-type Moved = Option<Option<RelationKey>>;
+/// Every relation where a rebuild's definition changed (empty: none did; None: unknown).
+type Moved = Option<BTreeSet<RelationKey>>;
 
 /// Each selected node in input order with what `--changed` does with it.
 pub(crate) fn decide(
@@ -291,28 +291,27 @@ fn execution_changes(node: &NodeFacts, context: &Context<'_>, window: &Window<'_
                     let Some(read) = read.filter(|read| *read != current) else {
                         continue;
                     };
-                    let (reason, kind, origin) =
-                        match definition_moved(context, &facts.relation, (read, current)) {
-                            Some(Some(changed)) => (
-                                RunReason::UpstreamDefinitionChanged(name),
-                                Some(ChangeKind::Definition),
-                                context
-                                    .by_relation
-                                    .get(&changed)
-                                    .map_or_else(|| upstream.clone(), |key| (*key).clone()),
-                            ),
-                            Some(None) => (
-                                RunReason::InputChanged(name),
-                                Some(ChangeKind::SourceData),
-                                upstream.clone(),
-                            ),
-                            None => (RunReason::InputChanged(name), None, upstream.clone()),
-                        };
-                    changes.push(Change {
-                        reason,
-                        kind,
-                        origin: Some(origin),
-                    });
+                    match definition_moved(context, &facts.relation, (read, current)) {
+                        Some(moved) if !moved.is_empty() => {
+                            changes.extend(moved.iter().map(|changed| {
+                                Change {
+                                    reason: RunReason::UpstreamDefinitionChanged(name.clone()),
+                                    kind: Some(ChangeKind::Definition),
+                                    origin: Some(
+                                        context
+                                            .by_relation
+                                            .get(changed)
+                                            .map_or_else(|| upstream.clone(), |key| (*key).clone()),
+                                    ),
+                                }
+                            }));
+                        }
+                        moved => changes.push(Change {
+                            reason: RunReason::InputChanged(name),
+                            kind: moved.map(|_| ChangeKind::SourceData),
+                            origin: Some(upstream.clone()),
+                        }),
+                    }
                 }
             }
         }
@@ -335,7 +334,7 @@ fn definition_moved(
     (old, new): (&str, &str),
 ) -> Moved {
     if old == new {
-        return Some(None);
+        return Some(BTreeSet::new());
     }
     let memo_key: (RelationKey, String, String) =
         (relation.clone(), old.to_owned(), new.to_owned());
@@ -360,19 +359,19 @@ fn compare_executions(
     if !before.complete || !after.complete {
         return None;
     }
-    let here: Moved = Some(Some(relation.clone()));
+    let mut changed: BTreeSet<RelationKey> = BTreeSet::new();
     if before.version_hash != after.version_hash {
-        return here;
+        changed.insert(relation.clone());
     }
     if after.inputs.iter().any(|input| input.kind == OPAQUE_INPUT) {
-        return None;
+        return (!changed.is_empty()).then_some(changed);
     }
+    let mut unknown: bool = false;
     let before_nodes: usize = before
         .inputs
         .iter()
         .filter(|input| input.kind == NODE_INPUT)
         .count();
-    let mut unknown: bool = false;
     let mut after_nodes: usize = 0;
     for input in after.inputs.iter().filter(|input| input.kind == NODE_INPUT) {
         after_nodes += 1;
@@ -381,7 +380,8 @@ fn compare_executions(
             .iter()
             .find(|earlier| earlier.kind == NODE_INPUT && earlier.name == input.name)
         else {
-            return here;
+            changed.insert(relation.clone());
+            continue;
         };
         let Some(upstream) = context.by_input_name.get(&input.name).copied() else {
             unknown = true;
@@ -392,15 +392,14 @@ fn compare_executions(
             &upstream.relation,
             (&read_before.version, &input.version),
         ) {
-            Some(Some(changed)) => return Some(Some(changed)),
-            Some(None) => {}
+            Some(moved) => changed.extend(moved),
             None => unknown = true,
         }
     }
     if after_nodes != before_nodes {
-        return here;
+        changed.insert(relation.clone());
     }
-    (!unknown).then_some(None)
+    (!changed.is_empty() || !unknown).then_some(changed)
 }
 
 /// Nodes with every upstream that has facts before it.

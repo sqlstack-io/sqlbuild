@@ -47,6 +47,16 @@ fn given_recorded_builds_when_deciding_changed_then_counts_and_reach_pick_what_r
     both_redefined.redefine("stg_a", "v2");
     both_redefined.redefine("stg_b", "v2");
     both_redefined.build(&["stg_a", "stg_b"]);
+    let mut redefined_two_up = Scenario::new(&[
+        ("stg_a", &["src_a"]),
+        ("stg_b", &["src_b"]),
+        ("int_joined", &["stg_a", "stg_b"]),
+        ("mart", &["int_joined"]),
+    ]);
+    redefined_two_up.build(&["stg_a", "stg_b", "int_joined", "mart"]);
+    redefined_two_up.redefine("stg_a", "v2");
+    redefined_two_up.redefine("stg_b", "v2");
+    redefined_two_up.build(&["stg_a", "stg_b", "int_joined"]);
     let mut renamed = streaming();
     renamed.force("fct_events", ForcedRun::PlannerChange("renamed".to_owned()));
     let mut deep = Scenario::new(&[
@@ -226,6 +236,27 @@ fn given_recorded_builds_when_deciding_changed_then_counts_and_reach_pick_what_r
                     "joined",
                     runs(RunReason::UpstreamDefinitionChanged(
                         "model:stg_b".to_owned(),
+                    )),
+                ),
+            ],
+        },
+        DecideTestCase {
+            description: "a node runs when its job holds any definition change two levels up, whatever the input order",
+            outcomes: redefined_two_up.decide(
+                &[Definition],
+                Some(&[
+                    ("job_a", &["stg_b", "mart"]),
+                    ("job_b", &["stg_a", "int_joined"]),
+                ]),
+            ),
+            expected_outcomes: vec![
+                ("stg_a", ChangedOutcome::Unchanged),
+                ("stg_b", ChangedOutcome::Unchanged),
+                ("int_joined", ChangedOutcome::Unchanged),
+                (
+                    "mart",
+                    runs(RunReason::UpstreamDefinitionChanged(
+                        "model:int_joined".to_owned(),
                     )),
                 ),
             ],
