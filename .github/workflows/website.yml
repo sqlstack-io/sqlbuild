@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "website/**"
+      - "ui/**"
       - ".github/workflows/website.yml"
   pull_request:
     paths:
       - "website/**"
+      - "ui/**"
       - ".github/workflows/website.yml"
   workflow_dispatch:
 
@@ -33,13 +35,23 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache-dependency-path: |
+            website/package-lock.json
+            ui/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build
         run: npm run build
+
+      # The click-through demo at /demo: the web UI replaying a recording of DuckShop on sqb dev.
+      - name: Build the UI demo
+        working-directory: ui
+        run: |
+          npm ci
+          SQB_UI_BASE=/demo VITE_SQB_DEMO=1 npm run build
+          node scripts/demo-pages.mjs build demo/recording.json.gz ../website/dist/demo
 
       - name: Check links
         run: python3 scripts/check_links.py dist

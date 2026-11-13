@@ -16,6 +16,7 @@ import {
 	type NavCounts,
 	type PlatformEvent,
 	type Scope,
+	type Snapshot,
 	type WarehouseSync
 } from '$lib/api';
 
@@ -38,6 +39,8 @@ class AppState {
 	navCounts = $state<NavCounts | null>(null);
 	platformEvents = $state<PlatformEvent[]>([]);
 	warehouseSync = $state<WarehouseSync | null>(null);
+	/** The selected location's newest deployed version: undefined until read, null before its first deploy. */
+	snapshot = $state<Snapshot | null | undefined>(undefined);
 
 	readonly scope = $derived<Scope | null>(this.locationId ? { locationId: this.locationId } : null);
 	readonly location = $derived(this.bootstrap?.locations.find((l) => l.id === this.locationId) ?? null);
@@ -81,6 +84,7 @@ class AppState {
 		this.client.changes.subscribe((signal) => {
 			if (channelMatches(signal.channel, ['platform_events'])) void this.#loadPlatformEvents();
 			if (channelMatches(signal.channel, ['warehouse_sync'])) void this.#loadWarehouseSync();
+			if (channelMatches(signal.channel, ['snapshot'])) void this.#loadSnapshot();
 			if (channelMatches(signal.channel, ['runs', 'triggers', 'checks'])) void this.#loadNavCounts();
 		});
 		try {
@@ -118,6 +122,7 @@ class AppState {
 		this.client.changes.follow(this.scope);
 		this.navCounts = null;
 		this.warehouseSync = null;
+		this.snapshot = undefined;
 		this.#loadScoped();
 	}
 
@@ -140,6 +145,19 @@ class AppState {
 	#loadScoped() {
 		void this.#loadNavCounts();
 		void this.#loadWarehouseSync();
+		void this.#loadSnapshot();
+	}
+
+	async #loadSnapshot() {
+		if (!this.client.supports('getLatestSnapshot')) return;
+		const scope = this.scope;
+		if (!scope) return;
+		try {
+			const snapshot = await this.client.getLatestSnapshot(scope);
+			if (this.scope === scope) this.snapshot = snapshot;
+		} catch {
+			// The version is decoration; a person who may not read it sees the bar without it.
+		}
 	}
 
 	async #loadNavCounts() {

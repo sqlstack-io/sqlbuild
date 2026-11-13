@@ -7,7 +7,7 @@ import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-chec
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { manualConnectionTest, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { manualConnectionTest, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments, toServerSettings } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
@@ -17,7 +17,7 @@ import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent
 import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, WarehouseSync } from './types';
+import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
@@ -79,6 +79,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'platformHealth',
 	'listRoles',
 	'getRole',
+	'getLatestSnapshot',
 	'getWarehouseSync',
 	'requestWarehouseSync',
 	'maintenanceHistory',
@@ -251,14 +252,18 @@ export type HttpClientOptions = {
 	baseUrl?: string;
 	/** Called when the session is missing or rejected, before the request fails. */
 	onUnauthorized: () => void;
+	/** Answers the requests instead of the network; the static demo replays a recording through it. */
+	fetch?: (request: Request) => Promise<Response>;
+	/** The change feed; by default the server's, followed with `EventSource`. */
+	changes?: ChangeSubscription;
 };
 
 /**
  * The server-backed client. Methods without an endpoint throw, and `supports`
  * reports them so the shell never shows a page it cannot load.
  */
-export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOptions): ApiClient {
-	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
+export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, changes }: HttpClientOptions): ApiClient {
+	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin', fetch: answer });
 	// Locations whose bootstrap actions include view.sql, which may hold on only some nodes, and the
 	// nodes there whose SQL was refused; each refused read is audited, so neither is asked again until reload.
 	let sqlLocations = new Set<string>();
@@ -303,7 +308,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	}
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
-		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
+		changes: changes ?? new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
 		async bootstrap(): Promise<Bootstrap> {
 			const { data, error, response } = await http.GET('/api/control/bootstrap');
 			if (response.status === 401) onUnauthorized();
@@ -542,6 +547,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				before = data[data.length - 1].storage_id;
 			}
 			return found.slice(0, limit);
+		},
+		async getLatestSnapshot(scope: Scope): Promise<Snapshot | null> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/snapshots', { params: { path: { location_id: locationId, target }, query: { limit: 1 } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return snapshotOf(data[0] ?? null);
 		},
 		async getWarehouseSync(scope: Scope): Promise<WarehouseSync | null> {
 			const { locationId, target } = parseLocationKey(scope.locationId);

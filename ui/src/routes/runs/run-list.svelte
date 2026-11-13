@@ -1,10 +1,9 @@
 <script lang="ts">
 	import Loading from '$lib/components/loading.svelte';
-	import { to } from '$lib/paths';
+	import { openRow, to } from '$lib/paths';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import RadarIcon from '@lucide/svelte/icons/radar';
 	import UserIcon from '@lucide/svelte/icons/user';
-	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import type { RunRow } from '$lib/api';
 	import CopyButton from '$lib/components/copy-button.svelte';
@@ -44,14 +43,6 @@
 		if (list.hasMore && !list.loadingMore && !list.loading && last >= rows.length - OVERSCAN) void list.loadMore();
 	});
 
-	const CONTROL = 'a, button, input, label, [data-control]';
-	function open(e: MouseEvent, id: string) {
-		if ((e.target as Element).closest(CONTROL)) return;
-		const href = `/runs/${id}`;
-		if (e.metaKey || e.ctrlKey || e.button === 1) window.open(to(href), '_blank', 'noopener');
-		else void goto(to(href));
-	}
-
 	const toneColor = { muted: 'var(--muted-foreground)', warn: 'var(--sb-warning)', error: 'var(--sb-error)', live: 'var(--sb-running)' };
 	const kindToken = (r: RunRow) => (r.run.kind === 'adhoc' ? 'adhoc' : r.run.kind);
 </script>
@@ -89,7 +80,7 @@
 			{#each visible as d (d.key)}
 				{@const r = d.row.run}
 				{@const line = statusLine(d.row, app.now)}
-				<tr class:child={d.child} class:checked={list.selected.has(r.id)} style:height="{ROW_H}px" onclick={(e) => open(e, r.id)} onauxclick={(e) => e.button === 1 && open(e, r.id)}>
+				<tr class:child={d.child} class:checked={list.selected.has(r.id)} style:height="{ROW_H}px" onclick={(e) => openRow(e, `/runs/${r.id}`)} onauxclick={(e) => e.button === 1 && openRow(e, `/runs/${r.id}`)}>
 					<td class="sel">
 						<i class="stripe" style:background={runStatusTone[r.status]}></i>
 						<input type="checkbox" class="sb-check" checked={list.selected.has(r.id)} onchange={() => list.toggleSelected(r.id)} aria-label="Select run {shortRunId(r.id)}" />

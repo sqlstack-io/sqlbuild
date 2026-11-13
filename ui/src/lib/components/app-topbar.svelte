@@ -32,26 +32,27 @@
 		offline: 'Offline'
 	};
 
-	const snapshot = $derived(app.location?.snapshot);
+	const snapshot = $derived(app.snapshot);
+	const where = $derived(app.location ? `${app.location.name} · ${targetWords(app.location.target)}` : '—');
 </script>
 
 <div class="app-topbar flex h-[52px] shrink-0 items-center gap-3 border-b border-border px-5">
 	<h1 class="text-[15px] font-semibold">{title}</h1>
-	<span class="text-muted-foreground text-[12.5px]">{app.location ? `${app.location.name} · ${targetWords(app.location.target)}` : '—'}</span>
+	<span class="text-muted-foreground min-w-0 truncate text-[12.5px]" title={where}>{where}</span>
 	<div class="ml-auto flex items-center gap-2.5">
 		<span
 			class="text-muted-foreground flex items-center gap-[7px] text-[12px]"
 			title={snapshot === undefined
 				? connectionTitle[app.connection]
 				: `${connectionTitle[app.connection]}\n${snapshot
-					? `Version ${snapshot.generation}: commit ${snapshot.gitRevision}${snapshot.gitDirty ? ' (with uncommitted changes)' : ''} by ${snapshot.gitAuthor} (snapshot ${snapshot.id}, generation ${snapshot.generation})`
+					? `Version ${snapshot.generation}${snapshot.gitRevision ? `: commit ${snapshot.gitRevision}${snapshot.gitDirty ? ' (with uncommitted changes)' : ''}${snapshot.gitAuthor ? ` by ${snapshot.gitAuthor}` : ''}` : ', not from a git commit'} (snapshot ${snapshot.id}, generation ${snapshot.generation})`
 					: 'Nothing deployed to this location yet'}`}
 		>
 			<!-- A fixed slot, so going from Connecting to Live doesn't shift the bar. -->
 			<span class="connection"><span class="h-[7px] w-[7px] rounded-full" style:background={connectionTone[app.connection]}></span>{connectionLabel[app.connection]}</span>
 			{#if snapshot !== undefined}
 				<span class="text-[var(--sb-text-faint)]">·</span>
-				{snapshot ? `Version ${snapshot.generation}, deployed ${formatAgo(snapshot.publishedAt, app.now)}` : 'nothing deployed yet'}
+				<span class="whitespace-nowrap">{snapshot ? `Version ${snapshot.generation}, deployed ${formatAgo(snapshot.publishedAt, app.now)}` : 'nothing deployed yet'}</span>
 			{/if}
 		</span>
 		{#if app.client.supports('getWarehouseSync')}

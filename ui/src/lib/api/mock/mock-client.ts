@@ -24,6 +24,7 @@ import type {
 	RunOutputLine,
 	RunStatement,
 	Scope,
+	Snapshot,
 	SnapshotNode,
 	Timeline,
 	Trigger,
@@ -327,6 +328,10 @@ export class MockApiClient implements ApiClient {
 	async listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]> {
 		const events = this.#platformEvents();
 		return this.#reply(query.activeOnly ? events.filter((e) => e.active) : events);
+	}
+
+	async getLatestSnapshot(scope: Scope): Promise<Snapshot | null> {
+		return this.#reply(this.#location(scope).snapshot ?? null);
 	}
 
 	async getWarehouseSync(scope: Scope): Promise<WarehouseSync> {

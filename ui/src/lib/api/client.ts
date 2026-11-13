@@ -28,6 +28,7 @@ import type {
 	RunRowPage,
 	RunRowQuery,
 	RunStatement,
+	Snapshot,
 	RunTabCounts,
 	Scope,
 	SnapshotChange,
@@ -134,6 +135,8 @@ export interface ApiClient extends PlatformApi {
 
 	listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]>;
 
+	/** The newest version deployed to the location; null before its first deploy. */
+	getLatestSnapshot(scope: Scope): Promise<Snapshot | null>;
 	/** Null when the location has reported no recent sync. */
 	getWarehouseSync(scope: Scope): Promise<WarehouseSync | null>;
 	/** Asks the location to read SQLBuild's state back from the warehouse now. `connection.test` */

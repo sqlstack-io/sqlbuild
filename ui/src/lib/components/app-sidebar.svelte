@@ -39,7 +39,7 @@
 	}
 </script>
 
-<aside class="app-sidebar bg-sidebar flex h-screen w-56 shrink-0 flex-col border-r border-[var(--sidebar-border)] px-3 py-4">
+<aside class="app-sidebar bg-sidebar flex h-full w-56 shrink-0 flex-col border-r border-[var(--sidebar-border)] px-3 py-4">
 	<div class="flex items-center gap-2 px-2 pb-4">
 		<img src={logoForLight} alt="SQLBuild" class="h-6 w-auto dark:hidden" />
 		<img src={logoForDark} alt="SQLBuild" class="hidden h-6 w-auto dark:block" />
