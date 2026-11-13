@@ -2,14 +2,11 @@
 
 use crate::resource_costs::constants::{
     COLLECTION_FAILED_STATUS, MAX_FAILED_COLLECTION_ATTEMPTS, MAX_REFRESHED_RUNS,
-    REFRESH_WINDOW_DAYS, REFRESHABLE_COST_STATUSES,
+    REFRESH_WINDOW_DAYS, REFRESHABLE_COST_STATUSES, SECONDS_PER_DAY,
 };
 use crate::resource_costs::models::RunCostAttempt;
 
-const SECONDS_PER_DAY: i64 = 86_400;
-
-/// Newest first, at most `MAX_REFRESHED_RUNS`: refreshable runs inside the query history window,
-/// except failed collections that already used every attempt. `now` is seconds since the epoch.
+/// Newest refreshable runs in the history window, skipping exhausted failures; `now` is epoch seconds.
 #[must_use]
 pub fn refresh_candidates(latest: &[RunCostAttempt], now: i64) -> Vec<RunCostAttempt> {
     let oldest: i64 = now - REFRESH_WINDOW_DAYS * SECONDS_PER_DAY;

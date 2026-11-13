@@ -286,6 +286,78 @@ export type RunEventPage = {
 	nextCursor: number | null;
 };
 
+/** How complete a run's estimated query cost is; `none` until any cost was collected and synced. */
+export type RunCostStatus = 'complete' | 'partial' | 'pending' | 'collection_failed' | 'unavailable' | 'none';
+
+/** One latest cost observation: a collection's totals (`resourceType` "_total") or one resource on one warehouse. */
+export type RunCostRow = {
+	/** The build's own run ID, which groups the rows of one collection. */
+	buildRunId: string;
+	resourceType: string;
+	resourceName: string;
+	/** The resource's catalog node key; null on run rows. */
+	nodeKey: string | null;
+	warehouseName: string;
+	warehouseSize: string;
+	queryCount: number;
+	seconds: number;
+	bytesScanned: number;
+	credits: number;
+	/** Null without a configured credit price; the UI never guesses one. */
+	usd: number | null;
+	status: Exclude<RunCostStatus, 'none'>;
+	statementsExpected: number;
+	statementsObserved: number;
+};
+
+export type RunCostResource = { nodeKey: string; credits: number; usd: number | null; seconds: number; queryCount: number; bytesScanned: number; warehouses: string[] };
+export type RunCostWarehouse = { name: string; size: string; credits: number; usd: number | null; seconds: number; queryCount: number };
+
+/** A run's estimated query cost, with its resources and warehouses most expensive first. */
+export type RunCostBreakdown = {
+	status: RunCostStatus;
+	credits: number;
+	usd: number | null;
+	seconds: number;
+	queryCount: number;
+	statementsExpected: number;
+	statementsObserved: number;
+	resources: RunCostResource[];
+	warehouses: RunCostWarehouse[];
+};
+
+/** One group of a cost summary: a job, a warehouse size or a node; `key` is null for builds no server run started. */
+export type CostGroup = { key: string | null; credits: number; usd: number | null; seconds: number; runs: number };
+
+/** A target's estimated query cost over recent days, each breakdown most expensive first. */
+export type CostSummary = {
+	since: string;
+	credits: number;
+	/** Null when any run in the window had no configured credit price. */
+	usd: number | null;
+	runs: number;
+	/** Runs whose cost is still pending or partial, or whose collection failed. */
+	incompleteRuns: number;
+	byJob: CostGroup[];
+	byWarehouseSize: CostGroup[];
+	/** Every node that ran, keyed by node key. */
+	byNode: CostGroup[];
+};
+
+/** One node's estimated query cost in one build, across every warehouse it used. */
+export type NodeBuildCost = {
+	buildRunId: string;
+	/** The server run that started the build; null for builds from the command line. */
+	runId: string | null;
+	startedAt: string;
+	/** The collection status of the whole build. */
+	status: Exclude<RunCostStatus, 'none'>;
+	credits: number;
+	usd: number | null;
+	seconds: number;
+	queryCount: number;
+};
+
 export type RunStatement = {
 	id: string;
 	runId: string;

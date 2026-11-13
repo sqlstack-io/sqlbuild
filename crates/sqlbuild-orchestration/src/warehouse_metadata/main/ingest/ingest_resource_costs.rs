@@ -18,18 +18,7 @@ pub async fn ingest_resource_costs(
     batch: &MetadataBatch,
 ) -> Result<WarehouseSyncResponse, ControlError> {
     let records: Vec<WarehouseResourceCostRecord> = batch_records(batch)?;
-    let invalid_identity: bool = records.iter().any(|record| {
-        record.attempt < 1
-            || [
-                &record.observation_id,
-                &record.state_schema,
-                &record.run_id,
-                &record.resource_type,
-                &record.resource_name,
-            ]
-            .iter()
-            .any(|value| value.trim().is_empty())
-    });
+    let invalid_identity: bool = records.iter().any(invalid_identity);
     ingest_events(
         store,
         scope,
@@ -68,4 +57,16 @@ pub async fn ingest_resource_costs(
         ),
     )
     .await
+}
+
+/// Whether an observation lacks an attempt or any part of its identity.
+fn invalid_identity(record: &WarehouseResourceCostRecord) -> bool {
+    let identity: [&String; 5] = [
+        &record.observation_id,
+        &record.state_schema,
+        &record.run_id,
+        &record.resource_type,
+        &record.resource_name,
+    ];
+    record.attempt < 1 || identity.iter().any(|value| value.trim().is_empty())
 }

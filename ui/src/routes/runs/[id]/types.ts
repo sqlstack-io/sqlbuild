@@ -1,6 +1,6 @@
 import type { RunNode, RunNodeStatus } from '$lib/api';
 
-export type BottomTab = 'log' | 'statements';
+export type BottomTab = 'log' | 'statements' | 'cost';
 
 /** The node panel's groups, in display order. */
 export type NodeGroupKey = 'running' | 'failed' | 'skipped' | 'succeeded' | 'not_run';

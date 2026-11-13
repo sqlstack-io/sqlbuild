@@ -27,6 +27,7 @@
 	import { upstreamNote, type Tab } from './utils';
 
 	let { name }: { name: string } = $props();
+	const COST_DAYS = 30;
 
 	const res = createResource((client, scope) => client.getCatalogNode(scope, name), ['runs', 'checks', 'snapshot', 'node_status', 'warehouse_sync']);
 	const n = $derived(res.data ?? null);
@@ -36,6 +37,7 @@
 	});
 	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs']);
 	const colLineage = createResource((client, scope) => client.getColumnLineage(scope, name), ['snapshot']);
+	const costs = createResource((client, scope) => (client.supports('listNodeCosts') ? client.listNodeCosts(scope, name, COST_DAYS) : Promise.resolve([])), ['runs', 'warehouse_sync']);
 
 	const tabs = $derived.by<[Tab, string][]>(() => {
 		if (!n) return [['overview', 'Overview']];
@@ -161,7 +163,7 @@
 					<ColumnLineage focal={name} models={colLineage.data.models} colEdges={colLineage.data.edges} modelSql={colLineage.data.sql} modelColExpr={colLineage.data.expressions} />
 				{/if}
 			{:else if tab === 'runs'}
-				<RunsTab node={n} />
+				<RunsTab node={n} costs={costs.data ?? []} costDays={COST_DAYS} />
 			{:else if tab === 'checks'}
 				<ChecksTab node={n} />
 			{:else if tab === 'warehouse' && n.warehouse}

@@ -1,5 +1,6 @@
 //! A seeded target with scoped people, password sessions, fixtures and audit reads for warehouse history API tests.
 
+use chrono::{Duration, Utc};
 use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -216,4 +217,46 @@ pub(crate) fn ids(history: &Value, kind: &str) -> Vec<String> {
 /// One microbatch coverage batch as the API returns it.
 pub(crate) fn coverage_batch(start: &str, end: &str, state: &str, run_id: Value) -> Value {
     json!({"start": start, "end": end, "state": state, "run_id": run_id})
+}
+
+/// The fixture's observations, each started `hours_ago` before now so the read windows apply.
+pub(crate) fn cost_observations(data: &Value) -> Vec<Value> {
+    let now = Utc::now();
+    data["observations"]
+        .as_array()
+        .expect("observations")
+        .iter()
+        .map(|values| {
+            let mut record = data["record"].clone();
+            for (key, value) in values.as_object().expect("override") {
+                record[key] = value.clone();
+            }
+            let started = now - Duration::hours(values["hours_ago"].as_i64().expect("hours"));
+            let attempt = record["attempt"].as_i64().expect("attempt");
+            record["run_started_at"] = json!(started);
+            record["run_completed_at"] = json!(started + Duration::minutes(10));
+            record["observed_at"] = json!(started + Duration::minutes(10 + 5 * attempt));
+            record.as_object_mut().expect("record").remove("hours_ago");
+            record
+        })
+        .collect()
+}
+
+/// `(key, credits, usd, runs)` of each cost group, amounts rounded to hundredths.
+pub(crate) fn cost_groups(summary: &Value, field: &str) -> Vec<(Value, f64, Value, i64)> {
+    summary[field]
+        .as_array()
+        .expect("groups")
+        .iter()
+        .map(|group| {
+            (
+                group["key"].clone(),
+                (group["credits"].as_f64().expect("credits") * 100.0).round() / 100.0,
+                group["usd"]
+                    .as_f64()
+                    .map_or(Value::Null, |usd| json!((usd * 100.0).round() / 100.0)),
+                group["runs"].as_i64().expect("runs"),
+            )
+        })
+        .collect()
 }

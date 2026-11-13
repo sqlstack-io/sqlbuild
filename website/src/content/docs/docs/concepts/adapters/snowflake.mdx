@@ -178,10 +178,23 @@ contract rate. Use `sqb cost`, `sqb cost latest`, `sqb cost <run_id>`, or
 provide a versioned, decimal-safe output contract. Pending detail records are refreshed from
 Snowflake when inspected again.
 
+Under [`sqb server`](/docs/cli/server), the UI labels the same figures "estimated query cost":
+
+| Page | Shows |
+| --- | --- |
+| Run | The run's total, then each model and each warehouse, most expensive first |
+| Model, Runs tab | The model's cost and query time in each build over the last 30 days |
+| Overview | The last 7 or 30 days by job, folder and warehouse size |
+
+Figures are in dollars when `usd_per_credit` is set, and in credits with the default rate. A run
+whose cost isn't final shows "Cost pending" or "Partial", never $0.
+
 The estimate is read from `INFORMATION_SCHEMA.QUERY_HISTORY` when the run finishes. If it can't be
 read within 30 seconds, the build is unaffected and its cost is recorded as `pending`;
 `sqb cost <run_id>` collects it later. Any other failure is recorded as `collection_failed` with the
-Snowflake error.
+Snowflake error. Each later build in the target also re-reads up to three pending, partial or failed
+runs from the last six days while its warehouse is still running, so the server's figures complete
+without resuming a suspended warehouse. A failed collection is tried at most three times in all.
 
 The estimate is attributed compute, not your Snowflake bill. It sees only query history visible to
 the executing role, and leaves out warehouse resume and idle time, the 60-second minimum,

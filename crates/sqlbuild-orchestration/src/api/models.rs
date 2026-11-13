@@ -33,6 +33,9 @@ use crate::api::_helpers::resources::{
     person_reads::node_runs,
     person_reads::run_events,
     person_reads::run_statements,
+    person_reads::run_cost,
+    person_reads::cost_summary,
+    person_reads::node_costs,
     person_reads::run_statement_sql,
     person_reads::run_output,
     person_reads::run_node_error,
@@ -126,6 +129,14 @@ pub(crate) struct PlatformEventsQuery {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReadQuery {
+    pub(crate) limit: Option<u32>,
+}
+
+/// A cost read's window in days (default 7, at most 90) and, for history, its row limit.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CostQuery {
+    pub(crate) days: Option<u32>,
     pub(crate) limit: Option<u32>,
 }
 

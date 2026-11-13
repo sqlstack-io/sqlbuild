@@ -418,6 +418,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonCostSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/fingerprint": {
         parameters: {
             query?: never;
@@ -546,6 +562,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonNodeCosts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs": {
         parameters: {
             query?: never;
@@ -634,6 +666,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPersonRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunCost"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1614,6 +1662,48 @@ export interface components {
             access: components["schemas"]["PersonAccess"];
             login_mode: components["schemas"]["LoginMode"];
         };
+        /** @description Estimated query cost of one group, such as a job, a warehouse size or a node. */
+        CostGroup: {
+            /** Format: double */
+            credits: number;
+            /** @description The group's name; None for builds no server run started, or a resource without a warehouse. */
+            key?: string | null;
+            /**
+             * Format: int64
+             * @description Builds that contributed, counted once each.
+             */
+            runs: number;
+            /** Format: double */
+            seconds: number;
+            /**
+             * Format: double
+             * @description None when any of the group's observations had no configured credit price.
+             */
+            usd?: number | null;
+        };
+        /** @description A target's estimated query cost over a window, from the latest observation of each run. */
+        CostSummaryRecord: {
+            by_job: components["schemas"]["CostGroup"][];
+            /**
+             * @description Every node that ran, keyed `<resource_type>:<resource_name>` like catalog node keys, so
+             *     callers can group nodes by folder.
+             */
+            by_node: components["schemas"]["CostGroup"][];
+            by_warehouse_size: components["schemas"]["CostGroup"][];
+            /** Format: double */
+            credits: number;
+            /**
+             * Format: int64
+             * @description Runs whose cost is still pending or partial, or whose collection failed.
+             */
+            incomplete_runs: number;
+            /** Format: int64 */
+            runs: number;
+            /** Format: date-time */
+            since: string;
+            /** Format: double */
+            usd?: number | null;
+        };
         /** @description One stretch of the cursor, as raw bound texts. */
         CoverageBatch: {
             end: string;
@@ -2043,6 +2133,23 @@ export interface components {
         };
         MutationResponse: {
             applied: boolean;
+        };
+        /** @description One build's estimated query cost of one node, across every warehouse it used. */
+        NodeCostRecord: {
+            /** Format: double */
+            credits: number;
+            orchestration_run_id?: string | null;
+            /** Format: int64 */
+            query_count: number;
+            run_id: string;
+            /** Format: date-time */
+            run_started_at: string;
+            /** Format: double */
+            seconds: number;
+            /** @description The collection status of the whole build. */
+            status: string;
+            /** Format: double */
+            usd?: number | null;
         };
         /** @enum {string} */
         NodeEventKind: "success" | "failed" | "recovered";
@@ -3281,7 +3388,7 @@ export interface components {
          * @description Catalog observations require full scans; only immutable history supports a watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "column_migrations" | "node_results" | "consumption" | "observations" | "catalog" | "statistics";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "column_migrations" | "node_results" | "consumption" | "observations" | "resource_costs" | "catalog" | "statistics";
         /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
         WarehouseJanitorRecord: {
             archive_name: string;
@@ -3342,6 +3449,46 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
             value: string;
+        };
+        /**
+         * @description One estimated query cost observation of a run, resource and warehouse; display only.
+         *     A refresh appends a later attempt, and readers take the newest attempt per key.
+         */
+        WarehouseResourceCostRecord: {
+            /** Format: int64 */
+            attempt: number;
+            attributed_seconds: string;
+            /** Format: int64 */
+            bytes_scanned: number;
+            /** Format: int64 */
+            cluster_number?: number | null;
+            estimated_credits: string;
+            estimated_usd?: string | null;
+            limitations: string;
+            observation_id: string;
+            /** Format: date-time */
+            observed_at: string;
+            orchestration_run_id?: string | null;
+            /** Format: int64 */
+            query_count: number;
+            resource_name: string;
+            resource_type: string;
+            /** Format: date-time */
+            run_completed_at: string;
+            run_id: string;
+            /** Format: date-time */
+            run_started_at: string;
+            state_database?: string | null;
+            state_schema: string;
+            /** Format: int64 */
+            statements_expected: number;
+            /** Format: int64 */
+            statements_observed: number;
+            status: string;
+            target_name?: string | null;
+            warehouse_name: string;
+            warehouse_size: string;
+            warehouse_type?: string | null;
         };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
@@ -4448,6 +4595,47 @@ export interface operations {
             };
         };
     };
+    readPersonCostSummary: {
+        parameters: {
+            query?: {
+                /** @description Runs that started in the last this many days; defaults to 7, capped at 90 */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Estimated query cost by job, warehouse size and node, most expensive first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostSummaryRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     readPersonFingerprint: {
         parameters: {
             query: {
@@ -4791,6 +4979,50 @@ export interface operations {
             };
         };
     };
+    listPersonNodeCosts: {
+        parameters: {
+            query?: {
+                /** @description Builds that started in the last this many days; defaults to 7, capped at 90 */
+                days?: number;
+                /** @description Maximum builds; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                node_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The node's estimated query cost in each build, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeCostRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     listPersonNodeRuns: {
         parameters: {
             query?: {
@@ -5048,6 +5280,52 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
+            };
+        };
+    };
+    readPersonRunCost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The latest estimated query cost observation of the run and of each resource and warehouse it used; empty when none was synced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseResourceCostRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

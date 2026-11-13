@@ -286,8 +286,7 @@ pub struct WarehouseObservationRecord {
     pub observed_at: DateTime<Utc>,
 }
 
-/// One estimated query cost observation of a run, resource and warehouse; display only.
-/// A refresh appends a later attempt, and readers take the newest attempt per key.
+/// One estimated query cost observation of a run, resource and warehouse; refreshes append.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WarehouseResourceCostRecord {

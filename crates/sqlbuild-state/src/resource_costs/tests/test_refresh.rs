@@ -1,32 +1,9 @@
-use sqlbuild_core::cost_command::models::CostCoverage;
-
 use crate::resource_costs::main::refresh_candidates::refresh_candidates;
-use crate::resource_costs::main::resource_cost_observation_id::resource_cost_observation_id;
-use crate::resource_costs::models::{ResourceCostKey, RunCostAttempt};
+use crate::resource_costs::tests::helpers::{NOW, observation_id, run};
 use crate::resource_costs::tests::test_types::{ObservationIdTestCase, RefreshTestCase};
 
-const NOW: i64 = 1_800_000_000;
 const HOUR: i64 = 3_600;
 const DAY: i64 = 86_400;
-
-fn run(run_id: &str, attempt: i64, status: &str, age: i64) -> RunCostAttempt {
-    RunCostAttempt {
-        run_id: run_id.to_owned(),
-        orchestration_run_id: None,
-        attempt,
-        coverage: CostCoverage {
-            status: status.to_owned(),
-            expected_statement_count: 2,
-            observed_statement_count: 1,
-            query_count: 1,
-            limitations: Vec::new(),
-        },
-        target_name: None,
-        run_started_at: String::new(),
-        run_completed_at: String::new(),
-        started_epoch: NOW - age,
-    }
-}
 
 #[test]
 fn given_latest_run_rows_when_choosing_refreshes_then_only_bounded_recent_incomplete_runs() {
@@ -72,20 +49,6 @@ fn given_latest_run_rows_when_choosing_refreshes_then_only_bounded_recent_incomp
             .collect();
         assert_eq!(runs, test_case.expected_runs, "{}", test_case.description);
     }
-}
-
-fn observation_id(attempt: i64, cluster_number: Option<i64>) -> String {
-    resource_cost_observation_id(&ResourceCostKey {
-        run_id: "run",
-        attempt,
-        resource_type: "model",
-        resource_name: "orders",
-        warehouse_name: "BUILD_WH",
-        warehouse_size: "X-Small",
-        warehouse_type: Some("STANDARD"),
-        cluster_number,
-    })
-    .expect("identity encodes")
 }
 
 #[test]

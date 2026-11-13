@@ -31,8 +31,7 @@ pub const RESOURCE_COST_COLUMN_TYPES: [(&str, &str); 23] = [
     ("run_completed_at", TEXT_TIMESTAMP_STATE_VALUE_TYPE),
     (OBSERVED_AT_COLUMN, TEXT_TIMESTAMP_STATE_VALUE_TYPE),
 ];
-/// Columns that may be NULL: the server run of a location build, optional warehouse detail, USD
-/// without a configured rate, and the target.
+/// Columns that may be NULL: server run, optional warehouse detail, unpriced USD and target.
 pub const NULLABLE_RESOURCE_COST_COLUMNS: [&str; 5] = [
     "orchestration_run_id",
     "warehouse_type",
@@ -40,8 +39,8 @@ pub const NULLABLE_RESOURCE_COST_COLUMNS: [&str; 5] = [
     "estimated_usd",
     "target_name",
 ];
-/// Resource type of the row carrying a run's totals and status, with empty warehouse columns.
-pub const RUN_RESOURCE_TYPE: &str = "run";
+/// Resource type of a run's totals row; executor resource types never start with an underscore.
+pub const TOTAL_RESOURCE_TYPE: &str = "_total";
 /// Columns a refresh reads from each run's newest run row, in this order.
 pub const LATEST_RUN_COST_COLUMNS: [&str; 11] = [
     "run_id",
@@ -68,3 +67,5 @@ pub const MAX_FAILED_COLLECTION_ATTEMPTS: i64 = 3;
 pub const REFRESH_WINDOW_DAYS: i64 = 6;
 /// Most runs one build re-reads, newest first.
 pub const MAX_REFRESHED_RUNS: usize = 3;
+/// Seconds in one day, for the refresh window.
+pub const SECONDS_PER_DAY: i64 = 86_400;

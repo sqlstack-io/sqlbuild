@@ -23,6 +23,9 @@ import type {
 	RunNodeError,
 	RunOutputLine,
 	RunStatement,
+	RunCostRow,
+	CostSummary,
+	NodeBuildCost,
 	Scope,
 	Snapshot,
 	SnapshotNode,
@@ -210,6 +213,21 @@ export class MockApiClient implements ApiClient {
 	async listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]> {
 		this.#location(scope);
 		return this.#operate.listRunStatements(scope, runId);
+	}
+
+	async listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]> {
+		this.#location(scope);
+		return this.#operate.listRunCost(scope, runId);
+	}
+
+	async getCostSummary(scope: Scope, days: number): Promise<CostSummary> {
+		this.#location(scope);
+		return this.#operate.getCostSummary(scope, days);
+	}
+
+	async listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]> {
+		this.#location(scope);
+		return this.#operate.listNodeCosts(scope, nodeKey, days);
 	}
 
 	async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {

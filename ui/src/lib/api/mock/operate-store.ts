@@ -33,6 +33,9 @@ import type {
 	RunRowPage,
 	RunRowQuery,
 	RunStatement,
+	RunCostRow,
+	CostSummary,
+	NodeBuildCost,
 	RunTabCounts,
 	Scope,
 	SnapshotNode,
@@ -312,6 +315,128 @@ export class MockOperate {
 		const rec = this.#require(runId);
 		const now = Date.now();
 		return this.#ctx.reply(execution(rec, this.#nodesOf(rec, now), now).statements);
+	}
+
+	listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]> {
+		return this.#ctx.reply(this.#costRows(scope, this.#require(runId), Date.now()));
+	}
+
+	/** The latest cost of the builds that started in the window, grouped as the server groups them. */
+	getCostSummary(scope: Scope, days: number): Promise<CostSummary> {
+		const now = Date.now();
+		const since = now - days * 86_400_000;
+		const totals = () => ({ credits: 0, usd: 0 as number | null, seconds: 0, runs: new Set<string>() });
+		type Totals = ReturnType<typeof totals>;
+		const add = (groups: Map<string | null, Totals>, key: string | null, row: RunCostRow) => {
+			const g = groups.get(key) ?? totals();
+			g.credits += row.credits;
+			g.usd = g.usd === null || row.usd === null ? null : g.usd + row.usd;
+			g.seconds += row.seconds;
+			g.runs.add(row.buildRunId);
+			groups.set(key, g);
+		};
+		const all = new Map<string | null, Totals>();
+		const byJob = new Map<string | null, Totals>();
+		const bySize = new Map<string | null, Totals>();
+		const byNode = new Map<string | null, Totals>();
+		let incompleteRuns = 0;
+		for (const rec of this.#records) {
+			if (!rec.run.startedAt || Date.parse(rec.run.startedAt) < since) continue;
+			for (const row of this.#costRows(scope, rec, now)) {
+				if (row.resourceType === '_total') {
+					add(all, null, row);
+					add(byJob, rec.run.jobKey, row);
+					if (row.status !== 'complete') incompleteRuns += 1;
+				} else {
+					add(bySize, row.warehouseSize || null, row);
+					add(byNode, row.nodeKey, row);
+				}
+			}
+		}
+		const total = all.get(null) ?? totals();
+		const ranked = (groups: Map<string | null, Totals>) =>
+			[...groups].map(([key, g]) => ({ key, credits: g.credits, usd: g.usd, seconds: g.seconds, runs: g.runs.size })).sort((a, b) => b.credits - a.credits);
+		return this.#ctx.reply({
+			since: new Date(since).toISOString(),
+			credits: total.credits,
+			usd: total.runs.size ? total.usd : null,
+			runs: total.runs.size,
+			incompleteRuns,
+			byJob: ranked(byJob),
+			byWarehouseSize: ranked(bySize),
+			byNode: ranked(byNode)
+		});
+	}
+
+	/** One node's cost in each build of the window, newest first. */
+	listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]> {
+		const now = Date.now();
+		const since = now - days * 86_400_000;
+		const costs: NodeBuildCost[] = [];
+		for (const rec of this.#records) {
+			if (!rec.run.startedAt || Date.parse(rec.run.startedAt) < since) continue;
+			const rows = this.#costRows(scope, rec, now);
+			const mine = rows.filter((r) => r.nodeKey === nodeKey);
+			const run = rows.find((r) => r.resourceType === '_total');
+			if (!run || !mine.length) continue;
+			costs.push({
+				buildRunId: run.buildRunId,
+				runId: rec.run.id,
+				startedAt: rec.run.startedAt,
+				status: run.status,
+				credits: mine.reduce((t, r) => t + r.credits, 0),
+				usd: mine.some((r) => r.usd === null) ? null : mine.reduce((t, r) => t + (r.usd ?? 0), 0),
+				seconds: mine.reduce((t, r) => t + r.seconds, 0),
+				queryCount: mine.reduce((t, r) => t + r.queryCount, 0)
+			});
+		}
+		return this.#ctx.reply(costs.sort((a, b) => b.startedAt.localeCompare(a.startedAt)));
+	}
+
+	/**
+	 * Cost follows the mock statements at 1 credit an hour on X-Small, 2 on Small, and $3 a credit
+	 * where the target prices credits.
+	 * Only Snowflake estimates query cost, and a run that built nothing (a group run) has none.
+	 */
+	#costRows(scope: Scope, rec: RunRecord, now: number): RunCostRow[] {
+		if (this.#ctx.adapter(scope) !== 'snowflake' || !rec.run.startedAt || !rec.script.nodes.length) return [];
+		const statements = execution(rec, this.#nodesOf(rec, now), now).statements.filter((st) => st.nodeKey);
+		const buildRunId = `build-${rec.run.id}`;
+		// Staging sets no credit price, so it shows credits and the hint to set one.
+		const priced = this.#ctx.target(scope) !== 'staging';
+		const status: RunCostRow['status'] = isActive(rec.run.status) ? 'pending' : 'complete';
+		// Mock node keys are bare names, so each resource row carries its name as its node key.
+		const row = (resourceType: string, resourceName: string, seconds: number, queryCount: number, warehouse: [string, string], credits: number): RunCostRow => ({
+			buildRunId,
+			resourceType,
+			resourceName,
+			nodeKey: resourceType === '_total' ? null : resourceName,
+			warehouseName: warehouse[0],
+			warehouseSize: warehouse[1],
+			queryCount,
+			seconds,
+			bytesScanned: queryCount * 52_428_800,
+			credits,
+			usd: priced ? credits * 3 : null,
+			status,
+			statementsExpected: statements.length,
+			statementsObserved: status === 'pending' ? 0 : statements.length
+		});
+		if (status === 'pending') return [row('_total', buildRunId, 0, 0, ['', ''], 0)];
+		const byNode = new Map<string, { seconds: number; queries: number }>();
+		for (const st of statements) {
+			const seconds = st.endedAt ? Math.max(0, (Date.parse(st.endedAt) - Date.parse(st.startedAt)) / 1000) : 0;
+			const node = byNode.get(st.nodeKey) ?? { seconds: 0, queries: 0 };
+			node.seconds += seconds;
+			node.queries += 1;
+			byNode.set(st.nodeKey, node);
+		}
+		const parts = [...byNode].map(([key, node]) => {
+			const small = /revenue|rollup|segments|status/.test(key);
+			return row('model', key, node.seconds, node.queries, small ? ['TRANSFORM_WH', 'Small'] : ['LOAD_WH', 'X-Small'], (node.seconds / 3600) * (small ? 2 : 1));
+		});
+		const sum = (pick: (p: RunCostRow) => number) => parts.reduce((total, p) => total + pick(p), 0);
+		return [row('_total', buildRunId, sum((p) => p.seconds), statements.length, ['', ''], sum((p) => p.credits)), ...parts];
 	}
 
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql> {

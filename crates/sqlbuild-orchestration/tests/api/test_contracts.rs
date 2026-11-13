@@ -86,6 +86,8 @@ mod test_proxy;
 mod test_publish_encoding;
 #[path = "test_reads.rs"]
 mod test_reads;
+#[path = "test_resource_costs.rs"]
+mod test_resource_costs;
 #[path = "test_server_errors.rs"]
 mod test_server_errors;
 #[path = "test_statistics_recovery.rs"]
