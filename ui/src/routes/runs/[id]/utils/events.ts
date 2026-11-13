@@ -139,15 +139,15 @@ export function logEntries(events: readonly RunEvent[], output: readonly (RunOut
 			runId: l.runId,
 			at: l.at,
 			nodeKey: null,
-			level: 'info',
+			level: l.error ? 'error' : 'info',
 			category: 'output',
 			text: l.text,
 			title: l.stream,
-			tone: l.stream === 'stderr' ? 'var(--sb-warning)' : 'var(--sb-text-faint)',
+			tone: l.error ? 'var(--sb-error)' : l.stream === 'stderr' ? 'var(--sb-warning)' : 'var(--sb-text-faint)',
 			stream: l.stream,
 			statementId: null,
 			queries: [],
-			pinned: lastStderr.get(l.runId) === i
+			pinned: l.error || lastStderr.get(l.runId) === i
 		})
 	);
 	// A stable sort keeps each source's own order for equal times.

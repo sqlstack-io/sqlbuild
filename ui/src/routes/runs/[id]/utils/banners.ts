@@ -30,7 +30,8 @@ function cancelTechnical(cancel: CancelProgress): string {
 	].join('\n');
 }
 
-export function bannersFor(detail: RunDetail, now: number): Banner[] {
+/** `cause` is the first error the run recorded, when the person may read its output. */
+export function bannersFor(detail: RunDetail, now: number, cause: string | null = null): Banner[] {
 	const out: Banner[] = [];
 	const { run, liveness: live, cancel } = detail;
 	if (live?.state === 'unresponsive' && live.lastHeartbeatAt) {
@@ -53,8 +54,11 @@ export function bannersFor(detail: RunDetail, now: number): Banner[] {
 			detail: run.statusReason ?? undefined
 		});
 	}
-	if (run.status === 'failed' && run.statusReason && run.nodeCounts.failed === 0) {
-		out.push({ key: 'failed', tone: 'error', title: 'The run failed.', body: [{ text: run.statusReason }] });
+	// With no failed node to explain it, the first recorded error leads. It may be an earlier error the run
+	// survived, so the status reason, the scheduler's own account of the end, stays beside it.
+	if (run.status === 'failed' && (cause || run.statusReason) && run.nodeCounts.failed === 0) {
+		const reason = cause && run.statusReason ? [{ text: ` · Ended: ${run.statusReason}` }] : [];
+		out.push({ key: 'failed', tone: 'error', title: 'The run failed.', body: [{ text: cause ?? run.statusReason ?? '' }, ...reason] });
 	}
 	if (live?.state === 'never_started') {
 		out.push({

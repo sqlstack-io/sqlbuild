@@ -315,6 +315,8 @@ export type RunOutputLine = {
 	stream: 'stdout' | 'stderr';
 	at: Iso;
 	text: string;
+	/** The error the invocation recorded when it failed, rather than a line it printed. */
+	error: boolean;
 };
 
 export type RunInvocation = {
@@ -356,14 +358,17 @@ export type CancelProgress = {
 export type RunProvenance = {
 	snapshotId: string;
 	snapshotGeneration: number;
-	gitRevision: string;
+	/** Null when the project was published outside a git checkout. */
+	gitRevision: string | null;
 	gitDirty: boolean;
-	imageId: string;
+	/** Null when the location publishes no deployment image. */
+	imageId: string | null;
 	sqbVersion: string;
 	/** The frozen selection the run was authorized for. */
 	selection: string[];
 	exclude: string[];
-	command: string;
+	/** Null where the server does not report the command the worker ran. */
+	command: string | null;
 };
 
 export type RunDetail = {
