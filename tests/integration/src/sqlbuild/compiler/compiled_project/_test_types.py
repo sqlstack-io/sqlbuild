@@ -253,6 +253,14 @@ class SnapshotLineageTestCase:
 
 
 @dataclass(frozen=True)
+class SnapshotProvidersTestCase:
+    description: str
+    files: dict[str, str]
+    environment: dict[str, str]
+    expected_providers: dict[str, object] | None
+
+
+@dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
     schedule: Schedule

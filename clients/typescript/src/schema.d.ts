@@ -610,6 +610,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -2383,6 +2399,46 @@ export interface components {
             run_id: string;
             state_database?: string | null;
             state_schema: string;
+        };
+        /** @description Code that injects a provider: a node (`loader`, `task`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`. */
+        ProviderConsumer: {
+            kind: string;
+            name: string;
+        };
+        /** @description A provider as its location published it, from the class alone: never a setting value. */
+        ProviderRecord: {
+            /** @description The class as `module.qualname`. */
+            class: string;
+            /** @description The class docstring. */
+            description: string;
+            /** @description Jobs whose selection includes one of those nodes. */
+            jobs?: string[];
+            name: string;
+            /** @description Snapshot nodes that run that code: Python nodes, models calling a hook or using a materialization, and sources a loader fills. */
+            nodes?: string[];
+            /** @description The file declaring the class, relative to the project. */
+            path: string;
+            settings: components["schemas"]["ProviderSetting"][];
+            /** @description Code that injects the provider, in discovery order. */
+            used_by: components["schemas"]["ProviderConsumer"][];
+        };
+        /** @description One declared setting field; its value stays in the location's environment. */
+        ProviderSetting: {
+            description?: string | null;
+            /** @description The environment variable the setting is read from. */
+            env: string;
+            name: string;
+            required: boolean;
+            /** @description Whether the annotation is a pydantic secret type. */
+            secret: boolean;
+            /** @description The annotation as written, such as `str` or `SecretStr | None`. */
+            type: string;
+        };
+        /** @description Providers the current snapshot declares; empty before a publish or when the project has none. */
+        ProvidersRead: {
+            providers: components["schemas"]["ProviderRecord"][];
+            /** Format: uuid */
+            snapshot_id?: string | null;
         };
         /** @description A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles). */
         PublishedChange: {
@@ -4848,6 +4904,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["LocationWorkRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Declared providers without setting values */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvidersRead"];
                 };
             };
             /** @description Session rejected */

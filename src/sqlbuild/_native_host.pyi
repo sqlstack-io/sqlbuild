@@ -152,6 +152,9 @@ from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
     parameter_annotations as parameter_annotations,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
+    provider_settings as provider_settings,
+)
+from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
     provider_usages as provider_usages,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (

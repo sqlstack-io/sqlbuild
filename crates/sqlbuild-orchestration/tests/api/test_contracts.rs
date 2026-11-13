@@ -78,6 +78,8 @@ mod test_person_location_work;
 mod test_person_plans;
 #[path = "test_person_sessions.rs"]
 mod test_person_sessions;
+#[path = "test_providers.rs"]
+mod test_providers;
 #[path = "test_proxy.rs"]
 mod test_proxy;
 #[path = "test_publish_encoding.rs"]

@@ -43,6 +43,7 @@ import type {
 	Scope,
 	ServerSettings,
 	SettingField,
+	ProviderSetting,
 	SsoMapping,
 	WarehouseConnection
 } from '../types';
@@ -368,60 +369,72 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			}
 		]
 	};
+	const setting = (name: string, type: string, env: string, description: string, extra: Partial<ProviderSetting> = {}): ProviderSetting => ({
+		name,
+		type,
+		required: false,
+		secret: type.includes('Secret'),
+		env,
+		description,
+		...extra
+	});
 	const providers: ProviderConnection[] = [
 		{
 			name: 'orders_api',
-			type: 'rest',
+			className: 'providers.orders_api.OrdersApi',
 			description: 'Partner orders API used by the raw orders loader.',
 			sourceFile: 'providers/orders_api.py',
 			settings: [
-				{ key: 'base_url', type: 'string', required: true, description: 'API base URL' },
-				{ key: 'page_size', type: 'int', default: 500, min: 1, max: 5000, description: 'Records per request' },
-				{ key: 'timeout_seconds', type: 'int', default: 30, min: 1, max: 300, description: 'Request timeout' },
-				{ key: 'api_key', type: 'secret', required: true, secretSource: 'env: ORDERS_API_KEY', description: 'API key' }
+				setting('base_url', 'str', 'ORDERS_API_BASE_URL', 'API base URL', { required: true }),
+				setting('page_size', 'int', 'ORDERS_API_PAGE_SIZE', 'Records per request'),
+				setting('timeout_seconds', 'int', 'ORDERS_API_TIMEOUT_SECONDS', 'Request timeout'),
+				setting('api_key', 'SecretStr', 'ORDERS_API_KEY', 'API key', { required: true })
 			],
-			values: { base_url: 'https://orders.example.com/v2' },
-			usedBy: { nodes: ['raw__orders'], jobs: ['load_sources', 'nightly_all'], triggers: [] }
+			usedBy: [{ kind: 'loader', name: 'raw__orders' }],
+			jobs: ['load_sources', 'nightly_all']
 		},
 		{
 			name: 'export_bucket',
-			type: 's3',
+			className: 'providers.storage.ExportBucket',
 			description: 'Object storage for CSV exports of reporting models.',
 			sourceFile: 'providers/storage.py',
 			settings: [
-				{ key: 'bucket', type: 'string', required: true, description: 'Bucket name' },
-				{ key: 'prefix', type: 'string', default: 'exports/', description: 'Key prefix' },
-				{ key: 'region', type: 'string', required: true, description: 'Region' },
-				{ key: 'compression', type: 'enum', enum: ['none', 'gzip', 'zstd'], default: 'gzip', description: 'File compression' },
-				{ key: 'secret_access_key', type: 'secret', required: true, secretSource: 'secret store: exports/bucket', description: 'Access key secret' }
+				setting('bucket', 'str', 'EXPORT_BUCKET_BUCKET', 'Bucket name', { required: true }),
+				setting('prefix', 'str', 'EXPORT_BUCKET_PREFIX', 'Key prefix'),
+				setting('region', 'str', 'EXPORT_BUCKET_REGION', 'Region', { required: true }),
+				setting('compression', "Literal['none', 'gzip', 'zstd']", 'EXPORT_BUCKET_COMPRESSION', 'File compression'),
+				setting('secret_access_key', 'SecretStr', 'EXPORT_BUCKET_SECRET_ACCESS_KEY', 'Access key secret', { required: true })
 			],
-			values: { bucket: 'example-exports', region: 'eu-west-1' },
-			usedBy: { nodes: ['export_revenue_csv'], jobs: ['revenue_refresh', 'reporting_exports'], triggers: [] }
+			usedBy: [
+				{ kind: 'task', name: 'export_revenue_csv' },
+				{ kind: 'sink', name: 'run_log_archive' }
+			],
+			jobs: ['revenue_refresh', 'reporting_exports']
 		},
 		{
 			name: 'support_desk',
-			type: 'rest',
+			className: 'providers.support_desk.SupportDesk',
 			description: 'Support ticket system read by the tickets loader.',
 			sourceFile: 'providers/support_desk.py',
 			settings: [
-				{ key: 'base_url', type: 'string', required: true, description: 'API base URL' },
-				{ key: 'include_closed', type: 'bool', default: false, description: 'Also load closed tickets' },
-				{ key: 'token', type: 'secret', required: true, secretSource: 'env: SUPPORT_DESK_TOKEN', description: 'Access token' }
+				setting('base_url', 'str', 'SUPPORT_DESK_BASE_URL', 'API base URL', { required: true }),
+				setting('include_closed', 'bool', 'SUPPORT_DESK_INCLUDE_CLOSED', 'Also load closed tickets'),
+				setting('token', 'SecretStr', 'SUPPORT_DESK_TOKEN', 'Access token', { required: true })
 			],
-			values: { base_url: 'https://support.example.com/api', include_closed: true },
-			usedBy: { nodes: ['raw__support_tickets'], jobs: ['load_sources'], triggers: [] }
+			usedBy: [{ kind: 'loader', name: 'raw__support_tickets' }],
+			jobs: ['load_sources']
 		},
 		{
 			name: 'chat_webhook',
-			type: 'webhook',
-			description: 'Incoming webhook of the team chat room; sensors post messages to it.',
+			className: 'providers.chat.ChatWebhook',
+			description: 'Incoming webhook of the team chat room.',
 			sourceFile: 'providers/chat.py',
 			settings: [
-				{ key: 'url', type: 'secret', required: true, secretSource: 'env: CHAT_WEBHOOK_URL', description: 'Webhook URL' },
-				{ key: 'timeout_seconds', type: 'int', default: 10, min: 1, max: 60, description: 'Request timeout' }
+				setting('url', 'SecretStr', 'CHAT_WEBHOOK_URL', 'Webhook URL', { required: true }),
+				setting('timeout_seconds', 'int', 'CHAT_WEBHOOK_TIMEOUT_SECONDS', 'Request timeout')
 			],
-			values: {},
-			usedBy: { nodes: [], jobs: [], triggers: [{ id: triggerId('platform_health_webhook'), name: 'platform_health_webhook' }] }
+			usedBy: [],
+			jobs: []
 		}
 	];
 

@@ -186,6 +186,18 @@ Providers
 
 Use `--verbose` to see which specific nodes consume each provider.
 
+## Providers in the web UI
+
+When a location publishes to [`sqb server`](/docs/cli/server/), the **Providers** page lists each
+provider with its class and docstring. A provider's page shows:
+
+| Tab | Shows |
+| --- | --- |
+| Settings | Each setting's type, environment variable and whether it is required; secret settings are marked |
+| Used by | The loaders, tasks, hooks and other code that take the provider, and the jobs that run that code |
+
+Setting values, defaults included, are never published.
+
 ## Project layout
 
 ```

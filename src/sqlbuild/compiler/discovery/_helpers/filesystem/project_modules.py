@@ -9,8 +9,8 @@ import sys
 from collections.abc import Callable
 from importlib.machinery import ModuleSpec
 from pathlib import Path
-from types import ModuleType
-from typing import get_type_hints
+from types import ModuleType, UnionType
+from typing import TYPE_CHECKING, Annotated, Literal, Union, get_args, get_origin, get_type_hints
 
 from sqlbuild._native import (
     PYTHON_INIT_MODULE_STEM,
@@ -26,6 +26,9 @@ from sqlbuild.runtime.event_exporting.constants import EVENT_EXPORTER_EVENT_PARA
 from sqlbuild.runtime.observability.models import LifecycleEvent
 from sqlbuild.runtime.user_code.main.register_user_code_root import register_user_code_root
 from sqlbuild.runtime.user_code.main.user_code_spec import user_code_spec
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
 
 _PROJECT_PYTHON_PACKAGE_MARKER: str = "__sqlbuild_project_python__"
 
@@ -415,3 +418,65 @@ def provider_usages(
             )
         )
     return tuple(usages)
+
+
+def provider_settings(*, provider_class: type) -> dict[str, object]:
+    """A provider class's path, docstring and declared setting fields; never a setting value."""
+
+    config: dict[str, object] = dict(getattr(provider_class, "model_config", {}))
+    fields: dict[str, FieldInfo] = getattr(provider_class, "model_fields", {})
+    rows: list[dict[str, object]] = []
+    for name, info in fields.items():
+        rows.append(
+            {
+                "name": name,
+                "type": _annotation_text(info.annotation),
+                "required": info.is_required(),
+                "alias": _environment_alias(info),
+                "description": info.description,
+            }
+        )
+    return {
+        "class": f"{provider_class.__module__}.{provider_class.__qualname__}",
+        "description": inspect.cleandoc(provider_class.__doc__ or ""),
+        "env_prefix": config.get("env_prefix") or "",
+        "case_sensitive": bool(config.get("case_sensitive")),
+        "env_prefix_target": config.get("env_prefix_target"),
+        "fields": rows,
+    }
+
+
+def _environment_alias(info: FieldInfo) -> str | None:
+    """The first environment variable an alias names: an `AliasChoices` choice or path head."""
+
+    from pydantic import AliasChoices, AliasPath
+
+    alias: object = info.validation_alias or info.alias
+    if isinstance(alias, AliasChoices | AliasPath):
+        first: object = next(iter(alias.convert_to_aliases()), None)
+        if isinstance(first, list):
+            first = next(iter(first), None)
+        return first if isinstance(first, str) else None
+    return alias if isinstance(alias, str) else None
+
+
+def _annotation_text(annotation: object) -> str:
+    """An annotation as a reader writes it: `SecretStr | None`, `list[str]` or `Literal['gzip']`."""
+
+    if annotation is None or annotation is type(None):
+        return "None"
+    origin: object = get_origin(annotation)
+    arguments: tuple[object, ...] = get_args(annotation)
+    if origin is None or not arguments:
+        if isinstance(annotation, type):
+            return annotation.__name__
+        return str(annotation).replace("typing.", "")
+    if origin is Annotated:
+        return _annotation_text(arguments[0])
+    if origin is Literal:
+        return f"Literal[{', '.join(repr(argument) for argument in arguments)}]"
+    parts: list[str] = [_annotation_text(argument) for argument in arguments]
+    if origin is Union or origin is UnionType:
+        return " | ".join(parts)
+    name: str = origin.__name__ if isinstance(origin, type) else str(origin).replace("typing.", "")
+    return f"{name}[{', '.join(parts)}]"

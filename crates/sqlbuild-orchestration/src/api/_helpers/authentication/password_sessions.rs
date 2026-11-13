@@ -152,6 +152,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::job),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/providers",
+            get(crate::api::_helpers::resources::person_reads::providers),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/triggers",
             get(crate::api::_helpers::resources::person_reads::triggers),
         )
