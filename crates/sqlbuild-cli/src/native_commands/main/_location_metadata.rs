@@ -9,7 +9,9 @@ use sqlbuild_orchestration::platform::models::{
     LocationWorkClient, LocationWorkPoll, WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    MetadataKeyPage, MetadataScan, WarehouseHistoryKind, WarehouseHistoryPage,
+};
 use tokio::time::Instant;
 
 use crate::argv::models::Stream;
@@ -22,6 +24,12 @@ use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::constants::METADATA_POLL_SECONDS;
 use crate::native_commands::models::{LocationMetadataSync, LocationServe, LocationWatch};
+
+/// Shutdown, a rejected key page, or the page with its missing rows (`None` when the read failed).
+type MissingRows = Option<(
+    LocationMetadataSync,
+    Result<Option<WarehouseHistoryPage>, ClientError>,
+)>;
 
 /// One bounded source or mirror page leaves named work polling a turn between pages.
 pub(super) async fn sync_location_metadata(
@@ -72,11 +80,37 @@ pub(super) async fn sync_location_metadata(
             }
         }
         let Some((read, page)) =
-            read_metadata_page((options, script), state, stopped.as_mut()).await?
+            read_metadata_page((options, script), (state, None), stopped.as_mut()).await?
         else {
             return Ok(None);
         };
         state = read;
+        let page = match page {
+            Some(page) if !page.keys.is_empty() => {
+                let Some((read, rows)) = missing_rows(
+                    (state, page),
+                    (options, script),
+                    (client, poll),
+                    stopped.as_mut(),
+                )
+                .await?
+                else {
+                    return Ok(None);
+                };
+                state = read;
+                match rows {
+                    Ok(rows) => rows,
+                    Err(error) => {
+                        tokio::select! {
+                            result = &mut stopped => { result?; return Ok(None); },
+                            () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
+                        }
+                        return retry_metadata(state, error);
+                    }
+                }
+            }
+            page => page,
+        };
         let Some(page) = page else {
             let failure = if state.busy {
                 WarehouseSyncFailure::Busy
@@ -130,6 +164,52 @@ pub(super) async fn sync_location_metadata(
         () = metadata_health(&state, (client, poll), (started, None)) => {},
     }
     finish_metadata_page(acknowledge_metadata_page(state)).await
+}
+
+/// The mirror's rows join the scan by key; only the rows it lacks are read in full.
+async fn missing_rows(
+    (state, page): (LocationMetadataSync, WarehouseHistoryPage),
+    (options, script): (&LocationServe, &Path),
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<MissingRows, ControlError> {
+    tokio::pin!(stopped);
+    let request = MetadataKeyPage {
+        kind: state.kind(),
+        session_id: poll.session_id,
+        generation: state.generation,
+        scan: MetadataScan {
+            scan_id: state.scan_id,
+            location: state.location().clone(),
+            complete: false,
+        },
+        keys: page.keys.clone(),
+    };
+    let matched = tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        result = client.match_metadata_keys(&options.target, &request) => result,
+    };
+    let missing: Vec<serde_json::Value> = match matched {
+        Ok(matched) => matched
+            .missing
+            .iter()
+            .filter_map(|index| request.keys.get(*index).cloned())
+            .collect(),
+        Err(error) => return Ok(Some((state, Err(error)))),
+    };
+    if missing.is_empty() {
+        return Ok(Some((state, Ok(Some(page)))));
+    }
+    let Some((state, read)) =
+        read_metadata_page((options, script), (state, Some(&missing)), stopped).await?
+    else {
+        return Ok(None);
+    };
+    let page = read.map(|read| WarehouseHistoryPage {
+        records: read.records,
+        ..page
+    });
+    Ok(Some((state, Ok(page))))
 }
 
 fn retry_metadata(

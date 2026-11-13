@@ -59,5 +59,6 @@ pub(crate) fn read_statistics(
         next_after: request.next_after.map(|id| vec![Some(id.to_string())]),
         change_token: None,
         unchanged: false,
+        keys: Vec::new(),
     })
 }

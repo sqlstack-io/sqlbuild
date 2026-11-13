@@ -370,7 +370,11 @@ pub(crate) fn metadata_sync(
     }
 }
 
-pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, ControlError> {
+/// `keys` names a key page's missing rows; otherwise a keyed reconcile scan reads a key page.
+pub(crate) fn history_request(
+    state: &LocationMetadataSync,
+    keys: Option<&[serde_json::Value]>,
+) -> Result<Vec<u8>, ControlError> {
     if state.index == 0 && state.source_after.is_none() && state.limit == MAX_HISTORY_RECORDS {
         drop(write_output(&[(
             Stream::Stderr,
@@ -384,11 +388,20 @@ pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, C
         json!({(kind): {
             "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
         }})
-    } else {
+    } else if let Some(keys) = keys {
         json!({(kind): {
             "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit,
-            "unchanged_token":state.unchanged_token()
+            "keys":keys
         }})
+    } else {
+        let mut read = json!({
+            "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit,
+            "unchanged_token":state.unchanged_token()
+        });
+        if state.key_pages() {
+            read["keys_only"] = json!(true);
+        }
+        json!({(kind): read})
     };
     serde_json::to_vec(&request).map_err(|error| ControlError::Invalid(error.to_string()))
 }
@@ -429,7 +442,8 @@ pub(crate) fn freeze_history_page(
         state.scan_token.clone_from(&page.change_token);
         state.scan_delivered = false;
     }
-    state.scan_delivered |= !page.records.is_empty();
+    // Rows a key page matched were delivered earlier; an emptied mirror must not skip their scan.
+    state.scan_delivered |= !page.records.is_empty() || !page.keys.is_empty();
     let batch = MetadataBatch {
         kind: state.kind(),
         session_id: poll.session_id,
@@ -538,7 +552,7 @@ pub(crate) async fn load_watermark(
         state.reconcile = Instant::now() >= state.reconcile_at;
     }
     state.mirror_holds_rows = false;
-    if (!state.reconcile || state.change_tokens.contains_key(&state.index))
+    if (!state.reconcile || state.change_tokens.contains_key(&state.index) || state.kind().keyed())
         && !matches!(
             state.kind(),
             WarehouseHistoryKind::Catalog | WarehouseHistoryKind::Statistics
@@ -1183,7 +1197,7 @@ pub(crate) async fn stop_location_runtime(
 /// An outer absence means shutdown; an inner absence is a failed read, never an empty table.
 pub(crate) async fn read_metadata_page(
     (options, script): (&LocationServe, &Path),
-    mut state: LocationMetadataSync,
+    (mut state, keys): (LocationMetadataSync, Option<&[serde_json::Value]>),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationMetadataSync, Option<WarehouseHistoryPage>)>, ControlError> {
     if let Some(statistics) = &state.statistics
@@ -1194,10 +1208,11 @@ pub(crate) async fn read_metadata_page(
             next_after: statistics.next_after.map(|id| vec![Some(id.to_string())]),
             change_token: None,
             unchanged: false,
+            keys: Vec::new(),
         };
         return Ok(Some((state, Some(page))));
     }
-    let request = history_request(&state)?;
+    let request = history_request(&state, keys)?;
     let reader = match state.reader.take() {
         Some(reader) => reader,
         None => match open_location_runtime(options, script, Vec::new()) {

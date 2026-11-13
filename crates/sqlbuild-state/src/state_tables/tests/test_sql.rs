@@ -1,5 +1,6 @@
 use crate::state_tables::main::create_table_sql::create_table_sql;
 use crate::state_tables::main::read_history_sql::read_history_sql;
+use crate::state_tables::main::read_keys_sql::read_keys_sql;
 use crate::state_tables::main::values_insert_sql::values_insert_sql;
 use crate::state_tables::models::HistoryRead;
 use crate::state_tables::tests::helpers::column;
@@ -109,4 +110,21 @@ fn given_a_table_without_event_ids_when_paging_history_then_the_missing_key_neve
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_missing_keys_when_reading_rows_then_each_key_matches_its_columns_and_nulls() {
+    assert_eq!(
+        read_keys_sql(
+            "s.t",
+            (&["k", "phase", "ts"], false),
+            &["k", "phase"],
+            &[
+                vec![Some("'a'".to_owned()), None],
+                vec![Some("'b'".to_owned()), Some("'final'".to_owned())],
+            ],
+        ),
+        "SELECT k, phase, ts, NULL AS event_id FROM s.t WHERE (k = 'a' AND phase IS NULL) \
+            OR (k = 'b' AND phase = 'final')"
+    );
 }
