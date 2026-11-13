@@ -2292,9 +2292,24 @@ export interface components {
             kind: "launch_failed";
             /** Format: uuid */
             run_id: string;
+        } | {
+            /** Format: int64 */
+            failed_node_count: number;
+            /** @description The first failed nodes by key, with redacted and bounded error text. */
+            failed_nodes: components["schemas"]["RunNodeFailure"][];
+            job_key?: string | null;
+            /** @enum {string} */
+            kind: "run_failed";
+            /** Format: uuid */
+            location_id: string;
+            outcome: components["schemas"]["RunOutcome"];
+            /** Format: uuid */
+            run_id: string;
+            run_kind: components["schemas"]["RunKind"];
+            target: string;
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];

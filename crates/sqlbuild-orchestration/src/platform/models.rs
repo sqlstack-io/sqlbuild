@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::api::models::ControlClient;
 use crate::declarations::models::TriggerDefinition;
+use crate::runs::models::{RunKind, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use crate::warehouse_metadata::models::{WarehouseHistoryKind, WarehouseStateLocation};
 
@@ -186,6 +187,7 @@ pub enum PlatformEventKind {
     CalendarHorizonLow,
     LocationBroken,
     LaunchFailed,
+    RunFailed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -216,6 +218,18 @@ pub enum PlatformEvent {
         claim_id: Uuid,
         code: String,
     },
+    /// A job, group or ad-hoc run ended failed or partial; only the webhook receives it, never person reads.
+    RunFailed {
+        run_id: Uuid,
+        run_kind: RunKind,
+        job_key: Option<String>,
+        location_id: Uuid,
+        target: String,
+        outcome: RunOutcome,
+        /// The first failed nodes by key, with redacted and bounded error text.
+        failed_nodes: Vec<RunNodeFailure>,
+        failed_node_count: i64,
+    },
 }
 
 impl PlatformEvent {
@@ -228,6 +242,7 @@ impl PlatformEvent {
             Self::CalendarHorizonLow { .. } => PlatformEventKind::CalendarHorizonLow,
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
+            Self::RunFailed { .. } => PlatformEventKind::RunFailed,
         }
     }
 
@@ -240,6 +255,7 @@ impl PlatformEvent {
             Self::CalendarHorizonLow { .. } => "platform_calendar_horizon_low",
             Self::LocationBroken { .. } => "platform_location_broken",
             Self::LaunchFailed { .. } => "platform_launch_failed",
+            Self::RunFailed { .. } => "platform_run_failed",
         }
     }
 }

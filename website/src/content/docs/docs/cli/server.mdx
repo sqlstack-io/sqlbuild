@@ -26,6 +26,64 @@ warning: the bearer token for http://control.example.com travels unencrypted ove
 
 Connections to `localhost`, `127.0.0.1` or `::1` print no warning.
 
+## Receive platform events
+
+Set `SQLBUILD_PLATFORM_WEBHOOK_URL` in the server's environment to have it `POST` each platform
+event to that URL as JSON. Leave it unset to turn delivery off. Locations and workers never
+receive the URL.
+
+```json
+{
+  "storage_id": 4182,
+  "event_id": "01a1d3c2-6f0e-7a51-9b2e-3c4d5e6f7a80",
+  "occurred_at": "2026-11-13T07:12:04.381Z",
+  "payload": {
+    "platform": {
+      "kind": "run_failed",
+      "run_id": "01a1d3b9-2c4e-7f10-8a3b-1d2e3f4a5b6c",
+      "run_kind": "job",
+      "job_key": "daily_orders",
+      "location_id": "01a1d38b-e214-7151-8c8e-8606917c3ee6",
+      "target": "production",
+      "outcome": "partial",
+      "failed_nodes": [
+        {
+          "node_key": "model:fct_orders",
+          "error_code": "E100",
+          "message": "Conversion Error: Could not convert string 'n/a' to INT32",
+          "path": "models/marts/fct_orders.sql"
+        }
+      ],
+      "failed_node_count": 1
+    }
+  }
+}
+```
+
+Delivery is at least once and in order. A response other than `2xx`, or no response within 10
+seconds, stops delivery and retries the same event. Deduplicate by `event_id`, which the
+`Idempotency-Key` header repeats.
+
+| `kind` | Sent when | Fields |
+| --- | --- | --- |
+| `heartbeat` | Each server replica is alive, periodically | `replica_id` |
+| `scheduler_no_leader` | No server holds the scheduler lease | None |
+| `tick_overdue` | A schedule tick is late | `trigger_id`, `scheduled_for` |
+| `calendar_horizon_low` | A running calendar schedule has a day or less of dates left | `trigger_id`, `refresh_at`, `horizon_end` |
+| `location_broken` | Every instance of a location and target has stopped reporting for over 90 seconds | `location_id`, `target`, `last_seen_at` |
+| `launch_failed` | Starting a worker failed; it may still start | `run_id`, `claim_id`, `code` |
+| `run_failed` | A job, group or ad-hoc run ends `failed` or `partial` | `run_id`, `run_kind`, `job_key`, `location_id`, `target`, `outcome`, `failed_nodes`, `failed_node_count` |
+
+Each condition is sent once when it starts, not on every 30-second scan. Monitor heartbeats from
+outside the server too: a stopped server can't report its own outage.
+
+`run_failed` lists at most 20 failed nodes, ordered by node key; `failed_node_count` is the full
+number. A `partial` run is included because some of its nodes failed. `job_key` is `null` for
+ad-hoc runs. Each `message` is the node's error text with credentials redacted, cut to 2,000
+characters, and `null` when the worker reported none. It can quote warehouse data, so treat the
+webhook like other run evidence. `run_failed` events appear only in the webhook, not in the
+server's platform history.
+
 ## Upgrade
 
 Upgrade the server first, then the locations and workers that connect to it. Don't downgrade the

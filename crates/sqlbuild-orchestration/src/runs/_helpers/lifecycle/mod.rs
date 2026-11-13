@@ -12,4 +12,5 @@ pub(in crate::runs) mod publish_change;
 pub(in crate::runs) mod queued;
 pub(in crate::runs) mod reads;
 pub(in crate::runs) mod recall;
+pub(in crate::runs) mod run_failure;
 pub(in crate::runs) mod waits;

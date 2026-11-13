@@ -5,6 +5,7 @@ use serde_json::json;
 use crate::platform::models::PlatformEvent;
 use crate::runs::_helpers::lifecycle::events::append_run_event;
 use crate::runs::_helpers::lifecycle::projection::project_change;
+use crate::runs::_helpers::lifecycle::run_failure::publish_run_failure;
 use crate::runs::models::{ChangingRun, RunChange, RunChangeRequest, RunOutcome};
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
@@ -53,6 +54,13 @@ pub(crate) async fn publish_change(
         return Ok(transaction);
     }
     let mut transaction = project_change(transaction, request, state).await?;
+    if let RunChange::Finished {
+        outcome: outcome @ (RunOutcome::Failed | RunOutcome::Partial),
+        ..
+    } = request.change
+    {
+        transaction = publish_run_failure(transaction, request, outcome).await?;
+    }
     if let Some((node_key, _)) = request.change.finished_node() {
         (transaction, _) = query(
             transaction,
