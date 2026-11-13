@@ -78,28 +78,6 @@ fn same(left: Option<&str>, right: Option<&str>) -> bool {
     left.unwrap_or_default().to_lowercase() == right.unwrap_or_default().to_lowercase()
 }
 
-/// A listing call's database, schemas and optional relation names.
-type ListingScope = (Option<String>, Option<Vec<String>>, Option<Vec<String>>);
-
-/// The `database`, `schemas` and optional `names` of a listing call; its connection goes unused.
-fn scope(
-    py: Python<'_>,
-    function: &str,
-    options: Option<Bound<'_, PyDict>>,
-) -> PyResult<ListingScope> {
-    let arguments: KeywordArguments<'_> = KeywordArguments::read(
-        py,
-        function,
-        options,
-        (&["connection", "database", "schemas"], &["names"]),
-    )?;
-    Ok((
-        arguments.value("database")?.extract()?,
-        arguments.value("schemas")?.extract()?,
-        arguments.value("names")?.extract()?,
-    ))
-}
-
 /// Whether `wanted` is unset or holds `value`, compared as the warehouse folds case.
 fn any_same(wanted: Option<&[String]>, value: &str) -> bool {
     let Some(wanted) = wanted else {
@@ -295,6 +273,25 @@ impl SyncedCopyAdapter {
         Ok(None)
     }
 
+    /// The relations a listing call named by its `database`, `schemas` and optional `names`.
+    fn listed_by<'py>(
+        &self,
+        py: Python<'py>,
+        function: &str,
+        options: Option<Bound<'py, PyDict>>,
+    ) -> PyResult<Vec<&WarehouseCatalogRecord>> {
+        let arguments: KeywordArguments<'_> = KeywordArguments::read(
+            py,
+            function,
+            options,
+            (&["connection", "database", "schemas"], &["names"]),
+        )?;
+        let database: Option<String> = arguments.value("database")?.extract()?;
+        let schemas: Option<Vec<String>> = arguments.value("schemas")?.extract()?;
+        let names: Option<Vec<String>> = arguments.value("names")?.extract()?;
+        Ok(self.listed(database.as_deref(), schemas.as_deref(), names.as_deref()))
+    }
+
     fn listed(
         &self,
         database: Option<&str>,
@@ -383,11 +380,11 @@ impl SyncedCopyAdapter {
         py: Python<'py>,
         options: Option<Bound<'py, PyDict>>,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        let (database, schemas, names) = scope(py, "list_relations", options)?;
-        let mut relations: Vec<Bound<'py, PyAny>> = Vec::new();
-        for record in self.listed(database.as_deref(), schemas.as_deref(), names.as_deref()) {
-            relations.push(self.relation_info(py, record)?);
-        }
+        let relations: Vec<Bound<'py, PyAny>> = self
+            .listed_by(py, "list_relations", options)?
+            .into_iter()
+            .map(|record| self.relation_info(py, record))
+            .collect::<PyResult<_>>()?;
         PyTuple::new(py, relations)
     }
 
@@ -397,9 +394,8 @@ impl SyncedCopyAdapter {
         py: Python<'py>,
         options: Option<Bound<'py, PyDict>>,
     ) -> PyResult<Bound<'py, PyDict>> {
-        let (database, schemas, names) = scope(py, "get_all_columns", options)?;
         let columns: Bound<'py, PyDict> = PyDict::new(py);
-        for record in self.listed(database.as_deref(), schemas.as_deref(), names.as_deref()) {
+        for record in self.listed_by(py, "get_all_columns", options)? {
             columns.set_item(&record.name, self.columns(py, record)?)?;
         }
         Ok(columns)
