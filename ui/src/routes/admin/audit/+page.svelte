@@ -91,6 +91,7 @@
 			</thead>
 			<tbody>
 				{#each rows as e (e.id)}
+					{@const change = e.before !== null || e.after !== null ? `${e.before ?? '∅'} → ${e.after ?? '∅'}` : null}
 					<tr>
 						<td><RelativeTime value={formatAgo(e.at, app.now)} exact={formatStamp(e.at)} /></td>
 						<td>
@@ -118,8 +119,8 @@
 						<td class="muted">{e.grantingRole ?? '—'}</td>
 						<td class="detail">
 							{e.summary}
-							<div class="cell-desc clip" title="Request {e.requestId}">
-								{#if e.before !== null || e.after !== null}<code>{e.before ?? '∅'} → {e.after ?? '∅'}</code> ·{/if}
+							<div class="cell-desc clip" title={change ? `${change}\nRequest ${e.requestId}` : `Request ${e.requestId}`}>
+								{#if change && !e.summary}<code>{change}</code> ·{/if}
 								<code>{e.requestId}</code>
 							</div>
 						</td>
