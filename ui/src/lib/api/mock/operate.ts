@@ -653,6 +653,7 @@ type Seed = {
 	warn?: string[];
 	errors?: Record<string, string>;
 	end?: RunEnd;
+	crashError?: string;
 	select?: string[];
 	exclude?: string[];
 	verb?: LaunchVerb;
@@ -753,6 +754,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			critical: job?.criticalNodes ?? [],
 			plannedMs,
 			end: seed.end ?? 'complete',
+			crashError: seed.crashError,
 			cancel,
 			lastHeartbeatAt: seed.lastHeartbeatAgoSec != null ? now - seed.lastHeartbeatAgoSec * 1000 : null,
 			imageId: seed.image ?? IMAGE_ID,
@@ -861,6 +863,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 	record({ id: 'run-c40e', origin: 'manual', job: 'marts_only', by: CI_ACCOUNT, queuedAgo: 1080, startedAgo: 1079.8, durationMin: 4 });
 	record({ id: 'run-e3f8', origin: 'schedule', job: 'activity_microbatch', trigger: 'activity_microbatch', tick: 101, by: SCHEDULER, queuedAgo: at('activity_microbatch', 101, 0), startedAgo: at('activity_microbatch', 101, 6), durationMin: 11, end: 'presumed_failed', lastHeartbeatAgoSec: (at('activity_microbatch', 101, 6) - 0.6) * 60, reason: 'Lost contact: no heartbeat for 10 minutes, so the run was stopped and marked failed' });
 	record({ id: 'run-a7c1', origin: 'schedule', job: 'revenue_refresh', trigger: 'revenue_refresh', tick: 0, by: SCHEDULER, queuedAgo: at('revenue_refresh', 0, 0), startedAgo: at('revenue_refresh', 0, 8), durationMin: 2, fail: ['daily_revenue'], errors: { daily_revenue: 'Warehouse error: the warehouse was suspended while the statement ran' } });
+	record({ id: 'run-7e14', origin: 'manual', job: 'marts_only', by: DEMO_USER, queuedAgo: 300, startedAgo: 299.8, durationMin: 1, end: 'crashed', reason: 'worker executor completed and closed its connections', crashError: "Couldn't connect to the warehouse: role TRANSFORMER has no access to warehouse REPORTING_WH" });
 	record({ id: 'run-f1a9', origin: 'sensor', job: 'load_sources', trigger: 'partner_feed_poll', runKey: 'orders_part_0398.csv', by: SENSOR_DAEMON, queuedAgo: 50 * 60, end: 'never_started', reason: 'Couldn’t start: the run didn’t report in within 2 minutes of launch (the image couldn’t be downloaded)', image: PREVIOUS_IMAGE_ID, generation: 41 });
 
 	const nightlyStages = [['load_sources'], ['core_build'], ['activity_microbatch'], ['reporting_exports']];

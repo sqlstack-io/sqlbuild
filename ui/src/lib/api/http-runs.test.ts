@@ -216,6 +216,14 @@ describe('run detail', () => {
 		expect(nodes[4].status).toBe('not_run');
 		expect(nodes[2].skippedBecauseOf).toEqual({ nodeKey: 'model.n1', runId: 'run', jobKey: 'orders_daily' });
 	});
+
+	it("shows the version a run executes from its snapshot, and none when the server doesn't report it", () => {
+		const built = wire('built', { snapshot_generation: 7, git_revision: 'c31f0b9', git_dirty: true, sqb_version: '0.216.0', image_id: null, selection_json: ['model.orders'] });
+		const [run, bare] = toRuns([built, wire('bare')], LOCATION);
+		expect(runDetailOf(run, built, [run], []).provenance).toMatchObject({ snapshotGeneration: 7, gitRevision: 'c31f0b9', gitDirty: true, sqbVersion: '0.216.0', imageId: null, command: null, selection: ['model.orders'] });
+		expect(run.gitRevision).toBe('c31f0b9');
+		expect(runDetailOf(bare, wire('bare'), [bare], []).provenance).toBeNull();
+	});
 });
 
 describe('run Recall reads', () => {
@@ -262,10 +270,10 @@ describe('run Recall reads', () => {
 			],
 			errors: [{ invocation_id: inv, occurred_at: '2026-11-08T06:00:02Z', error_type: 'ValueError', message: 'RuntimeError: bad input' }]
 		});
-		expect(output.map((l) => [l.stream, l.text])).toEqual([
-			['stderr', 'warning'],
-			['stderr', 'RuntimeError: bad input'],
-			['stdout', 'done']
+		expect(output.map((l) => [l.stream, l.text, l.error])).toEqual([
+			['stderr', 'warning', false],
+			['stderr', 'RuntimeError: bad input', true],
+			['stdout', 'done', false]
 		]);
 	});
 });

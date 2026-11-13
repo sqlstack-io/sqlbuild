@@ -20,7 +20,8 @@ import type {
 } from '../types';
 import { ancestors, snapshotNode, sortTopologically } from './operate-graph';
 
-export type RunEnd = 'complete' | 'cancelled' | 'presumed_failed' | 'never_started';
+/** `crashed`: the worker stopped before building anything, as when its plan is refused; `crashError` says why. */
+export type RunEnd = 'complete' | 'cancelled' | 'presumed_failed' | 'never_started' | 'crashed';
 
 export type RunScript = {
 	verb: LaunchVerb;
@@ -36,6 +37,7 @@ export type RunScript = {
 	plannedMs: number;
 	/** How the run ends, once terminal. */
 	end: RunEnd;
+	crashError?: string;
 	cancel: CancelProgress | null;
 	/** Last heartbeat; node progress stops here for unresponsive and lost runs. */
 	lastHeartbeatAt: number | null;
@@ -126,6 +128,8 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 		const status: RunNodeStatus = terminal ? (run.status === 'cancelled' ? 'cancelled' : 'not_run') : 'pending';
 		return sortTopologically(script.nodes).map((k) => base(k, status));
 	}
+
+	if (terminal && script.end === 'crashed') return sortTopologically(script.nodes).map((k) => ({ ...base(k, 'skipped'), endedAt: run.endedAt }));
 
 	const { timed, total } = schedule(script.nodes);
 	const t0 = started + 1500;
@@ -226,7 +230,7 @@ export function countNodes(nodes: RunNode[]): NodeCounts {
 
 /** Terminal status from node outcomes: partial when something failed and everything else completed. */
 export function deriveTerminalStatus(end: RunEnd, nodes: RunNode[]): RunStatus {
-	if (end === 'never_started') return 'failed';
+	if (end === 'never_started' || end === 'crashed') return 'failed';
 	if (end === 'cancelled') return 'cancelled';
 	if (end === 'presumed_failed') return 'presumed_failed';
 	const c = countNodes(nodes);
@@ -354,7 +358,7 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 		drafts.push({ producer: 'scheduler', type, occurredAt: typeof at === 'number' ? iso(at) : at, invocationId: null, nodeKey: null, statementId: null, attempt: null, message });
 	const ev = (type: Draft['type'], at: number, nodeKey: string | null, message: string, statementId: string | null = null) =>
 		drafts.push({ type, occurredAt: iso(at), invocationId: inv, nodeKey, statementId, attempt: nodeKey ? 1 : null, message });
-	const out = (stream: RunOutputLine['stream'], at: number, text: string) => inv && output.push({ invocationId: inv, stream, at: iso(at), text });
+	const out = (stream: RunOutputLine['stream'], at: number, text: string, error = false) => inv && output.push({ invocationId: inv, stream, at: iso(at), text, error });
 
 	const queued = Date.parse(run.queuedAt);
 	fact('requested', queued - 200, `Requested by ${run.requestedBy.displayName}${run.triggerName ? ` via ${run.triggerName}` : ''}`);
@@ -433,6 +437,7 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 				out('stdout', e, `OK    ${n.nodeKey}  ${k}  ${dur}s`);
 			}
 		}
+		if (run.endedAt && script.crashError) out('stderr', Date.parse(run.endedAt) - 500, script.crashError, true);
 		if (run.endedAt) {
 			const end = Date.parse(run.endedAt) - 400;
 			const c = countNodes(nodes);
