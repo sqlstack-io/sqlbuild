@@ -33,12 +33,22 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             expected_launch: Ok(true),
         },
         AdhocCommandTestCase {
-            description: "a build claims the managed source it loads for a selected model",
+            description: "a build claims the managed source it loads for a selected model and its loader chain",
             person: AdhocPerson::Developer,
             command: &["build", "model:customers"],
             priority: 0,
             reason: "Refresh customers",
-            expected_check: json!({"selection": ["model:customers"], "write_set": ["model:customers", "source:shop.customers"],
+            expected_check: json!({"selection": ["model:customers"], "write_set": ["model:customers", "source:shop.accounts", "source:shop.customers"],
+                "permissions": [["run.adhoc", true]], "error": null, "launchable": true}),
+            expected_launch: Ok(true),
+        },
+        AdhocCommandTestCase {
+            description: "a build of a selected source claims it alone, as only its own loader runs",
+            person: AdhocPerson::Developer,
+            command: &["build", "source:shop.customers"],
+            priority: 0,
+            reason: "Reload customers",
+            expected_check: json!({"selection": ["source:shop.customers"], "write_set": ["source:shop.customers"],
                 "permissions": [["run.adhoc", true]], "error": null, "launchable": true}),
             expected_launch: Ok(true),
         },
@@ -276,7 +286,8 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             );
             let audit = rows(
                 store,
-                "SELECT after_json FROM sqb_security_audit WHERE action='run.adhoc_requested'",
+                "SELECT after_json FROM sqb_security_audit WHERE action='run.adhoc_requested' \
+                 ORDER BY occurred_at, event_id",
                 Vec::new(),
             )
             .await;
@@ -293,6 +304,7 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                 vec![
                     json!(["build", {}, "Refresh orders"]),
                     json!(["build", {}, "Refresh customers"]),
+                    json!(["build", {}, "Reload customers"]),
                     json!(["build", {"load_sources": false}, "Refresh customers only"]),
                     json!(["build", {"full_refresh": true, "warehouse": "BUILD_XS"}, "Rebuild orders now"]),
                     json!(["test", {}, "Check orders"]),

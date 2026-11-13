@@ -5,15 +5,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::snapshots::constants::{
-    LOAD_SOURCES_SETTING, LOADER_POINTER, MODEL_NODE_KIND, SOURCE_KEY_PREFIX, SOURCE_NODE_KIND,
-    WRITER_NODE_KINDS,
-};
+use crate::snapshots::_helpers::write_set::{loads, managed, selected_writers};
+use crate::snapshots::constants::LOAD_SOURCES_SETTING;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 
-/// Selected writers plus the managed sources a build loads: selected ones, and parents of selected models unless loading is off.
+/// Selected writers, the managed sources a build loads, and loader chains of sources selected models read; a selected source runs only its own loader.
 pub(crate) async fn job_write_set(
     transaction: ControlTransaction,
     snapshot_id: Uuid,
@@ -22,40 +20,14 @@ pub(crate) async fn job_write_set(
     let (transaction, selected) =
         read_snapshot_nodes(transaction, snapshot_id, Some(selection)).await?;
     let loads_model_sources = settings.get(LOAD_SOURCES_SETTING) != Some(&Value::Bool(false));
-    let mut writers: BTreeSet<String> = BTreeSet::new();
-    let mut sources: BTreeSet<String> = BTreeSet::new();
-    for (key, node) in &selected {
-        if WRITER_NODE_KINDS.contains(&node.kind.as_str()) {
-            writers.insert(key.clone());
-        }
-        if node.kind == SOURCE_NODE_KIND {
-            sources.insert(key.clone());
-        } else if node.kind == MODEL_NODE_KIND && loads_model_sources {
-            sources.extend(
-                node.definition
-                    .get("deps")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .filter_map(Value::as_str)
-                    .filter(|key| key.starts_with(SOURCE_KEY_PREFIX))
-                    .map(str::to_owned),
-            );
-        }
-    }
+    let (mut writers, candidates, model_reads) = selected_writers(&selected, loads_model_sources);
     let (transaction, sources) =
-        read_snapshot_nodes(transaction, snapshot_id, Some(&sources)).await?;
-    writers.extend(
-        sources
-            .into_iter()
-            .filter(|(_, node)| {
-                node.kind == SOURCE_NODE_KIND
-                    && node
-                        .definition
-                        .pointer(LOADER_POINTER)
-                        .is_some_and(|loader| !loader.is_null())
-            })
-            .map(|(key, _)| key),
-    );
+        read_snapshot_nodes(transaction, snapshot_id, Some(&candidates)).await?;
+    for (key, node) in sources.into_iter().filter(|(_, node)| managed(node)) {
+        if model_reads.contains(&key) {
+            writers.extend(loads(&node.definition));
+        }
+        writers.insert(key);
+    }
     Ok((transaction, writers))
 }

@@ -2,9 +2,12 @@
 
 use crate::assembly::project::types::ObjectKey;
 use crate::planner_scope::main::expand_loaders::expand_loaders;
+use crate::planner_scope::main::node_loads::node_loads;
 use crate::planner_scope::models::LoaderGraph;
-use crate::planner_scope::tests::test_types::{DeepLoaderTestCase, LoaderTestCase};
-use std::collections::HashSet;
+use crate::planner_scope::tests::test_types::{
+    DeepLoaderTestCase, LoaderTestCase, NodeLoadsTestCase,
+};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 #[test]
 fn given_shared_loader_dependencies_when_expanding_then_preserves_depth_first_edges_and_breadth_first_names()
@@ -115,6 +118,90 @@ fn given_deep_loader_chain_when_expanding_then_uses_iterative_traversal() {
         assert_eq!(
             edges.len(),
             test_case.expected_count,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_loader_chains_and_unmanaged_reads_when_listing_node_loads_then_only_declared_source_writers_appear()
+ {
+    let test_cases = [
+        NodeLoadsTestCase {
+            description: "a hook-read managed source is listed and an unmanaged read is not",
+            loaders: vec![("raw_returns", vec![])],
+            sources: vec![("raw_returns", Some("raw_returns")), ("raw_products", None)],
+            upstream: vec![
+                (
+                    "model:orders",
+                    vec![
+                        "source:raw_returns",
+                        "source:raw_products",
+                        "model:stg_orders",
+                    ],
+                ),
+                ("model:stg_orders", vec!["source:raw_products"]),
+                ("source:raw_products", vec![]),
+            ],
+            expected_loads: vec![("model:orders", vec!["source:raw_returns"])],
+        },
+        NodeLoadsTestCase {
+            // stage_orders has no declaring source, so a run that loads it still fails in the worker.
+            description: "a chain keeps declared loaders behind an intermediate one and drops the intermediate",
+            loaders: vec![
+                ("raw_orders", vec!["stage_orders"]),
+                ("stage_orders", vec!["raw_customers"]),
+                ("raw_customers", vec![]),
+            ],
+            sources: vec![
+                ("raw_orders", Some("raw_orders")),
+                ("raw_customers", Some("raw_customers")),
+            ],
+            upstream: vec![
+                ("source:raw_orders", vec![]),
+                ("source:raw_customers", vec![]),
+            ],
+            expected_loads: vec![("source:raw_orders", vec!["source:raw_customers"])],
+        },
+    ];
+    let key = |text: &str| {
+        let (kind, name) = text.split_once(':').expect("kind:name");
+        (kind.to_owned(), name.to_owned())
+    };
+    for test_case in test_cases {
+        let graph = LoaderGraph {
+            loaders: test_case
+                .loaders
+                .iter()
+                .map(|(name, deps)| {
+                    (
+                        (*name).to_owned(),
+                        deps.iter().map(|dep| (*dep).to_owned()).collect(),
+                    )
+                })
+                .collect(),
+            sources: test_case
+                .sources
+                .iter()
+                .map(|(name, loader)| ((*name).to_owned(), loader.map(str::to_owned)))
+                .collect(),
+        };
+        let upstream: Vec<(ObjectKey, Vec<ObjectKey>)> = test_case
+            .upstream
+            .iter()
+            .map(|(node, deps)| (key(node), deps.iter().map(|dep| key(dep)).collect()))
+            .collect();
+        assert_eq!(
+            node_loads(&graph, &upstream),
+            test_case
+                .expected_loads
+                .iter()
+                .map(|(node, writers)| (
+                    key(node),
+                    writers.iter().map(|writer| key(writer)).collect()
+                ))
+                .collect::<BTreeMap<ObjectKey, BTreeSet<ObjectKey>>>(),
             "{}",
             test_case.description
         );
