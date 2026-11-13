@@ -86,7 +86,7 @@
 			<div class="text-[var(--sidebar-foreground)] flex items-center gap-2 px-2.5 py-1.5 text-[12.5px]">
 				<span class="bg-primary grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[2px] text-[10px] font-semibold text-white">{initials}</span>
 				<span class="truncate">{app.user.displayName}{#if app.user.role} · <span class="text-muted-foreground">{app.user.role}</span>{/if}</span>
-				{#if app.signOut}
+				{#if app.signOut && app.bootstrap?.authMode !== 'disabled'}
 					<button class="text-muted-foreground hover:text-foreground ml-auto text-[12px]" onclick={() => app.signOut?.()}>Sign out</button>
 				{/if}
 			</div>

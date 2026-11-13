@@ -1913,7 +1913,7 @@ export interface components {
          * @description How people sign in to this server.
          * @enum {string}
          */
-        LoginMode: "password" | "trusted_proxy" | "oidc";
+        LoginMode: "password" | "trusted_proxy" | "oidc" | "disabled";
         /** @description A running calendar schedule whose last date is at most a day away, or which has none left. */
         LowCalendar: {
             /**

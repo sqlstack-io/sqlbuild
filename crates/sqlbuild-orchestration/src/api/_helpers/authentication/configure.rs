@@ -2,9 +2,9 @@
 
 use std::net::SocketAddr;
 
-use axum::{Extension, Router};
+use axum::{Extension, Router, middleware};
 
-use crate::api::_helpers::authentication::{oidc, password_sessions, trusted_proxy};
+use crate::api::_helpers::authentication::{development, oidc, password_sessions, trusted_proxy};
 use crate::api::models::{ApiAuthentication, DevelopmentScope, GroupRole, HumanLogin, LoginMode};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -31,6 +31,7 @@ pub(crate) async fn configure(
     let login_mode = match &login {
         HumanLogin::Oidc(_) => LoginMode::Oidc,
         HumanLogin::TrustedProxy(_) => LoginMode::TrustedProxy,
+        HumanLogin::Development(_) => LoginMode::Disabled,
         _ => LoginMode::Password,
     };
     let (development, routes) = match login {
@@ -41,7 +42,14 @@ pub(crate) async fn configure(
                     "disabled authentication requires a loopback listener".into(),
                 ));
             }
-            (Some(scope), Router::new())
+            let person = scope.principal_id;
+            (
+                Some(scope),
+                password_sessions::person_routes().route_layer(middleware::from_fn_with_state(
+                    person,
+                    development::authenticate,
+                )),
+            )
         }
         HumanLogin::Password(origin) => (None, password_sessions::router(store, origin)?),
         HumanLogin::TrustedProxy(settings) => (None, trusted_proxy::router(store, settings)?),
