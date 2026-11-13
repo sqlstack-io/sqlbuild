@@ -3,6 +3,7 @@
 use uuid::Uuid;
 
 use crate::api::models::{ApiAuthentication, DevelopmentScope, HumanLogin};
+use crate::credentials::main::identities::development_person::development_person;
 use crate::credentials::main::locations::development_location::development_location;
 use crate::credentials::models::AuditContext;
 use crate::declarations::main::{
@@ -82,6 +83,15 @@ fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pause
                 .await
                 .expect("target-specific identity");
             assert_ne!(location, other);
+            let person = development_person(store, &context)
+                .await
+                .expect("development person");
+            assert_eq!(
+                development_person(store, &context)
+                    .await
+                    .expect("retained development person"),
+                person
+            );
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
@@ -89,12 +99,29 @@ fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pause
                         location_id: location,
                         target: "development".into(),
                         triggers: false,
+                        principal_id: person,
                     }),
                     ..ApiAuthentication::default()
                 },
             )
             .await;
             let client = reqwest::Client::new();
+            let bootstrap: serde_json::Value = client
+                .get(format!("{}/api/control/bootstrap", api.url))
+                .send()
+                .await
+                .expect("bootstrap")
+                .error_for_status()
+                .expect("loopback person needs no sign-in")
+                .json()
+                .await
+                .expect("bootstrap body");
+            assert_eq!(bootstrap["login_mode"], "disabled", "{bootstrap}");
+            assert_eq!(
+                bootstrap["access"]["principal_id"],
+                person.to_string(),
+                "{bootstrap}"
+            );
             let url = format!(
                 "{}/api/locations/{location}/targets/development/snapshots",
                 api.url
