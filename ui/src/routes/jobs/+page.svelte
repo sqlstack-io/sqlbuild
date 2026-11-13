@@ -15,7 +15,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { isActiveRun, isProblemRun, runStatusLabel, runStatusTone } from '$lib/status';
-	import { overlapHelp, overlapPlain } from '$lib/operate/labels';
+	import { onFailureText, overlapHelp, overlapPlain } from '$lib/operate/labels';
 
 	const jobs = createResource((client, scope) => client.listJobs(scope), ['jobs', 'runs', 'snapshot']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
@@ -51,7 +51,7 @@
 	);
 	const scheduledCount = $derived(all.filter((j) => j.triggerIds.some((id) => triggerById.get(id)?.state === 'running')).length);
 	// Columns the server doesn't report stay hidden rather than showing dashes.
-	const showPolicy = $derived(all.some((j) => j.overlap !== null));
+	const showPolicy = $derived(all.some((j) => j.overlap === 'skip' || j.onFailure !== null));
 	const showOwner = $derived(all.some((j) => j.owner !== null));
 	const showSelection = $derived(all.some((j) => j.select !== null || j.members !== null));
 	const failingCount = $derived(all.filter((j) => j.lastRun && isProblemRun(j.lastRun.status)).length);
@@ -103,7 +103,7 @@
 				<th>Job</th>
 				{#if showSelection}<th>Selection</th>{/if}
 				<th class="num">Nodes</th>
-				{#if showPolicy}<th title="What happens when it's asked to run while a run is already waiting or running">If already running</th>{/if}
+				{#if showPolicy}<th title="Whether scheduled requests skip while a run is active, and whether failed runs retry">Overlap and retries</th>{/if}
 				<th>Started by</th>
 				{#if showOwner}<th>Owner</th>{/if}
 				<th>Last run</th>
@@ -132,7 +132,7 @@
 						</td>
 					{/if}
 					<td class="num muted">{j.nodeCount}</td>
-					{#if showPolicy}<td class="muted nowrap" title={j.overlap ? `${overlapHelp[j.overlap]} (overlap = ${j.overlap})` : undefined}>{j.overlap ? overlapPlain[j.overlap] : '—'}{#if j.priority}<span title="Higher priority runs go first when they wait for the same slot"> · priority {j.priority}</span>{/if}</td>{/if}
+					{#if showPolicy}<td class="muted nowrap">{#if j.overlap === 'skip'}<span title="{overlapHelp.skip} (overlap = skip)">{overlapPlain.skip}</span>{/if}{#if j.overlap === 'skip' && j.onFailure}<span> · </span>{/if}{#if j.onFailure}<span title="on_failure: up to {j.onFailure.retries} reruns from failure">{onFailureText(j.onFailure)}</span>{/if}{#if !j.onFailure && j.overlap !== 'skip'}—{/if}{#if j.priority}<span title="Higher priority runs go first when they wait for the same slot"> · priority {j.priority}</span>{/if}</td>{/if}
 					<td>
 						{#if jobTriggers.length === 0}
 							<span class="muted" title="No schedule or sensor starts it; start it from its page">Only by hand</span>

@@ -12,7 +12,7 @@
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { formatCost, narrowingText, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
+	import { formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
@@ -219,8 +219,8 @@
 						{#if hasSettings}
 							<InspectorSection title="Settings">
 								<dl>
-									{#if def.overlap}<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>{/if}
-									{#if def.onFailure}<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>{/if}
+									{#if def.overlap}<div><dt>If already running</dt><dd title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">{overlapPlain[def.overlap]}</dd></div>{/if}
+									{#if def.onFailure}<div><dt>If it fails</dt><dd title="on_failure: retries = {def.onFailure.retries}, retry_delay = {def.onFailure.retryDelaySeconds}s{def.memberOf?.length ? '. Inside a group run, the group’s own policy applies' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
 									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
 									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
 								</dl>

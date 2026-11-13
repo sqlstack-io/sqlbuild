@@ -89,6 +89,8 @@ pub(crate) async fn jobs_in(
             select: job.definition_json.select,
             declared_at: job.definition_json.declared_at,
             owner: job.definition_json.owner,
+            overlap: job.definition_json.overlap,
+            on_failure: job.definition_json.on_failure,
         })
         .collect();
     Ok((transaction, jobs))

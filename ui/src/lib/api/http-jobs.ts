@@ -49,6 +49,7 @@ export function toTick(wire: Wire['TickRecord']): Tick {
 		outcome: wire.outcome,
 		runId: wire.run_id ?? null,
 		coveredByRunId: wire.covered_by_run_id ?? null,
+		activeRunId: wire.active_run_id ?? null,
 		reason: null,
 		lateBySeconds: Math.max(0, Math.round((Date.parse(wire.evaluated_at) - Date.parse(wire.scheduled_for)) / 1000)),
 		catchUp: false
@@ -115,6 +116,7 @@ function toEvaluation(wire: Wire['PersonSensorEvaluation']): SensorEvaluation {
 		cursorAfter: wire.cursor_after ? shownCursor(wire.cursor_after) : null,
 		runRequests: wire.run_count,
 		skipReason: null,
+		skippedFor: wire.skipped_for,
 		error: wire.failure_code ?? null,
 		definitionFingerprint: wire.definition_fingerprint
 	};
@@ -192,11 +194,11 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		select: wire.select ?? null,
 		members: null,
 		nodeCount: wire.selection.length,
-		overlap: null,
-		onFailure: null,
+		overlap: wire.overlap,
+		onFailure: wire.on_failure ? { retries: wire.on_failure.retries, retryDelaySeconds: wire.on_failure.retry_delay_seconds } : null,
 		concurrencyGroups: wire.concurrency_groups,
 		priority: null,
-		owner: null,
+		owner: wire.owner?.trim() || null,
 		sourceFile: wire.declared_at ? `${wire.declared_at.path}:${wire.declared_at.line}` : null,
 		triggerIds: triggers.filter((t) => t.jobKey === wire.job_key).map((t) => t.id),
 		lastRun: newest(runs, (r) => r.jobKey === wire.job_key)
