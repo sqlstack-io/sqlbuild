@@ -13,8 +13,9 @@ use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource};
 use sqlbuild_orchestration::runs::types::{CommandPlanner, PublishedJobs};
 
 use crate::adhoc::constants::{
-    ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, COMMAND_DEST, FRESHNESS_VERB, INTEGER_CONVERTERS,
-    LOAD_SOURCES_DEST, POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS,
+    ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, CHANGED_COUNTS_DEST, CHANGED_DEST, COMMAND_DEST,
+    FRESHNESS_VERB, INTEGER_CONVERTERS, LOAD_SOURCES_DEST, POSITIVE_INTEGER_CONVERTER,
+    REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS,
 };
 use crate::argv::main::command_settings_arguments::command_settings_arguments;
 use crate::argv::main::job_settings_arguments::job_settings_arguments;
@@ -49,6 +50,13 @@ impl CommandPlanner for CliPlanner {
             }
             if let Some(selector) = SELECTOR_DESTS.iter().find(|name| **name == dest) {
                 selectors.insert(selector, texts(value));
+                continue;
+            }
+            if dest == CHANGED_COUNTS_DEST {
+                settings.insert(CHANGED_DEST.to_owned(), json!(texts(value)));
+                continue;
+            }
+            if dest == CHANGED_DEST && settings.contains_key(CHANGED_DEST) {
                 continue;
             }
             settings.insert(dest.clone(), setting(dest, value)?);

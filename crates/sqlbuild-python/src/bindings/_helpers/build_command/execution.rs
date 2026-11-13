@@ -31,8 +31,9 @@ use crate::bindings::_helpers::check::check_core::{
 use crate::bindings::_helpers::check::check_results::write_check_results;
 use crate::bindings::_helpers::command_runtime::warehouses::describe_connection_warehouse;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
+use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
 use crate::bindings::_helpers::consumption::recorder::{
-    ConsumptionRecorder, Prepared, prepare as prepare_consumption, run_reason_text,
+    ConsumptionRecorder, Prepared, held_back_text, prepare as prepare_consumption, run_reason_text,
 };
 use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::cursor::overrides::{cursor_integer, cursor_timestamp};
@@ -49,6 +50,7 @@ use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
 use crate::bindings::_helpers::sql_test_command::timeouts::{TimeoutKind, resolve_run_timeout};
+use sqlbuild_state::consumption::models::ChangedPolicy;
 
 const EXECUTION_COMMAND: &str = "sqb build";
 const NODE_START: [&str; 2] = ["name", "resource_kind"];
@@ -375,13 +377,15 @@ pub(crate) fn execute_build_plan<'py>(
             ),
         ],
     )?;
+    let policy: Option<ChangedPolicy> = changed_policy(
+        &context.get("effective_project_dir")?,
+        &context.request,
+        &project,
+    )?;
     let prepared: Prepared<'py> = prepare_consumption(
         (&plan, &project),
         (&adapter, &connection_config),
-        (
-            context.request_flag("changed")?,
-            context.request_flag("full_refresh")?,
-        ),
+        (policy.as_ref(), context.request_flag("full_refresh")?),
         (
             native_field(&project, "run_id")?.str()?.extract()?,
             native_field(&preparation.lifecycle, "on_node_complete")?,
@@ -516,14 +520,29 @@ fn report_changed_decision(context: &BuildContext<'_>, prepared: &Prepared<'_>) 
             .map(|key| format!("{}:{}", key.kind, key.name))
             .collect();
         worker.unchanged(context.py(), &skipped)?;
+        let held_back: Vec<(String, String)> = decision
+            .held_back
+            .iter()
+            .map(|(key, why)| (format!("{}:{}", key.kind, key.name), held_back_text(why)))
+            .collect();
+        worker.held_back(context.py(), &held_back)?;
     }
+    let total: usize = decision.run + decision.skipped.len() + decision.held_back.len();
+    let left: String = if decision.held_back.is_empty() {
+        format!("{} unchanged are skipped", decision.skipped.len())
+    } else {
+        format!(
+            "{} unchanged and {} held back are skipped",
+            decision.skipped.len(),
+            decision.held_back.len()
+        )
+    };
     emit(
         &context.stream,
         &format!(
-            "Changed: {} of {} selected models and seeds run; {} unchanged are skipped.\n",
-            decision.run,
-            decision.run + decision.skipped.len(),
-            decision.skipped.len()
+            "{}\nChanged: {} of {total} selected models and seeds run; {left}.\n",
+            policy_line(&decision.policy),
+            decision.run
         ),
     )?;
     if context.request_flag("verbose")? {
@@ -535,6 +554,17 @@ fn report_changed_decision(context: &BuildContext<'_>, prepared: &Prepared<'_>) 
                     key.kind,
                     key.name,
                     run_reason_text(reason)
+                ),
+            )?;
+        }
+        for (key, why) in &decision.held_back {
+            emit(
+                &context.stream,
+                &format!(
+                    "  held back {} {}: {}\n",
+                    key.kind,
+                    key.name,
+                    held_back_text(why)
                 ),
             )?;
         }
@@ -558,8 +588,7 @@ fn with_skipped_keys<'py>(
             let entry: Bound<'py, PyAny> = entry?;
             let name: String = native_field(&entry, "name")?.extract()?;
             if decision
-                .skipped
-                .iter()
+                .not_run()
                 .any(|key| key.kind == kind && key.name == name)
             {
                 keys.push(native_field(&entry, "key")?);

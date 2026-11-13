@@ -47,6 +47,7 @@ const PLAN_OPTIONS: (&[&str], &[&str]) = (
         "python_plan_entries",
         "include_direct_freshness_diagnostics",
         "include_completion",
+        "changed_sections",
     ],
 );
 
@@ -524,7 +525,11 @@ pub(crate) fn format_plan(py: Python<'_>, options: Option<Bound<'_, PyDict>>) ->
     let arguments: KeywordArguments<'_> =
         KeywordArguments::read(py, "format_plan", options, PLAN_OPTIONS)?;
     let report: PlanTextReport = report(&arguments)?;
-    let text: String = format_plan_text(&report);
+    let mut text: String = format_plan_text(&report);
+    if arguments.passed("changed_sections")? {
+        let sections: String = arguments.value("changed_sections")?.extract()?;
+        text = format!("{text}\n\n{sections}");
+    }
     if !arguments.flag("include_completion")? {
         return Ok(text);
     }

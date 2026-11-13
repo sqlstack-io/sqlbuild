@@ -24,6 +24,13 @@ describe('the plan page command line', () => {
 		expect(values('sqb build --select marts')).toEqual(['path:models/marts']);
 	});
 
+	it('reads --changed as the CLI does: its counts only after =, never the next token', () => {
+		expect(parseCommand('sqb build --changed customers').select).toEqual(['customers']);
+		expect(parseCommand('sqb build --changed customers').flags).toEqual({ '--changed': true });
+		expect(parseCommand('sqb build --changed=definition,source_data --reach all').flags).toEqual({ '--changed': 'definition,source_data', '--reach': 'all' });
+		expect(withVerb('sqb build --select customers --changed=source_data --reach all', 'build')).toBe('sqb build --select customers --changed=source_data --reach all ');
+	});
+
 	it('keeps the selection and only the flags the new verb accepts when switching verbs', () => {
 		expect(withVerb('sqb build --select customers --full-refresh --warehouse WH_S', 'test')).toBe('sqb test --select customers --warehouse WH_S ');
 	});

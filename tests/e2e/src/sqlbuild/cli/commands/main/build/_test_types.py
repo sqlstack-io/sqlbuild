@@ -1595,3 +1595,13 @@ class ChangedCrashE2ETestCase:
     warehouse: ChangedWarehouse
     expected_ran: frozenset[str]
     expected_killed_rows: list[tuple[object, ...]]
+
+
+@dataclass(frozen=True)
+class ChangedReachE2ETestCase:
+    description: str
+    warehouse: ChangedWarehouse
+    expected_redefined: frozenset[str]
+    expected_summary: str
+    expected_plan_lines: tuple[str, ...]
+    expected_reach_all: frozenset[str]

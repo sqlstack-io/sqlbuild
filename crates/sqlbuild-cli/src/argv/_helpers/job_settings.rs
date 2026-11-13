@@ -6,7 +6,7 @@ use serde_json::Value as Json;
 
 use crate::argv::_helpers::table::root_parser;
 use crate::argv::constants::CONCURRENCY_DEST;
-use crate::argv::models::{ActionKind, ActionSpec, Default, ParserSpec, Value};
+use crate::argv::models::{ActionKind, ActionSpec, Default, Nargs, ParserSpec, Value};
 
 pub(crate) fn setting_argument(
     parser: &ParserSpec,
@@ -45,6 +45,9 @@ pub(crate) fn setting_argument(
         return boolean_argument(name, value, &actions);
     }
     let option = &action.option_strings[0];
+    if action.nargs == Nargs::Attached {
+        return attached_argument(name, value, option);
+    }
     let text = setting_text(name, value, action)?;
     if action
         .choices
@@ -81,6 +84,25 @@ fn boolean_argument(
         return Err(format!("job setting {name} cannot be set to {flag}"));
     }
     Ok(None)
+}
+
+/// `true` as the bare option, `false` as nothing, and a list of strings as `--option=a,b`.
+fn attached_argument(name: &str, value: &Json, option: &str) -> Result<Option<String>, String> {
+    match value {
+        Json::Bool(true) => Ok(Some(option.to_owned())),
+        Json::Bool(false) => Ok(None),
+        Json::Array(items) if !items.is_empty() => {
+            let texts: Vec<&str> = items
+                .iter()
+                .map(Json::as_str)
+                .collect::<Option<_>>()
+                .ok_or_else(|| format!("job setting {name} must be true or a list of strings"))?;
+            Ok(Some(format!("{option}={}", texts.join(","))))
+        }
+        _ => Err(format!(
+            "job setting {name} must be true or a list of strings"
+        )),
+    }
 }
 
 fn setting_text(name: &str, value: &Json, action: &ActionSpec) -> Result<String, String> {

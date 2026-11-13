@@ -13,9 +13,11 @@ use sqlbuild_state::consumption::main::consumed_inputs::consumed_inputs;
 use sqlbuild_state::consumption::main::consumption_history::consumption_history;
 use sqlbuild_state::consumption::main::started_append::started_append;
 use sqlbuild_state::consumption::main::succeeded_appends::succeeded_appends;
+use sqlbuild_state::consumption::main::unread_references::unread_references;
+use sqlbuild_state::consumption::main::with_referenced::with_referenced;
 use sqlbuild_state::consumption::models::{
-    ConsumptionAppend, ConsumptionHistory, ConsumptionRow, ForcedRun, InputFact, NodeFacts,
-    NodeKey, RunReason,
+    ChangedOutcome, ChangedPolicy, ConsumptionAppend, ConsumptionHistory, ConsumptionRow,
+    ForcedRun, HeldBack, InputFact, NodeFacts, NodeKey, RunReason,
 };
 use uuid::Uuid;
 
@@ -74,9 +76,22 @@ pub(crate) struct ConsumptionRecorder {
 
 /// What `--changed` decided, for the build's report.
 pub(crate) struct ChangedDecision {
+    pub(crate) policy: ChangedPolicy,
     pub(crate) run: usize,
+    /// Unchanged nodes, which are up to date.
     pub(crate) skipped: Vec<NodeKey>,
+    /// Nodes downstream of a change that wait for a later run.
+    pub(crate) held_back: Vec<(NodeKey, HeldBack)>,
     pub(crate) reasons: Vec<(NodeKey, RunReason)>,
+}
+
+impl ChangedDecision {
+    /// Every selected node `--changed` leaves unbuilt: unchanged and held back.
+    pub(crate) fn not_run(&self) -> impl Iterator<Item = &NodeKey> {
+        self.skipped
+            .iter()
+            .chain(self.held_back.iter().map(|(key, _)| key))
+    }
 }
 
 fn kind_of(result: &Bound<'_, PyAny>) -> PyResult<Option<(&'static str, String)>> {
@@ -264,50 +279,21 @@ pub(crate) struct Prepared<'py> {
 pub(crate) fn prepare<'py>(
     (plan, project): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (adapter, connection_config): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    (changed, full_refresh): (bool, bool),
+    (policy, full_refresh): (Option<&ChangedPolicy>, bool),
     (run_id, base_on_node_complete): (String, Bound<'py, PyAny>),
 ) -> PyResult<Prepared<'py>> {
     let py: Python<'py> = plan.py();
-    let facts: BuildFacts = build_facts((plan, project), (changed, full_refresh))?;
+    let facts: BuildFacts = build_facts((plan, project), (policy.is_some(), full_refresh))?;
     let connection = ConsumptionConnection::new(adapter, connection_config);
-    let mut warnings: Vec<String> = Vec::new();
-    let mut rows: Vec<ConsumptionRow> = Vec::new();
-    for location in read_locations(&facts, changed) {
-        match connection.read_recent(py, &location) {
-            Ok(read) => rows.extend(read),
-            Err(error) => warnings.push(format!(
-                "could not read consumed inputs in schema {}: {error}; its models and seeds count as changed",
-                location.schema
-            )),
-        }
-    }
-    let history: ConsumptionHistory = consumption_history(&rows, RECENT_EXECUTIONS);
-    let mut skipped: BTreeSet<NodeKey> = BTreeSet::new();
-    let decision: Option<ChangedDecision> = if changed {
-        let mut reasons: Vec<(NodeKey, RunReason)> = Vec::new();
-        for (key, reason) in changed_run_set(&facts.nodes, &history) {
-            if !facts.runnable.contains(&key) {
-                continue;
-            }
-            match reason {
-                Some(reason) => reasons.push((key, reason)),
-                None => {
-                    skipped.insert(key);
-                }
-            }
-        }
-        Some(ChangedDecision {
-            run: reasons.len(),
-            skipped: skipped.iter().cloned().collect(),
-            reasons,
-        })
-    } else {
-        None
-    };
+    let (history, warnings): (ConsumptionHistory, Vec<String>) =
+        read_history(py, &connection, (&facts, policy));
+    let decision: Option<ChangedDecision> =
+        policy.map(|policy| changed_decision(&facts, &history, policy));
+    let not_run: BTreeSet<&NodeKey> = decision.iter().flat_map(ChangedDecision::not_run).collect();
     let executions: HashMap<NodeKey, String> = facts
         .runnable
         .iter()
-        .filter(|key| !skipped.contains(*key))
+        .filter(|key| !not_run.contains(key))
         .map(|key| (key.clone(), Uuid::now_v7().to_string()))
         .collect();
     let nodes: HashMap<NodeKey, NodeFacts> = facts
@@ -363,6 +349,116 @@ pub(crate) fn prepare<'py>(
     })
 }
 
+/// What `plan --changed` previews: what a build would run now, read without recording anything.
+pub(crate) fn preview_changed(
+    (plan, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    (adapter, connection_config): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    (policy, full_refresh): (&ChangedPolicy, bool),
+) -> PyResult<(ChangedDecision, Vec<String>)> {
+    let py: Python<'_> = plan.py();
+    let facts: BuildFacts = build_facts((plan, project), (true, full_refresh))?;
+    let connection = ConsumptionConnection::new(adapter, connection_config);
+    let (history, warnings): (ConsumptionHistory, Vec<String>) =
+        read_history(py, &connection, (&facts, Some(policy)));
+    connection.close(py)?;
+    Ok((changed_decision(&facts, &history, policy), warnings))
+}
+
+/// Recent executions the build reads, with older ones read back when one kind of change counts.
+fn read_history(
+    py: Python<'_>,
+    connection: &ConsumptionConnection,
+    (facts, policy): (&BuildFacts, Option<&ChangedPolicy>),
+) -> (ConsumptionHistory, Vec<String>) {
+    let mut warnings: Vec<String> = Vec::new();
+    let mut rows: Vec<ConsumptionRow> = Vec::new();
+    for location in read_locations(facts, policy.is_some()) {
+        match connection.read_recent(py, &location) {
+            Ok(read) => rows.extend(read),
+            Err(error) => warnings.push(format!(
+                "could not read consumed inputs in schema {}: {error}; its models and seeds count as changed",
+                location.schema
+            )),
+        }
+    }
+    let history: ConsumptionHistory = consumption_history(&rows, RECENT_EXECUTIONS);
+    if policy.is_some_and(|policy| policy.counts.len() == 1) {
+        let (history, read_back): (ConsumptionHistory, Vec<String>) =
+            with_read_back(py, connection, history, &facts.nodes);
+        warnings.extend(read_back);
+        return (history, warnings);
+    }
+    (history, warnings)
+}
+
+/// What `--changed` does with each runnable node.
+fn changed_decision(
+    facts: &BuildFacts,
+    history: &ConsumptionHistory,
+    policy: &ChangedPolicy,
+) -> ChangedDecision {
+    let mut reasons: Vec<(NodeKey, RunReason)> = Vec::new();
+    let mut skipped: Vec<NodeKey> = Vec::new();
+    let mut held_back: Vec<(NodeKey, HeldBack)> = Vec::new();
+    for (key, outcome) in changed_run_set(&facts.nodes, history, policy) {
+        if !facts.runnable.contains(&key) {
+            continue;
+        }
+        match outcome {
+            ChangedOutcome::Runs(reason) => reasons.push((key, reason)),
+            ChangedOutcome::Unchanged => skipped.push(key),
+            ChangedOutcome::HeldBack(why) => held_back.push((key, why)),
+        }
+    }
+    ChangedDecision {
+        policy: policy.clone(),
+        run: reasons.len(),
+        skipped,
+        held_back,
+        reasons,
+    }
+}
+
+/// `history` plus the older upstream executions its builds read; unreadable ones count as changed.
+fn with_read_back(
+    py: Python<'_>,
+    connection: &ConsumptionConnection,
+    history: ConsumptionHistory,
+    nodes: &[NodeFacts],
+) -> (ConsumptionHistory, Vec<String>) {
+    let mut warnings: Vec<String> = Vec::new();
+    let mut by_location: BTreeMap<Location, Vec<String>> = BTreeMap::new();
+    for (relation, ids) in unread_references(&history, nodes) {
+        by_location
+            .entry(Location::of(&relation))
+            .or_default()
+            .extend(ids);
+    }
+    let mut rows: Vec<ConsumptionRow> = Vec::new();
+    for (location, ids) in by_location {
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+        match connection.read_executions(py, &location, &ids) {
+            Ok(read) => rows.extend(read),
+            Err(error) => warnings.push(format!(
+                "could not read earlier executions in schema {}: {error}; rebuilt upstreams there count as changed",
+                location.schema
+            )),
+        }
+    }
+    (with_referenced(history, &rows), warnings)
+}
+
+/// Why `--changed` holds a node back, as one line for verbose output.
+pub(crate) fn held_back_text(why: &HeldBack) -> String {
+    match why {
+        HeldBack::RefreshedBy(jobs) => format!(
+            "job {} refreshes it, and the change is not in that job",
+            jobs.join(", ")
+        ),
+        HeldBack::ReadsHeldBack(key) => format!("reads held-back {} {}", key.kind, key.name),
+    }
+}
+
 /// Why `--changed` runs a node, as one line for verbose output.
 pub(crate) fn run_reason_text(reason: &RunReason) -> String {
     match reason {
@@ -379,6 +475,9 @@ pub(crate) fn run_reason_text(reason: &RunReason) -> String {
         RunReason::DefinitionChanged => "definition changed".to_owned(),
         RunReason::InputsChanged => "inputs changed".to_owned(),
         RunReason::InputChanged(input) => format!("input {input} changed"),
+        RunReason::UpstreamDefinitionChanged(input) => {
+            format!("upstream {input} was rebuilt with a definition change")
+        }
         RunReason::InputUnknown(input) => format!("input {input} has no known version"),
         RunReason::UpstreamRuns(key) => format!("upstream {} {} runs", key.kind, key.name),
     }

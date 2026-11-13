@@ -174,6 +174,7 @@ fn nargs(json: &Json) -> Nargs {
         Json::Number(_) => Nargs::Zero,
         Json::String(text) => match text.as_str() {
             "?" => Nargs::Optional,
+            "=?" => Nargs::Attached,
             "*" => Nargs::ZeroOrMore,
             "+" => Nargs::OneOrMore,
             _ => Nargs::Parser,

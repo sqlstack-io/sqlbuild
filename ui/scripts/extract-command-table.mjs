@@ -74,6 +74,8 @@ const REQUIRES = new Map([
 function valueType(action) {
 	const flag = action.options[0];
 	if (action.kind === 'store_true' || action.kind === 'store_false') return 'bool';
+	// A value only `--flag=value` sets; a bare flag never takes the next token.
+	if (action.nargs === '=?') return 'attached';
 	if (flag.endsWith('-ts')) return 'timestamp';
 	if (flag.endsWith('-int') || flag === '--max-microbatches' || flag === '--concurrency') return 'int';
 	if (action.kind === 'extend') return 'selector';

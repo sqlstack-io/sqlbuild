@@ -2,11 +2,11 @@
 
 use crate::argv::_helpers::parsing::{Exit, KnownArgs, Run};
 use crate::argv::constants::{
-    COMMAND_DEST, CONCURRENCY_COMMANDS, CONCURRENCY_ENV_VAR, CURSOR_COMMANDS, DBT_COMMAND,
-    DBT_DEBUG_COMMAND, DBT_PASSTHROUGH_COMMANDS, DBT_PASSTHROUGH_SEPARATOR, DBT_VERBOSE_OPTION,
-    DBT_VERBOSE_OPTIONS, DEBUG_OPTION, INT_CONVERTER, JANITOR_COMMAND, NO_COLOR_OPTION,
-    POSITIONAL_SELECT_COMMANDS, RENAME_COMMAND, SCOPE_COMMAND, SCOPE_DEFAULT_PAGE_SIZE,
-    SCOPE_GLOBAL_SUMMARY, SCOPE_KIND_DEST, TEST_COMMAND,
+    CHANGE_COUNTS, COMMAND_DEST, CONCURRENCY_COMMANDS, CONCURRENCY_ENV_VAR, CURSOR_COMMANDS,
+    DBT_COMMAND, DBT_DEBUG_COMMAND, DBT_PASSTHROUGH_COMMANDS, DBT_PASSTHROUGH_SEPARATOR,
+    DBT_VERBOSE_OPTION, DBT_VERBOSE_OPTIONS, DEBUG_OPTION, INT_CONVERTER, JANITOR_COMMAND,
+    NO_COLOR_OPTION, POSITIONAL_SELECT_COMMANDS, RENAME_COMMAND, SCOPE_COMMAND,
+    SCOPE_DEFAULT_PAGE_SIZE, SCOPE_GLOBAL_SUMMARY, SCOPE_KIND_DEST, TEST_COMMAND,
 };
 use crate::argv::models::{Namespace, ParserSpec, Value};
 
@@ -102,6 +102,8 @@ impl Run<'_> {
                 "test --inspect cannot be combined with --json or --json-output",
             ));
         }
+        namespace =
+            with_changed_counts(namespace).map_err(|message| self.error(parser, &message))?;
         if let Some(message) = since_error(&namespace) {
             return Err(self.error(parser, message));
         }
@@ -297,4 +299,32 @@ fn subcommand_parser<'a>(parser: &'a ParserSpec, name: &str) -> Option<&'a Parse
         .flat_map(|action| &action.parsers)
         .find(|(command, _)| command == name)
         .map(|(_, spec)| spec)
+}
+
+/// `namespace` with `--changed=COUNTS` split into `changed_counts`; refuses `--reach` alone.
+fn with_changed_counts(mut namespace: Namespace) -> Result<Namespace, String> {
+    if let Value::Str(text) = namespace.value("changed") {
+        let counts: Vec<&str> = text.split(',').map(str::trim).collect();
+        if counts.iter().any(|count| !CHANGE_COUNTS.contains(count)) {
+            return Err(format!(
+                "--changed lists what counts as a change: one or more of {}, separated by commas, \
+                 not {text:?}",
+                CHANGE_COUNTS.join(", ")
+            ));
+        }
+        let mut listed: Vec<Value> = Vec::new();
+        for count in CHANGE_COUNTS {
+            if counts.contains(&count) {
+                listed.push(Value::Str(count.to_owned()));
+            }
+        }
+        namespace.set("changed", Value::Bool(true));
+        namespace.set("changed_counts", Value::List(listed));
+    } else if truthy(&namespace.value("changed")) {
+        namespace.set("changed_counts", Value::None);
+    }
+    if namespace.value("reach") != Value::None && !truthy(&namespace.value("changed")) {
+        return Err("--reach needs --changed".to_owned());
+    }
+    Ok(namespace)
 }

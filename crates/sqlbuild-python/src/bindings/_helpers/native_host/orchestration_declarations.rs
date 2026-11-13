@@ -1,6 +1,6 @@
 //! The public authoring records enter native compilation here, never scheduler execution.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Component, Path};
 
 use pyo3::exceptions::{PyTypeError, PyValueError};
@@ -385,10 +385,7 @@ pub(crate) fn job_selections(
         if kind != JOB_LABEL && kind != GROUP_LABEL {
             continue;
         }
-        let targets: Vec<String> = declaration.getattr("targets")?.extract()?;
-        if !targets.is_empty()
-            && !target.is_some_and(|target| targets.iter().any(|name| name == target))
-        {
+        if !declared_for(&declaration, target)? {
             continue;
         }
         let tokens = |field: &str| -> PyResult<Vec<String>> {
@@ -421,4 +418,39 @@ pub(crate) fn job_selections(
         }
     }
     Ok(catalog)
+}
+
+/// Whether a declaration applies to `target`: it names no targets, or names this one.
+fn declared_for(declaration: &Bound<'_, PyAny>, target: Option<&str>) -> PyResult<bool> {
+    let targets: Vec<String> = declaration.getattr("targets")?.extract()?;
+    Ok(
+        targets.is_empty()
+            || target.is_some_and(|target| targets.iter().any(|name| name == target)),
+    )
+}
+
+/// The jobs and groups that a schedule, calendar schedule or sensor declared for `target` starts.
+pub(crate) fn triggered_job_names(
+    py: Python<'_>,
+    roots: &[(Bound<'_, PyAny>, String)],
+    target: Option<&str>,
+) -> PyResult<BTreeSet<String>> {
+    let mut names: BTreeSet<String> = BTreeSet::new();
+    for (declaration, kind, _) in reachable_declarations(py, roots)? {
+        if !declared_for(&declaration, target)? {
+            continue;
+        }
+        let started: Option<Bound<'_, PyAny>> = match kind {
+            JOB_LABEL | GROUP_LABEL => {
+                (!declaration.getattr("schedule")?.is_none()).then(|| declaration.clone())
+            }
+            CALENDAR_LABEL => Some(declaration.getattr("job")?),
+            SENSOR_LABEL => Some(declaration.getattr("run")?),
+            _ => None,
+        };
+        if let Some(job) = started {
+            names.insert(job.getattr("name")?.extract()?);
+        }
+    }
+    Ok(names)
 }

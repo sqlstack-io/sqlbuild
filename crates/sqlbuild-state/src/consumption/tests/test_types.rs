@@ -78,3 +78,17 @@ pub(crate) struct SimulationTestCase {
     pub(crate) miss: Option<(u64, String, Vec<String>)>,
     pub(crate) expected_miss: bool,
 }
+
+/// A small project recorded with real `started` and `succeeded` rows, for decision cases.
+pub(crate) struct Scenario {
+    pub(crate) nodes: Vec<crate::consumption::models::NodeFacts>,
+    pub(crate) sources: std::collections::BTreeMap<String, String>,
+    pub(crate) rows: Vec<ConsumptionRow>,
+    pub(crate) clock: i64,
+}
+
+pub(crate) struct DecideTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) outcomes: Vec<(String, crate::consumption::models::ChangedOutcome)>,
+    pub(crate) expected_outcomes: Vec<(&'static str, crate::consumption::models::ChangedOutcome)>,
+}

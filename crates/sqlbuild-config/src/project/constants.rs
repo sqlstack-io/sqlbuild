@@ -201,6 +201,11 @@ pub(crate) const TARGET_KEYS: [&str; 21] = [
     "concurrency",
 ];
 pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
+pub(crate) const CHANGES_KEYS: [&str; 2] = ["counts", "reach"];
+/// What `[changes] counts` may list, in the order `--changed` prints them.
+pub(crate) const CHANGE_COUNTS: [&str; 2] = ["definition", "source_data"];
+/// How far `[changes] reach` lets a change run downstream.
+pub(crate) const CHANGE_REACHES: [&str; 2] = ["job", "all"];
 /// Shortest safety sync interval, so a typo cannot bring back aggressive warehouse polling.
 pub(crate) const MIN_SYNC_INTERVAL_SECONDS: u64 = 60;
 pub(crate) const SYNC_INTERVAL_OFF: [&str; 3] = ["0", "0s", "off"];

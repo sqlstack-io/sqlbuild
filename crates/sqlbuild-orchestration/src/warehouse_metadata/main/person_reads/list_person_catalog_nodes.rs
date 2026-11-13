@@ -14,7 +14,7 @@ use crate::warehouse_metadata::_helpers::catalog_nodes::{
     catalog_node, last_outcome, latest_attempts,
 };
 use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprints;
-use crate::warehouse_metadata::_helpers::node_status::{definition_evidence, destination};
+use crate::warehouse_metadata::_helpers::node_status::{definition_evidences, destination};
 use crate::warehouse_metadata::models::{
     CatalogNodeBuild, CatalogNodeRecord, DefinitionEvidence, FingerprintQuery,
 };
@@ -52,14 +52,20 @@ pub async fn list_person_catalog_nodes(
     let (transaction, mut attempts) = latest_attempts(transaction, (location_id, target)).await?;
     let (transaction, mut checks) =
         read_node_check_counts(transaction, (location_id, target)).await?;
+    let (transaction, evidences) = definition_evidences(
+        transaction,
+        &positions
+            .iter()
+            .zip(&found)
+            .map(|(position, build)| (nodes[*position].1, build.as_ref()))
+            .collect::<Vec<_>>(),
+    )
+    .await?;
     let mut builds: Vec<Option<CatalogNodeBuild>> = vec![None; nodes.len()];
     let mut changed: Vec<bool> = vec![false; nodes.len()];
-    for (position, build) in positions.iter().zip(found) {
-        changed[*position] = matches!(
-            definition_evidence(nodes[*position].1, build.as_ref()),
-            DefinitionEvidence::Changed { .. }
-        );
-        builds[*position] = build.map(|(record, _)| CatalogNodeBuild {
+    for ((position, build), evidence) in positions.iter().zip(found).zip(evidences) {
+        changed[*position] = matches!(evidence, DefinitionEvidence::Changed { .. });
+        builds[*position] = build.map(|(record, _, _)| CatalogNodeBuild {
             observed_at: record.observed_at,
             run_id: record.run_id,
             version_hash: record.version_hash,

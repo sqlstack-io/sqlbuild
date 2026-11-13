@@ -4,7 +4,8 @@
 import type { Capability, LaunchVerb } from '$lib/api';
 import table from './command-table.generated.json';
 
-export type FlagType = 'bool' | 'string' | 'int' | 'timestamp' | 'selector';
+/** `attached` takes a value only as `--flag=value`; a bare flag is a switch. */
+export type FlagType = 'bool' | 'attached' | 'string' | 'int' | 'timestamp' | 'selector';
 
 export type FlagSpec = {
 	flag: string;

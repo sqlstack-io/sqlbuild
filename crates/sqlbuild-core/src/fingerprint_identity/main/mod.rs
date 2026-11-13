@@ -1,5 +1,6 @@
 pub mod canonical_text;
 pub mod decoded_object;
+pub mod fingerprint_dialect;
 pub mod model_local_identity_hash;
 pub mod normalize_version_identity_metadata;
 pub mod python_equal;

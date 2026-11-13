@@ -5,15 +5,21 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use crate::consumption::_helpers::decision::decide;
 use crate::consumption::_helpers::history::build_history;
 use crate::consumption::constants::RECENT_EXECUTIONS;
+use crate::consumption::main::changed_run_set::changed_run_set;
 use crate::consumption::main::consumed_inputs::consumed_inputs;
+use crate::consumption::main::consumption_history::consumption_history;
 use crate::consumption::main::started_append::started_append;
 use crate::consumption::main::succeeded_appends::succeeded_appends;
+use crate::consumption::main::unread_references::unread_references;
+use crate::consumption::main::with_referenced::with_referenced;
+use crate::consumption::models::TriggeredJob;
 use crate::consumption::models::{
-    ConsumptionAppend, ConsumptionHistory, ConsumptionRow, ForcedRun, InputFact, NodeFacts,
-    NodeKey, RelationKey, RunReason,
+    ChangeKind, ChangedOutcome, ChangedPolicy, ConsumptionAppend, ConsumptionHistory,
+    ConsumptionRow, ForcedRun, HeldBack, InputFact, NodeFacts, NodeKey, Reach, RelationKey,
+    RunReason,
 };
 use crate::consumption::tests::test_types::{
-    Content, Derivation, Input, Miss, Node, Random, Source, World, Writer,
+    Content, Derivation, Input, Miss, Node, Random, Scenario, Source, World, Writer,
 };
 
 impl Random {
@@ -39,6 +45,8 @@ impl Random {
 }
 
 const SECOND: i64 = 1_000_000;
+/// Between scenario builds, well past the order skew.
+const HOUR: i64 = 3_600 * SECOND;
 const SIMULATED_CASES: u64 = 400;
 const SIMULATED_BUILDS: usize = 14;
 
@@ -306,14 +314,18 @@ impl World {
             .collect();
         let facts: Vec<NodeFacts> = self.facts(&selected, &observed, full_refresh);
         let history: ConsumptionHistory = build_history(&self.read_rows(), RECENT_EXECUTIONS);
-        let decided: Vec<(NodeKey, Option<RunReason>)> = decide(&facts, &history);
+        let policy = ChangedPolicy {
+            counts: BTreeSet::from([ChangeKind::Definition, ChangeKind::SourceData]),
+            reach: Reach::All,
+        };
+        let decided: Vec<(NodeKey, ChangedOutcome)> = decide(&facts, &history, &policy);
         let run: Vec<usize> = (0..self.nodes.len())
             .filter(|index| selected.contains(index))
             .filter(|index| {
                 !changed
-                    || decided
-                        .iter()
-                        .any(|(key, reason)| *key == Self::key(*index) && reason.is_some())
+                    || decided.iter().any(|(key, outcome)| {
+                        *key == Self::key(*index) && matches!(outcome, ChangedOutcome::Runs(_))
+                    })
             })
             .collect();
         self.trace.push(format!(
@@ -539,3 +551,209 @@ pub(crate) fn found(writer: Writer) -> Option<(u64, String, Vec<String>)> {
         )
     })
 }
+
+impl Scenario {
+    /// Models named with their direct inputs; an input starting with `src_` is a source.
+    pub(crate) fn new(models: &[(&str, &[&str])]) -> Self {
+        let mut sources: BTreeMap<String, String> = BTreeMap::new();
+        let nodes: Vec<NodeFacts> = models
+            .iter()
+            .map(|(name, inputs)| NodeFacts {
+                key: scenario_key(name),
+                relation: RelationKey {
+                    database: None,
+                    schema: "analytics".to_owned(),
+                    name: (*name).to_owned(),
+                },
+                version_hash: "v1".to_owned(),
+                selected: true,
+                forced: Vec::new(),
+                inputs: inputs
+                    .iter()
+                    .map(|input| {
+                        if input.starts_with("src_") {
+                            sources.insert((*input).to_owned(), "d1".to_owned());
+                            InputFact::Source {
+                                name: (*input).to_owned(),
+                                version: None,
+                            }
+                        } else {
+                            InputFact::Node(scenario_key(input))
+                        }
+                    })
+                    .collect(),
+            })
+            .collect();
+        let mut scenario = Self {
+            nodes,
+            sources,
+            rows: Vec::new(),
+            clock: 1_000 * SECOND,
+        };
+        scenario.refresh_sources();
+        scenario
+    }
+
+    fn refresh_sources(&mut self) {
+        for node in &mut self.nodes {
+            for input in &mut node.inputs {
+                if let InputFact::Source { name, version } = input {
+                    *version = self.sources.get(name).cloned();
+                }
+            }
+        }
+    }
+
+    /// New data arrives in a source.
+    pub(crate) fn new_data(&mut self, source: &str, version: &str) {
+        self.sources.insert(source.to_owned(), version.to_owned());
+        self.refresh_sources();
+    }
+
+    /// A deploy changes a model's definition.
+    pub(crate) fn redefine(&mut self, name: &str, version_hash: &str) {
+        for node in &mut self.nodes {
+            if node.key.name == name {
+                version_hash.clone_into(&mut node.version_hash);
+            }
+        }
+    }
+
+    /// Build the named models in order, recording what each read.
+    pub(crate) fn build(&mut self, names: &[&str]) {
+        let by_key: HashMap<NodeKey, NodeFacts> = self
+            .nodes
+            .iter()
+            .map(|node| (node.key.clone(), node.clone()))
+            .collect();
+        let mut this_build: HashMap<NodeKey, String> = HashMap::new();
+        self.clock += HOUR;
+        for name in names {
+            let history: ConsumptionHistory = consumption_history(&self.rows, RECENT_EXECUTIONS);
+            let node: &NodeFacts = &by_key[&scenario_key(name)];
+            self.clock += SECOND;
+            let execution_id: String = format!("{name}@{}", self.clock);
+            let inputs = consumed_inputs(node, (&by_key, &history), &this_build);
+            let mut appends: Vec<ConsumptionAppend> =
+                vec![started_append(node, &execution_id, "run")];
+            appends.extend(succeeded_appends(node, (&execution_id, "run"), &inputs));
+            for row in appends {
+                self.clock += 1;
+                self.rows.push(ConsumptionRow {
+                    row,
+                    recorded_at: self.clock,
+                });
+            }
+            this_build.insert(node.key.clone(), execution_id);
+        }
+    }
+
+    /// Forget the executions of a model older than its latest, as retention pruning does.
+    pub(crate) fn prune(&mut self, name: &str) {
+        let latest: Option<String> = self
+            .rows
+            .iter()
+            .rev()
+            .find(|row| row.row.node.name == name)
+            .map(|row| row.row.execution_id.clone());
+        self.rows.retain(|row| {
+            row.row.node.name != name || Some(&row.row.execution_id) == latest.as_ref()
+        });
+    }
+
+    /// What `--changed` does, reading recent rows and then the older executions they reference.
+    pub(crate) fn decide(
+        &self,
+        counts: &[ChangeKind],
+        jobs: Option<&[(&str, &[&str])]>,
+    ) -> Vec<(String, ChangedOutcome)> {
+        let history: ConsumptionHistory = consumption_history(&self.rows, RECENT_EXECUTIONS);
+        let unread = unread_references(&history, &self.nodes);
+        let referenced: Vec<ConsumptionRow> = self
+            .rows
+            .iter()
+            .filter(|row| {
+                unread
+                    .get(&row.row.relation)
+                    .is_some_and(|ids| ids.contains(&row.row.execution_id))
+            })
+            .cloned()
+            .collect();
+        let history: ConsumptionHistory = with_referenced(history, &referenced);
+        let reach: Reach = match jobs {
+            None => Reach::All,
+            Some(jobs) => Reach::Job(
+                jobs.iter()
+                    .map(|(name, nodes)| TriggeredJob {
+                        name: (*name).to_owned(),
+                        nodes: nodes.iter().map(|node| scenario_key(node)).collect(),
+                    })
+                    .collect(),
+            ),
+        };
+        let policy = ChangedPolicy {
+            counts: counts.iter().copied().collect(),
+            reach,
+        };
+        changed_run_set(&self.nodes, &history, &policy)
+            .into_iter()
+            .map(|(key, outcome)| (key.name, outcome))
+            .collect()
+    }
+}
+
+pub(crate) fn scenario_key(name: &str) -> NodeKey {
+    NodeKey {
+        kind: "model".to_owned(),
+        name: name.to_owned(),
+    }
+}
+
+pub(crate) fn runs(reason: RunReason) -> ChangedOutcome {
+    ChangedOutcome::Runs(reason)
+}
+
+pub(crate) fn after(name: &str) -> ChangedOutcome {
+    runs(RunReason::UpstreamRuns(scenario_key(name)))
+}
+
+pub(crate) fn refreshed_by(job: &str) -> ChangedOutcome {
+    ChangedOutcome::HeldBack(HeldBack::RefreshedBy(vec![job.to_owned()]))
+}
+
+pub(crate) fn reads_held(name: &str) -> ChangedOutcome {
+    ChangedOutcome::HeldBack(HeldBack::ReadsHeldBack(scenario_key(name)))
+}
+
+/// A streaming source feeding a staging model and a fact built on it.
+pub(crate) fn streaming() -> Scenario {
+    let mut scenario = Scenario::new(&[
+        ("stg_events", &["src_events"]),
+        ("fct_events", &["stg_events"]),
+    ]);
+    scenario.build(&["stg_events", "fct_events"]);
+    scenario
+}
+
+/// The ticket's two-job project, built once: job_a holds staging, job_b the finance models.
+pub(crate) fn two_jobs() -> Scenario {
+    let mut scenario = Scenario::new(&[
+        ("stg_orders", &["src_orders"]),
+        ("int_orders", &["stg_orders"]),
+        ("fct_revenue", &["int_orders"]),
+        ("rpt_pnl", &["fct_revenue"]),
+        ("orders_export", &["stg_orders"]),
+    ]);
+    scenario.build(&[
+        "stg_orders",
+        "int_orders",
+        "fct_revenue",
+        "rpt_pnl",
+        "orders_export",
+    ]);
+    scenario.redefine("stg_orders", "v2");
+    scenario
+}
+
+pub(crate) const JOB_A: (&str, &[&str]) = ("job_a", &["stg_orders", "int_orders"]);
+pub(crate) const JOB_B: (&str, &[&str]) = ("job_b", &["fct_revenue", "rpt_pnl"]);

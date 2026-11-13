@@ -1,0 +1,13 @@
+{
+  "description": "A model built before a fingerprint scheme change keeps its old recorded hash; the node is unchanged until its SQL changes.",
+  "dialect": "duckdb",
+  "definition": "select order_id,\n  amount -- gross\nfrom orders",
+  "edited_definition": "select order_id, amount * 2 as amount from orders",
+  "old_scheme_hash": "scheme-orders-hash-before-upgrade",
+  "metadata": {
+    "model_name": "scheme_orders",
+    "config": {"materialized": "table"},
+    "execution_signature": {},
+    "local_function_hashes": {}
+  }
+}

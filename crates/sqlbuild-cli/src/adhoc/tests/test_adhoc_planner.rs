@@ -96,6 +96,26 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             )),
         },
         AdhocPlanTestCase {
+            description: "--changed with its counts and reach is the job setting a schedule would use",
+            command: &[
+                "build",
+                "-s",
+                "orders",
+                "--changed=source_data,definition",
+                "--reach",
+                "all",
+            ],
+            expected_plan: Ok((
+                &["model:orders"],
+                json!({"changed": ["definition", "source_data"], "reach": "all"}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "a bare --changed uses the project's [changes] defaults",
+            command: &["build", "-s", "orders", "--changed"],
+            expected_plan: Ok((&["model:orders"], json!({"changed": true}))),
+        },
+        AdhocPlanTestCase {
             description: "an abbreviated flag is the same flag, so it is still detected",
             command: &["build", "-s", "orders", "--full-ref"],
             expected_plan: Ok((&["model:orders"], json!({"full_refresh": true}))),
@@ -143,11 +163,6 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             description: "variables are refused",
             command: &["build", "--vars", "{\"day\": 1}"],
             expected_plan: Err("--vars is not available for ad-hoc runs"),
-        },
-        AdhocPlanTestCase {
-            description: "a flag outside the allowlist is refused by the name people typed",
-            command: &["build", "--changed"],
-            expected_plan: Err("--changed is not available for ad-hoc runs"),
         },
         AdhocPlanTestCase {
             description: "a selector file is refused",

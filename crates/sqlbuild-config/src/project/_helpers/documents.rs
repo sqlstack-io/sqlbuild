@@ -14,8 +14,8 @@ use crate::project::_helpers::help::{
 };
 use crate::project::_helpers::keys::Place;
 use crate::project::_helpers::sections::{
-    load_constants, load_control, load_cost, load_cursors, load_dbt, load_diff, load_git,
-    load_janitor, load_local_dbt, load_microbatches, load_migrations, load_policy_flag,
+    load_changes, load_constants, load_control, load_cost, load_cursors, load_dbt, load_diff,
+    load_git, load_janitor, load_local_dbt, load_microbatches, load_migrations, load_policy_flag,
     load_review, load_scenario, load_settings, load_snapshots, setting_overrides,
 };
 use crate::project::_helpers::sinks::load_sinks;
@@ -28,7 +28,9 @@ use crate::project::constants::{
     LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
-use crate::project::models::{Built, ConfigFile, ConfigPaths, ControlConfig, ReviewConfig};
+use crate::project::models::{
+    Built, ChangesConfig, ConfigFile, ConfigPaths, ControlConfig, ReviewConfig,
+};
 use crate::project::types::{Entries, Fields, Loaded};
 use crate::recall::constants::RECALL_SECTION;
 use crate::recall::main::recall_section::recall_section;
@@ -279,6 +281,7 @@ fn project_fields(payload: &Entries) -> Loaded<Fields> {
     load_git(get(payload, "git"), PROJECT_FILE)?;
     load_review(get(payload, "review"), PROJECT_FILE)?;
     load_control(get(payload, "control"), PROJECT_FILE)?;
+    load_changes(get(payload, "changes"), PROJECT_FILE)?;
     let mut fields = identity(payload)?;
     fields.extend(sections(payload)?);
     fields.push(("targets", targets(payload)?));
@@ -447,6 +450,11 @@ pub(crate) fn git_base_ref(paths: &ConfigPaths) -> Result<Option<String>, LoadFa
 /// `[control]` of `sqlbuild_project.toml`.
 pub(crate) fn control_config(paths: &ConfigPaths) -> Result<ControlConfig, LoadFailure> {
     project_section(paths, "control", load_control)
+}
+
+/// `[changes]` of `sqlbuild_project.toml`.
+pub(crate) fn changes_config(paths: &ConfigPaths) -> Result<ChangesConfig, LoadFailure> {
+    project_section(paths, "changes", load_changes)
 }
 
 /// `[review]` of `sqlbuild_project.toml`.

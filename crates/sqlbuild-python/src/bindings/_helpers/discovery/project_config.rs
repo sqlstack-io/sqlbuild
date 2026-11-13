@@ -10,13 +10,16 @@ use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_config::project::errors::{ConfigFailure, FailureClass, LoadFailure};
 use sqlbuild_config::project::main::deprecated_setting_warnings::deprecated_setting_warnings;
+use sqlbuild_config::project::main::load_changes_config::load_changes_config;
 use sqlbuild_config::project::main::load_git_base_ref::load_git_base_ref;
 use sqlbuild_config::project::main::load_local_config::load_local_config;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
 use sqlbuild_config::project::main::load_review_config::load_review_config;
 use sqlbuild_config::project::main::local_sql_analysis_failure::local_sql_analysis_failure;
 use sqlbuild_config::project::main::resolve_config_file::resolve_config_file;
-use sqlbuild_config::project::models::{Built, ConfigFile, ConfigPaths, ReviewConfig};
+use sqlbuild_config::project::models::{
+    Built, ChangesConfig, ConfigFile, ConfigPaths, ReviewConfig,
+};
 
 use crate::bindings::_helpers::boundary::config_values::config_value_to_python;
 use crate::bindings::_helpers::native_host::host::write_console;
@@ -202,6 +205,13 @@ pub(crate) fn configured_git_base_ref(project_dir: &Bound<'_, PyAny>) -> PyResul
 pub(crate) fn configured_review(project_dir: &Bound<'_, PyAny>) -> PyResult<ReviewConfig> {
     let files = files(project_dir)?;
     load_review_config(&files.native)
+        .or_else(|failure| Err(load_error(project_dir.py(), &failure, &files)?))
+}
+
+/// `[changes]` of the project at `project_dir`: what `--changed` counts and reaches by default.
+pub(crate) fn configured_changes(project_dir: &Bound<'_, PyAny>) -> PyResult<ChangesConfig> {
+    let files = files(project_dir)?;
+    load_changes_config(&files.native)
         .or_else(|failure| Err(load_error(project_dir.py(), &failure, &files)?))
 }
 

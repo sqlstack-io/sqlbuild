@@ -11,6 +11,7 @@ use sqlbuild_core::constants::CONSUMPTION_TABLE_NAME;
 use sqlbuild_state::consumption::constants::{
     CONSUMPTION_COLUMN_TYPES, INTEGER_STATE_VALUE_TYPE, NULLABLE_COLUMNS, RECENT_EXECUTIONS,
 };
+use sqlbuild_state::consumption::main::executions_by_id_sql::executions_by_id_sql;
 use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
 use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_sql;
 use sqlbuild_state::consumption::models::{
@@ -26,6 +27,8 @@ use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
 
 /// Rows per `INSERT`; SQL Server accepts at most 1,000 rows in one `VALUES` list.
 pub(crate) const ROWS_PER_STATEMENT: usize = 500;
+/// Execution IDs per `IN` list when reading executions back by ID.
+const EXECUTION_ID_BATCH: usize = 500;
 /// Warehouse timestamp texts with a UTC offset, as drivers render aware values.
 const OFFSET_TIME_FORMATS: [&str; 2] = ["%Y-%m-%dT%H:%M:%S%.f%:z", "%Y-%m-%d %H:%M:%S%.f%:z"];
 /// Warehouse timestamp texts without an offset, which the consumption table stores as UTC.
@@ -250,6 +253,30 @@ fn read_recent(
         .collect()
 }
 
+/// Rows of the named executions in `location`, read in batches; none when the table is missing.
+fn read_executions(
+    adapter: &Bound<'_, PyAny>,
+    connection: &Bound<'_, PyAny>,
+    location: &Location,
+    execution_ids: &[&str],
+) -> PyResult<Vec<ConsumptionRow>> {
+    let Some(table) = table_of(adapter, location)? else {
+        return Ok(Vec::new());
+    };
+    if execution_ids.is_empty() || !table_exists(adapter, connection, location)? {
+        return Ok(Vec::new());
+    }
+    let mut rows: Vec<ConsumptionRow> = Vec::new();
+    for batch in execution_ids.chunks(EXECUTION_ID_BATCH) {
+        let result: Bound<'_, PyAny> =
+            execute(adapter, connection, &executions_by_id_sql(&table, batch))?;
+        for row in call_with(&native_field(&result, "fetchall")?, &[])?.try_iter()? {
+            rows.push(read_row(&row?)?);
+        }
+    }
+    Ok(rows)
+}
+
 pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if value.is_none() {
         return Ok(None);
@@ -426,6 +453,20 @@ impl ConsumptionConnection {
         location: &Location,
     ) -> PyResult<Vec<ConsumptionRow>> {
         read_recent(self.adapter.bind(py), &self.connected(py)?, location)
+    }
+
+    pub(crate) fn read_executions(
+        &self,
+        py: Python<'_>,
+        location: &Location,
+        execution_ids: &[&str],
+    ) -> PyResult<Vec<ConsumptionRow>> {
+        read_executions(
+            self.adapter.bind(py),
+            &self.connected(py)?,
+            location,
+            execution_ids,
+        )
     }
 
     pub(crate) fn append(

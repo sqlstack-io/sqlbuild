@@ -292,7 +292,11 @@ impl<'p, 'r, 'h> Level<'p, 'r, 'h> {
                 action_tuples.push((index, self.arg_strings[first..stop].to_vec()));
                 break;
             };
-            let count: usize = match_argument(spec, b"A")?;
+            let count: usize = if spec.nargs == Nargs::Attached {
+                1
+            } else {
+                match_argument(spec, b"A")?
+            };
             let second: char = option_string.chars().nth(1).unwrap_or_default();
             if count == 1 {
                 stop = start + 1;

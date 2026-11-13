@@ -40,7 +40,7 @@ impl Run<'_> {
         args: &[String],
     ) -> Result<Option<Value>, String> {
         let positional: bool = action.option_strings.is_empty();
-        if args.is_empty() && action.nargs == Nargs::Optional {
+        if args.is_empty() && matches!(action.nargs, Nargs::Optional | Nargs::Attached) {
             let value: Value = if positional {
                 match &action.default {
                     Default::Suppress => return Ok(None),
@@ -61,7 +61,12 @@ impl Run<'_> {
                 Default::Value(value) => Some(value.clone()),
             });
         }
-        if args.len() == 1 && matches!(action.nargs, Nargs::Single | Nargs::Optional) {
+        if args.len() == 1
+            && matches!(
+                action.nargs,
+                Nargs::Single | Nargs::Optional | Nargs::Attached
+            )
+        {
             let value: Value = self.converted_value(action, &args[0])?;
             self.check_value(action, &value)?;
             return Ok(Some(value));

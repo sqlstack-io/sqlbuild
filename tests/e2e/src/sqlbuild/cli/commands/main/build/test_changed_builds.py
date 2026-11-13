@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -9,19 +10,25 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     ChangedBuildE2ETestCase,
     ChangedCrashE2ETestCase,
+    ChangedReachE2ETestCase,
+    ChangedWarehouse,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
+    CHANGED_ANY,
+    CHANGED_BUILDS_REACH_FIXTURE,
     CHANGED_BUILDS_UDF_FIXTURE,
     CHANGED_BUILDS_UNQUALIFIED_FIXTURE,
     DUCKDB_CHANGED,
     SQLITE_CHANGED,
     add_changed_overlay,
     apply_changed_step,
+    changed_build_output,
     changed_build_steps,
     kill_changed_build_mid_write,
     prepare_changed_project,
     run_changed_build,
 )
+from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
 
 EVERY_MODEL: frozenset[str] = frozenset({"stg_orders", "stg_customers", "customer_orders"})
 # Functions deploy on every build; `--changed` decides models and seeds only.
@@ -191,3 +198,77 @@ def test_given_a_build_killed_mid_write_when_building_with_changed_then_every_in
     assert killed_rows == test_case.expected_killed_rows
     assert run_changed_build(project_dir, ("--changed",)) == test_case.expected_ran
     assert run_changed_build(project_dir, ("--changed",)) == frozenset()
+
+
+REACH_MODELS: frozenset[str] = EVERY_MODEL | {
+    "int_orders",
+    "fct_revenue",
+    "rpt_pnl",
+    "orders_export",
+    "summary",
+}
+STG_ORDERS_REDEFINED: str = (
+    'MODEL (description "Staged orders.", materialized table);\n'
+    'SELECT order_id, customer_id FROM __source("raw_orders") WHERE order_id > 0\n'
+)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ChangedReachE2ETestCase(
+            description=DUCKDB_CHANGED.name,
+            warehouse=DUCKDB_CHANGED,
+            expected_redefined=frozenset(
+                {"stg_orders", "int_orders", "orders_export", "customer_orders"}
+            ),
+            expected_summary="Changed: 4 of 8 selected models and seeds run; "
+            "1 unchanged and 3 held back",
+            expected_plan_lines=(
+                "Counting: definition (source data not counted) · reach: job",
+                "Changed (1)",
+                "Downstream of changes (3)",
+                "Held back (3)",
+                "job finance_daily",
+                "reads fct_revenue, which is held back",
+            ),
+            expected_reach_all=frozenset({"fct_revenue", "rpt_pnl", "summary"}),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_scheduled_jobs_when_building_with_changed_then_a_change_stops_at_another_jobs_edge(
+    test_case: ChangedReachE2ETestCase, tmp_path: Path
+) -> None:
+    warehouse: ChangedWarehouse = test_case.warehouse
+    project_dir: Path = prepare_changed_project(tmp_path=tmp_path, warehouse=warehouse)
+    add_changed_overlay(project_dir, CHANGED_BUILDS_REACH_FIXTURE)
+    first: frozenset[str] = run_changed_build(project_dir, (CHANGED_ANY,))
+    warehouse.execute(
+        project_dir / warehouse.warehouse_file, "INSERT INTO raw.orders VALUES (2, 1, 2)"
+    )
+    new_data: frozenset[str] = run_changed_build(project_dir, ("--changed",))
+    (project_dir / "models/stg_orders.sql").write_text(STG_ORDERS_REDEFINED, encoding="utf-8")
+    plan: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "plan", "--changed"), project_dir=project_dir
+    )
+    redefined, build_output = changed_build_output(project_dir, ("--changed",))
+    held: frozenset[str] = run_changed_build(project_dir, ("--changed",))
+    reach_all: frozenset[str] = run_changed_build(project_dir, ("--changed", "--reach", "all"))
+    refused: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", "--reach", "all"), project_dir=project_dir
+    )
+
+    assert first == REACH_MODELS
+    assert new_data == frozenset(), "new source data is not a change by default"
+    assert redefined == test_case.expected_redefined, (
+        "the change stops at finance_daily; a job without a trigger and a model in no job run"
+    )
+    assert test_case.expected_summary in build_output
+    assert plan.returncode == 0, plan.stdout + plan.stderr
+    for line in test_case.expected_plan_lines:
+        assert line in plan.stdout, plan.stdout
+    assert held == frozenset(), "held-back models wait for their job, not the next --changed"
+    assert reach_all == test_case.expected_reach_all
+    assert refused.returncode != 0
+    assert "--reach needs --changed" in refused.stdout + refused.stderr
