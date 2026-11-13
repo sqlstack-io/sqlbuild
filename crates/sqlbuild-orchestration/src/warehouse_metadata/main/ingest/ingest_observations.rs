@@ -26,7 +26,6 @@ pub async fn ingest_observations(
             records
                 .iter()
                 .map(|record| StateEventImport {
-                    source_id: record.observation_id.clone(),
                     location: WarehouseStateLocation {
                         database: record.state_database.clone(),
                         schema: record.state_schema.clone(),

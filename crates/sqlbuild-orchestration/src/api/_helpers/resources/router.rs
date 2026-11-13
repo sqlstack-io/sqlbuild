@@ -36,6 +36,10 @@ pub(crate) fn router(store: &ControlStore, feed: ChangeFeed) -> Router<ControlSt
             post(warehouse_metadata::report),
         )
         .route(
+            "/api/locations/{location_id}/targets/{target}/metadata/keys",
+            post(warehouse_metadata::keys),
+        )
+        .route(
             "/api/locations/{location_id}/targets/{target}/metadata/preview-copy",
             post(warehouse_metadata::preview_copy),
         )

@@ -19,11 +19,11 @@ pub(crate) async fn event_history(
     store: &ControlStore,
     outbound: &LocationWorkClient,
     (session_id, preview_session): (Uuid, Uuid),
-    (client, metadata_url, bearer, (kind, fixture_name, source_key)): (
+    (client, metadata_url, bearer, (kind, fixture_name, source_key, key_fields)): (
         &Client,
         &str,
         &str,
-        (WarehouseHistoryKind, &str, &str),
+        (WarehouseHistoryKind, &str, &str, &[&str]),
     ),
 ) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
@@ -204,6 +204,80 @@ pub(crate) async fn event_history(
             .await
             .expect("response"),
         json!({"applied":true})
+    );
+    key_page(
+        store,
+        (client, url, bearer),
+        session_id,
+        (kind, &record, source_key, key_fields),
+    )
+    .await;
+}
+
+/// A reconcile scan's key page keeps the mirrored row it names; the complete scan removes the rest.
+async fn key_page(
+    store: &ControlStore,
+    (client, url, bearer): (&Client, &str, &str),
+    session_id: Uuid,
+    (kind, record, source_key, key_fields): (WarehouseHistoryKind, &Value, &str, &[&str]),
+) {
+    let projection: Value = key_fields
+        .iter()
+        .map(|field| ((*field).to_owned(), record[*field].clone()))
+        .collect::<serde_json::Map<_, _>>()
+        .into();
+    let mut unknown = projection.clone();
+    unknown[source_key] = json!("key-page-missing");
+    let location = json!({"database": record["state_database"], "schema": record["state_schema"]});
+    let scan = json!({"scan_id": Uuid::now_v7(), "location": location, "complete": false});
+    let page = json!({"kind": kind, "session_id": session_id, "generation": 1,
+        "keys": [projection, unknown], "scan": scan});
+    let keys_url = format!("{url}/keys");
+    assert_eq!(
+        client
+            .post(&keys_url)
+            .bearer_auth(bearer)
+            .json(&page)
+            .send()
+            .await
+            .expect("key page")
+            .json::<Value>()
+            .await
+            .expect("key page response"),
+        json!({"missing": [1]}),
+        "{kind:?}: the key projection matches the mirrored full record"
+    );
+    let mut complete = page.clone();
+    complete["scan"]["complete"] = json!(true);
+    assert_eq!(
+        client
+            .post(&keys_url)
+            .bearer_auth(bearer)
+            .json(&complete)
+            .send()
+            .await
+            .expect("complete key page")
+            .status(),
+        StatusCode::BAD_REQUEST,
+        "{kind:?}: only a records page completes a scan"
+    );
+    let mut finish = json!({"kind": kind, "session_id": session_id, "generation": 1, "records": [], "scan": scan});
+    finish["scan"]["complete"] = json!(true);
+    let _ = sync_events((client, url, bearer), &finish).await;
+    let scanned: Vec<Value> = mirrored_events(store, kind)
+        .await
+        .into_iter()
+        .filter(|row| {
+            row["target"] == "development"
+                && row["record_json"]["state_schema"] == record["state_schema"]
+                && row["record_json"]["state_database"] == record["state_database"]
+        })
+        .map(|row| row["record_json"].clone())
+        .collect();
+    assert_eq!(
+        scanned,
+        [record.clone()],
+        "{kind:?}: the complete scan keeps only the row its key page matched"
     );
 }
 

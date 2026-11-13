@@ -7,4 +7,5 @@ pub(crate) mod freshness;
 pub(crate) mod ingestion;
 pub(crate) mod mirror_pages;
 pub(crate) mod node_status;
+pub(crate) mod source_keys;
 pub(crate) mod statistics;

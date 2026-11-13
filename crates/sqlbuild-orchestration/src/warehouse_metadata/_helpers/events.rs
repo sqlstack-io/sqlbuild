@@ -8,6 +8,7 @@ use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::ingestion::{
     begin_ingestion, commit_ingestion, outside_scan, scoped_event_id, validate_fields,
 };
+use crate::warehouse_metadata::_helpers::source_keys::source_id;
 use crate::warehouse_metadata::models::{MetadataBatch, StateEventImport, WarehouseSyncResponse};
 
 pub(crate) async fn ingest_events(
@@ -41,7 +42,10 @@ pub(crate) async fn ingest_events(
     .await?;
     let mut applied = false;
     let mut keys: Vec<Uuid> = Vec::new();
-    for record in records {
+    for (record, delivered) in records.into_iter().zip(&batch.records) {
+        let source_id = source_id(batch.kind, delivered)?.ok_or_else(|| {
+            ControlError::Invalid(format!("{} has no source key", batch.kind.as_str()))
+        })?;
         let event_id = scoped_event_id(
             (location_id, target),
             (
@@ -49,7 +53,7 @@ pub(crate) async fn ingest_events(
                 &record.location.schema,
                 source_table,
             ),
-            &record.source_id,
+            &source_id,
         )?;
         keys.push(event_id);
         let mut columns = vec![

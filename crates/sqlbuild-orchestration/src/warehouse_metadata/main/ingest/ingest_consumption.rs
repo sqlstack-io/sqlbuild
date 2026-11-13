@@ -1,7 +1,6 @@
 //! Mirror consumed input versions; rows carry no event identity, so their identity columns derive one.
 
 use serde_json::json;
-use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::store::errors::ControlError;
@@ -27,18 +26,6 @@ pub async fn ingest_consumption(
             records
                 .iter()
                 .map(|record| StateEventImport {
-                    source_id: sha256_hex(
-                        json!([
-                            record.execution_id,
-                            record.phase,
-                            record.input_kind,
-                            record.input_name,
-                            record.input_version,
-                            record.recorded_at,
-                        ])
-                        .to_string()
-                        .as_bytes(),
-                    ),
                     location: WarehouseStateLocation {
                         database: record.state_database.clone(),
                         schema: record.state_schema.clone(),
