@@ -427,28 +427,31 @@ pub(crate) fn local_sql_analysis_failure(
     )
 }
 
-/// `[git] base_ref` of `sqlbuild_project.toml`, validated as project loading validates it.
+/// One section of `sqlbuild_project.toml`, validated as project loading validates it.
+fn project_section<T>(
+    paths: &ConfigPaths,
+    section: &str,
+    load: fn(Option<&ConfigValue>, ConfigFile) -> Loaded<T>,
+) -> Result<T, LoadFailure> {
+    let file = resolve(paths, false)?;
+    let table = load_toml_mapping(paths, file)?;
+    let payload = table.as_map().unwrap_or_default();
+    Ok(load(get(payload, section), PROJECT_FILE)?)
+}
+
+/// `[git] base_ref` of `sqlbuild_project.toml`.
 pub(crate) fn git_base_ref(paths: &ConfigPaths) -> Result<Option<String>, LoadFailure> {
-    let file = resolve(paths, false)?;
-    let table = load_toml_mapping(paths, file)?;
-    let payload = table.as_map().unwrap_or_default();
-    Ok(load_git(get(payload, "git"), PROJECT_FILE)?)
+    project_section(paths, "git", load_git)
 }
 
-/// `[control]` of `sqlbuild_project.toml`, validated as project loading validates it.
+/// `[control]` of `sqlbuild_project.toml`.
 pub(crate) fn control_config(paths: &ConfigPaths) -> Result<ControlConfig, LoadFailure> {
-    let file = resolve(paths, false)?;
-    let table = load_toml_mapping(paths, file)?;
-    let payload = table.as_map().unwrap_or_default();
-    Ok(load_control(get(payload, "control"), PROJECT_FILE)?)
+    project_section(paths, "control", load_control)
 }
 
-/// `[review]` of `sqlbuild_project.toml`, validated as project loading validates it.
+/// `[review]` of `sqlbuild_project.toml`.
 pub(crate) fn review_config(paths: &ConfigPaths) -> Result<ReviewConfig, LoadFailure> {
-    let file = resolve(paths, false)?;
-    let table = load_toml_mapping(paths, file)?;
-    let payload = table.as_map().unwrap_or_default();
-    Ok(load_review(get(payload, "review"), PROJECT_FILE)?)
+    project_section(paths, "review", load_review)
 }
 
 /// One warning line per configuration file whose `[settings]` still sets `column_contract_mode`.
