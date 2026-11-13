@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, PoisonError};
 
 use chrono::SecondsFormat;
+use pyo3::IntoPyObject;
 use pyo3::create_exception;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python, pyclass, pymethods};
@@ -22,7 +23,6 @@ use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KI
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, SqliteCursor};
-use crate::bindings::_helpers::planner_phases::objects::optional_text;
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 create_exception!(
@@ -328,7 +328,11 @@ impl SyncedCopyAdapter {
             &[
                 (
                     "database",
-                    optional_text(py, record.state_database.as_deref()),
+                    record
+                        .state_database
+                        .as_deref()
+                        .into_pyobject(py)?
+                        .into_any(),
                 ),
                 ("schema", PyString::new(py, &record.state_schema).into_any()),
                 ("name", PyString::new(py, &record.name).into_any()),
