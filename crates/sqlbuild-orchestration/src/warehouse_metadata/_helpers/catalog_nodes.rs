@@ -12,8 +12,8 @@ use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 use crate::warehouse_metadata::constants::LINEAGE_DEFINITION_BATCH;
 use crate::warehouse_metadata::models::{
-    CatalogNodeBuild, CatalogNodeRecord, CatalogRelation, ColumnLineageEdge, LineageColumn,
-    LineageNodeColumns,
+    CatalogNodeBuild, CatalogNodeOutcome, CatalogNodeRecord, CatalogRelation, ColumnLineageEdge,
+    LineageColumn, LineageNodeColumns,
 };
 
 /// A declared value from the definition itself, its schema entry or its config, in that order.
@@ -60,7 +60,11 @@ fn relation(node: &SnapshotNode) -> Option<CatalogRelation> {
 pub(crate) fn catalog_node(
     (node_key, node): (&str, &SnapshotNode),
     snapshot_id: Uuid,
-    last_build: Option<CatalogNodeBuild>,
+    (last_build, last_outcome, definition_changed): (
+        Option<CatalogNodeBuild>,
+        Option<CatalogNodeOutcome>,
+        bool,
+    ),
 ) -> CatalogNodeRecord {
     let definition = &node.definition;
     CatalogNodeRecord {
@@ -84,6 +88,8 @@ pub(crate) fn catalog_node(
             _ => None,
         },
         last_build,
+        last_outcome,
+        definition_changed,
         snapshot_id,
     }
 }
