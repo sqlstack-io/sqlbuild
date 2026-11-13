@@ -41,5 +41,5 @@ pub(crate) async fn recent(
     Path(location_id): Path<Uuid>,
 ) -> Result<Json<Vec<LocationHealthObservation>>, ApiError> {
     require_location(&identity, location_id)?;
-    Ok(Json(location_health(&store, location_id).await?))
+    Ok(Json(location_health(&store, (location_id, None)).await?))
 }

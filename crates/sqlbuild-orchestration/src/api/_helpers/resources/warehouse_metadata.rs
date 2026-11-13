@@ -21,12 +21,14 @@ use crate::warehouse_metadata::main::ingest::ingest_observations::ingest_observa
 use crate::warehouse_metadata::main::ingest::ingest_old_name_views::ingest_old_name_views;
 use crate::warehouse_metadata::main::ingest::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::main::ingest::ingest_statistics::ingest_statistics;
+use crate::warehouse_metadata::main::location_reads::read_preview_copy::read_preview_copy;
 use crate::warehouse_metadata::main::location_reads::read_statistics_due::read_statistics_due;
 use crate::warehouse_metadata::main::location_reads::read_sync_due::read_sync_due;
 use crate::warehouse_metadata::main::location_reads::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
-    MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseSyncDue,
-    WarehouseSyncDueRead, WarehouseSyncResponse, WarehouseWatermarkRead,
+    MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
+    WarehouseHistoryKind, WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse,
+    WarehouseWatermarkRead,
 };
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata", operation_id = "report_metadata",
@@ -115,5 +117,23 @@ pub(crate) async fn sync_due(
     require_location(&identity, location_id)?;
     Ok(Json(
         read_sync_due(&store, (location_id, &target), &request).await?,
+    ))
+}
+
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/preview-copy",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = PreviewCopyRead,
+    responses((status = 200, body = PreviewCopy), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized"),
+        (status = 409, description = "Reader generation fenced")),
+    security(("bearer" = [])))]
+pub(crate) async fn preview_copy(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Json(request): Json<PreviewCopyRead>,
+) -> Result<Json<PreviewCopy>, ApiError> {
+    require_location(&identity, location_id)?;
+    Ok(Json(
+        read_preview_copy(&store, (location_id, &target), &request).await?,
     ))
 }

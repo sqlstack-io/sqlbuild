@@ -106,6 +106,8 @@ mod warehouse_events_helpers;
 pub(crate) mod warehouse_history_helpers;
 #[path = "warehouse_metadata/helpers.rs"]
 mod warehouse_metadata_helpers;
+#[path = "warehouse_metadata/preview_copy/helpers.rs"]
+mod warehouse_preview_copy_helpers;
 #[path = "warehouse_metadata/reconciliation/helpers.rs"]
 mod warehouse_reconciliation_helpers;
 #[path = "work/helpers.rs"]

@@ -423,6 +423,12 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                 (&client, &url, &token.bearer),
             )
             .await;
+            crate::api::tests::warehouse_preview_copy_helpers::preview_copy_scope(
+                &outbound,
+                (session_id, preview_session),
+                (&client, &url, &token.bearer),
+            )
+            .await;
             stop_api(api).await;
             close_test_store(fixture).await;
         });
