@@ -210,7 +210,8 @@ def test_given_a_failed_statement_when_recalled_then_its_sql_is_readable(
     recorded: list[list[object]] = recall_rows(
         project_dir,
         "SELECT s.sql_available, s.sql_unavailable_reason, a.text FROM statements s "
-        "LEFT JOIN artifacts a USING (invocation_id, statement_id) WHERE s.outcome = 'failed'",
+        "LEFT JOIN artifacts a ON a.invocation_id = s.invocation_id "
+        "AND a.digest = 'sha256:' || s.sql_digest WHERE s.outcome = 'failed'",
     )
 
     assert built.returncode == 1

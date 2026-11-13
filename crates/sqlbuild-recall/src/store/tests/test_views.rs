@@ -138,6 +138,15 @@ fn given_duplicates_and_conflicts_when_written_then_first_row_is_kept_and_confli
         vec![original.clone()],
         vec![conflicting.clone()],
     ];
+    // An earlier version stored the full 64-digit digest, of which today's is the prefix.
+    let mut legacy = original.clone();
+    for (name, value) in &mut legacy.values {
+        if *name == "content_hash"
+            && let RecallValue::Text(hash) = value
+        {
+            hash.push_str(&"0".repeat(32));
+        }
+    }
     let test_cases = [
         ProjectionTestCase {
             description: "the first row wins",
@@ -153,9 +162,19 @@ fn given_duplicates_and_conflicts_when_written_then_first_row_is_kept_and_confli
         },
         ProjectionTestCase {
             description: "identical rewrites are not conflicts",
-            batches: vec![vec![original.clone()], vec![original]],
+            batches: vec![vec![original.clone()], vec![original.clone()]],
             sql: "SELECT COUNT(*) FROM conflicts",
             expected_rows: vec![vec![integer(0)]],
+        },
+        ProjectionTestCase {
+            description: "a row stored with a full-length digest matches its rewrite, not different content",
+            batches: vec![
+                vec![legacy.clone()],
+                vec![original.clone()],
+                vec![conflicting],
+            ],
+            sql: "SELECT record_key FROM conflicts",
+            expected_rows: vec![vec![text("dup:0")]],
         },
     ];
 

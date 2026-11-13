@@ -69,9 +69,8 @@ impl Built {
 #[derive(Debug)]
 pub(crate) struct Materializer {
     envelope: RowEnvelope,
+    /// Digests whose content row and one reference row are written.
     artifacts_seen: HashSet<String>,
-    /// Digests and the references already written for them.
-    refs_seen: HashSet<(String, String)>,
     /// Output bytes stored per stream, for the offsets of replaced chunks.
     output_bytes: [u64; 2],
     audit_evidence: AuditEvidence,
@@ -83,7 +82,6 @@ impl Materializer {
             audit_evidence,
             envelope,
             artifacts_seen: HashSet::new(),
-            refs_seen: HashSet::new(),
             output_bytes: [0; 2],
         }
     }
@@ -130,7 +128,7 @@ impl Materializer {
         Ok(stored)
     }
 
-    /// The content row the first time a digest is seen, and a reference row for each statement that ran it; `None` when both are already written.
+    /// The content row and its reference row the first time a digest is seen; `None` after that.
     fn sql_rows(&mut self, input: SqlInput) -> Option<Vec<RecallRow>> {
         let artifact: ArtifactInput = artifact_input(
             input.sql.into_bytes(),
@@ -141,21 +139,12 @@ impl Materializer {
         self.artifact_rows(artifact)
     }
 
-    /// `artifact`'s content row the first time its digest is seen and its reference row the first time it is named; `None` when both are written.
+    /// `artifact`'s content row and one reference row per invocation, named by the first statement or event written with it; statements and audits find it by digest. `None` once its digest is written.
     fn artifact_rows(&mut self, artifact: ArtifactInput) -> Option<Vec<RecallRow>> {
-        if !self
-            .refs_seen
-            .insert((artifact.digest.clone(), artifact.ref_id.clone()))
-        {
+        if !self.artifacts_seen.insert(artifact.digest.clone()) {
             return None;
         }
-        let first_sighting: bool = self.artifacts_seen.insert(artifact.digest.clone());
-        let [content, reference] = artifact_rows(&self.envelope, &artifact);
-        Some(if first_sighting {
-            vec![content, reference]
-        } else {
-            vec![reference]
-        })
+        Some(artifact_rows(&self.envelope, &artifact).to_vec())
     }
 
     /// The row of `event`, then the artifact rows of its evidence: an `audit_completed` event's evidence rows leave its payload and, when the outcome keeps them, become an artifact its `sample_digest` names.

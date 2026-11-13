@@ -1,7 +1,7 @@
 //! Deterministic record IDs and content digests.
 
 use crate::records::constants::{
-    CONTENT_HASH_BUFFER_BYTES, DIAGNOSTIC_RECORD_ID_INFIX, OUTPUT_RECORD_ID_INFIX,
+    CONTENT_HASH_BUFFER_BYTES, CONTENT_HASH_HEX, DIAGNOSTIC_RECORD_ID_INFIX, OUTPUT_RECORD_ID_INFIX,
 };
 use crate::records::models::RecallValue;
 use crate::schema::constants::UNHASHED_COLUMNS;
@@ -40,7 +40,7 @@ fn valued(mut buffer: Vec<u8>, value: &RecallValue) -> Vec<u8> {
     buffer
 }
 
-/// Hex BLAKE3 over every non-NULL named value except `ingested_at` and `content_hash`, by column name; a NULL column hashes like an absent one.
+/// The first 128 bits of a hex BLAKE3 over every non-NULL named value except `ingested_at` and `content_hash`, by column name; a NULL column hashes like an absent one.
 pub(crate) fn content_hash(values: &[(&str, RecallValue)]) -> String {
     let mut sorted: Vec<&(&str, RecallValue)> = values
         .iter()
@@ -53,5 +53,5 @@ pub(crate) fn content_hash(values: &[(&str, RecallValue)]) -> String {
         Vec::with_capacity(CONTENT_HASH_BUFFER_BYTES),
         |buffer, (name, value)| valued(framed(buffer, b'n', name.as_bytes()), value),
     );
-    blake3::hash(&encoded).to_hex().to_string()
+    blake3::hash(&encoded).to_hex()[..CONTENT_HASH_HEX].to_owned()
 }

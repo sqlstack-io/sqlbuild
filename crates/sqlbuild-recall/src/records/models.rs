@@ -61,6 +61,13 @@ impl RecallRow {
             _ => None,
         }
     }
+
+    /// Whether `stored` is this row's content digest, including a full-length digest an earlier version stored.
+    #[must_use]
+    pub fn same_content(&self, stored: &str) -> bool {
+        let written: &str = self.content_hash().unwrap_or_default();
+        !written.is_empty() && stored.starts_with(written)
+    }
 }
 
 /// What every row of one invocation carries.

@@ -26,3 +26,6 @@ pub(crate) const PLAN_REASON: &str = "plan";
 
 /// A plan only reads warehouse metadata, so it never takes a warehouse a viewer names; `run.warehouse` gates that for runs.
 pub(crate) const PLAN_IGNORED_SETTING: &str = "warehouse";
+
+/// Hex digits kept of a worker's invocation-namespaced Recall ID: 128 bits.
+pub(crate) const NAMESPACED_ID_HEX: usize = 32;

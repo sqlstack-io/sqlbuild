@@ -40,15 +40,15 @@ fn given_audit_evidence_settings_when_audits_complete_then_kept_evidence_is_an_a
 }
 
 #[test]
-fn given_statements_sharing_sql_and_a_failed_one_when_recorded_then_text_is_stored_once_and_every_statement_is_referenced()
+fn given_statements_sharing_sql_and_a_failed_one_when_recorded_then_each_text_is_stored_and_referenced_once()
  {
     let test_cases = [FailedStatementTestCase {
-        description: "two texts, three references, no conflict",
+        description: "two texts, one reference each; failed SQL is written first, so it names the shared text",
         expected_rows: vec![vec![
             RecallValue::Integer(2),
-            RecallValue::Integer(3),
+            RecallValue::Integer(2),
             RecallValue::Integer(0),
-            recall_text("s1,s2,s3"),
+            recall_text("s2,s3"),
         ]],
     }];
 

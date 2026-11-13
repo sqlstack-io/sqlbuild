@@ -63,6 +63,8 @@ pub(crate) const MARCH_BASED_JANUARY_INDEX: i64 = 10;
 pub const DROPPED_BEFORE_COLUMN: &str = "dropped_before";
 /// Initial capacity of the buffer a row's content hash is computed over.
 pub(crate) const CONTENT_HASH_BUFFER_BYTES: usize = 1_024;
+/// Hex digits kept of a row's content digest; rows stored before carry all 64, of which these are the prefix.
+pub(crate) const CONTENT_HASH_HEX: usize = 32;
 /// The origin of an invocation an integration such as Dagster started.
 pub const INTEGRATION_ORIGIN: &str = "integration";
 /// The origin of an invocation a CI system ran.

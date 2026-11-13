@@ -42,7 +42,7 @@ See the rows the audit flagged, which Recall keeps as the audit's evidence:
 ```bash
 sqb recall query \
   "SELECT r.text FROM audit_results a JOIN artifacts r
-     ON r.invocation_id = a.invocation_id AND r.ref_id = a.event_id
+     ON r.invocation_id = a.invocation_id AND r.digest = 'sha256:' || a.sample_digest
    WHERE a.audit_name = 'revenue_is_non_negative' AND a.outcome <> 'pass'
    ORDER BY a.invocation_started_at DESC LIMIT 1"
 ```
@@ -151,11 +151,11 @@ and `selection_truncated` is `1`, while `selection_count` still counts all of th
 When an audit warns or fails, Recall keeps its [evidence](/docs/concepts/audits#evidence): up to
 `evidence_limit` of the rows it flagged. `audit_results` counts them in `evidence_count`, sets
 `evidence_truncated` to `1` when the limit cut rows off, and names the stored rows by
-`sample_digest`. Read them from `artifacts`, joined on the audit's `event_id`:
+`sample_digest`. Read them from `artifacts`, joined on that digest:
 
 ```sql
 SELECT r.text FROM audit_results a JOIN artifacts r
-  ON r.invocation_id = a.invocation_id AND r.ref_id = a.event_id
+  ON r.invocation_id = a.invocation_id AND r.digest = 'sha256:' || a.sample_digest
 WHERE a.outcome <> 'pass'
 ```
 
@@ -336,7 +336,7 @@ in the store's SQL dialect, against these views:
 | `audit_results` | Evaluated audit, with its evidence count |
 | `events` | Lifecycle event |
 | `diagnostics` | Retained diagnostic |
-| `artifacts` | Reference from an invocation to captured SQL, with its text |
+| `artifacts` | Captured SQL or audit evidence an invocation used, with its text; join on `digest` |
 | `output_invocations` | Invocation's output, with completeness |
 | `output_transcripts` | Invocation's stdout, stderr, and combined output |
 | `output_tail` | Recent output chunk |
