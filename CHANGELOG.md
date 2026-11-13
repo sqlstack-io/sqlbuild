@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.222.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.221.0...v0.222.0) (2026-11-13)
+
+
+### Features
+
+* count definition changes and stop --changed at job edges ([#1458](https://github.com/sqlstack-io/sqlbuild/issues/1458)) ([442b9a8](https://github.com/sqlstack-io/sqlbuild/commit/442b9a8735e78ee8bac9d08be38738b7c4f871bf))
+
 ## [0.221.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.220.0...v0.221.0) (2026-11-13)
 
 
