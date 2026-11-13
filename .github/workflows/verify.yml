@@ -5,6 +5,10 @@ on:
     # Labelling a pull request `full-verify` (or removing the label) changes how much it runs.
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
+  # Nightly, main also runs the 5k and 10k-model compile jobs that pull requests and merge groups
+  # leave out, and opens or updates an issue when it fails.
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,12 +17,14 @@ permissions:
 # Each merge group has its own gh-readonly-queue ref, so queued groups never cancel each other; the
 # queue itself discards a group's run when it rebuilds the group. A push to a pull request cancels
 # its older run. Adding or removing any label other than `full-verify` starts a run in a group of its
-# own that verifies nothing, so it never cancels the pull request's real run.
+# own that verifies nothing, so it never cancels the pull request's real run. The nightly run has
+# its own group, so a manual run on main and the nightly never cancel each other.
 concurrency:
   group: >-
     verify-${{ github.workflow }}-${{ github.event.merge_group.head_ref || github.ref }}${{
     (github.event.action == 'labeled' || github.event.action == 'unlabeled')
-    && github.event.label.name != 'full-verify' && format('-label-{0}', github.run_id) || '' }}
+    && github.event.label.name != 'full-verify' && format('-label-{0}', github.run_id) || '' }}${{
+    github.event_name == 'schedule' && '-nightly' || '' }}
   cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 jobs:
@@ -41,6 +47,9 @@ jobs:
       wheels: ${{ steps.scope.outputs.wheels }}
       recovery: ${{ steps.scope.outputs.recovery }}
       ui: ${{ steps.scope.outputs.ui }}
+      cold_models: ${{ steps.tiers.outputs.cold_models }}
+      dense_models: ${{ steps.tiers.outputs.dense_models }}
+      cache_models: ${{ steps.tiers.outputs.cache_models }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -124,10 +133,13 @@ jobs:
           # required Verify status is posted only by the trusted release checks in
           # release-please.yml after the metadata, version and distribution checks pass; the
           # verify job below reports under another name on Release Please branches.
-          if [[ "${EVENT_NAME}" == "pull_request" \
+          # A merge group is judged by its content alone: one whose whole diff is release metadata
+          # carries only a release pull request whose product code already passed on main.
+          if { [[ "${EVENT_NAME}" == "merge_group" ]] \
+                || [[ "${EVENT_NAME}" == "pull_request" \
                 && "${HEAD_REPOSITORY}" == "${GITHUB_REPOSITORY}" \
-                && "${HEAD_REF}" == release-please--branches--* ]] && release_metadata_only; then
-            echo "Release Please pull request changes only release metadata; skipping the suites" \
+                && "${HEAD_REF}" == release-please--branches--* ]]; } && release_metadata_only; then
+            echo "The change is only release metadata; skipping the suites" \
               | tee -a "${GITHUB_STEP_SUMMARY}"
             write_scope false false false false false false false false false false false
             exit 0
@@ -169,6 +181,9 @@ jobs:
               *) ui_only=false ;;
             esac
             case "${path}" in
+              # Rust test crates and modules that only `cargo test` compiles; they are not in the
+              # native build identity and never reach a wheel.
+              crates/sqlbuild-cli/tests/*|crates/sqlbuild-orchestration/tests/*) ;;
               crates/*|ui/*|Cargo.toml|Cargo.lock|pyproject.toml|.github/workflows/verify.yml|.github/workflows/build-distributions.yml|deploy/Dockerfile|deploy/project/*|deploy/compose*|compose.yml|.dockerignore|Makefile|tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py|tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/*|benchmarks/duckshop/edge_cases/orchestration/container_deployment.json)
                 wheels=true
                 ;;
@@ -192,6 +207,10 @@ jobs:
                 ;;
             esac
             case "${path}" in
+              crates/sqlbuild-cli/tests/*|crates/sqlbuild-orchestration/tests/*)
+                # Native checks and the scheduler recovery suite run these tests; the Python,
+                # warehouse, wheel and timing suites cannot see them.
+                ;;
               crates/*|Cargo.toml|Cargo.lock|pyproject.toml|uv.lock)
                 broad=true
                 performance=true
@@ -278,12 +297,33 @@ jobs:
             "${recovery}" \
             "${ui}"
 
+      # Pull requests and merge groups run the 3k-model compile jobs and the 1k dense job; the
+      # nightly run and manual runs add 5k and 10k. Budgets and ratio gates are the same in both.
+      - name: Choose the compile-performance model counts
+        id: tiers
+        env:
+          ALL: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
+        run: |
+          if [[ "${ALL}" == "true" ]]; then
+            echo "cold_models=[3000, 5000, 10000]"
+            echo "dense_models=[1000, 3000, 5000, 10000]"
+            echo "cache_models=[3000, 5000, 10000]"
+          else
+            echo "cold_models=[3000]"
+            echo "dense_models=[1000, 3000]"
+            echo "cache_models=[3000]"
+          fi >> "${GITHUB_OUTPUT}"
+
       # Pull requests run the fast Linux core: static checks, unit and integration tests, native
       # workspace checks and the UI checks. The rest of the matrix (wheels, Compose, Windows, macOS,
       # DuckDB E2E, warehouse, compiler-golden and timing jobs) runs only once a pull request is
       # labelled `full-verify` and is not a draft, and always on merge groups and manual runs. A
       # run that leaves out suites its change needs reports under another name, so the required
-      # Verify stays missing and blocks the merge until the full matrix has passed.
+      # Verify stays missing and blocks the merge until the full matrix has passed. When the
+      # repository variable SQLBUILD_MERGE_QUEUE is true, the merge queue runs the full matrix on
+      # every group before it merges, so a passing fast core reports as Verify and each pull
+      # request runs the heavy suites once, in the queue. Unsetting the variable restores the old
+      # behaviour.
       - name: Choose the fast core or the full matrix
         id: depth
         env:
@@ -297,7 +337,7 @@ jobs:
           partial=false
           if [[ "${FULL}" != "true" && "${HEAVY_SELECTED}" == "true" ]]; then
             partial=true
-            echo "Fast core only: label the pull request full-verify to run the full matrix Verify needs" \
+            echo "Fast core only: the full-verify label, or the merge queue when it verifies groups, runs the full matrix" \
               | tee -a "${GITHUB_STEP_SUMMARY}"
           fi
           {
@@ -747,7 +787,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        models: [3000, 5000, 10000]
+        models: ${{ fromJSON(needs.changes.outputs.cold_models) }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-uv
@@ -799,7 +839,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        models: [1000, 3000, 5000, 10000]
+        models: ${{ fromJSON(needs.changes.outputs.dense_models) }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-uv
@@ -949,7 +989,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        models: [3000, 5000, 10000]
+        models: ${{ fromJSON(needs.changes.outputs.cache_models) }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-uv
@@ -1150,6 +1190,11 @@ jobs:
       retention-days: 3
       # Release Distributions builds and smoke tests the slower dist profile for every release.
       cargo-profile: release
+      # Pull requests and merge groups build the wheel Compose installs; manual runs build every
+      # platform, and Release Distributions builds every platform for each release.
+      platforms: >-
+        ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+        && 'linux-x86_64' || '' }}
 
   compose:
     name: Packaged Compose lifecycle
@@ -1207,15 +1252,16 @@ jobs:
     # metadata-only pass can never satisfy Verify first; a skipped job would count as passing, so
     # the job always runs and only its name changes. Until those checks post Verify on the head,
     # the pull request waits for an expected check, and every new push to the branch waits again.
-    # The same holds for a fast-core run that leaves out suites its change needs, and for a run
-    # started by an unrelated label: neither reports as Verify.
+    # The same holds for a run started by an unrelated label, and for a fast-core run that leaves
+    # out suites its change needs, unless the merge queue (SQLBUILD_MERGE_QUEUE) runs them.
     name: >-
       ${{ (github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
       && startsWith(github.event.pull_request.head.ref, 'release-please--branches--'))
       && 'Release pull request suites'
       || ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify') && 'Label change (nothing verified)'
-      || needs.changes.outputs.partial == 'true' && 'Fast core (label full-verify for Verify)'
+      || needs.changes.outputs.partial == 'true' && vars.SQLBUILD_MERGE_QUEUE != 'true'
+      && 'Fast core (label full-verify for Verify)'
       || 'Verify' }}
     if: always()
     needs:
@@ -1349,7 +1395,41 @@ jobs:
               fi
             done
           else
-            echo "Fast core passed; the full matrix runs once the pull request is labelled full-verify"
+            echo "Fast core passed; the full matrix runs on full-verify, or in the merge queue when it verifies groups"
             exit 0
           fi
           echo "All path-relevant verification jobs passed"
+
+  report_nightly:
+    name: Report nightly failure
+    needs: verify
+    if: ${{ !cancelled() && github.event_name == 'schedule' && needs.verify.result == 'failure' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the nightly Verify issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          LABEL: nightly-verify
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "Nightly Verify failed at ${GITHUB_SHA} on main."
+            echo
+            echo "Run: ${RUN_URL}"
+            echo
+            echo "The nightly run adds the 5k and 10k-model compile jobs and every wheel platform."
+          } > report.md
+          gh label create "${LABEL}" --color B60205 \
+            --description "The nightly Verify run on main failed" 2>/dev/null || true
+          issue="$(gh issue list --label "${LABEL}" --state open --limit 1 \
+            --json number --jq '.[0].number // empty')"
+          if [[ -n "${issue}" ]]; then
+            gh issue comment "${issue}" --body-file report.md
+            echo "Updated issue #${issue}" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            gh issue create --title "Nightly Verify failed on main" \
+              --label "${LABEL}" --body-file report.md
+          fi
