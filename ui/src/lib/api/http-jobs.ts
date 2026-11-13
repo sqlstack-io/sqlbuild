@@ -129,18 +129,23 @@ function cursorMovedAt(state: Wire['PersonSensorState'], history: TriggerStateEv
 	return times.length ? times.reduce((a, b) => (Date.parse(a) >= Date.parse(b) ? a : b)) : null;
 }
 
+/** A calendar is running out of dates once its last one is this close, as the server judges it. */
+const CALENDAR_LOW_MS = 24 * 60 * 60 * 1000;
+
 export function triggerDetailOf(
 	trigger: Trigger,
 	wire: Wire['PersonTriggerRecord'],
 	ticks: Tick[],
 	history: TriggerStateEvent[],
-	state: Wire['PersonSensorState'] | null = null
+	state: Wire['PersonSensorState'] | null = null,
+	now = Date.now()
 ): TriggerDetail {
 	const d = wire.definition_json;
 	const evaluations = state?.evaluations.map(toEvaluation) ?? null;
 	const lastEvaluatedFingerprint = state?.evaluations[0]?.definition_fingerprint ?? null;
 	const calendar = isSchedule(d) && d.schedule.kind === 'calendar' ? d.schedule : null;
 	const stored = calendar ? calendar.times.map(Date.parse) : [];
+	const last = stored.length ? Math.max(...stored) : null;
 	return {
 		...trigger,
 		definitionChanged: !!state && lastEvaluatedFingerprint !== null && lastEvaluatedFingerprint !== state.definition_fingerprint,
@@ -151,11 +156,12 @@ export function triggerDetailOf(
 		upcoming: isSchedule(d) ? wire.upcoming : null,
 		calendar: calendar && {
 			horizon: null,
-			storedUntil: stored.length ? new Date(Math.max(...stored)).toISOString() : null,
+			storedUntil: last === null ? null : new Date(last).toISOString(),
 			lastRefreshedAt: null,
 			nextRefreshAt: calendar.refresh_at,
-			lowHorizonWarningBelow: null,
-			low: false
+			// The server warns when a calendar's last date is a day away or less.
+			lowHorizonWarningBelow: '1 day of dates',
+			low: last === null || last <= now + CALENDAR_LOW_MS
 		},
 		sensor: isSchedule(d)
 			? null

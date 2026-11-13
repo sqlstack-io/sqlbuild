@@ -188,8 +188,11 @@ describe('schedule due times', () => {
 	const calendar = trigger('t-cal', 'business_days', 'orders', { description: 'Business days', job_key: 'orders', schedule: { kind: 'calendar', times, refresh_at: '2026-11-08T00:00:00Z' } });
 	const detailOf = (wire: W['PersonTriggerRecord']) => triggerDetailOf(toTrigger(wire, [], null), wire, [], []);
 
-	it('reports the last stored calendar time and the next refresh', () => {
-		expect(detailOf(calendar).calendar).toMatchObject({ storedUntil: '2026-11-10T09:00:00.000Z', nextRefreshAt: '2026-11-08T00:00:00Z', horizon: null, low: false });
+	it('reports the last stored calendar time, the next refresh, and whether it is running out of dates', () => {
+		const at = (now: string) => triggerDetailOf(toTrigger(calendar, [], null), calendar, [], [], null, Date.parse(now)).calendar;
+		expect(at('2026-11-08T12:00:00Z')).toMatchObject({ storedUntil: '2026-11-10T09:00:00.000Z', nextRefreshAt: '2026-11-08T00:00:00Z', horizon: null, low: false });
+		// The last date is 23 hours away: under the server's one-day warning.
+		expect(at('2026-11-09T10:00:00Z')).toMatchObject({ low: true, lowHorizonWarningBelow: '1 day of dates' });
 		expect(detailOf(daily).calendar).toBeNull();
 	});
 

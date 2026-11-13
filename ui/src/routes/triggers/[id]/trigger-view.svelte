@@ -124,7 +124,7 @@
 					<h3 title="Calendar horizon">Calendar</h3>
 					<dl>
 						{#if t.calendar.horizon}<div><dt>Worked out ahead</dt><dd>{t.calendar.horizon}</dd></div>{/if}
-						<div><dt>Known until</dt><dd class:warn={t.calendar.low}>{t.calendar.storedUntil ? formatStamp(t.calendar.storedUntil) : 'no times stored'}</dd></div>
+						<div><dt>Known until</dt><dd class:warn={t.calendar.low}>{#if t.calendar.storedUntil}{formatStamp(t.calendar.storedUntil)} <span class="faint">{formatIn(t.calendar.storedUntil, app.now)}</span>{:else}no times stored{/if}</dd></div>
 						{#if t.calendar.lastRefreshedAt}<div><dt>Last updated</dt><dd>{formatAgo(t.calendar.lastRefreshedAt, app.now)}</dd></div>{/if}
 						{#if t.calendar.nextRefreshAt}<div><dt>Next update</dt><dd title={formatStamp(t.calendar.nextRefreshAt)}>{Date.parse(t.calendar.nextRefreshAt) > app.now ? formatIn(t.calendar.nextRefreshAt, app.now) : `due ${formatAgo(t.calendar.nextRefreshAt, app.now)}`}</dd></div>{/if}
 						{#if t.calendar.lowHorizonWarningBelow}<div><dt>Warns when under</dt><dd>{t.calendar.lowHorizonWarningBelow}</dd></div>{/if}
