@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.221.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.220.0...v0.221.0) (2026-11-13)
+
+
+### Features
+
+* **orchestration:** job owner, skip overlap and on_failure retries ([#1453](https://github.com/sqlstack-io/sqlbuild/issues/1453)) ([dba15f4](https://github.com/sqlstack-io/sqlbuild/commit/dba15f456a52b2672987504703945a18d2fcc55a))
+
 ## [0.220.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.219.0...v0.220.0) (2026-11-13)
 
 
