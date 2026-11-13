@@ -1,5 +1,6 @@
+use crate::consumption::constants::RECENT_EXECUTIONS;
 use crate::consumption::models::ChangeKind::{Definition, SourceData};
-use crate::consumption::models::{ChangedOutcome, RunReason};
+use crate::consumption::models::{ChangedOutcome, ForcedRun, RunReason};
 use crate::consumption::tests::helpers::{
     JOB_A, JOB_B, after, reads_held, refreshed_by, runs, streaming, two_jobs,
 };
@@ -37,6 +38,27 @@ fn given_recorded_builds_when_deciding_changed_then_counts_and_reach_pick_what_r
     let mut propagated = two_jobs();
     propagated.build(&["stg_orders", "int_orders"]);
     let two_jobs = two_jobs();
+    let mut both_redefined = Scenario::new(&[
+        ("stg_a", &["src_a"]),
+        ("stg_b", &["src_b"]),
+        ("joined", &["stg_b", "stg_a"]),
+    ]);
+    both_redefined.build(&["stg_a", "stg_b", "joined"]);
+    both_redefined.redefine("stg_a", "v2");
+    both_redefined.redefine("stg_b", "v2");
+    both_redefined.build(&["stg_a", "stg_b"]);
+    let mut renamed = streaming();
+    renamed.force("fct_events", ForcedRun::PlannerChange("renamed".to_owned()));
+    let mut deep = Scenario::new(&[
+        ("raw_copy", &["src_events"]),
+        ("stg_events", &["raw_copy"]),
+        ("daily", &["stg_events"]),
+    ]);
+    deep.build(&["raw_copy", "stg_events", "daily"]);
+    for batch in 0..=RECENT_EXECUTIONS {
+        deep.new_data("src_events", &format!("d{batch}"));
+        deep.build(&["raw_copy", "stg_events"]);
+    }
     let test_cases = [
         DecideTestCase {
             description: "an upstream rebuilt with only new data stays out of --changed",
@@ -189,6 +211,45 @@ fn given_recorded_builds_when_deciding_changed_then_counts_and_reach_pick_what_r
                 ("fct_revenue", refreshed_by("job_b")),
                 ("dim_dates", ChangedOutcome::Unchanged),
                 ("summary", reads_held("fct_revenue")),
+            ],
+        },
+        DecideTestCase {
+            description: "a node runs when any job holding one of its changes contains it, whatever the input order",
+            outcomes: both_redefined.decide(
+                &[Definition],
+                Some(&[("job_a", &["stg_a", "joined"]), ("job_b", &["stg_b"])]),
+            ),
+            expected_outcomes: vec![
+                ("stg_a", ChangedOutcome::Unchanged),
+                ("stg_b", ChangedOutcome::Unchanged),
+                (
+                    "joined",
+                    runs(RunReason::UpstreamDefinitionChanged(
+                        "model:stg_b".to_owned(),
+                    )),
+                ),
+            ],
+        },
+        DecideTestCase {
+            description: "a planner change that is not a definition edit runs even when only source data counts",
+            outcomes: renamed.decide(&[SourceData], None),
+            expected_outcomes: vec![
+                ("stg_events", ChangedOutcome::Unchanged),
+                (
+                    "fct_events",
+                    runs(RunReason::Forced(ForcedRun::PlannerChange(
+                        "renamed".to_owned(),
+                    ))),
+                ),
+            ],
+        },
+        DecideTestCase {
+            description: "new data through a chain rebuilt more often than the recent window is still not a change",
+            outcomes: deep.decide(&[Definition], None),
+            expected_outcomes: vec![
+                ("raw_copy", ChangedOutcome::Unchanged),
+                ("stg_events", ChangedOutcome::Unchanged),
+                ("daily", ChangedOutcome::Unchanged),
             ],
         },
     ];

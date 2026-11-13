@@ -7,7 +7,7 @@ use crate::consumption::constants::NODE_INPUT;
 use crate::consumption::models::{ConsumptionHistory, NodeFacts, RelationKey};
 
 /// Upstream executions that builds in `history` read but `history` lacks, by the upstream's relation.
-pub fn unread_references(
+pub(crate) fn unread_references(
     history: &ConsumptionHistory,
     nodes: &[NodeFacts],
 ) -> BTreeMap<RelationKey, BTreeSet<String>> {

@@ -11,13 +11,12 @@ use sqlbuild_state::consumption::constants::RECENT_EXECUTIONS;
 use sqlbuild_state::consumption::main::changed_run_set::changed_run_set;
 use sqlbuild_state::consumption::main::consumed_inputs::consumed_inputs;
 use sqlbuild_state::consumption::main::consumption_history::consumption_history;
+use sqlbuild_state::consumption::main::read_back_history::read_back_history;
 use sqlbuild_state::consumption::main::started_append::started_append;
 use sqlbuild_state::consumption::main::succeeded_appends::succeeded_appends;
-use sqlbuild_state::consumption::main::unread_references::unread_references;
-use sqlbuild_state::consumption::main::with_referenced::with_referenced;
 use sqlbuild_state::consumption::models::{
     ChangedOutcome, ChangedPolicy, ConsumptionAppend, ConsumptionHistory, ConsumptionRow,
-    ForcedRun, HeldBack, InputFact, NodeFacts, NodeKey, RunReason,
+    ForcedRun, HeldBack, InputFact, NodeFacts, NodeKey, Reach, RelationKey, RunReason,
 };
 use uuid::Uuid;
 
@@ -364,7 +363,7 @@ pub(crate) fn preview_changed(
     Ok((changed_decision(&facts, &history, policy), warnings))
 }
 
-/// Recent executions the build reads, with older ones read back when one kind of change counts.
+/// Recent executions the build reads, with older ones read back when deciding needs them.
 fn read_history(
     py: Python<'_>,
     connection: &ConsumptionConnection,
@@ -382,7 +381,7 @@ fn read_history(
         }
     }
     let history: ConsumptionHistory = consumption_history(&rows, RECENT_EXECUTIONS);
-    if policy.is_some_and(|policy| policy.counts.len() == 1) {
+    if policy.is_some_and(needs_read_back) {
         let (history, read_back): (ConsumptionHistory, Vec<String>) =
             with_read_back(py, connection, history, &facts.nodes);
         warnings.extend(read_back);
@@ -419,24 +418,43 @@ fn changed_decision(
     }
 }
 
-/// `history` plus the older upstream executions its builds read; unreadable ones count as changed.
+/// Whether deciding needs older executions: to tell definition from data, or to attribute a change.
+fn needs_read_back(policy: &ChangedPolicy) -> bool {
+    policy.counts.len() == 1 || matches!(policy.reach, Reach::Job(_))
+}
+
+/// `history` plus every older upstream execution its builds read, followed back until none is left.
 fn with_read_back(
     py: Python<'_>,
     connection: &ConsumptionConnection,
     history: ConsumptionHistory,
     nodes: &[NodeFacts],
 ) -> (ConsumptionHistory, Vec<String>) {
-    let mut warnings: Vec<String> = Vec::new();
-    let mut by_location: BTreeMap<Location, Vec<String>> = BTreeMap::new();
-    for (relation, ids) in unread_references(&history, nodes) {
+    let mut warnings: BTreeSet<String> = BTreeSet::new();
+    let history: ConsumptionHistory = read_back_history(history, nodes, |references| {
+        let (rows, failures) = read_references(py, connection, references);
+        warnings.extend(failures);
+        rows
+    });
+    (history, warnings.into_iter().collect())
+}
+
+/// The rows of these executions; a schema that cannot be read leaves its rebuilds counted.
+fn read_references(
+    py: Python<'_>,
+    connection: &ConsumptionConnection,
+    references: &[(RelationKey, String)],
+) -> (Vec<ConsumptionRow>, Vec<String>) {
+    let mut by_location: BTreeMap<Location, Vec<&str>> = BTreeMap::new();
+    for (relation, id) in references {
         by_location
-            .entry(Location::of(&relation))
+            .entry(Location::of(relation))
             .or_default()
-            .extend(ids);
+            .push(id.as_str());
     }
     let mut rows: Vec<ConsumptionRow> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
     for (location, ids) in by_location {
-        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
         match connection.read_executions(py, &location, &ids) {
             Ok(read) => rows.extend(read),
             Err(error) => warnings.push(format!(
@@ -445,7 +463,7 @@ fn with_read_back(
             )),
         }
     }
-    (with_referenced(history, &rows), warnings)
+    (rows, warnings)
 }
 
 /// Why `--changed` holds a node back, as one line for verbose output.

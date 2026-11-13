@@ -232,7 +232,8 @@ STG_ORDERS_REDEFINED: str = (
                 "job finance_daily",
                 "reads fct_revenue, which is held back",
             ),
-            expected_reach_all=frozenset({"fct_revenue", "rpt_pnl", "summary"}),
+            expected_job_run=frozenset({"fct_revenue", "rpt_pnl"}),
+            expected_reach_all=frozenset({"summary"}),
         )
     ],
     ids=lambda case: case.description,
@@ -254,6 +255,9 @@ def test_given_scheduled_jobs_when_building_with_changed_then_a_change_stops_at_
     )
     redefined, build_output = changed_build_output(project_dir, ("--changed",))
     held: frozenset[str] = run_changed_build(project_dir, ("--changed",))
+    job_run: frozenset[str] = run_changed_build(
+        project_dir, ("--changed", "--select", "finance_daily")
+    )
     reach_all: frozenset[str] = run_changed_build(project_dir, ("--changed", "--reach", "all"))
     refused: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build", "--reach", "all"), project_dir=project_dir
@@ -269,6 +273,7 @@ def test_given_scheduled_jobs_when_building_with_changed_then_a_change_stops_at_
     for line in test_case.expected_plan_lines:
         assert line in plan.stdout, plan.stdout
     assert held == frozenset(), "held-back models wait for their job, not the next --changed"
+    assert job_run == test_case.expected_job_run, "running a job never holds back its own models"
     assert reach_all == test_case.expected_reach_all
     assert refused.returncode != 0
     assert "--reach needs --changed" in refused.stdout + refused.stderr

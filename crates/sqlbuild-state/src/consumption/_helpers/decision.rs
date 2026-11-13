@@ -4,7 +4,9 @@ use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 
 use crate::consumption::_helpers::history::Window;
-use crate::consumption::constants::{NODE_INPUT, OPAQUE_INPUT, SOURCE_INPUT};
+use crate::consumption::constants::{
+    DEFINITION_PLANNER_CHANGES, NODE_INPUT, OPAQUE_INPUT, SOURCE_INPUT,
+};
 use crate::consumption::models::{
     ChangeKind, ChangedOutcome, ChangedPolicy, ConsumptionHistory, ForcedRun, HeldBack, InputFact,
     NodeFacts, NodeKey, Reach, RelationKey, RunReason,
@@ -117,7 +119,7 @@ fn node_status<'a>(
     context: &Context<'a>,
     state: &HashMap<&'a NodeKey, Status<'a>>,
 ) -> Status<'a> {
-    let own: Option<Change> = own_change(node, context);
+    let own: Vec<Change> = own_changes(node, context);
     let mut groups: BTreeSet<Vec<&'a str>> = BTreeSet::new();
     let mut running: Option<&NodeKey> = None;
     let mut held: Option<&NodeKey> = None;
@@ -141,16 +143,11 @@ fn node_status<'a>(
             Some(Status::Unaffected) | None => {}
         }
     }
-    let reason: Option<RunReason> = match (own, running) {
-        (Some(change), _) => {
-            let origin: &NodeKey = change
-                .origin
-                .as_ref()
-                .and_then(|key| context.by_key.get(key).map(|facts| &facts.key))
-                .unwrap_or(&node.key);
-            groups.insert(context.triggered.get(origin).cloned().unwrap_or_default());
-            Some(change.reason)
-        }
+    for change in &own {
+        groups.insert(holding_jobs(node, change, context));
+    }
+    let reason: Option<RunReason> = match (own.into_iter().next(), running) {
+        (Some(change), _) => Some(change.reason),
         (None, Some(upstream)) => Some(RunReason::UpstreamRuns(upstream.clone())),
         (None, None) if held.is_some() => None,
         (None, None) => return Status::Unaffected,
@@ -173,31 +170,45 @@ fn node_status<'a>(
     }
 }
 
-/// The first reason the node's own facts or records give that always counts or has a counted kind.
-fn own_change(node: &NodeFacts, context: &Context<'_>) -> Option<Change> {
-    for forced in &node.forced {
-        let kind: Option<ChangeKind> = match forced {
-            ForcedRun::PlannerChange(_) => Some(ChangeKind::Definition),
-            _ => None,
-        };
-        if counted(kind, context.counts) {
-            return Some(Change {
-                reason: RunReason::Forced(forced.clone()),
-                kind,
-                origin: None,
-            });
-        }
-    }
+/// The triggered jobs of the node a change came from, which hold that change.
+fn holding_jobs<'a>(node: &'a NodeFacts, change: &Change, context: &Context<'a>) -> Vec<&'a str> {
+    let origin: &NodeKey = change
+        .origin
+        .as_ref()
+        .and_then(|key| context.by_key.get(key).map(|facts| &facts.key))
+        .unwrap_or(&node.key);
+    context.triggered.get(origin).cloned().unwrap_or_default()
+}
+
+/// Every reason the node's own facts or records give that always counts or has a counted kind.
+fn own_changes(node: &NodeFacts, context: &Context<'_>) -> Vec<Change> {
+    let mut changes: Vec<Change> = node
+        .forced
+        .iter()
+        .map(|forced| Change {
+            reason: RunReason::Forced(forced.clone()),
+            kind: forced_kind(forced),
+            origin: None,
+        })
+        .collect();
     let history: &ConsumptionHistory = context.history;
-    let Some(window) = history.window(&node.relation) else {
-        return Some(always(RunReason::NoRecord));
-    };
-    if window.ambiguous {
-        return Some(always(RunReason::AmbiguousOrder));
+    match history.window(&node.relation) {
+        None => changes.push(always(RunReason::NoRecord)),
+        Some(window) if window.ambiguous => changes.push(always(RunReason::AmbiguousOrder)),
+        Some(window) => changes.extend(execution_changes(node, context, &window)),
     }
-    execution_changes(node, context, &window)
-        .into_iter()
-        .find(|change| counted(change.kind, context.counts))
+    changes.retain(|change| counted(change.kind, context.counts));
+    changes
+}
+
+/// A planner change of the definition itself counts as Definition; every other forced run always counts.
+fn forced_kind(forced: &ForcedRun) -> Option<ChangeKind> {
+    match forced {
+        ForcedRun::PlannerChange(kind) if DEFINITION_PLANNER_CHANGES.contains(&kind.as_str()) => {
+            Some(ChangeKind::Definition)
+        }
+        _ => None,
+    }
 }
 
 /// True when none of the jobs holding a change refresh the node.
@@ -352,6 +363,9 @@ fn compare_executions(
     let here: Moved = Some(Some(relation.clone()));
     if before.version_hash != after.version_hash {
         return here;
+    }
+    if after.inputs.iter().any(|input| input.kind == OPAQUE_INPUT) {
+        return None;
     }
     let before_nodes: usize = before
         .inputs

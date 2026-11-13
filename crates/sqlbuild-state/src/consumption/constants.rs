@@ -40,6 +40,9 @@ pub const SOURCE_INPUT: &str = "source";
 pub const NODE_INPUT: &str = "node";
 /// Input kind of anything whose version cannot be known.
 pub const OPAQUE_INPUT: &str = "opaque";
+/// Planner change kinds that are edits of the node's own definition.
+pub const DEFINITION_PLANNER_CHANGES: [&str; 3] =
+    ["query_changed", "function_changed", "config_changed"];
 /// The version recorded for an input whose current version is unknown.
 pub const UNKNOWN_VERSION: &str = "unknown";
 /// Executions read per relation, newest first.

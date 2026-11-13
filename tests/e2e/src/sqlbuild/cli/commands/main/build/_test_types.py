@@ -1604,4 +1604,5 @@ class ChangedReachE2ETestCase:
     expected_redefined: frozenset[str]
     expected_summary: str
     expected_plan_lines: tuple[str, ...]
+    expected_job_run: frozenset[str]
     expected_reach_all: frozenset[str]

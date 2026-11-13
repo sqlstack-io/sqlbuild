@@ -196,23 +196,26 @@ pub(crate) fn load_project_config_file(
 
 /// `[git] base_ref` of the project at `project_dir`, which `--since @base` names.
 pub(crate) fn configured_git_base_ref(project_dir: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    let files = files(project_dir)?;
-    load_git_base_ref(&files.native)
-        .or_else(|failure| Err(load_error(project_dir.py(), &failure, &files)?))
+    configured(project_dir, load_git_base_ref)
 }
 
 /// `[review]` of the project at `project_dir`: the defaults `sqb review` falls back to.
 pub(crate) fn configured_review(project_dir: &Bound<'_, PyAny>) -> PyResult<ReviewConfig> {
-    let files = files(project_dir)?;
-    load_review_config(&files.native)
-        .or_else(|failure| Err(load_error(project_dir.py(), &failure, &files)?))
+    configured(project_dir, load_review_config)
 }
 
 /// `[changes]` of the project at `project_dir`: what `--changed` counts and reaches by default.
 pub(crate) fn configured_changes(project_dir: &Bound<'_, PyAny>) -> PyResult<ChangesConfig> {
-    let files = files(project_dir)?;
-    load_changes_config(&files.native)
-        .or_else(|failure| Err(load_error(project_dir.py(), &failure, &files)?))
+    configured(project_dir, load_changes_config)
+}
+
+/// One configuration section of the project at `project_dir`, with load failures raised as Python's.
+fn configured<T>(
+    project_dir: &Bound<'_, PyAny>,
+    load: fn(&ConfigPaths) -> Result<T, LoadFailure>,
+) -> PyResult<T> {
+    let files: Files<'_> = files(project_dir)?;
+    load(&files.native).or_else(|failure| Err(load_error(project_dir.py(), &failure, &files)?))
 }
 
 /// `load_local_config`: the validated `LocalConfig` of `project_dir`, or the default.

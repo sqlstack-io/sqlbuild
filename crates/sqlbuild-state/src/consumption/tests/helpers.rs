@@ -8,10 +8,9 @@ use crate::consumption::constants::RECENT_EXECUTIONS;
 use crate::consumption::main::changed_run_set::changed_run_set;
 use crate::consumption::main::consumed_inputs::consumed_inputs;
 use crate::consumption::main::consumption_history::consumption_history;
+use crate::consumption::main::read_back_history::read_back_history;
 use crate::consumption::main::started_append::started_append;
 use crate::consumption::main::succeeded_appends::succeeded_appends;
-use crate::consumption::main::unread_references::unread_references;
-use crate::consumption::main::with_referenced::with_referenced;
 use crate::consumption::models::TriggeredJob;
 use crate::consumption::models::{
     ChangeKind, ChangedOutcome, ChangedPolicy, ConsumptionAppend, ConsumptionHistory,
@@ -661,25 +660,57 @@ impl Scenario {
         });
     }
 
+    /// The rows of each relation's newest executions, as the recent-executions read returns them.
+    fn recent_rows(&self) -> Vec<ConsumptionRow> {
+        let mut recent: HashMap<&RelationKey, Vec<&str>> = HashMap::new();
+        for row in self.rows.iter().rev() {
+            let ids: &mut Vec<&str> = recent.entry(&row.row.relation).or_default();
+            if !ids.contains(&row.row.execution_id.as_str()) && ids.len() < RECENT_EXECUTIONS {
+                ids.push(&row.row.execution_id);
+            }
+        }
+        self.rows
+            .iter()
+            .filter(|row| {
+                recent
+                    .get(&row.row.relation)
+                    .is_some_and(|ids| ids.contains(&row.row.execution_id.as_str()))
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// The recorded rows of these executions.
+    fn rows_of(&self, references: &[(RelationKey, String)]) -> Vec<ConsumptionRow> {
+        self.rows
+            .iter()
+            .filter(|row| {
+                references.contains(&(row.row.relation.clone(), row.row.execution_id.clone()))
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Run a model regardless of its records, as the planner does for `forced`.
+    pub(crate) fn force(&mut self, name: &str, forced: ForcedRun) {
+        for node in &mut self.nodes {
+            if node.key.name == name {
+                node.forced.push(forced.clone());
+            }
+        }
+    }
+
     /// What `--changed` does, reading recent rows and then the older executions they reference.
     pub(crate) fn decide(
         &self,
         counts: &[ChangeKind],
         jobs: Option<&[(&str, &[&str])]>,
     ) -> Vec<(String, ChangedOutcome)> {
-        let history: ConsumptionHistory = consumption_history(&self.rows, RECENT_EXECUTIONS);
-        let unread = unread_references(&history, &self.nodes);
-        let referenced: Vec<ConsumptionRow> = self
-            .rows
-            .iter()
-            .filter(|row| {
-                unread
-                    .get(&row.row.relation)
-                    .is_some_and(|ids| ids.contains(&row.row.execution_id))
-            })
-            .cloned()
-            .collect();
-        let history: ConsumptionHistory = with_referenced(history, &referenced);
+        let history: ConsumptionHistory = read_back_history(
+            consumption_history(&self.recent_rows(), RECENT_EXECUTIONS),
+            &self.nodes,
+            |references| self.rows_of(references),
+        );
         let reach: Reach = match jobs {
             None => Reach::All,
             Some(jobs) => Reach::Job(

@@ -94,8 +94,8 @@ This replaces the former `sqb run` command. The full lifecycle (tests + audits) 
 ## Building only what changed
 
 `--changed` builds the selected models and seeds that changed since they last built, and what
-they reach downstream. By default only definition changes count, and a change stops at models that
-another scheduled job refreshes:
+they reach downstream. From the command line only definition changes count by default, and a change
+stops at models that another scheduled job refreshes:
 
 ```bash
 sqb build --changed
@@ -130,6 +130,15 @@ counts = ["definition"]   # add "source_data" to count new source data
 reach = "job"             # or "all"
 ```
 
+Without `[changes] counts`, the default depends on how the build starts:
+
+| Build | Counts by default |
+|-------|-------------------|
+| `sqb build --changed` and `sqb plan --changed` | `definition` |
+| A job's run with `settings={'changed': True}`, started by a schedule, a sensor or by hand | `definition` and `source_data` |
+
+`[changes] counts` sets both, and a list after `--changed=` or in the job's settings overrides it.
+
 Write the kinds with `=`: `sqb build --changed definition` reads `definition` as a selector.
 
 A model or seed always runs, whatever counts, when:
@@ -139,6 +148,7 @@ A model or seed always runs, whatever counts, when:
 | It has no successful build on record | A new model |
 | Its last build did not finish | The build was killed or failed after the model started writing |
 | Its relation is missing, or `--full-refresh` or a cursor override applies | `sqb build --changed --full-refresh` |
+| The planner must rebuild it for a reason other than an edit to its definition | A renamed model |
 | What it reads can't be listed | SQL that reads relations not declared as sources or models, or a Python task or asset upstream |
 | An upstream needs to run, even when it is not selected | `sqb build customer_orders --changed` runs `customer_orders` until a changed `stg_orders` is built |
 
@@ -159,15 +169,19 @@ model is held back:
   group, for the target you build. A job nothing starts counts as no job.
 - A model held back by one job runs if another job that holds the change also contains it.
 - A model that reads a held-back model is held back too. Unchanged parents never hold a model back.
+- A job never holds back its own models while it runs: a scheduled run, or a build that selects the
+  job, such as `sqb build finance_daily --changed`.
 - With no scheduled jobs, everything downstream runs.
 
 `--reach all` builds everything downstream of a change. `--reach` without `--changed` is refused.
 
 ### In a scheduled job
 
-Set `settings={'changed': True}` to use the project's `[changes]` defaults, or name the kinds, such
-as `settings={'changed': ['definition', 'source_data']}`. Skipped and held-back models count as
-successful nodes of the run.
+Set `settings={'changed': True}` to count definition and source data changes, or what
+`[changes] counts` sets, or name the kinds, such as `settings={'changed': ['definition']}`. A
+sensor on new source data therefore still rebuilds its job's models. A job's run builds every
+changed model it selects, whatever its `reach` setting. Skipped models count as successful nodes
+of the run.
 
 A model that runs under `--changed` plans exactly as in a plain build: its
 [`replay_on_change`](../concepts/planning/replay-decisions.md) policy still decides how much

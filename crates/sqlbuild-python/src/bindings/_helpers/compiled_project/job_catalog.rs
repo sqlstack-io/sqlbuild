@@ -9,10 +9,14 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
+use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
-use sqlbuild_analysis::graph::models::{JobSelection, ProjectGraph};
+use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector, ProjectGraph};
 use sqlbuild_cli::native_commands::main::effective_target::effective_target;
 
+use crate::bindings::_helpers::compiled_project::constants::{
+    JOB_SELECTOR_KINDS, SELECTOR_INTERSECTION,
+};
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::discover_declarations;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     job_selections, triggered_job_names,
@@ -73,10 +77,11 @@ pub(crate) fn job_names(py: Python<'_>) -> PyResult<Vec<String>> {
         .unwrap_or_default())
 }
 
-/// Each job a schedule or sensor starts with its nodes on `graph`, skipping unresolved selections.
+/// Each job a schedule or sensor starts with the nodes it refreshes, less those of jobs `selectors` run.
 pub(crate) fn triggered_jobs(
     py: Python<'_>,
     graph: &ProjectGraph,
+    selectors: &[String],
 ) -> PyResult<Vec<(String, BTreeSet<ObjectKey>)>> {
     let Some((catalog, triggered)) = job_catalog(py)? else {
         return Ok(Vec::new());
@@ -84,15 +89,44 @@ pub(crate) fn triggered_jobs(
     if triggered.is_empty() {
         return Ok(Vec::new());
     }
+    let running: BTreeSet<String> = selected_jobs(selectors, &catalog);
     let mut graph: ProjectGraph = attach_jobs(graph.clone(), catalog);
     let mut resolved = graph.jobs.take().unwrap_or_default();
+    let mut running_nodes: BTreeSet<ObjectKey> = BTreeSet::new();
+    for name in &running {
+        if let Some(Ok(keys)) = resolved.get(name) {
+            running_nodes.extend(keys.iter().cloned());
+        }
+    }
     Ok(triggered
         .into_iter()
+        .filter(|name| !running.contains(name))
         .filter_map(|name| match resolved.remove(&name) {
-            Some(Ok(keys)) => Some((name, keys)),
+            Some(Ok(keys)) => Some((name, &keys - &running_nodes)),
             _ => None,
         })
         .collect())
+}
+
+/// The jobs `selectors` name, as `job:<name>` or as a bare job name.
+fn selected_jobs(
+    selectors: &[String],
+    catalog: &BTreeMap<String, JobSelection>,
+) -> BTreeSet<String> {
+    let mut jobs: BTreeSet<String> = BTreeSet::new();
+    let parts = selectors
+        .iter()
+        .flat_map(|selector| selector.split(char::is_whitespace))
+        .flat_map(|token| token.split(SELECTOR_INTERSECTION));
+    for part in parts {
+        let Ok(ParsedSelector::Kind { kind, value, .. }) = parse_selector(part) else {
+            continue;
+        };
+        if JOB_SELECTOR_KINDS.contains(&kind.as_str()) && catalog.contains_key(&value) {
+            jobs.insert(value);
+        }
+    }
+    jobs
 }
 
 fn job_catalog(py: Python<'_>) -> PyResult<Option<Catalog>> {

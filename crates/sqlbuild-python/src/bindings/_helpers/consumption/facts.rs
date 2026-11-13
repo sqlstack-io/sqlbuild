@@ -214,7 +214,7 @@ fn entry_forced(entry: &Bound<'_, PyAny>, full_refresh: bool) -> PyResult<Vec<Fo
     Ok(forced)
 }
 
-/// Facts of the selected models and seeds and of every model and seed they read from.
+/// Facts of the selected models and seeds and of every ancestor, which decides on its records alone.
 pub(crate) fn build_facts(
     (plan, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     (changed, full_refresh): (bool, bool),
@@ -271,10 +271,6 @@ pub(crate) fn build_facts(
         }
     }
     let sources: HashMap<String, Option<String>> = source_versions(plan)?;
-    let existing: BTreeSet<String> = native_field(plan, "existing_model_names")?
-        .try_iter()?
-        .map(|name| name?.extract())
-        .collect::<PyResult<_>>()?;
     let dialect: Option<String> = native_field(project, "sql_analysis_dialect")?.extract()?;
     let recorded: Bound<'_, PyAny> = native_field(plan, "recorded_fingerprints")?;
     let recorded_models: Bound<'_, PyAny> = if recorded.is_none() {
@@ -342,13 +338,7 @@ pub(crate) fn build_facts(
                 pending.push_back(upstream.clone());
             }
         }
-        let mut forced: Vec<ForcedRun> = match selected.get(&key) {
-            Some(forced) => forced.clone(),
-            None if key.kind == MODEL && !existing.contains(&key.name) => {
-                vec![ForcedRun::RelationMissing]
-            }
-            None => Vec::new(),
-        };
+        let mut forced: Vec<ForcedRun> = selected.get(&key).cloned().unwrap_or_default();
         let destination: Bound<'_, PyAny> = node.destination()?;
         let relation: Option<RelationKey> = (!native_field(&destination, "schema")?.is_none())
             .then(|| relation(&destination))

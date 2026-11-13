@@ -29,8 +29,11 @@ use crate::bindings::_helpers::compile_attachment::effective_config::build_effec
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
+use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
-use crate::bindings::_helpers::location_command::constants::COMMAND_IMPLEMENTATIONS;
+use crate::bindings::_helpers::location_command::constants::{
+    CHANGED_SETTING, COMMAND_IMPLEMENTATIONS, JOB_RUN_COUNTS, JOB_RUN_REACH, REACH_SETTING,
+};
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::session::InvocationRecall;
@@ -70,6 +73,27 @@ fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
     attached
 }
 
+/// A job run's `--changed` settings: its whole selection, and source data counted unless configured.
+fn job_run_settings(
+    project_dir: &Bound<'_, PyAny>,
+    mut settings: BTreeMap<String, Value>,
+) -> PyResult<BTreeMap<String, Value>> {
+    let Some(changed) = settings.get(CHANGED_SETTING).cloned() else {
+        return Ok(settings);
+    };
+    if changed == Value::Bool(false) {
+        return Ok(settings);
+    }
+    settings.insert(REACH_SETTING.to_owned(), Value::from(JOB_RUN_REACH));
+    if changed == Value::Bool(true) && configured_changes(project_dir)?.counts.is_none() {
+        settings.insert(
+            CHANGED_SETTING.to_owned(),
+            Value::from(JOB_RUN_COUNTS.to_vec()),
+        );
+    }
+    Ok(settings)
+}
+
 /// The frozen command's request and warehouse scope; build carries the verified inputs in its request.
 fn command_request<'py>(
     py: Python<'py>,
@@ -99,6 +123,9 @@ fn command_request<'py>(
         settings.insert(format!("end_cursor_{kind}"), serde_json::json!(end));
     }
     let command: RunCommand = frozen.command;
+    if frozen.job_key.is_some() {
+        settings = job_run_settings(&arguments.value("project_dir")?, settings)?;
+    }
     let flags: Vec<String> = if command == RunCommand::Build {
         job_settings_arguments(&settings)
     } else {

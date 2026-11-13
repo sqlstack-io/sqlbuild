@@ -37,6 +37,13 @@ pub(crate) const fn kind_value(kind: ChangeKind) -> &'static str {
     }
 }
 
+/// The request's `--select` selectors.
+fn selectors(request: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+    Ok(native_field(request, "select")?
+        .extract::<Option<Vec<String>>>()?
+        .unwrap_or_default())
+}
+
 /// A triggered job with its selected nodes as consumption keys.
 fn triggered_job((name, keys): (String, BTreeSet<ObjectKey>)) -> TriggeredJob {
     TriggeredJob {
@@ -86,7 +93,7 @@ pub(crate) fn changed_policy(
             let graph: PyRef<'_, NativeProjectGraph> =
                 native_field(project, "lineage_graph")?.extract()?;
             Reach::Job(
-                triggered_jobs(project.py(), graph.graph())?
+                triggered_jobs(project.py(), graph.graph(), &selectors(request)?)?
                     .into_iter()
                     .map(triggered_job)
                     .collect(),

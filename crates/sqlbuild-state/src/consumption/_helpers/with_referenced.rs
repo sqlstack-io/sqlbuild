@@ -4,7 +4,7 @@ use crate::consumption::_helpers::history::executions_of;
 use crate::consumption::models::{ConsumptionHistory, ConsumptionRow};
 
 /// `history` with the executions in `rows` added as read-back executions.
-pub fn with_referenced(
+pub(crate) fn with_referenced(
     mut history: ConsumptionHistory,
     rows: &[ConsumptionRow],
 ) -> ConsumptionHistory {
