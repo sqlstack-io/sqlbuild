@@ -31,8 +31,7 @@ pub(crate) async fn frozen_group_children(
             "group scope differs from its pinned membership".into(),
         ));
     }
-    let (transaction, writers) =
-        job_write_set(transaction, request.snapshot_id, &request.selection).await?;
+    let mut transaction = transaction;
     let mut children: Vec<RunRequest> = Vec::new();
     for name in group.jobs.keys() {
         let job = &definitions.jobs[name];
@@ -48,6 +47,9 @@ pub(crate) async fn frozen_group_children(
         if let Some(full_refresh) = request.settings.get(FULL_REFRESH_SETTING) {
             settings.insert(FULL_REFRESH_SETTING.into(), full_refresh.clone());
         }
+        let write_set;
+        (transaction, write_set) =
+            job_write_set(transaction, request.snapshot_id, (&selection, &settings)).await?;
         children.push(RunRequest {
             run_id: Uuid::new_v5(&request.run_id, name.as_bytes()),
             kind: RunKind::Job,
@@ -57,7 +59,7 @@ pub(crate) async fn frozen_group_children(
             rerun_of_run_id: request
                 .rerun_of_run_id
                 .map(|id| Uuid::new_v5(&id, name.as_bytes())),
-            write_set: selection.intersection(&writers).cloned().collect(),
+            write_set,
             selection,
             settings,
             concurrency_groups: job.concurrency_groups.clone(),

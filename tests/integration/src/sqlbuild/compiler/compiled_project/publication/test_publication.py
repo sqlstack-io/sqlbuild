@@ -1,9 +1,11 @@
 """Real compile, native transport, authenticated server and durable publication."""
 
 import json
+import os
 import socket
 import sqlite3
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -27,6 +29,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     TYPE_PROOF_FILES,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    PlainHttpWarningTestCase,
     SnapshotPublicationTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
@@ -303,3 +306,64 @@ def test_given_a_code_location_when_publishing_from_cli_then_compilation_isolate
         delivery_output: CaptureResult[str] = capsys.readouterr()
         assert "was published, but result delivery failed" in delivery_output.err
         assert current_snapshot(api, test_case.target)["record"]["generation"] == 3
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PlainHttpWarningTestCase(
+            description="a loopback server gets the token without a warning",
+            host="127.0.0.1",
+            expected_warnings=0,
+        ),
+        PlainHttpWarningTestCase(
+            description="a plain-HTTP server on another address is warned about once per process",
+            host="0.0.0.0",
+            expected_warnings=1,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_plain_http_server_when_a_location_publishes_then_only_a_non_loopback_origin_warns_once(
+    test_case: PlainHttpWarningTestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = tmp_path / "project"
+    write_files(
+        project_dir=project_dir,
+        files=TYPE_PROOF_FILES
+        | {
+            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
+            + '\n[targets.development]\nschema = "main"\n',
+        },
+    )
+    with snapshot_api(tmp_path / "control", server_arguments=("--host", "0.0.0.0")) as api:
+        result: subprocess.CompletedProcess[str] = subprocess.run(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--no-color",
+                "--project-dir",
+                str(project_dir),
+                "location",
+                "publish",
+                "--server",
+                f"http://{test_case.host}:{api.url.rpartition(':')[2]}",
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+                "--generation",
+                "1",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=os.environ
+            | {
+                "SQLBUILD_LOCATION_TOKEN": api.bearer,
+                "SQLBUILD_CONTROL_DATABASE_URL": "unsupported://must-not-open",
+            },
+        )
+    assert result.returncode == 0, result.stderr
+    assert api.bearer not in result.stderr
+    assert result.stderr.count("travels unencrypted over HTTP") == test_case.expected_warnings

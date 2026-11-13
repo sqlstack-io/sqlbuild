@@ -249,3 +249,10 @@ pub(crate) struct PreviousTriggerState {
     pub(crate) last_tick_for: Option<DateTime<Utc>>,
     pub(crate) status_override: Option<TriggerStatus>,
 }
+
+/// Each member job's waits, and why it waits: an explicit `after`, or the first lineage edge found.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct GroupWaits {
+    pub(crate) edges: BTreeMap<String, BTreeSet<String>>,
+    pub(crate) reasons: BTreeMap<(String, String), String>,
+}

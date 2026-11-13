@@ -65,6 +65,7 @@ fn person_event(
             Some(scopes.get(trigger_id).cloned()?)
         }
         PlatformEvent::LaunchFailed { run_id, .. } => Some(scopes.get(run_id).cloned()?),
+        PlatformEvent::RunFailed { .. } => return None,
         PlatformEvent::Heartbeat { .. } | PlatformEvent::SchedulerNoLeader => None,
     };
     let (location_id, target) = scope.map_or((None, None), |(location_id, target)| {

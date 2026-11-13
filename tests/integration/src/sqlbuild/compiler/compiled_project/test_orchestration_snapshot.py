@@ -888,6 +888,35 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             },
         ),
         SnapshotDiscoveryTestCase(
+            description="DuckShop layer jobs that share a function wait only by lineage",
+            files={
+                "orchestration/jobs.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/shared_function_layers.py"
+                ).read_text(),
+                "functions/sql/order_cents.sql": (
+                    "FUNCTION (description 'Amount in cents.',"
+                    " arguments (amount INTEGER), returns INTEGER);\nSELECT amount * 100\n"
+                ),
+                "models/stg_orders.sql": (
+                    "MODEL (description 'Staged orders.', tags [staging],\n"
+                    "  columns (order_id (type INTEGER), cents (type INTEGER)),\n"
+                    ");\n\n"
+                    "SELECT CAST(1 AS INTEGER) AS order_id,"
+                    ' __udf("order_cents")(CAST(5 AS INTEGER)) AS cents\n'
+                ),
+                "models/orders.sql": (
+                    "MODEL (description 'Typed orders.', tags [marts],\n"
+                    "  columns (order_id (type INTEGER), cents (type INTEGER)),\n"
+                    ");\n\n"
+                    'SELECT order_id, __udf("order_cents")(cents) AS cents\nFROM __ref("stg_orders")\n'
+                ),
+            },
+            expected_jobs=("marts_layer", "staging_layer"),
+            expected_groups={
+                "layered_orders": {"marts_layer": ["staging_layer"], "staging_layer": []}
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="explicit empty declarations do not execute project files",
             files={"orchestration/jobs.py": "raise RuntimeError('must not import')\n"},
             expected_jobs=(),
@@ -1250,7 +1279,10 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                 ),
             },
             expected_error=ValueError,
-            expected_message="group dependencies contain a cycle",
+            expected_message=re.escape(
+                "group dependencies contain a cycle in job group daily: marts waits for staging "
+                "(model:orders reads model:stg_orders); staging waits for marts (declared in after)"
+            ),
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="group waits cannot refer to nonmember jobs",

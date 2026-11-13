@@ -91,6 +91,7 @@ describe('toPlatformEventRecords', () => {
 			open,
 			[
 				{ storage_id: 9, event_id: 'e9', occurred_at: '2026-11-08T11:00:00Z', location_id: 'l1', target: 'development', event: { kind: 'launch_failed', run_id: 'r1', claim_id: 'c1', code: 'image_missing' } },
+				{ storage_id: 7, event_id: 'e7', occurred_at: '2026-11-08T10:30:00Z', event: { kind: 'run_failed', run_id: 'r2', run_kind: 'job', job_key: 'orders_daily', location_id: 'l1', target: 'development', outcome: 'failed', failed_nodes: [{ node_key: 'model:orders' }], failed_node_count: 1 } },
 				{ storage_id: 4, event_id: 'e4', occurred_at: '2026-11-08T10:00:00Z', event: { kind: 'scheduler_no_leader' } }
 			],
 			new Map([['l1:development', 'orders']])

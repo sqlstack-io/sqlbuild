@@ -1732,6 +1732,12 @@ symbols = ["PersonCredential", "LoginFlow"]
 reason = "Person credential and handoff models implement Debug manually to redact bearer, CSRF and approval secrets."
 
 [[targets.rust.rule_exceptions]]
+rule = "FPRSH011"
+path = "crates/sqlbuild-orchestration/src/api/_helpers/resources/plain_http.rs"
+symbols = ["warn_plain_http"]
+reason = "Locations, workers and remote publication share this client; it warns once per process on stderr, before any request, when a bearer token would travel over plain HTTP to a non-loopback host."
+
+[[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
 path = "crates/sqlbuild-orchestration/src/webhooks/models.rs"
 symbols = ["Webhook"]

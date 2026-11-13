@@ -597,6 +597,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const limit = query.limit ?? 200;
 			const wanted = (wire: Wire['PersonPlatformEvent']) =>
 				(query.locationId === undefined || (wire.location_id && wire.target ? locationKey(wire.location_id, wire.target) : null) === query.locationId) &&
+				wire.event.kind !== 'run_failed' &&
 				(!query.kinds?.length || query.kinds.includes(wire.event.kind));
 			/** Each scan skips the events the person may not see, so one can come back short; keep scanning until enough match. */
 			async function storedEvents(): Promise<Wire['PersonPlatformEvent'][]> {

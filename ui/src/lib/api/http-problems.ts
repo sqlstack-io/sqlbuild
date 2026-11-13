@@ -91,7 +91,7 @@ export function toPlatformHealth(problems: Wire['PlatformProblems']): PlatformHe
 
 /** Stored events newest first; an open problem marks the newest stored event of its kind and place as ongoing, or comes first when none was stored. */
 export function toPlatformEventRecords(open: PlatformEvent[], stored: Wire['PersonPlatformEvent'][], names: Map<string, string>): PlatformEventRecord[] {
-	const records = stored.map((wire) => storedRecord(wire, names));
+	const records = stored.flatMap((wire) => storedRecord(wire, names) ?? []);
 	const unmatched: PlatformEventRecord[] = [];
 	for (const event of open) {
 		const latest = records.find((r) => !r.active && r.kind === event.kind && r.locationId === event.locationId);
@@ -101,7 +101,8 @@ export function toPlatformEventRecords(open: PlatformEvent[], stored: Wire['Pers
 	return [...unmatched, ...records];
 }
 
-function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord {
+/** Null for `run_failed`, which only the platform webhook receives; person reads never return it. */
+function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord | null {
 	const key = wire.location_id && wire.target ? keyOf(wire.location_id, wire.target) : null;
 	const place = key && wire.target ? placeOf(names.get(key) ?? 'A location', wire.target) : null;
 	const base = { id: wire.event_id, occurredAt: wire.occurred_at, active: false, locationId: key, subject: place, resolvedAt: null, reactions: [] };
@@ -119,5 +120,7 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'critical', message: `A run in ${place ?? 'a location'} couldn't start (${event.code}).`, links: key ? [{ kind: 'run', id: event.run_id, locationId: key }] : [], payload: { code: event.code } };
 		case 'heartbeat':
 			return { ...base, kind: event.kind, severity: 'info', message: 'A server checked in.', links: [], payload: {} };
+		case 'run_failed':
+			return null;
 	}
 }

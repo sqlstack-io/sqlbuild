@@ -5,6 +5,9 @@ pub const PLATFORM_WEBHOOK_VARIABLE: &str = "SQLBUILD_PLATFORM_WEBHOOK_URL";
 
 pub(crate) const PLATFORM_EVENT_PAGE_SIZE: i64 = 100;
 
+/// A run-failure event names at most this many failed nodes and reports the full count beside them.
+pub(crate) const RUN_FAILURE_NODE_LIMIT: i64 = 20;
+
 /// Replica heartbeats older than this are pruned; a day's date-scoped invocation is complete by then.
 pub(crate) const HEARTBEAT_RETENTION_DAYS: i64 = 2;
 

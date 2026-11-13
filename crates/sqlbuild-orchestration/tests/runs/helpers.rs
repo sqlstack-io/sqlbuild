@@ -135,7 +135,7 @@ pub(crate) fn json_column(value: &Value) -> Value {
     })
 }
 
-/// A publication of two models, a seed and a source, with one person per role under test.
+/// Two models, a seed, a read-only source, a loaded customers source and one person per role under test.
 pub(crate) async fn adhoc_fixture(
     store: &ControlStore,
     context: &AuditContext,
@@ -153,6 +153,14 @@ pub(crate) async fn adhoc_fixture(
     .into_iter()
     .map(published_node)
     .collect();
+    let (key, mut managed) = published_node("source:shop.customers");
+    managed.definition = json!({"entry": {"loader": "load_customers"}});
+    input.nodes.insert(key, managed);
+    input
+        .nodes
+        .get_mut("model:customers")
+        .expect("customers model")
+        .definition = json!({"materialization": "table", "deps": ["source:shop.customers"]});
     let published = publish_snapshot(store, &input).await.expect("publish");
     let admin = bootstrap_user(store, context, "orders-admin")
         .await

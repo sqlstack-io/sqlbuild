@@ -17,7 +17,7 @@ pub(crate) async fn persist_ticks(
     let (mut transaction, write_set) = job_write_set(
         transaction,
         trigger.snapshot_id,
-        &trigger.job_json.selection,
+        (&trigger.job_json.selection, &trigger.job_json.settings),
     )
     .await?;
     for action in &plan.actions {

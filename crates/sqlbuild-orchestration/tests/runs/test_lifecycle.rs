@@ -8,7 +8,8 @@ use crate::runs::main::heartbeat_run::heartbeat_run;
 use crate::runs::main::list_run_nodes::list_run_nodes;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::models::{
-    NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
+    NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunKind, RunNodeFailure, RunOutcome,
+    RunStatus,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -438,6 +439,35 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
             assert_eq!(nodes[0].status, "success");
             assert_eq!(nodes[0].rows_affected, Some(17));
             assert_eq!(nodes[1].error_code.as_deref(), Some("E100"));
+            let failures: Vec<PlatformEvent> = read_recall_events(store, 0, 100)
+                .await
+                .expect("run failure facts")
+                .into_iter()
+                .filter(|row| row["event_type"] == "platform_run_failed")
+                .map(|row| {
+                    serde_json::from_value(row["payload"]["platform"].clone())
+                        .expect("typed run failure")
+                })
+                .collect();
+            assert_eq!(
+                failures,
+                vec![PlatformEvent::RunFailed {
+                    run_id: started.run_id,
+                    run_kind: RunKind::Adhoc,
+                    job_key: None,
+                    location_id: location,
+                    target: "development".into(),
+                    outcome: RunOutcome::Partial,
+                    failed_nodes: vec![RunNodeFailure {
+                        node_key: "orders".into(),
+                        error_code: Some("E100".into()),
+                        message: None,
+                        path: None,
+                    }],
+                    failed_node_count: 1,
+                }],
+                "a partial run publishes one failure event, surviving rolled-back attempts and retries"
+            );
             let late_failure = RunChangeRequest {
                 event_id: Uuid::now_v7(),
                 ..launch_failed.clone()

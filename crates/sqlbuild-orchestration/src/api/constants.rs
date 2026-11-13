@@ -17,6 +17,8 @@ pub(crate) const OIDC_RESPONSE_BYTES: usize = 1024 * 1024;
 #[cfg(unix)]
 pub(crate) const DOCKER_IMAGE_HEX_LENGTH: usize = 64;
 pub(crate) const HTTPS_SCHEME: &str = "https";
+pub(crate) const HTTP_SCHEME: &str = "http";
+pub(crate) const LOOPBACK_HOST: &str = "localhost";
 pub(crate) const ROOT_PATH: &str = "/";
 pub(crate) const UI_INDEX_PATH: &str = "/index.html";
 pub(crate) const UI_IMMUTABLE_PREFIX: &str = "/_app/immutable/";

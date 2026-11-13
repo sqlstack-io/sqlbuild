@@ -59,8 +59,12 @@ pub(crate) async fn frozen_adhoc_request(
         let refusal = format!("workers do not run sqb {}", plan.verb);
         return Ok((transaction, Err(refusal)));
     };
-    let (transaction, writers) =
-        job_write_set(transaction, snapshot.snapshot_id, &plan.selection).await?;
+    let (transaction, writers) = job_write_set(
+        transaction,
+        snapshot.snapshot_id,
+        (&plan.selection, &plan.settings),
+    )
+    .await?;
     let (transaction, images) = query(
         transaction,
         "SELECT image_id FROM sqb_snapshots WHERE snapshot_id=$1",

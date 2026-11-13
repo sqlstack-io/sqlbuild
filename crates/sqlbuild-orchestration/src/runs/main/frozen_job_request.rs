@@ -60,8 +60,12 @@ pub(crate) async fn frozen_job_request(
         )
         .await?;
     }
-    let (transaction, write_set) =
-        job_write_set(transaction, snapshot_id, &definition.selection).await?;
+    let (transaction, write_set) = job_write_set(
+        transaction,
+        snapshot_id,
+        (&definition.selection, &definition.settings),
+    )
+    .await?;
     Ok((
         transaction,
         RunRequest {

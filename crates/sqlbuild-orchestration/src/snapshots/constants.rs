@@ -48,3 +48,12 @@ pub(crate) const CONTENT: [((&str, &str), &str, &str); 3] = [
         "",
     ),
 ];
+/// Node kinds a build writes when they are selected.
+pub(crate) const WRITER_NODE_KINDS: [&str; 4] = ["model", "seed", "udf", "table_fn"];
+pub(crate) const MODEL_NODE_KIND: &str = "model";
+pub(crate) const SOURCE_NODE_KIND: &str = "source";
+pub(crate) const SOURCE_KEY_PREFIX: &str = "source:";
+/// A source with a non-null loader here is managed, so automatic source loading writes it.
+pub(crate) const LOADER_POINTER: &str = "/entry/loader";
+/// The frozen setting for `--no-load-sources`; `false` stops a build loading sources its models read.
+pub(crate) const LOAD_SOURCES_SETTING: &str = "load_sources";
