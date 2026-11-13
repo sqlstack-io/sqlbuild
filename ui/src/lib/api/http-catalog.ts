@@ -15,13 +15,16 @@ function kindOf(wire: Wire['CatalogNodeRecord']): NodeKind | null {
 }
 
 /**
- * One node of the current snapshot. The server reports declared metadata and the newest
- * fingerprint, not run outcomes, staleness, check counts, owners or groups, so those stay null
- * or empty and the pages hide them. The fingerprint's run is a `sqb` run, not a scheduler run.
+ * One node of the current snapshot. The server reports declared metadata, the newest fingerprint,
+ * the newest decisive outcome and whether the definition changed since that fingerprint, not
+ * check counts, owners or groups, so those stay null or empty and the pages hide them. The
+ * fingerprint's run is a `sqb` run, not a scheduler run. Staleness from upstream builds needs the
+ * whole listing, so `toCatalogNodes` adds it.
  */
 export function toCatalogNode(wire: Wire['CatalogNodeRecord']): CatalogNode | null {
 	const kind = kindOf(wire);
 	if (!kind) return null;
+	const outcome = wire.last_outcome?.status;
 	return {
 		key: wire.node_key,
 		kind,
@@ -37,18 +40,62 @@ export function toCatalogNode(wire: Wire['CatalogNodeRecord']): CatalogNode | nu
 		lastBuild: wire.last_build
 			? { fingerprintRunId: wire.last_build.run_id, runId: null, jobKey: null, builtAt: wire.last_build.observed_at, fingerprint: wire.last_build.version_hash }
 			: null,
-		lastOutcome: null,
-		stale: null,
+		lastOutcome: outcome === 'success' || outcome === 'failed' ? outcome : null,
+		stale:
+			wire.definition_changed && wire.last_build
+				? [{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: wire.last_build.observed_at }]
+				: [],
 		sourceFreshness: null,
 		checks: null
 	};
 }
 
+/**
+ * When the data a node reads last changed: its own last build, or for a view, which reads its
+ * upstream when queried, the newest data behind it. Null when nothing behind it is built.
+ */
+function dataTimes(listed: Map<string, CatalogNode>): (key: string) => number | null {
+	const memo = new Map<string, number | null>();
+	const at = (key: string): number | null => {
+		if (memo.has(key)) return memo.get(key) ?? null;
+		memo.set(key, null);
+		const node = listed.get(key);
+		let time = node?.lastBuild ? Date.parse(node.lastBuild.builtAt) : null;
+		if (node?.kind === 'view') {
+			const upstream = node.upstream.flatMap((k) => at(k) ?? []);
+			time = upstream.length ? Math.max(...upstream) : null;
+		}
+		memo.set(key, time);
+		return time;
+	};
+	return at;
+}
+
+/**
+ * Upstream nodes with newer data than this node's own last build. Views read their upstream when
+ * queried, so they are never behind, and an unbuilt node is not built yet rather than behind.
+ */
+function behindOf(node: CatalogNode, dataAt: (key: string) => number | null): StaleReason[] {
+	const builtAt = node.lastBuild?.builtAt;
+	if (!builtAt || node.kind === 'view') return [];
+	const newer = node.upstream.flatMap((key) => {
+		const at = dataAt(key);
+		return at !== null && at > Date.parse(builtAt) ? [{ key, at }] : [];
+	});
+	if (!newer.length) return [];
+	const since = new Date(Math.min(...newer.map((n) => n.at))).toISOString();
+	const names = newer.map((n) => shortName(n.key));
+	const detail = `${names.length === 1 ? names[0] : `${names.length} upstream nodes`} ${names.length === 1 ? 'has' : 'have'} newer data than this build.`;
+	return [{ reason: 'behind', upstream: newer.map((n) => n.key), detail, since }];
+}
+
 /** Catalog nodes in listing order, keeping only dependencies that are themselves listed. */
 export function toCatalogNodes(wire: Wire['CatalogNodeRecord'][]): CatalogNode[] {
 	const nodes = wire.flatMap((node) => toCatalogNode(node) ?? []);
-	const listed = new Set(nodes.map((node) => node.key));
-	return nodes.map((node) => ({ ...node, upstream: node.upstream.filter((key) => listed.has(key)) }));
+	const keys = new Set(nodes.map((node) => node.key));
+	const linked = nodes.map((node) => ({ ...node, upstream: node.upstream.filter((key) => keys.has(key)) }));
+	const dataAt = dataTimes(new Map(linked.map((node) => [node.key, node])));
+	return linked.map((node) => ({ ...node, stale: [...(node.stale ?? []), ...behindOf(node, dataAt)] }));
 }
 
 /** Passing, warning and failing by each check's newest result; checks without one count only towards the total. */
@@ -61,13 +108,6 @@ export function checkCountsOf(checks: Check[]): CheckCounts {
 		failing: checks.filter((c) => ['fail', 'error'].includes(outcome(c) ?? '')).length
 	};
 }
-
-/** A definition that changed since its last recorded build here; other staleness is not reported by the server. */
-function staleOf(status: Wire['NodeStatus'] | null): StaleReason[] {
-	if (status?.definition.status !== 'changed' || !status.build) return [];
-	return [{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: status.build.observed_at }];
-}
-
 
 /** The listed node a key or bare name refers to, preferring a model; migrations name models without their kind. */
 export function findNode(nodes: CatalogNode[], ref: string): CatalogNode | null {
@@ -160,7 +200,7 @@ export function nodeDetailOf(
 	const physical = status?.physical.status === 'observed' ? status.physical.observation.record : null;
 	return {
 		...node,
-		stale: staleOf(status),
+		stale: node.stale ?? [],
 		checks: checkCountsOf(own),
 		downstream: nodes.filter((n) => n.upstream.includes(node.key)).map((n) => n.key),
 		recentOutcomes: (runs ?? []).slice(0, 40).map((r) => r.outcome).reverse(),

@@ -5,7 +5,7 @@ use std::cell::Cell;
 use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
-use crate::runs::tests::helpers::snapshot;
+use crate::runs::tests::helpers::{request, request_run, snapshot};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotInput;
 use crate::snapshots::models::SnapshotNode;
@@ -21,7 +21,7 @@ use crate::warehouse_metadata::main::{
 };
 use crate::warehouse_metadata::models::{MetadataBatch, NodeStatusQuery};
 
-/// Statements a catalog listing issues besides one build read per 100 nodes: 7 fixed, 1 per extra namespace shape.
+/// Statements a catalog listing issues besides one build read per 100 nodes and one attempt read per 1,000: 7 fixed, 1 per extra namespace shape.
 const WIDE_LISTING_FIXED_STATEMENTS: usize = 8;
 
 pub(crate) async fn node_status_reads(
@@ -53,7 +53,7 @@ pub(crate) async fn node_status_reads(
             python_source: None,
         },
     );
-    publish_snapshot(store, &input)
+    let published = publish_snapshot(store, &input)
         .await
         .expect("identity snapshot");
     let options = NodeStatusQuery {
@@ -236,6 +236,15 @@ pub(crate) async fn node_status_reads(
     );
     assert_eq!(orders["dependencies"], json!(["source:raw_orders"]));
     assert_eq!(
+        orders["definition_changed"], true,
+        "the listing compares definitions like the node status"
+    );
+    assert_eq!(
+        orders["last_outcome"],
+        json!({"status": "success", "at": changed.records[0]["ts"], "run_id": null}),
+        "a build outside the scheduler is a success"
+    );
+    assert_eq!(
         listed_node("udf:orders")["last_build"]["run_id"],
         "orders-function-run",
         "a same-named function keeps its own build"
@@ -248,6 +257,13 @@ pub(crate) async fn node_status_reads(
     );
     assert!(!json!(listed).to_string().contains("metadata_json"));
     listing_ignores_build_history(store, credentials, (location, &listed)).await;
+    listing_reports_scheduler_attempts(
+        store,
+        credentials,
+        (location, published.snapshot_id),
+        serde_json::from_value(changed.records[0]["ts"].clone()).expect("build time"),
+    )
+    .await;
     listing_wide_targets_is_batched_without_super_linear_growth(
         store,
         credentials,
@@ -368,6 +384,61 @@ async fn listing_ignores_build_history(
     );
 }
 
+/// A failed scheduler attempt replaces the outcome only when it ended after the newest build.
+async fn listing_reports_scheduler_attempts(
+    store: &ControlStore,
+    credentials: (&AuditContext, Uuid),
+    (location, snapshot_id): (Uuid, Uuid),
+    built_at: chrono::DateTime<chrono::Utc>,
+) {
+    let outcome = || async {
+        let listed = list_person_catalog_nodes(
+            store,
+            credentials,
+            (location, "development"),
+            DefaultRole::None,
+        )
+        .await
+        .expect("catalog nodes");
+        let orders = listed
+            .into_iter()
+            .find(|node| node.node_key == "model:orders")
+            .expect("orders listed");
+        json!(orders.last_outcome)
+    };
+    for (id, ended_at, expected) in [
+        (
+            0x0f01,
+            built_at - chrono::Duration::hours(1),
+            json!({"status": "success", "at": built_at, "run_id": null}),
+        ),
+        (
+            0x0f02,
+            built_at + chrono::Duration::hours(1),
+            json!({"status": "failed", "at": built_at + chrono::Duration::hours(1),
+                "run_id": Uuid::from_u128(0x0f02)}),
+        ),
+    ] {
+        let run = request((location, snapshot_id), id, 0, &["model:orders"]);
+        request_run(store, &run).await.expect("queue attempt");
+        let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+        let (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_run_nodes SET status='failed',started_at=$1,ended_at=$2,finished_storage_id=$3 WHERE run_id=$4",
+            vec![
+                Parameter::Time(ended_at - chrono::Duration::minutes(5)),
+                Parameter::Time(ended_at),
+                Parameter::Integer(i64::try_from(id).expect("storage id")),
+                Parameter::Id(run.run_id),
+            ],
+        )
+        .await
+        .expect("finish attempt");
+        commit(transaction).await.expect("commit attempt");
+        assert_eq!(outcome().await, expected, "attempt ending at {ended_at}");
+    }
+}
+
 /// Three thousand nodes, half in a named database, keep their own builds, read 100 per statement without super-linear growth.
 async fn listing_wide_targets_is_batched_without_super_linear_growth(
     store: &ControlStore,
@@ -385,8 +456,8 @@ async fn listing_wide_targets_is_batched_without_super_linear_growth(
         )
         .await;
         assert!(
-            statements <= size.div_ceil(100) + WIDE_LISTING_FIXED_STATEMENTS,
-            "listing {size} nodes issued {statements} store statements; builds must be read 100 or more nodes per statement"
+            statements <= size.div_ceil(100) + size.div_ceil(1_000) + WIDE_LISTING_FIXED_STATEMENTS,
+            "listing {size} nodes issued {statements} store statements; builds must be read 100 and attempts 1,000 or more nodes per statement"
         );
         medians.push(median);
     }

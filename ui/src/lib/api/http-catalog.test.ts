@@ -7,7 +7,7 @@ type W = components['schemas'];
 
 function node(key: string, extra: Partial<W['CatalogNodeRecord']> = {}): W['CatalogNodeRecord'] {
 	const [kind, name] = key.split(':');
-	return { node_key: key, kind, name, tags: [], dependencies: [], snapshot_id: '01a1b000-0000-7000-8000-000000000001', ...extra };
+	return { node_key: key, kind, name, tags: [], dependencies: [], definition_changed: false, snapshot_id: '01a1b000-0000-7000-8000-000000000001', ...extra };
 }
 
 describe('catalog node mapping', () => {
@@ -39,7 +39,7 @@ describe('catalog node mapping', () => {
 		expect(orders.upstream).toEqual(['source:raw_orders']);
 	});
 
-	it('reports the fingerprint as a sqb build and leaves unreported build state unknown, not empty', () => {
+	it('reports the fingerprint as a sqb build and leaves unreported state unknown, not empty', () => {
 		const [orders] = toCatalogNodes([
 			node('model:orders', {
 				materialization: 'table',
@@ -52,7 +52,28 @@ describe('catalog node mapping', () => {
 		]);
 		expect(orders.lastBuild).toEqual({ fingerprintRunId: 'sqb-run-1', runId: null, jobKey: null, builtAt: '2026-11-07T06:00:00Z', fingerprint: 'v1' });
 		expect([orders.description, orders.tags, orders.columnCount, orders.relation]).toEqual(['One row per order', ['marts'], 4, { database: null, schema: 'main', name: 'orders' }]);
-		expect([orders.stale, orders.checks, orders.lastOutcome, orders.group, orders.owner]).toEqual([null, null, null, null, []]);
+		expect([orders.stale, orders.checks, orders.lastOutcome, orders.group, orders.owner]).toEqual([[], null, null, null, []]);
+	});
+
+	it('marks a changed definition, and a built table older than the data upstream of it, even through a view, as stale', () => {
+		const built = (observed_at: string) => ({ last_build: { observed_at, run_id: 'sqb', version_hash: 'v' } });
+		const table = (key: string, at: string | null, extra: Partial<W['CatalogNodeRecord']> = {}) =>
+			node(key, { materialization: 'table', dependencies: ['model:orders', 'source:raw_orders'], ...(at ? built(at) : {}), ...extra });
+		const nodes = toCatalogNodes([
+			node('source:raw_orders'),
+			table('model:orders', '2026-11-07T06:00:00Z', { dependencies: ['source:raw_orders'], definition_changed: true, last_outcome: { status: 'failed', at: '2026-11-07T06:30:00Z', run_id: 'r1' } }),
+			table('model:order_totals', '2026-11-07T05:00:00Z', { last_outcome: { status: 'success', at: '2026-11-07T05:00:00Z' } }),
+			table('model:order_daily', '2026-11-07T07:00:00Z'),
+			table('model:order_view', '2026-11-07T04:00:00Z', { materialization: 'view' }),
+			table('model:order_drafts', null, { definition_changed: true }),
+			table('model:order_report', '2026-11-07T05:30:00Z', { dependencies: ['model:order_view'] })
+		]);
+		const by = Object.fromEntries(nodes.map((n) => [n.key, n]));
+		expect(by['model:orders'].stale).toEqual([{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: '2026-11-07T06:00:00Z' }]);
+		expect(by['model:order_totals'].stale).toEqual([{ reason: 'behind', upstream: ['model:orders'], detail: 'orders has newer data than this build.', since: '2026-11-07T06:00:00.000Z' }]);
+		expect(by['model:order_report'].stale?.map((r) => r.reason === 'behind' && [r.upstream, r.since])).toEqual([[['model:order_view'], '2026-11-07T06:00:00.000Z']]);
+		expect(['model:order_daily', 'model:order_view', 'model:order_drafts', 'source:raw_orders'].map((k) => by[k].stale)).toEqual([[], [], [], []]);
+		expect(nodes.map((n) => n.lastOutcome)).toEqual([null, 'failed', 'success', null, null, null, null]);
 	});
 
 	it('finds a node by key, or by bare name preferring the model', () => {
@@ -82,8 +103,9 @@ describe('catalog node detail', () => {
 		expect(d.downstream).toEqual(['model:order_totals']);
 	});
 
-	it('reports a changed definition as stale and maps the warehouse columns', () => {
-		const changed = nodeDetailOf(nodes, nodes[0], status({ status: 'changed', current_local_hash: 'b', recorded_local_hash: 'a' }, observed), null, []);
+	it('keeps the listing staleness and maps the warehouse columns', () => {
+		const [listed] = toCatalogNodes([node('model:orders', { materialization: 'table', definition_changed: true, last_build: { observed_at: '2026-11-07T06:00:00Z', run_id: 'sqb', version_hash: 'v' } })]);
+		const changed = nodeDetailOf(nodes, listed, status({ status: 'changed', current_local_hash: 'b', recorded_local_hash: 'a' }, observed), null, []);
 		expect(changed.stale.map((r) => [r.reason, r.since])).toEqual([['changed', '2026-11-07T06:00:00Z']]);
 		expect(changed.columns).toEqual([{ name: 'order_id', type: 'INTEGER', description: '', audits: [] }]);
 		const matched = nodeDetailOf(nodes, nodes[0], status({ status: 'matched', local_hash: 'a' }, { status: 'unavailable', reason: 'no catalog' }), null, []);

@@ -1,3 +1,4 @@
+import { shortName } from '$lib/build-area/labels';
 import type { CheckOutcome, NodeCounts, NodeOutcome, StaleReason, RunKind, RunOrigin, RunStatus, TickOutcome, TriggerState } from '$lib/api/types';
 
 export const runStatusTone: Record<RunStatus, string> = {
@@ -115,8 +116,8 @@ export function staleReasonLabel(reason: StaleReason): string {
 /** One-line explanation of a stale reason. */
 export function staleReasonDetail(reason: StaleReason): string {
 	if (reason.reason === 'changed') return reason.detail;
-	if (reason.reason === 'changed_upstream') return `Upstream definition changed: ${reason.upstream.join(', ')}`;
-	return `Newer data in ${reason.upstream.join(', ')}`;
+	if (reason.reason === 'changed_upstream') return `Upstream definition changed: ${reason.upstream.map(shortName).join(', ')}`;
+	return `Newer data in ${reason.upstream.map(shortName).join(', ')}`;
 }
 
 /** e.g. `8 ok · 1 warn · 1 failed · 3 skipped`, or `4 running · 10 pending`. */

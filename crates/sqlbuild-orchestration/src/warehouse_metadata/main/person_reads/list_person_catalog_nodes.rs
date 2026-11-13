@@ -1,4 +1,4 @@
-//! A person lists the current nodes with view on all of them; builds are batched indexed seeks.
+//! A person lists the current nodes with view on all of them; builds and attempts are batched indexed seeks.
 
 use uuid::Uuid;
 
@@ -11,8 +11,11 @@ use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_metadata::_helpers::catalog_nodes::catalog_node;
 use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprints;
-use crate::warehouse_metadata::_helpers::node_status::destination;
-use crate::warehouse_metadata::models::{CatalogNodeBuild, CatalogNodeRecord, FingerprintQuery};
+use crate::warehouse_metadata::_helpers::node_outcomes::{last_outcome, latest_attempts};
+use crate::warehouse_metadata::_helpers::node_status::{definition_evidence, destination};
+use crate::warehouse_metadata::models::{
+    CatalogNodeBuild, CatalogNodeRecord, DefinitionEvidence, FingerprintQuery,
+};
 
 pub async fn list_person_catalog_nodes(
     store: &ControlStore,
@@ -33,6 +36,7 @@ pub async fn list_person_catalog_nodes(
         return Ok(Vec::new());
     };
     let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot.snapshot_id, None).await?;
+    let nodes: Vec<_> = nodes.iter().collect();
     let mut positions: Vec<usize> = Vec::new();
     let mut queries: Vec<FingerprintQuery> = Vec::new();
     for (position, (_, node)) in nodes.iter().enumerate() {
@@ -43,8 +47,16 @@ pub async fn list_person_catalog_nodes(
     }
     let (transaction, found) =
         latest_fingerprints(transaction, (location_id, target, &queries)).await?;
+    let keys: Vec<&str> = nodes.iter().map(|(key, _)| key.as_str()).collect();
+    let (transaction, mut attempts) =
+        latest_attempts(transaction, (location_id, target, &keys)).await?;
     let mut builds: Vec<Option<CatalogNodeBuild>> = vec![None; nodes.len()];
+    let mut changed: Vec<bool> = vec![false; nodes.len()];
     for (position, build) in positions.iter().zip(found) {
+        changed[*position] = matches!(
+            definition_evidence(nodes[*position].1, build.as_ref()),
+            DefinitionEvidence::Changed { .. }
+        );
         builds[*position] = build.map(|(record, _)| CatalogNodeBuild {
             observed_at: record.observed_at,
             run_id: record.run_id,
@@ -53,8 +65,11 @@ pub async fn list_person_catalog_nodes(
     }
     let records: Vec<CatalogNodeRecord> = nodes
         .iter()
-        .zip(builds)
-        .map(|((key, node), build)| catalog_node((key, node), snapshot.snapshot_id, build))
+        .zip(builds.into_iter().zip(changed))
+        .map(|((key, node), (build, changed))| {
+            let outcome = last_outcome(attempts.remove(key.as_str()), build.as_ref());
+            catalog_node((key, node), snapshot.snapshot_id, (build, outcome, changed))
+        })
         .collect();
     commit(transaction).await?;
     Ok(records)
