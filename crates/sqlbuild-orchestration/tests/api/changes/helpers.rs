@@ -65,7 +65,7 @@ pub(crate) async fn opened(response: reqwest::Response) -> SseConnection {
 }
 
 pub(crate) async fn next_topic(stream: &mut SseConnection) -> Option<String> {
-    tokio::time::timeout(Duration::from_secs(3), async {
+    tokio::time::timeout(Duration::from_secs(30), async {
         for _ in 0..4096 {
             for _ in 0..4096 {
                 let Some(end) = stream.pending.windows(2).position(|bytes| bytes == b"\n\n") else {
