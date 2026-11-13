@@ -11,6 +11,7 @@ from itertools import product
 from pathlib import Path
 from textwrap import dedent
 from types import MappingProxyType
+from typing import Any
 
 from sqlbuild._native import (
     Fingerprint,
@@ -145,7 +146,9 @@ def create_janitor_scenario_relations(*, db_path: Path) -> None:
         connection.close()
 
 
-JANITOR_AUDIT_BINDING_KEYS: tuple[str, ...] = ("orders.valid_orders", "customers.unique_ids")
+DIRECT_STATE_PRUNING: dict[str, Any] = json.loads(
+    Path("benchmarks/duckshop/edge_cases/orchestration/direct_state_pruning.json").read_text()
+)
 
 
 def audit_record(*, binding_key: str, run_id: str, occurred_at: datetime) -> AuditResultRecord:
@@ -202,12 +205,7 @@ def create_direct_state_history(*, db_path: Path, schema: str = "main") -> None:
     try:
         run_id: str
         observed_hour: int
-        for run_id, observed_hour in (
-            ("run_000", 10),
-            ("run_001", 12),
-            ("run_002", 12),
-            ("run_003", 13),
-        ):
+        for run_id, observed_hour in DIRECT_STATE_PRUNING["runs"]:
             _ = write_fingerprint(
                 connection=connection,
                 execute=lambda *, connection, sql: connection.execute(sql),
@@ -240,7 +238,7 @@ def create_direct_state_history(*, db_path: Path, schema: str = "main") -> None:
                         run_id=run_id,
                         occurred_at=datetime(2026, 1, 15, observed_hour, 10, 0, tzinfo=UTC),
                     )
-                    for binding_key in JANITOR_AUDIT_BINDING_KEYS
+                    for binding_key in DIRECT_STATE_PRUNING["audit_binding_keys"]
                 ),
                 render_qualified_name=adapter.render_qualified_name,
                 render_framework_type=adapter.render_framework_type,
