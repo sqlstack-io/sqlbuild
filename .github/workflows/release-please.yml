@@ -22,7 +22,7 @@ jobs:
     outputs:
       prs_created: ${{ steps.release.outputs.prs_created }}
       release_branch: ${{ steps.release_branch.outputs.name }}
-      release_pr: ${{ steps.release_branch.outputs.pr }}
+      release_pr: ${{ steps.release_branch.outputs.pr || steps.open_release.outputs.pr }}
     steps:
       - name: Create delivery token
         id: delivery-token
@@ -52,6 +52,18 @@ jobs:
         run: |
           gh workflow run publish.yml --repo "${GITHUB_REPOSITORY}" --ref main \
             -f "tag=${RELEASE_TAG}"
+
+      # A push that changes nothing in the release pull request, such as a docs commit, leaves it
+      # as checked; the merge job re-enables auto-merge that an earlier run handed to this one.
+      - name: Find the unchanged release pull request
+        id: open_release
+        if: steps.release.outputs.prs_created != 'true' && steps.release.outputs.release_created != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_pr="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
+            --label "autorelease: pending" --json number --jq '.[0].number // empty')"
+          echo "pr=${release_pr}" >> "${GITHUB_OUTPUT}"
 
       - name: Resolve release branch
         id: release_branch
@@ -209,6 +221,17 @@ jobs:
           post_status success Verify \
             "Product changes passed verification before release metadata update"
 
+  # Merging waits for this run's trusted checks, or reuses the ones an unchanged pull request
+  # already passed, so a run that leaves the pull request untouched still hands it to the queue.
+  release-merge:
+    name: Merge the checked release pull request
+    needs: [release-please, release-checks]
+    if: >-
+      always() && github.ref == 'refs/heads/main' && needs.release-please.result == 'success'
+      && needs.release-please.outputs.release_pr != ''
+      && (needs.release-checks.result == 'success' || needs.release-checks.result == 'skipped')
+    runs-on: ubuntu-24.04
+    steps:
       # The checks can wait longer than an installation token lives, so mint one just before use.
       - name: Create delivery token
         id: delivery-token
@@ -231,12 +254,24 @@ jobs:
           PROCESSED_SHA: ${{ github.sha }}
         run: |
           # A commit merged to main while these checks ran is not in this release pull request yet.
-          # Its own Release Please run is queued behind this one and refreshes and re-checks the
-          # pull request, so merging now would tag a release whose changelog omits that commit.
+          # Its own Release Please run is queued behind this one: it refreshes and re-checks the
+          # pull request, or merges it from these checks when the commit changes nothing in it.
           main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
           if [[ "${main_sha}" != "${PROCESSED_SHA}" ]]; then
             gh pr merge "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --disable-auto 2>/dev/null || true
-            echo "main moved from ${PROCESSED_SHA} to ${main_sha}; leaving the merge to the queued run" \
+            {
+              echo "main moved from ${PROCESSED_SHA} to ${main_sha}; leaving the merge to the queued run."
+              echo "If that run already finished, re-run the latest Release Please run on main."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          # Verify on a release branch comes only from the trusted checks; without its success on
+          # the current head, nothing has checked this pull request yet.
+          head_sha="$(gh pr view "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" --json headRefOid --jq .headRefOid)"
+          verify="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${head_sha}/status" \
+            --jq '[.statuses[] | select(.context == "Verify")][0].state // empty')"
+          if [[ "${verify}" != "success" ]]; then
+            echo "Release pull request head ${head_sha} has no passing Verify; leaving it unmerged" \
               >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
