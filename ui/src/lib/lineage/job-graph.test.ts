@@ -72,6 +72,24 @@ describe('job graph', () => {
 		expect(laid.find((n) => n.id === boxId('staging'))!.height).toBeLessThan(61);
 	});
 
+	it('wraps a tall column into several, keeping every node right of what it reads', () => {
+		// 40 marts with no lineage inside the job, and 30 models off one source: 71 cards, at most 15 to a column.
+		const wide = [
+			...Array.from({ length: 40 }, (_, i) => node(`model:mart_${i}`)),
+			node('model:src'),
+			...Array.from({ length: 30 }, (_, i) => node(`model:stg_${i}`, ['model:src']))
+		];
+		const { nodes, edges } = jobGraph(wide.map((n) => n.key), wide);
+		const laid = layoutJobGraph(measured(nodes), edges);
+		const columns = Map.groupBy(laid, (n) => Math.round(n.position.x));
+		expect(Math.max(...[...columns.values()].map((c) => c.length))).toBeLessThanOrEqual(15);
+		// The wrapped columns sit side by side rather than staggered: the graph is no taller than one full column.
+		const ys = laid.map((n) => n.position.y);
+		expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(15 * (61 + 24));
+		const x = (id: string) => laid.find((n) => n.id === id)!.position.x;
+		for (let i = 0; i < 30; i++) expect(x(`model:stg_${i}`)).toBeGreaterThan(x('model:src'));
+	});
+
 	it('draws a plain job without boxes', () => {
 		const { nodes } = jobGraph(['model:raw', 'model:stg'], catalog);
 		expect(nodes.map((n) => [n.id, n.type, n.parentId])).toEqual([
