@@ -287,14 +287,15 @@ def test_given_semantic_edits_when_publishing_then_local_identities_keep_planner
             ).to_json()
         )
         hashes: dict[str, str] = {}
-        for key in (
-            "model:orders",
-            "model:stg_orders",
-            "udf:edge_next_quantity",
-            "seed:edge_quantity_steps",
+        for key, expected_identity_keys in (
+            ("model:orders", {"local_hash", "dialect"}),
+            ("model:stg_orders", {"local_hash", "dialect"}),
+            ("udf:edge_next_quantity", {"local_hash"}),
+            ("seed:edge_quantity_steps", {"local_hash"}),
         ):
             identity: dict[str, str] = snapshot["nodes"][key]["definition"]["planner_identity"]
-            assert set(identity) == {"local_hash"}
+            assert set(identity) == expected_identity_keys
+            assert identity.get("dialect", "duckdb") == "duckdb"
             assert len(identity["local_hash"]) == 64
             hashes[key] = identity["local_hash"]
         identities.append(hashes)
