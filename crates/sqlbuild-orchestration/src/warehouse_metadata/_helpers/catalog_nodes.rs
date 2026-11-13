@@ -1,7 +1,9 @@
-//! Catalog listing rows and column lineage from snapshot node definitions and published edges.
+//! Catalog listing rows with each node's newest attempt, and column lineage from published edges.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use chrono::{DateTime, Utc};
+use serde::Deserialize;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -9,11 +11,14 @@ use crate::sensors::constants::SOURCE_NODE_KIND;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
-use crate::store::models::ControlTransaction;
-use crate::warehouse_metadata::constants::LINEAGE_DEFINITION_BATCH;
+use crate::store::main::query_records::query_records;
+use crate::store::models::{ControlTransaction, Parameter};
+use crate::warehouse_metadata::constants::{
+    LINEAGE_DEFINITION_BATCH, OUTCOME_FAILURE_WINDOW, OUTCOME_RECENT_RUNS,
+};
 use crate::warehouse_metadata::models::{
-    CatalogNodeBuild, CatalogNodeRecord, CatalogRelation, ColumnLineageEdge, LineageColumn,
-    LineageNodeColumns,
+    CatalogNodeBuild, CatalogNodeOutcome, CatalogNodeRecord, CatalogRelation, ColumnLineageEdge,
+    LineageColumn, LineageNodeColumns,
 };
 
 /// A declared value from the definition itself, its schema entry or its config, in that order.
@@ -60,7 +65,11 @@ fn relation(node: &SnapshotNode) -> Option<CatalogRelation> {
 pub(crate) fn catalog_node(
     (node_key, node): (&str, &SnapshotNode),
     snapshot_id: Uuid,
-    last_build: Option<CatalogNodeBuild>,
+    (last_build, last_outcome, definition_changed): (
+        Option<CatalogNodeBuild>,
+        Option<CatalogNodeOutcome>,
+        bool,
+    ),
 ) -> CatalogNodeRecord {
     let definition = &node.definition;
     CatalogNodeRecord {
@@ -84,7 +93,75 @@ pub(crate) fn catalog_node(
             _ => None,
         },
         last_build,
+        last_outcome,
+        definition_changed,
         snapshot_id,
+    }
+}
+
+#[derive(Deserialize)]
+struct Attempt {
+    node_key: String,
+    run_id: Uuid,
+    status: String,
+    ended_at: Option<DateTime<Utc>>,
+    finished_storage_id: i64,
+}
+
+/// Each node's newest started `success`, `warn` or `failed` attempt in those runs, excluding group runs.
+pub(crate) async fn latest_attempts(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, HashMap<String, CatalogNodeOutcome>), ControlError> {
+    let newest = "SELECT run_id, status, queued_at FROM sqb_runs WHERE location_id=$1 AND target=$2 AND kind<>'group' \
+        ORDER BY queued_at DESC, run_id DESC";
+    let (transaction, attempts): (_, Vec<Attempt>) = query_records(transaction,
+        &format!("SELECT n.node_key,n.run_id,n.status,n.ended_at,n.finished_storage_id FROM (\
+            SELECT run_id FROM ({newest} LIMIT $3) AS latest UNION \
+            SELECT run_id FROM (SELECT run_id FROM ({newest} LIMIT $4) AS recent WHERE status IN ('failed','partial','warn') \
+            ORDER BY queued_at DESC, run_id DESC LIMIT $3) AS failures) AS r \
+         JOIN sqb_run_nodes n ON n.run_id=r.run_id WHERE n.kind='node' AND n.finished_storage_id IS NOT NULL \
+         AND n.started_at IS NOT NULL AND n.status IN ('success','warn','failed')"),
+        vec![Parameter::Id(location_id), Parameter::Text(target.into()), Parameter::Integer(OUTCOME_RECENT_RUNS), Parameter::Integer(OUTCOME_FAILURE_WINDOW)]).await?;
+    let mut newest: HashMap<String, Attempt> = HashMap::new();
+    for attempt in attempts {
+        if newest
+            .get(&attempt.node_key)
+            .is_none_or(|seen| attempt.finished_storage_id > seen.finished_storage_id)
+        {
+            newest.insert(attempt.node_key.clone(), attempt);
+        }
+    }
+    let outcomes: HashMap<String, CatalogNodeOutcome> = newest
+        .into_iter()
+        .filter_map(|(key, attempt)| {
+            Some((
+                key,
+                CatalogNodeOutcome {
+                    status: attempt.status,
+                    at: attempt.ended_at?,
+                    run_id: Some(attempt.run_id),
+                },
+            ))
+        })
+        .collect();
+    Ok((transaction, outcomes))
+}
+
+/// The scheduler attempt, unless a fingerprint from another clock was recorded after it ended.
+pub(crate) fn last_outcome(
+    attempt: Option<CatalogNodeOutcome>,
+    build: Option<&CatalogNodeBuild>,
+) -> Option<CatalogNodeOutcome> {
+    let newer_build =
+        build.filter(|build| attempt.as_ref().is_none_or(|a| build.observed_at > a.at));
+    match newer_build {
+        Some(build) => Some(CatalogNodeOutcome {
+            status: "success".into(),
+            at: build.observed_at,
+            run_id: None,
+        }),
+        None => attempt,
     }
 }
 

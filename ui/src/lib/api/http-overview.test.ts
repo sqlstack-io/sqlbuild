@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { overviewOf } from './http-overview';
-import type { CatalogNode, Check, NodeChange, PlatformEvent, Run, SnapshotChange } from './types';
+import type { CatalogNode, Check, NodeChange, PlatformEvent, Run, SnapshotChange, StaleReason } from './types';
 
 const now = Date.parse('2026-11-09T12:00:00Z');
 const hoursAgo = (h: number) => new Date(now - h * 3_600_000).toISOString();
@@ -9,7 +9,7 @@ function run(id: string, status: Run['status'], queuedHoursAgo: number, endedHou
 	return { id, status, parentRunId, jobKey, narrowing, window: null, kind: jobKey ? 'job' : 'adhoc', statusReason: null, queuedAt: hoursAgo(queuedHoursAgo), startedAt: hoursAgo(queuedHoursAgo), endedAt: endedHoursAgo === null ? null : hoursAgo(endedHoursAgo) } as Run;
 }
 
-const node = (key: string, kind: CatalogNode['kind']) => ({ key, kind }) as CatalogNode;
+const node = (key: string, kind: CatalogNode['kind'], stale: StaleReason['reason'][] = []) => ({ key, kind, stale: stale.map((reason) => ({ reason })) }) as CatalogNode;
 const check = (id: string, outcome: string | null) => ({ id, latest: outcome ? { outcome } : null }) as unknown as Check;
 const change = (publishedHoursAgo: number, nodes: [NodeChange['op'], string][]) =>
 	({ snapshotId: `s-${publishedHoursAgo}`, publishedAt: hoursAgo(publishedHoursAgo), nodes: nodes.map(([op, key]) => ({ key, op })) }) as SnapshotChange;
@@ -39,7 +39,7 @@ describe('overview from live reads', () => {
 	const overview = overviewOf({
 		runs,
 		checks: [check('a', 'pass'), check('b', 'fail'), check('c', 'error'), check('d', 'warn'), check('e', null)],
-		nodes: [node('model:orders', 'table'), node('model:totals', 'view'), node('model:events', 'incremental'), node('source:raw', 'source'), node('seed:regions', 'seed')],
+		nodes: [node('model:orders', 'table', ['changed', 'behind']), node('model:totals', 'view'), node('model:events', 'incremental', ['behind']), node('source:raw', 'source'), node('seed:regions', 'seed')],
 		changes: [change(1, [['added', 'model:orders'], ['added', 'seed:regions'], ['removed', 'model:old']]), change(24 * 8, [['added', 'model:totals']])],
 		events: [event('scheduler', true), event('cleared', false)],
 		acknowledgements: new Map([['orders-new', { by: 'ada', at: hoursAgo(1) }]]),
@@ -59,7 +59,8 @@ describe('overview from live reads', () => {
 			'run_problem:catalogue-partial:-',
 			'run_problem:adhoc-old:-',
 			'run_unresponsive:stuck:-',
-			'event:scheduler'
+			'event:scheduler',
+			'stale_models'
 		]);
 	});
 
@@ -75,7 +76,12 @@ describe('overview from live reads', () => {
 		expect(overview.latestRun?.id).toBe('fulfilment-ok');
 	});
 
+	it('counts each stale node once, and leaves late sources unknown', () => {
+		expect(overview.metrics.stale).toEqual({ nodes: 2, changed: 1, behind: 2, sources: null });
+		expect(overview.attention.find((i) => i.kind === 'stale_models')).toEqual({ kind: 'stale_models', changed: ['model:orders'], behind: ['model:orders', 'model:events'] });
+	});
+
 	it('leaves parts without a server read empty instead of zero', () => {
-		expect([overview.metrics.stale, overview.metrics.cost, overview.groups]).toEqual([null, null, null]);
+		expect([overview.metrics.cost, overview.groups]).toEqual([null, null]);
 	});
 });

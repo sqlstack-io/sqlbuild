@@ -5,6 +5,7 @@ import { describeWait, outcomeCounts } from '$lib/operate/labels';
 import { eventKindLabel, problemHref } from '$lib/platform/labels';
 import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
+import { shortName } from '$lib/build-area/labels';
 
 export type AttentionTone = 'error' | 'warning' | 'stale' | 'info';
 
@@ -51,7 +52,7 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				key: 'stale',
 				tone: 'stale',
 				title: `${plural(total, 'node')} ${total === 1 ? 'is' : 'are'} stale`,
-				detail: `${parts.join(' · ')} · ${[...new Set([...item.changed, ...item.behind])].slice(0, 4).join(', ')}`,
+				detail: `${parts.join(' · ')} · ${[...new Set([...item.changed, ...item.behind])].slice(0, 4).map(shortName).join(', ')}`,
 				since: 'since the last build',
 				href: '/catalog?stale=1',
 				action: 'View in catalog'
