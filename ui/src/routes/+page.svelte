@@ -20,8 +20,8 @@
 	import { runStatusLabel } from '$lib/status';
 	import { attentionRank, attentionView, type AttentionTone } from '$lib/build-area/attention';
 	import type { AttentionItem } from '$lib/api';
-	import { changeOpLabel, formatCredits } from '$lib/build-area/labels';
-	import { summarizeChange } from '$lib/build-area/changes';
+	import { formatCredits } from '$lib/build-area/labels';
+	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
 	import { pagesBeyondTarget } from '$lib/nav';
 
 	const overview = createResource((client, scope) => client.overview(scope), ['runs', 'checks', 'node_status', 'snapshot', 'platform_events', 'triggers']);
@@ -258,7 +258,7 @@
 								<span class="change-rev" title={c.gitRevision ? `Commit ${c.gitRevision}` : 'Published outside a git checkout'}><code>{c.gitRevision?.slice(0, 7) ?? '—'}</code><small>version {c.generation}</small></span>
 								<span class="change-copy">
 									<strong>{summarizeChange(c)}</strong>
-									<span>{c.nodes.slice(0, 3).map((n) => `${changeOpLabel[n.op].toLowerCase()} ${n.key}`).join(' · ') || 'No node changes'}</span>
+									<span>{nodeChangeLine(c.nodes)}</span>
 								</span>
 								<small>{c.gitAuthor ? `${c.gitAuthor} · ` : ''}{formatAgo(c.publishedAt, app.now)}</small>
 							</a>
