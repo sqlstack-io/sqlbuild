@@ -14,9 +14,9 @@ use crate::project::_helpers::help::{
 };
 use crate::project::_helpers::keys::Place;
 use crate::project::_helpers::sections::{
-    load_constants, load_cost, load_cursors, load_dbt, load_diff, load_git, load_janitor,
-    load_local_dbt, load_microbatches, load_migrations, load_policy_flag, load_review,
-    load_scenario, load_settings, load_snapshots, setting_overrides,
+    load_constants, load_control, load_cost, load_cursors, load_dbt, load_diff, load_git,
+    load_janitor, load_local_dbt, load_microbatches, load_migrations, load_policy_flag,
+    load_review, load_scenario, load_settings, load_snapshots, setting_overrides,
 };
 use crate::project::_helpers::sinks::load_sinks;
 use crate::project::_helpers::targets::{
@@ -28,7 +28,7 @@ use crate::project::constants::{
     LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
-use crate::project::models::{Built, ConfigFile, ConfigPaths, ReviewConfig};
+use crate::project::models::{Built, ConfigFile, ConfigPaths, ControlConfig, ReviewConfig};
 use crate::project::types::{Entries, Fields, Loaded};
 use crate::recall::constants::RECALL_SECTION;
 use crate::recall::main::recall_section::recall_section;
@@ -278,6 +278,7 @@ fn project_fields(payload: &Entries) -> Loaded<Fields> {
     }
     load_git(get(payload, "git"), PROJECT_FILE)?;
     load_review(get(payload, "review"), PROJECT_FILE)?;
+    load_control(get(payload, "control"), PROJECT_FILE)?;
     let mut fields = identity(payload)?;
     fields.extend(sections(payload)?);
     fields.push(("targets", targets(payload)?));
@@ -426,20 +427,31 @@ pub(crate) fn local_sql_analysis_failure(
     )
 }
 
-/// `[git] base_ref` of `sqlbuild_project.toml`, validated as project loading validates it.
-pub(crate) fn git_base_ref(paths: &ConfigPaths) -> Result<Option<String>, LoadFailure> {
+/// One section of `sqlbuild_project.toml`, validated as project loading validates it.
+fn project_section<T>(
+    paths: &ConfigPaths,
+    section: &str,
+    load: fn(Option<&ConfigValue>, ConfigFile) -> Loaded<T>,
+) -> Result<T, LoadFailure> {
     let file = resolve(paths, false)?;
     let table = load_toml_mapping(paths, file)?;
     let payload = table.as_map().unwrap_or_default();
-    Ok(load_git(get(payload, "git"), PROJECT_FILE)?)
+    Ok(load(get(payload, section), PROJECT_FILE)?)
 }
 
-/// `[review]` of `sqlbuild_project.toml`, validated as project loading validates it.
+/// `[git] base_ref` of `sqlbuild_project.toml`.
+pub(crate) fn git_base_ref(paths: &ConfigPaths) -> Result<Option<String>, LoadFailure> {
+    project_section(paths, "git", load_git)
+}
+
+/// `[control]` of `sqlbuild_project.toml`.
+pub(crate) fn control_config(paths: &ConfigPaths) -> Result<ControlConfig, LoadFailure> {
+    project_section(paths, "control", load_control)
+}
+
+/// `[review]` of `sqlbuild_project.toml`.
 pub(crate) fn review_config(paths: &ConfigPaths) -> Result<ReviewConfig, LoadFailure> {
-    let file = resolve(paths, false)?;
-    let table = load_toml_mapping(paths, file)?;
-    let payload = table.as_map().unwrap_or_default();
-    Ok(load_review(get(payload, "review"), PROJECT_FILE)?)
+    project_section(paths, "review", load_review)
 }
 
 /// One warning line per configuration file whose `[settings]` still sets `column_contract_mode`.

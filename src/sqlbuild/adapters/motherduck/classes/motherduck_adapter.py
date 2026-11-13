@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any, ClassVar
 from urllib.parse import urlencode
 
+from sqlbuild.adapter.contract.classes.audit_results import AuditResultsMixin
 from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.duckdb_backed_adapter import DuckDbBackedAdapter
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
@@ -23,7 +24,9 @@ from sqlbuild.adapters.motherduck.constants import (
 )
 
 
-class MotherDuckAdapter(MicrobatchMixin, ConsumptionMixin, ObservationsMixin, DuckDbBackedAdapter):
+class MotherDuckAdapter(
+    MicrobatchMixin, ConsumptionMixin, ObservationsMixin, AuditResultsMixin, DuckDbBackedAdapter
+):
     """MotherDuck adapter backed by DuckDB's MotherDuck connection support."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.MOTHERDUCK.value

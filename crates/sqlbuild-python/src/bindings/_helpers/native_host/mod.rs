@@ -1,5 +1,6 @@
 //! Permanent Python host calls and compatibility views of native-owned execution data.
 
+pub(crate) mod audit_results_state;
 pub(crate) mod connections;
 pub(crate) mod constants;
 pub(crate) mod consumption_state;

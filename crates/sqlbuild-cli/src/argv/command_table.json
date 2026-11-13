@@ -213,6 +213,13 @@
        },
        {
         "kind": "store",
+        "options": ["--sync-at-least-every"],
+        "dest": "location_sync_at_least_every",
+        "help": "for serve, sync the warehouse at least this often, such as 30m; 0 or off turns it off",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": ["--run-id"],
         "dest": "location_run_id",
         "help": "frozen run UUID for execute; requires SQLBUILD_RUN_TOKEN",

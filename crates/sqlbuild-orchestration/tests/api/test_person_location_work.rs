@@ -15,6 +15,7 @@ use crate::credentials::models::{
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::{
+    read_location_work::read_location_work,
     read_person_connection_test::read_person_connection_test,
     request_location_work::request_location_work,
 };
@@ -22,7 +23,10 @@ use crate::platform::models::{LocationWork, LocationWorkRequest};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
+use crate::store::main::begin::begin;
+use crate::store::main::commit::commit;
 use crate::store::main::migrate_store::migrate_store;
+use crate::store::models::TransactionMode;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -140,6 +144,28 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 request_location_work(store, (&context, Some(credentials)), &sync)
                     .await
                     .expect("connection-test authority requests a sync")
+            );
+            let repeated = LocationWorkRequest {
+                request_id: Uuid::now_v7(),
+                reason: "Requested after sqb build".into(),
+                ..sync.clone()
+            };
+            assert!(
+                !request_location_work(store, (&context, Some(credentials)), &repeated)
+                    .await
+                    .expect("a second sync while one is pending"),
+                "a sync already pending for the target answers as applied"
+            );
+            let (transaction, stored) = read_location_work(
+                begin(store, TransactionMode::Read).await.expect("read"),
+                repeated.request_id,
+            )
+            .await
+            .expect("read work");
+            commit(transaction).await.expect("commit");
+            assert!(
+                stored.is_none(),
+                "the coalesced sync request leaves no second pending work row"
             );
             assert!(
                 read_person_connection_test(

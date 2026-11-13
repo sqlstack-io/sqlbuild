@@ -1,11 +1,13 @@
 use crate::project::errors::ConfigFailure;
+use crate::project::main::load_control_config::load_control_config;
 use crate::project::main::load_git_base_ref::load_git_base_ref;
 use crate::project::main::load_review_config::load_review_config;
 use crate::project::models::ConfigFile;
-use crate::project::models::ReviewConfig;
+use crate::project::models::{ControlConfig, ReviewConfig};
 use crate::project::tests::helpers::{failure_at, first_failure, project_directory};
 use crate::project::tests::test_types::{
-    GitBaseRefTestCase, ProjectFailureTestCase, ReviewConfigErrorTestCase, ReviewConfigTestCase,
+    ControlConfigTestCase, GitBaseRefTestCase, ProjectFailureTestCase, ReviewConfigErrorTestCase,
+    ReviewConfigTestCase,
 };
 
 const PROJECT: &str = "name = 'orders'\nadapter = 'duckdb'\n";
@@ -259,5 +261,116 @@ fn given_invalid_review_section_when_reading_then_it_is_rejected() {
             "{}: {failure}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_control_section_when_reading_then_returns_its_values_and_interval_seconds() {
+    let control = |sync: &str| ControlConfig {
+        server: Some("https://sqlbuild.example.com".to_owned()),
+        location: Some("orders-warehouse".to_owned()),
+        sync_at_least_every_seconds: sync.parse().ok(),
+    };
+    let test_cases = [
+        ControlConfigTestCase {
+            description: "every control key with a compound interval",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\n\
+                      server = 'https://sqlbuild.example.com'\nlocation = 'orders-warehouse'\n\
+                      sync_at_least_every = '1h30m'\n",
+            expected_config: control("5400"),
+        },
+        ControlConfigTestCase {
+            description: "exactly the one-minute minimum",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\n\
+                      server = 'https://sqlbuild.example.com'\nlocation = 'orders-warehouse'\n\
+                      sync_at_least_every = '60s'\n",
+            expected_config: control("60"),
+        },
+        ControlConfigTestCase {
+            description: "off turns safety syncs off",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\n\
+                      server = 'https://sqlbuild.example.com'\nlocation = 'orders-warehouse'\n\
+                      sync_at_least_every = 'off'\n",
+            expected_config: control("0"),
+        },
+        ControlConfigTestCase {
+            description: "a bare zero turns safety syncs off",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\n\
+                      server = 'https://sqlbuild.example.com'\nlocation = 'orders-warehouse'\n\
+                      sync_at_least_every = '0'\n",
+            expected_config: control("0"),
+        },
+        ControlConfigTestCase {
+            description: "no control section",
+            project: PROJECT,
+            expected_config: ControlConfig::default(),
+        },
+    ];
+    for test_case in test_cases {
+        let (_directory, paths) = project_directory(test_case.project, "");
+
+        let config: ControlConfig = load_control_config(&paths).expect(test_case.description);
+
+        assert_eq!(
+            config, test_case.expected_config,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_invalid_control_section_when_loading_then_project_loading_rejects_it() {
+    let interval = "control.sync_at_least_every must be a duration of at least '1m'";
+    let test_cases = [
+        ReviewConfigErrorTestCase {
+            description: "an interval one second under the minimum",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\nsync_at_least_every = '59s'\n",
+            expected_fragment: interval,
+        },
+        ReviewConfigErrorTestCase {
+            description: "a negative interval",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\nsync_at_least_every = '-30m'\n",
+            expected_fragment: interval,
+        },
+        ReviewConfigErrorTestCase {
+            description: "an interval that is not a duration",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\nsync_at_least_every = 'hourly'\n",
+            expected_fragment: interval,
+        },
+        ReviewConfigErrorTestCase {
+            description: "a calendar interval",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\nsync_at_least_every = '1mo'\n",
+            expected_fragment: interval,
+        },
+        ReviewConfigErrorTestCase {
+            description: "an integer interval",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\nsync_at_least_every = 1800\n",
+            expected_fragment: interval,
+        },
+        ReviewConfigErrorTestCase {
+            description: "a misspelt control key",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[control]\nlocaton = 'orders-warehouse'\n",
+            expected_fragment: "control contains unknown key(s): locaton",
+        },
+    ];
+    for test_case in test_cases {
+        let (_directory, paths) = project_directory(test_case.project, "");
+
+        let failures: [String; 2] = [
+            format!(
+                "{:?}",
+                load_control_config(&paths).expect_err(test_case.description)
+            ),
+            format!("{:?}", first_failure(&paths).expect(test_case.description)),
+        ];
+
+        for failure in failures {
+            assert!(
+                failure.contains(test_case.expected_fragment),
+                "{}: {failure}",
+                test_case.description
+            );
+        }
     }
 }

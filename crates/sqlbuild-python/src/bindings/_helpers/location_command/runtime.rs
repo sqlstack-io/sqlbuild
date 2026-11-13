@@ -12,6 +12,7 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 
 use crate::bindings::_helpers::boundary::python_calls::within;
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
+use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
 use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::{
@@ -25,6 +26,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
     within(&redirect, |_| {
         let mut session = None;
         let mut stream = None;
+        let mut reported_busy = false;
         let mut serve = || -> PyResult<i32> {
             loop {
                 let line = py.detach(|| -> io::Result<Option<String>> {
@@ -61,15 +63,24 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         serde_json::from_value(request).map_err(|_| {
                             PyValueError::new_err("runtime received an invalid metadata read")
                         })?;
+                    let mut busy = false;
                     if session.is_none() {
                         let arguments = location_arguments(py, Some(options.clone()))?;
                         session = match open_history_session(py, &arguments) {
                             Ok(opened) => Some(opened),
-                            Err(_) => {
-                                write_stderr(
-                                    py,
-                                    "Warehouse connection for metadata reads failed.\n",
-                                )?;
+                            Err(error) => {
+                                busy = error.to_string().contains(DUCKDB_LOCK_CONFLICT);
+                                if !busy {
+                                    write_stderr(
+                                        py,
+                                        "Warehouse connection for metadata reads failed.\n",
+                                    )?;
+                                } else if !reported_busy {
+                                    write_stderr(
+                                        py,
+                                        "Warehouse file is in use by another process, such as a DuckDB build; the sync waits for it.\n",
+                                    )?;
+                                }
                                 None
                             }
                         };
@@ -91,13 +102,21 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     {
                         drop(close_history_session(opened, stream.take()));
                     }
-                    if page.is_none() {
-                        if let Some(opened) = session.take() {
-                            drop(close_history_session(opened, None));
+                    reported_busy = busy;
+                    if busy {
+                        serde_json::to_string(&serde_json::json!({ "busy": true }))
+                    } else {
+                        if page.is_none() {
+                            if let Some(opened) = session.take() {
+                                drop(close_history_session(opened, None));
+                            }
+                            write_stderr(
+                                py,
+                                "Warehouse metadata read failed. No page delivered.\n",
+                            )?;
                         }
-                        write_stderr(py, "Warehouse metadata read failed. No page delivered.\n")?;
+                        serde_json::to_string(&page)
                     }
-                    serde_json::to_string(&page)
                 } else {
                     let evaluation: SensorEvaluationRequest = serde_json::from_value(request)
                         .map_err(|_| {

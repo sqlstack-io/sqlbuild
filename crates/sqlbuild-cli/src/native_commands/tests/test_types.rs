@@ -111,3 +111,32 @@ pub(super) struct UnchangedScanTestCase {
     pub(super) mirror_holds_rows: bool,
     pub(super) expected_token: Option<&'static str>,
 }
+
+pub(super) struct SyncCoalescingTestCase {
+    pub(super) description: &'static str,
+    /// Sync requests that arrive while one sync is in progress, such as one per CLI build.
+    pub(super) requests: usize,
+    pub(super) run_ends_during_sync: bool,
+    /// Seconds between safety syncs; `0` turns them off.
+    pub(super) safety_seconds: u64,
+    /// Seconds until the safety interval passes, set while the sync runs; `0` passes during it.
+    pub(super) safety_due_after_seconds: u64,
+    pub(super) expected_follow_ups: usize,
+}
+
+pub(super) struct SafetySyncSettingTestCase {
+    pub(super) description: &'static str,
+    pub(super) flag: Option<&'static str>,
+    pub(super) environment: Option<&'static str>,
+    pub(super) project: Option<u64>,
+    pub(super) expected_seconds: Result<u64, &'static str>,
+}
+
+/// An idle location after one complete sync, and whether its safety interval makes a sync due.
+pub(super) struct SafetySyncIdleTestCase {
+    pub(super) description: &'static str,
+    /// Seconds between safety syncs; `0` turns them off.
+    pub(super) safety_seconds: u64,
+    pub(super) safety_due_after_seconds: u64,
+    pub(super) expected_sync_due: bool,
+}

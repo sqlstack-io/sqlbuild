@@ -2,9 +2,12 @@
 
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import time
+from contextlib import closing
+from functools import partial
 from http.cookies import SimpleCookie
 from pathlib import Path
 from subprocess import Popen
@@ -300,3 +303,59 @@ def verify_connection_test_transport(
         with pytest.raises(HTTPError) as denied:
             person_request(api, path, body=body | extra, session=administrator)
         assert denied.value.code == 422
+
+
+def build_stderr(
+    invoke: partial[subprocess.CompletedProcess[Any]],
+    project: tuple[str, Path],
+    environment: dict[str, str],
+    configuration: str,
+    extra: dict[str, str] | None = None,
+) -> str:
+    """Build the project with `configuration` as its project file; the build always succeeds."""
+    binary, project_file = project
+    _ = project_file.write_text(configuration)
+    built: subprocess.CompletedProcess[str] = invoke(
+        [binary, "--no-color", "build", "--project-dir", str(project_file.parent)]
+        + ["--target", "development"],
+        env=environment | (extra or {}),
+    )
+    assert built.returncode == 0, built.stderr
+    return built.stderr
+
+
+def quiet_builds(
+    invoke: partial[subprocess.CompletedProcess[Any]],
+    project: tuple[str, Path],
+    environment: dict[str, str],
+    origin: str,
+) -> tuple[partial[str], str]:
+    """Builds print no sync line without a [control] location or before anyone signs in."""
+    unconfigured: str = project[1].read_text()
+    build: partial[str] = partial(build_stderr, invoke, project, environment)
+    for control in ("", f"[control]\nserver = '{origin}'\nlocation = 'orders'\n"):
+        assert "Warehouse sync" not in build(unconfigured + control), control
+    return build, unconfigured
+
+
+def assert_build_syncs_coalesce(
+    build: partial[str], project: tuple[str, str, str], control_store: Path
+) -> None:
+    """An unknown location is named; the environment overrides the file; repeats queue nothing."""
+    unconfigured, origin, requester = project
+    returns: str = unconfigured + f"[control]\nserver = '{origin}'\nlocation = 'returns'\n"
+    assert (
+        f"Warehouse sync skipped: no location named 'returns' that you can view on {origin}."
+        in build(returns)
+    )
+    for _ in range(4):
+        assert "Warehouse sync requested for location 'orders' target 'development'." in build(
+            returns, {"SQLBUILD_CONTROL_LOCATION": "orders"}
+        )
+    with closing(sqlite3.connect(control_store)) as store:
+        queued: list[tuple[str]] = store.execute(
+            "SELECT requested_by FROM sqb_location_work "
+            "WHERE json_extract(request_json,'$.work.kind')='sync_warehouse'"
+        ).fetchall()
+    assert queued == [(requester,)], "build syncs join the person's pending request"
+    _ = build(unconfigured)

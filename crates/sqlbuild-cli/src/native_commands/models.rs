@@ -10,7 +10,8 @@ use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseStateLocation,
+    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
+    WarehouseStateLocation,
 };
 use uuid::Uuid;
 
@@ -149,6 +150,8 @@ pub(crate) struct LocationServe {
     pub(crate) target: String,
     pub(crate) image_id: Option<String>,
     pub(crate) metadata_reconcile_seconds: u32,
+    /// Seconds between safety syncs of an idle location; `0` turns them off.
+    pub(crate) safety_sync_seconds: u64,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -209,6 +212,12 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) idle: bool,
     /// Server time when the current or last synchronization began; `None` before the first.
     pub(crate) cycle_started_at: Option<DateTime<Utc>>,
+    /// Seconds between safety syncs; `0` turns them off.
+    pub(crate) safety_seconds: u64,
+    /// When an idle location syncs even though no run ended and nobody asked.
+    pub(crate) safety_at: tokio::time::Instant,
+    /// The last read found the warehouse file held by another process, such as a DuckDB build.
+    pub(crate) busy: bool,
     /// Per scan index: the table's change token after its last complete read.
     pub(crate) change_tokens: HashMap<usize, ScanToken>,
     /// The token read before the current scan's first page, recorded once the scan completes.
@@ -219,6 +228,15 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) mirror_holds_rows: bool,
     /// One warm runtime interpreter and warehouse session serve every page of a synchronization.
     pub(crate) reader: Option<LocationCompiler>,
+}
+
+/// The metadata reader's answer to one read.
+#[derive(Debug)]
+pub(crate) enum MetadataReply {
+    /// A page, or `None` when the read failed.
+    Page(Option<WarehouseHistoryPage>),
+    /// Another process holds the warehouse file; nothing was read.
+    Busy,
 }
 
 /// A table's change token after a complete read, and what that read proves about the mirror.
@@ -238,6 +256,23 @@ impl LocationMetadataSync {
         if self.idle {
             self.next_at = tokio::time::Instant::now();
         }
+    }
+
+    /// Whether an idle location starts its one outstanding sync: first, requested, after a run, or safety.
+    pub(crate) fn sync_due(&self, runs_ended_at: Option<DateTime<Utc>>) -> bool {
+        let ran = match (self.cycle_started_at, runs_ended_at) {
+            (None, _) => true,
+            (Some(started_at), Some(ended_at)) => ended_at >= started_at,
+            (Some(_), None) => false,
+        };
+        ran || (self.safety_seconds > 0 && tokio::time::Instant::now() >= self.safety_at)
+    }
+
+    /// Start the sync `sync_due` asked for, at server time `now`.
+    pub(crate) fn begin_sync(&mut self, now: DateTime<Utc>) {
+        self.idle = false;
+        self.cycle_started_at = Some(now);
+        self.next_at = tokio::time::Instant::now();
     }
 
     /// Failed samples revisit catalog before retrying; no frozen delivery is discarded.

@@ -1164,6 +1164,17 @@ class StrictAdapter(
         ...
 
     @abstractmethod
+    def render_prune_audit_results_history_sql(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+        retain_versions: int,
+    ) -> str:
+        """Render SQL that prunes old audit results."""
+        ...
+
+    @abstractmethod
     def sql_analysis_dialect(self) -> str | None:
         """Return the SQL analysis dialect name for this adapter, if any."""
         ...

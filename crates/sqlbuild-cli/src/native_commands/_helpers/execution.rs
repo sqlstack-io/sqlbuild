@@ -14,6 +14,10 @@ use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
+use sqlbuild_config::project::main::load_control_config::load_control_config;
+use sqlbuild_config::project::main::project_config_paths::project_config_paths;
+use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
+use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
@@ -73,8 +77,8 @@ use crate::native_commands::_helpers::terminal::{
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
     METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS, METADATA_RECONCILE_SECONDS,
-    METADATA_REPLY_BYTES, METADATA_SYNC_CHECK_SECONDS, SCHEDULER_COMMAND,
-    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS, METADATA_SYNC_CHECK_SECONDS,
+    SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -82,8 +86,8 @@ use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
-    LocationMetadataPage, LocationMetadataSync, LocationServe, LostStdout, NativeCommand,
-    NativeInvocation, ProjectLocation, ScanToken,
+    LocationMetadataPage, LocationMetadataSync, LocationServe, LostStdout, MetadataReply,
+    NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
 };
 use crate::native_commands::types::LocationPublication;
 use crate::workers::main::docker_image_sources::docker_image_sources;
@@ -335,7 +339,7 @@ pub(crate) fn location_result<T: serde::de::DeserializeOwned>(
 
 pub(crate) fn metadata_sync(
     (locations, generation): (Vec<WarehouseStateLocation>, i64),
-    reconcile_seconds: u32,
+    (reconcile_seconds, safety_seconds): (u32, u64),
 ) -> LocationMetadataSync {
     LocationMetadataSync {
         locations,
@@ -355,6 +359,9 @@ pub(crate) fn metadata_sync(
         next_at: Instant::now(),
         idle: true,
         cycle_started_at: None,
+        safety_seconds,
+        safety_at: Instant::now() + Duration::from_secs(safety_seconds),
+        busy: false,
         change_tokens: HashMap::new(),
         scan_token: None,
         scan_delivered: false,
@@ -483,15 +490,9 @@ pub(crate) async fn begin_after_run(
         Ok(due) => due,
         Err(error) => return (state, Err(error)),
     };
-    let ran = match (state.cycle_started_at, due.runs_ended_at) {
-        (None, _) => true,
-        (Some(started_at), Some(ended_at)) => ended_at >= started_at,
-        (Some(_), None) => false,
-    };
+    let ran = state.sync_due(due.runs_ended_at);
     if ran {
-        state.idle = false;
-        state.cycle_started_at = Some(due.now);
-        state.next_at = Instant::now();
+        state.begin_sync(due.now);
     }
     (state, Ok(ran))
 }
@@ -589,6 +590,7 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
         }
         state.idle = true;
         state.next_at = Instant::now();
+        state.safety_at = Instant::now() + Duration::from_secs(state.safety_seconds);
         drop(write_output(&[(
             Stream::Stderr,
             "Warehouse history synchronization completed.\n",
@@ -699,6 +701,28 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
                 "SQLBUILD_METADATA_RECONCILE_SECONDS must be a positive integer".into(),
             )
         })?;
+    let environment = match std::env::var(SAFETY_SYNC_ENV) {
+        Ok(value) => Some(value),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(std::env::VarError::NotUnicode(_)) => {
+            return Err(ControlError::Invalid(format!(
+                "{SAFETY_SYNC_ENV} must be text"
+            )));
+        }
+    };
+    let safety_sync_seconds = safety_sync_seconds(
+        text(namespace, "location_sync_at_least_every").as_deref(),
+        environment.as_deref(),
+        || {
+            load_control_config(&project_config_paths(&project_dir)).map_err(|failure| {
+                failure.into_config_failure().map_or_else(
+                    || "sqlbuild_project.toml could not be read".to_owned(),
+                    |failure| failure.render(|_| "sqlbuild_project.toml".to_owned()),
+                )
+            })
+        },
+    )
+    .map_err(ControlError::Invalid)?;
     Ok(LocationServe {
         project_dir,
         server_url: text(namespace, "location_server_url").unwrap_or_default(),
@@ -706,7 +730,25 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
         target,
         image_id: text(namespace, "location_image_id"),
         metadata_reconcile_seconds,
+        safety_sync_seconds,
     })
+}
+
+/// The safety sync interval from the flag, then the environment, then the project, then thirty minutes.
+pub(crate) fn safety_sync_seconds(
+    flag: Option<&str>,
+    environment: Option<&str>,
+    project: impl FnOnce() -> Result<ControlConfig, String>,
+) -> Result<u64, String> {
+    if let Some(text) = flag {
+        return sync_interval_seconds(text).map_err(|help| format!("--sync-at-least-every {help}"));
+    }
+    if let Some(text) = environment.filter(|text| !text.trim().is_empty()) {
+        return sync_interval_seconds(text).map_err(|help| format!("{SAFETY_SYNC_ENV} {help}"));
+    }
+    Ok(project()?
+        .sync_at_least_every_seconds
+        .unwrap_or(METADATA_SAFETY_SYNC_SECONDS))
 }
 
 /// Reconcile from the server after restarts or lost acknowledgements; transient outages retry.
@@ -1152,6 +1194,7 @@ pub(crate) async fn read_metadata_page(
     mut state: LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationMetadataSync, Option<WarehouseHistoryPage>)>, ControlError> {
+    state.busy = false;
     if let Some(statistics) = &state.statistics
         && statistics.names.is_empty()
     {
@@ -1181,9 +1224,14 @@ pub(crate) async fn read_metadata_page(
             Duration::from_secs(METADATA_POLL_SECONDS),
             exchange_metadata_read(reader, request),
         ) => match result {
-            Ok((reader, Ok(page))) => {
+            Ok((reader, Ok(MetadataReply::Page(page)))) => {
                 state.reader = Some(reader);
                 Ok(Some((state, page)))
+            }
+            Ok((reader, Ok(MetadataReply::Busy))) => {
+                state.busy = true;
+                state.reader = Some(reader);
+                Ok(Some((state, None)))
             }
             Ok((reader, Err(_))) => {
                 stop_location_runtime(Some(reader)).await?;
@@ -1230,10 +1278,7 @@ pub(crate) async fn close_metadata_reader(
 async fn exchange_metadata_read(
     mut reader: LocationCompiler,
     request: Vec<u8>,
-) -> (
-    LocationCompiler,
-    Result<Option<WarehouseHistoryPage>, ControlError>,
-) {
+) -> (LocationCompiler, Result<MetadataReply, ControlError>) {
     let result = async {
         reader.stdin.write_all(&request).await?;
         reader.stdin.write_all(b"\n").await?;
@@ -1253,7 +1298,13 @@ async fn exchange_metadata_read(
                 "location reply exceeds its byte limit".into(),
             ));
         }
-        serde_json::from_str(&line)
+        let reply: serde_json::Value = serde_json::from_str(&line)
+            .map_err(|_| ControlError::Invalid("invalid location reply".into()))?;
+        if reply.get("busy") == Some(&serde_json::Value::Bool(true)) {
+            return Ok(MetadataReply::Busy);
+        }
+        serde_json::from_value(reply)
+            .map(MetadataReply::Page)
             .map_err(|_| ControlError::Invalid("invalid location reply".into()))
     }
     .await;

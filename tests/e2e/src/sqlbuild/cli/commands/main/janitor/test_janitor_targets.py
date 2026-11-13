@@ -162,7 +162,7 @@ def test_given_prod_old_name_view_when_previewing_early_drop_as_prod_then_view_i
             expected_stdout_fragments=(
                 "Janitor preview  prod",
                 "prod.customers  ->  prod._sqb_archive__",
-                "\u2713 Janitor completed  archived 1, deleted 1, pruned 3",
+                "\u2713 Janitor completed  archived 1, deleted 1, pruned 4",
             ),
             expected_deleted_names=(EXPIRED_ARCHIVE_NAME, "customers"),
             expected_archived_original_names=("customers",),
@@ -176,7 +176,7 @@ def test_given_prod_old_name_view_when_previewing_early_drop_as_prod_then_view_i
             expected_stdout_fragments=(
                 "Janitor preview  dev",
                 "dev.customers  ->  dev._sqb_archive__",
-                "\u2713 Janitor completed  archived 1, deleted 1, pruned 3",
+                "\u2713 Janitor completed  archived 1, deleted 1, pruned 4",
             ),
             expected_deleted_names=(EXPIRED_ARCHIVE_NAME, "customers"),
             expected_archived_original_names=("customers",),

@@ -393,12 +393,13 @@ def test_given_scenario_artifacts_when_running_direct_janitor_then_it_archives_t
             plan_command=("--no-color", "plan"),
             expected_exit_code=0,
             expected_stdout_fragments=(
-                "direct state pruned    3",
+                "direct state pruned    4",
                 "Eligible direct state pruning",
                 "main._sqlbuild_fingerprints  keep latest 2",
                 "main._sqlbuild_source_freshness  keep latest 2",
                 "main._sqlbuild_consumption  keep latest 2",
-                "Pruned 3 direct state tables.",
+                "main._sqlbuild_audit_results  keep latest 2",
+                "Pruned 4 direct state tables.",
             ),
             expected_fingerprint_count_before=5,
             expected_fingerprint_count_after=3,
@@ -406,6 +407,13 @@ def test_given_scenario_artifacts_when_running_direct_janitor_then_it_archives_t
             expected_source_freshness_count_after=2,
             expected_fingerprint_run_ids_after=("run_003", "run_002"),
             expected_source_freshness_run_ids_after=("run_003", "run_002"),
+            # Newest two per audit binding.
+            expected_audit_results_after=(
+                ("customers.unique_ids", "run_003"),
+                ("customers.unique_ids", "run_002"),
+                ("orders.valid_orders", "run_003"),
+                ("orders.valid_orders", "run_002"),
+            ),
         )
     ],
     ids=lambda case: case.description,
@@ -477,6 +485,13 @@ def test_given_direct_state_history_when_running_janitor_then_it_prunes_history(
             "ORDER BY observed_at DESC, run_id DESC"
         ),
     ) == [(run_id,) for run_id in test_case.expected_source_freshness_run_ids_after]
+    assert query_duckdb(
+        db_path=db_path,
+        sql=(
+            "SELECT binding_key, run_id FROM main._sqlbuild_audit_results "
+            "WHERE run_id LIKE 'run_%' ORDER BY binding_key, occurred_at DESC, result_id DESC"
+        ),
+    ) == list(test_case.expected_audit_results_after)
 
     plan_result: subprocess.CompletedProcess[str] = run_sqb(
         command=test_case.plan_command,

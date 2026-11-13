@@ -56,6 +56,17 @@ pub struct SettingSite<'a> {
     pub key: &'a str,
 }
 
+/// `[control]` of `sqlbuild_project.toml`: the server and location this project syncs with.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ControlConfig {
+    /// HTTPS origin of the SQLBuild server, as `sqb login --server` takes it.
+    pub server: Option<String>,
+    /// Name of the location whose warehouse copy a signed-in `sqb build` refreshes.
+    pub location: Option<String>,
+    /// Seconds between safety syncs of `sqb location serve`; `Some(0)` turns them off.
+    pub sync_at_least_every_seconds: Option<u64>,
+}
+
 /// `[review]` of `sqlbuild_project.toml`: the defaults `sqb review` uses when flags are omitted.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReviewConfig {
