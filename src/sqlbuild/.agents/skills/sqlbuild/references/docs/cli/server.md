@@ -236,8 +236,18 @@ next request, including sessions created by [`sqb login`](login.md).
 ## Sync from the warehouse now
 
 A code location reads what has been built, checks and freshness back from the warehouse when it
-starts and after each run the server starts has ended. It does not see a `sqb build` you run on
-your own machine until then. To sync now, select **Sync now** on the location's page, or run:
+starts, after each run the server starts has ended, and at least every 30 minutes. To pick up a
+`sqb build` you run on your own machine straight away, name the server and location in
+`sqlbuild_project.toml` and sign in with [`sqb login`](login.md):
+
+```toml
+[control]
+server = "https://control.example.com"
+location = "orders-warehouse"
+```
+
+Each `sqb build` then asks that location to sync the target the build used, and prints one line
+saying whether it did. You can also select **Sync now** on the location's page, or run:
 
 ```bash
 sqb control sync \
@@ -246,13 +256,36 @@ sqb control sync \
   --target development
 ```
 
-The command prints `{"applied": true}` when the server has queued the request. The location starts
-the sync within a few seconds, and the top bar shows when it last synced. A sync reads the
-warehouse and never writes to it. On Snowflake, it skips state tables that haven't changed since
-the last sync, so a sync with nothing new doesn't resume the warehouse.
+The command prints `{"applied": true}` when the server has queued the request, and
+`{"applied": false}` when a sync for that target is already waiting, which covers this request too.
+The location starts the sync within a few seconds, and the top bar shows when it last synced.
+
+| Setting | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `[control] server` | `SQLBUILD_CONTROL_SERVER` | none | HTTPS origin of the server, as `sqb login --server` takes it |
+| `[control] location` | `SQLBUILD_CONTROL_LOCATION` | none | Location name a signed-in `sqb build` asks to sync |
+| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"` | Longest a location waits between syncs; `"0"` or `"off"` turns it off |
+| none | `SQLBUILD_CONTROL_CA_CERT` | none | Extra trusted PEM CA certificate for the server |
+
+An environment variable overrides the project file. `sqb location serve --sync-at-least-every`
+overrides both. The interval uses the project's duration syntax, such as `"45m"` or `"2h"`, and
+must be at least `"1m"`.
 
 Requesting a sync needs the same access as a connection test: Developer or Admin on the location
 and target. Viewer and Operator cannot request one. Every request is recorded in the audit log.
+
+Details:
+
+- The sync after a build never changes the build's exit code and gives up after 5 seconds. It
+  prints nothing when `[control]` sets neither key or nobody is signed in to that server. When the
+  location is not one you can view, it prints `Warehouse sync skipped:` and the reason.
+- Requests that arrive while a sync is running, from builds, **Sync now**, ended runs or the
+  interval, add one more sync after it, not one each.
+- The interval restarts after every completed sync, so a location that syncs often for other
+  reasons never syncs extra.
+- A sync reads the warehouse and never writes to it. On Snowflake, it skips state tables that
+  haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
+- `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 
 ## Run ad-hoc commands
 
