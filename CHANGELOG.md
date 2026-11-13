@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.216.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.215.0...v0.216.0) (2026-11-13)
+
+
+### Features
+
+* **server:** preview plans from the synced warehouse copy ([#1437](https://github.com/sqlstack-io/sqlbuild/issues/1437)) ([45005ee](https://github.com/sqlstack-io/sqlbuild/commit/45005ee38feb4931d3c69a77b81f5ba7dee82dac))
+
 ## [0.215.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.214.1...v0.215.0) (2026-11-13)
 
 
