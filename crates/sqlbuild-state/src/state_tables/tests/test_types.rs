@@ -19,3 +19,10 @@ pub(crate) struct HistoryReadTestCase {
     pub(crate) after: Option<Vec<Option<String>>>,
     pub(crate) expected_sql: &'static str,
 }
+
+pub(crate) struct KeyReadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) has_event_id: bool,
+    pub(crate) rows: Vec<Vec<Option<String>>>,
+    pub(crate) expected_sql: &'static str,
+}

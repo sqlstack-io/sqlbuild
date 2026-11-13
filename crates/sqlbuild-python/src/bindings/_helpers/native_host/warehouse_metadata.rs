@@ -501,7 +501,6 @@ fn read_page<'py>(
     let projection: Vec<&str> = projection.iter().map(String::as_str).collect();
     if let (Some(keys), Some(key_columns)) = (keys, key_columns) {
         let page = rows_by_keys(
-            py,
             (session, request),
             (&qualified, &projection, has_event_id),
             (columns, timestamp),
@@ -881,12 +880,12 @@ fn key_read(request: &WarehouseHistoryRead) -> (bool, Option<&[Value]>) {
 
 /// Text keys select candidate rows; timestamps and collation-equal strings are compared exactly here.
 fn rows_by_keys<'py>(
-    py: Python<'py>,
     (session, request): (&HistorySession<'py>, &WarehouseHistoryRead),
     (qualified, projection, has_event_id): (&str, &[&str], bool),
     (columns, timestamp): (&[&str], &str),
     (key_columns, keys): (&[&str], &[Value]),
 ) -> PyResult<WarehouseHistoryPage> {
+    let py = session.adapter.py();
     let adapter = &session.adapter;
     let matched: Vec<&str> = key_columns
         .iter()

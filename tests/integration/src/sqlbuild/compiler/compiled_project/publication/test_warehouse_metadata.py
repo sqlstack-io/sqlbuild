@@ -10,6 +10,7 @@ import sys
 import time
 from contextlib import closing
 from datetime import UTC, datetime, timedelta, timezone
+from operator import itemgetter
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -470,7 +471,7 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
             "",
             "audit_result_history",
             append_audit_history,
-            key_width=3,
+            expected_key_width=3,
         ),
         KeyPageTestCase(
             "duckdb node results",
@@ -479,7 +480,7 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
             "external-run",
             "node_result_history",
             append_node_result_history,
-            key_width=9,
+            expected_key_width=9,
         ),
         KeyPageTestCase(
             "duckdb consumption",
@@ -488,7 +489,7 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
             "external-run",
             "consumption_history",
             append_consumption_history,
-            key_width=7,
+            expected_key_width=7,
         ),
         KeyPageTestCase(
             "sqlite observations",
@@ -497,7 +498,7 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
             "external-run",
             "observation_history",
             append_observation_history,
-            key_width=3,
+            expected_key_width=3,
         ),
     ],
     ids=lambda case: case.description,
@@ -610,7 +611,7 @@ def test_given_a_mirrored_location_when_a_reconcile_scan_runs_then_only_keys_and
 
             unchanged: list[tuple[bool, int]] = reconcile()
             assert unchanged, "a reconcile scan reads the warehouse"
-            assert set(unchanged) == {(True, test_case.key_width)}, (
+            assert set(unchanged) == {(True, test_case.expected_key_width)}, (
                 "a mirror that holds every row is reconciled from key pages alone"
             )
             assert mirrored() == initial
@@ -623,7 +624,7 @@ def test_given_a_mirrored_location_when_a_reconcile_scan_runs_then_only_keys_and
                 )
                 database.commit()
             repaired: list[tuple[bool, int]] = reconcile()
-            assert {read for read in repaired if read[0]} == {(True, test_case.key_width)}, (
+            assert set(filter(itemgetter(0), repaired)) == {(True, test_case.expected_key_width)}, (
                 "no page is read in full"
             )
             assert 1 <= sum(not ordered for ordered, _ in repaired) <= lost, (

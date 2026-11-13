@@ -5,7 +5,7 @@ use crate::state_tables::main::values_insert_sql::values_insert_sql;
 use crate::state_tables::models::HistoryRead;
 use crate::state_tables::tests::helpers::column;
 use crate::state_tables::tests::test_types::{
-    CreateTableTestCase, HistoryReadTestCase, ValuesInsertTestCase,
+    CreateTableTestCase, HistoryReadTestCase, KeyReadTestCase, ValuesInsertTestCase,
 };
 
 #[test]
@@ -114,17 +114,36 @@ fn given_a_table_without_event_ids_when_paging_history_then_the_missing_key_neve
 
 #[test]
 fn given_missing_keys_when_reading_rows_then_each_key_matches_its_columns_and_nulls() {
-    assert_eq!(
-        read_keys_sql(
-            "s.t",
-            (&["k", "phase", "ts"], false),
-            &["k", "phase"],
-            &[
+    let test_cases = [
+        KeyReadTestCase {
+            description: "a NULL key column matches IS NULL, never = NULL",
+            has_event_id: false,
+            rows: vec![
                 vec![Some("'a'".to_owned()), None],
                 vec![Some("'b'".to_owned()), Some("'final'".to_owned())],
             ],
-        ),
-        "SELECT k, phase, ts, NULL AS event_id FROM s.t WHERE (k = 'a' AND phase IS NULL) \
-            OR (k = 'b' AND phase = 'final')"
-    );
+            expected_sql: "SELECT k, phase, ts, NULL AS event_id FROM s.t WHERE \
+                (k = 'a' AND phase IS NULL) OR (k = 'b' AND phase = 'final')",
+        },
+        KeyReadTestCase {
+            description: "a real event ID is projected after the key columns",
+            has_event_id: true,
+            rows: vec![vec![Some("'a'".to_owned()), Some("'start'".to_owned())]],
+            expected_sql: "SELECT k, phase, ts, event_id FROM s.t WHERE (k = 'a' AND phase = 'start')",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            read_keys_sql(
+                "s.t",
+                (&["k", "phase", "ts"], test_case.has_event_id),
+                &["k", "phase"],
+                &test_case.rows,
+            ),
+            test_case.expected_sql,
+            "{}",
+            test_case.description
+        );
+    }
 }

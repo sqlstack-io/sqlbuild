@@ -14,22 +14,17 @@ pub fn read_keys_sql(
     } else {
         ", NULL AS event_id"
     });
-    let matches: Vec<String> = rows
-        .iter()
-        .map(|row| {
-            let terms: Vec<String> = key_columns
-                .iter()
-                .zip(row)
-                .map(|(column, literal)| {
-                    literal.as_ref().map_or_else(
-                        || format!("{column} IS NULL"),
-                        |literal| format!("{column} = {literal}"),
-                    )
-                })
-                .collect();
-            format!("({})", terms.join(" AND "))
-        })
-        .collect();
+    let mut matches: Vec<String> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let mut terms: Vec<String> = Vec::with_capacity(key_columns.len());
+        for (column, literal) in key_columns.iter().zip(row) {
+            terms.push(match literal {
+                Some(literal) => format!("{column} = {literal}"),
+                None => format!("{column} IS NULL"),
+            });
+        }
+        matches.push(format!("({})", terms.join(" AND ")));
+    }
     format!(
         "SELECT {projection} FROM {qualified_name} WHERE {}",
         matches.join(" OR ")

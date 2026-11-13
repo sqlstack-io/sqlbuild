@@ -41,7 +41,7 @@ use sqlbuild_orchestration::store::main::set_release_version::set_release_versio
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, StatisticsRetention,
+    MetadataBatch, MetadataKeyPage, MetadataScan, StatisticsDueRead, StatisticsRead, StatisticsRetention,
     WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead,
     WarehouseWatermarkRead,
 };
@@ -89,7 +89,7 @@ use crate::native_commands::models::{
     LocationMetadataPage, LocationMetadataSync, LocationServe, LostStdout, MetadataReply,
     NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
 };
-use crate::native_commands::types::LocationPublication;
+use crate::native_commands::types::{KeyedPage, LocationPublication};
 use crate::workers::main::docker_image_sources::docker_image_sources;
 use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
@@ -442,8 +442,8 @@ pub(crate) fn freeze_history_page(
         state.scan_token.clone_from(&page.change_token);
         state.scan_delivered = false;
     }
-    // Rows a key page matched were delivered earlier; an emptied mirror must not skip their scan.
-    state.scan_delivered |= !page.records.is_empty() || !page.keys.is_empty();
+    let key_page_matched_earlier_deliveries = !page.keys.is_empty();
+    state.scan_delivered |= !page.records.is_empty() || key_page_matched_earlier_deliveries;
     let batch = MetadataBatch {
         kind: state.kind(),
         session_id: poll.session_id,
@@ -1324,4 +1324,81 @@ async fn exchange_metadata_read(
     }
     .await;
     (reader, result)
+}
+
+/// A key page joins the mirror's rows to the scan; only the rows it lacks are read in full.
+pub(crate) async fn missing_rows(
+    (state, page): (LocationMetadataSync, Option<WarehouseHistoryPage>),
+    (options, script): (&LocationServe, &Path),
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    (started, stopped): (Instant, impl Future<Output = Result<(), ControlError>>),
+) -> Result<KeyedPage, ControlError> {
+    let page = match page {
+        Some(page) if !page.keys.is_empty() => page,
+        page => return Ok(Ok((state, page))),
+    };
+    tokio::pin!(stopped);
+    let request = MetadataKeyPage {
+        kind: state.kind(),
+        session_id: poll.session_id,
+        generation: state.generation,
+        scan: MetadataScan {
+            scan_id: state.scan_id,
+            location: state.location().clone(),
+            complete: false,
+        },
+        keys: page.keys.clone(),
+    };
+    let matched = tokio::select! {
+        result = &mut stopped => { result?; return Ok(Err(None)); },
+        result = client.match_metadata_keys(&options.target, &request) => result,
+    };
+    let missing: Vec<serde_json::Value> = match matched {
+        Ok(matched) => matched
+            .missing
+            .iter()
+            .filter_map(|index| request.keys.get(*index).cloned())
+            .collect(),
+        Err(error) => {
+            tokio::select! {
+                result = &mut stopped => { result?; return Ok(Err(None)); },
+                () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
+            }
+            return retry_metadata(state, error).map(Err);
+        }
+    };
+    if missing.is_empty() {
+        return Ok(Ok((state, Some(page))));
+    }
+    let Some((state, read)) =
+        read_metadata_page((options, script), (state, Some(&missing)), stopped).await?
+    else {
+        return Ok(Err(None));
+    };
+    let page = read.map(|read| WarehouseHistoryPage {
+        records: read.records,
+        ..page
+    });
+    Ok(Ok((state, page)))
+}
+
+/// Configuration and credential failures stop the location; anything else retries after a poll interval.
+pub(crate) fn retry_metadata(
+    mut state: LocationMetadataSync,
+    error: ClientError,
+) -> Result<Option<LocationMetadataSync>, ControlError> {
+    if matches!(error, ClientError::Configuration(_))
+        || matches!(error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
+    {
+        return Err(ControlError::Invalid(error.to_string()));
+    }
+    state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+    state.reader = None;
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!(
+            "Warehouse history synchronization failed; retaining progress and exact pending page for retry: {error}\n"
+        ),
+    )]));
+    Ok(Some(state))
 }
