@@ -346,7 +346,7 @@ export class MockOperate {
 				if (row.resourceType === '_total') {
 					add(all, null, row);
 					add(byJob, rec.run.jobKey, row);
-					if (row.status !== 'complete') incompleteRuns += 1;
+					if (row.status === 'pending' || row.status === 'partial') incompleteRuns += 1;
 				} else {
 					add(bySize, row.warehouseSize || null, row);
 					add(byNode, row.nodeKey, row);

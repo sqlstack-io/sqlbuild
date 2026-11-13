@@ -1684,17 +1684,14 @@ export interface components {
         /** @description A target's estimated query cost over a window, from the latest observation of each run. */
         CostSummaryRecord: {
             by_job: components["schemas"]["CostGroup"][];
-            /**
-             * @description Every node that ran, keyed `<resource_type>:<resource_name>` like catalog node keys, so
-             *     callers can group nodes by folder.
-             */
+            /** @description Every node that ran, keyed `<resource_type>:<resource_name>` like catalog node keys. */
             by_node: components["schemas"]["CostGroup"][];
             by_warehouse_size: components["schemas"]["CostGroup"][];
             /** Format: double */
             credits: number;
             /**
              * Format: int64
-             * @description Runs whose cost is still pending or partial, or whose collection failed.
+             * @description Runs whose cost is still pending or partial, which a later build re-reads.
              */
             incomplete_runs: number;
             /** Format: int64 */
@@ -3450,10 +3447,7 @@ export interface components {
             state_schema: string;
             value: string;
         };
-        /**
-         * @description One estimated query cost observation of a run, resource and warehouse; display only.
-         *     A refresh appends a later attempt, and readers take the newest attempt per key.
-         */
+        /** @description One estimated query cost observation of a run, resource and warehouse; refreshes append. */
         WarehouseResourceCostRecord: {
             /** Format: int64 */
             attempt: number;

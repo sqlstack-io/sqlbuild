@@ -11,7 +11,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_history::_helpers::costs::{
-    Accumulator, COMPLETE_STATUS, TOTAL_RESOURCE_TYPE, latest_costs_in, ranked,
+    Accumulator, PENDING_STATUSES, TOTAL_RESOURCE_TYPE, latest_costs_in, ranked,
 };
 use crate::warehouse_history::models::{CostGroup, CostSummaryRecord};
 
@@ -42,7 +42,7 @@ pub async fn read_person_cost_summary(
         let record = &cost.record;
         if record.resource_type == TOTAL_RESOURCE_TYPE {
             total.add(cost);
-            incomplete_runs += i64::from(record.status != COMPLETE_STATUS);
+            incomplete_runs += i64::from(PENDING_STATUSES.contains(&record.status.as_str()));
             by_job.entry(cost.job_key.clone()).or_default().add(cost);
             continue;
         }

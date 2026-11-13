@@ -209,7 +209,7 @@ pub struct CostSummaryRecord {
     pub credits: f64,
     pub usd: Option<f64>,
     pub runs: i64,
-    /// Runs whose cost is still pending or partial, or whose collection failed.
+    /// Runs whose cost is still pending or partial, which a later build re-reads.
     pub incomplete_runs: i64,
     pub by_job: Vec<CostGroup>,
     pub by_warehouse_size: Vec<CostGroup>,

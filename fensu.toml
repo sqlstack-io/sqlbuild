@@ -1853,7 +1853,7 @@ paths = ["src/sqlbuild/adapter/contract/classes/*", "src/sqlbuild/adapters/*/cla
 reason = "tests/unit/src/sqlbuild/adapter/contract/classes/strict_adapter/test_strict_adapter.py requires every first-class adapter to define each StrictAdapter method itself instead of inheriting it from BaseAdapter."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python/src/bindings/_helpers/native_host/audit_results_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/observations_state.rs"]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/native_host/audit_results_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/observations_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/resource_costs_state.rs"]
 reason = "Each state table has its own Python-facing create and prune bindings. The DDL and table naming live in the shared fixed_state_table_sql and state_table_name; each prune keeps its own retention rule."
 
 [[dupes.allowlist]]

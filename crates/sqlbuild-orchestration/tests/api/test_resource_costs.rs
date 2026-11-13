@@ -20,12 +20,12 @@ fn given_refreshed_and_unpriced_costs_when_people_read_cost_then_latest_observat
         WarehouseMetadataTestCase {
             description: "SQLite cost reads",
             backend: Backend::Sqlite,
-            expected_observations: 11,
+            expected_observations: 12,
         },
         WarehouseMetadataTestCase {
             description: "PostgreSQL cost reads",
             backend: Backend::Postgres,
-            expected_observations: 11,
+            expected_observations: 12,
         },
     ];
     for test_case in test_cases {
@@ -141,6 +141,18 @@ fn given_refreshed_and_unpriced_costs_when_people_read_cost_then_latest_observat
                 "newest first, each build once with its latest status"
             );
             assert!((orders[0]["credits"].as_f64().expect("credits") - 0.25).abs() < 1e-9);
+
+            let (_, payments) = get(
+                &client,
+                (&api.url, &viewer),
+                &format!("{path}/nodes/model:payments/cost?days=30"),
+            )
+            .await;
+            assert_eq!(
+                payments,
+                json!([]),
+                "a resource only the superseded attempt saw has no current cost"
+            );
 
             let (_, run_cost) = get(
                 &client,

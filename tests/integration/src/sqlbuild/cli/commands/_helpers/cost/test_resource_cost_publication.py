@@ -93,9 +93,9 @@ def test_given_later_builds_when_publishing_cost_then_only_improved_refreshes_ar
             "FROM main._sqlbuild_resource_costs "
             "WHERE resource_type = '_total' AND resource_name = 'run-1' AND attempt = 2"
         ).fetchone()
-        models: int = connection.execute(
+        models: list[tuple[Any, ...]] = connection.execute(
             "SELECT COUNT(*) FROM main._sqlbuild_resource_costs WHERE resource_type = 'model'"
-        ).fetchone()[0]
+        ).fetchall()
 
     assert runs == [
         ("run-1", 1, "partial", 2),
@@ -105,6 +105,6 @@ def test_given_later_builds_when_publishing_cost_then_only_improved_refreshes_ar
         ("run-4", 1, "complete", 4),
     ], "the partial run-1 is refreshed once, and run-3's regressed re-read is not appended"
     assert adapter.collected == ["run-1", "run-2", "run-1", "run-3", "run-4", "run-3"]
-    assert models == len(runs), "each attempt also records its model row"
+    assert models == [(len(runs),)], "each attempt also records its model row"
     assert refreshed is not None
     assert refreshed == (test_case.expected_run_usd, Decimal("0.12"))

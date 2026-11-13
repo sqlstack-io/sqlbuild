@@ -37,7 +37,7 @@
 	});
 	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs']);
 	const colLineage = createResource((client, scope) => client.getColumnLineage(scope, name), ['snapshot']);
-	const costs = createResource((client, scope) => (client.supports('listNodeCosts') ? client.listNodeCosts(scope, name, COST_DAYS) : Promise.resolve([])), ['runs', 'warehouse_sync']);
+	const costs = createResource((client, scope) => (n && client.supports('listNodeCosts') ? client.listNodeCosts(scope, n.key, COST_DAYS) : Promise.resolve([])), ['runs', 'warehouse_sync']);
 
 	const tabs = $derived.by<[Tab, string][]>(() => {
 		if (!n) return [['overview', 'Overview']];

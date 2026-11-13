@@ -8,7 +8,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::RESOURCE_COSTS_TABLE_NAME;
 use sqlbuild_core::cost_command::models::CostCoverage;
 use sqlbuild_core::cost_report::models::CostSummary;
-use sqlbuild_state::consumption::constants::INTEGER_STATE_VALUE_TYPE;
 use sqlbuild_state::events::main::resource_cost_observation_id::resource_cost_observation_id;
 use sqlbuild_state::resource_costs::constants::{
     NULLABLE_RESOURCE_COST_COLUMNS, RESOURCE_COST_COLUMN_TYPES, TOTAL_RESOURCE_TYPE,
@@ -19,11 +18,10 @@ use sqlbuild_state::resource_costs::models::{ResourceCostKey, RunCostAttempt};
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
-use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
 use crate::bindings::_helpers::execution_history::conversion::{parsed_iso, utc};
 use crate::bindings::_helpers::native_host::consumption_state::{
-    Location, ROWS_PER_STATEMENT, execute, fixed_state_table_sql, literal, optional_text,
-    state_table_name,
+    Location, ROWS_PER_STATEMENT, execute, fixed_state_table_sql, integer_literal, literal,
+    optional_text, state_table_name,
 };
 use crate::bindings::_helpers::records::fields::field as native_field;
 
@@ -79,14 +77,6 @@ pub(crate) struct CostRunIdentity<'a> {
     pub(crate) target_name: Option<&'a str>,
     pub(crate) started_at: &'a str,
     pub(crate) completed_at: &'a str,
-}
-
-fn integer(py: Python<'_>, value: Option<i64>) -> PyResult<String> {
-    let value: Bound<'_, PyAny> = value.map_or_else(
-        || py.None().into_bound(py),
-        |value| PyInt::new(py, value).into_any(),
-    );
-    render_state_sql_literal(py, &value, INTEGER_STATE_VALUE_TYPE, None)
 }
 
 fn table(adapter: &Bound<'_, PyAny>, location: &Location) -> PyResult<Option<String>> {
@@ -167,21 +157,21 @@ fn observation_cells(
                 literal(py, Some(&observation_id))?,
                 literal(py, Some(run.run_id))?,
                 literal(py, run.orchestration_run_id)?,
-                integer(py, Some(attempt))?,
+                integer_literal(py, Some(attempt))?,
                 literal(py, Some(row.resource_type))?,
                 literal(py, Some(row.resource_name))?,
                 literal(py, Some(row.warehouse_name))?,
                 literal(py, Some(row.warehouse_size))?,
                 literal(py, row.warehouse_type)?,
-                integer(py, row.cluster_number)?,
-                integer(py, Some(row.query_count))?,
+                integer_literal(py, row.cluster_number)?,
+                integer_literal(py, Some(row.query_count))?,
                 literal(py, Some(row.attributed_seconds))?,
-                integer(py, Some(row.bytes_scanned))?,
+                integer_literal(py, Some(row.bytes_scanned))?,
                 literal(py, Some(row.estimated_credits))?,
                 literal(py, row.estimated_usd.as_deref())?,
                 literal(py, Some(&summary.status))?,
-                integer(py, Some(summary.expected_statement_count))?,
-                integer(py, Some(summary.observed_statement_count))?,
+                integer_literal(py, Some(summary.expected_statement_count))?,
+                integer_literal(py, Some(summary.observed_statement_count))?,
                 literal(py, Some(&limitations))?,
                 literal(py, run.target_name)?,
                 literal(py, Some(run.started_at))?,

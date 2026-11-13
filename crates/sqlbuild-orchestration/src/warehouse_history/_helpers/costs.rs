@@ -13,28 +13,22 @@ use crate::warehouse_metadata::models::WarehouseResourceCostRecord;
 
 /// Total rows carry a build's totals; every other row is one resource on one warehouse.
 pub(crate) const TOTAL_RESOURCE_TYPE: &str = "_total";
-/// A build whose cost is final.
-pub(crate) const COMPLETE_STATUS: &str = "complete";
+/// Statuses of a build whose cost may still change: a later build re-reads it.
+pub(crate) const PENDING_STATUSES: [&str; 2] = ["pending", "partial"];
 
-/// Newest attempt per run, resource and warehouse; a refresh appends, so older attempts stay.
-pub(crate) const RUN_COST_SQL: &str = "SELECT record_json FROM (SELECT record_json, ROW_NUMBER() OVER \
-    (PARTITION BY run_id, resource_type, resource_name, record_json ->> 'warehouse_name', \
-    record_json ->> 'warehouse_size', record_json ->> 'warehouse_type', \
-    record_json ->> 'cluster_number' ORDER BY attempt DESC, observed_at DESC, event_id DESC) AS newest \
-    FROM sqb_warehouse_resource_costs WHERE location_id=$1 AND target=$2 \
-    AND orchestration_run_id=$3) costs WHERE newest=1 \
+/// Every row of the run's newest attempt; a refresh appends a whole attempt, so older ones stay.
+pub(crate) const RUN_COST_SQL: &str = "SELECT record_json FROM (SELECT record_json, attempt, \
+    MAX(attempt) OVER (PARTITION BY run_id) AS newest FROM sqb_warehouse_resource_costs \
+    WHERE location_id=$1 AND target=$2 AND orchestration_run_id=$3) costs WHERE attempt=newest \
     ORDER BY record_json ->> 'resource_type', record_json ->> 'resource_name'";
 
-/// Newest attempt per run, resource and warehouse since `$3`, optionally of one node (`$4`, `$5`).
+/// Rows of each run's newest attempt since `$3`, optionally only a node's (`$4`, `$5`) and totals.
 const LATEST_COSTS_SQL: &str = "SELECT c.record_json, r.job_key FROM (SELECT record_json, \
-    orchestration_run_id, ROW_NUMBER() OVER (PARTITION BY run_id, resource_type, resource_name, \
-    record_json ->> 'warehouse_name', record_json ->> 'warehouse_size', \
-    record_json ->> 'warehouse_type', record_json ->> 'cluster_number' \
-    ORDER BY attempt DESC, observed_at DESC, event_id DESC) AS newest \
+    orchestration_run_id, attempt, MAX(attempt) OVER (PARTITION BY run_id) AS newest \
     FROM sqb_warehouse_resource_costs WHERE location_id=$1 AND target=$2 AND run_started_at >= $3 \
     AND (CAST($4 AS TEXT) IS NULL OR resource_type IN ('_total', $4)) \
     AND (CAST($5 AS TEXT) IS NULL OR resource_type='_total' OR resource_name=$5)) c \
-    LEFT JOIN sqb_runs r ON CAST(r.run_id AS TEXT)=c.orchestration_run_id WHERE c.newest=1";
+    LEFT JOIN sqb_runs r ON CAST(r.run_id AS TEXT)=c.orchestration_run_id WHERE c.attempt=c.newest";
 
 /// One latest observation and the job of the server run that built it, if any.
 pub(crate) struct LatestCost {

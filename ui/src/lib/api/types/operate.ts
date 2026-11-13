@@ -336,7 +336,7 @@ export type CostSummary = {
 	/** Null when any run in the window had no configured credit price. */
 	usd: number | null;
 	runs: number;
-	/** Runs whose cost is still pending or partial, or whose collection failed. */
+	/** Runs whose cost is still pending or partial, which a later build re-reads. */
 	incompleteRuns: number;
 	byJob: CostGroup[];
 	byWarehouseSize: CostGroup[];
