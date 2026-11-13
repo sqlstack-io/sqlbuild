@@ -12,6 +12,7 @@ use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 use sqlbuild_rules::project_tree::main::project_real_path::project_real_path;
 use tokio::time::Instant;
 
+use crate::native_commands::constants::LOCATION_COMMIT_CHECK_SECONDS;
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{LocationWatch, ProjectLocation};
 use crate::replay::main::output_file_identities::output_file_identities;
@@ -25,12 +26,16 @@ pub(crate) fn location_watch(root: &Path) -> LocationWatch {
         .collect();
     let local_files = location_database_files(root, files);
     LocationWatch {
-        observed: location_inputs(root, &rules, &local_files),
+        observed: (
+            location_files(root, &rules, &local_files),
+            head_commit(root),
+        ),
         rules,
         local_files,
         attempted: None,
         changed_at: tokio::time::Instant::now(),
         retry_at: None,
+        commit_checked_at: tokio::time::Instant::now(),
     }
 }
 
@@ -39,7 +44,18 @@ pub(crate) fn observe_location_inputs(
     root: &Path,
     mut watch: LocationWatch,
 ) -> (LocationWatch, bool) {
-    let current = location_inputs(root, &watch.rules, &watch.local_files);
+    let commit = if watch.commit_checked_at.elapsed()
+        >= Duration::from_secs(LOCATION_COMMIT_CHECK_SECONDS)
+    {
+        watch.commit_checked_at = Instant::now();
+        head_commit(root)
+    } else {
+        watch.observed.1.clone()
+    };
+    let current = (
+        location_files(root, &watch.rules, &watch.local_files),
+        commit,
+    );
     if watch.observed != current {
         watch.observed = current;
         watch.changed_at = Instant::now();
@@ -74,12 +90,12 @@ fn location_rules() -> SnapshotRules {
     }
 }
 
-/// Git commits matter to publication metadata even when no working-tree file changes.
-pub(crate) fn location_inputs(
+/// The project files a location publishes; the watch adds the git commit on its own cadence.
+pub(crate) fn location_files(
     root: &Path,
     rules: &SnapshotRules,
     local_files: &[PathBuf],
-) -> (Vec<PathStamp>, Option<String>) {
+) -> Vec<PathStamp> {
     let mut stamps = snapshot_project_files(root, rules);
     stamps.retain(|stamp| {
         !rules
@@ -107,7 +123,7 @@ pub(crate) fn location_inputs(
         });
     }
     stamps.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
-    (stamps, head_commit(root))
+    stamps
 }
 
 /// Apply resolved exclusions to retained observations, never a fresh snapshot of possible source edits.

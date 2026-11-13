@@ -54,7 +54,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
-use tokio::time::{Instant, MissedTickBehavior};
+use tokio::time::{Instant, Interval, MissedTickBehavior};
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream, Value};
@@ -86,8 +86,8 @@ use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
-    LocationMetadataPage, LocationMetadataSync, LocationServe, LostStdout, MetadataReply,
-    NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
+    LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
+    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
 };
 use crate::native_commands::types::LocationPublication;
 use crate::workers::main::docker_image_sources::docker_image_sources;
@@ -1309,4 +1309,29 @@ async fn exchange_metadata_read(
     }
     .await;
     (reader, result)
+}
+
+/// Wait for the next tick unless a synchronization's next page is due; `Some` means shutdown.
+pub(crate) async fn next_turn(
+    clock: &mut Interval,
+    (published, watch, metadata): (Option<i64>, &LocationWatch, &Option<LocationMetadataSync>),
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Option<Result<(), ControlError>> {
+    if published.is_some()
+        && watch.attempted.as_ref() == Some(&watch.observed)
+        && metadata.as_ref().is_some_and(LocationMetadataSync::paging)
+    {
+        return None;
+    }
+    tokio::select! {
+        result = stopped => Some(result),
+        _ = clock.tick() => None,
+    }
+}
+
+/// The location's 250 ms turn; a slow turn skips missed ticks instead of bursting.
+pub(crate) fn location_clock() -> Interval {
+    let mut clock = tokio::time::interval(Duration::from_millis(250));
+    clock.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    clock
 }

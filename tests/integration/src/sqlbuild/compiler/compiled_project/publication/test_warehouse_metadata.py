@@ -5,6 +5,7 @@ import gzip
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 import sys
 import time
@@ -42,6 +43,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     CatalogConnectionTestCase,
     FingerprintHistoryTestCase,
     StateEventsTestCase,
+    SyncPacingTestCase,
     WarehouseHistoryTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
@@ -345,6 +347,14 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
             (
                 "duckdb",
                 "database",
+                "consumption_history",
+                append_consumption_history,
+                "external-run",
+                (),
+            ),
+            (
+                "sqlite",
+                "path",
                 "consumption_history",
                 append_consumption_history,
                 "external-run",
@@ -1482,3 +1492,123 @@ def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or
                 database.commit()
             assert resync() == ["_sqlbuild_source_freshness"], "a lost mirror is read again"
             assert mirrored() == (initial[0] + changed_rows, initial[1])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SyncPacingTestCase(
+            "SQLite pages back to back",
+            "sqlite",
+            "path",
+            "legacy-run",
+            added_rows=4000,
+            idle_seconds=4.0,
+            expected_max_seconds=9.5,
+            expected_max_git_calls=4,
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_served_location_when_a_sync_has_many_pages_then_pages_run_back_to_back_and_idle_git_checks_are_rare(
+    test_case: SyncPacingTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    adapter.close(connection)
+    (project / "orchestration/orders.py").write_text("")
+    fixture: dict[str, Any] = json.loads(
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/automatic_warehouse_history.json"
+        ).read_text()
+    )
+    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    shim: Path = tmp_path / "git-shim"
+    shim.mkdir()
+    calls: Path = shim / "calls.log"
+    calls.write_text("")
+    (shim / "git").write_text(f'#!/bin/sh\necho "$*" >> {calls}\nexec {shutil.which("git")} "$@"\n')
+    (shim / "git").chmod(0o755)
+    with snapshot_api(tmp_path / "control") as api:
+        log: Path = tmp_path / "location.log"
+        control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ
+            | {
+                "SQLBUILD_LOCATION_TOKEN": api.bearer,
+                "SQLBUILD_METADATA_RECONCILE_SECONDS": "3600",
+                "PATH": f"{shim}{os.pathsep}{os.environ['PATH']}",
+            },
+        ) as location:
+            _ = wait_for_generation(api, "development", 1, location, log)
+
+            def synced(completed: int) -> None:
+                deadline: float = time.monotonic() + 60
+                while log.read_text().count("synchronization completed") == completed:
+                    assert location.poll() is None, log.read_text()
+                    assert time.monotonic() < deadline, log.read_text()
+                    time.sleep(0.01)
+
+            synced(0)
+            connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
+            _ = adapter.execute(
+                connection=connection,
+                sql=(
+                    "INSERT INTO _sqlbuild_fingerprints SELECT node_type,"
+                    "'orders-paced-' || page.i,target_database,target_schema,target_name,"
+                    "'paced-run',definition_hash,version_hash,schema_fingerprint,"
+                    "definition_b64,metadata_json_b64,ts FROM _sqlbuild_fingerprints "
+                    "CROSS JOIN (WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n "
+                    f"WHERE i < {test_case.added_rows - 1}) SELECT i FROM n) AS page "
+                    f"WHERE run_id='{test_case.expected_run_id}'"
+                ),
+            )
+            adapter.close(connection)
+            completed: int = log.read_text().count("synchronization completed")
+            reading: int = log.read_text().count("Reading warehouse history")
+            record_finished_run(control)
+            deadline: float = time.monotonic() + 30
+            while log.read_text().count("Reading warehouse history") == reading:
+                assert time.monotonic() < deadline, log.read_text()
+                time.sleep(0.01)
+            started: float = time.monotonic()
+            synced(completed)
+            elapsed: float = time.monotonic() - started
+            with closing(sqlite3.connect(control)) as database:
+                paced: int = database.execute(
+                    "SELECT COUNT(*) FROM sqb_warehouse_fingerprints "
+                    "WHERE json_extract(record_json, '$.run_id') = 'paced-run'"
+                ).fetchone()[0]
+            assert paced == test_case.added_rows, test_case.description
+            assert elapsed < test_case.expected_max_seconds, (
+                f"{test_case.description}: {elapsed:.1f} s for "
+                f"{test_case.added_rows // 100} pages; a tick per page needs at least "
+                f"{test_case.added_rows / 400:.0f} s"
+            )
+
+            calls.write_text("")
+            time.sleep(test_case.idle_seconds)
+            idle_calls: list[str] = calls.read_text().splitlines()
+            assert len(idle_calls) <= test_case.expected_max_git_calls, (
+                f"{test_case.description}: an idle location ran git {len(idle_calls)} times "
+                f"in {test_case.idle_seconds} s"
+            )
