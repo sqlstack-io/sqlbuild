@@ -13,6 +13,7 @@ use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
+use crate::store::main::store_bytes::store_bytes;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub(crate) async fn scan_health(
@@ -61,11 +62,18 @@ pub(crate) async fn scan_health(
         return Ok(());
     }
     let transaction = begin(store, TransactionMode::Write).await?;
+    let (transaction, store_bytes) = store_bytes(transaction).await?;
     commit(
         observe(
             transaction,
             health.installation_id,
-            (PlatformEvent::Heartbeat { replica_id }, None),
+            (
+                PlatformEvent::Heartbeat {
+                    replica_id,
+                    store_bytes,
+                },
+                None,
+            ),
         )
         .await?,
     )

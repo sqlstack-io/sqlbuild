@@ -6,6 +6,7 @@ use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::platform::models::{InstallationRecord, StorageKind, StoredInstallation};
 use crate::store::errors::ControlError;
+use crate::store::main::store_bytes::store_bytes;
 use crate::store::main::{commit::commit, query_records::query_records};
 use crate::store::models::{ControlStore, ControlTransaction};
 
@@ -28,6 +29,7 @@ pub async fn read_installation(
         Vec::new(),
     )
     .await?;
+    let (transaction, store_bytes) = store_bytes(transaction).await?;
     commit(transaction).await?;
     let stored = rows.into_iter().next().ok_or_else(|| {
         ControlError::Invalid("the control store has no installation record".into())
@@ -41,5 +43,6 @@ pub async fn read_installation(
         installed_at: stored.installed_at,
         schema_checksum: stored.schema_checksum,
         schema_applied_at: stored.schema_applied_at,
+        store_bytes,
     })
 }

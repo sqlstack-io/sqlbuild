@@ -212,6 +212,7 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                 PlatformEvent::SchedulerNoLeader,
                 PlatformEvent::Heartbeat {
                     replica_id: Uuid::now_v7(),
+                    store_bytes: 0,
                 },
                 PlatformEvent::LocationBroken {
                     location_id: locations[1],

@@ -36,5 +36,7 @@ mod test_permissions;
 mod test_requests;
 #[path = "test_reruns.rs"]
 mod test_reruns;
+#[path = "test_run_logs.rs"]
+mod test_run_logs;
 #[path = "test_types.rs"]
 pub(crate) mod test_types;

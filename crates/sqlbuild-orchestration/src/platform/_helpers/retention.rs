@@ -8,6 +8,8 @@ use crate::platform::constants::{
     HEARTBEAT_PAGE, HEARTBEAT_RETENTION_DAYS, LOCATION_RETENTION_DAYS,
     PLATFORM_ALERT_RETENTION_DAYS, SENSOR_EVALUATION_RETENTION_DAYS,
 };
+use crate::runs::main::prune_run_logs::prune_run_logs;
+use crate::runs::models::RunLogRetention;
 use crate::snapshots::main::prune_snapshots::prune_snapshots;
 use crate::snapshots::models::SnapshotRetention;
 use crate::store::errors::ControlError;
@@ -40,9 +42,15 @@ const LOCATION_INSTANCES: &str = "DELETE FROM sqb_location_instances WHERE insta
 /// Returns how many audit rows outlive their horizon because a sink has not acknowledged them.
 pub(crate) async fn retain(
     store: &ControlStore,
-    (audit, statistics, snapshots): (AuditRetention, StatisticsRetention, SnapshotRetention),
+    (audit, statistics, snapshots, run_logs): (
+        AuditRetention,
+        StatisticsRetention,
+        SnapshotRetention,
+        RunLogRetention,
+    ),
     sinks: &[String],
 ) -> Result<i64, ControlError> {
+    prune_run_logs(store, run_logs).await?;
     prune_snapshots(store, snapshots).await?;
     while prune_statistics(store, statistics).await? == MAX_HISTORY_RECORDS {
         tokio::task::yield_now().await;

@@ -56,7 +56,12 @@ pub(crate) async fn run_control(
         start_platform_roles(
             &mut tasks,
             (&store, &shutdown),
-            (facts.audit, facts.statistics, facts.snapshots),
+            (
+                facts.audit,
+                facts.statistics,
+                facts.snapshots,
+                facts.run_logs,
+            ),
         )?;
     }
     if facts.scheduler {

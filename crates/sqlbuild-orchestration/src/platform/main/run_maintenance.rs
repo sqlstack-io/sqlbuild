@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::credentials::models::AuditRetention;
 use crate::platform::_helpers::retention::retain;
 use crate::platform::_helpers::watchdog::scan_health;
+use crate::runs::models::RunLogRetention;
 use crate::snapshots::models::SnapshotRetention;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -18,7 +19,12 @@ use crate::webhooks::models::{Webhook, WebhookSource};
 pub async fn run_maintenance(
     (store, replica_id): (&ControlStore, Uuid),
     (retention, sinks): (
-        (AuditRetention, StatisticsRetention, SnapshotRetention),
+        (
+            AuditRetention,
+            StatisticsRetention,
+            SnapshotRetention,
+            RunLogRetention,
+        ),
         &[Webhook],
     ),
     (report, mut shutdown): (impl Fn(i64), watch::Receiver<bool>),

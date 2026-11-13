@@ -197,6 +197,8 @@ pub enum PlatformEventKind {
 pub enum PlatformEvent {
     Heartbeat {
         replica_id: Uuid,
+        /// The control store's database size on disk when the replica checked in.
+        store_bytes: i64,
     },
     SchedulerNoLeader,
     TickOverdue {
@@ -420,6 +422,8 @@ pub struct InstallationRecord {
     /// Digest of the schema; a server starts only on the exact schema it creates.
     pub schema_checksum: String,
     pub schema_applied_at: DateTime<Utc>,
+    /// The database's size on disk now: SQLite's main file, or the whole PostgreSQL database.
+    pub store_bytes: i64,
 }
 
 /// The stored installation and schema rows.

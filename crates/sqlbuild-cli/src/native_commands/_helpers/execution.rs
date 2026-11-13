@@ -29,6 +29,7 @@ use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
     WarehouseSyncFailure,
 };
+use sqlbuild_orchestration::runs::models::RunLogRetention;
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -891,7 +892,12 @@ pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command 
 pub(crate) fn start_platform_roles(
     tasks: &mut JoinSet<Result<(), ControlError>>,
     (store, shutdown): (&ControlStore, &watch::Receiver<bool>),
-    retention: (AuditRetention, StatisticsRetention, SnapshotRetention),
+    retention: (
+        AuditRetention,
+        StatisticsRetention,
+        SnapshotRetention,
+        RunLogRetention,
+    ),
 ) -> Result<(), ControlError> {
     let mut sinks: Vec<(Webhook, &str)> = Vec::new();
     for (variable, source, label) in [

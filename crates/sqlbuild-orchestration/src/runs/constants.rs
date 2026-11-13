@@ -29,3 +29,12 @@ pub(crate) const PLAN_IGNORED_SETTING: &str = "warehouse";
 
 /// Hex digits kept of a worker's invocation-namespaced Recall ID: 128 bits.
 pub(crate) const NAMESPACED_ID_HEX: usize = 32;
+
+/// Days a finished run keeps its worker log by default.
+pub(crate) const DEFAULT_RUN_LOG_RETENTION_DAYS: u16 = 14;
+/// Finished runs per location target that keep their worker logs by default.
+pub(crate) const DEFAULT_RUN_LOG_RETENTION_COUNT: u16 = 200;
+/// Runs whose logs one writer transaction deletes.
+pub(crate) const RUN_LOG_RETENTION_BATCH: usize = 10;
+/// Artifact digests checked for remaining references per statement.
+pub(crate) const RUN_LOG_DIGEST_CHUNK: usize = 500;
