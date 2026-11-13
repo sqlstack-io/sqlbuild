@@ -13,7 +13,6 @@
 	import { kindLine } from '$lib/build-area/labels';
 	import { formatAgo } from '$lib/format/time';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
-	import { PERMISSIONS } from '$lib/platform/permission-catalog';
 	import { VERBS } from '$lib/run/command-table';
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
@@ -309,6 +308,7 @@
 					{:else}
 						<b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
+					{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code" title="Option">{value === true ? name : `${name}=${value}`}</span>{/each}
 					<div class="tabs" role="tablist">
 						<button role="tab" aria-selected={view === 'plan'} onclick={() => (view = 'plan')}>{shown.verb === 'build' ? 'Plan' : 'Nodes'}</button>
 						<button role="tab" aria-selected={view === 'graph'} onclick={() => (view = 'graph')}>Graph</button>
@@ -356,25 +356,6 @@
 		{/if}
 		</div>
 
-		<!-- Always present, so the result never changes width when the check returns. -->
-		<aside class="rail sb-scroll" class:stale={!fresh || !!problem}>
-		{#if shown?.verb}
-				<h3>Permissions</h3>
-				{#each job ? jobPermissions : shown.permissions as p (p.action)}
-					<p class="decision" data-testid="adhoc-permission">
-						<span class={p.allowed ? 'ok-text' : 'bad-text'}>{p.allowed ? '✓' : '✕'}</span>
-						<span title={p.action}>{PERMISSIONS[p.action].label}</span>
-					</p>
-					{#if p.reason}<p class="bad-text reason">{p.reason}</p>{/if}
-				{/each}
-				{#if Object.keys(shown.settings).length}
-					<h3>Options</h3>
-					<div class="chips">
-						{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code">{value === true ? name : `${name}=${value}`}</span>{/each}
-					</div>
-				{/if}
-		{/if}
-		</aside>
 	</div>
 
 	<div class="foot">
@@ -522,8 +503,7 @@
 		padding: 14px 24px;
 		transition: opacity 0.15s;
 	}
-	.main.stale,
-	.rail.stale {
+	.main.stale {
 		opacity: 0.55;
 	}
 	.problem-bar {
@@ -629,38 +609,6 @@
 	.right {
 		text-align: right;
 	}
-	.rail {
-		width: 280px;
-		flex-shrink: 0;
-		overflow: auto;
-		padding: 14px 18px;
-		border-left: 1px solid var(--border);
-	}
-	.rail h3 {
-		margin: 16px 0 6px;
-		color: var(--sb-text-faint);
-		font-size: 12px;
-		font-weight: 500;
-	}
-	.rail h3:first-child {
-		margin-top: 0;
-	}
-	.decision {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		margin: 3px 0;
-		font-size: 12.5px;
-	}
-	.reason {
-		margin: 0 0 6px 18px;
-		font-size: 11.5px;
-	}
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 5px;
-	}
 	.foot {
 		display: flex;
 		align-items: center;
@@ -682,12 +630,6 @@
 	.faint {
 		color: var(--sb-text-faint);
 		font-size: 12px;
-	}
-	.ok-text {
-		color: var(--sb-success);
-	}
-	.bad-text {
-		color: var(--sb-error);
 	}
 	.problem {
 		color: var(--sb-error);
