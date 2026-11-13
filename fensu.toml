@@ -1685,6 +1685,7 @@ exceptions = [
     "ScopeDiagnosticCode=Wire enum that serde builds from Python scope diagnostics.",
     "TickOutcome::Covered=The scheduler writes it as SQL text and serde reads it back.",
     "TickOutcome::Requested=The scheduler writes it as SQL text and serde reads it back.",
+    "TickOutcome::Skipped=The scheduler writes it as SQL text and serde reads it back.",
     "UsageKind=Wire enum that serde builds from Python usage records.",
 ]
 

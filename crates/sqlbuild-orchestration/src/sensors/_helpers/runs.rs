@@ -46,13 +46,9 @@ pub(crate) async fn consume_run_events(
     for run in runs {
         cursor.event_storage_id = run.last_event_storage_id;
         if eligible.contains(&run.run_id) && kinds.iter().any(|kind| kind.matches(run.status)) {
-            transaction = queue_sensor_run(
-                transaction,
-                evaluation,
-                &run.run_id.to_string(),
-                &mut requests,
-            )
-            .await?;
+            (transaction, requests) =
+                queue_sensor_run(transaction, evaluation, &run.run_id.to_string(), requests)
+                    .await?;
         }
     }
     Ok((transaction, (cursor, requests)))

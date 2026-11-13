@@ -12,7 +12,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Rerun the failed and skipped nodes after the policy's delay, unless the run was cancelled, is a group member, or used up its retries.
+/// Rerun the failed and skipped nodes after the policy's delay, unless the run was cancelled, is a group member, used up its retries, or its retry's ID is already taken.
 pub(crate) async fn queue_retry(
     transaction: ControlTransaction,
     run_id: Uuid,
@@ -49,6 +49,15 @@ pub(crate) async fn queue_retry(
         return Ok(transaction);
     };
     let retry_id = Uuid::new_v5(&run_id, b"retry");
+    let (transaction, taken) = query(
+        transaction,
+        "SELECT 1 FROM sqb_runs WHERE run_id=$1",
+        vec![Parameter::Id(retry_id)],
+    )
+    .await?;
+    if !taken.is_empty() {
+        return Ok(transaction);
+    }
     let context = AuditContext {
         actor: "system:retry".into(),
         granting_role: "system:scheduler".into(),

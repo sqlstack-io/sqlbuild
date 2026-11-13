@@ -52,11 +52,11 @@ pub(crate) async fn consume_node_events(
         let matches;
         (transaction, matches) = matches_transition(transaction, evaluation, &node, kinds).await?;
         if matches {
-            transaction = queue_sensor_run(
+            (transaction, requests) = queue_sensor_run(
                 transaction,
                 evaluation,
                 &format!("{}/{}", node.run_id, node.node_key),
-                &mut requests,
+                requests,
             )
             .await?;
         }
@@ -120,7 +120,8 @@ pub(crate) async fn consume_source_events(
         if !requested.is_empty() {
             continue;
         }
-        transaction = queue_sensor_run(transaction, evaluation, &run_key, &mut requests).await?;
+        (transaction, requests) =
+            queue_sensor_run(transaction, evaluation, &run_key, requests).await?;
     }
     let mut cursor = evaluation.cursor.clone();
     cursor.custom = next;
@@ -258,13 +259,8 @@ pub(crate) async fn consume_stale_sources(
             after_seconds,
         ))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        transaction = queue_sensor_run(
-            transaction,
-            evaluation,
-            &sha256_hex(&identity),
-            &mut requests,
-        )
-        .await?;
+        (transaction, requests) =
+            queue_sensor_run(transaction, evaluation, &sha256_hex(&identity), requests).await?;
     }
     let mut cursor = evaluation.cursor.clone();
     cursor.custom = next;

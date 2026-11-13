@@ -280,17 +280,25 @@ nightly_orders = job(
 | `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
 | `on_failure` | `retries` from 1 to 10, `retry_delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or the retries run out |
 
-A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to. A sensor
-check lists the requests it skipped the same way. Neither creates a run.
+A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
+creates no run. A sensor check lists the requests it skipped the same way.
+
+| Sensor watches | A request skipped while the job runs |
+| --- | --- |
+| Run, node or platform events | Is dropped |
+| New source data or stale sources | Is checked again on the next check and starts a run once the job is idle, if the source is still new or stale |
+| Custom code | Starts a run once the job is idle if the code returns the same run key again |
 
 Details:
 
 - Runs people start, reruns and backfills always queue, whatever the job's `overlap`.
-- A tick that makes up for missed times while the scheduler was down still queues.
+- A tick that makes up for several missed times, after the scheduler was down or the trigger was
+  paused, still queues.
 - A retry waits in the queue until its delay ends, and the run list shows it as a rerun of the run
   that failed. Cancelling a run stops its retries.
-- A group retries as a whole with the group's own `on_failure`. A member job's `on_failure`
-  applies only when that job runs on its own.
+- A group retries at group level, with the group's own `on_failure`: each retry is one rerun of the
+  group's failed and skipped nodes. A member job's `on_failure` applies only when that job runs on
+  its own.
 - An invalid value fails publication with the job's name, such as
   `job nightly_orders overlap must be queue or skip, not coalesce`.
 

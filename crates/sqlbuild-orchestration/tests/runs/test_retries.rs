@@ -10,11 +10,11 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::_helpers::lifecycle::reads::list_runs_in;
 use crate::runs::main::{
     change_run::change_run, claim_next_run::claim_next_run, list_runs::list_runs,
-    request_job_run::request_job_run,
+    request_job_run::request_job_run, request_rerun::request_rerun,
 };
 use crate::runs::models::{
-    JobRunRequest, NodeOutcome, QueueWait, RunAuthority, RunChange, RunChangeRequest, RunOrigin,
-    RunOutcome, RunStatus,
+    JobRunRequest, NodeOutcome, QueueWait, RerunRequest, RunAuthority, RunChange, RunChangeRequest,
+    RunOrigin, RunOutcome, RunStatus,
 };
 use crate::runs::tests::claim_helpers::finish;
 use crate::runs::tests::helpers::snapshot;
@@ -98,25 +98,44 @@ fn given_a_job_with_on_failure_when_its_runs_fail_then_retries_rerun_failed_work
                 .expect("claim")
                 .expect("source run");
             finish(store, &first, (NodeOutcome::Failed, RunOutcome::Failed)).await;
-            let mut attempts: Vec<u8> = Vec::new();
-            let mut previous = source.run_id;
-            while let Some(claim) = claim_next_run(store, &lease, &limits, Some(scope))
+            let retry_one = claim_next_run(store, &lease, &limits, Some(scope))
                 .await
-                .expect("claim retry")
-            {
-                assert_eq!(
-                    claim.request.origin,
-                    RunOrigin::Rerun,
-                    "{}",
-                    test_case.description
-                );
-                assert_eq!(claim.request.rerun_of_run_id, Some(previous));
-                attempts.push(claim.request.retry.expect("an automatic retry").attempt);
-                previous = claim.request.run_id;
-                finish(store, &claim, (NodeOutcome::Failed, RunOutcome::Failed)).await;
-            }
+                .expect("claim first retry")
+                .expect("first retry");
+            finish(store, &retry_one, (NodeOutcome::Failed, RunOutcome::Failed)).await;
+            let retry_two = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim second retry")
+                .expect("second retry");
+            finish(store, &retry_two, (NodeOutcome::Failed, RunOutcome::Failed)).await;
+            assert!(
+                claim_next_run(store, &lease, &limits, Some(scope))
+                    .await
+                    .expect("claim after retries are spent")
+                    .is_none(),
+                "{}: no retry is queued once retries are spent",
+                test_case.description
+            );
             assert_eq!(
-                attempts, test_case.expected_attempts,
+                [&retry_one, &retry_two]
+                    .map(|claim| (claim.request.origin, claim.request.rerun_of_run_id)),
+                [
+                    (RunOrigin::Rerun, Some(source.run_id)),
+                    (RunOrigin::Rerun, Some(retry_one.request.run_id)),
+                ],
+                "{}: each retry reruns the run before it",
+                test_case.description
+            );
+            assert_eq!(
+                [&retry_one, &retry_two]
+                    .map(|claim| claim.request.retry.as_ref().map(|retry| retry.attempt))
+                    .to_vec(),
+                test_case
+                    .expected_attempts
+                    .iter()
+                    .copied()
+                    .map(Some)
+                    .collect::<Vec<_>>(),
                 "{}",
                 test_case.description
             );
@@ -176,6 +195,26 @@ fn given_a_job_with_on_failure_when_its_runs_fail_then_retries_rerun_failed_work
                 inventory,
                 vec![RunStatus::Cancelled, RunStatus::Failed],
                 "{}: cancelling the pending retry ends the chain",
+                test_case.description
+            );
+            let rerun = RerunRequest {
+                run_id: Uuid::now_v7(),
+                source_run_id: waiting.run_id,
+                from_failure: false,
+                reason: "Retry by hand".into(),
+                priority: 0,
+                nodes: Vec::new(),
+            };
+            request_rerun(store, (&context, None), &rerun)
+                .await
+                .expect("rerun the cancelled retry");
+            assert_eq!(
+                claim_next_run(store, &lease, &limits, Some(scope))
+                    .await
+                    .expect("claim the rerun")
+                    .map(|claim| claim.request.run_id),
+                Some(rerun.run_id),
+                "{}: a person's rerun of a retry starts at once, without the retry's delay",
                 test_case.description
             );
             close_test_store(fixture).await;

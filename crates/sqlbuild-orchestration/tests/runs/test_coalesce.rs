@@ -163,35 +163,40 @@ fn given_a_skip_overlap_job_when_a_tick_falls_due_during_its_run_then_the_tick_i
                 .await
                 .expect("claim first run")
                 .expect("scheduled run");
-            for (generation, times) in [(2, 2), (3, 3)] {
-                input.generation = generation;
-                input.documents.get_mut("triggers").expect("triggers")["daily_orders"]["schedule"]
-                    ["times"] = json!((0..times).map(calendar_text).collect::<Vec<_>>());
-                publish_snapshot(store, &input)
-                    .await
-                    .expect("refresh calendar");
-                let plan = evaluate_trigger(store, &lease, trigger)
-                    .await
-                    .expect("tick")
-                    .expect("active trigger");
-                if generation == 2 {
-                    assert_eq!(
-                        plan.actions[0].decision,
-                        TickDecision::Skipped {
-                            active_run_id: claim.request.run_id
-                        },
-                        "{}",
-                        test_case.description
-                    );
-                    succeed(store, &claim).await;
-                } else {
-                    assert!(
-                        matches!(plan.actions[0].decision, TickDecision::Requested { .. }),
-                        "{}: the job ended, so the next tick queues",
-                        test_case.description
-                    );
-                }
-            }
+            input.generation = 2;
+            input.documents.get_mut("triggers").expect("triggers")["daily_orders"]["schedule"]["times"] =
+                json!((0..2).map(calendar_text).collect::<Vec<_>>());
+            publish_snapshot(store, &input)
+                .await
+                .expect("add a second calendar time");
+            let plan = evaluate_trigger(store, &lease, trigger)
+                .await
+                .expect("tick while the first run executes")
+                .expect("active trigger");
+            assert_eq!(
+                plan.actions[0].decision,
+                TickDecision::Skipped {
+                    active_run_id: claim.request.run_id
+                },
+                "{}",
+                test_case.description
+            );
+            succeed(store, &claim).await;
+            input.generation = 3;
+            input.documents.get_mut("triggers").expect("triggers")["daily_orders"]["schedule"]["times"] =
+                json!((0..3).map(calendar_text).collect::<Vec<_>>());
+            publish_snapshot(store, &input)
+                .await
+                .expect("add a third calendar time");
+            let plan = evaluate_trigger(store, &lease, trigger)
+                .await
+                .expect("tick after the first run ended")
+                .expect("active trigger");
+            assert!(
+                matches!(plan.actions[0].decision, TickDecision::Requested { .. }),
+                "{}: the job ended, so the next tick queues",
+                test_case.description
+            );
             let ticks = list_ticks(store, trigger, 10).await.expect("ticks");
             let skipped: Vec<_> = ticks
                 .iter()

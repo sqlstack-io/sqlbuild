@@ -4,10 +4,10 @@ use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
 use crate::declarations::models::{Overlap, StoredJob};
-use crate::runs::main::active_job_run::active_job_run;
 use crate::runs::main::frozen_job_request::frozen_job_request;
 use crate::runs::main::queue_run::queue_run;
 use crate::runs::models::{JobRunRequest, RunOrigin};
+use crate::scheduler::main::active_job_run::active_job_run;
 use crate::sensors::models::{SensorEvaluationRequest, SensorRequests, SkippedRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -19,8 +19,8 @@ pub(crate) async fn queue_sensor_run(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
     run_key: &str,
-    requests: &mut SensorRequests,
-) -> Result<ControlTransaction, ControlError> {
+    mut requests: SensorRequests,
+) -> Result<(ControlTransaction, SensorRequests), ControlError> {
     let (transaction, rows) = query(
         transaction,
         "SELECT run_id FROM sqb_run_requests WHERE trigger_id=$1 AND run_key=$2",
@@ -35,7 +35,7 @@ pub(crate) async fn queue_sensor_run(
             serde_json::from_value(row["run_id"].clone())
                 .map_err(|error| ControlError::Invalid(error.to_string()))?,
         );
-        return Ok(transaction);
+        return Ok((transaction, requests));
     }
     let job_key = &evaluation.definition.job_key;
     let (transaction, overlap) = job_overlap(transaction, evaluation).await?;
@@ -53,7 +53,7 @@ pub(crate) async fn queue_sensor_run(
             run_key: run_key.into(),
             active_run_id,
         });
-        return Ok(transaction);
+        return Ok((transaction, requests));
     }
     let run_id = Uuid::new_v5(&evaluation.trigger_id, run_key.as_bytes());
     let context = AuditContext {
@@ -86,7 +86,7 @@ pub(crate) async fn queue_sensor_run(
         "INSERT INTO sqb_run_requests (trigger_id,run_key,evaluation_id,run_id) VALUES ($1,$2,$3,$4)",
         vec![Parameter::Id(evaluation.trigger_id), Parameter::Text(run_key.into()), Parameter::Id(evaluation.evaluation_id), Parameter::Id(run_id)]).await?;
     requests.run_ids.push(run_id);
-    Ok(transaction)
+    Ok((transaction, requests))
 }
 
 /// The overlap the sensor's job declares in the evaluated snapshot, which the target currently publishes.

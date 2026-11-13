@@ -97,6 +97,7 @@ pub(crate) async fn frozen_rerun(
     frozen.trigger_id = None;
     frozen.tick_id = None;
     frozen.rerun_of_run_id = Some(request.source_run_id);
+    frozen.retry = None;
     frozen.requested_by = context.actor.clone();
     frozen.priority = request.priority;
     let mut context = context.clone();
