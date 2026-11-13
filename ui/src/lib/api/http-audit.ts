@@ -32,6 +32,24 @@ function scopeOf(scope: Record<string, unknown>): AuditEntry['scope'] {
 	};
 }
 
+const WORK: Record<string, string> = {
+	check_connection: 'Test the warehouse connection',
+	sync_warehouse: 'Sync the warehouse copy',
+	evaluate_sensor: 'Evaluate a sensor'
+};
+
+/** What an allowed action did, from the fields the server records with it; empty when nothing reads better than the raw change. */
+function allowedSummary(action: string, after: Record<string, unknown>): string {
+	if (action === 'location.work_requested') {
+		const work = fieldsOf(after.work);
+		const kind = textOf(work.kind) ?? '';
+		if (kind === 'plan' && Array.isArray(work.command)) return `Plan sqb ${work.command.join(' ')}`;
+		return WORK[kind] ?? kind;
+	}
+	const run = textOf(after.run_id);
+	return run ? `Run ${run.slice(0, 8)}${after.found === false ? ', not found' : ''}` : '';
+}
+
 /** A denial is listed under the action it refused, with its decision ID and reason. */
 export function toAuditEntry(wire: Wire['SecurityAuditEvent']): AuditEntry {
 	const denied = wire.action === DENIED;
@@ -48,7 +66,7 @@ export function toAuditEntry(wire: Wire['SecurityAuditEvent']): AuditEntry {
 		grantingRole: denied ? null : wire.granting_role,
 		decisionId: denied ? textOf(after.decision_id) : null,
 		evidenceRead: wire.action === 'evidence.read',
-		summary: denied ? (textOf(after.reason) ?? '') : '',
+		summary: denied ? (textOf(after.reason) ?? '') : allowedSummary(wire.action, after),
 		before: jsonText(wire.before_json),
 		after: denied ? null : jsonText(wire.after_json),
 		ip: wire.ip_address ?? '',

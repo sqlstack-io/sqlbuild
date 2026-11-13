@@ -211,6 +211,8 @@ pub enum LoginMode {
     Password,
     TrustedProxy,
     Oidc,
+    /// `sqb dev` on loopback: no sign-in, every request acts as the local development person.
+    Disabled,
 }
 
 /// What the UI needs first: how people sign in, and what this person may see and do.
@@ -232,6 +234,8 @@ pub struct DevelopmentScope {
     pub location_id: uuid::Uuid,
     pub target: String,
     pub triggers: bool,
+    /// The local person every loopback request acts as.
+    pub principal_id: uuid::Uuid,
 }
 
 /// The one way people sign in to this server, if any.
