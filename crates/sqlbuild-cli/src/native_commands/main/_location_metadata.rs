@@ -18,7 +18,7 @@ use crate::native_commands::_helpers::execution::{
     metadata_health, next_scan, statistics_page,
 };
 use crate::native_commands::_helpers::execution::{finish_metadata_page, read_metadata_page};
-use crate::native_commands::_helpers::paths::location_inputs;
+use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::constants::METADATA_POLL_SECONDS;
 use crate::native_commands::models::{LocationMetadataSync, LocationServe, LocationWatch};
@@ -32,7 +32,8 @@ pub(super) async fn sync_location_metadata(
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
     if Instant::now() < state.next_at
         || state.locations.is_empty()
-        || location_inputs(&options.project_dir, &watch.rules, &watch.local_files) != watch.observed
+        || location_files(&options.project_dir, &watch.rules, &watch.local_files)
+            != watch.observed.0
     {
         return Ok(Some(state));
     }
@@ -80,7 +81,8 @@ pub(super) async fn sync_location_metadata(
         let Some(page) = page else {
             return failed_read(state, (client, poll), started, stopped.as_mut()).await;
         };
-        if location_inputs(&options.project_dir, &watch.rules, &watch.local_files) != watch.observed
+        if location_files(&options.project_dir, &watch.rules, &watch.local_files)
+            != watch.observed.0
         {
             return Ok(Some(state));
         }

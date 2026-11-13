@@ -163,6 +163,8 @@ pub(crate) struct LocationWatch {
     pub(crate) attempted: Option<(Vec<PathStamp>, Option<String>)>,
     pub(crate) changed_at: tokio::time::Instant,
     pub(crate) retry_at: Option<tokio::time::Instant>,
+    /// Git commits matter to publication metadata, but asking git every tick spawns a process each time.
+    pub(crate) commit_checked_at: tokio::time::Instant,
 }
 
 /// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
@@ -290,6 +292,11 @@ impl LocationMetadataSync {
         }
         self.next_at = tokio::time::Instant::now()
             + std::time::Duration::from_secs(super::constants::METADATA_POLL_SECONDS);
+    }
+
+    /// A synchronization is mid-flight and its next page is due, so the loop need not wait a tick.
+    pub(crate) fn paging(&self) -> bool {
+        !self.idle && tokio::time::Instant::now() >= self.next_at
     }
 
     pub(crate) fn reconciling(&self) -> bool {

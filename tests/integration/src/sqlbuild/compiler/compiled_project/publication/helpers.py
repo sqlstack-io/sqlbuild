@@ -299,7 +299,7 @@ def append_consumption_history(adapter: Any, connection: Any, fixture: dict[str,
     columns: list[str] = list(fixture["record"])[2:]
     types: dict[str, StateSqlValueType] = dict.fromkeys(columns, StateSqlValueType.STRING) | {
         "input_count": StateSqlValueType.INTEGER,
-        "recorded_at": StateSqlValueType.TIMESTAMP,
+        "recorded_at": StateSqlValueType.TEXT_TIMESTAMP,
     }
     rows: list[dict[str, Any]] = [
         row | {"recorded_at": datetime.fromisoformat(row["recorded_at"])}
@@ -523,6 +523,18 @@ def wait_for_log(
         assert process.poll() is None, log.read_text()
         assert time.monotonic() < deadline, log.read_text()
         time.sleep(0.02)
+
+
+def wait_for_idle_sync(process: subprocess.Popen[bytes], log: Path) -> None:
+    """Wait until the latest synchronization has completed, so a held lock meets the next one."""
+
+    deadline: float = time.monotonic() + 45
+    text: str = log.read_text()
+    while text.rfind("synchronization completed.") < text.rfind("Reading warehouse history"):
+        assert process.poll() is None, text
+        assert time.monotonic() < deadline, text
+        time.sleep(0.05)
+        text = log.read_text()
 
 
 def location_health_reports(api: SnapshotApi) -> list[dict[str, Any]]:
