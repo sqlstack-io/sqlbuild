@@ -25,6 +25,7 @@ use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::discovery::project_facts::{named_node_rows, project_facts};
 use crate::bindings::_helpers::discovery::project_validation::validation_error;
 use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
+use crate::bindings::_helpers::location_command::snapshot_providers::providers_document;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     collect_declarations, orchestration_names,
 };
@@ -110,6 +111,9 @@ pub(crate) fn orchestration_snapshot<'py>(
     }
     input.nodes = resource_nodes(py, &project, &owner, input.nodes)?;
     drop(owner);
+    if let Some(providers) = providers_document(&discovered_inputs, &input.nodes)? {
+        input.documents.insert("providers".into(), providers);
+    }
     let declarations = match declarations {
         Some(declarations) => declarations
             .into_iter()

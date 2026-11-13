@@ -14,3 +14,7 @@ pub(crate) const COMMAND_IMPLEMENTATIONS: [(RunCommand, &str); 5] = [
     (RunCommand::Audit, "run_audit_command"),
     (RunCommand::Freshness, "run_freshness_command"),
 ];
+
+/// Snapshot node kinds a provider consumer can run inside.
+pub(crate) const MODEL_NODE_KIND: &str = "model";
+pub(crate) const SOURCE_NODE_KIND: &str = "source";

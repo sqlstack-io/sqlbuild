@@ -256,3 +256,53 @@ pub(crate) struct GroupWaits {
     pub(crate) edges: BTreeMap<String, BTreeSet<String>>,
     pub(crate) reasons: BTreeMap<(String, String), String>,
 }
+
+/// Providers the current snapshot declares; empty before a publish or when the project has none.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ProvidersRead {
+    pub snapshot_id: Option<uuid::Uuid>,
+    pub providers: Vec<ProviderRecord>,
+}
+
+/// A provider as its location published it, from the class alone: never a setting value.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ProviderRecord {
+    pub name: String,
+    /// The class as `module.qualname`.
+    pub class: String,
+    /// The class docstring.
+    pub description: String,
+    /// The file declaring the class, relative to the project.
+    pub path: String,
+    pub settings: Vec<ProviderSetting>,
+    /// Code that injects the provider, in discovery order.
+    pub used_by: Vec<ProviderConsumer>,
+    /// Snapshot nodes that run that code: Python nodes, models calling a hook or using a materialization, and sources a loader fills.
+    #[serde(default)]
+    pub nodes: Vec<String>,
+    /// Jobs whose selection includes one of those nodes.
+    #[serde(default)]
+    pub jobs: Vec<String>,
+}
+
+/// One declared setting field; its value stays in the location's environment.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ProviderSetting {
+    pub name: String,
+    /// The annotation as written, such as `str` or `SecretStr | None`.
+    #[serde(rename = "type")]
+    pub type_name: String,
+    pub required: bool,
+    /// Whether the annotation is a pydantic secret type.
+    pub secret: bool,
+    /// The environment variable the setting is read from.
+    pub env: String,
+    pub description: Option<String>,
+}
+
+/// Code that injects a provider: a node (`loader`, `task`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ProviderConsumer {
+    pub kind: String,
+    pub name: String,
+}

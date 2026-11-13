@@ -9,8 +9,10 @@ import sys
 from collections.abc import Callable
 from importlib.machinery import ModuleSpec
 from pathlib import Path
-from types import ModuleType
-from typing import get_type_hints
+from types import ModuleType, UnionType
+from typing import Annotated, Literal, Union, get_args, get_origin, get_type_hints
+
+from pydantic.fields import FieldInfo
 
 from sqlbuild._native import (
     PYTHON_INIT_MODULE_STEM,
@@ -415,3 +417,53 @@ def provider_usages(
             )
         )
     return tuple(usages)
+
+
+def provider_settings(*, provider_class: type) -> dict[str, object]:
+    """A provider class's path, docstring and declared setting fields; never a setting value."""
+
+    config: dict[str, object] = dict(getattr(provider_class, "model_config", {}))
+    fields: dict[str, FieldInfo] = getattr(provider_class, "model_fields", {})
+    rows: list[dict[str, object]] = []
+    for name, info in fields.items():
+        aliases: list[str] = [
+            alias for alias in (info.validation_alias, info.alias) if isinstance(alias, str)
+        ]
+        rows.append(
+            {
+                "name": name,
+                "type": _annotation_text(info.annotation),
+                "required": info.is_required(),
+                "alias": aliases[0] if aliases else None,
+                "description": info.description,
+            }
+        )
+    return {
+        "class": f"{provider_class.__module__}.{provider_class.__qualname__}",
+        "description": inspect.cleandoc(provider_class.__doc__ or ""),
+        "env_prefix": config.get("env_prefix") or "",
+        "case_sensitive": bool(config.get("case_sensitive")),
+        "fields": rows,
+    }
+
+
+def _annotation_text(annotation: object) -> str:
+    """An annotation as a reader writes it: `SecretStr | None`, `list[str]` or `Literal['gzip']`."""
+
+    if annotation is None or annotation is type(None):
+        return "None"
+    origin: object = get_origin(annotation)
+    arguments: tuple[object, ...] = get_args(annotation)
+    if origin is None or not arguments:
+        if isinstance(annotation, type):
+            return annotation.__name__
+        return str(annotation).replace("typing.", "")
+    if origin is Annotated:
+        return _annotation_text(arguments[0])
+    if origin is Literal:
+        return f"Literal[{', '.join(repr(argument) for argument in arguments)}]"
+    parts: list[str] = [_annotation_text(argument) for argument in arguments]
+    if origin is Union or origin is UnionType:
+        return " | ".join(parts)
+    name: str = origin.__name__ if isinstance(origin, type) else str(origin).replace("typing.", "")
+    return f"{name}[{', '.join(parts)}]"
