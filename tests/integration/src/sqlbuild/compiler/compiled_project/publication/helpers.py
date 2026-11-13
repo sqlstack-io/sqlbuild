@@ -1508,3 +1508,32 @@ def security_audit_rows(control_store: Path) -> int:
     """Rows in the security audit, so a test can show a request recorded nothing."""
     with sqlite3.connect(control_store) as control:
         return control.execute("SELECT count(*) FROM sqb_security_audit").fetchone()[0]
+
+
+def run_sqb(project: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    """Run this environment's `sqb` on `project` without raising on failure."""
+    return subprocess.run(
+        [str(Path(sys.executable).with_name("sqb")), "--project-dir", str(project), *arguments],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def live_plan(project: Path, selection: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run `sqb plan --json` against the warehouse for node keys such as `model:orders`."""
+    selected: list[str] = []
+    for key in selection:
+        selected.extend(("--select", key.split(":")[1]))
+    return run_sqb(project, "plan", "--target", "development", "--json", "--no-color", *selected)
+
+
+def hold_write_lock(database: Path) -> duckdb.DuckDBPyConnection:
+    """Hold the warehouse's write lock, so any process that opens it fails."""
+    deadline: float = time.monotonic() + 15
+    while True:
+        try:
+            return duckdb.connect(database)
+        except duckdb.IOException:
+            assert time.monotonic() < deadline
+            time.sleep(0.05)

@@ -381,6 +381,6 @@ class PlanPreviewTestCase:
     description: str
     edited_files: dict[str, str]
     injected_sql: tuple[str, ...]
-    window_models: tuple[str, ...]
-    unplanned_cursor_models: tuple[str, ...]
-    added_unknowns: tuple[str, ...]
+    expected_window_models: tuple[str, ...]
+    expected_unplanned_cursor_models: tuple[str, ...]
+    expected_added_unknowns: tuple[str, ...]

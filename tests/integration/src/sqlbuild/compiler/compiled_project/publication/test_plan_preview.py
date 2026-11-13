@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
@@ -20,7 +19,10 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalo
     request_plan,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    hold_write_lock,
+    live_plan,
     location_process,
+    run_sqb,
     snapshot_api,
     wait_for_generation,
     wait_for_location_work,
@@ -105,31 +107,6 @@ _UNKNOWN: list[str] = [
 ]
 
 
-def _sqb(project: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [str(Path(sys.executable).with_name("sqb")), "--project-dir", str(project), *arguments],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
-def _live_plan(project: Path) -> subprocess.CompletedProcess[str]:
-    selected: list[str] = [part for key in _SELECTION for part in ("--select", key.split(":")[1])]
-    return _sqb(project, "plan", "--target", "development", "--json", "--no-color", *selected)
-
-
-def _locked(database: Path) -> duckdb.DuckDBPyConnection:
-    """Hold the warehouse's write lock, so any process that opens it fails."""
-    deadline: float = time.monotonic() + 15
-    while True:
-        try:
-            return duckdb.connect(database)
-        except duckdb.IOException:
-            assert time.monotonic() < deadline
-            time.sleep(0.05)
-
-
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -137,9 +114,9 @@ def _locked(database: Path) -> duckdb.DuckDBPyConnection:
             description="matching observations plan like the live warehouse",
             edited_files={},
             injected_sql=(),
-            window_models=("orders",),
-            unplanned_cursor_models=(),
-            added_unknowns=(),
+            expected_window_models=("orders",),
+            expected_unplanned_cursor_models=(),
+            expected_added_unknowns=(),
         ),
         PlanPreviewTestCase(
             description="a cursor_max from no successful build is not a cursor position",
@@ -149,9 +126,11 @@ def _locked(database: Path) -> duckdb.DuckDBPyConnection:
                 "'orders', 'timestamp', '2099-01-01 00:00:00', 'injected-run', "
                 "'2099-01-01 00:00:00')",
             ),
-            window_models=(),
-            unplanned_cursor_models=("orders",),
-            added_unknowns=("cursor position of orders (no successful build recorded it)",),
+            expected_window_models=(),
+            expected_unplanned_cursor_models=("orders",),
+            expected_added_unknowns=(
+                "cursor position of orders (no successful build recorded it)",
+            ),
         ),
         PlanPreviewTestCase(
             description="an edited expression plans its declared columns and says so",
@@ -159,9 +138,9 @@ def _locked(database: Path) -> duckdb.DuckDBPyConnection:
                 "sources/raw.yml": _SOURCES.format(expression=f"{_EXPRESSION} WHERE true") + "\n"
             },
             injected_sql=(),
-            window_models=("orders",),
-            unplanned_cursor_models=(),
-            added_unknowns=(
+            expected_window_models=("orders",),
+            expected_unplanned_cursor_models=(),
+            expected_added_unknowns=(
                 "query columns of expression source raw_refunds (planned as declared)",
             ),
         ),
@@ -173,13 +152,13 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
 ) -> None:
     project: Path = tmp_path / "project"
     write_files(project_dir=project, files=_PROJECT_FILES)
-    built: subprocess.CompletedProcess[str] = _sqb(project, "build", "--target", "development")
+    built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
     assert built.returncode == 0, built.stderr
     with duckdb.connect(project / "warehouse.db") as warehouse:
         for statement in test_case.injected_sql:
             _ = warehouse.execute(statement)
     write_files(project_dir=project, files=test_case.edited_files)
-    live_run: subprocess.CompletedProcess[str] = _live_plan(project)
+    live_run: subprocess.CompletedProcess[str] = live_plan(project, _SELECTION)
     assert live_run.returncode == 0, live_run.stderr
     live: dict[str, Any] = json.loads(live_run.stdout)
     control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
@@ -214,9 +193,9 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
             log,
             after=started,
         )
-        lock: duckdb.DuckDBPyConnection = _locked(project / "warehouse.db")
+        lock: duckdb.DuckDBPyConnection = hold_write_lock(project / "warehouse.db")
         try:
-            refused: subprocess.CompletedProcess[str] = _live_plan(project)
+            refused: subprocess.CompletedProcess[str] = live_plan(project, _SELECTION)
             request_id: str = request_plan(control, _SELECTION)
             result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
         finally:
@@ -229,15 +208,16 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
     assert "synced_copy" in preview, log.read_text()
     synced: dict[str, Any] = preview.pop("synced_copy")
     assert synced["synced_at"] is not None
-    assert synced["unknown_until_run"] == [*_UNKNOWN, *test_case.added_unknowns]
+    assert synced["unknown_until_run"] == [*_UNKNOWN, *test_case.expected_added_unknowns]
     live_models: dict[str, dict[str, Any]] = {model["name"]: model for model in live.pop("models")}
     preview_models: dict[str, dict[str, Any]] = {
         model["name"]: model for model in preview.pop("models")
     }
     assert synced["cursor_window_starts"] == {
-        name: live_models[name]["cursor_bounds"]["start"] for name in test_case.window_models
+        name: live_models[name]["cursor_bounds"]["start"]
+        for name in test_case.expected_window_models
     }
-    for name in (*test_case.window_models, *test_case.unplanned_cursor_models):
+    for name in (*test_case.expected_window_models, *test_case.expected_unplanned_cursor_models):
         for model in (live_models[name], preview_models.pop(name)):
             assert model["action"] == "incremental_append"
             assert model["reason"] == "normal_incremental"
