@@ -518,6 +518,27 @@ CREATE TABLE sqb_warehouse_observations (
 );
 CREATE INDEX sqb_observations_namespace ON sqb_warehouse_observations (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE INDEX sqb_observations_latest ON sqb_warehouse_observations (location_id,target,kind,node,observed_at,event_id);
+CREATE TABLE sqb_warehouse_resource_costs (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    orchestration_run_id TEXT,
+    attempt BIGINT NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_name TEXT NOT NULL,
+    run_started_at {time} NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL,
+    scan_id {uuid}
+);
+CREATE INDEX sqb_resource_costs_namespace ON sqb_warehouse_resource_costs (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_resource_costs_run ON sqb_warehouse_resource_costs (location_id,target,run_id,attempt);
+CREATE INDEX sqb_resource_costs_orchestration_run ON sqb_warehouse_resource_costs (orchestration_run_id);
+CREATE INDEX sqb_resource_costs_started ON sqb_warehouse_resource_costs (location_id,target,run_started_at);
 CREATE INDEX sqb_freshness_source_latest ON sqb_warehouse_freshness (
     location_id, target, (record_json ->> 'source_name'),
     (record_json ->> 'target_database'), (record_json ->> 'target_schema'),
