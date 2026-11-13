@@ -9,7 +9,9 @@ function run(id: string, status: Run['status'], queuedHoursAgo: number, endedHou
 	return { id, status, parentRunId, jobKey, narrowing, window: null, kind: jobKey ? 'job' : 'adhoc', statusReason: null, queuedAt: hoursAgo(queuedHoursAgo), startedAt: hoursAgo(queuedHoursAgo), endedAt: endedHoursAgo === null ? null : hoursAgo(endedHoursAgo) } as Run;
 }
 
-const node = (key: string, kind: CatalogNode['kind'], stale: StaleReason['reason'][] = []) => ({ key, kind, stale: stale.map((reason) => ({ reason })) }) as CatalogNode;
+const node = (key: string, kind: CatalogNode['kind'], path: string, stale: StaleReason['reason'][] = [], extra: Partial<CatalogNode> = {}) =>
+	({ key, kind, path, group: null, lastOutcome: null, lastBuild: null, stale: stale.map((reason) => ({ reason })), ...extra }) as CatalogNode;
+const built = { lastBuild: { builtAt: hoursAgo(1) } } as Partial<CatalogNode>;
 const check = (id: string, outcome: string | null) => ({ id, latest: outcome ? { outcome } : null }) as unknown as Check;
 const change = (publishedHoursAgo: number, nodes: [NodeChange['op'], string][]) =>
 	({ snapshotId: `s-${publishedHoursAgo}`, publishedAt: hoursAgo(publishedHoursAgo), nodes: nodes.map(([op, key]) => ({ key, op })) }) as SnapshotChange;
@@ -39,11 +41,26 @@ describe('overview from live reads', () => {
 	const overview = overviewOf({
 		runs,
 		checks: [check('a', 'pass'), check('b', 'fail'), check('c', 'error'), check('d', 'warn'), check('e', null)],
-		nodes: [node('model:orders', 'table', ['changed', 'behind']), node('model:totals', 'view'), node('model:events', 'incremental', ['behind']), node('source:raw', 'source'), node('seed:regions', 'seed')],
+		nodes: [
+			node('model:orders', 'table', 'models/marts/core/orders.sql', ['changed', 'behind'], built),
+			node('model:totals', 'view', 'models/marts/totals.sql', [], built),
+			node('model:returns', 'table', 'models/marts/returns.sql', [], { ...built, lastOutcome: 'failed' }),
+			node('model:events', 'incremental', 'models/staging/events.sql', ['behind'], built),
+			node('source:raw', 'source', 'models/staging/sources.yml'),
+			node('seed:regions', 'seed', 'seeds/regions.csv')
+		],
 		changes: [change(1, [['added', 'model:orders'], ['added', 'seed:regions'], ['removed', 'model:old']]), change(24 * 8, [['added', 'model:totals']])],
 		events: [event('scheduler', true), event('cleared', false)],
 		acknowledgements: new Map([['orders-new', { by: 'ada', at: hoursAgo(1) }]]),
 		now
+	});
+
+	it('counts the nodes it builds by top-level folder, leaving sources out', () => {
+		expect(overview.groups).toEqual([
+			{ group: 'marts', total: 3, current: 1, changed: 1, behind: 1, failed: 1 },
+			{ group: 'seeds', total: 1, current: 0, changed: 0, behind: 0, failed: 0 },
+			{ group: 'staging', total: 1, current: 0, changed: 0, behind: 1, failed: 0 }
+		]);
 	});
 
 	it('counts top-level runs queued in the last 24 hours', () => {
@@ -65,7 +82,7 @@ describe('overview from live reads', () => {
 	});
 
 	it('counts models and this week’s model changes only', () => {
-		expect(overview.metrics.models).toEqual({ total: 3, addedThisWeek: 1, removedThisWeek: 1 });
+		expect(overview.metrics.models).toEqual({ total: 4, addedThisWeek: 1, removedThisWeek: 1 });
 	});
 
 	it('counts check outcomes, with errors as failing', () => {
@@ -82,6 +99,8 @@ describe('overview from live reads', () => {
 	});
 
 	it('leaves parts without a server read empty instead of zero', () => {
-		expect([overview.metrics.cost, overview.groups]).toEqual([null, null]);
+		expect(overview.metrics.cost).toBeNull();
+		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], acknowledgements: new Map(), now });
+		expect(unknown.groups).toBeNull();
 	});
 });

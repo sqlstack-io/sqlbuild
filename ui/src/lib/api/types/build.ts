@@ -59,8 +59,6 @@ export type CatalogNode = {
 	/** Null when the server does not report groups. */
 	group: string | null;
 	tags: string[];
-	/** Declared `owner`, or the project default. */
-	owner: string[];
 	description: string;
 	path: string;
 	upstream: string[];

@@ -882,7 +882,19 @@ pub struct CatalogNodeRecord {
     pub last_outcome: Option<CatalogNodeOutcome>,
     /// The current definition differs from the one `last_build` recorded; false when either is unknown.
     pub definition_changed: bool,
+    /// The checks on the node by their newest result.
+    pub checks: CatalogNodeChecks,
     pub snapshot_id: Uuid,
+}
+
+/// Checks without a result yet are not known to the server, so they are not counted.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CatalogNodeChecks {
+    pub total: usize,
+    pub passing: usize,
+    pub warning: usize,
+    /// Failed or errored.
+    pub failing: usize,
 }
 
 /// `success`, `warn` or `failed`; `run_id` is the scheduler run, null for a newer build outside the scheduler.

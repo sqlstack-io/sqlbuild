@@ -7,7 +7,6 @@ import { NODE_SPECS, type NodeSpec } from './build-fixtures';
 const FACT_ORDERS_SQL = `MODEL (
   materialized table,
   unique_key order_id,
-  owner [analytics, finance-data],
   tags [finance, core],
   description "One row per order with payment and customer attributes."
 );
@@ -48,7 +47,6 @@ function header(spec: NodeSpec, sn: SnapshotNode): string {
 	const lines = [`materialized ${materialized}`];
 	if (strategy) lines.push(`strategy ${strategy}`);
 	if (spec.microbatch) lines.push(`cursor ${spec.microbatch.cursorColumn}`, `batch_size ${spec.microbatch.batchSize}`);
-	if (spec.owner.length) lines.push(`owner [${spec.owner.join(', ')}]`);
 	if (sn.tags.length) lines.push(`tags [${sn.tags.join(', ')}]`);
 	lines.push(`description "${spec.description}"`);
 	return `MODEL (\n  ${lines.join(',\n  ')}\n);`;
