@@ -94,6 +94,8 @@ pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
 /// A metadata reader that ignores end of input this long after a synchronization is killed.
 pub(crate) const METADATA_READER_CLOSE_SECONDS: u64 = 5;
+/// How often a location asks git whether `HEAD` moved.
+pub(crate) const LOCATION_COMMIT_CHECK_SECONDS: u64 = 2;
 /// How often an idle location asks the server, never the warehouse, whether a run ended.
 pub(crate) const METADATA_SYNC_CHECK_SECONDS: u64 = 5;
 /// Full key-set reconciliation is independent of the incremental poll and overlap window.

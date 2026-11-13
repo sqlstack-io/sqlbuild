@@ -201,6 +201,20 @@ class StateEventsTestCase(CatalogConnectionTestCase):
 
 
 @dataclass(frozen=True)
+class SyncPacingTestCase:
+    """A tick-paced sync waits `added_rows / 100` ticks of 250 ms; git is asked every 2 s."""
+
+    description: str
+    adapter_name: str
+    connection_key: str
+    expected_run_id: str
+    added_rows: int
+    idle_seconds: float
+    expected_max_seconds: float
+    expected_max_git_calls: int
+
+
+@dataclass(frozen=True)
 class AutomaticHistoryTestCase:
     description: str
     adapter_name: str

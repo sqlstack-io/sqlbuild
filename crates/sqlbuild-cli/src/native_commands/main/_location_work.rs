@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::check_location_connection;
-use crate::native_commands::_helpers::paths::location_inputs;
+use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
@@ -48,7 +48,8 @@ pub(super) async fn run_location_work(
             .unwrap_or_default();
     let mut files: Vec<PathBuf> = Vec::new();
     let outcome = if generation == Some(claim.generation)
-        && location_inputs(&options.project_dir, &watch.rules, &watch.local_files) == watch.observed
+        && location_files(&options.project_dir, &watch.rules, &watch.local_files)
+            == watch.observed.0
     {
         let mut shutting_down = false;
         let expires = async {
@@ -73,7 +74,7 @@ pub(super) async fn run_location_work(
             .retain(|stamp| !files.contains(&options.project_dir.join(&stamp.relative_path)));
         let mut excluded = watch.local_files.clone();
         excluded.extend(files.clone());
-        if location_inputs(&options.project_dir, &watch.rules, &excluded) == expected {
+        if location_files(&options.project_dir, &watch.rules, &excluded) == expected.0 {
             outcome
         } else {
             LocationWorkOutcome::Superseded {}

@@ -298,7 +298,7 @@ def append_consumption_history(adapter: Any, connection: Any, fixture: dict[str,
     columns: list[str] = list(fixture["record"])[2:]
     types: dict[str, StateSqlValueType] = dict.fromkeys(columns, StateSqlValueType.STRING) | {
         "input_count": StateSqlValueType.INTEGER,
-        "recorded_at": StateSqlValueType.TIMESTAMP,
+        "recorded_at": StateSqlValueType.TEXT_TIMESTAMP,
     }
     rows: list[dict[str, Any]] = [
         row | {"recorded_at": datetime.fromisoformat(row["recorded_at"])}
