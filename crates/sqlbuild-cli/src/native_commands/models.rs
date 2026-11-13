@@ -305,6 +305,11 @@ impl LocationMetadataSync {
             .then_some(recorded.token.as_str())
     }
 
+    /// A reconcile scan of rows the mirror already holds sends keys first and reads only what is missing.
+    pub(crate) fn key_pages(&self) -> bool {
+        self.reconciling() && self.mirror_holds_rows && self.kind().keyed()
+    }
+
     pub(crate) fn kind(&self) -> WarehouseHistoryKind {
         WarehouseHistoryKind::ALL[self.index % WarehouseHistoryKind::ALL.len()]
     }

@@ -397,6 +397,15 @@ impl WarehouseHistoryKind {
         self.names().2
     }
 
+    /// Rows identified by their key columns, so a reconcile scan sends keys before rows.
+    #[must_use]
+    pub const fn keyed(self) -> bool {
+        !matches!(
+            self,
+            Self::Fingerprints | Self::SourceFreshness | Self::Catalog | Self::Statistics
+        )
+    }
+
     #[must_use]
     pub const fn mirror_table(self) -> &'static str {
         self.names().1
@@ -580,6 +589,12 @@ pub struct NodeResultsRead {
     /// The table's change token after the last complete read; an equal token skips this read.
     #[serde(default)]
     pub unchanged_token: Option<String>,
+    /// Read only the key columns, so a reconcile scan learns which rows the mirror lacks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub keys_only: bool,
+    /// Read exactly the rows these key columns name, as a key page delivered them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keys: Option<Vec<serde_json::Value>>,
 }
 
 /// Consumption rows carry no event identity, so the cursor holds the row's identity columns.
@@ -593,6 +608,12 @@ pub struct ConsumptionRead {
     /// The table's change token after the last complete read; an equal token skips this read.
     #[serde(default)]
     pub unchanged_token: Option<String>,
+    /// Read only the key columns, so a reconcile scan learns which rows the mirror lacks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub keys_only: bool,
+    /// Read exactly the rows these key columns name, as a key page delivered them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keys: Option<Vec<serde_json::Value>>,
 }
 
 /// Stable event identities and timestamps order observations without comparing their payloads.
@@ -606,6 +627,12 @@ pub struct StateEventsRead {
     /// The table's change token after the last complete read; an equal token skips this read.
     #[serde(default)]
     pub unchanged_token: Option<String>,
+    /// Read only the key columns, so a reconcile scan learns which rows the mirror lacks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub keys_only: bool,
+    /// Read exactly the rows these key columns name, as a key page delivered them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keys: Option<Vec<serde_json::Value>>,
 }
 
 /// The private interpreter accepts only known state tables, never arbitrary SQL.
@@ -656,6 +683,9 @@ pub struct WarehouseHistoryPage {
     /// The token still equals the request's: nothing was read and nothing is delivered.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unchanged: bool,
+    /// A key page's rows as their key columns; its records stay empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keys: Vec<serde_json::Value>,
 }
 
 /// Typed import columns are selected by code, never from location-supplied field names.

@@ -29,6 +29,7 @@ use sqlbuild_state::freshness::constants::{
 };
 use sqlbuild_state::observations::constants::OBSERVATION_COLUMN_TYPES;
 use sqlbuild_state::state_tables::main::read_history_sql::read_history_sql;
+use sqlbuild_state::state_tables::main::read_keys_sql::read_keys_sql;
 use sqlbuild_state::state_tables::models::HistoryRead;
 
 use crate::bindings::_helpers::authored_values::sql_values::{SqlValueClasses, sql_value};
@@ -182,6 +183,7 @@ fn read_page<'py>(
         }
     };
     let (adapter, connection) = (&session.adapter, &session.connection);
+    let (keys_only, keys) = key_read(request);
     let freshness_columns = SOURCE_FRESHNESS_COLUMN_TYPES.map(|(name, _)| name);
     let consumption_columns = CONSUMPTION_COLUMN_TYPES.map(|(name, _)| name);
     let observation_columns = OBSERVATION_COLUMN_TYPES.map(|(name, _)| name);
@@ -339,10 +341,11 @@ fn read_page<'py>(
             next_after: None,
             change_token: None,
             unchanged: false,
+            keys: Vec::new(),
         };
         return Ok((page, None));
     }
-    let change_token: Option<String> = if after.is_none() {
+    let change_token: Option<String> = if after.is_none() && keys.is_none() {
         relation_change_token(py, (adapter, connection), (&database, &schema, &name))?
     } else {
         None
@@ -353,6 +356,7 @@ fn read_page<'py>(
             next_after: None,
             change_token,
             unchanged: true,
+            keys: Vec::new(),
         };
         return Ok((page, None));
     }
@@ -422,6 +426,15 @@ fn read_page<'py>(
         WarehouseHistoryRead::Observations(_) => Some(&["observation_id", OBSERVED_AT_COLUMN]),
         _ => None,
     };
+    if keys_only && since.is_some() {
+        return Err(PyValueError::new_err(
+            "metadata key pages read whole reconcile scans",
+        ));
+    }
+    let columns = match key_columns {
+        Some(key_columns) if keys_only => key_columns,
+        _ => columns,
+    };
     let mut cursor_indexes: Vec<usize> = columns
         .iter()
         .enumerate()
@@ -486,6 +499,16 @@ fn read_page<'py>(
         })
         .collect();
     let projection: Vec<&str> = projection.iter().map(String::as_str).collect();
+    if let (Some(keys), Some(key_columns)) = (keys, key_columns) {
+        let page = rows_by_keys(
+            py,
+            (session, request),
+            (&qualified, &projection, has_event_id),
+            (columns, timestamp),
+            (key_columns, keys),
+        )?;
+        return Ok((page, None));
+    }
     let window = if session.local {
         limit
     } else {
@@ -536,8 +559,10 @@ fn stream_page<'py>(
     limit: usize,
 ) -> PyResult<(WarehouseHistoryPage, Option<HistoryStream<'py>>)> {
     let columns: Vec<&str> = stream.columns.iter().map(String::as_str).collect();
+    let (keys_only, _) = key_read(request);
     let tuple = py.import("builtins")?.getattr("tuple")?;
     let mut records: Vec<WarehouseHistoryRecord> = Vec::new();
+    let mut keys: Vec<Value> = Vec::new();
     let mut next_after = None;
     let mut read_count = 0;
     let fetch = limit.min(stream.remaining);
@@ -548,11 +573,6 @@ fn stream_page<'py>(
     {
         read_count += 1;
         let row = tuple.call1((row?,))?;
-        let record = decode_record(
-            py,
-            (request, &row, &stream.qualified),
-            (&columns, &stream.timestamp),
-        )?;
         let mut cursor = vec![None; stream.cursor_indexes.len()];
         for (index, value) in cursor.iter_mut().enumerate() {
             let raw = row.get_item(stream.cursor_indexes[index])?;
@@ -562,6 +582,16 @@ fn stream_page<'py>(
                 Some(raw.str()?.extract()?)
             };
         }
+        next_after = Some(cursor);
+        if keys_only {
+            keys.push(key_value(&row, (&columns, &columns, &stream.timestamp))?);
+            continue;
+        }
+        let record = decode_record(
+            py,
+            (request, &row, &stream.qualified),
+            (&columns, &stream.timestamp),
+        )?;
         let observed = match &record {
             WarehouseHistoryRecord::Catalog(_) | WarehouseHistoryRecord::Statistics(_) => {
                 return Err(PyValueError::new_err(
@@ -583,7 +613,6 @@ fn stream_page<'py>(
         if stream.since.is_none_or(|since| observed >= since) {
             records.push(record);
         }
-        next_after = Some(cursor);
     }
     stream.remaining -= read_count;
     let open = match &next_after {
@@ -606,6 +635,7 @@ fn stream_page<'py>(
         next_after,
         change_token: None,
         unchanged: false,
+        keys,
     };
     Ok((page, open))
 }
@@ -632,10 +662,15 @@ fn discard_stream(
     connection: &Bound<'_, PyAny>,
     stream: Option<HistoryStream<'_>>,
 ) -> PyResult<()> {
-    if let Some(stream) = stream
-        && !stream.cursor.is(connection)
-    {
-        stream.cursor.call_method0("close")?;
+    match stream {
+        Some(stream) => close_cursor(connection, &stream.cursor),
+        None => Ok(()),
+    }
+}
+
+fn close_cursor(connection: &Bound<'_, PyAny>, cursor: &Bound<'_, PyAny>) -> PyResult<()> {
+    if !cursor.is(connection) {
+        cursor.call_method0("close")?;
     }
     Ok(())
 }
@@ -784,24 +819,132 @@ fn decode_event_record(
 ) -> PyResult<WarehouseHistoryRecord> {
     let mut value = json!({"state_database": location.database, "state_schema": location.schema});
     for (index, name) in columns.iter().enumerate() {
-        let item = row.get_item(index)?;
-        value[*name] = if timestamps.contains(name) && !item.is_none() {
-            let item = if item.is_instance_of::<PyString>() {
-                item.py()
-                    .import("datetime")?
-                    .getattr("datetime")?
-                    .call_method1("fromisoformat", (&item,))?
-            } else {
-                item
-            };
-            json!(
-                presumed_utc_datetime(&item)?
-                    .call_method0("isoformat")?
-                    .extract::<String>()?
-            )
-        } else {
-            plain_value(&item)?
-        };
+        value[*name] = event_value(row.get_item(index)?, timestamps.contains(name))?;
     }
     serde_json::from_value(value).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+/// Key pages and full records format a column alike, so a fetched row matches its key by equality.
+fn event_value(item: Bound<'_, PyAny>, timestamp: bool) -> PyResult<Value> {
+    if !timestamp || item.is_none() {
+        return plain_value(&item);
+    }
+    let item = if item.is_instance_of::<PyString>() {
+        item.py()
+            .import("datetime")?
+            .getattr("datetime")?
+            .call_method1("fromisoformat", (&item,))?
+    } else {
+        item
+    };
+    Ok(json!(
+        presumed_utc_datetime(&item)?
+            .call_method0("isoformat")?
+            .extract::<String>()?
+    ))
+}
+
+/// A row's key columns as a key page carries them.
+fn key_value(
+    row: &Bound<'_, PyAny>,
+    (columns, key_columns, timestamp): (&[&str], &[&str], &str),
+) -> PyResult<Value> {
+    let mut key = serde_json::Map::new();
+    for name in key_columns {
+        let index = columns
+            .iter()
+            .position(|column| column == name)
+            .ok_or_else(|| PyValueError::new_err(format!("key column {name} is not read")))?;
+        key.insert(
+            (*name).to_owned(),
+            event_value(row.get_item(index)?, *name == timestamp)?,
+        );
+    }
+    Ok(Value::Object(key))
+}
+
+/// A reconcile scan of a keyed kind reads key pages, then only the rows the mirror lacks.
+fn key_read(request: &WarehouseHistoryRead) -> (bool, Option<&[Value]>) {
+    match request {
+        WarehouseHistoryRead::AuditResults(read)
+        | WarehouseHistoryRead::JanitorEvents(read)
+        | WarehouseHistoryRead::Migrations(read)
+        | WarehouseHistoryRead::OldNameViews(read)
+        | WarehouseHistoryRead::Microbatches(read)
+        | WarehouseHistoryRead::ColumnMigrations(read)
+        | WarehouseHistoryRead::Observations(read) => (read.keys_only, read.keys.as_deref()),
+        WarehouseHistoryRead::NodeResults(read) => (read.keys_only, read.keys.as_deref()),
+        WarehouseHistoryRead::Consumption(read) => (read.keys_only, read.keys.as_deref()),
+        _ => (false, None),
+    }
+}
+
+/// Text keys select candidate rows; timestamps and collation-equal strings are compared exactly here.
+fn rows_by_keys<'py>(
+    py: Python<'py>,
+    (session, request): (&HistorySession<'py>, &WarehouseHistoryRead),
+    (qualified, projection, has_event_id): (&str, &[&str], bool),
+    (columns, timestamp): (&[&str], &str),
+    (key_columns, keys): (&[&str], &[Value]),
+) -> PyResult<WarehouseHistoryPage> {
+    let adapter = &session.adapter;
+    let matched: Vec<&str> = key_columns
+        .iter()
+        .copied()
+        .filter(|column| *column != timestamp)
+        .collect();
+    let classes = SqlValueClasses::load(py)?;
+    let mut literals: Vec<Vec<Option<String>>> = Vec::with_capacity(keys.len());
+    for key in keys {
+        let mut row = Vec::with_capacity(matched.len());
+        for column in &matched {
+            row.push(match &key[*column] {
+                Value::Null => None,
+                Value::String(text) => Some(
+                    call_with(
+                        &adapter.getattr("render_typed_scalar")?,
+                        &[(
+                            "value",
+                            sql_value(&SqlValue::String(text.clone()), &classes)?,
+                        )],
+                    )?
+                    .extract()?,
+                ),
+                _ => {
+                    return Err(PyValueError::new_err(format!(
+                        "metadata key column {column} must be text"
+                    )));
+                }
+            });
+        }
+        literals.push(row);
+    }
+    let sql = read_keys_sql(qualified, (projection, has_event_id), &matched, &literals);
+    let cursor = call_with(
+        &adapter.getattr("execute")?,
+        &[
+            ("connection", session.connection.clone()),
+            ("sql", PyString::new(py, &sql).into_any()),
+        ],
+    )?;
+    let tuple = py.import("builtins")?.getattr("tuple")?;
+    let mut records: Vec<WarehouseHistoryRecord> = Vec::new();
+    for row in cursor.call_method0("fetchall")?.try_iter()? {
+        let row = tuple.call1((row?,))?;
+        if keys.contains(&key_value(&row, (columns, key_columns, timestamp))?) {
+            records.push(decode_record(
+                py,
+                (request, &row, qualified),
+                (columns, timestamp),
+            )?);
+        }
+    }
+    close_cursor(&session.connection, &cursor)?;
+    Ok(WarehouseHistoryPage {
+        records,
+        next_after: None,
+        change_token: None,
+        unchanged: false,
+        keys: Vec::new(),
+    })
 }
