@@ -22,6 +22,7 @@ use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KI
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, SqliteCursor};
+use crate::bindings::_helpers::planner_phases::objects::optional_text;
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 create_exception!(
@@ -356,13 +357,6 @@ impl SyncedCopyAdapter {
             )?);
         }
         PyTuple::new(py, columns)
-    }
-}
-
-fn optional_text<'py>(py: Python<'py>, value: Option<&str>) -> Bound<'py, PyAny> {
-    match value {
-        Some(value) => PyString::new(py, value).into_any(),
-        None => py.None().into_bound(py),
     }
 }
 
