@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { actionText, planSections, readySummary } from './plan-text';
+import { actionText, planSections, planSentence } from './plan-text';
 
 const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	name,
@@ -73,6 +73,22 @@ describe('plan text, as sqb plan prints it', () => {
 	it('collapses a plan that is all full refresh into counts by materialization', () => {
 		const full = plan([model('a', { reason: 'full_refresh' }), model('b', { reason: 'full_refresh' }), model('v', { reason: 'full_refresh', materialization_type: 'view' })]);
 		expect(planSections(full)).toEqual([{ title: 'Full refresh', changed: true, entries: [{ name: 'table', value: '2 models', detail: [] }, { name: 'view', value: '1 model', detail: [] }] }]);
-		expect(readySummary(full)).toBe('full refresh, 3 selected');
+		expect(planSentence(full)).toBe('3 models build from scratch, replacing what was built.');
+	});
+});
+
+describe('plan sentence', () => {
+	const incremental = { reason: 'normal_incremental', materialization_type: 'incremental' } as const;
+
+	it('names a changed model, counts the ones taking new rows, and calls the rest usual', () => {
+		const p = plan([model('orders', { reason: 'query_changed' }), model('events', incremental), model('visits', incremental), model('a'), model('b'), model('c', { action: 'skip' })]);
+		expect(planSentence(p)).toBe('5 models build: orders changed since its last build, 2 incremental models take new rows and the other 2 are recreated as usual. 1 other model is up to date.');
+	});
+
+	it('counts many changes, says first builds apart, and says when nothing changed', () => {
+		const changed = ['a', 'b', 'c'].map((n) => model(n, { reason: 'config_changed' }));
+		expect(planSentence(plan([...changed, model('new', { reason: 'first_run' })]))).toBe('4 models build: 3 models changed since their last build and new builds for the first time.');
+		expect(planSentence(plan([model('a'), model('b')], { source_loads: [{ name: 'raw', kind: 'source', is_reload: false }] }))).toBe('2 models build: none changed since their last build. 1 source loads first.');
+		expect(planSentence(plan([model('a', { action: 'skip' })]))).toBe('Nothing to build: 1 model is up to date.');
 	});
 });
