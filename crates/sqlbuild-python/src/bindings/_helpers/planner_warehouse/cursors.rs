@@ -41,6 +41,7 @@ use pyo3::IntoPyObject;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyFloat, PyTuple};
+use sqlbuild_analysis::planner_changes::constants::FORWARD_ONLY_POLICY;
 use sqlbuild_analysis::planner_warehouse::main::cursor_bounds::cursor_bounds;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_query_groups;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_identity::cursor_query_identity;
@@ -91,8 +92,10 @@ struct CursorModel<'py> {
     effective_grain: Bound<'py, PyAny>,
     start_cursor_config: Bound<'py, PyAny>,
     has_start_override: bool,
-    /// Lookback, a backfill duration or microbatches move the run's start off the last cursor.
+    /// Lookback, a replay on change, a start override or microbatches move the start off the last cursor.
     replays: bool,
+    /// The `cursor_start` floor's text, which lifts the start when it lies past the last cursor.
+    floor: Option<String>,
     watermark_mode: Bound<'py, PyAny>,
     watermark_all: bool,
     watermark_strategy: bool,
@@ -315,6 +318,29 @@ fn input_grain(reference: &Bound<'_, PyAny>, maps: &ModelMaps<'_>) -> PyResult<O
     }
 }
 
+/// The `cursor_start` floor of a timestamp or integer cursor, the types the replay policy floors.
+fn cursor_floor(model: &Bound<'_, PyAny>, cursor_type: Option<&str>) -> PyResult<Option<String>> {
+    if !cursor_type.is_some_and(|kind| [CURSOR_TYPE_TIMESTAMP, CURSOR_TYPE_INTEGER].contains(&kind))
+    {
+        return Ok(None);
+    }
+    config_cursor_bound(model.py(), &model_values(model)?, "cursor_start")?
+        .map(|raw| raw.str()?.extract())
+        .transpose()
+}
+
+/// Whether a `cursor_start` floor lifts the run's start past the last build's cursor.
+fn floor_lifts(info: &CursorModel<'_>, observed: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let py = observed.py();
+    let (Some(floor), Some(cursor_type)) = (&info.floor, &info.cursor_type) else {
+        return Ok(false);
+    };
+    match scalars::try_parse(&text(py, floor), &text(py, cursor_type))? {
+        Some(floor) => Ok(compare_values(&floor, observed)? > 0),
+        None => Ok(false),
+    }
+}
+
 fn start_override_set(model: &Bound<'_, PyAny>, overrides: &Bound<'_, PyAny>) -> PyResult<bool> {
     if overrides.is_none() {
         return Ok(false);
@@ -474,6 +500,7 @@ fn collect_models<'py>(
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| "all".to_owned());
         let watermark_mode = native_member(py, RecordId::CursorWatermarkMode, &mode)?;
+        let has_start_override = start_override_set(&model, &inputs.cursor_overrides)?;
         models.push(CursorModel {
             target_tag,
             target_relation,
@@ -488,10 +515,13 @@ fn collect_models<'py>(
             upstreams,
             effective_grain,
             start_cursor_config: resolve_start_cursor_config(&model, &inputs.start_cursor_config)?,
-            has_start_override: start_override_set(&model, &inputs.cursor_overrides)?,
+            has_start_override,
             replays: config_str(&model, "lookback")?.is_some()
-                || config_str(&model, "backfill_duration")?.is_some()
-                || config_str(&model, "batch_size")?.is_some(),
+                || config_str(&model, "batch_size")?.is_some()
+                || config_str(&model, "replay_on_change")?
+                    .is_some_and(|policy| policy != FORWARD_ONLY_POLICY)
+                || has_start_override,
+            floor: cursor_floor(&model, cursor_type.as_deref())?,
             watermark_all: watermark_mode.eq("all")?,
             watermark_mode,
             watermark_strategy: strategy.as_deref() == Some("watermark"),
@@ -1171,11 +1201,12 @@ fn synced_copy_values<'py>(
             .and_then(|_| facade.target_max(&info.model_name));
         match (&info.target_tag, observed) {
             (Some(tag), Some(observed)) => {
-                let value = text(info.effective_grain.py(), observed);
-                values.insert(tag.clone(), parse_warehouse_cursor(&value)?);
-                if reads_inputs && info.replays {
+                let value = parse_warehouse_cursor(&text(info.effective_grain.py(), observed))?;
+                let lifted = floor_lifts(info, &value)?;
+                values.insert(tag.clone(), value);
+                if reads_inputs && (info.replays || lifted) {
                     facade.mark_unknown(format!(
-                        "cursor window of {} (lookback or backfill starts it before the last build's cursor)",
+                        "cursor window of {} (the run starts it away from the last build's cursor)",
                         info.model_name
                     ));
                 } else if reads_inputs {

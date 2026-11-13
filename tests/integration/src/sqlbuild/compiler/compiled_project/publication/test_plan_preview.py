@@ -39,6 +39,8 @@ _SOURCES: str = dedent(
         expression: |
           {expression}
         type_enforcement: true
+        freshness:
+          column: refund_id
         columns:
           - name: refund_id
             type: INTEGER
@@ -80,6 +82,22 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
+    "models/daily_orders.sql": dedent(
+        """
+        MODEL (description "Daily orders rebuilt over a lookback.",
+          materialized incremental,
+          incremental_strategy delete_insert,
+          cursor ordered_at,
+          cursor_type timestamp,
+          cursor_grain second,
+          lookback 1d,
+        );
+
+        SELECT id, ordered_at FROM __seed("raw_orders")
+        WHERE ordered_at >= __cursor_start() AND ordered_at < __cursor_end()
+        """
+    ).strip()
+    + "\n",
     "models/order_count.sql": dedent(
         """
         MODEL (description "Order count without a cursor.", materialized table);
@@ -98,13 +116,21 @@ _PROJECT_FILES: dict[str, str] = {
     + "\n",
     "sources/raw.yml": _SOURCES.format(expression=_EXPRESSION) + "\n",
 }
-_SELECTION: list[str] = ["model:order_count", "model:orders", "model:refunds"]
+_SELECTION: list[str] = [
+    "model:daily_orders",
+    "model:order_count",
+    "model:orders",
+    "model:refunds",
+]
 _UNKNOWN: list[str] = [
     "source freshness",
     "retention",
     "column rename support",
     "sources outside mirrored schemas",
 ]
+_REPLAYED: str = (
+    "cursor window of daily_orders (the run starts it away from the last build's cursor)"
+)
 
 
 @pytest.mark.parametrize(
@@ -116,7 +142,7 @@ _UNKNOWN: list[str] = [
             injected_sql=(),
             expected_window_models=("orders",),
             expected_unplanned_cursor_models=(),
-            expected_added_unknowns=(),
+            expected_added_unknowns=(_REPLAYED,),
         ),
         PlanPreviewTestCase(
             description="a cursor_max from no successful build is not a cursor position",
@@ -130,6 +156,7 @@ _UNKNOWN: list[str] = [
             expected_unplanned_cursor_models=("orders",),
             expected_added_unknowns=(
                 "cursor position of orders (no successful build recorded it)",
+                _REPLAYED,
             ),
         ),
         PlanPreviewTestCase(
@@ -141,6 +168,7 @@ _UNKNOWN: list[str] = [
             expected_window_models=("orders",),
             expected_unplanned_cursor_models=(),
             expected_added_unknowns=(
+                _REPLAYED,
                 "query columns of expression source raw_refunds (planned as declared)",
             ),
         ),
@@ -213,6 +241,23 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
     preview_models: dict[str, dict[str, Any]] = {
         model["name"]: model for model in preview.pop("models")
     }
+    live_replayed: dict[str, Any] = live_models.pop("daily_orders")
+    preview_replayed: dict[str, Any] = preview_models.pop("daily_orders")
+    assert live_replayed["cursor"]["resolved_bounds"]["start"] is not None
+    assert (preview_replayed["action"], preview_replayed["reason"]) == (
+        live_replayed["action"],
+        live_replayed["reason"],
+    )
+    live_freshness: dict[str, Any] = live["metadata"].pop("direct_source_freshness")
+    preview_freshness: dict[str, Any] = preview["metadata"].pop("direct_source_freshness")
+    assert live_freshness["observed_source_names"] == ["raw_refunds"]
+    assert preview_freshness["unknown_source_details"] == [
+        {
+            "message": "a plan preview does not observe source freshness",
+            "reason": "error",
+            "source_name": "raw_refunds",
+        }
+    ]
     assert synced["cursor_window_starts"] == {
         name: live_models[name]["cursor_bounds"]["start"]
         for name in test_case.expected_window_models

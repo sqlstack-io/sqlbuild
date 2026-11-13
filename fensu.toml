@@ -1668,7 +1668,9 @@ allowed_paths = [
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=Only sqb plan activates the synced copy and reports what it could not know.",
     "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/cursors.rs=Preview branch: target MAX from the copy, watermark inputs read when the run starts.",
     "crates/sqlbuild-python/src/bindings/_helpers/planner_phases/retention.rs=Preview branch: table types and retention stay unknown.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_resolution/orchestration.rs=Preview branch: cursor intrinsics bind to bounds the run resolves.",
     "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_columns.rs=Preview branch: expression columns from the copy instead of DESCRIBE.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_freshness.rs=Preview branch: the copy has no source freshness state to read.",
     "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_tables.rs=Preview branch: sources outside the copy are not probed.",
 ]
 

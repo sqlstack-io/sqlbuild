@@ -33,7 +33,8 @@ create_exception!(
 );
 
 /// Adapter methods that only describe the dialect, never reaching the warehouse.
-const PASSTHROUGH_NAMES: [&str; 11] = [
+const PASSTHROUGH_NAMES: [&str; 12] = [
+    "_render_source_relation_cast_subquery_with_columns",
     "adapter_name",
     "default_database",
     "default_schema",

@@ -274,7 +274,8 @@ These stay unknown until it does:
 - source freshness, retention, table types and column rename support;
 - sources outside the schemas the server syncs;
 - the cursor position of an incremental model with no successful build;
-- the range start of an incremental model with lookback, a backfill duration or microbatches;
+- the range start of an incremental model with lookback, a replay on change, a start override,
+  microbatches or a `cursor_start` past its last build;
 - whether a start set with `cursor_start_max_ahead` sits too far ahead;
 - the columns of an expression source whose SQL changed since it was last described, which the
   plan takes as declared.

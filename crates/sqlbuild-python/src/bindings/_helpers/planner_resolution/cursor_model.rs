@@ -45,7 +45,8 @@ fn config<'py>(model: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAn
     Ok(value.unwrap_or_else(|| py.None().into_bound(py)))
 }
 
-fn unbounded(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+/// Bounds the run resolves when it starts, as for inputs another node of the run produces.
+pub(crate) fn unbounded(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     let sentinel = host::entry(py, ExecutorHost::BoundSentinel)?;
     new_record_with(
         py,

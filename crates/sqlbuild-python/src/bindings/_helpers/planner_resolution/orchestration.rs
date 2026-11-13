@@ -10,9 +10,12 @@ use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
 use crate::bindings::_helpers::model_config::typed_config::{
     config_node_of, config_text_is, config_text_object, config_value, model_values,
 };
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
-use crate::bindings::_helpers::planner_resolution::cursor_model::compute_model_cursor_bounds;
+use crate::bindings::_helpers::planner_resolution::cursor_model::{
+    compute_model_cursor_bounds, unbounded,
+};
 use crate::bindings::_helpers::planner_resolution::models::{CursorFiltering, ModelSqlRequest};
 use crate::bindings::_helpers::planner_resolution::refs::{
     resolve_dbt_ref_references, resolve_refs, resolve_table_function_references,
@@ -216,14 +219,18 @@ pub(crate) fn resolve_model_sql<'py>(
     let (_, uses_intrinsics) = resolve_cursor_intrinsics(py, &sql, None, None)?;
     let name: String = model_reads::model_name(model)?;
     if uses_intrinsics {
-        if bounds.is_none() {
-            let cause = match &request.full_rebuild_cause {
-                Some(cause) => Some(cause.clone()),
-                None if request.full_refresh => Some("--full-refresh".to_owned()),
-                None => None,
-            };
-            return Err(unresolved_bounds_error(py, &name, cause.as_deref())?);
-        }
+        let cause = match &request.full_rebuild_cause {
+            Some(cause) => Some(cause.clone()),
+            None if request.full_refresh => Some("--full-refresh".to_owned()),
+            None => None,
+        };
+        let bounds = match bounds {
+            bounds if !bounds.is_none() => bounds,
+            _ if cause.is_none() && resolution.adapter.is_instance_of::<SyncedCopyAdapter>() => {
+                unbounded(py)?
+            }
+            _ => return Err(unresolved_bounds_error(py, &name, cause.as_deref())?),
+        };
         sql = intrinsic_bounds(&sql, &bounds, &cursor_type, &resolution.adapter)?;
     }
     resolution.assert_resolved(&sql, &format!("Model '{name}'"))?;
