@@ -10,10 +10,7 @@ from collections.abc import Callable
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import ModuleType, UnionType
-from typing import Annotated, Literal, Union, get_args, get_origin, get_type_hints
-
-from pydantic import AliasChoices, AliasPath
-from pydantic.fields import FieldInfo
+from typing import TYPE_CHECKING, Annotated, Literal, Union, get_args, get_origin, get_type_hints
 
 from sqlbuild._native import (
     PYTHON_INIT_MODULE_STEM,
@@ -29,6 +26,9 @@ from sqlbuild.runtime.event_exporting.constants import EVENT_EXPORTER_EVENT_PARA
 from sqlbuild.runtime.observability.models import LifecycleEvent
 from sqlbuild.runtime.user_code.main.register_user_code_root import register_user_code_root
 from sqlbuild.runtime.user_code.main.user_code_spec import user_code_spec
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
 
 _PROJECT_PYTHON_PACKAGE_MARKER: str = "__sqlbuild_project_python__"
 
@@ -448,6 +448,8 @@ def provider_settings(*, provider_class: type) -> dict[str, object]:
 
 def _environment_alias(info: FieldInfo) -> str | None:
     """The first environment variable an alias names: an `AliasChoices` choice or path head."""
+
+    from pydantic import AliasChoices, AliasPath
 
     alias: object = info.validation_alias or info.alias
     if isinstance(alias, AliasChoices | AliasPath):
