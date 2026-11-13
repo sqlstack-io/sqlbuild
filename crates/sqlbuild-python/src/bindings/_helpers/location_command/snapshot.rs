@@ -7,7 +7,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{IntoPyObject, pyfunction};
-use serde_json::json;
+use serde_json::{Value, json};
+use sqlbuild_analysis::planner_scope::main::node_loads::node_loads;
 use sqlbuild_core::models::DiagnosticSeverity;
 use sqlbuild_discovery::project_validation::main::validate_orchestration_names::validate_orchestration_names;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
@@ -28,8 +29,10 @@ use crate::bindings::_helpers::native_host::orchestration_declarations::{
     collect_declarations, orchestration_names,
 };
 use crate::bindings::_helpers::native_host::orchestration_environment::environment_hash;
+use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_identity::identities::direct_model_version_identities;
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
+use crate::bindings::_helpers::planner_scope::values::project_graph;
 use crate::bindings::_helpers::records::fields::field;
 
 /// Where declarations passed to the snapshot directly are reported as declared.
@@ -140,6 +143,7 @@ pub(crate) fn orchestration_snapshot<'py>(
         input.documents.insert("lineage".into(), lineage);
     }
     input.nodes = identity_nodes(project.as_any(), input.nodes)?;
+    input.nodes = load_nodes(project.as_any(), input.nodes)?;
     Ok(NativeOrchestrationSnapshot { input })
 }
 
@@ -173,4 +177,36 @@ fn identity_nodes(
         node.definition["planner_identity"] = json!({"local_hash": hash});
     }
     Ok(nodes)
+}
+
+/// `loads` lists the source writers a loading build of the node plans beyond its compiled `deps`, absent when none.
+fn load_nodes(
+    project: &Bound<'_, PyAny>,
+    mut nodes: BTreeMap<String, SnapshotNode>,
+) -> PyResult<BTreeMap<String, SnapshotNode>> {
+    for ((kind, name), writers) in node_loads(&project_graph(project)?, &execution_deps(project)?) {
+        let Some(node) = nodes.get_mut(&format!("{kind}:{name}")) else {
+            continue;
+        };
+        let deps: Vec<Value> = node
+            .definition
+            .get("deps")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let loads: Vec<String> = writers
+            .into_iter()
+            .map(|(kind, name)| format!("{kind}:{name}"))
+            .filter(|key| !listed(&deps, key))
+            .collect();
+        if !loads.is_empty() {
+            node.definition["loads"] = json!(loads);
+        }
+    }
+    Ok(nodes)
+}
+
+/// Whether `key` is already one of the node's compiled `deps`.
+fn listed(deps: &[Value], key: &str) -> bool {
+    deps.iter().any(|dep| dep.as_str() == Some(key))
 }

@@ -1,5 +1,6 @@
 """Publication cases and isolated server credentials."""
 
+import sqlite3
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
@@ -118,9 +119,19 @@ class WorkerExecutionTestCase:
     files: dict[str, str] = field(default_factory=dict)
     files_after_publication: dict[str, str] = field(default_factory=dict)
     store_setup: str = ""
+    store_edit: Callable[[sqlite3.Connection], None] = lambda _: None
     concurrency_limits: dict[str, int] = field(default_factory=dict)
     launcher: Literal["native", "uncooperative", "docker"] = "native"
     warehouse_setup: Callable[[Path], None] = lambda _: None
+
+
+@dataclass(frozen=True)
+class UnclaimedLoadTestCase:
+    description: str
+    files: dict[str, str]
+    store_edit: Callable[[sqlite3.Connection], None]
+    refused_writer: str
+    expected_write_set: frozenset[str]
 
 
 @dataclass(frozen=True)

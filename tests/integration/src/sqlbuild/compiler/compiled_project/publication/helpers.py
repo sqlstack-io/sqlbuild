@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import gzip
 import hashlib
 import json
 import os
@@ -826,6 +827,7 @@ def scheduled_worker(
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:
             _ = control.executescript(test_case.store_setup)
+            test_case.store_edit(control)
         monkeypatch.setenv("SQLBUILD_SCHEDULER_TEST_STORE", f"sqlite://{control_store}")
         monkeypatch.setenv(
             "SQLBUILD_PLATFORM_WEBHOOK_URL",
@@ -1537,3 +1539,43 @@ def hold_write_lock(database: Path) -> duckdb.DuckDBPyConnection:
         except duckdb.IOException:
             assert time.monotonic() < deadline
             time.sleep(0.05)
+
+
+LOADED_ORDER_FILES: dict[str, str] = {
+    "sources/loaded.yml": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/loaded_sources.yml"
+    ).read_text(),
+    "python/loaders/loaded.py": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/loaded_sources.py"
+    ).read_text(),
+    "models/orders.sql": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.sql"
+    ).read_text(),
+    "orchestration/orders.py": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.py"
+    ).read_text(),
+}
+
+
+def without_loads(control: sqlite3.Connection, node_key: str) -> None:
+    """Drop a published node's `loads` in place; its content address and the worker's check stay."""
+    for node_hash, body in control.execute(
+        "SELECT d.node_hash, d.body FROM sqb_node_definitions d JOIN sqb_snapshot_nodes n "
+        "ON n.node_hash = d.node_hash WHERE n.node_key = ?",
+        (node_key,),
+    ).fetchall():
+        content: dict[str, Any] = json.loads(gzip.decompress(body))
+        del content["definition"]["loads"]
+        _ = control.execute(
+            "UPDATE sqb_node_definitions SET body = ? WHERE node_hash = ?",
+            (gzip.compress(json.dumps(content).encode()), node_hash),
+        )
+
+
+def run_write_set(control_store: Path, run_id: str) -> frozenset[str]:
+    """The frozen write set a run's request recorded."""
+    with closing(sqlite3.connect(control_store)) as control:
+        (request,) = control.execute(
+            "SELECT request_json FROM sqb_runs WHERE run_id=?", (run_id,)
+        ).fetchone()
+    return frozenset(json.loads(request)["write_set"])

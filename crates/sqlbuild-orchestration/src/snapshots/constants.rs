@@ -55,5 +55,7 @@ pub(crate) const SOURCE_NODE_KIND: &str = "source";
 pub(crate) const SOURCE_KEY_PREFIX: &str = "source:";
 /// A source with a non-null loader here is managed, so automatic source loading writes it.
 pub(crate) const LOADER_POINTER: &str = "/entry/loader";
+/// Source writers a loading build of the node plans beyond its `deps`: hook and audit reads, loader chains.
+pub(crate) const LOADS_FIELD: &str = "loads";
 /// The frozen setting for `--no-load-sources`; `false` stops a build loading sources its models read.
 pub(crate) const LOAD_SOURCES_SETTING: &str = "load_sources";
