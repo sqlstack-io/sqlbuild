@@ -51,7 +51,18 @@ describe('toAuditEntry', () => {
 			after: '{"token_id":"t-1"}',
 			scope: { locationId: null, subject: 'run_id=run-4' }
 		});
+		expect(entry.summary).toBe('');
 		expect(auditMatches(entry, { outcome: 'denied' })).toBe(false);
 		expect(auditMatches(entry, { actor: 'scheduler/s-1', action: 'token.issued' })).toBe(true);
+	});
+
+	it('says what work a location was asked for, and which run a read was of', () => {
+		const allowed = (action: string, after_json: Record<string, unknown>) =>
+			toAuditEntry({ ...base, actor: 'principal:p-1', actor_name: 'ana', action, granting_role: 'admin', scope_json: { location_id: 'loc-1', target: 'prod' }, after_json }).summary;
+		const work = (work: Record<string, unknown>) => allowed('location.work_requested', { request_id: 'q-1', reason: 'plan', work });
+		expect(work({ kind: 'plan', command: ['build', '--select', 'orders'], selection: ['model:orders'], settings: {} })).toBe('Plan sqb build --select orders');
+		expect(work({ kind: 'sync_warehouse' })).toBe('Sync the warehouse copy');
+		expect(allowed('error.read', { run_id: 'd36ac8b2-314c-46aa', found: true })).toBe('Run d36ac8b2');
+		expect(allowed('output.read', { run_id: 'd36ac8b2-314c-46aa', found: false })).toBe('Run d36ac8b2, not found');
 	});
 });
