@@ -5,6 +5,7 @@ pub(crate) mod holds_on_current_nodes;
 pub(crate) mod job_write_set;
 pub mod list_person_snapshots;
 pub mod next_remote_generation;
+pub mod node_hashes;
 pub(crate) mod prune_snapshots;
 pub(crate) mod publish_development_snapshot;
 pub mod publish_remote_snapshot;

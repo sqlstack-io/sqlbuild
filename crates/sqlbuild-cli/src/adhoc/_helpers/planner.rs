@@ -76,7 +76,6 @@ impl CommandPlanner for CliPlanner {
             for (dest, value) in LOAD_BUILD_SETTINGS {
                 settings.insert(dest.to_owned(), json!(value));
             }
-            // `--reload` implies loading, and a build refuses it together with `--load`.
             if settings.get(RELOAD_DEST) == Some(&Json::Bool(true)) {
                 settings.remove(LOAD_SOURCES_DEST);
             }

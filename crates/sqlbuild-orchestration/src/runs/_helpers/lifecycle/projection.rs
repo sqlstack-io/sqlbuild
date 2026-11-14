@@ -58,7 +58,8 @@ pub(crate) async fn project_run_state(
     match &request.change {
         RunChange::LaunchFailed { .. }
         | RunChange::CheckStarted { .. }
-        | RunChange::CheckFinished { .. } => {}
+        | RunChange::CheckFinished { .. }
+        | RunChange::Compiled { .. } => {}
         RunChange::NodeStarted { .. } | RunChange::NodeFinished { .. } => {
             return project_node(transaction, request, &state.node_counts_json).await;
         }

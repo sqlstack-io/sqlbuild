@@ -15,7 +15,7 @@ use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
 use crate::runs::_helpers::requests::run_id::refuse_derived_run_id;
-use crate::runs::constants::ADHOC_AUDIT_TAG;
+use crate::runs::constants::{ADHOC_AUDIT_TAG, LOAD_VERB};
 use crate::runs::models::{
     AdhocCheckRequest, AdhocPermission, AdhocRunRequest, CommandPlan, PlannerResource, RunCommand,
     RunKind, RunOrigin, RunRequest,
@@ -64,13 +64,12 @@ pub(crate) async fn frozen_adhoc_request(
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
-    // A load runs as a build of its managed sources, so the worker's verified build path enforces its write set.
-    let verb = if plan.verb == "load" {
-        "build"
+    let command = if plan.verb == LOAD_VERB {
+        Some(RunCommand::Build)
     } else {
-        plan.verb.as_str()
+        RunCommand::of_verb(&plan.verb)
     };
-    let Some(command) = RunCommand::of_verb(verb) else {
+    let Some(command) = command else {
         let refusal = format!("workers do not run sqb {}", plan.verb);
         return Ok((transaction, Err(refusal)));
     };

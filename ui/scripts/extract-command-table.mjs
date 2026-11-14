@@ -25,11 +25,9 @@ const VERB_DESCRIPTIONS = {
 	test: 'Run unit and scenario tests for the selection',
 	seed: 'Load seed files',
 	audit: 'Evaluate audits against what is already built',
-	freshness: 'Check source freshness'
+	freshness: 'Check source freshness',
+	load: 'Run the loaders of managed sources'
 };
-
-/** Flags the planner refuses although their destination is accepted: `--no-load` shares `--load`'s. */
-const REFUSED_FLAGS = ['--load'];
 
 /** Descriptions for flags the table leaves undocumented. */
 const DESCRIPTIONS = {
@@ -68,8 +66,12 @@ const ACCEPTED = new Set([...rustStrings(ALLOWLIST, 'ALLOWED_DESTS'), ...rustStr
 /** Destinations whose setting needs a permission beyond run.adhoc, as the control plane decides it. */
 const REQUIRES = new Map([
 	...['full_refresh', ...rustStrings(GATES, 'CURSOR_SETTINGS'), ...rustStrings(GATES, 'ADHOC_DESTRUCTIVE_SETTINGS')].map((dest) => [dest, 'run.rewrite_history']),
-	['warehouse', 'run.warehouse']
+	['warehouse', 'run.warehouse'],
+	['vars', 'run.vars'],
+	['reload', 'run.load']
 ]);
+/** Flags gated apart from their destination: `--load` needs run.load, the `--no-load` sharing it does not. */
+const FLAG_REQUIRES = new Map([['--load', 'run.load']]);
 
 function valueType(action) {
 	const flag = action.options[0];
@@ -95,7 +97,7 @@ function extract(table) {
 			if (!action.options) continue;
 			for (const option of action.options) known.add(option);
 			const flag = action.options.find((o) => o.startsWith('--'));
-			if (!flag || !ACCEPTED.has(action.dest) || REFUSED_FLAGS.includes(flag)) continue;
+			if (!flag || !ACCEPTED.has(action.dest)) continue;
 			const help = typeof action.help === 'string' ? action.help : null;
 			if (action.help && typeof action.help === 'object') continue;
 			flags.push({
@@ -104,13 +106,13 @@ function extract(table) {
 				type: valueType(action),
 				choices: action.choices ?? null,
 				repeatable: action.kind === 'extend' || action.kind === 'append',
-				requires: REQUIRES.get(action.dest) ?? null,
+				requires: FLAG_REQUIRES.get(flag) ?? REQUIRES.get(action.dest) ?? null,
 				description: help ?? DESCRIPTIONS[flag] ?? ''
 			});
 		}
 		return { name, description, flags };
 	});
-	for (const flag of [...REFUSED_FLAGS, ...Object.keys(DESCRIPTIONS)]) {
+	for (const flag of [...FLAG_REQUIRES.keys(), ...Object.keys(DESCRIPTIONS)]) {
 		if (!known.has(flag)) throw new Error(`${flag} is described here but not in the command table for any ad-hoc verb`);
 	}
 	for (const dest of REQUIRES.keys()) {
