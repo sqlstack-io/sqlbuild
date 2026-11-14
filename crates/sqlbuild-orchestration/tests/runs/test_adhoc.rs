@@ -33,7 +33,7 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             expected_launch: Ok(true),
         },
         AdhocCommandTestCase {
-            description: "a build claims the managed source it loads for a selected model and its loader chain",
+            description: "a Developer's plain build loads the managed source a selected model reads, and its loader chain, under run.adhoc alone",
             person: AdhocPerson::Developer,
             command: &["build", "model:customers"],
             priority: 0,
@@ -100,6 +100,72 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             expected_launch: Err(403),
         },
         AdhocCommandTestCase {
+            description: "Developer lacks run.load for an explicit --load of the sources a model reads",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:customers", "--load"],
+            priority: 0,
+            reason: "Refresh customers",
+            expected_check: json!({"selection": ["model:customers"], "write_set": ["model:customers", "source:shop.accounts", "source:shop.customers"],
+                "permissions": [["run.adhoc", true], ["run.load", false]], "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "Developer lacks run.load for --reload",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:customers", "--reload"],
+            priority: 0,
+            reason: "Reload customers",
+            expected_check: json!({"selection": ["model:customers"], "write_set": ["model:customers", "source:shop.accounts", "source:shop.customers"],
+                "permissions": [["run.adhoc", true], ["run.load", false]], "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "Developer lacks run.load for the load verb",
+            person: AdhocPerson::Developer,
+            command: &["load", "source:shop.customers"],
+            priority: 0,
+            reason: "Load customers",
+            expected_check: json!({"selection": ["source:shop.customers"], "write_set": ["source:shop.customers"],
+                "permissions": [["run.adhoc", true], ["run.load", false]], "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "--load that loads no managed source needs no run.load",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:orders", "--load"],
+            priority: 0,
+            reason: "Refresh orders",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true]], "error": null, "launchable": true}),
+            expected_launch: Ok(true),
+        },
+        AdhocCommandTestCase {
+            description: "Developer lacks run.vars",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:orders", "--vars", "{\"day\": 1}"],
+            priority: 0,
+            reason: "Refresh orders for one day",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true], ["run.vars", false]], "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "Admin loads with variables, needing run.vars and run.load on the loaded source only",
+            person: AdhocPerson::Admin,
+            command: &[
+                "load",
+                "source:shop.customers",
+                "--reload",
+                "--vars",
+                "{\"day\": 1}",
+            ],
+            priority: 0,
+            reason: "Reload customers for one day",
+            expected_check: json!({"selection": ["source:shop.customers"], "write_set": ["source:shop.customers"],
+                "permissions": [["run.adhoc", true], ["run.vars", true], ["run.load", true]], "error": null, "launchable": true}),
+            expected_launch: Ok(true),
+        },
+        AdhocCommandTestCase {
             description: "Developer lacks run.prioritise alone",
             person: AdhocPerson::Developer,
             command: &["build", "model:orders"],
@@ -159,11 +225,11 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
         AdhocCommandTestCase {
             description: "a refused flag is refused before any permission",
             person: AdhocPerson::Admin,
-            command: &["build", "--vars"],
+            command: &["build", "--debug"],
             priority: 0,
             reason: "Refresh orders",
             expected_check: json!({"selection": [], "write_set": [], "permissions": [],
-                "error": "--vars is not available for ad-hoc runs", "launchable": false}),
+                "error": "--debug is not available for ad-hoc runs", "launchable": false}),
             expected_launch: Err(400),
         },
         AdhocCommandTestCase {
@@ -266,14 +332,22 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                 ],
                 "{backend:?}: the worker receives the exact resolved selection of the pinned publication"
             );
-            let tested = test_cases
-                .iter()
-                .position(|test_case| test_case.command[0] == "test")
-                .expect("a test launch");
+            let position = |verb: &str| {
+                test_cases
+                    .iter()
+                    .position(|test_case| {
+                        test_case.command[0] == verb && test_case.expected_launch.is_ok()
+                    })
+                    .expect("a launch of the verb")
+            };
             let commands = rows(
                 store,
-                "SELECT request_json FROM sqb_runs WHERE run_id=$1 OR run_id=$2 ORDER BY run_id",
-                vec![Parameter::Id(run_ids[0]), Parameter::Id(run_ids[tested])],
+                "SELECT request_json FROM sqb_runs WHERE run_id IN ($1, $2, $3) ORDER BY run_id",
+                vec![
+                    Parameter::Id(run_ids[0]),
+                    Parameter::Id(run_ids[position("load")]),
+                    Parameter::Id(run_ids[position("test")]),
+                ],
             )
             .await
             .iter()
@@ -281,8 +355,8 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             .collect::<Vec<Option<Value>>>();
             assert_eq!(
                 commands,
-                vec![None, Some(json!("test"))],
-                "{backend:?}: the worker receives the command, and a build request is serialized as before"
+                vec![None, None, Some(json!("test"))],
+                "{backend:?}: the worker receives the command, a load runs as a build, and a build request is serialized as before"
             );
             let audit = rows(
                 store,
@@ -306,6 +380,8 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                     json!(["build", {}, "Refresh customers"]),
                     json!(["build", {}, "Reload customers"]),
                     json!(["build", {"load_sources": false}, "Refresh customers only"]),
+                    json!(["build", {"load_sources": true}, "Refresh orders"]),
+                    json!(["load", {"reload": true, "vars": {"day": 1}}, "Reload customers for one day"]),
                     json!(["build", {"full_refresh": true, "warehouse": "BUILD_XS"}, "Rebuild orders now"]),
                     json!(["test", {}, "Check orders"]),
                 ],

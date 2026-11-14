@@ -21,6 +21,9 @@ const CURSOR_SETTINGS: [&str; 6] = [
     "end_cursor_int",
 ];
 
+/// Settings that ask for source loads beyond a plain build's automatic ones; the `load` verb sets `load_sources`.
+const EXPLICIT_LOAD_SETTINGS: [&str; 2] = ["load_sources", "reload"];
+
 /// Confirmations of destructive changes an ad-hoc command may set; a published job's authored settings keep job.run.
 const ADHOC_DESTRUCTIVE_SETTINGS: [&str; 4] = [
     "allow_snapshot_full_refresh",
@@ -81,10 +84,13 @@ pub(crate) fn execution_scopes(
     if launches && adhoc && request.settings.contains_key("warehouse") {
         actions.push(Action::RunWarehouse);
     }
+    if launches && adhoc && request.settings.contains_key("vars") {
+        actions.push(Action::RunVars);
+    }
     if launches && request.priority > 0 {
         actions.push(Action::RunPrioritise);
     }
-    actions
+    let mut scopes: Vec<PermissionScope> = actions
         .into_iter()
         .map(|action| PermissionScope {
             action,
@@ -92,6 +98,36 @@ pub(crate) fn execution_scopes(
             target: Some(request.target.clone()),
             nodes: nodes.clone(),
         })
+        .collect();
+    let loaded = explicitly_loaded(request);
+    if launches && adhoc && !loaded.is_empty() {
+        scopes.push(PermissionScope {
+            action: Action::RunLoad,
+            location_id: Some(request.location_id),
+            target: Some(request.target.clone()),
+            nodes: loaded,
+        });
+    }
+    scopes
+}
+
+/// The sources an ad-hoc `--load`, `--reload` or `load` writes; a plain build's automatic loads need only `run.adhoc`.
+fn explicitly_loaded(request: &RunRequest) -> BTreeSet<String> {
+    let explicit = EXPLICIT_LOAD_SETTINGS.iter().any(|name| {
+        request
+            .settings
+            .get(*name)
+            .and_then(serde_json::Value::as_bool)
+            == Some(true)
+    });
+    if !explicit {
+        return BTreeSet::new();
+    }
+    request
+        .write_set
+        .iter()
+        .filter(|key| key.starts_with("source:"))
+        .cloned()
         .collect()
 }
 

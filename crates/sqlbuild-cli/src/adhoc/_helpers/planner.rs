@@ -20,9 +20,9 @@ use sqlbuild_orchestration::runs::types::{CommandPlanner, PublishedJobs};
 
 use crate::adhoc::constants::{
     ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, CHANGED_COUNTS_DEST, CHANGED_DEST, COMMAND_DEST,
-    FRESHNESS_VERB, INCLUDE_PYTHON_DEST, INTEGER_CONVERTERS, LOAD_SOURCES_DEST,
-    POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS, SQL_TEST_KIND,
-    UNIT_TEST_VERBS,
+    FRESHNESS_VERB, INCLUDE_PYTHON_DEST, INTEGER_CONVERTERS, LOAD_BUILD_SETTINGS,
+    LOAD_SOURCES_DEST, LOAD_VERB, POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS, RELOAD_DEST,
+    SEED_VERB, SELECTOR_DESTS, SQL_TEST_KIND, UNIT_TEST_VERBS, VARS_CONVERTER, VARS_DEST,
 };
 use crate::argv::main::command_settings_arguments::command_settings_arguments;
 use crate::argv::main::job_settings_arguments::job_settings_arguments;
@@ -44,7 +44,7 @@ impl CommandPlanner for CliPlanner {
             .ok_or_else(|| "enter a command, such as build --select orders".to_owned())?;
         if !ADHOC_VERBS.contains(&verb.as_str()) {
             return Err(format!(
-                "sqb {verb} is not available as an ad-hoc run; use build, test, seed, audit or freshness"
+                "sqb {verb} is not available as an ad-hoc run; use build, test, seed, audit, freshness or load"
             ));
         }
         let parsed = parse(command)?;
@@ -66,9 +66,22 @@ impl CommandPlanner for CliPlanner {
             if dest == CHANGED_DEST && settings.contains_key(CHANGED_DEST) {
                 continue;
             }
-            settings.insert(dest.clone(), setting(dest, value)?);
+            let setting = setting(dest, value)?;
+            if dest == VARS_DEST && setting.as_object().is_some_and(serde_json::Map::is_empty) {
+                continue;
+            }
+            settings.insert(dest.clone(), setting);
         }
-        if verb == BUILD_VERB {
+        if verb == LOAD_VERB {
+            for (dest, value) in LOAD_BUILD_SETTINGS {
+                settings.insert(dest.to_owned(), json!(value));
+            }
+            // `--reload` implies loading, and a build refuses it together with `--load`.
+            if settings.get(RELOAD_DEST) == Some(&Json::Bool(true)) {
+                settings.remove(LOAD_SOURCES_DEST);
+            }
+        }
+        if verb == BUILD_VERB || verb == LOAD_VERB {
             job_settings_arguments(&settings)?;
         } else {
             command_settings_arguments(verb, &settings)?;
@@ -88,6 +101,7 @@ impl CommandPlanner for CliPlanner {
                 seeds
             }
             FRESHNESS_VERB => freshness_sources(publication, &select, &exclude)?,
+            LOAD_VERB => managed_sources(publication, &select, &exclude)?,
             _ => {
                 let python = verb == BUILD_VERB
                     && settings.get(INCLUDE_PYTHON_DEST) != Some(&Json::Bool(false));
@@ -102,11 +116,22 @@ impl CommandPlanner for CliPlanner {
     }
 }
 
-/// Whole numbers convert as the parser needs them; paths and variables stay text so the refusal can name them.
+/// Whole numbers convert as the parser needs them; `--vars` must be a JSON object; paths stay text so the refusal can name them.
 struct PlannerHost;
 
 impl ArgvHost for PlannerHost {
     fn convert(&mut self, converter: &str, text: &str) -> Result<Value, TypeFailure> {
+        if converter == VARS_CONVERTER {
+            return match serde_json::from_str::<Json>(text) {
+                Ok(Json::Object(_)) => Ok(Value::Str(text.to_owned())),
+                Ok(_) => Err(TypeFailure::ArgumentType(
+                    "--vars must be a JSON object".to_owned(),
+                )),
+                Err(error) => Err(TypeFailure::ArgumentType(format!(
+                    "--vars must be valid JSON: {error}"
+                ))),
+            };
+        }
         if !INTEGER_CONVERTERS.contains(&converter) {
             return Ok(Value::Str(text.to_owned()));
         }
@@ -165,12 +190,6 @@ fn setting(dest: &str, value: &Value) -> Result<Json, String> {
     if let Some((_, flag, reason)) = REFUSED_DESTS.iter().find(|(name, _, _)| *name == dest) {
         return Err(format!("{flag} is not available for ad-hoc runs: {reason}"));
     }
-    if dest == LOAD_SOURCES_DEST && *value == Value::Bool(true) {
-        return Err(
-            "--load is not available for ad-hoc runs: source loads are not part of ad-hoc runs yet"
-                .into(),
-        );
-    }
     if !ALLOWED_DESTS.contains(&dest) {
         return Err(format!(
             "{} is not available for ad-hoc runs",
@@ -183,6 +202,8 @@ fn setting(dest: &str, value: &Value) -> Result<Json, String> {
             .parse::<i64>()
             .map(|number| json!(number))
             .map_err(|_| format!("{} must be a whole number", flag_of(dest))),
+        Value::Str(text) if dest == VARS_DEST => serde_json::from_str(text)
+            .map_err(|error| format!("--vars must be valid JSON: {error}")),
         Value::Str(text) => Ok(json!(text)),
         _ => Err(format!(
             "{} is not available for ad-hoc runs",
@@ -360,6 +381,28 @@ fn published_jobs(jobs: &PublishedJobs, include_python: bool) -> BTreeMap<String
         selections.insert(name.clone(), JobSelection::Resolved { keys });
     }
     selections
+}
+
+/// Managed sources `sqb load` runs; a source only a loader writes is not published as a resource but is managed.
+fn managed_sources(
+    publication: (&[PlannerResource], &PublishedJobs),
+    select: &[String],
+    exclude: &[String],
+) -> Result<BTreeSet<String>, String> {
+    let unmanaged: BTreeSet<&str> = publication
+        .0
+        .iter()
+        .filter(|resource| resource.loader.is_none())
+        .map(|resource| resource.key.as_str())
+        .collect();
+    let sources: BTreeSet<String> = resolved(publication, select, exclude, true)?
+        .into_iter()
+        .filter(|key| key.starts_with("source:") && !unmanaged.contains(key.as_str()))
+        .collect();
+    if sources.is_empty() {
+        return Err("the selectors match no managed sources in the current publication".into());
+    }
+    Ok(sources)
 }
 
 /// Sources `sqb freshness` observes: selected or upstream sources, less those the exclusions reach.
