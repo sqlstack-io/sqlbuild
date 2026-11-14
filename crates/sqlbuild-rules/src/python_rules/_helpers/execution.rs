@@ -16,7 +16,9 @@ use crate::models::{Fault, RuleMetadata};
 use crate::python_rules::_helpers::contexts::{rule_context, threshold_calls};
 use crate::python_rules::_helpers::faults::python_fault;
 use crate::python_rules::_helpers::file_cache::{answers_digest, file_identity};
-use crate::python_rules::_helpers::observations::{observations, relative_query, repository_index};
+use crate::python_rules::_helpers::observations::{
+    observations, relative_queries, repository_index,
+};
 use crate::python_rules::constants::{PACKAGE_ROOT, PYTHON_RULES, ROOT_SCOPE};
 use crate::python_rules::models::{
     CacheSplit, CallInputs, FilePlan, PythonCacheEntry, PythonEvaluation, PythonFiles,
@@ -215,10 +217,10 @@ fn file_calls<'a>(plan: &FilePlan<'a>, inputs: &CallInputs<'_>) -> Result<Vec<Ru
                 ..base.clone()
             };
             RuleCall {
-                queries: plan_core_rule_queries(program, codes, &context)
-                    .into_iter()
-                    .map(|query| relative_query(query, &inputs.request.project_dir))
-                    .collect(),
+                queries: relative_queries(
+                    plan_core_rule_queries(program, codes, &context),
+                    &inputs.request.project_dir,
+                ),
                 codes: codes.clone(),
                 context,
             }

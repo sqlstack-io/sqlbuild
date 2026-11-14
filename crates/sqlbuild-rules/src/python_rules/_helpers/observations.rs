@@ -122,9 +122,18 @@ fn filesystem_query(query: &NativeProjectQuery) -> RepositoryObservationQuery {
     }
 }
 
-/// `query` with its path relative to `project_dir`, so its answer can be read again from the project.
-///
-/// Fensu spells query paths with `/`, while a Windows `project_dir` uses `\`, so both are compared with `/`.
+/// Each of `queries` with its path relative to `project_dir`, so its answer can be read again from the project.
+pub(crate) fn relative_queries(
+    queries: Vec<NativeProjectQuery>,
+    project_dir: &str,
+) -> Vec<NativeProjectQuery> {
+    queries
+        .into_iter()
+        .map(|query| relative_query(query, project_dir))
+        .collect()
+}
+
+/// `query` relative to `project_dir`, both spelled with `/` as Fensu spells query paths, even on Windows.
 pub(crate) fn relative_query(query: NativeProjectQuery, project_dir: &str) -> NativeProjectQuery {
     let project_dir: String = project_dir.replace('\\', "/");
     let path: String = match query

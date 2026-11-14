@@ -104,12 +104,7 @@ fn namespace_packages(
     let folders: BTreeSet<&str> = targets
         .iter()
         .filter(|target| target.package)
-        .flat_map(|target| {
-            target
-                .repository_path
-                .match_indices('/')
-                .map(|(end, _)| &target.repository_path[..end])
-        })
+        .flat_map(|target| ancestor_folders(&target.repository_path))
         .filter(|folder| !paths.contains(format!("{folder}/{INIT_FILE}").as_str()))
         .collect();
     let empty = ProgramHandle::parse_source("", python_version.0, python_version.1)
@@ -126,6 +121,11 @@ fn namespace_packages(
             .with_ownership(Some(1), Some(ownership_root.to_owned()))
         })
         .collect())
+}
+
+/// Every folder above project-relative `path`, outermost first.
+fn ancestor_folders(path: &str) -> impl Iterator<Item = &str> {
+    path.match_indices('/').map(move |(end, _)| &path[..end])
 }
 
 /// The dotted-name parts of the module at project-relative `path`.

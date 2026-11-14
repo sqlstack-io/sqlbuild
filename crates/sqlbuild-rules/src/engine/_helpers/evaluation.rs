@@ -368,13 +368,7 @@ fn model_rules_fingerprint(
     dialect: &str,
 ) -> Result<String, String> {
     let model_config = RulesConfig {
-        select: config.select.as_ref().map(|selectors| {
-            selectors
-                .iter()
-                .filter(|selector| !selector.starts_with(PYTHON_RULE_PREFIX))
-                .cloned()
-                .collect()
-        }),
+        select: config.select.as_deref().map(model_selectors),
         rule_options: config
             .rule_options
             .iter()
@@ -388,6 +382,15 @@ fn model_rules_fingerprint(
         ..config.clone()
     };
     fingerprint::fingerprint(selected, &model_config, dialect)
+}
+
+/// The selectors outside the Python family, which alone can name model rules.
+fn model_selectors(selectors: &[String]) -> Vec<String> {
+    selectors
+        .iter()
+        .filter(|selector| !selector.starts_with(PYTHON_RULE_PREFIX))
+        .cloned()
+        .collect()
 }
 
 /// The only configuration the Python rules read: their own options.
