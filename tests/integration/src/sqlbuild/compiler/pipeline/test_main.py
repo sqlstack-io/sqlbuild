@@ -541,17 +541,16 @@ def test_given_progress_callback_when_building_project_graph_then_reports_compil
     "test_case",
     [
         SnowflakeTargetValidationIntegrationTestCase(
-            description="snowflake compile requires explicit target database and schema",
+            description="snowflake compile without a database anywhere fails early",
             project_files={
                 "sqlbuild_project.toml": (
-                    'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
+                    'name = "demo"\nadapter = "duckdb"\n\n[connection]\npath = "demo.duckdb"\n'
                 ),
                 "sqlbuild_local.toml": (
                     'adapter = "snowflake"\n\n'
                     "[connection]\n"
                     'account = "${ENV:TEST_ACCOUNT}"\n'
                     'warehouse = "TEST_WH"\n'
-                    'database = "TEST_DB"\n'
                     'schema = "TEST_SCHEMA"\n'
                 ),
                 "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
