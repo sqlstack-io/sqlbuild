@@ -12,6 +12,7 @@ from scripts.cold_compile_performance.constants import (
     DENSE_MACRO_QUANTITY_COLUMNS,
     DENSE_MACRO_SHARE,
     DENSE_MEDIUM_CTE_PERCENTILE,
+    DENSE_RULE_SELECT,
     DENSE_UNION_MEDIUM_INDEX,
     DENSE_UNION_TAIL_INDEX,
 )
@@ -76,8 +77,7 @@ def write_dense_compile_project(*, project_dir: Path, model_count: int) -> None:
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "dense_orders"\nadapter = "snowflake"\n'
         '[defaults]\ndatabase = "warehouse"\nschema = "analytics"\n'
-        '[rules]\nselect = ["SQBR", "SQBRPYTHON", "SQBRPYTHON306", "SQBRPYTHON507", "SQLCLEAN",'
-        f' "XSQBR"]\ndomains = [{domains}]\n',
+        f"[rules]\n{DENSE_RULE_SELECT}\ndomains = [{domains}]\n",
         encoding="utf-8",
     )
     source_count: int = max(1, model_count * 24 // 100)
