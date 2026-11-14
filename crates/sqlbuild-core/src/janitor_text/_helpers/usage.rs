@@ -2,9 +2,7 @@
 
 use crate::cli_text::main::format_count_noun::format_count_noun;
 use crate::janitor_text::_helpers::phases::noun;
-use crate::janitor_text::constants::{
-    KEEP_WITHOUT_USAGE_NOTICE, READER_LIMIT, USAGE_NOT_CHECKED_PREFIX, WINDOW_UNITS,
-};
+use crate::janitor_text::constants::{READER_LIMIT, USAGE_NOT_CHECKED_PREFIX, WINDOW_UNITS};
 use crate::janitor_text::models::{ArchiveCandidateText, JanitorPlanText, UsageCheckText};
 
 /// The usage check when it ran and could read usage.
@@ -81,14 +79,10 @@ pub(crate) fn usage_notices(plan: &JanitorPlanText) -> Vec<String> {
     if check.checked {
         return check.notices.clone();
     }
-    let mut notices: Vec<String> = vec![format!(
+    vec![format!(
         "{USAGE_NOT_CHECKED_PREFIX}{}",
         check.reason.as_deref().unwrap_or("unknown reason")
-    )];
-    if check.keep_in_use {
-        notices.push(KEEP_WITHOUT_USAGE_NOTICE.to_owned());
-    }
-    notices
+    )]
 }
 
 /// The prompt line stating how many archived relations are in use, or which are kept.

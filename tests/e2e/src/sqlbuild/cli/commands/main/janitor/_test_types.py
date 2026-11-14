@@ -340,6 +340,17 @@ class JanitorUsageJsonE2ETestCase:
 
 
 @dataclass(frozen=True)
+class JanitorKeepInUseIncompleteE2ETestCase:
+    """Test case for `--keep-in-use` when usage is unavailable or only partly read."""
+
+    description: str
+    reads: dict[str, tuple[tuple[str, ...], int]]
+    unavailable: str | None
+    notices: tuple[str, ...]
+    expected_error: str
+
+
+@dataclass(frozen=True)
 class JanitorUsageFailureE2ETestCase:
     """Test case for janitor runs whose usage source fails outright."""
 

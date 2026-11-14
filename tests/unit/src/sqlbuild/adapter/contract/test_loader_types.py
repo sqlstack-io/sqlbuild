@@ -9,6 +9,7 @@ from sqlbuild.adapter.contract.types import BuiltinAdapter, LoaderLogicalType
 from sqlbuild.adapter.discovery.main.builtins import builtin_adapter_classes
 from tests.unit.src.sqlbuild.adapter.contract._test_types import (
     AdapterIdentifierRenderingTestCase,
+    AdapterLoaderDecimalTypeTestCase,
     AdapterLoaderJsonRowsTestCase,
     AdapterLoaderRowsEmptySelectTestCase,
     AdapterLoaderRowsSelectTestCase,
@@ -21,6 +22,7 @@ _DEFAULT_EXPECTED_TYPES: dict[LoaderLogicalType, str] = {
     LoaderLogicalType.BOOLEAN: "BOOLEAN",
     LoaderLogicalType.INTEGER: "BIGINT",
     LoaderLogicalType.FLOAT: "DOUBLE",
+    LoaderLogicalType.DECIMAL: "DECIMAL(38, 0)",
     LoaderLogicalType.STRING: "VARCHAR",
     LoaderLogicalType.TIMESTAMP: "TIMESTAMP",
     LoaderLogicalType.DATE: "DATE",
@@ -49,13 +51,18 @@ _DEFAULT_EXPECTED_TYPES: dict[LoaderLogicalType, str] = {
                 LoaderLogicalType.BOOLEAN: "BOOL",
                 LoaderLogicalType.INTEGER: "INT64",
                 LoaderLogicalType.FLOAT: "FLOAT64",
+                LoaderLogicalType.DECIMAL: "BIGNUMERIC(38, 0)",
                 LoaderLogicalType.STRING: "STRING",
             },
         ),
         AdapterLoaderTypeMappingTestCase(
             description="snowflake maps json to variant",
             adapter_name=BuiltinAdapter.SNOWFLAKE.value,
-            expected_types={**_DEFAULT_EXPECTED_TYPES, LoaderLogicalType.JSON: "VARIANT"},
+            expected_types={
+                **_DEFAULT_EXPECTED_TYPES,
+                LoaderLogicalType.DECIMAL: "NUMBER(38, 0)",
+                LoaderLogicalType.JSON: "VARIANT",
+            },
         ),
         AdapterLoaderTypeMappingTestCase(
             description="databricks maps strings and json to string",
@@ -72,6 +79,7 @@ _DEFAULT_EXPECTED_TYPES: dict[LoaderLogicalType, str] = {
             expected_types={
                 **_DEFAULT_EXPECTED_TYPES,
                 LoaderLogicalType.FLOAT: "DOUBLE PRECISION",
+                LoaderLogicalType.DECIMAL: "NUMERIC(38, 0)",
                 LoaderLogicalType.STRING: "TEXT",
                 LoaderLogicalType.JSON: "JSONB",
             },
@@ -88,9 +96,58 @@ def test_given_builtin_adapter_when_rendering_loader_types_then_maps_every_logic
     logical_type: LoaderLogicalType
     for logical_type in LoaderLogicalType:
         assert (
-            adapter.render_loader_logical_type(logical_type)
+            adapter.render_loader_logical_type(type_name=logical_type)
             == test_case.expected_types[logical_type]
         )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AdapterLoaderDecimalTypeTestCase(
+            description="bigquery keeps a decimal that fits NUMERIC in NUMERIC",
+            adapter_name=BuiltinAdapter.BIGQUERY.value,
+            precision=38,
+            scale=9,
+            expected_type="NUMERIC(38, 9)",
+        ),
+        AdapterLoaderDecimalTypeTestCase(
+            description="bigquery moves a decimal with ten fractional digits to BIGNUMERIC",
+            adapter_name=BuiltinAdapter.BIGQUERY.value,
+            precision=12,
+            scale=10,
+            expected_type="BIGNUMERIC(12, 10)",
+        ),
+        AdapterLoaderDecimalTypeTestCase(
+            description="bigquery moves a decimal with thirty integer digits to BIGNUMERIC",
+            adapter_name=BuiltinAdapter.BIGQUERY.value,
+            precision=32,
+            scale=2,
+            expected_type="BIGNUMERIC(32, 2)",
+        ),
+        AdapterLoaderDecimalTypeTestCase(
+            description="clickhouse wraps a decimal in Nullable",
+            adapter_name=BuiltinAdapter.CLICKHOUSE.value,
+            precision=6,
+            scale=2,
+            expected_type="Nullable(Decimal(6, 2))",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_decimal_shape_when_rendering_loader_type_then_uses_its_precision_and_scale(
+    test_case: AdapterLoaderDecimalTypeTestCase,
+) -> None:
+    adapter: BaseAdapter = builtin_adapter_classes()[test_case.adapter_name]()
+
+    assert (
+        adapter.render_loader_logical_type(
+            type_name=LoaderLogicalType.DECIMAL,
+            precision=test_case.precision,
+            scale=test_case.scale,
+        )
+        == test_case.expected_type
+    )
 
 
 @pytest.mark.parametrize(
@@ -265,8 +322,8 @@ def test_given_builtin_adapter_when_rendering_loader_rows_then_returns_adapter_s
         rows=({"id": 1, "status": "placed"}, {"id": 2, "status": "shipped"}),
         column_names=("id", "status"),
         column_sql_types={
-            "id": adapter.render_loader_logical_type(LoaderLogicalType.INTEGER),
-            "status": adapter.render_loader_logical_type(LoaderLogicalType.STRING),
+            "id": adapter.render_loader_logical_type(type_name=LoaderLogicalType.INTEGER),
+            "status": adapter.render_loader_logical_type(type_name=LoaderLogicalType.STRING),
         },
         inferred_types={"id": LoaderLogicalType.INTEGER, "status": LoaderLogicalType.STRING},
     )
@@ -312,8 +369,8 @@ def test_given_json_rows_when_rendering_loader_rows_then_values_hold_only_consta
         rows=test_case.rows,
         column_names=("id", "payload"),
         column_sql_types={
-            "id": adapter.render_loader_logical_type(LoaderLogicalType.INTEGER),
-            "payload": adapter.render_loader_logical_type(LoaderLogicalType.JSON),
+            "id": adapter.render_loader_logical_type(type_name=LoaderLogicalType.INTEGER),
+            "payload": adapter.render_loader_logical_type(type_name=LoaderLogicalType.JSON),
         },
         inferred_types={"id": LoaderLogicalType.INTEGER, "payload": LoaderLogicalType.JSON},
     )

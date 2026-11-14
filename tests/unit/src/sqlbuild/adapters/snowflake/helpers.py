@@ -8,7 +8,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from io import StringIO
 from itertools import cycle, islice
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 from sqlbuild._native import NativeProgressProjector
@@ -682,3 +682,16 @@ def prefix_listing_statements(warehouse: RecordingSnowflakeWarehouse) -> tuple[s
         sql.split(" IN SCHEMA ")[0]
         for sql in filter(lambda sql: sql.startswith("SHOW TERSE OBJECTS"), warehouse.attempted_sql)
     )
+
+
+class RecordingSnowflakeAdapter(SnowflakeAdapter):
+    """Snowflake adapter that records each statement instead of running it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.executed: list[str] = []
+
+    def execute(self, *, connection: Any, sql: str, **kwargs: Any) -> Any:
+        del connection, kwargs
+        self.executed.append(sql)
+        return SimpleNamespace(rowcount=3)

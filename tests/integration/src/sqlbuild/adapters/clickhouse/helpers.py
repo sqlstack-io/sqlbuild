@@ -322,6 +322,17 @@ def _cursor_oracle(test_case: ClickHouseRewriteTestCase) -> tuple[str, ...]:
     )
 
 
+def _keyed_cursor_oracle(test_case: ClickHouseRewriteTestCase) -> tuple[str, ...]:
+    assert test_case.window is not None
+    keys: str = ", ".join(test_case.unique_key)
+    return (
+        f"DELETE FROM orders WHERE (order_date >= '{test_case.window[0]}' "
+        f"AND order_date < '{test_case.window[1]}') "
+        f"OR ({keys}) IN (SELECT {keys} FROM incoming)",
+        "INSERT INTO orders SELECT * FROM incoming",
+    )
+
+
 def _merge_oracle(test_case: ClickHouseRewriteTestCase) -> tuple[str, ...]:
     updated_columns: list[str] = sorted(
         set(ORDER_COLUMN_NAMES[1:]) - set(test_case.exclude_columns)
@@ -392,6 +403,29 @@ def _write_cursor(
     )
 
 
+def _write_keyed_cursor(
+    *,
+    adapter: ClickHouseAdapter,
+    connection: Any,
+    test_case: ClickHouseRewriteTestCase,
+    relation: str,
+    sql: str,
+) -> None:
+    assert test_case.window is not None
+    adapter.delete_insert_cursor(
+        connection=connection,
+        destination=relation,
+        sql=sql,
+        cursor_column="order_date",
+        cursor_start=test_case.window[0],
+        cursor_end=test_case.window[1],
+        columns=ORDER_COLUMN_NAMES,
+        statement_recorder=StatementRecorder(),
+        cursor_type="timestamp",
+        unique_key=test_case.unique_key,
+    )
+
+
 def _write_merge(
     *,
     adapter: ClickHouseAdapter,
@@ -414,12 +448,14 @@ _ORACLE_STATEMENTS: dict[str, Callable[[ClickHouseRewriteTestCase], tuple[str, .
     "append": _append_oracle,
     "delete_insert": _delete_insert_oracle,
     "cursor": _cursor_oracle,
+    "keyed_cursor": _keyed_cursor_oracle,
     "merge": _merge_oracle,
 }
 _WRITERS: dict[str, Callable[..., None]] = {
     "append": _write_append,
     "delete_insert": _write_delete_insert,
     "cursor": _write_cursor,
+    "keyed_cursor": _write_keyed_cursor,
     "merge": _write_merge,
 }
 

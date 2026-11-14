@@ -47,9 +47,13 @@ When `append_cursor_inclusive` is `true` (the default), the lower bound uses `>=
 
 Append without a cursor is also valid. The model simply inserts all rows from the source query on every run.
 
+Append keeps every row. A `unique_key` on an append model only matches rows in
+[diff](/docs/concepts/diff#row-matching) and [review](/docs/cli/review), so the same key can appear in the
+table more than once.
+
 ### delete_insert
 
-Deletes rows in the cursor range, then inserts the new delta. Requires either `cursor` or `unique_key`.
+Deletes the rows the new delta replaces, then inserts the delta. Requires either `cursor` or `unique_key`.
 
 ```sql
 MODEL (
@@ -65,7 +69,17 @@ SELECT order_id, customer_id, order_status, ordered_at, line_total_cents
 FROM __ref("fact_orders")
 ```
 
-With a cursor, `delete_insert` removes rows where the cursor column falls within the replay window, then inserts the new delta. With a `unique_key` only, it deletes matching rows by key before inserting.
+Which rows it deletes depends on the model's settings:
+
+| Settings | Rows deleted before the insert |
+|----------|--------------------------------|
+| `cursor` | Rows whose cursor falls in the replay window |
+| `unique_key` | Rows whose key appears in the delta |
+| `cursor` and `unique_key` | Rows in the replay window, and rows whose key appears in the delta |
+| `incremental_mode microbatch` | Rows in the batch's window; a `unique_key` only matches rows in diff and review |
+
+With both a cursor and a key, a row whose cursor value moved out of the window, such as an order
+updated after its first load, replaces its earlier version instead of adding a second row.
 
 ### merge
 

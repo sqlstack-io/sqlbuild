@@ -92,27 +92,27 @@ def test_given_query_log_when_running_janitor_then_view_chain_reads_are_in_use(
     "test_case",
     (
         ClickHouseJanitorUsageUncheckedE2ETestCase(
-            description="a janitor role that may not read system.query_log is not checked",
+            description="--keep-in-use stops when the role may not read system.query_log",
             connection_settings="",
             grants=(),
             expected_fragments=(
-                "Relation usage not checked: cannot read system.query_log (",
-                "  usage not checked: cannot read system.query_log (needs query logging on "
-                "and SELECT on system.query_log)\n",
+                "usage was not checked: cannot read system.query_log (needs query logging on "
+                "and SELECT on system.query_log); nothing was archived",
             ),
         ),
         ClickHouseJanitorUsageUncheckedE2ETestCase(
-            description="query logging turned off for the connection is not checked",
+            description="--keep-in-use stops when query logging is off for the connection",
             connection_settings="\n[connection.settings]\nlog_queries = 0\n",
             grants=("GRANT SELECT ON system.query_log TO {user}",),
             expected_fragments=(
-                "  usage not checked: query logging is off for this connection (log_queries = 0)\n",
+                "usage was not checked: query logging is off for this connection "
+                "(log_queries = 0); nothing was archived",
             ),
         ),
     ),
     ids=lambda case: case.description,
 )
-def test_given_no_query_log_when_running_janitor_then_usage_is_not_checked(
+def test_given_no_query_log_when_keeping_in_use_then_janitor_stops_and_archives_nothing(
     test_case: ClickHouseJanitorUsageUncheckedE2ETestCase,
     clickhouse_e2e_config: dict[str, object],
     janitor_schema: str,
@@ -135,14 +135,18 @@ def test_given_no_query_log_when_running_janitor_then_usage_is_not_checked(
             schema=janitor_schema,
             connection_settings=test_case.connection_settings,
         )
+        stale: tuple[str, ...] = stale_relation_names(
+            config=clickhouse_e2e_config, schema=janitor_schema
+        )
 
         result: subprocess.CompletedProcess[str] = run_sqb(
             command=(*APPROVED_JANITOR, "--keep-in-use"), project_dir=project_dir
         )
 
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode != 0, result.stdout
+    output: str = " ".join((result.stdout + result.stderr).split())
     fragment: str
     for fragment in test_case.expected_fragments:
-        assert fragment in result.stdout, result.stdout
-    assert "nothing kept in use: no usage could be checked" in result.stdout
-    assert stale_relation_names(config=clickhouse_e2e_config, schema=janitor_schema) == ()
+        assert fragment in output, output
+    assert stale
+    assert stale_relation_names(config=clickhouse_e2e_config, schema=janitor_schema) == stale

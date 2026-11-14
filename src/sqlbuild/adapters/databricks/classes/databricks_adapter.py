@@ -136,6 +136,7 @@ from sqlbuild.adapters.databricks.constants import (
     DETAILED_TABLE_INFORMATION_MARKER,
     NON_ROW_RESULT_COLUMN_NAMES,
     RELATION_NOT_FOUND_ERROR_CLASSES,
+    SERVER_OPERATION_ERROR_CLASS_NAME,
     STRING_LITERAL_ESCAPES,
     TABLE_RELATION_METADATA_TYPES,
     TEMPORARY_FUNCTION_PREFIX,
@@ -657,87 +658,13 @@ class DatabricksAdapter(
         )
         if not lookup_requests:
             return results
-        try:
-            results.update(
-                self._get_delta_history_freshness_metadata(
-                    connection=connection,
-                    requests=lookup_requests,
-                )
+        results.update(
+            self._get_delta_history_freshness_metadata(
+                connection=connection,
+                requests=lookup_requests,
             )
-        except Exception:
-            results.update(
-                self._get_unity_catalog_freshness_metadata(
-                    connection=connection,
-                    requests=lookup_requests,
-                )
-            )
+        )
         return results
-
-    def _get_unity_catalog_freshness_metadata(
-        self,
-        *,
-        connection: Any,
-        requests: tuple[TableFreshnessRequest, ...],
-    ) -> dict[TableFreshnessRequest, TableFreshnessMetadata]:
-        clauses: str = " OR ".join(
-            "(table_catalog = "
-            + self._string_literal(str(request.database).lower())
-            + " AND table_schema = "
-            + self._string_literal(str(request.schema).lower())
-            + " AND table_name = "
-            + self._string_literal(request.name.lower())
-            + ")"
-            for request in requests
-        )
-        query: str = (
-            "SELECT table_catalog, table_schema, table_name, table_type, last_altered "
-            "FROM `system`.`information_schema`.`tables` WHERE "
-            f"{clauses}"
-        )
-        cursor: Any = connection.cursor()
-        try:
-            cursor.execute(query)
-            rows: list[tuple[Any, ...]] = list(cursor.fetchall())
-        finally:
-            cursor.close()
-
-        requests_by_key: dict[tuple[str, str, str], TableFreshnessRequest] = {
-            (
-                str(request.database).lower(),
-                str(request.schema).lower(),
-                request.name.lower(),
-            ): request
-            for request in requests
-        }
-        results: dict[TableFreshnessRequest, TableFreshnessMetadata] = {}
-        row: tuple[Any, ...]
-        for row in rows:
-            matched_request: TableFreshnessRequest | None = requests_by_key.get(
-                (str(row[0]).lower(), str(row[1]).lower(), str(row[2]).lower())
-            )
-            if matched_request is None:
-                continue
-            table_type: str = str(row[3])
-            if self._normalize_relation_type(table_type) != RelationType.TABLE:
-                results[matched_request] = TableFreshnessMetadata.unavailable(
-                    message="Databricks table freshness metadata only supports Delta tables; "
-                    f"found {table_type} for {matched_request.name}"
-                )
-                continue
-            if row[4] is None:
-                results[matched_request] = TableFreshnessMetadata.unavailable(
-                    message="Databricks table freshness metadata is missing LAST_ALTERED "
-                    f"for {matched_request.name}"
-                )
-                continue
-            results[matched_request] = TableFreshnessMetadata(
-                data_version=row[4],
-                value_kind="timestamp",
-                observed_at=row[4] if isinstance(row[4], datetime) else None,
-            )
-        return complete_table_freshness_results(
-            requests=requests, results=results, adapter_label="Databricks"
-        )
 
     def _get_delta_history_freshness_metadata(
         self,
@@ -772,10 +699,26 @@ class DatabricksAdapter(
             cursor.execute(" UNION ALL ".join(selects))
             rows: list[tuple[Any, ...]] = list(cursor.fetchall())
         except Exception as error:
-            raise AdapterUserError(
-                message="Databricks table freshness metadata requires Unity Catalog table metadata "
-                "or Delta history"
-            ) from error
+            if not any(
+                kind.__name__ == SERVER_OPERATION_ERROR_CLASS_NAME for kind in type(error).__mro__
+            ):
+                raise
+            if len(requests) == 1:
+                reason: str = (str(error).strip().splitlines() or [type(error).__name__])[0]
+                return {
+                    requests[0]: TableFreshnessMetadata.unavailable(
+                        message=f"Databricks Delta history unavailable for {requests[0].name}: "
+                        f"{reason}"
+                    )
+                }
+            results: dict[TableFreshnessRequest, TableFreshnessMetadata] = {}
+            for request in requests:
+                results.update(
+                    self._get_delta_history_freshness_metadata(
+                        connection=connection, requests=(request,)
+                    )
+                )
+            return results
         finally:
             cursor.close()
 
@@ -792,9 +735,10 @@ class DatabricksAdapter(
             if matched_request is None:
                 continue
             if row[3] is None:
-                raise AdapterUserError(
+                results[matched_request] = TableFreshnessMetadata.unavailable(
                     message=f"Databricks Delta history not found for {matched_request.name}"
                 )
+                continue
             results[matched_request] = TableFreshnessMetadata(
                 data_version=row[3],
                 value_kind="timestamp",
@@ -878,7 +822,9 @@ class DatabricksAdapter(
     def render_exact_identifier(self, name: str) -> str:
         return self.render_identifier(name)
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "BOOLEAN"
@@ -886,6 +832,8 @@ class DatabricksAdapter(
                 return "BIGINT"
             case LoaderLogicalType.FLOAT:
                 return "DOUBLE"
+            case LoaderLogicalType.DECIMAL:
+                return f"DECIMAL({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "STRING"
             case LoaderLogicalType.TIMESTAMP:
@@ -917,7 +865,9 @@ class DatabricksAdapter(
             return "NULL"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return self._quote_sql_string(value.isoformat())
@@ -1864,6 +1814,7 @@ class DatabricksAdapter(
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         column_list: str = ""
         if columns is not None:
@@ -1874,6 +1825,15 @@ class DatabricksAdapter(
         replace_where: str = (
             f"{quoted_cursor_column} >= {start_bound} AND {quoted_cursor_column} < {end_bound}"
         )
+        if unique_key:
+            key_delete, *insert_statements = self.render_delete_insert(
+                destination=destination, sql=sql, unique_key=unique_key, columns=columns
+            )
+            key_match: str = key_delete.removeprefix(f"DELETE FROM {destination} WHERE ")
+            return (
+                f"DELETE FROM {destination} WHERE ({replace_where}) OR {key_match}",
+                *insert_statements,
+            )
         return (f"INSERT INTO {destination}{column_list} REPLACE WHERE {replace_where} {sql}",)
 
     def render_rename(self, *, origin: str, destination: str) -> tuple[str, ...]:
@@ -2321,6 +2281,7 @@ class DatabricksAdapter(
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> None:
         statements: tuple[str, ...] = self.render_delete_insert_cursor(
             destination=destination,
@@ -2330,6 +2291,7 @@ class DatabricksAdapter(
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
         statement: str

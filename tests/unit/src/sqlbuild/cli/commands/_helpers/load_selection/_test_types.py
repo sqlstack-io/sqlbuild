@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -29,3 +29,5 @@ class LoaderDefaultResolutionTestCase:
     adapter: str
     connection: dict[str, object]
     expected_defaults: tuple[str | None, str | None]
+    project_defaults: tuple[str | None, str | None] = (None, None)
+    connections: dict[str, dict[str, object]] = field(default_factory=dict)

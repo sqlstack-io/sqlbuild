@@ -10,6 +10,9 @@ use sqlbuild_analysis::assembly::project::main::configured_namespace::configured
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
+use crate::bindings::_helpers::compile_attachment::target::{
+    connection_is_default_target, project_location,
+};
 use crate::bindings::_helpers::compile_driver::assembly::{AssemblyRequest, AssemblyStage};
 use crate::bindings::_helpers::compile_driver::assembly_analysis::{
     AnalysisContext, analysis_context, and_not,
@@ -171,22 +174,30 @@ fn target_field<'py>(inputs: &Bound<'py, PyAny>, field: &str) -> PyResult<Bound<
     native_field(&target, field)
 }
 
-/// The target database and schema, with connection fallbacks, resolved as early model templates.
+/// The project's target database and schema, resolved as models resolve theirs.
 fn effective_target_values<'py>(inputs: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = inputs.py();
     let connection: Bound<'py, PyAny> = native_field(inputs, "effective_connection")?;
-    let database: Bound<'py, PyAny> = target_field(inputs, "database")?;
-    let database: Bound<'py, PyAny> = if database.is_truthy()? {
-        database
-    } else {
-        connection_database_fallback(inputs, &connection)?
+    let defaults: Bound<'py, PyAny> =
+        native_field(&native_field(inputs, "project_config")?, "defaults")?;
+    let inline: bool = connection_is_default_target(&native_field(inputs, "discovered_inputs")?)?;
+    let connection_value = |value: Bound<'py, PyAny>| -> Vec<Bound<'py, PyAny>> {
+        [value].into_iter().filter(|_| inline).collect()
     };
-    let schema: Bound<'py, PyAny> = target_field(inputs, "schema")?;
-    let schema: Bound<'py, PyAny> = if schema.is_truthy()? {
-        schema
-    } else {
-        str_or_none(&mapping_get(&connection, "schema")?)?
-    };
+    let database: Bound<'py, PyAny> = project_location(
+        (
+            target_field(inputs, "database")?,
+            native_field(&defaults, "database")?,
+        ),
+        connection_value(connection_database_fallback(inputs, &connection)?),
+    )?;
+    let schema: Bound<'py, PyAny> = project_location(
+        (
+            target_field(inputs, "schema")?,
+            native_field(&defaults, "schema")?,
+        ),
+        connection_value(str_or_none(&mapping_get(&connection, "schema")?)?),
+    )?;
     early_model_templates(
         keywords(py, &[("database", database), ("schema", schema)])?.as_any(),
         &native_field(inputs, "effective_vars")?,
@@ -197,17 +208,22 @@ fn effective_target_values<'py>(inputs: &Bound<'py, PyAny>) -> PyResult<Bound<'p
     )
 }
 
+/// The adapter the project compiles for.
+fn effective_adapter_name<'py>(inputs: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    resolve_effective_adapter_name(
+        &native_field(inputs, "project_config")?,
+        &native_field(inputs, "local_config")?,
+    )
+    .and_then(|value| value.into_bound_py_any(inputs.py()))
+}
+
 /// The connection's database, except under DuckDB, whose database is a file.
 fn connection_database_fallback<'py>(
     inputs: &Bound<'py, PyAny>,
     connection: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = inputs.py();
-    let adapter_name: Bound<'py, PyAny> = resolve_effective_adapter_name(
-        &native_field(inputs, "project_config")?,
-        &native_field(inputs, "local_config")?,
-    )
-    .and_then(|value| value.into_bound_py_any(py))?;
+    let adapter_name: Bound<'py, PyAny> = effective_adapter_name(inputs)?;
     if adapter_name.eq(host::entry(py, AdapterHost::BuiltinAdapter)?.getattr("DUCKDB")?)? {
         return Ok(py.None().into_bound(py));
     }

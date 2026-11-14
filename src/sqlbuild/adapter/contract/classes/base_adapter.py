@@ -710,6 +710,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         delete_sql: str = (
             f"DELETE FROM {destination} "
@@ -717,6 +718,13 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             f"{self._quote_sql_string(cursor_start)} "
             f"AND {self.render_identifier(cursor_column)} < {self._quote_sql_string(cursor_end)}"
         )
+        if unique_key:
+            return (
+                delete_sql,
+                *self.render_delete_insert(
+                    destination=destination, sql=sql, unique_key=unique_key, columns=columns
+                ),
+            )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
         )
@@ -1488,6 +1496,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> int | None:
         statements: tuple[str, ...] = self.render_delete_insert_cursor(
             destination=destination,
@@ -1497,6 +1506,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
         affected: int | None = None
@@ -1504,7 +1514,8 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             stmt: str
             for stmt in statements:
                 cursor: Any = self.execute(connection=connection, sql=stmt)
-                affected = self.affected_row_count(cursor=cursor)
+                if stmt.startswith("INSERT"):
+                    affected = self.affected_row_count(cursor=cursor)
         return affected
 
     def merge(
@@ -1976,7 +1987,9 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             case FrameworkType.TIMESTAMP:
                 return "TIMESTAMP"
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         """Render one source-loader logical type using generic SQL defaults."""
 
         match type_name:
@@ -1986,6 +1999,8 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
                 return "BIGINT"
             case LoaderLogicalType.FLOAT:
                 return "DOUBLE"
+            case LoaderLogicalType.DECIMAL:
+                return f"DECIMAL({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "VARCHAR"
             case LoaderLogicalType.TIMESTAMP:
@@ -2039,7 +2054,9 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             return "NULL"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return _quote_sql_string(value.isoformat())

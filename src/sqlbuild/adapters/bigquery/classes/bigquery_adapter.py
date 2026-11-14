@@ -142,6 +142,8 @@ from sqlbuild.adapters.bigquery.constants import (
     INTEGER_WIRE_TYPE_NAME,
     NATIVE_TABLE_TYPE,
     NOT_FOUND_ERROR_CLASS_NAME,
+    NUMERIC_FRACTION_DIGITS,
+    NUMERIC_INTEGER_DIGITS,
     SELECT_STATEMENT_TYPE,
     STRING_LITERAL_ESCAPES,
     TABLE_NAME_WILDCARD,
@@ -1080,7 +1082,9 @@ class BigQueryAdapter(
     def render_current_utc_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP()"
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "BOOL"
@@ -1088,6 +1092,10 @@ class BigQueryAdapter(
                 return "INT64"
             case LoaderLogicalType.FLOAT:
                 return "FLOAT64"
+            case LoaderLogicalType.DECIMAL:
+                if precision - scale <= NUMERIC_INTEGER_DIGITS and scale <= NUMERIC_FRACTION_DIGITS:
+                    return f"NUMERIC({precision}, {scale})"
+                return f"BIGNUMERIC({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "STRING"
             case LoaderLogicalType.TIMESTAMP:
@@ -1128,7 +1136,11 @@ class BigQueryAdapter(
             return f"JSON {self._quote_sql_string(json.dumps(value, sort_keys=True))}"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal) and logical_type == LoaderLogicalType.DECIMAL:
+            return self._quote_sql_string(format(value, "f"))
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return self._quote_sql_string(value.isoformat())
@@ -1810,7 +1822,10 @@ class BigQueryAdapter(
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
+        """Replace a cursor window; with a key and columns, one MERGE also replaces delta keys."""
+
         insert_clause: str = "INSERT ROW"
         if columns is not None:
             column_list: str = ", ".join(self.render_identifier(column) for column in columns)
@@ -1824,6 +1839,22 @@ class BigQueryAdapter(
             f"AND __target.{self.render_identifier(cursor_column)} < "
             f"{self._render_cursor_bound_string(cursor_end)}"
         )
+        if unique_key and columns is not None:
+            (merge_sql,) = self.render_merge(
+                destination=self._quote_identifier_path(destination),
+                sql=sql,
+                unique_key=unique_key,
+                source_columns=columns,
+            )
+            return (f"{merge_sql} WHEN NOT MATCHED BY SOURCE AND {cursor_filter} THEN DELETE",)
+        if unique_key:
+            return (
+                f"DELETE FROM {self._quote_identifier_path(destination)} AS __target "
+                f"WHERE {cursor_filter}",
+                *self.render_delete_insert(
+                    destination=destination, sql=sql, unique_key=unique_key, columns=columns
+                ),
+            )
         return (
             f"MERGE {self._quote_identifier_path(destination)} AS __target "
             f"USING ({sql}) AS __source ON FALSE "
@@ -2522,6 +2553,7 @@ class BigQueryAdapter(
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> int | None:
         if columns is None:
             columns = self.query_column_names(connection=connection, sql=sql)
@@ -2533,6 +2565,7 @@ class BigQueryAdapter(
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
         affected: int | None = None
@@ -3095,6 +3128,8 @@ class BigQueryAdapter(
             return DATETIME_TYPE_NAME
         if any(token in normalized for token in ("FLOAT", "DOUBLE", "REAL")):
             return FLOAT_WIRE_TYPE_NAME
+        if any(token in normalized for token in ("BIGNUMERIC", "BIGDECIMAL")):
+            return "BIGNUMERIC"
         if any(token in normalized for token in ("DECIMAL", "NUMERIC", "NUMBER")):
             return "NUMERIC"
         if INTEGER_TYPE_TOKEN in normalized:

@@ -202,6 +202,20 @@ def _cursor_window(adapter: SqliteAdapter, connection: Any, sql: str) -> None:
     )
 
 
+def _keyed_cursor_window(adapter: SqliteAdapter, connection: Any, sql: str) -> None:
+    adapter.delete_insert_cursor(
+        connection=connection,
+        destination="orders",
+        sql=sql,
+        cursor_column="ordered_at",
+        cursor_start="2026-01-02 00:00:00",
+        cursor_end="2026-01-03 00:00:00",
+        cursor_type="timestamp",
+        statement_recorder=recorder(),
+        unique_key=("order_id",),
+    )
+
+
 def _add_column(adapter: SqliteAdapter, connection: Any) -> None:
     adapter.add_columns(
         connection=connection,
@@ -245,6 +259,7 @@ _WRITERS: MappingProxyType[str, Callable[[SqliteAdapter, Any, str], None]] = Map
         "merge": _merge,
         "delete_insert": _delete_insert,
         "cursor": _cursor_window,
+        "keyed_cursor": _keyed_cursor_window,
     }
 )
 _EVOLUTIONS: MappingProxyType[str, Callable[[SqliteAdapter, Any], None]] = MappingProxyType(

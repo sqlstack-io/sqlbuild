@@ -279,6 +279,13 @@ fn logical_ddl<'py>(
                 "cursor_type",
                 or_none(py, config_text_object(py, &values, "cursor_type")?),
             ));
+            let microbatch: bool = match config_text_object(py, &values, "incremental_mode")? {
+                Some(mode) => mode.eq(MICROBATCH_MODE)?,
+                None => false,
+            };
+            if !microbatch {
+                pairs.push(("unique_key", unique_key.clone().into_any()));
+            }
             "render_delete_insert_cursor"
         }
         "incremental_delete_insert" => {

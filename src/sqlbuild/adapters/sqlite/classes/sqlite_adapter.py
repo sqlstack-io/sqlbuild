@@ -719,6 +719,7 @@ class SqliteAdapter(
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         quoted_cursor_column: str = self.render_cursor_operand(
             expression=self.render_identifier(cursor_column), cursor_type=cursor_type
@@ -733,6 +734,13 @@ class SqliteAdapter(
             f"DELETE FROM {destination} WHERE {quoted_cursor_column} >= {start_literal} "
             f"AND {quoted_cursor_column} < {end_literal}"
         )
+        if unique_key:
+            return (
+                delete_sql,
+                *self.render_delete_insert(
+                    destination=destination, sql=sql, unique_key=unique_key, columns=columns
+                ),
+            )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
         )
@@ -1262,6 +1270,7 @@ class SqliteAdapter(
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> int | None:
         statements: tuple[str, ...] = self.render_delete_insert_cursor(
             destination=destination,
@@ -1271,6 +1280,7 @@ class SqliteAdapter(
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
         affected: int | None = None
@@ -1278,7 +1288,8 @@ class SqliteAdapter(
             stmt: str
             for stmt in statements:
                 cursor: Any = self.execute(connection=connection, sql=stmt)
-                affected = self.affected_row_count(cursor=cursor)
+                if stmt.startswith(INSERT_KEYWORD):
+                    affected = self.affected_row_count(cursor=cursor)
         return affected
 
     def merge(
@@ -2237,7 +2248,9 @@ class SqliteAdapter(
             case FrameworkType.TIMESTAMP:
                 return "TIMESTAMP"
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "BOOLEAN"
@@ -2245,6 +2258,8 @@ class SqliteAdapter(
                 return "INTEGER"
             case LoaderLogicalType.FLOAT:
                 return "REAL"
+            case LoaderLogicalType.DECIMAL:
+                return f"DECIMAL({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "TEXT"
             case LoaderLogicalType.TIMESTAMP:
@@ -2277,7 +2292,9 @@ class SqliteAdapter(
             return _quote_sql_string(json.dumps(value, sort_keys=True))
         if isinstance(value, bool):
             return "1" if value else "0"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime):
             return _quote_sql_string(canonical_timestamp_text(value.isoformat()))

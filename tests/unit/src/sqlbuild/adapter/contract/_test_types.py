@@ -13,6 +13,15 @@ class AdapterUserErrorTestCase:
 
 
 @dataclass(frozen=True)
+class AdapterLoaderDecimalTypeTestCase:
+    description: str
+    adapter_name: str
+    precision: int
+    scale: int
+    expected_type: str
+
+
+@dataclass(frozen=True)
 class AdapterLoaderTypeMappingTestCase:
     description: str
     adapter_name: str

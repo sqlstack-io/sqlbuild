@@ -71,6 +71,45 @@ def test_given_debug_command_when_running_then_outputs_checks(
 @pytest.mark.parametrize(
     "test_case",
     [
+        DebugCliTestCase(
+            description="reports the defaults location models use, not the connection's",
+            command=("debug", "--no-connection"),
+            expected_stdout_fragment=(
+                "  database: DEFAULTS_DB [OK resolved]\n  schema: DEFAULTS_SCHEMA [OK resolved]\n"
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_defaults_location_when_debugging_then_reports_it(
+    tmp_path: Path,
+    test_case: DebugCliTestCase,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="debug_defaults",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "debug_defaults"\nadapter = "snowflake"\n\n'
+                '[connection]\naccount = "acme"\nuser = "u"\npassword = "p"\n'
+                'database = "CONN_DB"\nschema = "CONN_SCHEMA"\n\n'
+                '[defaults]\ndatabase = "DEFAULTS_DB"\nschema = "DEFAULTS_SCHEMA"\n'
+            ),
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=test_case.command,
+        project_dir=project_dir,
+    )
+
+    assert result.returncode == test_case.expected_returncode, result.stderr
+    assert test_case.expected_stdout_fragment in result.stdout
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         DebugJsonCliTestCase(
             description="outputs machine readable skipped connection checks",
             command=("debug", "--json", "--no-connection"),

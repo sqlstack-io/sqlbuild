@@ -25,8 +25,6 @@ pub(crate) const SECONDS_PER_HOUR: u64 = 3600;
 /// How many readers each in-use line names before `+N more`.
 pub(crate) const READER_LIMIT: usize = 3;
 pub(crate) const USAGE_NOT_CHECKED_PREFIX: &str = "usage not checked: ";
-pub(crate) const KEEP_WITHOUT_USAGE_NOTICE: &str =
-    "nothing kept in use: no usage could be checked, so relations in use are archived too";
 /// Single-unit usage windows and the noun of their unit.
 pub(crate) const WINDOW_UNITS: [(&str, &str); 4] = [
     ("d", "day"),

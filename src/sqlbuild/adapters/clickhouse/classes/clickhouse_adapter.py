@@ -529,7 +529,9 @@ class ClickHouseAdapter(
             case FrameworkType.TIMESTAMP:
                 return "Nullable(DateTime64(6, 'UTC'))"
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "Nullable(Bool)"
@@ -537,6 +539,8 @@ class ClickHouseAdapter(
                 return "Nullable(Int64)"
             case LoaderLogicalType.FLOAT:
                 return "Nullable(Float64)"
+            case LoaderLogicalType.DECIMAL:
+                return f"Nullable(Decimal({precision}, {scale}))"
             case LoaderLogicalType.STRING:
                 return "Nullable(String)"
             case LoaderLogicalType.TIMESTAMP:
@@ -576,7 +580,11 @@ class ClickHouseAdapter(
             return quote_string(json.dumps(value, sort_keys=True))
         if isinstance(value, bool):
             return "true" if value else "false"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal) and logical_type == LoaderLogicalType.DECIMAL:
+            return quote_string(format(value, "f"))
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return quote_string(value.isoformat())
@@ -965,6 +973,7 @@ class ClickHouseAdapter(
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         request: PartitionRewrite = self._window_rewrite(
             destination=destination,
@@ -974,6 +983,7 @@ class ClickHouseAdapter(
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         return (
             request.delta_insert_sql,
@@ -1032,6 +1042,7 @@ class ClickHouseAdapter(
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> int | None:
         return self._rewrite(
             connection=connection,
@@ -1043,6 +1054,7 @@ class ClickHouseAdapter(
                 cursor_end=cursor_end,
                 columns=columns,
                 cursor_type=cursor_type,
+                unique_key=unique_key,
             ),
             statement_recorder=statement_recorder,
         )
@@ -1110,14 +1122,19 @@ class ClickHouseAdapter(
         cursor_end: str,
         columns: tuple[str, ...] | None,
         cursor_type: str | None,
+        unique_key: tuple[str, ...],
     ) -> PartitionRewrite:
         quoted: str = self.render_identifier(cursor_column)
         start: str = self.render_cursor_bound_literal(value=cursor_start, cursor_type=cursor_type)
         end: str = self.render_cursor_bound_literal(value=cursor_end, cursor_type=cursor_type)
+        displaced: str = f"({quoted} >= {start} AND {quoted} < {end})"
+        if unique_key:
+            key_tuple: str = _key_tuple(adapter=self, keys=unique_key)
+            displaced = f"({displaced} OR {key_tuple} IN (SELECT {key_tuple} FROM {{delta}}))"
         return PartitionRewrite(
             destination=destination,
             delta_insert_sql=self.render_append(destination="{delta}", sql=sql, columns=columns)[0],
-            displaced_predicate=f"({quoted} >= {start} AND {quoted} < {end})",
+            displaced_predicate=displaced,
         )
 
     def _merge_rewrite(

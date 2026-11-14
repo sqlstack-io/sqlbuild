@@ -45,6 +45,14 @@ class FakeDatabricksMetadataCursor:
         self.closed = True
 
 
+class ServerOperationError(Exception):
+    """Stand-in named like the connector's error for a statement the server rejected."""
+
+
+class RequestError(Exception):
+    """Stand-in named like the connector's error for a failed request to the server."""
+
+
 class FailingDatabricksMetadataCursor(FakeDatabricksMetadataCursor):
     def __init__(self, *, execute_error: Exception) -> None:
         super().__init__()

@@ -17,7 +17,7 @@ from sqlbuild.executor.load._helpers.rows import (
     loader_column_sql_types,
     update_loader_rows_schema,
 )
-from sqlbuild.executor.load.models import LoaderRowsSchema
+from sqlbuild.executor.load.models import DecimalShape, LoaderRowsSchema
 from sqlbuild.executor.run.constants import STAGING_RELATION_SUFFIX
 
 
@@ -38,6 +38,7 @@ def write_loader_rows_to_staging(
     staging_created: bool = False
     column_names: tuple[str, ...] = tuple(column.name for column in source_entry.columns)
     inferred_types: dict[str, LoaderLogicalType] = {}
+    decimal_shapes: dict[str, DecimalShape] = {}
     adapter.drop(
         connection=connection,
         destination=staging,
@@ -52,10 +53,12 @@ def write_loader_rows_to_staging(
             columns=source_entry.columns,
             column_names=column_names,
             inferred_types=inferred_types,
+            decimal_shapes=decimal_shapes,
             contract_enforced=source_entry.contract == ContractPolicy.ENFORCED,
         )
         column_names = schema.column_names
         inferred_types = schema.inferred_types
+        decimal_shapes = schema.decimal_shapes
         if staging_created and schema.added_columns:
             adapter.add_columns(
                 connection=connection,
@@ -69,6 +72,7 @@ def write_loader_rows_to_staging(
             columns=source_entry.columns,
             column_names=column_names,
             inferred_types=inferred_types,
+            decimal_shapes=decimal_shapes,
         )
         if staging_created:
             staging_adapter: BaseAdapter = adapter
@@ -89,6 +93,7 @@ def write_loader_rows_to_staging(
                     source_entry=source_entry,
                     column_names=column_names,
                     inferred_types=inferred_types,
+                    decimal_shapes=decimal_shapes,
                 ),
                 statement_recorder=statement_recorder,
             )
@@ -101,6 +106,7 @@ def write_loader_rows_to_staging(
             columns=source_entry.columns,
             column_names=column_names,
             inferred_types=inferred_types,
+            decimal_shapes=decimal_shapes,
         )
         adapter.create_table_as(
             connection=connection,
@@ -111,6 +117,7 @@ def write_loader_rows_to_staging(
                 source_entry=source_entry,
                 column_names=column_names,
                 inferred_types=inferred_types,
+                decimal_shapes=decimal_shapes,
             ),
             statement_recorder=statement_recorder,
         )
@@ -123,6 +130,7 @@ def _staging_config(
     source_entry: SourceEntry,
     column_names: tuple[str, ...],
     inferred_types: dict[str, LoaderLogicalType],
+    decimal_shapes: dict[str, DecimalShape],
 ) -> dict[str, Any]:
     """Hand loader column types to adapters whose CTAS cannot keep them."""
 
@@ -132,6 +140,7 @@ def _staging_config(
             columns=source_entry.columns,
             column_names=column_names,
             inferred_types=inferred_types,
+            decimal_shapes=decimal_shapes,
         )
     }
 
