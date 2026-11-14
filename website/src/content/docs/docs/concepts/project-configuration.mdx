@@ -713,7 +713,7 @@ Code that extends SQLBuild itself keeps its own root:
 | `hooks/python/` | Python model lifecycle hooks |
 | `functions/python/` | Python UDFs |
 | `macros/python/`, `enums/`, `constants/` and scoped `_macros/python/`, `_enums/`, `_constants/` | Python macros and declarations |
-| `orchestration/` | Jobs, job groups, sensors and calendar schedules. SQLBuild imports these modules only when a selector names a job or an unknown name, and when a location publishes. See [Job selectors](/docs/concepts/selectors#job) |
+| `orchestration/` | Jobs and job groups as TOML in `jobs/` and `job_groups/`; calendars and sensors as Python in `calendars/` and `sensors/`. See [Orchestration](/docs/concepts/orchestration) |
 
 Compilation rejects Python anywhere else with `D016`, so indirectly importable modules cannot create
 an unofficial project structure.

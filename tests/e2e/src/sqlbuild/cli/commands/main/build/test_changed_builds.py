@@ -231,7 +231,7 @@ STG_ORDERS_REDEFINED: str = (
                 "Changed (1)",
                 "Downstream of changes (3)",
                 "Held back (3)",
-                "job finance_daily",
+                "job finance_daily_job",
                 "reads fct_revenue, which is held back",
             ),
             expected_job_run=frozenset({"fct_revenue", "rpt_pnl"}),
@@ -258,7 +258,7 @@ def test_given_scheduled_jobs_when_building_with_changed_then_a_change_stops_at_
     redefined, build_output = changed_build_output(project_dir, ("--changed",))
     held: frozenset[str] = run_changed_build(project_dir, ("--changed",))
     job_run: frozenset[str] = run_changed_build(
-        project_dir, ("--changed", "--select", "finance_daily")
+        project_dir, ("--changed", "--select", "finance_daily_job")
     )
     reach_all: frozenset[str] = run_changed_build(project_dir, ("--changed", "--reach", "all"))
     refused: subprocess.CompletedProcess[str] = run_sqb(
@@ -268,7 +268,7 @@ def test_given_scheduled_jobs_when_building_with_changed_then_a_change_stops_at_
     assert first == REACH_MODELS
     assert new_data == frozenset(), "new source data is not a change by default"
     assert redefined == test_case.expected_redefined, (
-        "the change stops at finance_daily; a job without a trigger and a model in no job run"
+        "the change stops at finance_daily_job; a job without a trigger and a model in no job run"
     )
     assert test_case.expected_summary in build_output
     assert plan.returncode == 0, plan.stdout + plan.stderr
@@ -309,13 +309,15 @@ def test_given_two_jobs_each_holding_a_redefined_upstream_when_building_changed_
     sales_staged: frozenset[str] = run_changed_build(
         project_dir, ("--changed", "--select", "stg_orders")
     )
-    crm_run: frozenset[str] = run_changed_build(project_dir, ("--changed", "--select", "crm_daily"))
+    crm_run: frozenset[str] = run_changed_build(
+        project_dir, ("--changed", "--select", "crm_daily_job")
+    )
     downstream: frozenset[str] = run_changed_build(project_dir, ("--changed",))
 
     assert first == {"stg_customers", "stg_orders", "customer_orders", "customer_sales"}
     assert sales_staged == {"stg_orders"}
     assert crm_run == test_case.expected_crm_run
     assert downstream == test_case.expected_downstream, (
-        "sales_daily holds the stg_orders change that reached customer_orders, so customer_sales "
-        "runs even though crm_daily holds the stg_customers change too"
+        "sales_daily_job holds the stg_orders change that reached customer_orders, so customer_sales "
+        "runs even though crm_daily_job holds the stg_customers change too"
     )

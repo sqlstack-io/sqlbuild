@@ -59,20 +59,28 @@ def test_given_a_partial_group_when_retrying_from_failure_then_successful_nodes_
                 "MODEL (description 'Independent inventory.', materialized table);\n"
                 "SELECT 29 AS amount\n"
             ),
-            "orchestration/orders.py": (
-                "from sqlbuild.orchestration import job, job_group, schedule\n"
-                "staging = job('staging', description='Stage orders.', select='orders broken_orders')\n"
-                "marts = job('marts', description='Build totals.', select='totals')\n"
-                "inventory = job('stock', description='Build inventory.', select='inventory')\n"
-                "annual_orders = job_group('annual_orders', description='Retry boundaries.', "
-                "jobs=[inventory, marts, staging], schedule=schedule(cron='0 0 * * *', "
-                "timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+            "orchestration/jobs/staging_job.toml": (
+                'name = "staging_job"\n'
+                'description = "Stage orders."\n'
+                'select = "orders broken_orders"\n'
+            ),
+            "orchestration/jobs/marts_job.toml": (
+                'name = "marts_job"\ndescription = "Build totals."\nselect = "totals"\n'
+            ),
+            "orchestration/jobs/stock_job.toml": (
+                'name = "stock_job"\ndescription = "Build inventory."\nselect = "inventory"\n'
+            ),
+            "orchestration/job_groups/annual_orders_job_group.toml": (
+                'name = "annual_orders_job_group"\n'
+                'description = "Retry boundaries."\n'
+                'jobs = ["stock_job", "marts_job", "staging_job"]\n'
+                'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
             ),
         },
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         source: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job_group"
         )
         assert source["status"] == "partial", worker.log.read_text()
         with duckdb.connect(str(worker.project / "warehouse.duckdb")) as warehouse:
@@ -112,8 +120,8 @@ def test_given_a_partial_group_when_retrying_from_failure_then_successful_nodes_
                 (run_id,),
             ).fetchall()
             assert [(name, json.loads(selection)) for name, selection in children] == [
-                ("marts", ["model:totals"]),
-                ("staging", ["model:broken_orders"]),
+                ("marts_job", ["model:totals"]),
+                ("staging_job", ["model:broken_orders"]),
             ]
             assert control.execute(
                 "SELECT count(*) FROM sqb_security_audit WHERE action='run.rerun_requested'"

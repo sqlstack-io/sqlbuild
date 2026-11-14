@@ -58,18 +58,25 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
 ) -> None:
     project: Path = tmp_path / "project"
     compiler_pid: Path = tmp_path / "compiler.pid"
-    declaration: str = (
-        "from sqlbuild.orchestration import job\n"
-        "import os\nfrom pathlib import Path\n"
-        f"Path({str(compiler_pid)!r}).write_text(str(os.getpid()))\n"
-        'print("Orders declaration loaded.")\n'
-        'daily_orders = job("daily_orders", select="orders", description="Build orders.")\n'
-    )
+    calendar: str = "orchestration/calendars/compiler_probe_calendar.py"
+    orchestration: dict[str, str] = {
+        calendar: (
+            "from sqlbuild.orchestration import calendar\n"
+            "import os\nfrom pathlib import Path\n"
+            f"Path({str(compiler_pid)!r}).write_text(str(os.getpid()))\n"
+            'print("Orders declaration loaded.")\n'
+            "@calendar(name='compiler_probe_calendar', description='Probe.', horizon='1d')\n"
+            "def compiler_probe(window):\n    return []\n"
+        ),
+        "orchestration/jobs/daily_orders_job.toml": (
+            'name = "daily_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
+        ),
+    }
     files: dict[str, str] = TYPE_PROOF_FILES | {
         "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
         + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
         + f'\n[targets.{json.dumps(test_case.target)}]\nschema = "main"\n',
-        "orchestration/orders.py": declaration,
+        **orchestration,
         "sinks/orders.py": 'print("Loading orders sink", flush=True)\n',
     }
     write_files(project_dir=project, files=files)
@@ -134,20 +141,27 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             assert int(compiler_pid.read_text()) == first_interpreter
             assert "CAST(14 AS INTEGER)" in recovered["nodes"]["model:stg_orders"]["raw_sql"]
 
-            _ = (project / "orchestration/orders.py").write_text("invalid Python declaration !\n")
+            _ = (project / calendar).write_text("invalid Python declaration !\n")
             wait_for_log(process, log, "Location reload failed; retaining last good snapshot.")
             _ = wait_for_location_health(
                 api, test_case.target, {"kind": "compile_failed", "generation": 4}, process, log
             )
             assert current_snapshot(api, test_case.target)["record"] == recovered["record"]
-            _ = (project / "orchestration/orders.py").write_text(
-                declaration.replace("Build orders.", "Refresh order totals.")
+            write_files(
+                project_dir=project,
+                files=orchestration
+                | {
+                    "orchestration/jobs/daily_orders_job.toml": orchestration[
+                        "orchestration/jobs/daily_orders_job.toml"
+                    ].replace("Build orders.", "Refresh order totals.")
+                },
             )
             third: dict[str, Any] = wait_for_generation(api, test_case.target, 4, process, log)
             replacement_interpreter: int = int(compiler_pid.read_text())
             assert replacement_interpreter != first_interpreter
             assert (
-                third["documents"]["jobs"]["daily_orders"]["description"] == "Refresh order totals."
+                third["documents"]["jobs"]["daily_orders_job"]["description"]
+                == "Refresh order totals."
             )
             _ = subprocess.run(
                 [

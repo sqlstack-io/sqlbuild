@@ -1,0 +1,4 @@
+name = "edge_products_job_group"
+description = "Wait for safe admission when both installation limits are one."
+jobs = ["edge_snapshot_products_job"]
+concurrency_groups = ["edge_products_limit"]

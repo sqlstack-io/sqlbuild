@@ -1,0 +1,4 @@
+# Sensor-only roots retain referenced jobs while target filters and event enums stay native.
+name = "health_orders_job"
+description = "Refresh orders."
+select = "orders"

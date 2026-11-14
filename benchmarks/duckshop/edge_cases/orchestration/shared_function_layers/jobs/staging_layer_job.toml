@@ -1,0 +1,3 @@
+name = "staging_layer_job"
+description = "Build the staging layer."
+select = "tag:staging"

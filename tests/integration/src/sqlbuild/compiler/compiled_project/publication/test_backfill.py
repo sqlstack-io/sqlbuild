@@ -73,11 +73,19 @@ def test_given_explicit_backfill_bounds_when_running_and_rerunning_a_group_then_
         files=test_case.files
         | {
             "sources/raw_orders.yml": "sources:\n  - name: raw_orders\n    description: Synthetic order windows.\n    schema: main\n    table: raw_orders\n",
-            "orchestration/orders.py": (
-                "from sqlbuild.orchestration import job, job_group\n"
-                "orders = job('windowed_orders', description='Windowed orders.', select='orders', "
-                "settings={'start_cursor': '0', 'end_cursor': '1'})\n"
-                "annual_orders = job_group('annual_orders', description='Windowed group.', jobs=[orders])\n"
+            "orchestration/jobs/windowed_orders_job.toml": (
+                'name = "windowed_orders_job"\n'
+                'description = "Windowed orders."\n'
+                'select = "orders"\n'
+                "\n"
+                "[settings]\n"
+                'start_cursor = "0"\n'
+                'end_cursor = "1"\n'
+            ),
+            "orchestration/job_groups/annual_orders_job_group.toml": (
+                'name = "annual_orders_job_group"\n'
+                'description = "Windowed group."\n'
+                'jobs = ["windowed_orders_job"]\n'
             ),
         },
     )
@@ -95,7 +103,7 @@ def test_given_explicit_backfill_bounds_when_running_and_rerunning_a_group_then_
             "SQLBUILD_SCHEDULER_TEST_STORE",
             "request-run",
             worker.api.location_id,
-            "annual_orders",
+            "annual_orders_job_group",
             "--target",
             "development",
             "--run-id",

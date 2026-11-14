@@ -82,6 +82,7 @@ Renaming or moving a model rewrites:
 - `__ref__<name>` and `__expected__<name>` fixture CTEs in tests and scenarios;
 - `cursor_inputs` keys, `relationships (to ...)` audits, and `__ref("<name>")` inside quoted SQL in `MODEL` headers and reusable `SCHEMA` declarations;
 - `relationships` audits (`to:` and `field:`) and `__ref("<name>")` in source and seed YAML.
+- the model's name and folder in job and job group `select` and `exclude` selectors; see [Rename models in jobs](/docs/concepts/orchestration#rename-models-in-jobs).
 
 The model's own unit tests, the test files whose every `TEST` block targets only that model, follow it:
 

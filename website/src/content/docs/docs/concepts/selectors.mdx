@@ -69,13 +69,13 @@ sqb build --select source:raw__orders
 
 ### Job
 
-Select the SQL and Python nodes a job or job group declared under `orchestration/` builds. Job names are globally
+Select the SQL and Python nodes a [job or job group](/docs/concepts/orchestration) builds. Job names are globally
 unique, so a bare name works; `job:` is the explicit form and accepts glob patterns:
 
 ```bash
-sqb build nightly_orders
-sqb build --select job:nightly_orders --exclude order_totals
-sqb build --select "job:nightly_orders,tag:finance"
+sqb build nightly_orders_job
+sqb build --select job:nightly_orders_job --exclude order_totals
+sqb build --select "job:nightly_orders_job,tag:finance"
 ```
 
 A job selects its own `select` minus its own `exclude`. A job group selects the union of its jobs.
@@ -84,8 +84,7 @@ them, as on the server.
 Job selectors compose with `+`, `,` and `--exclude` like any other selector. A job's own selection
 cannot name another job, and path-between selectors cannot start or end at a job.
 
-SQLBuild imports the modules under `orchestration/` only when a selector names a job or a name no
-model, source, seed or function has.
+SQLBuild reads job and job group files without running project Python.
 
 ### Unit test
 

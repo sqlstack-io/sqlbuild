@@ -18,6 +18,7 @@ from sqlbuild._native import (
     write_source_freshness_records,
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     WorkerExecutionTestCase,
 )
@@ -41,9 +42,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             [(73,)],
             expected_origin="sensor",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("source_orders"),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
@@ -57,9 +56,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             [(73,)],
             expected_origin="sensor",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/stale_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("stale_orders"),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/managed_orders.yml"
                 ).read_text(),
@@ -79,9 +76,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             [(73,)],
             expected_origin="sensor",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/changed_source_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("changed_source_orders"),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
@@ -190,7 +185,7 @@ def test_given_external_source_versions_when_a_location_resyncs_then_only_change
                     worker.api, worker.process, worker.log, run_id=runs[-1][0]
                 )
                 assert result["status"] == test_case.expected_status
-                assert result["job_key"] == "orders_refresh"
+                assert result["job_key"] == "orders_refresh_job"
                 assert result["node_counts_json"] == {"success": 1}
             with duckdb.connect(
                 str(worker.project / "warehouse.duckdb"), read_only=True

@@ -27,6 +27,7 @@ from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     METADATA,
     TYPE_PROOF_FILES,
+    duckshop_orchestration,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     CheckExecutionTestCase,
@@ -63,7 +64,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             "SELECT amount FROM orders",
             "partial",
             [(11,)],
-            expected_child_statuses={"staging": ("partial",), "marts": ("partial",)},
+            expected_child_statuses={"staging_job": ("partial",), "marts_job": ("partial",)},
         ),
         GroupExecutionTestCase(
             "successful jobs honor compiled boundaries",
@@ -71,7 +72,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             "SELECT amount FROM totals",
             "success",
             [(17,)],
-            expected_child_statuses={"staging": ("success",), "marts": ("success",)},
+            expected_child_statuses={"staging_job": ("success",), "marts_job": ("success",)},
             expected_totals=("success", None),
         ),
         GroupExecutionTestCase(
@@ -81,18 +82,20 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             "success",
             [(17,)],
             expected_origin="sensor",
-            expected_child_statuses={"staging": ("success",), "marts": ("success",)},
+            expected_child_statuses={"staging_job": ("success",), "marts_job": ("success",)},
             expected_totals=("success", None),
             files={
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import PlatformEventKind, job, job_group, platform_event, sensor\n"
-                    "staging = job('staging', description='Stage orders.', select='stg_orders broken_orders')\n"
-                    "marts = job('marts', description='Build independent marts.', select='orders totals')\n"
-                    "annual_orders = job_group('annual_orders', description='Stage then build marts.', jobs=[marts, staging])\n"
-                    "health_orders = sensor('health_orders', description='Refresh on platform heartbeat.', "
-                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run=annual_orders, "
+                "orchestration/job_groups/annual_orders_job_group.toml": (
+                    'name = "annual_orders_job_group"\n'
+                    'description = "Stage then build marts."\n'
+                    'jobs = ["marts_job", "staging_job"]\n'
+                ),
+                "orchestration/sensors/health_orders_sensor.py": (
+                    "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
+                    "health_orders = sensor('health_orders_sensor', description='Refresh on platform heartbeat.', "
+                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run='annual_orders_job_group', "
                     "minimum_interval_seconds=60)\n"
-                )
+                ),
             },
         ),
         GroupExecutionTestCase(
@@ -101,7 +104,10 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
             "failed",
             [(0,)],
-            expected_child_statuses={"staging": ("partial", "cancelled"), "marts": ("cancelled",)},
+            expected_child_statuses={
+                "staging_job": ("partial", "cancelled"),
+                "marts_job": ("cancelled",),
+            },
             expected_totals=("cancelled", None),
             expected_marts_started=False,
             files={
@@ -138,22 +144,28 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 "MODEL (description 'Dependent totals.', materialized table);\n"
                 'SELECT amount FROM __ref("broken_orders")\n'
             ),
-            "orchestration/orders.py": (
-                "from sqlbuild.orchestration import job, job_group, schedule\n"
-                'staging = job("staging", description="Stage orders.", '
-                'select="stg_orders broken_orders")\n'
-                'marts = job("marts", description="Build independent marts.", select="orders totals")\n'
-                'annual_orders = job_group("annual_orders", description="Stage then build marts.", '
-                "jobs=[marts, staging], "
-                'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                'starts_at="2000-01-01T00:00:00Z"))\n'
+            "orchestration/jobs/staging_job.toml": (
+                'name = "staging_job"\n'
+                'description = "Stage orders."\n'
+                'select = "stg_orders broken_orders"\n'
+            ),
+            "orchestration/jobs/marts_job.toml": (
+                'name = "marts_job"\n'
+                'description = "Build independent marts."\n'
+                'select = "orders totals"\n'
+            ),
+            "orchestration/job_groups/annual_orders_job_group.toml": (
+                'name = "annual_orders_job_group"\n'
+                'description = "Stage then build marts."\n'
+                'jobs = ["marts_job", "staging_job"]\n'
+                'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
             ),
         }
         | test_case.files,
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         parent: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job_group"
         )
         assert parent["status"] == test_case.expected_status, worker.log.read_text()
         request: Request = Request(
@@ -162,14 +174,14 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
         )
         with urlopen(request, timeout=5) as response:
             runs: dict[str, Any] = {run["job_key"]: run for run in json.load(response)}
-        assert set(runs) == {"annual_orders", *test_case.expected_child_statuses}
+        assert set(runs) == {"annual_orders_job_group", *test_case.expected_child_statuses}
         assert all(
             runs[name]["status"] in statuses
             for name, statuses in test_case.expected_child_statuses.items()
         )
-        assert (runs["marts"]["started_at"] is not None) == test_case.expected_marts_started
-        assert datetime.fromisoformat(runs["staging"]["ended_at"]) <= datetime.fromisoformat(
-            runs["marts"]["started_at"] or runs["staging"]["ended_at"]
+        assert (runs["marts_job"]["started_at"] is not None) == test_case.expected_marts_started
+        assert datetime.fromisoformat(runs["staging_job"]["ended_at"]) <= datetime.fromisoformat(
+            runs["marts_job"]["started_at"] or runs["staging_job"]["ended_at"]
         )
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute(
@@ -179,18 +191,18 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 control.execute(
                     "SELECT parent_run_id, root_run_id FROM sqb_runs WHERE kind='job' ORDER BY job_key"
                 ).fetchall()
-                == [(runs["annual_orders"]["run_id"],) * 2] * 2
+                == [(runs["annual_orders_job_group"]["run_id"],) * 2] * 2
             )
             assert (
                 control.execute(
                     "SELECT status, skipped_because_of FROM sqb_run_nodes WHERE run_id=? AND node_key='model:totals'",
-                    (runs["marts"]["run_id"],),
+                    (runs["marts_job"]["run_id"],),
                 ).fetchone()
                 == test_case.expected_totals
             )
             assert control.execute(
                 "SELECT status FROM sqb_run_nodes WHERE run_id=? AND node_key='model:broken_orders'",
-                (runs["staging"]["run_id"],),
+                (runs["staging_job"]["run_id"],),
             ).fetchone() == ({"success": "success"}.get(test_case.expected_status, "failed"),)
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
             assert control.execute(
@@ -225,13 +237,11 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 "tests/unit/test_stg_orders.sql": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/worker_failed_unit_test.sql"
                 ).read_text(),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, schedule\n"
-                    'annual_orders = job("annual_orders", '
-                    'select="orders raw_orders stg_orders order_totals", '
-                    'description="Build orders.", '
-                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders raw_orders stg_orders order_totals"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
             expected_run_nodes=[
@@ -269,13 +279,11 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 "tests/unit/test_stg_orders.sql": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/worker_failed_unit_test_cases.sql"
                 ).read_text(),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, schedule\n"
-                    'annual_orders = job("annual_orders", '
-                    'select="orders raw_orders stg_orders order_totals", '
-                    'description="Build orders.", '
-                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders raw_orders stg_orders order_totals"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
             expected_run_nodes=[
@@ -313,13 +321,11 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 "tests/unit/test_stg_orders.sql": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/worker_failed_unit_test_assert.sql"
                 ).read_text(),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, schedule\n"
-                    'annual_orders = job("annual_orders", '
-                    'select="orders raw_orders stg_orders order_totals", '
-                    'description="Build orders.", '
-                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders raw_orders stg_orders order_totals"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
             expected_run_nodes=[
@@ -362,13 +368,11 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 "tests/unit/test_udf__order_band.sql": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/worker_failed_function_test.sql"
                 ).read_text(),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, schedule\n"
-                    'annual_orders = job("annual_orders", '
-                    'select="orders raw_orders udf__order_band stg_orders order_totals", '
-                    'description="Build orders.", '
-                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders raw_orders udf__order_band stg_orders order_totals"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
             expected_run_nodes=[
@@ -415,13 +419,11 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 )
                 .read_text()
                 .replace("(5, 'large')", "(5, 'small')"),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, schedule\n"
-                    'annual_orders = job("annual_orders", '
-                    'select="orders raw_orders udf__order_band stg_orders order_totals", '
-                    'description="Build orders.", '
-                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders raw_orders udf__order_band stg_orders order_totals"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
             expected_run_nodes=[
@@ -440,7 +442,7 @@ def test_given_a_failing_unit_test_when_a_worker_builds_then_its_model_fails_and
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert run["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
@@ -482,13 +484,11 @@ def test_given_a_failing_unit_test_when_a_worker_builds_then_its_model_fails_and
                     "MODEL (description 'Returns.', materialized table);\n"
                     'SELECT return_id FROM __source("raw_returns")\n'
                 ),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, schedule\n"
-                    'annual_orders = job("annual_orders", '
-                    'select="orders stale_orders late_orders returns", '
-                    'description="Build orders.", '
-                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders stale_orders late_orders returns"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
         )
@@ -500,7 +500,7 @@ def test_given_a_stale_source_when_a_worker_builds_then_blocked_nodes_finish_ski
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert run["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
@@ -540,13 +540,11 @@ def test_given_a_stale_source_when_a_worker_builds_then_blocked_nodes_finish_ski
                     "MODEL (description 'Coded orders.', materialized table);\n"
                     'SELECT code FROM __seed("order_codes")\n'
                 ),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, schedule\n"
-                    'annual_orders = job("annual_orders", '
-                    'select="orders order_codes coded_orders", '
-                    'description="Build orders.", '
-                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders order_codes coded_orders"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
         )
@@ -558,7 +556,7 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert run["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
@@ -598,18 +596,31 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
                 "models/inventory.sql": (
                     "MODEL (description 'Inventory.', materialized table);\nSELECT 23 AS amount\n"
                 ),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, job_group, schedule\n"
-                    "orders = job('orders_job', description='Build orders.', select='orders', "
-                    "concurrency_groups=('inventory_limit',))\n"
-                    "inventory = job('inventory_job', description='Build inventory.', select='inventory', "
-                    "concurrency_groups=('orders_limit',))\n"
-                    "annual_orders = job_group('annual_orders', description='Orders group.', jobs=[orders], "
-                    "concurrency_groups=('orders_limit',), "
-                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
-                    "annual_inventory = job_group('annual_inventory', description='Inventory group.', "
-                    "jobs=[inventory], concurrency_groups=('inventory_limit',), "
-                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                "orchestration/jobs/orders_job.toml": (
+                    'name = "orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders"\n'
+                    'concurrency_groups = ["inventory_limit"]\n'
+                ),
+                "orchestration/jobs/inventory_job.toml": (
+                    'name = "inventory_job"\n'
+                    'description = "Build inventory."\n'
+                    'select = "inventory"\n'
+                    'concurrency_groups = ["orders_limit"]\n'
+                ),
+                "orchestration/job_groups/annual_orders_job_group.toml": (
+                    'name = "annual_orders_job_group"\n'
+                    'description = "Orders group."\n'
+                    'jobs = ["orders_job"]\n'
+                    'concurrency_groups = ["orders_limit"]\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
+                ),
+                "orchestration/job_groups/annual_inventory_job_group.toml": (
+                    'name = "annual_inventory_job_group"\n'
+                    'description = "Inventory group."\n'
+                    'jobs = ["inventory_job"]\n'
+                    'concurrency_groups = ["inventory_limit"]\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
             store_setup=(
@@ -627,10 +638,10 @@ def test_given_opposing_group_limits_when_scheduled_then_each_group_holds_every_
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         orders: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job_group"
         )
         inventory: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_inventory"
+            worker.api, worker.process, worker.log, job_key="annual_inventory_job_group"
         )
         assert orders["status"] == inventory["status"] == "success", worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
@@ -638,10 +649,10 @@ def test_given_opposing_group_limits_when_scheduled_then_each_group_holds_every_
                 "SELECT r.job_key, c.group_key, max(c.occupied) FROM test_slot_claims c "
                 "JOIN sqb_runs r ON r.run_id=c.run_id GROUP BY r.job_key, c.group_key ORDER BY r.job_key"
             ).fetchall() == [
-                ("annual_inventory", "inventory_limit", 1),
-                ("annual_inventory", "orders_limit", 1),
-                ("annual_orders", "inventory_limit", 1),
-                ("annual_orders", "orders_limit", 1),
+                ("annual_inventory_job_group", "inventory_limit", 1),
+                ("annual_inventory_job_group", "orders_limit", 1),
+                ("annual_orders_job_group", "inventory_limit", 1),
+                ("annual_orders_job_group", "orders_limit", 1),
             ]
             assert control.execute(
                 "SELECT count(*) FROM sqb_runs WHERE status='success'"
@@ -804,13 +815,15 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(47,)],
             expected_origin="sensor",
             files={
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import PlatformEventKind, job, platform_event, sensor\n"
-                    "annual_orders = job('annual_orders', select='orders', description='Build orders.')\n"
-                    "health_orders = sensor('health_orders', description='Refresh on platform heartbeat.', "
-                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run=annual_orders, "
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
+                ),
+                "orchestration/sensors/health_orders_sensor.py": (
+                    "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
+                    "health_orders = sensor('health_orders_sensor', description='Refresh on platform heartbeat.', "
+                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run='annual_orders_job', "
                     "minimum_interval_seconds=60)\n"
-                )
+                ),
             },
         ),
         WorkerExecutionTestCase(
@@ -825,12 +838,16 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                     '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                     '[targets.development]\nschema = "main"\n'
                 ),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, schedule\n"
-                    "annual_orders = job('annual_orders', select='orders', description='Build orders.', "
-                    "settings={'vars': {'batch': 23}, 'reload': True, 'run_tests': False}, "
-                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', "
-                    "starts_at='2000-01-01T00:00:00Z'))\n"
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
+                    "\n"
+                    "[settings]\n"
+                    "vars = { batch = 23 }\n"
+                    "reload = true\n"
+                    "run_tests = false\n"
                 ),
             },
         ),
@@ -845,9 +862,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                 "sources/raw_orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/upstream_source_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("upstream_source_orders"),
             },
             warehouse_setup=lambda path: (
                 duckdb.connect(str(path))
@@ -867,9 +882,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                 "sources/raw_orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/upstream_source_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("upstream_source_orders"),
             },
             warehouse_setup=lambda path: (
                 duckdb.connect(str(path))
@@ -954,12 +967,7 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
             "SELECT amount FROM orders",
             "success",
             [(9,)],
-            files=INTERMEDIATE_LOADER_FILES
-            | {
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/upstream_loaded_orders.py"
-                ).read_text()
-            },
+            files=INTERMEDIATE_LOADER_FILES | {**duckshop_orchestration("upstream_loaded_orders")},
             expected_node_count=3,
             expected_write_set=frozenset(
                 {"model:orders", "source:raw_shipments", "source:stage_shipments"}
@@ -1188,7 +1196,9 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
             [(59,)],
             files={
                 "python/checks/orders.py": "failed",
-                "orchestration/orders.py": "on_failure",
+                "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
+                "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
+                "orchestration/sensors/failed_orders_sensor.py": "on_failure_sensor",
                 "models/inventory.sql": "inventory",
             },
         ),
@@ -1206,11 +1216,11 @@ def test_given_an_attached_check_failure_when_a_sensor_observes_it_then_its_dest
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         source: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert source["status"] == "failed", worker.log.read_text()
         destination: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="refresh_inventory"
+            worker.api, worker.process, worker.log, job_key="refresh_inventory_job"
         )
         assert destination["status"] == test_case.expected_status, worker.log.read_text()
         assert destination["selection_json"] == ["model:inventory"]
@@ -1231,7 +1241,9 @@ def test_given_an_attached_check_failure_when_a_sensor_observes_it_then_its_dest
             [(17,)],
             files={
                 "python/checks/orders.py": "cancelled",
-                "orchestration/orders.py": "on_failure",
+                "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
+                "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
+                "orchestration/sensors/failed_orders_sensor.py": "on_failure_sensor",
                 "models/inventory.sql": "inventory",
             },
         ),
@@ -1248,9 +1260,9 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
         test_case, files={path: fixture[key] for path, key in test_case.files.items()}
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
-        cancel_running_statement(worker, job_key="annual_orders")
+        cancel_running_statement(worker, job_key="annual_orders_job")
         run: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert run["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
@@ -1291,16 +1303,27 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
             [(59,)],
             expected_origin="sensor",
             files={
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import RunEventKind, job, job_group, run_event, schedule, sensor\n"
-                    "source = job('source_orders', select='orders', description='Source orders.')\n"
-                    "source_group = job_group('source_group', description='Source group.', jobs=[source], "
-                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
-                    "annual_orders = job('annual_orders', select='orders', description='Refresh orders.', settings={'reload': True})\n"
-                    "on_group = sensor('on_group', description='Refresh after group completion.', "
-                    "when=run_event(job=source_group, kinds=[RunEventKind.COMPLETED, RunEventKind.SUCCESS], executed_successfully=('orders',)), "
-                    "run=annual_orders, minimum_interval_seconds=1)\n"
-                )
+                "orchestration/jobs/source_orders_job.toml": (
+                    'name = "source_orders_job"\ndescription = "Source orders."\nselect = "orders"\n'
+                ),
+                "orchestration/job_groups/source_job_group.toml": (
+                    'name = "source_job_group"\n'
+                    'description = "Source group."\n'
+                    'jobs = ["source_orders_job"]\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
+                ),
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Refresh orders."\n'
+                    'select = "orders"\n'
+                    "\n[settings]\nreload = true\n"
+                ),
+                "orchestration/sensors/on_group_sensor.py": (
+                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
+                    "on_group = sensor('on_group_sensor', description='Refresh after group completion.', "
+                    "when=run_event(job='source_job_group', kinds=[RunEventKind.COMPLETED, RunEventKind.SUCCESS], executed_successfully=('orders',)), "
+                    "run='annual_orders_job', minimum_interval_seconds=1)\n"
+                ),
             },
         )
     ],
@@ -1311,7 +1334,7 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         destination: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert destination["status"] == test_case.expected_status, worker.log.read_text()
         result: dict[str, Any] = worker_result(worker, test_case)
@@ -1320,7 +1343,7 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
             assert control.execute("SELECT run_key,run_id FROM sqb_run_requests").fetchall() == [
                 (
                     control.execute(
-                        "SELECT run_id FROM sqb_runs WHERE job_key='source_group'"
+                        "SELECT run_id FROM sqb_runs WHERE job_key='source_job_group'"
                     ).fetchone()[0],
                     destination["run_id"],
                 )
@@ -1328,9 +1351,9 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
             assert control.execute(
                 "SELECT job_key,status FROM sqb_runs ORDER BY job_key"
             ).fetchall() == [
-                ("annual_orders", "success"),
-                ("source_group", "success"),
-                ("source_orders", "success"),
+                ("annual_orders_job", "success"),
+                ("source_job_group", "success"),
+                ("source_orders_job", "success"),
             ]
 
 
@@ -1346,15 +1369,26 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
             expected_origin="sensor",
             files={
                 "models/stg_orders.sql": "MODEL (description 'Staging orders.');\nSELECT 71 AS amount\n",
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import NodeEventKind, job, job_group, node_event, schedule, sensor\n"
-                    "source = job('source_orders', select='orders', description='Source orders.')\n"
-                    "source_group = job_group('source_group', description='Source group.', jobs=[source], "
-                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
-                    "annual_orders = job('annual_orders', select='stg_orders', description='Refresh staging.', settings={'reload': True})\n"
-                    "on_node = sensor('on_node', description='React to actual orders rebuilds.', "
+                "orchestration/jobs/source_orders_job.toml": (
+                    'name = "source_orders_job"\ndescription = "Source orders."\nselect = "orders"\n'
+                ),
+                "orchestration/job_groups/source_job_group.toml": (
+                    'name = "source_job_group"\n'
+                    'description = "Source group."\n'
+                    'jobs = ["source_orders_job"]\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
+                ),
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Refresh staging."\n'
+                    'select = "stg_orders"\n'
+                    "\n[settings]\nreload = true\n"
+                ),
+                "orchestration/sensors/on_node_sensor.py": (
+                    "from sqlbuild.orchestration import NodeEventKind, node_event, sensor\n"
+                    "on_node = sensor('on_node_sensor', description='React to actual orders rebuilds.', "
                     "when=node_event(select='orders', kinds=[NodeEventKind.SUCCESS]), "
-                    "run=annual_orders, minimum_interval_seconds=1)\n"
+                    "run='annual_orders_job', minimum_interval_seconds=1)\n"
                 ),
             },
         )
@@ -1366,23 +1400,23 @@ def test_given_a_real_group_child_rebuild_when_a_node_sensor_matches_then_only_t
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         destination: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert destination["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute(
                 "SELECT job_key,status FROM sqb_runs ORDER BY job_key"
             ).fetchall() == [
-                ("annual_orders", "success"),
-                ("source_group", "success"),
-                ("source_orders", "success"),
+                ("annual_orders_job", "success"),
+                ("source_job_group", "success"),
+                ("source_orders_job", "success"),
             ]
             assert control.execute(
                 "SELECT q.run_key,q.run_id FROM sqb_run_requests q"
             ).fetchall() == [
                 (
                     control.execute(
-                        "SELECT run_id FROM sqb_runs WHERE job_key='source_orders'"
+                        "SELECT run_id FROM sqb_runs WHERE job_key='source_orders_job'"
                     ).fetchone()[0]
                     + "/model:orders",
                     destination["run_id"],
@@ -1429,13 +1463,19 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
                     "MODEL (description 'Downstream totals.', materialized table);\n"
                     'SELECT amount FROM __ref("orders")\n'
                 ),
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, job_group, schedule\n"
-                    "orders = job('long_orders', description='Long query.', select='orders')\n"
-                    "totals = job('waiting_totals', description='Waiting query.', select='totals')\n"
-                    "annual_orders = job_group('annual_orders', description='Cancellable group.', "
-                    "jobs=[totals, orders], schedule=schedule(cron='0 0 * * *', timezone='UTC', "
-                    "starts_at='2000-01-01T00:00:00Z'))\n"
+                "orchestration/jobs/long_orders_job.toml": (
+                    'name = "long_orders_job"\ndescription = "Long query."\nselect = "orders"\n'
+                ),
+                "orchestration/jobs/waiting_totals_job.toml": (
+                    'name = "waiting_totals_job"\n'
+                    'description = "Waiting query."\n'
+                    'select = "totals"\n'
+                ),
+                "orchestration/job_groups/annual_orders_job_group.toml": (
+                    'name = "annual_orders_job_group"\n'
+                    'description = "Cancellable group."\n'
+                    'jobs = ["waiting_totals_job", "long_orders_job"]\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
         ),
@@ -1451,21 +1491,21 @@ def test_given_an_executing_group_when_parent_cancelled_then_all_children_stop_b
             worker.process,
             worker.log,
             pending=frozenset({"queued"}),
-            job_key="annual_orders",
+            job_key="annual_orders_job_group",
         )
         assert parent["status"] == "running", worker.log.read_text()
-        cancel_running_statement(worker, job_key="long_orders", run_id=parent["run_id"])
+        cancel_running_statement(worker, job_key="long_orders_job", run_id=parent["run_id"])
         completed: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job_group"
         )
         assert completed["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute(
                 "SELECT job_key, status FROM sqb_runs ORDER BY job_key"
             ).fetchall() == [
-                ("annual_orders", "cancelled"),
-                ("long_orders", "cancelled"),
-                ("waiting_totals", "cancelled"),
+                ("annual_orders_job_group", "cancelled"),
+                ("long_orders_job", "cancelled"),
+                ("waiting_totals_job", "cancelled"),
             ]
             assert control.execute(
                 "SELECT count(*) FROM sqb_runs WHERE parent_run_id=? AND ended_at>?",

@@ -14,6 +14,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import sqb, write
 
 _JOB: str = "orchestration/jobs/orders/refresh.toml"
 _UNRELATED: str = "orchestration/jobs/orders/totals.toml"
+_SELECTOR_REWRITE: str = Path(
+    "benchmarks/duckshop/edge_cases/orchestration/selector_rewrite/jobs/orders_refresh_job.toml"
+).read_text()
 _UNRELATED_JOB: str = (
     'name = "orders_totals_job"\ndescription = "Rebuild totals."\nselect = "customer_totals"\n'
 )
@@ -31,15 +34,11 @@ def _job(select: str, exclude: str = "") -> str:
         JobSelectorRefactorE2ETestCase(
             description="a rename rewrites exact names and leaves globs and other kinds alone",
             command=("rename", "stg_orders", "stg_orders_clean"),
-            job=_job(
-                '"+stg_orders+ fact_orders,+stg_orders stg_orders~customer_totals stg_ord*"',
-                "'stg_orders+,customer_totals'",
-            ),
-            expected_job=_job(
-                '"+stg_orders_clean+ fact_orders,+stg_orders_clean '
-                'stg_orders_clean~customer_totals stg_ord*"',
-                "'stg_orders_clean+,customer_totals'",
-            ),
+            job=_SELECTOR_REWRITE,
+            expected_job=_SELECTOR_REWRITE.replace(
+                "+stg_orders+ fact_orders,+stg_orders stg_orders~customer_totals",
+                "+stg_orders_clean+ fact_orders,+stg_orders_clean stg_orders_clean~customer_totals",
+            ).replace("'stg_orders+,customer_totals'", "'stg_orders_clean+,customer_totals'"),
             expected_output=("selector", _JOB),
         ),
         JobSelectorRefactorE2ETestCase(

@@ -60,7 +60,7 @@ WAREHOUSE_REFUSAL: str = (
             expected_customers_tables=0,
             # DuckDB has no session warehouse, so the CLI refuses the job's warehouse: the
             # published job reached the CLI instead of being refused by the worker.
-            job_settings="settings={'warehouse': 'ANALYST_XS'}, ",
+            job_settings='\n[settings]\nwarehouse = "ANALYST_XS"\n',
             expected_scheduled_status="failed",
             expected_worker_log="error[C260]: --warehouse ANALYST_XS was given",
         ),
@@ -82,12 +82,12 @@ def test_given_an_ad_hoc_command_when_checked_and_launched_then_the_worker_runs_
             )
         }
         | {
-            "orchestration/orders.py": (
-                "from sqlbuild.orchestration import job, schedule\n"
-                'annual_orders = job("annual_orders", select="orders", '
-                f'description="Build orders.", {test_case.job_settings}'
-                'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                'starts_at="2000-01-01T00:00:00Z"))\n'
+            "orchestration/jobs/annual_orders_job.toml": (
+                'name = "annual_orders_job"\n'
+                'description = "Build orders."\n'
+                'select = "orders"\n'
+                'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                'starts_at = "2000-01-01T00:00:00Z" }\n' + test_case.job_settings
             )
         },
     )
@@ -98,7 +98,7 @@ def test_given_an_ad_hoc_command_when_checked_and_launched_then_the_worker_runs_
         server_arguments=("--password-origin", "https://control.example.com"),
     ) as worker:
         scheduled: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert scheduled["status"] == test_case.expected_scheduled_status, worker.log.read_text()
         assert scheduled["status_reason"] != WAREHOUSE_REFUSAL, "published jobs are not refused"
@@ -332,7 +332,7 @@ def test_given_an_ad_hoc_verb_when_the_checkout_changes_after_verification_then_
         worker_case,
         server_arguments=("--password-origin", "https://control.example.com"),
     ) as worker:
-        _ = wait_for_run(worker.api, worker.process, worker.log, job_key="annual_orders")
+        _ = wait_for_run(worker.api, worker.process, worker.log, job_key="annual_orders_job")
         admin: dict[str, Any] = provision_person(
             tmp_path / "control", "create-user", "orders-admin"
         )

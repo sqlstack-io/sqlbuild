@@ -1,0 +1,226 @@
+<!-- generated-by: sqlbuild skills -->
+
+# Orchestration
+
+> Declare jobs, job groups and schedules in TOML, and calendars and sensors in Python, for a SQLBuild server to run.
+
+Online: https://sqlbuild.com/docs/concepts/orchestration/
+
+## Contents
+
+- Project layout
+- Declare a job
+- Group jobs
+- Schedule a job
+- Schedule from a calendar
+- Start a job from a sensor
+- Rename models in jobs
+- Errors
+
+A job names the nodes a server builds together, and a schedule says when. Write each job as a TOML
+file under `orchestration/jobs/`; `sqb compile` checks it and a code location publishes it.
+
+```toml
+# orchestration/jobs/nightly_orders_job.toml
+name = "nightly_orders_job"
+description = "Orders and their daily totals"
+select = "+order_totals"
+schedule = { cron = "0 2 * * *", timezone = "UTC" }
+```
+
+```bash
+sqb build nightly_orders_job        # build what the job builds, locally
+```
+
+## Project layout
+
+| Folder | Holds | Name suffix |
+| --- | --- | --- |
+| `orchestration/jobs/` | One job per `.toml` file | `_job` |
+| `orchestration/job_groups/` | One job group per `.toml` file | `_job_group` |
+| `orchestration/calendars/` | One calendar per `.py` module | `_calendar` |
+| `orchestration/sensors/` | One sensor per `.py` module | `_sensor` |
+
+- Subfolders are allowed, such as `orchestration/jobs/finance/revenue_job.toml`.
+- A name must end with its folder's suffix. Names are unique across the whole project, with models,
+  sources and every other resource.
+- A Python module whose file name starts with `_` is a private helper and declares nothing.
+- Any other file under `orchestration/`, or a folder not in the table, is a `D017` error.
+
+## Declare a job
+
+A job builds its `select` minus its `exclude`, with the same [selectors](selectors.md)
+as `sqb build`.
+
+```toml
+name = "nightly_orders_job"
+description = "Orders and their daily totals"
+select = "+order_totals"
+exclude = "tag:deprecated"
+targets = ["production"]
+owner = "Orders team"
+overlap = "skip"
+concurrency_groups = ["warehouse_heavy"]
+schedule = { cron = "0 2 * * *", timezone = "Europe/London" }
+
+[on_failure]
+retries = 2
+retry_delay_seconds = 600
+
+[settings]
+concurrency = 4
+vars = { batch_size = 500 }
+
+[resources]
+memory = "3g"
+cpus = 2
+```
+
+| Key | Required | Value |
+| --- | --- | --- |
+| `name` | Yes | The job's name, ending in `_job` |
+| `description` | Yes | Shown on the job's page |
+| `select` | Yes | The nodes the job builds |
+| `exclude` | No | Nodes removed from `select` |
+| `targets` | No | The targets the job exists in; all targets when omitted |
+| `owner` | No | Shown on the job's page and in the job list |
+| `overlap` | No | `queue` (default) or `skip`; see [Skip overlapping runs](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
+| `concurrency_groups` | No | Server concurrency limits the job's runs share |
+| `schedule` | No | When the server starts the job; see below |
+| `[on_failure]` | No | `retries` from 1 to 10, `retry_delay_seconds` from 0 to 86400 |
+| `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh` or `changed` |
+| `[resources]` | No | Docker worker limits; see [Limit worker containers](../cli/server.md#limit-worker-containers) |
+
+A job's `[settings]` cannot set `select` or `exclude`: the job's own selection is the run's
+selection.
+
+## Group jobs
+
+A job group runs its jobs as one run. A job waits for another job in the group when it reads a node
+that job builds.
+
+```toml
+# orchestration/job_groups/daily_orders_job_group.toml
+name = "daily_orders_job_group"
+description = "Stage orders, then build the marts"
+jobs = ["staging_orders_job", "orders_marts_job"]
+schedule = { cron = "0 3 * * *", timezone = "UTC" }
+```
+
+A group takes `name`, `description` and `jobs`, and the same `targets`, `owner`, `overlap`,
+`concurrency_groups`, `schedule` and `[on_failure]` as a job. Its members are jobs, never other
+groups.
+
+## Schedule a job
+
+`schedule` takes a cron expression or the name of a calendar, and always a timezone.
+
+| Key | Value |
+| --- | --- |
+| `cron` | A five-field cron expression |
+| `calendar` | The name of a calendar in `orchestration/calendars/` |
+| `timezone` | An IANA timezone, such as `"UTC"` or `"America/New_York"` |
+| `starts_at` | An RFC 3339 time with an offset; no ticks before it |
+| `default_status` | `running` (default) or `paused` when the schedule is first published |
+
+```toml
+schedule = { cron = "15 2 * * *", timezone = "Europe/London", starts_at = "2026-07-03T00:00:00Z" }
+```
+
+## Schedule from a calendar
+
+A calendar returns the upcoming times a job runs, such as fulfillment cut-offs that come from
+another system. The code location evaluates it when it publishes and again before its times run
+out.
+
+```python
+# orchestration/calendars/fulfillment_calendar.py
+from sqlbuild.orchestration import calendar
+
+@calendar(name="fulfillment_calendar", description="Upcoming fulfillment times", horizon="1d")
+def fulfillment_calendar(window, fulfillment):
+    return fulfillment.upcoming(window)
+```
+
+```toml
+schedule = { calendar = "fulfillment_calendar", timezone = "America/New_York" }
+```
+
+The function receives a `window` with timezone-aware `start` and `end`, in the job's timezone, and
+returns timezone-aware datetimes inside it. Other parameters name
+[providers](python-nodes/providers.md). `horizon` sets how far ahead the window reaches.
+
+## Start a job from a sensor
+
+A sensor starts a job or job group when something happens, named by `run`.
+
+```python
+# orchestration/sensors/on_new_orders_sensor.py
+from sqlbuild.orchestration import sensor, source_new_data
+
+on_new_orders = sensor(
+    "on_new_orders_sensor",
+    description="Refresh orders for each new source version",
+    when=source_new_data(select="source:raw_orders"),
+    run="orders_refresh_job",
+    minimum_interval_seconds=60,
+)
+```
+
+| Condition | Starts a run for |
+| --- | --- |
+| `platform_event(kinds=[...])` | Server events, such as an overdue tick |
+| `run_event(job="...", kinds=[...])` | Outcomes of another job or group, optionally only when `executed_successfully` nodes ran and succeeded |
+| `node_event(select="...", kinds=[...])` | Each success, failure or recovery of the selected nodes in any run |
+| `source_new_data(select="...")` | Each new version of the selected sources |
+| `source_stale(select="...", after_seconds=...)` | Each source version older than `after_seconds` |
+
+A sensor without `when` decorates a function that polls and returns `RunRequest(run_key=...)`
+values or a `SkipReason`. A sensor also takes `minimum_interval_seconds` (default 30),
+`default_status` and `targets`.
+
+## Rename models in jobs
+
+`sqb rename` and `sqb mv` update job and job group selectors with the models they rename or move:
+
+```bash
+sqb rename stg_orders stg_orders_clean
+```
+
+```text
+Rename model  stg_orders -> stg_orders_clean
+├── models/marts/fact_orders.sql
+│   └── 10:13   reference __ref("stg_orders")  ->  __ref("stg_orders_clean")
+├── models/staging/stg_orders_clean.sql  (moved from models/staging/stg_orders.sql)
+│   └── 1:8     migration + migrate_from stg_orders
+└── orchestration/jobs/orders_refresh_job.toml
+    └── 3:10    selector  "+stg_orders+ fact_orders"  ->  "+stg_orders_clean+ fact_orders"
+```
+
+- Exact names are rewritten, including inside graph operators such as `+stg_orders+`, `,` and `~`.
+  Tags, globs and `job:` selectors stay as written.
+- A folder selector, such as `models/staging` or `path:models/staging/`, moves when every model
+  under it moves to the same folder. When only some leave, the command lists a note at the
+  selector to check by hand.
+- A selector in a multi-line TOML string is reported for a manual edit and blocks the refactor.
+
+## Errors
+
+Every problem with an orchestration file is a `D017` error at its file, line and column, reported by
+`sqb compile` and every other command that reads the project.
+
+| Error | Fix |
+| --- | --- |
+| ``orchestration/jobs/nightly_orders_job.toml:4:11: unknown variant `coalesce`, expected `queue` or `skip` `` | Use one of the listed values |
+| `files cannot sit directly in orchestration/` | Move jobs and groups to TOML files in `orchestration/jobs/` or `orchestration/job_groups/` |
+| `` `job` was removed from sqlbuild.orchestration`` | Declare the job in TOML and name it in the sensor's `run` |
+| `declares a second sensor; each module declares exactly one` | Split the module |
+
+Details:
+
+- `sqb build` and the other commands read job and group files without running project Python, so
+  a job selector never imports a calendar or sensor module.
+- A job or group declared with `targets` is selectable only when the command's target is one of
+  them, as on the server.
+- A job's resources are checked when a location publishes, such as
+  `job nightly_orders_job resources: cpus must be a positive number`.

@@ -11,6 +11,7 @@ from typing import Any, cast
 import duckdb
 import pytest
 
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     WorkerExecutionTestCase,
 )
@@ -43,9 +44,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
             [(83,)],
             expected_origin="sensor",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/custom_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("custom_orders"),
                 "providers/fulfillment.py": (
                     "import json, os, time\nfrom pathlib import Path\n"
                     "from sqlbuild.orchestration import RunRequest, SkipReason\n"
@@ -168,7 +167,7 @@ def test_given_a_custom_polling_sensor_when_a_callback_fails_or_times_out_then_a
                 os.kill(timed_call["pid"], 0)
             data.write_text(json.dumps({"mode": "ready"}))
             destination: dict[str, Any] = wait_for_run(
-                worker.api, worker.process, worker.log, job_key="annual_orders"
+                worker.api, worker.process, worker.log, job_key="annual_orders_job"
             )
             assert destination["status"] == test_case.expected_status, log.read_text()
             for browser in [admin, session]:

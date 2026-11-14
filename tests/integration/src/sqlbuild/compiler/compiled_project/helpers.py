@@ -46,7 +46,6 @@ from sqlbuild.compiler.compile.types import (
     CompiledProjectView,
 )
 from sqlbuild.orchestration import compile_snapshot
-from sqlbuild.orchestration_declarations.models.authoring import Job, JobGroup
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 if TYPE_CHECKING:
@@ -429,6 +428,16 @@ EXPECTED_SUMMARIES: Path = Path(__file__).parent / "expected"
 WAFFLE_SHOP_NATIVE_MODELS: int = 13
 
 
+def duckshop_orchestration(fixture: str) -> dict[str, str]:
+    """A DuckShop orchestration fixture tree as project files below `orchestration/`."""
+    root: Path = Path("benchmarks/duckshop/edge_cases/orchestration") / fixture
+    return {
+        f"orchestration/{path.relative_to(root).as_posix()}": path.read_text()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
 def copy_project(*, fixtures: tuple[str, ...], files: dict[str, str], project_dir: Path) -> Path:
     """Copy each fixture into `project_dir`, then write `files` over them."""
 
@@ -754,10 +763,22 @@ def published_texts(test_case: SnapshotExpressionRangeTestCase, tmp_path: Path) 
 
 
 def python_pipeline_snapshot(
-    tmp_path: Path, declarations: list[Job | JobGroup]
+    tmp_path: Path, jobs: dict[str, str], groups: dict[str, tuple[str, ...]] | None = None
 ) -> NativeOrchestrationSnapshot:
-    """Publish the Python pipeline project with the given job declarations."""
-    write_files(project_dir=tmp_path, files=PYTHON_PIPELINE_FILES)
+    """Publish the Python pipeline project with TOML jobs, by name and selector, and groups."""
+    files: dict[str, str] = {
+        f"orchestration/jobs/{name}.toml": (
+            f'name = {json.dumps(name)}\ndescription = "Orders."\nselect = {json.dumps(select)}\n'
+        )
+        for name, select in jobs.items()
+    } | {
+        f"orchestration/job_groups/{name}.toml": (
+            f'name = {json.dumps(name)}\ndescription = "Nightly orders."\n'
+            f"jobs = {json.dumps(list(members))}\n"
+        )
+        for name, members in (groups or {}).items()
+    }
+    write_files(project_dir=tmp_path, files=PYTHON_PIPELINE_FILES | files)
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
     project: CompiledProjectView = build_compiled_project(
         discovered_inputs=discovered,
@@ -768,6 +789,5 @@ def python_pipeline_snapshot(
         project=project,
         metadata_json=json.dumps(METADATA),
         project_dir=tmp_path,
-        declarations=declarations,
         discovered_inputs=discovered,
     )

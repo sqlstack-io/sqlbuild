@@ -33,6 +33,42 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             ),
         ),
         PythonProjectLayoutCompileTestCase(
+            description="Python jobs left in orchestration/ point to the TOML layout",
+            repo_files={
+                "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job\n"
+                    "nightly = job('nightly', description='Orders.', select='orders')\n"
+                ),
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/jobs.py",
+                "files cannot sit directly in orchestration/",
+                "jobs, job groups and schedules are TOML files in orchestration/jobs/",
+                "https://sqlbuild.com/docs/concepts/orchestration/",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="a sensor importing the removed job API points to the TOML layout",
+            repo_files={
+                "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
+                "orchestration/sensors/orders_sensor.py": (
+                    "from sqlbuild.orchestration import job, sensor\n"
+                    "orders = sensor('orders_sensor', description='Orders.', "
+                    "run=job('nightly', description='Orders.', select='orders'))\n"
+                ),
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/sensors/orders_sensor.py:1:",
+                "`job` was removed from sqlbuild.orchestration",
+                "https://sqlbuild.com/docs/concepts/orchestration/",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
             description="removed tasks Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',

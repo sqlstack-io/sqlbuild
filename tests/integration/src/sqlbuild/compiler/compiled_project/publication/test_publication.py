@@ -62,14 +62,20 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
     test_case: SnapshotPublicationTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    files: dict[str, str] = TYPE_PROOF_FILES | {
-        "orchestration/edge_cases/definitions.py": Path(
-            "benchmarks/duckshop/project/orchestration/edge_cases/definitions.py"
-        ).read_text(),
-        "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
-            "MODEL (", "MODEL (tags ['edge_case'],", 1
-        ),
-    }
+    duckshop: Path = Path("benchmarks/duckshop/project")
+    files: dict[str, str] = (
+        TYPE_PROOF_FILES
+        | {
+            path.relative_to(duckshop).as_posix(): path.read_text()
+            for path in (duckshop / "orchestration").rglob("*")
+            if path.is_file()
+        }
+        | {
+            "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+                "MODEL (", "MODEL (tags ['edge_case'],", 1
+            ),
+        }
+    )
     write_files(project_dir=project_dir, files=files)
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=project_dir)
     project: CompiledProjectView = build_compiled_project(
@@ -130,34 +136,36 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         by_name: dict[str, dict[str, Any]] = {trigger["name"]: trigger for trigger in triggers}
         assert len(triggers) == 4
         assert set(by_name) == {
-            "edge_snapshot_orders",
-            "edge_platform_orders",
-            "edge_job_outcomes",
-            "edge_group_outcomes",
+            "edge_snapshot_orders_job",
+            "edge_platform_orders_sensor",
+            "edge_job_outcomes_sensor",
+            "edge_group_outcomes_sensor",
         }
-        scheduled: dict[str, Any] = by_name["edge_snapshot_orders"]
+        scheduled: dict[str, Any] = by_name["edge_snapshot_orders_job"]
         assert scheduled["status"] == "paused"
         assert scheduled["definition_json"]["starts_at"] == "2026-07-02T19:47:23.456789Z"
         assert scheduled["definition_json"]["default_status"] == "paused"
-        assert by_name["edge_platform_orders"]["status"] == "paused"
-        assert by_name["edge_platform_orders"]["definition_json"]["default_status"] == "paused"
-        assert by_name["edge_platform_orders"]["definition_json"]["when"] == {
+        assert by_name["edge_platform_orders_sensor"]["status"] == "paused"
+        assert (
+            by_name["edge_platform_orders_sensor"]["definition_json"]["default_status"] == "paused"
+        )
+        assert by_name["edge_platform_orders_sensor"]["definition_json"]["when"] == {
             "kind": "platform_event",
             "kinds": ["tick_overdue", "location_broken", "launch_failed"],
         }
-        assert by_name["edge_job_outcomes"]["definition_json"]["when"] == {
+        assert by_name["edge_job_outcomes_sensor"]["definition_json"]["when"] == {
             "kind": "run_event",
-            "job_key": "edge_snapshot_orders",
+            "job_key": "edge_snapshot_orders_job",
             "kinds": ["warn", "partial"],
         }
-        assert by_name["edge_group_outcomes"]["definition_json"]["when"] == {
+        assert by_name["edge_group_outcomes_sensor"]["definition_json"]["when"] == {
             "kind": "run_event",
-            "job_key": "edge_snapshot_group",
+            "job_key": "edge_snapshot_job_group",
             "kinds": ["completed"],
             "executed_successfully": ["model:orders"],
         }
-        assert by_name["edge_job_outcomes"]["status"] == "paused"
-        assert by_name["edge_group_outcomes"]["status"] == "paused"
+        assert by_name["edge_job_outcomes_sensor"]["status"] == "paused"
+        assert by_name["edge_group_outcomes_sensor"]["status"] == "paused"
 
 
 @pytest.mark.parametrize(
@@ -189,9 +197,8 @@ def test_given_a_code_location_when_publishing_from_cli_then_compilation_isolate
         "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
         + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
         + f'\n[targets.{json.dumps(test_case.target)}]\nschema = "main"\n',
-        "orchestration/orders.py": (
-            "from sqlbuild.orchestration import job\n"
-            'daily_orders = job("daily_orders", select="orders", description="Build orders.")\n'
+        "orchestration/jobs/daily_orders_job.toml": (
+            'name = "daily_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
         ),
     }
     write_files(project_dir=project_dir, files=files)
@@ -238,7 +245,7 @@ def test_given_a_code_location_when_publishing_from_cli_then_compilation_isolate
         assert "Location snapshot published." in first_output.err
         initial: dict[str, Any] = current_snapshot(api, test_case.target)
         assert frozenset(initial["nodes"]) == test_case.expected_nodes
-        assert initial["documents"]["jobs"]["daily_orders"]["selection"] == ["model:orders"]
+        assert initial["documents"]["jobs"]["daily_orders_job"]["selection"] == ["model:orders"]
         assert not (project_dir / ".sqlbuild/control.sqlite3").exists()
         assert not (project_dir / "warehouse.duckdb").exists()
         with sqlite3.connect(tmp_path / "control/.sqlbuild/control.sqlite3") as connection:

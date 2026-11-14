@@ -52,7 +52,7 @@ def test_given_relation_dropped_during_sampling_when_read_fails_then_catalog_can
     adapter, connection = open_legacy_warehouse(project, "sqlite", "path")
     _ = adapter.execute(connection=connection, sql=fixture["create_sql"])
     adapter.close(connection)
-    (project / "orchestration/orders.py").write_text("")
+    (project / "orchestration/calendars/unexpected_calendar.py").unlink()
     (project / "models").mkdir()
     (project / "models/orders.sql").write_text(fixture["model"])
     hook: Path = tmp_path / "sampling-hook"

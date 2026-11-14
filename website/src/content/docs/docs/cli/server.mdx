@@ -354,18 +354,18 @@ Details:
 Declare who owns a job, whether scheduled requests wait for a running copy, and how often a failed
 run retries:
 
-```python
-from sqlbuild.orchestration import job, on_failure, schedule
+```toml
+# orchestration/jobs/nightly_orders_job.toml
+name = "nightly_orders_job"
+description = "Orders and their daily totals"
+select = "+order_totals"
+owner = "Orders team"
+overlap = "skip"
+schedule = { cron = "0 2 * * *", timezone = "UTC" }
 
-nightly_orders = job(
-    "nightly_orders",
-    description="Orders and their daily totals",
-    select="+order_totals",
-    owner="Orders team",
-    overlap="skip",
-    on_failure=on_failure(retries=2, retry_delay_seconds=600),
-    schedule=schedule(cron="0 2 * * *", timezone="UTC"),
-)
+[on_failure]
+retries = 2
+retry_delay_seconds = 600
 ```
 
 | Setting | Values | Default | Effect |
@@ -393,8 +393,8 @@ Details:
 - A group retries at group level, with the group's own `on_failure`: each retry is one rerun of the
   group's failed and skipped nodes. A member job's `on_failure` applies only when that job runs on
   its own.
-- An invalid value fails publication with the job's name, such as
-  `job nightly_orders overlap must be queue or skip, not coalesce`.
+- An invalid value is a `D017` error at its line, such as
+  ``orchestration/jobs/nightly_orders_job.toml:6:11: unknown variant `coalesce`, expected `queue` or `skip` ``.
 
 ## Limit worker containers
 
@@ -418,15 +418,15 @@ pids = 512
 max_memory = "4g"
 ```
 
-```python
-from sqlbuild.orchestration import job, resources
+```toml
+# orchestration/jobs/nightly_orders_job.toml
+name = "nightly_orders_job"
+description = "Orders and their daily totals"
+select = "+order_totals"
 
-nightly_orders = job(
-    "nightly_orders",
-    description="Orders and their daily totals",
-    select="+order_totals",
-    resources=resources(memory="3g", cpus=2),
-)
+[resources]
+memory = "3g"
+cpus = 2
 ```
 
 | Setting | `run` table | `resources` | Value |
@@ -446,7 +446,7 @@ nightly_orders = job(
   `no-new-privileges`.
 - A job in a group uses its own `resources`. Local launchers ignore `resources`.
 - An invalid value fails publication with the job's name, such as
-  `job nightly_orders resources: cpus must be a positive number`.
+  `job nightly_orders_job resources: cpus must be a positive number`.
 
 ## Run ad-hoc commands
 

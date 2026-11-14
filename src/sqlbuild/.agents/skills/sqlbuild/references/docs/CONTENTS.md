@@ -57,6 +57,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [Source freshness](concepts/planning/source-freshness.md) (`concepts/planning/source-freshness`) - Observe external source changes and propagate them through planning.
 - [Selection and staleness](concepts/planning/selection-and-staleness.md) (`concepts/planning/selection-and-staleness`) - How selection interacts with change detection, and the stale warnings that stop silent partial rebuilds.
 - [Column Lineage](concepts/column-lineage.md) (`concepts/column-lineage`) - Trace individual columns through your SQL pipeline - understand where data comes from and where it goes.
+- [Orchestration](concepts/orchestration.md) (`concepts/orchestration`) - Declare jobs, job groups and schedules in TOML, and calendars and sensors in Python, for a SQLBuild server to run.
 
 ## Refactor
 

@@ -32,9 +32,10 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             files={
                 "models/customers.sql": "MODEL (description 'Customers.', materialized table);\nSELECT 7 AS customer_id\n",
                 "models/products.sql": "MODEL (description 'Products.', materialized table);\nSELECT 3 AS product_id\n",
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job\n"
-                    "nightly = job('nightly', description='Orders and customers.', select='orders customers')\n"
+                "orchestration/jobs/nightly_job.toml": (
+                    'name = "nightly_job"\n'
+                    'description = "Orders and customers."\n'
+                    'select = "orders customers"\n'
                 ),
             },
         )
@@ -53,7 +54,7 @@ def test_given_a_published_job_when_an_operator_excludes_a_model_then_only_the_r
             "SQLBUILD_SCHEDULER_TEST_STORE",
             "request-run",
             worker.api.location_id,
-            "nightly",
+            "nightly_job",
             "--target",
             "development",
             "--reason",
@@ -82,7 +83,7 @@ def test_given_a_published_job_when_an_operator_excludes_a_model_then_only_the_r
             worker.api, worker.process, worker.log, run_id=run_id
         )
         assert completed["status"] == test_case.expected_status, worker.log.read_text()
-        assert completed["job_key"] == "nightly"
+        assert completed["job_key"] == "nightly_job"
         with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(
                 "SELECT table_name FROM duckdb_tables() "

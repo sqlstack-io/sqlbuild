@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -22,17 +21,7 @@ from sqlbuild._native import (
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
-from sqlbuild.orchestration import (
-    RunEventKind,
-    compile_snapshot,
-    job,
-    job_group,
-    on_failure,
-    run_event,
-    schedule,
-    sensor,
-)
-from sqlbuild.orchestration_declarations.models.authoring import Job, JobGroup
+from sqlbuild.orchestration import compile_snapshot
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
     PythonCheckJobRejectionTestCase,
     PythonCheckJobTestCase,
@@ -55,8 +44,8 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
     METADATA,
     PARITY_FILES,
-    PYTHON_PIPELINE_FILES,
     TYPE_PROOF_FILES,
+    duckshop_orchestration,
     published_texts,
     python_pipeline_snapshot,
 )
@@ -64,12 +53,29 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 ORCHESTRATION_NAME_CONFLICT: str = (
     "; model, source, seed, function, loader, task, asset, check, provider, hook, unit test, "
-    "scenario, job, job group, sensor, and calendar schedule names must be globally unique; "
-    "rename one of them (a job, job group or sensor takes its name from its first argument, and "
-    "a calendar schedule from the function it decorates)"
+    "scenario, job, job group, sensor, and calendar names must be globally unique; rename one of "
+    "them (a job or job group takes its name from `name` in its TOML file, and a calendar or "
+    "sensor from its `name` argument)"
 )
 
 _DUCKSHOP: Path = Path("benchmarks/duckshop/project")
+
+
+_DAILY_BUILD: dict[str, str] = {
+    "name": '"daily_build_job"',
+    "description": '"Orders."',
+    "select": '"orders"',
+    "schedule": '{ cron = "0 2 * * *", timezone = "UTC" }',
+}
+
+
+def _edited(fixture: str, old: str, new: str) -> dict[str, str]:
+    """A DuckShop orchestration fixture with one edit to the file that holds `old`."""
+    files: dict[str, str] = duckshop_orchestration(fixture)
+    (path,) = [path for path, text in files.items() if old in text]
+    return files | {path: files[path].replace(old, new)}
+
+
 _PROVIDER_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
     "models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n",
@@ -179,9 +185,7 @@ _PRICE_MODELS: dict[str, str] = {
             "DuckShop polling callback with nested code is relocatable",
             TYPE_PROOF_FILES
             | {
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/custom_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("custom_orders"),
             },
             frozenset({"model"}),
         ),
@@ -836,22 +840,23 @@ def test_given_a_dependency_lock_when_it_changes_then_environment_identity_chang
     [
         SnapshotScheduleTestCase(
             description="daylight saving zone",
-            schedule=schedule(cron="15 2 * * *", timezone="Europe/London"),
+            schedule='{ cron = "15 2 * * *", timezone = "Europe/London" }',
+            expected_timezone="Europe/London",
             expected_selection=("model:orders",),
         ),
         SnapshotScheduleTestCase(
             description="fixed offset zone",
-            schedule=schedule(cron="15 2 * * *", timezone="UTC"),
+            schedule='{ cron = "15 2 * * *", timezone = "UTC" }',
+            expected_timezone="UTC",
             expected_selection=("model:orders",),
         ),
         SnapshotScheduleTestCase(
             description="paused with a zoned start",
-            schedule=schedule(
-                cron="15 2 * * *",
-                timezone="Europe/London",
-                starts_at="2026-07-03T01:17:23.456789+05:30",
-                default_status="paused",
+            schedule=(
+                '{ cron = "15 2 * * *", timezone = "Europe/London", '
+                'starts_at = "2026-07-03T01:17:23.456789+05:30", default_status = "paused" }'
             ),
+            expected_timezone="Europe/London",
             expected_selection=("model:orders",),
             expected_controls={
                 "starts_at": "2026-07-02T19:47:23.456789Z",
@@ -871,32 +876,46 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
-    nightly: Job = job(
-        "nightly_orders",
-        description="Refresh order reporting.",
-        select="+orders",
-        exclude="stg_orders",
-        settings={"run_tests": False, "vars": {"batch": 3}, "warehouse": "reporting"},
-        concurrency=4,
-        concurrency_groups=("order_reporting",),
-        schedule=test_case.schedule,
-        targets=("development",),
-        owner="Orders team",
-        overlap="skip",
-        on_failure=on_failure(retries=2, retry_delay_seconds=600),
-    )
-    excluded: Job = replace(nightly, name="other_target", targets=("production",))
-    first: dict[str, Any] = json.loads(
-        compile_snapshot(
-            project=project,
-            metadata_json=json.dumps(METADATA),
+
+    def snapshot(schedule: str) -> dict[str, Any]:
+        write_files(
             project_dir=tmp_path,
-            declarations=[nightly, excluded],
-            discovered_inputs=discovered,
-        ).to_json()
-    )
+            files={
+                "orchestration/jobs/nightly_orders_job.toml": (
+                    'name = "nightly_orders_job"\n'
+                    'description = "Refresh order reporting."\n'
+                    'select = "+orders"\n'
+                    'exclude = "stg_orders"\n'
+                    'targets = ["development"]\n'
+                    'owner = "Orders team"\n'
+                    'overlap = "skip"\n'
+                    'concurrency_groups = ["order_reporting"]\n'
+                    f"schedule = {schedule}\n"
+                    "\n[on_failure]\nretries = 2\nretry_delay_seconds = 600\n"
+                    '\n[settings]\nrun_tests = false\nvars = { batch = 3 }\nwarehouse = "reporting"\n'
+                    "concurrency = 4\n"
+                ),
+                "orchestration/jobs/other_target_job.toml": (
+                    'name = "other_target_job"\n'
+                    'description = "Refresh order reporting."\n'
+                    'select = "+orders"\n'
+                    'targets = ["production"]\n'
+                    f"schedule = {schedule}\n"
+                ),
+            },
+        )
+        return json.loads(
+            compile_snapshot(
+                project=project,
+                metadata_json=json.dumps(METADATA),
+                project_dir=tmp_path,
+                discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+            ).to_json()
+        )
+
+    first: dict[str, Any] = snapshot(test_case.schedule)
     assert first["documents"]["jobs"] == {
-        "nightly_orders": {
+        "nightly_orders_job": {
             "description": "Refresh order reporting.",
             "selection": list(test_case.expected_selection),
             "settings": {
@@ -912,29 +931,21 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             "owner": "Orders team",
             "overlap": "skip",
             "on_failure": {"retries": 2, "retry_delay_seconds": 600},
+            "declared_at": {"path": "orchestration/jobs/nightly_orders_job.toml", "line": 1},
         }
     }
-    trigger: dict[str, Any] = first["documents"]["triggers"]["nightly_orders"]
-    assert trigger["job_key"] == "nightly_orders"
+    trigger: dict[str, Any] = first["documents"]["triggers"]["nightly_orders_job"]
+    assert trigger["job_key"] == "nightly_orders_job"
     assert trigger["targets"] == ["development"]
     assert trigger["schedule"] == {
         "kind": "cron",
         "expression": "15 2 * * *",
-        "timezone": test_case.schedule.timezone,
+        "timezone": test_case.expected_timezone,
     }
     assert {key: trigger[key] for key in test_case.expected_controls} == test_case.expected_controls
-    edited: Job = replace(nightly, schedule=schedule(cron="30 3 * * *", timezone="UTC"))
-    second: dict[str, Any] = json.loads(
-        compile_snapshot(
-            project=project,
-            metadata_json=json.dumps(METADATA),
-            project_dir=tmp_path,
-            declarations=[edited],
-            discovered_inputs=discovered,
-        ).to_json()
-    )
+    second: dict[str, Any] = snapshot('{ cron = "30 3 * * *", timezone = "UTC" }')
     assert second["documents"]["triggers"].keys() == first["documents"]["triggers"].keys()
-    assert second["documents"]["triggers"]["nightly_orders"]["schedule"]["expression"] == (
+    assert second["documents"]["triggers"]["nightly_orders_job"]["schedule"]["expression"] == (
         "30 3 * * *"
     )
     assert second["nodes"] == first["nodes"]
@@ -945,102 +956,115 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
     [
         SnapshotDeclarationRejectionTestCase(
             description="blank description",
-            job_description=" ",
-            expected_message="needs a description",
+            fields={"description": '" "'},
+            expected_message="2:15: description must not be blank",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="blank selection", select="", expected_message="needs a selection"
+            description="blank selection",
+            fields={"select": '""'},
+            expected_message="3:10: select must not be blank",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="missing model", select="missing", expected_message="missing"
+            description="missing model",
+            fields={"select": '"missing"'},
+            expected_message="missing",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="invalid cron", cron="not a cron", expected_message="cron"
+            description="invalid cron",
+            fields={"schedule": '{ cron = "not a cron", timezone = "UTC" }'},
+            expected_message="cron",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="invalid timezone", timezone="Unknown/Zone", expected_message="time zone"
+            description="invalid timezone",
+            fields={"schedule": '{ cron = "0 2 * * *", timezone = "Unknown/Zone" }'},
+            expected_message="time zone",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="start needs an explicit offset",
-            schedule=schedule(cron="0 2 * * *", timezone="UTC", starts_at="2026-07-03T01:17:23"),
+            fields={
+                "schedule": '{ cron = "0 2 * * *", timezone = "UTC", starts_at = "2026-07-03T01:17:23" }'
+            },
             expected_message="starts_at",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="duplicate names", copies=2, expected_message="duplicate job daily_build"
+            description="duplicate names",
+            copies=2,
+            expected_message="name 'daily_build_job' is declared as both job",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="unknown setting",
-            settings={"concurreny": 4},
+            tables="[settings]\nconcurreny = 4\n",
             expected_message="unknown build setting concurreny",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="selection cannot escape its pinned run",
-            settings={"select": "customers"},
+            tables='[settings]\nselect = "customers"\n',
             expected_message="owned by the run request",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="zero concurrency",
-            concurrency=0,
+            tables="[settings]\nconcurrency = 0\n",
             expected_message="must be positive",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="boolean is not concurrency",
-            concurrency=True,
+            tables="[settings]\nconcurrency = true\n",
             expected_message="concurrency must be an integer",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="integer is not a boolean flag",
-            settings={"full_refresh": 1},
+            tables="[settings]\nfull_refresh = 1\n",
             expected_message="must be boolean",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="integer strings are not typed settings",
-            settings={"concurrency": "3"},
+            tables='[settings]\nconcurrency = "3"\n',
             expected_message="must be an integer",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="variables need an object",
-            settings={"vars": ["orders"]},
+            tables='[settings]\nvars = ["orders"]\n',
             expected_message="must be a JSON object",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="mutually exclusive load settings",
-            settings={"load_sources": False, "reload": True},
+            tables="[settings]\nload_sources = false\nreload = true\n",
             expected_message="mutually exclusive",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="conflicting cursor families",
-            settings={"start_cursor": "2", "end_cursor_int": "4"},
+            tables='[settings]\nstart_cursor = "2"\nend_cursor_int = "4"\n',
             expected_message="cannot be combined",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="blank owner", owner=" ", expected_message="owner must not be blank"
+            description="blank owner",
+            fields={"owner": '" "'},
+            expected_message="owner must not be blank",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="unknown overlap",
-            overlap="coalesce",
-            expected_message="overlap must be queue or skip, not coalesce",
+            fields={"overlap": '"coalesce"'},
+            expected_message="unknown variant `coalesce`, expected `queue` or `skip`",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="no retries",
-            on_failure=on_failure(retries=0),
+            tables="[on_failure]\nretries = 0\n",
             expected_message="retries must be a whole number from 1 to 10",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="too many retries",
-            on_failure=on_failure(retries=11),
+            tables="[on_failure]\nretries = 11\n",
             expected_message="retries must be a whole number from 1 to 10",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="retry delay over a day",
-            on_failure=on_failure(retries=1, retry_delay_seconds=86_401),
+            tables="[on_failure]\nretries = 1\nretry_delay_seconds = 86401\n",
             expected_message="retry_delay_seconds must be a whole number from 0 to 86400",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="duplicate concurrency declarations",
-            concurrency=3,
-            settings={"concurrency": 4},
-            expected_message="declared twice",
+            description="concurrency belongs under settings",
+            fields={"concurrency": "3"},
+            expected_message="unknown job key 'concurrency'",
         ),
     ],
     ids=lambda case: case.description,
@@ -1048,33 +1072,24 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
 def test_given_invalid_declarations_when_compiling_then_native_validation_rejects_them(
     tmp_path: Path, test_case: SnapshotDeclarationRejectionTestCase
 ) -> None:
-    write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES)
-    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discovered,
-        adapter=DuckDbAdapter(),
-        resolved_connection={"database": "warehouse", "schema": "main"},
+    text: str = "".join(
+        f"{key} = {value}\n" for key, value in (_DAILY_BUILD | test_case.fields).items()
     )
-    declarations: list[Job] = [
-        job(
-            "daily_build",
-            description=test_case.job_description,
-            select=test_case.select,
-            settings=test_case.settings,
-            concurrency=test_case.concurrency,
-            schedule=test_case.schedule
-            or schedule(cron=test_case.cron, timezone=test_case.timezone),
-            owner=test_case.owner,
-            overlap=test_case.overlap,
-            on_failure=test_case.on_failure,
-        )
-    ] * test_case.copies
+    copies: dict[str, str] = {
+        f"orchestration/jobs/{'copy/' * copy}daily_build_job.toml": text + "\n" + test_case.tables
+        for copy in range(test_case.copies)
+    }
+    write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES | copies)
     with pytest.raises(ValueError, match=test_case.expected_message):
+        discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
         compile_snapshot(
-            project=project,
+            project=build_compiled_project(
+                discovered_inputs=discovered,
+                adapter=DuckDbAdapter(),
+                resolved_connection={"database": "warehouse", "schema": "main"},
+            ),
             metadata_json=json.dumps(METADATA),
             project_dir=tmp_path,
-            declarations=declarations,
             discovered_inputs=discovered,
         )
 
@@ -1083,53 +1098,38 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
     "test_case",
     [
         SnapshotDiscoveryTestCase(
-            description="relative imports aliases and factory containers",
-            files={
-                "orchestration/shared.py": (
-                    "from sqlbuild.orchestration import job\n"
-                    "staging = job('staging', description='Stage orders.', select='stg_orders')\n"
-                ),
-                "orchestration/jobs.py": (
-                    "from sqlbuild.orchestration import job\n"
-                    "from .shared import staging\n"
-                    "alias = staging\n"
-                    "def factory():\n"
-                    "    return [job('daily', description='Daily orders.', select='orders')]\n"
-                    "jobs = [factory(), staging]\n"
-                    "jobs.append(jobs)\n"
-                ),
-            },
-            expected_jobs=("daily", "staging"),
-        ),
-        SnapshotDiscoveryTestCase(
             description="group-only references retain lineage waits",
             files={
-                "orchestration/jobs.py": (
-                    "from sqlbuild.orchestration import job, job_group\n"
-                    "def factory():\n"
-                    "    staging = job('staging', description='Stage orders.', select='stg_orders')\n"
-                    "    marts = job('marts', description='Build orders.', select='orders')\n"
-                    "    inventory = job('inventory', description='Repeat staging.', select='stg_orders')\n"
-                    "    return job_group('daily', description='Ordered jobs.', "
-                    "jobs=[marts, inventory, staging])\n"
-                    "daily = factory()\n"
+                "orchestration/jobs/staging_job.toml": (
+                    'name = "staging_job"\ndescription = "Stage orders."\nselect = "stg_orders"\n'
+                ),
+                "orchestration/jobs/inventory_job.toml": (
+                    'name = "inventory_job"\n'
+                    'description = "Repeat staging."\n'
+                    'select = "stg_orders"\n'
+                ),
+                "orchestration/jobs/marts_job.toml": (
+                    'name = "marts_job"\ndescription = "Build orders."\nselect = "orders"\n'
+                ),
+                "orchestration/job_groups/daily_job_group.toml": (
+                    'name = "daily_job_group"\n'
+                    'description = "Ordered jobs."\n'
+                    'jobs = ["marts_job", "inventory_job", "staging_job"]\n'
                 ),
             },
-            expected_jobs=("inventory", "marts", "staging"),
+            expected_jobs=("inventory_job", "marts_job", "staging_job"),
             expected_groups={
-                "daily": {
-                    "inventory": [],
-                    "marts": ["inventory", "staging"],
-                    "staging": [],
+                "daily_job_group": {
+                    "inventory_job": [],
+                    "marts_job": ["inventory_job", "staging_job"],
+                    "staging_job": [],
                 }
             },
         ),
         SnapshotDiscoveryTestCase(
             description="DuckShop layer jobs that share a function wait only by lineage",
             files={
-                "orchestration/jobs.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/shared_function_layers.py"
-                ).read_text(),
+                **duckshop_orchestration("shared_function_layers"),
                 "functions/sql/order_cents.sql": (
                     "FUNCTION (description 'Amount in cents.',"
                     " arguments (amount INTEGER), returns INTEGER);\nSELECT amount * 100\n"
@@ -1148,142 +1148,154 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     'SELECT order_id, __udf("order_cents")(cents) AS cents\nFROM __ref("stg_orders")\n'
                 ),
             },
-            expected_jobs=("marts_layer", "staging_layer"),
+            expected_jobs=("marts_layer_job", "staging_layer_job"),
             expected_groups={
-                "layered_orders": {"marts_layer": ["staging_layer"], "staging_layer": []}
+                "layered_orders_job_group": {
+                    "marts_layer_job": ["staging_layer_job"],
+                    "staging_layer_job": [],
+                }
             },
-        ),
-        SnapshotDiscoveryTestCase(
-            description="explicit empty declarations do not execute project files",
-            files={"orchestration/jobs.py": "raise RuntimeError('must not import')\n"},
-            expected_jobs=(),
-            declarations=(),
         ),
         SnapshotDiscoveryTestCase(
             description="DuckShop edge-case declaration containers",
             files={
-                "orchestration/edge_cases/definitions.py": Path(
-                    "benchmarks/duckshop/project/orchestration/edge_cases/definitions.py"
-                ).read_text(),
+                **{
+                    path.relative_to(_DUCKSHOP).as_posix(): path.read_text()
+                    for path in (_DUCKSHOP / "orchestration").rglob("*")
+                    if path.is_file()
+                },
                 "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
                     "MODEL (", "MODEL (tags ['edge_case'],", 1
                 ),
             },
             expected_jobs=(
-                "edge_snapshot_inventory",
-                "edge_snapshot_orders",
-                "edge_snapshot_products",
+                "edge_snapshot_inventory_job",
+                "edge_snapshot_orders_job",
+                "edge_snapshot_products_job",
             ),
             expected_groups={
-                "edge_snapshot_group": {"edge_snapshot_orders": []},
-                "edge_inventory_group": {"edge_snapshot_inventory": []},
-                "edge_products_group": {"edge_snapshot_products": []},
+                "edge_snapshot_job_group": {"edge_snapshot_orders_job": []},
+                "edge_inventory_job_group": {"edge_snapshot_inventory_job": []},
+                "edge_products_job_group": {"edge_snapshot_products_job": []},
             },
             expected_sensors={
-                "edge_platform_orders": {
+                "edge_platform_orders_sensor": {
                     "description": "Catch up retained platform observations with a stopped group sensor.",
-                    "job_key": "edge_snapshot_group",
+                    "job_key": "edge_snapshot_job_group",
                     "when": {
                         "kind": "platform_event",
                         "kinds": ["tick_overdue", "location_broken", "launch_failed"],
                     },
                     "minimum_interval_seconds": 7,
                     "default_status": "paused",
-                    "declared_at": {"path": "orchestration/edge_cases/definitions.py", "line": 61},
+                    "declared_at": {
+                        "path": "orchestration/sensors/edge_cases/edge_platform_orders_sensor.py",
+                        "line": 5,
+                    },
                 },
-                "edge_job_outcomes": {
+                "edge_job_outcomes_sensor": {
                     "description": "Keep warning and partial outcomes distinct from success.",
-                    "job_key": "edge_snapshot_inventory",
+                    "job_key": "edge_snapshot_inventory_job",
                     "when": {
                         "kind": "run_event",
-                        "job_key": "edge_snapshot_orders",
+                        "job_key": "edge_snapshot_orders_job",
                         "kinds": ["warn", "partial"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "paused",
-                    "declared_at": {"path": "orchestration/edge_cases/definitions.py", "line": 77},
+                    "declared_at": {
+                        "path": "orchestration/sensors/edge_cases/edge_job_outcomes_sensor.py",
+                        "line": 5,
+                    },
                 },
-                "edge_group_outcomes": {
+                "edge_group_outcomes_sensor": {
                     "description": "Observe group completion including cancellation and presumed failure.",
-                    "job_key": "edge_snapshot_inventory",
+                    "job_key": "edge_snapshot_inventory_job",
                     "when": {
                         "kind": "run_event",
-                        "job_key": "edge_snapshot_group",
+                        "job_key": "edge_snapshot_job_group",
                         "kinds": ["completed"],
                         "executed_successfully": ["model:orders"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "paused",
-                    "declared_at": {"path": "orchestration/edge_cases/definitions.py", "line": 84},
+                    "declared_at": {
+                        "path": "orchestration/sensors/edge_cases/edge_group_outcomes_sensor.py",
+                        "line": 5,
+                    },
                 },
             },
-            expected_schedules=("edge_snapshot_orders",),
+            expected_schedules=("edge_snapshot_orders_job",),
             expected_trigger_declared_at={
-                "edge_snapshot_orders": {
-                    "path": "orchestration/edge_cases/definitions.py",
-                    "line": 14,
+                "edge_snapshot_orders_job": {
+                    "path": "orchestration/jobs/edge_cases/edge_snapshot_orders_job.toml",
+                    "line": 2,
                 },
             },
             expected_declared_at={
-                "edge_snapshot_orders": {
-                    "path": "orchestration/edge_cases/definitions.py",
-                    "line": 14,
+                "edge_snapshot_orders_job": {
+                    "path": "orchestration/jobs/edge_cases/edge_snapshot_orders_job.toml",
+                    "line": 2,
                 },
-                "edge_snapshot_group": {
-                    "path": "orchestration/edge_cases/definitions.py",
-                    "line": 30,
+                "edge_snapshot_job_group": {
+                    "path": "orchestration/job_groups/edge_cases/edge_snapshot_job_group.toml",
+                    "line": 1,
                 },
             },
         ),
         SnapshotDiscoveryTestCase(
-            description="sensor-only roots collect source groups and destination jobs natively",
-            files={},
-            declarations=(
-                sensor(
-                    "on_orders",
-                    description="Build inventory after group completion.",
-                    when=run_event(
-                        job=job_group(
-                            "source_group",
-                            description="Source orders.",
-                            jobs=[job("source_orders", description="Orders.", select="orders")],
-                        ),
-                        kinds=[RunEventKind.COMPLETED],
-                        executed_successfully=("orders", "orders*"),
-                    ),
-                    run=job("inventory", description="Inventory.", select="stg_orders"),
+            description="a run_event on a group freezes its members' execution selectors",
+            files={
+                "orchestration/jobs/source_orders_job.toml": (
+                    'name = "source_orders_job"\ndescription = "Orders."\nselect = "orders"\n'
                 ),
-            ),
-            expected_jobs=("inventory", "source_orders"),
-            expected_declared_at={"inventory": None, "source_group": None},
-            expected_groups={"source_group": {"source_orders": []}},
+                "orchestration/jobs/inventory_job.toml": (
+                    'name = "inventory_job"\ndescription = "Inventory."\nselect = "stg_orders"\n'
+                ),
+                "orchestration/job_groups/source_job_group.toml": (
+                    'name = "source_job_group"\ndescription = "Source orders."\n'
+                    'jobs = ["source_orders_job"]\n'
+                ),
+                "orchestration/sensors/on_orders_sensor.py": (
+                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
+                    "on_orders = sensor(\n"
+                    "    'on_orders_sensor',\n"
+                    "    description='Build inventory after group completion.',\n"
+                    "    when=run_event(\n"
+                    "        job='source_job_group',\n"
+                    "        kinds=[RunEventKind.COMPLETED],\n"
+                    "        executed_successfully=('orders', 'orders*'),\n"
+                    "    ),\n"
+                    "    run='inventory_job',\n"
+                    ")\n"
+                ),
+            },
+            expected_jobs=("inventory_job", "source_orders_job"),
+            expected_groups={"source_job_group": {"source_orders_job": []}},
             expected_sensors={
-                "on_orders": {
+                "on_orders_sensor": {
                     "description": "Build inventory after group completion.",
-                    "job_key": "inventory",
+                    "job_key": "inventory_job",
                     "when": {
                         "kind": "run_event",
-                        "job_key": "source_group",
+                        "job_key": "source_job_group",
                         "kinds": ["completed"],
                         "executed_successfully": ["model:orders"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 2},
                 }
             },
         ),
         SnapshotDiscoveryTestCase(
             description="any-run node selectors freeze canonical keys without a source job reference",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
-                ).read_text()
-            },
-            expected_jobs=("inventory", "source_orders"),
+            files={**duckshop_orchestration("node_orders")},
+            expected_jobs=("inventory_job", "source_orders_job"),
             expected_sensors={
-                "on_orders": {
+                "on_orders_sensor": {
                     "description": "Build inventory for every genuine orders rebuild.",
-                    "job_key": "inventory",
+                    "job_key": "inventory_job",
                     "when": {
                         "kind": "node_event",
                         "selection": ["model:orders"],
@@ -1291,24 +1303,24 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/orders.py", "line": 7},
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 5},
                 }
             },
         ),
         SnapshotDiscoveryTestCase(
             description="failure and recovery selectors preserve their individual transition kinds",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
+                **_edited(
+                    "node_orders",
+                    "NodeEventKind.SUCCESS",
+                    "NodeEventKind.FAILED, NodeEventKind.RECOVERED",
                 )
-                .read_text()
-                .replace("NodeEventKind.SUCCESS", "NodeEventKind.FAILED, NodeEventKind.RECOVERED")
             },
-            expected_jobs=("inventory", "source_orders"),
+            expected_jobs=("inventory_job", "source_orders_job"),
             expected_sensors={
-                "on_orders": {
+                "on_orders_sensor": {
                     "description": "Build inventory for every genuine orders rebuild.",
-                    "job_key": "inventory",
+                    "job_key": "inventory_job",
                     "when": {
                         "kind": "node_event",
                         "selection": ["model:orders"],
@@ -1316,47 +1328,46 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/orders.py", "line": 7},
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 5},
                 }
             },
         ),
         SnapshotDiscoveryTestCase(
             description="source_new_data selectors freeze only source nodes without event kinds",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("source_orders"),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
-            expected_jobs=("orders_refresh",),
+            expected_jobs=("orders_refresh_job",),
             expected_sensors={
-                "on_source_orders": {
+                "on_source_orders_sensor": {
                     "description": "Refresh orders for the first source version and each changed version.",
-                    "job_key": "orders_refresh",
+                    "job_key": "orders_refresh_job",
                     "when": {"kind": "source_new_data", "selection": ["source:raw_orders"]},
                     "minimum_interval_seconds": 1,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/orders.py", "line": 10},
+                    "declared_at": {
+                        "path": "orchestration/sensors/on_source_orders_sensor.py",
+                        "line": 5,
+                    },
                 }
             },
         ),
         SnapshotDiscoveryTestCase(
             description="source_stale freezes source nodes and a positive timestamp-age threshold",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/stale_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("stale_orders"),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
-            expected_jobs=("orders_refresh",),
+            expected_jobs=("orders_refresh_job",),
             expected_sensors={
-                "on_stale_orders": {
+                "on_stale_orders_sensor": {
                     "description": "Refresh orders once for each timestamp version older than one minute.",
-                    "job_key": "orders_refresh",
+                    "job_key": "orders_refresh_job",
                     "when": {
                         "kind": "source_stale",
                         "selection": ["source:raw_orders"],
@@ -1364,51 +1375,49 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 1,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/orders.py", "line": 7},
+                    "declared_at": {
+                        "path": "orchestration/sensors/on_stale_orders_sensor.py",
+                        "line": 5,
+                    },
                 }
             },
         ),
         SnapshotDiscoveryTestCase(
             description="source-job execution selectors compile to frozen canonical keys",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
-                ).read_text()
-            },
-            expected_jobs=("inventory", "source_orders"),
+            files={**duckshop_orchestration("run_orders")},
+            expected_jobs=("inventory_job", "source_orders_job"),
             expected_sensors={
-                "on_orders": {
+                "on_orders_sensor": {
                     "description": "Build inventory only after orders actually succeeds.",
-                    "job_key": "inventory",
+                    "job_key": "inventory_job",
                     "when": {
                         "kind": "run_event",
-                        "job_key": "source_orders",
+                        "job_key": "source_orders_job",
                         "kinds": ["completed"],
                         "executed_successfully": ["model:orders"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/orders.py", "line": 7},
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 5},
                 }
             },
         ),
         SnapshotDiscoveryTestCase(
             description="sensor-only roots preserve referenced jobs and filter targets",
-            files={
-                "orchestration/health.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
-                ).read_text()
-            },
-            expected_jobs=("health_orders",),
+            files={**duckshop_orchestration("platform_orders")},
+            expected_jobs=("health_orders_job",),
             expected_sensors={
-                "overdue_orders": {
+                "overdue_orders_sensor": {
                     "description": "Catch up overdue order reporting.",
-                    "job_key": "health_orders",
+                    "job_key": "health_orders_job",
                     "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
                     "minimum_interval_seconds": 7,
                     "default_status": "paused",
                     "targets": ["development"],
-                    "declared_at": {"path": "orchestration/health.py", "line": 9},
+                    "declared_at": {
+                        "path": "orchestration/sensors/overdue_orders_sensor.py",
+                        "line": 8,
+                    },
                 }
             },
         ),
@@ -1435,7 +1444,6 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             project=project,
             metadata_json=json.dumps(METADATA),
             project_dir=tmp_path,
-            declarations=test_case.declarations,
             discovered_inputs=discovered,
         ).to_json()
     )
@@ -1470,21 +1478,19 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
     [
         SnapshotDiscoveryRejectionTestCase(
             description="group members are jobs, not nested groups",
-            files={
-                "orchestration/jobs.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/nested_groups.py"
-                ).read_text(),
-            },
-            expected_error=TypeError,
-            expected_message="group members must be Job objects",
+            files=duckshop_orchestration("nested_groups"),
+            expected_error=ValueError,
+            expected_message="daily_orders_job_group",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="a polling sensor needs an actual callback",
             files={
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, sensor\n"
-                    "orders = job('refresh_orders', description='Build orders.', select='orders')\n"
-                    "poll = sensor('poll', description='Poll orders.', run=orders)\n"
+                "orchestration/jobs/refresh_orders_job.toml": (
+                    'name = "refresh_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
+                ),
+                "orchestration/sensors/poll_sensor.py": (
+                    "from sqlbuild.orchestration import sensor\n"
+                    "poll = sensor('poll_sensor', description='Poll orders.', run='refresh_orders_job')\n"
                 ),
             },
             expected_error=ValueError,
@@ -1493,10 +1499,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="callbacks with event conditions remain explicitly unsupported",
             files={
-                "orchestration/orders.py": (
-                    "from sqlbuild.orchestration import job, sensor, platform_event, PlatformEventKind\n"
-                    "orders = job('refresh_orders', description='Build orders.', select='orders')\n"
-                    "@sensor('poll', description='Poll orders.', run=orders, "
+                "orchestration/jobs/refresh_orders_job.toml": (
+                    'name = "refresh_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
+                ),
+                "orchestration/sensors/poll_sensor.py": (
+                    "from sqlbuild.orchestration import sensor, platform_event, PlatformEventKind\n"
+                    "@sensor('poll_sensor', description='Poll orders.', run='refresh_orders_job', "
                     "when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]))\n"
                     "def poll(ctx):\n    return []\n"
                 ),
@@ -1507,113 +1515,90 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="a job description past max_description_lines cannot publish",
             files={
-                "orchestration/jobs.py": (
-                    "from sqlbuild.orchestration import job\n"
-                    "daily = job('daily', description='Build orders. ' * 100, select='orders')\n"
+                "orchestration/jobs/daily_job.toml": (
+                    'name = "daily_job"\n'
+                    'description = """Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders. Build orders."""\n'
+                    'select = "orders"\n'
                 ),
             },
             expected_error=ValueError,
             expected_message=re.escape(
-                "job 'daily' description exceeds 10 lines; shorten it to 10 lines"
+                "job 'daily_job' description exceeds 10 lines; shorten it to 10 lines"
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="a group declaring after is refused at its module",
+            description="a group cannot declare an order between its jobs",
             files={
-                "orchestration/jobs.py": (
-                    "from sqlbuild.orchestration import job, job_group\n"
-                    "staging = job('staging', description='Stage orders.', select='stg_orders')\n"
-                    "marts = job('marts', description='Build orders.', select='orders')\n"
-                    "daily = job_group('daily', description='Ordered jobs.', "
-                    "jobs=[marts, staging], after={staging: [marts]})\n"
+                "orchestration/jobs/staging_job.toml": (
+                    'name = "staging_job"\ndescription = "Stage orders."\nselect = "stg_orders"\n'
+                ),
+                "orchestration/jobs/marts_job.toml": (
+                    'name = "marts_job"\ndescription = "Build orders."\nselect = "orders"\n'
+                ),
+                "orchestration/job_groups/daily_job_group.toml": (
+                    'name = "daily_job_group"\n'
+                    'description = "Ordered jobs."\n'
+                    'jobs = ["marts_job", "staging_job"]\n'
+                    'after = { staging_job = ["marts_job"] }\n'
                 ),
             },
             expected_error=ValueError,
-            expected_message=re.escape(
-                "Failed to import orchestration file orchestration/jobs.py: JobGroup.__init__() "
-                "got an unexpected keyword argument 'after'"
-            ),
+            expected_message="after",
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="distinct objects cannot share a job name",
+            description="two job files cannot share a name",
             files={
-                "orchestration/jobs.py": (
-                    "from sqlbuild.orchestration import job\n"
-                    "jobs = [job('daily', description='Orders.', select='orders') for _ in range(2)]\n"
+                "orchestration/jobs/daily_job.toml": (
+                    'name = "daily_job"\ndescription = "Orders."\nselect = "orders"\n'
+                ),
+                "orchestration/jobs/copy/daily_job.toml": (
+                    'name = "daily_job"\ndescription = "Orders."\nselect = "orders"\n'
                 ),
             },
             expected_error=DiscoveryConflictError,
             expected_message=re.escape(
-                "Project resource name 'daily' is declared as both job in orchestration/jobs.py "
-                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
+                "Project resource name 'daily_job' is declared as both job in "
+                "orchestration/jobs/copy/daily_job.toml and job in orchestration/jobs/daily_job.toml"
+                + ORCHESTRATION_NAME_CONFLICT
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="DuckShop jobs cannot reuse a model name",
-            files={
-                "orchestration/jobs.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/name_collision.py"
-                ).read_text()
-            },
+            files=duckshop_orchestration("name_collision")
+            | {"models/orders_job.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n"},
             expected_error=DiscoveryConflictError,
             expected_message=re.escape(
-                "Project resource name 'orders' is declared as both model in models/orders.sql "
-                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
-            ),
-        ),
-        SnapshotDiscoveryRejectionTestCase(
-            description="a sensor cannot reuse its job's name",
-            files={
-                "orchestration/jobs.py": (
-                    "from sqlbuild.orchestration import job, sensor\n"
-                    "daily = job('daily', description='Orders.', select='orders')\n"
-                    "poll = sensor('daily', description='Poll orders.', run=daily)\n"
-                ),
-            },
-            expected_error=DiscoveryConflictError,
-            expected_message=re.escape(
-                "Project resource name 'daily' is declared as both sensor in orchestration/jobs.py "
-                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
+                "Project resource name 'orders_job' is declared as both model in "
+                "models/orders_job.sql and job in orchestration/jobs/orders_job.toml"
+                + ORCHESTRATION_NAME_CONFLICT
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="broken imports fail on every retry",
-            files={
-                "orchestration/jobs.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/failed_import.py"
-                ).read_text()
-            },
+            files=duckshop_orchestration("failed_import"),
             expected_error=PythonNodeDiscoveryError,
-            expected_message="Failed to import orchestration file orchestration/jobs.py",
+            expected_message=(
+                "Failed to import orchestration file orchestration/sensors/broken_orders_sensor.py"
+            ),
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="DuckShop settings cannot replace the selection",
-            files={
-                "orchestration/jobs.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/invalid_settings.py"
-                ).read_text()
-            },
+            files={**duckshop_orchestration("invalid_settings")},
             expected_error=ValueError,
             expected_message="owned by the run request",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="DuckShop mutually exclusive settings fail on every retry",
-            files={
-                "orchestration/jobs.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/conflicting_settings.py"
-                ).read_text()
-            },
+            files={**duckshop_orchestration("conflicting_settings")},
             expected_error=ValueError,
             expected_message="mutually exclusive",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="a zero sensor interval cannot publish",
             files={
-                "orchestration/health.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
+                **_edited(
+                    "platform_orders", "minimum_interval_seconds=7", "minimum_interval_seconds=0"
                 )
-                .read_text()
-                .replace("minimum_interval_seconds=7", "minimum_interval_seconds=0")
             },
             expected_error=ValueError,
             expected_message="nonzero u32",
@@ -1621,11 +1606,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="empty platform conditions cannot publish",
             files={
-                "orchestration/health.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
-                )
-                .read_text()
-                .replace("kinds=[PlatformEventKind.TICK_OVERDUE]", "kinds=[]")
+                **_edited("platform_orders", "kinds=[PlatformEventKind.TICK_OVERDUE]", "kinds=[]")
             },
             expected_error=ValueError,
             expected_message="nonempty event kinds",
@@ -1633,35 +1614,25 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="platform kinds are a closed vocabulary",
             files={
-                "orchestration/health.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
+                **_edited(
+                    "platform_orders",
+                    "kinds=[PlatformEventKind.TICK_OVERDUE]",
+                    "kinds=['unknown_event']",
                 )
-                .read_text()
-                .replace("kinds=[PlatformEventKind.TICK_OVERDUE]", "kinds=['unknown_event']")
             },
             expected_error=ValueError,
             expected_message="unknown variant",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="empty node selectors cannot broaden matching to all nodes",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
-                )
-                .read_text()
-                .replace('select="orders orders*"', 'select=" "')
-            },
+            files={**_edited("node_orders", 'select="orders orders*"', 'select=" "')},
             expected_error=ValueError,
             expected_message="node_event needs nonempty selectors",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="unknown node event kinds cannot publish",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
-                )
-                .read_text()
-                .replace("kinds=[NodeEventKind.SUCCESS]", "kinds=['unknown_event']")
+                **_edited("node_orders", "kinds=[NodeEventKind.SUCCESS]", "kinds=['unknown_event']")
             },
             expected_error=ValueError,
             expected_message="unknown variant",
@@ -1669,11 +1640,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_new_data rejects model selections",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.py"
-                )
-                .read_text()
-                .replace('select="source:raw_orders"', 'select="orders"'),
+                **_edited("source_orders", 'select="source:raw_orders"', 'select="orders"'),
             },
             expected_error=ValueError,
             expected_message="source_new_data must select only source nodes",
@@ -1681,11 +1648,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_new_data rejects blank selections",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.py"
-                )
-                .read_text()
-                .replace('select="source:raw_orders"', 'select=" "'),
+                **_edited("source_orders", 'select="source:raw_orders"', 'select=" "'),
             },
             expected_error=ValueError,
             expected_message="source_new_data needs nonempty selectors",
@@ -1693,140 +1656,84 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_stale rejects a zero threshold",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/stale_orders.py"
-                )
-                .read_text()
-                .replace("after_seconds=60", "after_seconds=0"),
+                **_edited("stale_orders", "after_seconds=60", "after_seconds=0"),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
             expected_error=ValueError,
-            expected_message="sensor on_stale_orders",
+            expected_message="sensor on_stale_orders_sensor",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="source_stale rejects a boolean threshold",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/stale_orders.py"
-                )
-                .read_text()
-                .replace("after_seconds=60", "after_seconds=True"),
+                **_edited("stale_orders", "after_seconds=60", "after_seconds=True"),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
             expected_error=ValueError,
-            expected_message="sensor on_stale_orders",
+            expected_message="sensor on_stale_orders_sensor",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="source_stale rejects an overflowing threshold",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/stale_orders.py"
-                )
-                .read_text()
-                .replace("after_seconds=60", "after_seconds=2**32"),
+                **_edited("stale_orders", "after_seconds=60", "after_seconds=2**32"),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
             expected_error=ValueError,
-            expected_message="sensor on_stale_orders",
+            expected_message="sensor on_stale_orders_sensor",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="source_stale rejects model selections",
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/stale_orders.py"
-                )
-                .read_text()
-                .replace('select="source:raw_orders"', 'select="orders"'),
+                **_edited("stale_orders", 'select="source:raw_orders"', 'select="orders"'),
             },
             expected_error=ValueError,
             expected_message="source_stale must select only source nodes",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="explicit empty execution selectors cannot broaden matching",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
-                )
-                .read_text()
-                .replace('("orders",)', "()")
-            },
+            files={**_edited("run_orders", '("orders",)', "()")},
             expected_error=ValueError,
             expected_message="executed_successfully needs nonempty selectors",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="blank execution selectors cannot broaden matching",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
-                )
-                .read_text()
-                .replace('("orders",)', '(" ",)')
-            },
+            files={**_edited("run_orders", '("orders",)', '(" ",)')},
             expected_error=ValueError,
             expected_message="executed_successfully needs nonempty selectors",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="unresolved execution selectors fail closed",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
-                )
-                .read_text()
-                .replace('("orders",)', '("unknown_orders",)')
-            },
+            files={**_edited("run_orders", '("orders",)', '("unknown_orders",)')},
             expected_error=ValueError,
             expected_message="unknown selector name 'unknown_orders'",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="unmatched execution patterns cannot become an omitted filter",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
-                )
-                .read_text()
-                .replace('("orders",)', '("unknown_*",)')
-            },
+            files={**_edited("run_orders", '("orders",)', '("unknown_*",)')},
             expected_error=ValueError,
             expected_message="executed_successfully: unknown selector name 'unknown_\\*'",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="invalid execution selector syntax fails closed",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
-                )
-                .read_text()
-                .replace('("orders",)', '("tag:",)')
-            },
+            files={**_edited("run_orders", '("orders",)', '("tag:",)')},
             expected_error=ValueError,
             expected_message="has empty value after ':'",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="execution selectors outside the source job fail closed",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
-                )
-                .read_text()
-                .replace('("orders",)', '("stg_orders",)')
-            },
+            files={**_edited("run_orders", '("orders",)', '("stg_orders",)')},
             expected_error=ValueError,
             expected_message="executed_successfully must select nonempty source job/group nodes",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="sensor code defaults use running or paused",
             files={
-                "orchestration/health.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
-                )
-                .read_text()
-                .replace('default_status="paused"', 'default_status="stopped"')
+                **_edited("platform_orders", 'default_status="paused"', 'default_status="stopped"')
             },
             expected_error=ValueError,
             expected_message="unknown variant",
@@ -1838,16 +1745,15 @@ def test_given_broken_declaration_modules_when_compiling_then_no_partial_snapsho
     tmp_path: Path, test_case: SnapshotDiscoveryRejectionTestCase
 ) -> None:
     write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES | test_case.files)
-    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discovered,
-        adapter=DuckDbAdapter(),
-        resolved_connection={"database": "warehouse", "schema": "main"},
-    )
     for _ in range(2):
         with pytest.raises(test_case.expected_error, match=test_case.expected_message):
+            discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
             compile_snapshot(
-                project=project,
+                project=build_compiled_project(
+                    discovered_inputs=discovered,
+                    adapter=DuckDbAdapter(),
+                    resolved_connection={"database": "warehouse", "schema": "main"},
+                ),
                 metadata_json=json.dumps(METADATA),
                 project_dir=tmp_path,
                 discovered_inputs=discovered,
@@ -1903,22 +1809,8 @@ def test_given_broken_declaration_modules_when_compiling_then_no_partial_snapsho
 def test_given_python_selectors_when_publishing_jobs_then_selections_match_the_cli(
     tmp_path: Path, test_case: PythonJobSelectionTestCase
 ) -> None:
-    write_files(project_dir=tmp_path, files=PYTHON_PIPELINE_FILES)
-    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
-    project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discovered,
-        adapter=DuckDbAdapter(),
-        resolved_connection={"database": "warehouse", "schema": "main"},
-    )
-
     snapshot: dict[str, Any] = json.loads(
-        compile_snapshot(
-            project=project,
-            metadata_json=json.dumps(METADATA),
-            project_dir=tmp_path,
-            declarations=[job("orders_job", description="Orders.", select=test_case.select)],
-            discovered_inputs=discovered,
-        ).to_json()
+        python_pipeline_snapshot(tmp_path, {"orders_job": test_case.select}).to_json()
     )
 
     assert snapshot["documents"]["jobs"]["orders_job"]["selection"] == list(
@@ -1936,7 +1828,7 @@ def test_given_python_selectors_when_publishing_jobs_then_selections_match_the_c
                 ("carrier_sync_job", "python/fulfillment/carrier_sync"),
             ),
             expected_groups={
-                "orders_nightly": {
+                "orders_nightly_job_group": {
                     "carrier_sync_job": ["orders_export_job"],
                     "orders_export_job": [],
                 }
@@ -1946,7 +1838,7 @@ def test_given_python_selectors_when_publishing_jobs_then_selections_match_the_c
             description="a Python node's SQL dependency orders it after the model's job",
             jobs=(("orders_export_job", "asset:partner_orders_file"), ("models_job", "+orders")),
             expected_groups={
-                "orders_nightly": {"models_job": [], "orders_export_job": ["models_job"]}
+                "orders_nightly_job_group": {"models_job": [], "orders_export_job": ["models_job"]}
             },
         ),
     ],
@@ -1955,13 +1847,11 @@ def test_given_python_selectors_when_publishing_jobs_then_selections_match_the_c
 def test_given_python_dependencies_across_jobs_when_publishing_a_group_then_jobs_wait_for_them(
     tmp_path: Path, test_case: PythonJobGroupTestCase
 ) -> None:
-    jobs: list[Job] = [
-        job(name, description="Orders.", select=select) for name, select in test_case.jobs
-    ]
-    group: JobGroup = job_group("orders_nightly", description="Nightly orders.", jobs=jobs)
-
+    jobs: dict[str, str] = dict(test_case.jobs)
     snapshot: dict[str, Any] = json.loads(
-        python_pipeline_snapshot(tmp_path, [*jobs, group]).to_json()
+        python_pipeline_snapshot(
+            tmp_path, jobs, {"orders_nightly_job_group": tuple(jobs)}
+        ).to_json()
     )
 
     assert {
@@ -1979,7 +1869,7 @@ def test_given_python_dependencies_across_jobs_when_publishing_a_group_then_jobs
                 ("export_job", "asset:partner_orders_file"),
             ),
             expected_message=(
-                "group dependencies contain a cycle in job group orders_nightly: "
+                "group dependencies contain a cycle in job group orders_nightly_job_group: "
                 "export_job waits for staging_job (model:orders reads model:stg_orders); "
                 "staging_job waits for export_job "
                 "(task:request_carrier_collection reads asset:partner_orders_file)"
@@ -1991,13 +1881,9 @@ def test_given_python_dependencies_across_jobs_when_publishing_a_group_then_jobs
 def test_given_a_python_dependency_cycle_across_jobs_when_publishing_a_group_then_it_is_rejected(
     tmp_path: Path, test_case: PythonJobGroupCycleTestCase
 ) -> None:
-    jobs: list[Job] = [
-        job(name, description="Orders.", select=select) for name, select in test_case.jobs
-    ]
-    group: JobGroup = job_group("orders_nightly", description="Nightly orders.", jobs=jobs)
-
+    jobs: dict[str, str] = dict(test_case.jobs)
     with pytest.raises(ValueError, match=re.escape(test_case.expected_message)):
-        python_pipeline_snapshot(tmp_path, [*jobs, group])
+        python_pipeline_snapshot(tmp_path, jobs, {"orders_nightly_job_group": tuple(jobs)})
 
 
 @pytest.mark.parametrize(
@@ -2014,11 +1900,11 @@ def test_given_a_python_dependency_cycle_across_jobs_when_publishing_a_group_the
 def test_given_a_job_matching_a_check_and_its_node_when_publishing_then_the_check_runs_with_it(
     tmp_path: Path, test_case: PythonCheckJobTestCase
 ) -> None:
-    nightly: Job = job("nightly_orders", description="Orders.", select=test_case.select)
+    snapshot: dict[str, Any] = json.loads(
+        python_pipeline_snapshot(tmp_path, {"nightly_orders_job": test_case.select}).to_json()
+    )
 
-    snapshot: dict[str, Any] = json.loads(python_pipeline_snapshot(tmp_path, [nightly]).to_json())
-
-    assert snapshot["documents"]["jobs"]["nightly_orders"]["selection"] == (
+    assert snapshot["documents"]["jobs"]["nightly_orders_job"]["selection"] == (
         test_case.expected_selection
     )
 
@@ -2030,7 +1916,7 @@ def test_given_a_job_matching_a_check_and_its_node_when_publishing_then_the_chec
             description="a job matching a check without the model it checks names both",
             select="tag:order_checks",
             expected_message=(
-                "job nightly_orders: Python check 'orders_present' checks model:orders, which "
+                "job nightly_orders_job: Python check 'orders_present' checks model:orders, which "
                 "the selection does not include; select it too, or narrow the selector so it no "
                 "longer matches the check."
             ),
@@ -2041,7 +1927,5 @@ def test_given_a_job_matching_a_check_and_its_node_when_publishing_then_the_chec
 def test_given_a_job_matching_a_check_without_its_node_when_publishing_then_it_is_rejected(
     tmp_path: Path, test_case: PythonCheckJobRejectionTestCase
 ) -> None:
-    nightly: Job = job("nightly_orders", description="Orders.", select=test_case.select)
-
     with pytest.raises(ValueError, match=re.escape(test_case.expected_message)):
-        python_pipeline_snapshot(tmp_path, [nightly])
+        python_pipeline_snapshot(tmp_path, {"nightly_orders_job": test_case.select})

@@ -1,0 +1,7 @@
+# Negative fixture: job settings must not override the frozen selection.
+name = "refresh_orders_job"
+description = "Refresh orders."
+select = "orders"
+
+[settings]
+select = "customers"

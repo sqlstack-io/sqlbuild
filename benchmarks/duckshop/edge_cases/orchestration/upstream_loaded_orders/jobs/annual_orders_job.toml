@@ -1,0 +1,4 @@
+name = "annual_orders_job"
+description = "Build orders and everything upstream of it, loaders included."
+select = "+orders"
+schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }

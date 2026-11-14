@@ -95,7 +95,7 @@ def test_given_a_changed_job_when_inputs_change_between_runs_then_only_their_con
             time.sleep(ORDER_SKEW_SECONDS)
             for sql in mutation:
                 test_case.execute(warehouse, sql)
-            run: dict[str, Any] = request_job_run(worker, "changed_orders")
+            run: dict[str, Any] = request_job_run(worker, "changed_orders_job")
             assert run["status"] == "success", worker.log.read_text()
             started: set[tuple[Any, ...]] = set(
                 test_case.execute(

@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication import helpers
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ScheduledWorker,
@@ -50,18 +51,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             [(37,)],
             launcher="docker",
             files={
-                "orchestration/orders.py": (
-                    "import os\nfrom sqlbuild.orchestration import job, schedule\n"
-                    "if 'SQLBUILD_RUN_TOKEN' in os.environ:\n"
-                    "    assert os.getenv('SQLBUILD_WORKER_TEST_VALUE') == 'orders-context'\n"
-                    "    for name in ('SQLBUILD_LOCATION_TOKEN', 'SQLBUILD_CONTROL_DATABASE_URL', "
-                    "'SQLBUILD_SCHEDULER_TEST_STORE', 'SQLBUILD_PLATFORM_WEBHOOK_URL', "
-                    "'SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL'):\n"
-                    "        assert name not in os.environ, name\n"
-                    'annual_orders = job("annual_orders", select="orders", '
-                    'description="Build orders.", '
-                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 )
             },
         ),
@@ -72,11 +66,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             "success",
             [(41,)],
             launcher="docker",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/container_resources_orders.py"
-                ).read_text()
-            },
+            files={**duckshop_orchestration("container_resources_orders")},
             launcher_settings={
                 "run": {"memory": "768m", "cpus": 2, "pids": 256, "max_memory": "1g"}
             },
@@ -89,11 +79,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             "success",
             [(43,)],
             launcher="docker",
-            files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/container_resources_orders.py"
-                ).read_text()
-            },
+            files={**duckshop_orchestration("container_resources_orders")},
             expected_host_config={"Memory": 768 << 20, "NanoCpus": 500_000_000},
         ),
         WorkerExecutionTestCase(

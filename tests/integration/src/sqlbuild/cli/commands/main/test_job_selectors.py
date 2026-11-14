@@ -26,14 +26,20 @@ _PROJECT_FILES: dict[str, str] = {
     "models/customers.sql": (
         "MODEL (description 'Customers.', materialized table);\nSELECT 7 AS customer_id\n"
     ),
-    "orchestration/jobs.py": (
-        "from pathlib import Path\n"
-        "from sqlbuild.orchestration import job, job_group\n"
-        "Path(__file__).parent.parent.joinpath('jobs_imported').write_text('yes')\n"
-        "nightly = job('nightly', description='Orders.', select='+orders')\n"
-        "crm = job('crm', description='Customers.', select='customers')\n"
-        "daily = job_group('daily', description='Everything.', jobs=[nightly, crm])\n"
-        "restock = job('restock', description='Prod only.', select='customers', targets=['prod'])\n"
+    "orchestration/jobs/nightly_job.toml": (
+        'name = "nightly_job"\ndescription = "Orders."\nselect = "+orders"\n'
+    ),
+    "orchestration/jobs/crm_job.toml": (
+        'name = "crm_job"\ndescription = "Customers."\nselect = "customers"\n'
+    ),
+    "orchestration/jobs/restock_job.toml": (
+        'name = "restock_job"\n'
+        'description = "Prod only."\n'
+        'select = "customers"\n'
+        'targets = ["prod"]\n'
+    ),
+    "orchestration/job_groups/daily_job_group.toml": (
+        'name = "daily_job_group"\ndescription = "Everything."\njobs = ["nightly_job", "crm_job"]\n'
     ),
 }
 
@@ -43,67 +49,52 @@ _PROJECT_FILES: dict[str, str] = {
     [
         JobSelectorBuildTestCase(
             description="a job prefix builds the job's nodes",
-            build_args=("--select", "job:nightly"),
+            build_args=("--select", "job:nightly_job"),
             expected_exit_code=0,
             expected_tables=frozenset({"orders", "stg_orders"}),
-            expected_jobs_imported=True,
         ),
         JobSelectorBuildTestCase(
             description="a bare job name needs no prefix",
-            build_args=("--select", "nightly"),
+            build_args=("--select", "nightly_job"),
             expected_exit_code=0,
             expected_tables=frozenset({"orders", "stg_orders"}),
-            expected_jobs_imported=True,
         ),
         JobSelectorBuildTestCase(
             description="a job group builds its jobs' nodes",
-            build_args=("--select", "job:daily"),
+            build_args=("--select", "job:daily_job_group"),
             expected_exit_code=0,
             expected_tables=frozenset({"customers", "orders", "stg_orders"}),
-            expected_jobs_imported=True,
         ),
         JobSelectorBuildTestCase(
             description="a job intersects with a tag",
-            build_args=("--select", "job:daily,tag:staging"),
+            build_args=("--select", "job:daily_job_group,tag:staging"),
             expected_exit_code=0,
             expected_tables=frozenset({"stg_orders"}),
-            expected_jobs_imported=True,
         ),
         JobSelectorBuildTestCase(
             description="a job can be excluded from a group",
-            build_args=("--select", "job:daily", "--exclude", "job:crm"),
+            build_args=("--select", "job:daily_job_group", "--exclude", "job:crm_job"),
             expected_exit_code=0,
             expected_tables=frozenset({"orders", "stg_orders"}),
-            expected_jobs_imported=True,
         ),
         JobSelectorBuildTestCase(
             description="a job declared for another target is not selectable",
-            build_args=("--select", "job:restock"),
+            build_args=("--select", "job:restock_job"),
             expected_exit_code=1,
             expected_tables=frozenset(),
-            expected_jobs_imported=True,
-            expected_fragment="unknown job name 'restock'",
+            expected_fragment="unknown job name 'restock_job'",
         ),
         JobSelectorBuildTestCase(
             description="a job declared for the selected target is selectable",
-            build_args=("--target", "prod", "--select", "job:restock"),
+            build_args=("--target", "prod", "--select", "job:restock_job"),
             expected_exit_code=0,
             expected_tables=frozenset({"customers"}),
-            expected_jobs_imported=True,
-        ),
-        JobSelectorBuildTestCase(
-            description="model selectors never import orchestration modules",
-            build_args=("--select", "+orders"),
-            expected_exit_code=0,
-            expected_tables=frozenset({"orders", "stg_orders"}),
-            expected_jobs_imported=False,
         ),
         JobSelectorBuildTestCase(
             description="an unknown job suggests a known one",
             build_args=("--select", "job:nightyl"),
             expected_exit_code=1,
             expected_tables=frozenset(),
-            expected_jobs_imported=True,
             expected_fragment="unknown job name 'nightyl'",
         ),
     ],
@@ -126,7 +117,6 @@ def test_given_declared_jobs_when_building_by_job_then_only_their_nodes_build(
 
     assert exit_code == test_case.expected_exit_code, captured
     assert test_case.expected_fragment in captured
-    assert (tmp_path / "jobs_imported").exists() == test_case.expected_jobs_imported
     with duckdb.connect(str(tmp_path / "demo.duckdb")) as warehouse:
         rows: list[tuple[str]] = warehouse.sql(
             "SELECT table_name FROM duckdb_tables() "

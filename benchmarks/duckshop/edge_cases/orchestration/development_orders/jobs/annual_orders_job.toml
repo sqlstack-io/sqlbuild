@@ -1,0 +1,5 @@
+# Development defaults pause code-enabled triggers without changing their definitions.
+name = "annual_orders_job"
+description = "Build annual orders."
+select = "+orders"
+schedule = { cron = "0 0 1 1 *", timezone = "UTC", starts_at = "2099-01-01T00:00:00Z" }

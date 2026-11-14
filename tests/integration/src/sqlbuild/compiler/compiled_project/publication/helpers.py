@@ -61,6 +61,7 @@ from sqlbuild.microbatches.classes.direct_store import DirectMicrobatchEventStor
 from sqlbuild.microbatches.classes.event_codec import MicrobatchEventCodec
 from sqlbuild.microbatches.constants import MICROBATCH_COLUMNS
 from sqlbuild.microbatches.models import MicrobatchEvent, MicrobatchWriteResult
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
     ScheduledWorker,
@@ -123,7 +124,13 @@ def open_legacy_warehouse(project: Path, adapter_name: str, connection_key: str)
                 f'[connections.local]\n{connection_key} = "warehouse.db"\n'
                 '[targets.development]\nschema = "main"\n'
             ),
-            "orchestration/orders.py": 'raise AssertionError("unexpected declaration import")\n',
+            "orchestration/calendars/unexpected_calendar.py": (
+                "from sqlbuild.orchestration import calendar\n"
+                'raise AssertionError("unexpected declaration import")\n'
+                "@calendar(name='unexpected_calendar', description='Never imported.', "
+                "horizon='1d')\n"
+                "def unexpected(window):\n    return []\n"
+            ),
         },
     )
     adapter: Any = resolve_adapter(adapter_name=adapter_name)
@@ -802,17 +809,26 @@ def scheduled_worker(
             "models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n" + test_case.model_sql + "\n"
             ),
-            "orchestration/orders.py": (
-                "import os\nfrom sqlbuild.orchestration import job, schedule\n"
+            "python/environment_guard.py": (
+                "import os\n"
                 "if 'SQLBUILD_RUN_TOKEN' in os.environ:\n"
                 "    assert 'SQLBUILD_PLATFORM_WEBHOOK_URL' not in os.environ\n"
                 "    assert 'SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL' not in os.environ\n"
-                'annual_orders = job("annual_orders", select="orders", '
-                'description="Build orders.", '
-                'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
-                'starts_at="2000-01-01T00:00:00Z"))\n'
             ),
         }
+        | (
+            {}
+            if any(path.startswith("orchestration/jobs/") for path in test_case.files)
+            else {
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders."\n'
+                    'select = "orders"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                    'starts_at = "2000-01-01T00:00:00Z" }\n'
+                ),
+            }
+        )
         | test_case.files,
     )
     test_case.warehouse_setup(project / "warehouse.duckdb")
@@ -907,7 +923,7 @@ def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -
     assert run["node_counts_json"] == (
         test_case.expected_node_counts or {test_case.expected_status: test_case.expected_node_count}
     ), log.read_text()
-    assert run["job_key"] == "annual_orders"
+    assert run["job_key"] == "annual_orders_job"
     runs_url: str = f"{api.url}/api/locations/{api.location_id}/targets/development/runs"
     headers: dict[str, str] = {"Authorization": f"Bearer {api.bearer}"}
     with urlopen(
@@ -1250,11 +1266,13 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
     start: datetime = datetime.now(UTC).replace(second=0, microsecond=0) - timedelta(
         minutes=fixture["backlog_minutes"]
     )
-    declarations: str = "".join(
-        f'{name} = job("{name}", select="orders", description="Build {name}.", '
-        f'schedule=schedule(cron="* * * * *", timezone="UTC"))\n'
+    jobs: dict[str, str] = {
+        f"orchestration/jobs/{name}.toml": (
+            f'name = "{name}"\ndescription = "Build {name}."\nselect = "orders"\n'
+            'schedule = { cron = "* * * * *", timezone = "UTC" }\n'
+        )
         for name in fixture["jobs"]
-    )
+    }
     write_files(
         project_dir=project,
         files={
@@ -1266,9 +1284,8 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
             "models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\nSELECT 1 AS order_id\n"
             ),
-            "orchestration/orders.py": "from sqlbuild.orchestration import job, schedule\n"
-            + declarations,
-        },
+        }
+        | jobs,
     )
     executable: str = str(Path(sys.executable).with_name("sqb"))
     control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
@@ -1452,9 +1469,10 @@ def tagged_model(name: str, tags: str) -> str:
 
 CHANGED_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/changed_builds")
 CHANGED_JOB: str = (
-    "from sqlbuild.orchestration import job\n"
-    "changed_orders = job('changed_orders', description='Build what changed.', "
-    "select='stg_orders stg_customers customer_orders', settings={'changed': True})\n"
+    'name = "changed_orders_job"\n'
+    'description = "Build what changed."\n'
+    'select = "stg_orders stg_customers customer_orders"\n'
+    "\n[settings]\nchanged = true\n"
 )
 
 
@@ -1475,7 +1493,10 @@ def changed_job_files(project_toml: str) -> dict[str, str]:
     return {
         str(path.relative_to(CHANGED_FIXTURE)): path.read_text()
         for path in sorted(CHANGED_FIXTURE.glob("*/*"))
-    } | {"orchestration/orders.py": CHANGED_JOB, "sqlbuild_project.toml": project_toml}
+    } | {
+        "orchestration/jobs/changed_orders_job.toml": CHANGED_JOB,
+        "sqlbuild_project.toml": project_toml,
+    }
 
 
 def request_job_run(worker: ScheduledWorker, job: str) -> dict[str, Any]:
@@ -1600,9 +1621,7 @@ LOADED_ORDER_FILES: dict[str, str] = {
     "models/orders.sql": Path(
         "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.sql"
     ).read_text(),
-    "orchestration/orders.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.py"
-    ).read_text(),
+    **duckshop_orchestration("loaded_orders"),
 }
 
 
@@ -1616,9 +1635,7 @@ INTERMEDIATE_LOADER_FILES: dict[str, str] = {
     "models/orders.sql": Path(
         "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_orders.sql"
     ).read_text(),
-    "orchestration/orders.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.py"
-    ).read_text(),
+    **duckshop_orchestration("loaded_orders"),
 }
 
 

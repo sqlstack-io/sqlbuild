@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ScheduledWorker,
     WorkerExecutionTestCase,
@@ -113,9 +114,7 @@ def test_given_a_running_local_worker_when_scheduler_dies_then_restart_adopts_an
             launcher="uncooperative",
             concurrency_limits={"orders_limit": 1},
             files={
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/local_recovery_orders.py"
-                ).read_text(),
+                **duckshop_orchestration("local_recovery_orders"),
             },
             store_setup=Path(
                 "benchmarks/duckshop/edge_cases/orchestration/local_recovery_publication_fault.sql"

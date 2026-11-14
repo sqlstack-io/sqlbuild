@@ -1,0 +1,6 @@
+# Renaming stg_orders rewrites every exact name in these selectors, inside graph operators, unions,
+# intersections and path endpoints, keeps each string's quote style, and leaves the glob alone.
+name = "orders_refresh_job"
+description = "Refresh orders."
+select = "+stg_orders+ fact_orders,+stg_orders stg_orders~customer_totals stg_ord*"
+exclude = 'stg_orders+,customer_totals'

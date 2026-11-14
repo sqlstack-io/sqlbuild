@@ -13,7 +13,10 @@ from urllib.error import HTTPError
 import duckdb
 import pytest
 
-from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import TYPE_PROOF_FILES
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
+    TYPE_PROOF_FILES,
+    duckshop_orchestration,
+)
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     CalendarRefreshTestCase,
     CalendarRejectionTestCase,
@@ -71,11 +74,16 @@ def test_given_invalid_calendar_results_when_publishing_through_the_cli_then_val
             "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
-            "orchestration/orders.py": (
+            "orchestration/jobs/order_reporting_job.toml": (
+                'name = "order_reporting_job"\n'
+                'description = "Order reporting."\n'
+                'select = "orders"\n'
+                f'schedule = {{ calendar = "deliveries_calendar", timezone = {json.dumps(test_case.timezone)} }}\n'
+            ),
+            "orchestration/calendars/deliveries_calendar.py": (
                 "from datetime import datetime, timedelta\nfrom itertools import repeat\n"
-                "from sqlbuild.orchestration import calendar_schedule, job\n"
-                "orders = job('order_reporting', description='Order reporting.', select='orders')\n"
-                f"@calendar_schedule(job=orders, description='Delivery times.', horizon={test_case.horizon!r}, timezone={test_case.timezone!r})\n"
+                "from sqlbuild.orchestration import calendar\n"
+                f"@calendar(name='deliveries_calendar', description='Delivery times.', horizon={test_case.horizon!r})\n"
                 f"def deliveries(window):\n    return {test_case.expression}\n"
             ),
         },
@@ -134,18 +142,23 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
             "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
-            "orchestration/orders.py": Path(
-                "benchmarks/duckshop/edge_cases/orchestration/calendar_orders.py"
-            )
-            .read_text()
-            .replace("America/New_York", test_case.expected_timezone)
-            + (
-                "\n@calendar_schedule(job=orders, description='Other target.', horizon='8s', timezone='UTC', targets=('production',))\n"
+            **{
+                path: text.replace("America/New_York", test_case.expected_timezone)
+                for path, text in duckshop_orchestration("calendar_orders").items()
+            },
+            "orchestration/jobs/production_reporting_job.toml": (
+                'name = "production_reporting_job"\n'
+                'description = "Other target."\n'
+                'select = "orders"\n'
+                'targets = ["production"]\n'
+                'schedule = { calendar = "excluded_calendar", timezone = "UTC" }\n'
+            ),
+            "orchestration/calendars/excluded_calendar.py": (
+                "from sqlbuild.orchestration import calendar\n"
+                "@calendar(name='excluded_calendar', description='Other target.', horizon='8s')\n"
                 "def excluded_calendar(window):\n    raise ValueError('excluded calendar must not evaluate')\n"
             ),
-            "orchestration/platform_orders.py": Path(
-                "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
-            ).read_text(),
+            **duckshop_orchestration("platform_orders"),
             "providers/fulfillment.py": (
                 "import json, os\nfrom pathlib import Path\nfrom datetime import timedelta, timezone\n"
                 "from sqlbuild.provider.classes.provider import Provider\n"
@@ -189,23 +202,23 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
             assert first["nodes"] == second["nodes"]
             assert second["changes"] == []
             assert first["documents"]["triggers"].keys() == {
-                "fulfillment_calendar",
-                "overdue_orders",
+                "order_reporting_job",
+                "overdue_orders_sensor",
             }
-            assert first["documents"]["triggers"]["fulfillment_calendar"]["declared_at"] == {
-                "path": "orchestration/orders.py",
-                "line": 8,
+            assert first["documents"]["triggers"]["order_reporting_job"]["declared_at"] == {
+                "path": "orchestration/jobs/order_reporting_job.toml",
+                "line": 2,
             }
             with sqlite3.connect(tmp_path / "control/.sqlbuild/control.sqlite3") as control:
                 stored, next_due = control.execute(
                     "SELECT definition_json, next_due_at FROM sqb_triggers JOIN sqb_trigger_state USING (trigger_id) WHERE kind = 'schedule'"
                 ).fetchone()
-            original_times: list[str] = first["documents"]["triggers"]["fulfillment_calendar"][
+            original_times: list[str] = first["documents"]["triggers"]["order_reporting_job"][
                 "schedule"
             ]["times"]
             assert json.loads(stored)["schedule"]["times"] == sorted(
                 original_times
-                + second["documents"]["triggers"]["fulfillment_calendar"]["schedule"]["times"]
+                + second["documents"]["triggers"]["order_reporting_job"]["schedule"]["times"]
             )
             assert datetime.fromisoformat(next_due) == datetime.fromisoformat(original_times[0])
             observations: list[dict[str, Any]] = [
@@ -220,9 +233,9 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
                 start: datetime = datetime.fromisoformat(evaluation["start"])
                 end: datetime = datetime.fromisoformat(evaluation["end"])
                 assert end - start == timedelta(seconds=8)
-                schedule: dict[str, Any] = snapshot["documents"]["triggers"][
-                    "fulfillment_calendar"
-                ]["schedule"]
+                schedule: dict[str, Any] = snapshot["documents"]["triggers"]["order_reporting_job"][
+                    "schedule"
+                ]
                 assert schedule["kind"] == "calendar"
                 assert [datetime.fromisoformat(value) for value in schedule["times"]] == [
                     start + timedelta(seconds=offset) for offset in [0, 3]
@@ -246,8 +259,7 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
             third: dict[str, Any] = wait_for_generation(api, "development", 3, process, log)
             assert "CAST(19 AS INTEGER)" in third["nodes"]["model:stg_orders"]["raw_sql"]
             assert (
-                len(third["documents"]["triggers"]["fulfillment_calendar"]["schedule"]["times"])
-                == 1
+                len(third["documents"]["triggers"]["order_reporting_job"]["schedule"]["times"]) == 1
             )
         assert [
             json.loads(line)["generation"] for line in publications.read_text().splitlines()
@@ -277,15 +289,27 @@ def test_given_a_published_calendar_when_a_real_worker_compiles_then_it_does_not
         test_case,
         files=test_case.files
         | {
-            "orchestration/orders.py": (
-                "from pathlib import Path\nfrom sqlbuild.orchestration import calendar_schedule, job, schedule\n"
-                "orders = job('order_reporting', description='Order reporting.', select='orders', schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
-                "@calendar_schedule(job=orders, description='Upcoming deliveries.', horizon='1d', timezone='UTC')\n"
+            "orchestration/jobs/order_reporting_job.toml": (
+                'name = "order_reporting_job"\n'
+                'description = "Order reporting."\n'
+                'select = "orders"\n'
+                'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                'starts_at = "2000-01-01T00:00:00Z" }\n'
+            ),
+            "orchestration/jobs/deliveries_job.toml": (
+                'name = "deliveries_job"\n'
+                'description = "Upcoming deliveries."\n'
+                'select = "orders"\n'
+                'schedule = { calendar = "deliveries_calendar", timezone = "UTC" }\n'
+            ),
+            "orchestration/calendars/deliveries_calendar.py": (
+                "from pathlib import Path\nfrom sqlbuild.orchestration import calendar\n"
+                "@calendar(name='deliveries_calendar', description='Upcoming deliveries.', horizon='1d')\n"
                 "def deliveries(window):\n"
                 f"    marker = Path({str(evaluated)!r})\n"
                 "    if marker.exists():\n        raise ValueError('calendar evaluated inside a run worker')\n"
                 "    marker.write_text('evaluated')\n    return []\n"
-            )
+            ),
         },
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:

@@ -93,7 +93,7 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
             "run_id": str(uuid4()),
             "location_id": worker.api.location_id,
             "target": "development",
-            "job_key": "annual_orders",
+            "job_key": "annual_orders_job",
             "reason": "Refresh order totals",
             "priority": 0,
         }
@@ -349,7 +349,7 @@ def test_given_person_run_controls_when_scopes_change_then_frozen_execution_and_
             "run_id": str(uuid4()),
             "location_id": worker.api.location_id,
             "target": "development",
-            "job_key": "annual_orders",
+            "job_key": "annual_orders_job",
             "reason": "Build order totals",
             "priority": 0,
         }

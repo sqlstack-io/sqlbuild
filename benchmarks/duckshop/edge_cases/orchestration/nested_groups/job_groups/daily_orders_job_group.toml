@@ -1,0 +1,3 @@
+name = "daily_orders_job_group"
+description = "Build daily orders."
+jobs = ["orders_job"]

@@ -1,0 +1,5 @@
+# Provider-backed fulfillment times evaluated in the code location, never by the scheduler.
+name = "order_reporting_job"
+description = "Build order reporting."
+select = "orders"
+schedule = { calendar = "fulfillment_calendar", timezone = "America/New_York" }

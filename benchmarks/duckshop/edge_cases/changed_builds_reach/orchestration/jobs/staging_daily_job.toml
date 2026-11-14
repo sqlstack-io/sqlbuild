@@ -1,0 +1,5 @@
+# Two scheduled jobs split the orders lineage and share int_orders; a third job has no trigger.
+name = "staging_daily_job"
+description = "Stage orders."
+select = "stg_orders int_orders"
+schedule = { cron = "0 2 * * *", timezone = "UTC" }

@@ -159,18 +159,18 @@ belongs to a scheduled job without the changed model. That job's next run refres
 model is held back:
 
 ```
- staging_daily (schedule)               finance_daily (schedule)
+ staging_daily_job (schedule)           finance_daily_job (schedule)
  stg_orders* ─▶ int_orders ✓ ──────────▶ fct_revenue ⏸ ─▶ rpt_pnl ⏸
       │
       └──▶ orders_export ✓  (in no scheduled job)
 ```
 
-- A job counts when a schedule, calendar schedule or sensor starts it, directly or through its
+- A job counts when a schedule, calendar or sensor starts it, directly or through its
   group, for the target you build. A job nothing starts counts as no job.
 - A model held back by one job runs if another job that holds the change also contains it.
 - A model that reads a held-back model is held back too. Unchanged parents never hold a model back.
 - A job never holds back its own models while it runs: a scheduled run, or a build that selects the
-  job, such as `sqb build finance_daily --changed`.
+  job, such as `sqb build finance_daily_job --changed`.
 - With no scheduled jobs, everything downstream runs.
 
 `--reach all` builds everything downstream of a change. `--reach` without `--changed` is refused.

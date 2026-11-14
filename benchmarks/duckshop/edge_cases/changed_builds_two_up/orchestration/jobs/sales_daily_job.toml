@@ -1,0 +1,4 @@
+name = "sales_daily_job"
+description = "Refresh sales."
+select = "stg_orders customer_sales"
+schedule = { cron = "0 2 * * *", timezone = "UTC" }
