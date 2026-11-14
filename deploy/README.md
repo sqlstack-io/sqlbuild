@@ -354,7 +354,10 @@ outside this stack too: a stopped server cannot report its own outage.
 
 ## Back up and upgrade
 
-Back up PostgreSQL with `pg_dump` using your normal protected database backup tooling. Also
+Back up PostgreSQL with `pg_dump` using your normal protected database backup tooling. Back up
+a SQLite control store with `sqlite3 <file> ".backup '<copy>'"` while the server runs, or stop the
+server and copy the database file together with its `-wal` file; the database file alone can miss
+recent commits. Also
 back up warehouse data, the restricted `.env`, the `server` config, and referenced project
 images. Keep backup credentials and output outside the repository. Test restoration before an
 upgrade. Ordinary `docker compose down` preserves named volumes; `down --volumes` destroys them.
