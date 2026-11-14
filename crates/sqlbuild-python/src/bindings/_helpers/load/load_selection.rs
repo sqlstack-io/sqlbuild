@@ -18,6 +18,7 @@ use crate::bindings::_helpers::compile_attachment::effective_config::build_effec
 use crate::bindings::_helpers::compile_attachment::target::{
     connection_is_default_target, project_location,
 };
+use crate::bindings::_helpers::compile_driver::targets::managed_write_schema;
 use crate::bindings::_helpers::contracts::spec_resolution::loader_destination_parts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::native_host::host;
@@ -288,6 +289,42 @@ pub(crate) fn loader_defaults<'py>(
         database: location("database", connection_database)?,
         schema: location("schema", non_empty_text(connection.get_item("schema")?)?)?,
     })
+}
+
+/// Raise when a selected loader has no schema because the connection's schema is not used.
+pub(crate) fn loader_write_schemas<'py>(
+    discovered: &Bound<'py, PyAny>,
+    (selected_target, cli_vars): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    entries: &[Bound<'py, PyAny>],
+) -> PyResult<()> {
+    if connection_is_default_target(discovered)? {
+        return Ok(());
+    }
+    let connection: Bound<'py, PyDict> = build_effective_connection_config(
+        &discovered.clone(),
+        Some(selected_target.clone()).filter(|value| !value.is_none()),
+        Some(cli_vars.clone()).filter(|value| !value.is_none()),
+        false,
+    )?
+    .downcast_into()?;
+    let Some(ignored) = non_empty_text(connection.get_item("schema")?)? else {
+        return Ok(());
+    };
+    let ignored: String = ignored.extract()?;
+    for entry in entries {
+        if native_field(entry, "loader")?.is_none() {
+            continue;
+        }
+        managed_write_schema(
+            &format!(
+                "Intermediate loader '{}'",
+                native_field(entry, "name")?.str()?
+            ),
+            &native_field(entry, "schema")?,
+            (None, Some(&ignored)),
+        )?;
+    }
+    Ok(())
 }
 
 fn names(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {

@@ -617,7 +617,7 @@ pub(crate) fn managed_write_schemas(
 }
 
 /// Raise when neither the resource nor the project names a physical write schema.
-fn managed_write_schema(
+pub(crate) fn managed_write_schema(
     resource_label: &str,
     schema: &Bound<'_, PyAny>,
     (project_schema, ignored): (Option<&str>, Option<&str>),

@@ -1243,6 +1243,7 @@ class MissingTargetDatabaseTestCase:
     expected_error: str
     expected_example_count: int
     extra_files: dict[str, str] = field(default_factory=dict)
+    command: tuple[str, ...] = ("--no-color", "compile")
 
 
 @dataclass(frozen=True)

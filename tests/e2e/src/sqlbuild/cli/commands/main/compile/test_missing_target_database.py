@@ -101,6 +101,36 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             ),
             expected_example_count=1,
         ),
+        MissingTargetDatabaseTestCase(
+            description="sqb load stops a bare loader whose connection schema is not used",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\n\n[connection]\n'
+                'database = "dev.duckdb"\nschema = "raw"\n\n'
+                '[connections.archive]\ndatabase = "archive.duckdb"\n'
+            ),
+            extra_files={
+                "models/orders.sql": (
+                    "MODEL (description 'Test model orders.', materialized view, "
+                    "schema staging);\n\nSELECT 1 AS order_id\n"
+                ),
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error=(
+                "error[S103]: Intermediate loader 'raw_orders' has no explicitly resolved "
+                "physical write schema. Set schema on the resource or its defaults, selected "
+                "target, loader_schema, or connection. The connection's schema 'raw' is not used "
+                "because the project defines named connections or targets.\n"
+                "  = help: to set project-wide defaults, set this in sqlbuild_project.toml:\n"
+                "            [defaults]\n"
+                '            schema = "raw"\n'
+            ),
+            expected_example_count=1,
+            command=("--no-color", "load", "--select", "raw_orders"),
+        ),
     ),
     ids=lambda case: case.description,
 )
@@ -121,7 +151,7 @@ def test_given_model_without_location_when_compiling_then_error_names_the_settin
     )
 
     result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "compile"), project_dir=project_dir
+        command=test_case.command, project_dir=project_dir
     )
 
     assert result.returncode == 1, result.stdout + result.stderr
