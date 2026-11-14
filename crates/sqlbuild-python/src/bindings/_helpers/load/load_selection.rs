@@ -63,11 +63,11 @@ pub(crate) fn environment_sources<'py>(
             let source: Bound<'py, PyAny> = source?;
             let changes: Bound<'py, PyDict> = PyDict::new(py);
             let managed: bool = native_field(&source, "managed")?.is_truthy()?;
-            for field in ["database", "schema"] {
+            for (field, loader_first) in [("database", false), ("schema", managed)] {
                 let value: Bound<'py, PyAny> = native_field(&source, field)?;
                 let effective: Bound<'py, PyAny> = if !value.is_none() || target_config.is_none() {
                     value
-                } else if managed && field == "schema" {
+                } else if loader_first {
                     let loader_schema: Bound<'py, PyAny> =
                         native_field(target_config, "loader_schema")?;
                     if loader_schema.is_truthy()? {
