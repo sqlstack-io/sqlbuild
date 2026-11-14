@@ -18,6 +18,8 @@ pub(crate) mod store_helpers;
 pub(crate) mod store_test_types;
 #[path = "recall/test_contract.rs"]
 mod test_contract;
+#[path = "schema/test_foreign_key_indexes.rs"]
+mod test_foreign_key_indexes;
 #[path = "recall/test_types.rs"]
 mod test_types;
 #[path = "recall/test_views.rs"]
