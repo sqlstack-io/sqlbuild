@@ -66,15 +66,16 @@ pub(crate) fn launch(arguments: Vec<OsString>, started: (Instant, SystemTime)) -
         return code;
     }
     let program: PathBuf = std::env::current_exe().unwrap_or_default();
-    let Some(script) = beside(&program, PYTHON_CLI_SCRIPT) else {
-        report_missing_python_cli(&program);
-        return HANDOFF_FAILURE_EXIT_CODE;
-    };
+    let script = beside(&program, PYTHON_CLI_SCRIPT);
     if let Ok(NativeParse::Invocation { namespace, .. }) = &native
-        && let Some(code) = run_location_invocation(namespace, &script)
+        && let Some(code) = run_location_invocation(namespace, script.as_deref())
     {
         return code;
     }
+    let Some(script) = script else {
+        report_missing_python_cli(&program);
+        return HANDOFF_FAILURE_EXIT_CODE;
+    };
     let mut handed: Vec<OsString> = Vec::with_capacity(arguments.len() + 1);
     let record: Option<(PathBuf, String)> = launch_record(&program, &script, &arguments);
     if let Some((path, key)) = &record

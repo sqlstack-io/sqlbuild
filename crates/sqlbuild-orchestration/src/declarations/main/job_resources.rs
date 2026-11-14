@@ -19,12 +19,10 @@ pub async fn job_resources(
     )
     .await?;
     commit(transaction).await?;
-    rows.first()
-        .map(|row| {
-            serde_json::from_value::<JobDefinition>(row["definition_json"].clone())
-                .map(|definition| definition.resources)
-                .map_err(|error| ControlError::Schema(error.to_string()))
-        })
-        .transpose()
-        .map(Option::flatten)
+    let Some(row) = rows.first() else {
+        return Ok(None);
+    };
+    let definition: JobDefinition = serde_json::from_value(row["definition_json"].clone())
+        .map_err(|error| ControlError::Schema(error.to_string()))?;
+    Ok(definition.resources)
 }

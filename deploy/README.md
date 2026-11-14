@@ -4,30 +4,39 @@ This Linux reference runs PostgreSQL, the native SQLBuild server/scheduler, and 
 Python code location. Workers use Docker only. The server image contains no Python or project.
 The location image includes the example orders project and its Python dependencies.
 
-Use Docker Engine with a Unix socket and Docker Compose 2.23.1 or newer, Python 3.12, `uv`,
-a Rust toolchain, and `jq`. Build and test from a trusted checkout. Docker socket access is
-host-administrator authority: only the server gets that socket and control-store credentials.
+Use Docker Engine with a Unix socket and Docker Compose 2.23.1 or newer, or Podman 5 (see
+[Run on Podman](#run-on-podman)), and `jq`. Docker socket access is host-administrator authority:
+only the server gets that socket and control-store credentials.
 Locations and workers get warehouse access, but no control-store credentials or inbound ports.
 The default server port binds to loopback, not the public network.
 
 ## Build the images
 
-Build matching wheels from this checkout before building the images:
+The images install a released SQLBuild from PyPI. Copy the example settings and set
+`SQLBUILD_VERSION` in the ignored `.env` to the release you deploy:
+
+```sh
+cp deploy/compose.env.example .env
+```
+
+To test unreleased code from a trusted checkout instead, set `SQLBUILD_SOURCE=wheels` and build
+matching wheels first, with Python 3.12, `uv` and a Rust toolchain:
 
 ```sh
 uv sync --locked --all-extras
 uv run --no-sync maturin build --release --compatibility linux --out dist
 uv run --no-sync maturin build --manifest-path crates/sqlbuild-cli/Cargo.toml --release --compatibility linux --out dist
-cp deploy/compose.env.example .env
 ```
 
-Set the ignored `.env` values. Use a unique PostgreSQL password and put its URL-encoded value
+Keep only the matching SQLBuild and CLI wheels in `dist/`; their Python version and architecture
+must match the image's `PYTHON_VERSION` build argument and Docker host.
+
+Set the other `.env` values. Use a unique PostgreSQL password and put its URL-encoded value
 in `SQLBUILD_CONTROL_DATABASE_URL`, for example
 `postgresql://sqlbuild:<encoded-password>@postgres:5432/sqlbuild`.
 Set `DOCKER_GID` to `stat -c %g /var/run/docker.sock` and `SQLBUILD_GIT_REVISION` to
-`git rev-parse HEAD`. Keep only the matching SQLBuild and CLI wheels in `dist/`; their Python
-version and architecture must match the image's `PYTHON_VERSION` build argument and Docker host.
-The default image uses Python 3.12. Do not put credentials in build arguments or project files.
+`git rev-parse HEAD`. The default image uses Python 3.12. Do not put credentials in build
+arguments or project files.
 The Docker build context includes only wheels and the example project.
 
 ```sh
@@ -43,6 +52,11 @@ direct-store administration path, not an HTTP or person-role grant:
 ```sh
 docker compose run --rm --no-deps server admin create-location orders
 ```
+
+The server reads `/etc/sqlbuild/server.toml`, which `compose.yml` writes from its `server` config.
+Its `[[launchers.docker]]` entry starts workers for the location named `orders`, so create the
+location before the server starts. Edit that config and recreate the server to change launchers,
+retention or sign-in; see `sqb server` in the documentation for every setting.
 
 Replace `.env`'s placeholder `SQLBUILD_LOCATION_ID` with the returned `location_id`. Issue a
 bounded credential, using a future RFC 3339 expiry you choose:
@@ -65,6 +79,18 @@ its warehouse connection. The example schedule runs every minute. The server res
 running container's actual Docker image ID at publication; no `--image-id` or Docker socket is
 needed in the location. Workers recompile in that pinned image and verify environment and node
 hashes before writing. The warehouse persists in its named volume.
+
+Check the location the way a container health check would; it exits 1 when the location is down
+or its last load failed:
+
+```sh
+docker compose exec location sqb location health --server http://server:8000 --location-id "$SQLBUILD_LOCATION_ID" --target development
+```
+
+Workers get the location container's memory, CPU and process limits (`cpus: 2` and
+`mem_limit: 1g` in `compose.yml`), dropped capabilities and security options. Add a
+`[launchers.docker.run]` table to the `server` config for different worker limits, and give a job
+`resources` to ask for more or less, up to the table's `max_memory`.
 
 For your project, build the `runtime` target as a base, then extend it with `COPY --chown=10001:10001`
 of your project to `/project`, install its locked dependencies, and set `SQLBUILD_GIT_REVISION`.
@@ -104,6 +130,42 @@ changing the host source tree's ownership. Use the same overlay for `down --volu
 these development caches and logs. Workers reject source drift against a pinned snapshot; the
 bind mount is not an immutable deployment and does not provide old-source fallback.
 
+## Run on Podman
+
+The stack runs on Podman 5 through its Docker-compatible API socket. Workers start, report their
+exit, share the location's volumes and network, and run the image ID the location published, as
+they do on Docker.
+
+For rootful Podman, start the system socket, `/run/podman/podman.sock`:
+
+```sh
+sudo systemctl enable --now podman.socket
+```
+
+The socket belongs to `root:root` with mode `0660`. Give it a dedicated group instead, so the
+server joins that group rather than `root`:
+
+```sh
+sudo groupadd --system sqlbuild-socket
+sudo systemctl edit podman.socket  # add the two lines below under [Socket]
+# SocketGroup=sqlbuild-socket
+# SocketMode=0660
+sudo systemctl restart podman.socket
+```
+
+For rootless Podman, start your user's socket, `$XDG_RUNTIME_DIR/podman/podman.sock`, with
+`systemctl --user enable --now podman.socket`. It belongs to your user, and containers run in your
+user's namespace.
+
+Install Docker Compose 2.23.1 or newer as a Docker CLI plugin; `podman compose` runs it against
+the Podman socket. `podman-compose` cannot run this stack, because it does not create the
+server's `server.toml` from `compose.yml`.
+
+In `.env`, set `DOCKER_SOCKET` to the socket path and `DOCKER_GID` to
+`stat -c %g "$DOCKER_SOCKET"`. Then run each `docker compose` command in this guide as
+`podman compose`. Check that it uses Docker Compose: `podman compose version` prints
+`Docker Compose version`.
+
 ## Credentials, identity, and platform events
 
 Rotate a location credential with `docker compose run --rm --no-deps server admin rotate-token
@@ -111,9 +173,9 @@ TOKEN_UUID`, store its one-time replacement bearer, and recreate the location. T
 expiry stay unchanged, and the old credential is revoked atomically. Service-account principal
 tokens are separate from location/run tokens. Person identities do not become machine bearers.
 
-For OIDC sign-in, mount a server-owned JSON file with `origin`, `issuer`,
-`client_id`, and explicit `identities` subject-to-existing-person UUID bindings; append
-`--oidc-config /etc/sqlbuild/oidc.json` to the server command. Both origin and issuer require
+For OIDC sign-in, add an `[oidc]` section to the `server` config with `origin`, `issuer`,
+`client_id`, and explicit `identities` subject-to-existing-person UUID bindings, and name the
+client secret's environment variable in `client_secret_env`. Both origin and issuer require
 HTTPS. Terminate HTTPS at a trusted proxy, preserve the external Host, restrict backend access,
 and register `/api/auth/oidc/callback` at the issuer. The callback verifies an explicitly bound,
 enabled person and issues a one-hour browser session. With a trusted proxy, every request
@@ -178,7 +240,7 @@ outside this stack too: a stopped server cannot report its own outage.
 ## Back up and upgrade
 
 Back up PostgreSQL with `pg_dump` using your normal protected database backup tooling. Also
-back up warehouse data, the restricted `.env`/identity configuration, and referenced project
+back up warehouse data, the restricted `.env`, the `server` config, and referenced project
 images. Keep backup credentials and output outside the repository. Test restoration before an
 upgrade. Ordinary `docker compose down` preserves named volumes; `down --volumes` destroys them.
 

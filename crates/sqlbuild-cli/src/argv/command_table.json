@@ -127,7 +127,7 @@
      "name": "dev",
      "parser": {
       "prog": "sqb dev",
-      "description": "Run the local control API, scheduler and reloadable code location. Authentication is disabled only on loopback; triggers start paused. No UI is served.",
+      "description": "Run the local control API, scheduler and reloadable code location. Authentication is disabled only on loopback; triggers start paused. The web UI is served at the same address.",
       "groups": [{"title": "positional arguments"}, {"title": "options"}],
       "actions": [
        {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
@@ -168,8 +168,8 @@
         "options": [],
         "dest": "location_command",
         "required": true,
-        "choices": ["publish", "serve", "runtime", "execute"],
-        "help": "publish one snapshot, watch and reload, or run the supervisor's stdio compiler",
+        "choices": ["publish", "serve", "health", "runtime", "execute"],
+        "help": "publish one snapshot, watch and reload, check health (exits 1 when the location is down or its last load failed), or run the supervisor's stdio compiler",
         "group": 0
        },
        {

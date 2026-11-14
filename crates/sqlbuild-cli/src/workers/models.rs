@@ -90,7 +90,7 @@ pub(super) struct DockerLauncher {
 pub(super) struct RunDefaults {
     pub(super) memory: Option<MemorySize>,
     pub(super) cpus: Option<f64>,
-    pub(super) pids: Option<i64>,
+    pub(super) pids: Option<u64>,
     pub(super) cgroup_parent: Option<String>,
     pub(super) max_memory: Option<MemorySize>,
 }

@@ -721,14 +721,20 @@ def current_snapshot(api: SnapshotApi, target: str) -> dict[str, Any]:
     return result
 
 
+def toml_table(value: dict[str, Any]) -> str:
+    """Inline TOML table; every key is quoted so any name survives."""
+    return "{" + ", ".join(f"{json.dumps(str(key))} = {toml_value(item)}" for key, item in value.items()) + "}"
+
+
+def toml_array(value: list[Any]) -> str:
+    """Inline TOML array."""
+    return "[" + ", ".join(toml_value(item) for item in value) + "]"
+
+
 def toml_value(value: Any) -> str:
-    """One-line TOML for JSON-shaped settings; every key is quoted so any name survives."""
-    if isinstance(value, dict):
-        pairs: str = ", ".join(f"{json.dumps(str(key))} = {toml_value(item)}" for key, item in value.items())
-        return "{" + pairs + "}"
-    if isinstance(value, list):
-        return "[" + ", ".join(toml_value(item) for item in value) + "]"
-    return json.dumps(value)
+    """One-line TOML for JSON-shaped settings; scalars share JSON's spelling."""
+    writers: dict[type, Callable[[Any], str]] = {dict: toml_table, list: toml_array}
+    return writers.get(type(value), json.dumps)(value)
 
 
 def write_server_config(path: Path, sections: dict[str, Any]) -> None:
@@ -842,9 +848,7 @@ def scheduled_worker(
             "target": "development",
             "server_url": api.url,
             "max_workers": 1,
-        } | deployment.configuration
-        if test_case.launcher_run:
-            launcher["run"] = test_case.launcher_run
+        } | deployment.configuration | test_case.launcher_settings
         write_server_config(
             configuration,
             {

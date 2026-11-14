@@ -77,7 +77,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     "benchmarks/duckshop/edge_cases/orchestration/container_resources_orders.py"
                 ).read_text()
             },
-            launcher_run={"memory": "768m", "cpus": 2, "pids": 256, "max_memory": "1g"},
+            launcher_settings={"run": {"memory": "768m", "cpus": 2, "pids": 256, "max_memory": "1g"}},
             expected_host_config={"Memory": 1 << 30, "NanoCpus": 500_000_000, "PidsLimit": 256},
         ),
         WorkerExecutionTestCase(

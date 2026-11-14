@@ -71,3 +71,11 @@ impl Drop for TestControl {
         let _ = self.child.wait();
     }
 }
+
+pub(crate) struct LocationHealthTestCase {
+    pub(crate) description: &'static str,
+    /// Health reports the location sends before the check, oldest first, as JSON `health` values.
+    pub(crate) reports: &'static [&'static str],
+    pub(crate) expected_state: &'static str,
+    pub(crate) expected_exit: i32,
+}

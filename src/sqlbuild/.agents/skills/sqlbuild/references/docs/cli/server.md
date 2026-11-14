@@ -8,6 +8,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 
 ## Contents
 
+- Configure the server
 - Serve over HTTPS
 - Receive platform events
 - Upgrade
@@ -16,17 +17,69 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Inspect published SQL
 - Sync from the warehouse now
 - Skip overlapping runs and retry failures
+- Limit worker containers
 - Run ad-hoc commands
 - Plan builds
 - Define project roles
 
-Run the control API and scheduler without loading project Python:
+Run the control API and scheduler without loading project Python, with its settings in
+`server.toml`:
 
 ```bash
-sqb server
+sqb server --config server.toml
 ```
 
-Use `sqb server --help` for service, authentication and launcher options.
+## Configure the server
+
+`server.toml` holds the listener, retention, sign-in and the launchers that start workers. The
+server reads it once at start-up, so restart the server after you change it:
+
+```toml
+[server]
+host = "0.0.0.0"
+port = 8000
+default_role = "viewer"
+
+[retention]
+run_log_days = 7
+
+[trusted_proxy]
+origin = "https://control.example.com"
+trusted_peers = ["10.0.0.5"]
+
+[trusted_proxy.identities]
+orders-person = "0190c3c1-5a4e-7b8e-9f00-2a7d1c9e4b11"
+
+[[launchers.docker]]
+location = "orders"
+target = "development"
+server_url = "http://server:8000"
+max_workers = 2
+socket = "/var/run/docker.sock"
+location_container = "orders-location"
+executable = "/usr/local/bin/sqb"
+```
+
+| Section | Keys |
+| --- | --- |
+| `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`) |
+| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`; see [Set retention](#set-retention) |
+| `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
+| `[trusted_proxy]` | `origin`, `trusted_peers` and `identities` |
+| `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and an optional `run` table; see [Limit worker containers](#limit-worker-containers) |
+| `[[launchers.local]]` | `location`, `target`, `server_url`, `max_workers`, and absolute `project_dir` and `executable` paths |
+| `[launchers.concurrency_limits]` | The most runs at once for each job `concurrency_groups` name, such as `orders_pool = 2` |
+
+- A flag overrides the same setting in the file: `sqb server --config server.toml --port 9000`
+  listens on port 9000.
+- Keep secrets in environment variables. The file names the variable, as `database_env` and
+  `client_secret_env` do, never the secret itself.
+- Each launcher names a location by the name you gave `sqb admin create-location`. Create the
+  location before you start the server; an unknown name stops it.
+- `sqb scheduler --config server.toml` reads the same file for its control database and launchers.
+- An unknown section or key stops the server with the line it is on.
+
+Use `sqb server --help` for the remaining options.
 
 ## Serve over HTTPS
 
@@ -116,21 +169,25 @@ the control server is older than this worker and refused its run report; upgrade
 
 ## Set retention
 
-Set how much history the server keeps:
+Set how much history the server keeps in the `[retention]` section of `server.toml`:
 
-```bash
-sqb server --statistics-retention-days 30 --audit-retention-days 730 --snapshot-retention-count 20 \
-  --run-log-retention-days 7 --run-log-retention-count 100
+```toml
+[retention]
+statistics_days = 30
+audit_days = 730
+snapshot_count = 20
+run_log_days = 7
+run_log_count = 100
 ```
 
-| Data | Option | Default | Range |
-| --- | --- | --- | --- |
-| Hourly warehouse statistics | `--statistics-retention-days` | `90` | `1`–`65535` |
-| Security audit records | `--audit-retention-days` | `400` | `1`–`65535` |
-| Published snapshots per location and target | `--snapshot-retention-count` | `10` | `1`–`65535` |
-| Logs of finished runs | `--run-log-retention-days` | `14` | `1`–`65535` |
-| Finished runs per location and target that keep their logs | `--run-log-retention-count` | `200` | `1`–`65535` |
-| Skipped and covered schedule ticks | None | 30 days | Fixed |
+| Data | `[retention]` key | Option | Default | Range |
+| --- | --- | --- | --- | --- |
+| Hourly warehouse statistics | `statistics_days` | `--statistics-retention-days` | `90` | `1`–`65535` |
+| Security audit records | `audit_days` | `--audit-retention-days` | `400` | `1`–`65535` |
+| Published snapshots per location and target | `snapshot_count` | `--snapshot-retention-count` | `10` | `1`–`65535` |
+| Logs of finished runs | `run_log_days` | `--run-log-retention-days` | `14` | `1`–`65535` |
+| Finished runs per location and target that keep their logs | `run_log_count` | `--run-log-retention-count` | `200` | `1`–`65535` |
+| Skipped and covered schedule ticks | None | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
 deleted in the background.
@@ -152,7 +209,7 @@ deletes its node definitions and SQL text when no other snapshot shares them. Re
 interrupting this cleanup is safe.
 
 A finished run loses its log, the events, statements, SQL and output its worker recorded, when it
-is older than `--run-log-retention-days` or when more than `--run-log-retention-count` newer runs
+is older than `run_log_days` or when more than `run_log_count` newer runs
 have finished in its location and target, whichever comes first. The run itself, its node results,
 and the run history the scheduler recorded stay, so run lists, node status and history are
 unchanged; only the run's log, statements and SQL are no longer shown. A running run keeps its log.
@@ -172,20 +229,26 @@ webhook, so give them the same values and webhook.
 ## Grant roles to OIDC groups (beta)
 
 With OIDC sign-in, members of an identity-provider group can get a role without a per-person
-assignment. Add `groups_claim` and `group_roles` to the JSON file passed to `--oidc-config`:
+assignment. Add `groups_claim` and `group_roles` to the `[oidc]` section of `server.toml`:
 
-```json
-{
-  "origin": "https://control.example.com",
-  "issuer": "https://login.example.com",
-  "client_id": "orders-control",
-  "identities": {"orders-person": "0190c3c1-5a4e-7b8e-9f00-2a7d1c9e4b11"},
-  "groups_claim": "groups",
-  "group_roles": [
-    {"group": "orders-operators", "role": "operator", "location_id": "0190c3c1-6b2f-7c3d-8e44-5f1a2b3c4d5e", "target": null},
-    {"group": "orders-readers", "role": "viewer", "location_id": null, "target": null}
-  ]
-}
+```toml
+[oidc]
+origin = "https://control.example.com"
+issuer = "https://login.example.com"
+client_id = "orders-control"
+groups_claim = "groups"
+
+[oidc.identities]
+orders-person = "0190c3c1-5a4e-7b8e-9f00-2a7d1c9e4b11"
+
+[[oidc.group_roles]]
+group = "orders-operators"
+role = "operator"
+location_id = "0190c3c1-6b2f-7c3d-8e44-5f1a2b3c4d5e"
+
+[[oidc.group_roles]]
+group = "orders-readers"
+role = "viewer"
 ```
 
 | Key | Meaning |
@@ -347,6 +410,56 @@ Details:
   its own.
 - An invalid value fails publication with the job's name, such as
   `job nightly_orders overlap must be queue or skip, not coalesce`.
+
+## Limit worker containers
+
+A Docker worker starts with its location container's memory, CPU and process limits. Set limits
+for every run of a launcher in its `run` table, and for one job with `resources`:
+
+```toml
+[[launchers.docker]]
+location = "orders"
+target = "development"
+server_url = "http://server:8000"
+max_workers = 2
+socket = "/var/run/docker.sock"
+location_container = "orders-location"
+executable = "/usr/local/bin/sqb"
+
+[launchers.docker.run]
+memory = "1g"
+cpus = 1
+pids = 512
+max_memory = "4g"
+```
+
+```python
+from sqlbuild.orchestration import job, resources
+
+nightly_orders = job(
+    "nightly_orders",
+    description="Orders and their daily totals",
+    select="+order_totals",
+    resources=resources(memory="3g", cpus=2),
+)
+```
+
+| Setting | `run` table | `resources` | Value |
+| --- | --- | --- | --- |
+| `memory` | Yes | Yes | Bytes, or a size such as `"512m"` or `"2g"` |
+| `cpus` | Yes | Yes | A positive number, such as `0.5` |
+| `pids` | Yes | Yes | The most processes, a positive whole number |
+| `cgroup_parent` | Yes | No | The cgroup workers start under |
+| `max_memory` | Yes | No | The most memory any worker of the launcher gets |
+
+- A job's `resources` win over the launcher's `run` table, which wins over the location
+  container's limits.
+- A worker never gets more than `max_memory`: a job that asks for more gets `max_memory`.
+- Workers keep the location container's dropped capabilities and security options, such as
+  `no-new-privileges`.
+- A job in a group uses its own `resources`. Local launchers ignore `resources`.
+- An invalid value fails publication with the job's name, such as
+  `job nightly_orders resources: cpus must be a positive number`.
 
 ## Run ad-hoc commands
 

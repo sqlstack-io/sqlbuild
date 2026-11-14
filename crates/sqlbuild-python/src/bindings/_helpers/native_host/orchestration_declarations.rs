@@ -231,10 +231,10 @@ pub(crate) fn job_resources(
     let invalid = |reason: String| PyValueError::new_err(format!("job {name} resources: {reason}"));
     let resources: RunResources = serde_json::from_value(Value::Object(written))
         .map_err(|error| invalid(error.to_string()))?;
-    if resources.cpus.is_some_and(|cpus| !cpus.is_finite() || cpus <= 0.0) {
+    if resources.cpus.is_some_and(|cpus| !cpus.is_normal() || cpus.is_sign_negative()) {
         return Err(invalid("cpus must be a positive number".into()));
     }
-    if resources.pids.is_some_and(|pids| pids <= 0) {
+    if resources.pids == Some(0) {
         return Err(invalid("pids must be a positive whole number".into()));
     }
     Ok(Some(resources))
