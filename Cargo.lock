@@ -4524,6 +4524,7 @@ dependencies = [
  "sqlbuild-cache",
  "sqlbuild-core",
  "sqlbuild-discovery",
+ "sqlbuild-pysource",
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlclean",

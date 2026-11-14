@@ -202,6 +202,12 @@ impl RulesConfig {
             .and_then(|options| options.get(option))
     }
 
+    pub(crate) fn rule_option_u32(&self, code: &str, option: &str) -> Option<u32> {
+        self.rule_option(code, option)
+            .and_then(Value::as_u64)
+            .map(|value| u32::try_from(value).unwrap_or(u32::MAX))
+    }
+
     pub(crate) fn rule_option_enabled(&self, code: &str, option: &str) -> bool {
         self.rule_option(code, option)
             .and_then(Value::as_bool)

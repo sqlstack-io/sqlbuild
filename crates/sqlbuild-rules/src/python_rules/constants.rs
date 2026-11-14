@@ -825,3 +825,50 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 64] = [
         remediation: "Split the file by a cohesive role or concern instead of extracting arbitrary numbered fragments.",
     },
 ];
+
+/// The project folder that holds the runtime Python package, imported as `python`.
+pub(crate) const PACKAGE_ROOT: &str = "python";
+/// Fensu's scope for runtime code; every carried family applies to it.
+pub(crate) const ROOT_SCOPE: &str = "root";
+pub(crate) const INIT_FILE: &str = "__init__.py";
+/// The file holding a unit's implementation next to its node declarations.
+pub(crate) const UNIT_MAIN_FILE: &str = "main.py";
+/// The project file reported for project-wide reachability findings.
+pub(crate) const PROJECT_CONFIG_FILE: &str = "sqlbuild_project.toml";
+/// Fensu's fixed role file names and the role each gives its file.
+pub(crate) const ROLE_FILES: [(&str, &str); 4] = [
+    ("models.py", "models"),
+    ("types.py", "types"),
+    ("constants.py", "constants"),
+    ("exceptions.py", "exceptions"),
+];
+/// Fensu's role directories and the role each gives the files below it.
+pub(crate) const ROLE_DIRECTORIES: [(&str, &str); 7] = [
+    ("main", "main"),
+    ("_helpers", "helpers"),
+    ("classes", "classes"),
+    ("models", "models"),
+    ("types", "types"),
+    ("constants", "constants"),
+    ("exceptions", "exceptions"),
+];
+pub(crate) const MAIN_ROLE: &str = "main";
+/// Fensu's default naming contracts as prefix and contract; SQLBuild does not make them configurable.
+pub(crate) const NAMING_CONTRACTS: [(&str, &str); 10] = [
+    ("validate_*", "no-return"),
+    ("enforce_*", "no-return"),
+    ("is_*", "returns-bool"),
+    ("has_*", "returns-bool"),
+    ("can_*", "returns-bool"),
+    ("supports_*", "returns-bool"),
+    ("get_*", "returns-value"),
+    ("to_*", "returns-value"),
+    ("as_*", "returns-value"),
+    ("iter_*", "returns-iterator"),
+];
+/// Decorators whose top-level functions SQLBuild loads, making their module an entry point.
+pub(crate) const NODE_DECORATORS: [&str; 5] = ["loader", "task", "asset", "check", "factory"];
+/// The entry-point kind recorded for modules SQLBuild loads.
+pub(crate) const ENTRYPOINT_KIND: &str = "sqlbuild";
+/// Fensu's family of naming-contract rules, which read the naming contracts.
+pub(crate) const NAMING_FAMILY: &str = "naming";

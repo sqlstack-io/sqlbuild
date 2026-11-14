@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use fensu_facts::extension::models::ProgramHandle;
 use fensu_native::{NativeProjectPlane, NativeRuleContext, evaluate_core_rules};
 
-use crate::engine::_helpers::memo::prepare;
+use crate::engine::_helpers::memo::{evaluate_rows, prepare};
 use crate::models::{EvaluateRequest, RowsRequest, RuleMetadata, RuleScope, RulesConfig};
 use crate::rules::_helpers::catalogue::{catalogue, select};
 
@@ -85,4 +85,45 @@ fn request_key(project_dir: &std::path::Path, select: &[&str]) -> String {
     .expect("request prepares")
     .key
     .expect("keyed")
+}
+
+/// The Python faults of a project holding `files`, under rules config `config`, as code, path, line and column.
+pub(super) fn python_rule_faults(
+    files: &[(&str, &str)],
+    config: serde_json::Value,
+) -> Result<Vec<(String, String, u64, u64)>, String> {
+    let directory = tempfile::tempdir().map_err(|error| error.to_string())?;
+    for (path, contents) in files {
+        let file = directory.path().join(path);
+        std::fs::create_dir_all(file.parent().expect("parent"))
+            .map_err(|error| error.to_string())?;
+        std::fs::write(&file, contents).map_err(|error| error.to_string())?;
+    }
+    let mut config = config;
+    config["cache"] = serde_json::json!({ "enabled": false });
+    let request = EvaluateRequest {
+        project_dir: directory.path().to_string_lossy().into_owned(),
+        config: serde_json::from_value(config).map_err(|error| error.to_string())?,
+        ..EvaluateRequest::default()
+    };
+    let evaluation = evaluate_rows(RowsRequest {
+        request,
+        memo: None,
+        retain: false,
+    })
+    .map_err(|error| format!("{error:?}"))?;
+    Ok(evaluation
+        .faults
+        .into_iter()
+        .filter(|fault| fault.code.starts_with("SQBRPYTHON"))
+        .map(|fault| (fault.code, fault.path, fault.line, fault.column))
+        .collect())
+}
+
+/// Expected faults as the owned tuples `python_rule_faults` returns.
+pub(super) fn owned_faults(faults: &[(&str, &str, u64, u64)]) -> Vec<(String, String, u64, u64)> {
+    faults
+        .iter()
+        .map(|(code, path, line, column)| ((*code).to_owned(), (*path).to_owned(), *line, *column))
+        .collect()
 }

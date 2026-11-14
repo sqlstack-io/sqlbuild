@@ -33,3 +33,16 @@ pub(super) struct SourceKeyTestCase {
     pub(super) edited_source: &'static str,
     pub(super) expected_same_key: bool,
 }
+
+pub(super) struct PythonRunTestCase {
+    pub(super) description: &'static str,
+    pub(super) files: &'static [(&'static str, &'static str)],
+    pub(super) config: serde_json::Value,
+    pub(super) expected_faults: Vec<(&'static str, &'static str, u64, u64)>,
+}
+
+pub(super) struct PythonParseFailureTestCase {
+    pub(super) description: &'static str,
+    pub(super) files: &'static [(&'static str, &'static str)],
+    pub(super) expected_error: &'static str,
+}

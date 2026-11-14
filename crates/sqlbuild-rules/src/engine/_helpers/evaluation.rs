@@ -6,6 +6,7 @@ use crate::models::{
     EvaluateRequest, EvaluateResponse, Fault, Model, RuleException, RuleMetadata, RuleScope,
     RulesCodeGrammar, RulesConfig,
 };
+use crate::python_rules::main::evaluate_python_rules::evaluate_python_rules;
 use crate::rules::main::{
     assemble_catalogue, evaluate as rules, evaluate_project, fingerprint,
     resolve_threshold_overrides, select, sql_test_coverage,
@@ -101,18 +102,13 @@ fn evaluate_native_models(
         cache,
         model_rules_fingerprint,
     } = input;
-    if !context
-        .selected
-        .values()
-        .any(|rule| !rule.custom && !rule.code.starts_with("SQLCLEAN"))
-    {
+    if !context.selected.values().any(|rule| reads_models(rule)) {
         return Ok(NativeModelEvaluation::default());
     }
     let mut models: Vec<_> = context.request.models.iter().collect();
     models.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     let all_models_required = context.selected.values().any(|rule| {
-        !rule.custom
-            && !rule.code.starts_with("SQLCLEAN")
+        reads_models(rule)
             && !matches!(
                 rule.code.as_str(),
                 "SQBRDECLARATION201" | "SQBRDECLARATION301" | "SQBRTEST301"
@@ -284,6 +280,11 @@ fn parse_model_payloads(
     results.into_iter().collect()
 }
 
+/// Built-in rules other than SQLClean and the Python rules, which read neither models nor the model cache.
+fn reads_models(rule: &RuleMetadata) -> bool {
+    !rule.custom && !rule.code.starts_with("SQLCLEAN") && !rule.scope.evaluates_python()
+}
+
 fn native_rule_pool(items: usize) -> Result<rayon::ThreadPool, String> {
     rayon::ThreadPoolBuilder::new()
         .num_threads(NATIVE_RULE_WORKERS.min(items))
@@ -407,7 +408,14 @@ fn evaluated_request(
 
     let cache_enabled = request.config.cache.enabled;
     let model_rules_fingerprint = cache_enabled
-        .then(|| model_rules_fingerprint(&selected, &request.config, &request.dialect))
+        .then(|| {
+            let model_rules: Vec<&RuleMetadata> = selected
+                .iter()
+                .copied()
+                .filter(|rule| !rule.scope.evaluates_python())
+                .collect();
+            model_rules_fingerprint(&model_rules, &request.config, &request.dialect)
+        })
         .transpose()?
         .unwrap_or_default();
     let cache = cache_enabled
@@ -443,6 +451,18 @@ fn evaluated_request(
     let cache_hits = native.hits;
     let cache_misses = native.misses;
     raw_faults.extend(native.faults);
+    if selected.iter().any(|rule| rule.scope.evaluates_python()) {
+        let python_faults: Vec<Fault> = native_rule_pool(request.python_sources.len().max(1))?
+            .install(|| evaluate_python_rules(&request, &selected))?;
+        raw_faults.extend(scoped_faults(
+            &selected_by_code,
+            python_faults,
+            RuleScope::evaluates_python,
+        )?);
+        if control.cancelled() {
+            return Err(CANCELLED.to_owned());
+        }
+    }
     let built_in_ms = built_in_started.elapsed().as_millis() as u64;
     validate_exception_paths(&request)?;
     let faults = if request.defer_suppressions {

@@ -26,6 +26,7 @@ sqlbuild-attachments.workspace = true
 sqlbuild-cache.workspace = true
 sqlbuild-core.workspace = true
 sqlbuild-discovery.workspace = true
+sqlbuild-pysource.workspace = true
 sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlclean.workspace = true
