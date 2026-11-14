@@ -1,5 +1,6 @@
 //! The built-in rule catalogue returned as the Python `Rule` models.
 
+use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple};
 use sqlbuild_rules::models::RuleMetadata;
@@ -50,18 +51,22 @@ fn option<'py>(
             )?;
             return new_record(py, RecordId::RuleOption, (), Some(&arguments));
         }
+        BuiltinOptionKind::Integer { default, .. } => {
+            ("integer", default.into_pyobject(py)?.into_any())
+        }
     };
-    let arguments = keywords(
-        py,
-        vec![
-            ("name", PyString::new(py, declared.name).into_any()),
-            ("default", default),
-            (
-                "description",
-                PyString::new(py, declared.description).into_any(),
-            ),
-        ],
-    )?;
+    let mut fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
+        ("name", PyString::new(py, declared.name).into_any()),
+        ("default", default),
+        (
+            "description",
+            PyString::new(py, declared.description).into_any(),
+        ),
+    ];
+    if let BuiltinOptionKind::Integer { minimum, .. } = declared.kind {
+        fields.push(("minimum", minimum.into_pyobject(py)?.into_any()));
+    }
+    let arguments = keywords(py, fields)?;
     option_class.call_method(factory, (), Some(&arguments))
 }
 

@@ -161,7 +161,9 @@ passes its configured Rules. This keeps diagnostics and source mutation separate
 
 SQLBuild maintains native built-in Rules for reusable requirements. SQL Rule codes begin with
 `SQLCLEAN`, for example `SQLCLEAN004`. Rules that read the project, such as `SQBRGRAPH101`, begin
-with `SQBR`.
+with `SQBR`. The `SQBRPYTHON` Rules check the project's Python: annotations, imports, function
+shape and the layout of `python/`. They run only when `select` names `SQBRPYTHON` or one of its
+codes; see [Python Rules](rules/python-rules.md).
 
 Projects can define custom Python Rules under `rules/**/*.py`. Their codes begin with `XSQBR`, for
 example `XSQBRARCH001`. Custom Rules use the same selection, findings, exceptions, execution order,
@@ -244,6 +246,7 @@ Rules add about 14% to a cold compile and nothing to a warm one. See
 
     Select exact Rules or families and configure project-owned options.
     Understand diagnostics, exact exceptions, path ignores, and stale checks.
+    Check the project's Python for annotations, imports, function shape and the layout of `python/`.
     Keep each domain's published layer free of consumer-specific variants.
     Learn evaluation order, focused execution, and dependency-aware reuse.
     List, inspect, run, and generate guidance for configured Rules.

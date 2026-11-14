@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.cold_compile_performance._helpers.dense_project import write_dense_compile_project
+from scripts.cold_compile_performance.constants import DENSE_RULE_SELECT
 from scripts.delta_compile_series.constants import (
+    DELTA_RULE_SELECT,
     PROJECT_CONFIG,
     SQL_GLOB,
     TSQL_ADAPTER,
@@ -21,9 +23,9 @@ def write_delta_compile_project(
     write_dense_compile_project(project_dir=project_dir, model_count=model_count)
     config: Path = project_dir / PROJECT_CONFIG
     config.write_text(
-        config.read_text(encoding="utf-8").replace(
-            'adapter = "snowflake"', f'adapter = "{adapter}"'
-        ),
+        config.read_text(encoding="utf-8")
+        .replace('adapter = "snowflake"', f'adapter = "{adapter}"')
+        .replace(DENSE_RULE_SELECT, DELTA_RULE_SELECT),
         encoding="utf-8",
     )
     if adapter != TSQL_ADAPTER:

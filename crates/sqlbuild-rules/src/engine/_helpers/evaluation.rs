@@ -1,11 +1,15 @@
 use crate::configuration::main::validate as config;
-use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY, RELATION_EXCEPTION_RULES};
-use crate::engine::_helpers::cache::{Cache, PendingBucketWrite, RuleCacheEntry};
+use crate::constants::{
+    API_VERSION, NATIVE_BUILD_IDENTITY, PYTHON_RULE_PREFIX, RELATION_EXCEPTION_RULES,
+};
+use crate::engine::_helpers::cache::{Cache, PendingBucketWrite, RuleCacheBucket, RuleCacheEntry};
 use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
 use crate::models::{
     EvaluateRequest, EvaluateResponse, Fault, Model, RuleException, RuleMetadata, RuleScope,
     RulesCodeGrammar, RulesConfig,
 };
+use crate::python_rules::main::evaluate_python_rules::evaluate_python_rules;
+use crate::python_rules::models::PythonEvaluation;
 use crate::rules::main::{
     assemble_catalogue, evaluate as rules, evaluate_project, fingerprint,
     resolve_threshold_overrides, select, sql_test_coverage,
@@ -101,18 +105,13 @@ fn evaluate_native_models(
         cache,
         model_rules_fingerprint,
     } = input;
-    if !context
-        .selected
-        .values()
-        .any(|rule| !rule.custom && !rule.code.starts_with("SQLCLEAN"))
-    {
+    if !context.selected.values().any(|rule| reads_models(rule)) {
         return Ok(NativeModelEvaluation::default());
     }
     let mut models: Vec<_> = context.request.models.iter().collect();
     models.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     let all_models_required = context.selected.values().any(|rule| {
-        !rule.custom
-            && !rule.code.starts_with("SQLCLEAN")
+        reads_models(rule)
             && !matches!(
                 rule.code.as_str(),
                 "SQBRDECLARATION201" | "SQBRDECLARATION301" | "SQBRTEST301"
@@ -190,7 +189,7 @@ fn evaluate_native_models(
             None => cache.put_native_rules_bucket(model_rules_fingerprint, &bucket)?,
             Some(deferred) => {
                 *deferred.borrow_mut() =
-                    Some(cache.pending_native_rules_bucket(model_rules_fingerprint, bucket));
+                    Some(cache.pending_native_rules_bucket(model_rules_fingerprint, bucket)?);
             }
         }
     }
@@ -284,6 +283,57 @@ fn parse_model_payloads(
     results.into_iter().collect()
 }
 
+/// The Python rules' findings, reusing and then replacing their per-file cache when it is enabled.
+fn evaluate_python_phase(
+    request: &EvaluateRequest,
+    selected: &[&RuleMetadata],
+    cache: Option<&Cache>,
+    control: &EvaluationControl<'_>,
+) -> Result<PythonEvaluation, String> {
+    let python_rules: Vec<&RuleMetadata> = selected
+        .iter()
+        .copied()
+        .filter(|rule| rule.scope.evaluates_python())
+        .collect();
+    let fingerprint: String = format!(
+        "{}\0{}.{}",
+        fingerprint::fingerprint(&python_rules, &python_config(&request.config), "")?,
+        request.python_version.0,
+        request.python_version.1
+    );
+    let previous = cache
+        .map(|store| store.python_rules_bucket(&fingerprint))
+        .transpose()?
+        .unwrap_or_default();
+    let evaluation = native_rule_pool(request.python_sources.len().max(1))?
+        .install(|| evaluate_python_rules(request, selected, &previous.entries, &fingerprint))?;
+    let unchanged: bool =
+        evaluation.misses == 0 && evaluation.entries.len() == previous.entries.len();
+    if let Some(store) = cache.filter(|_| !unchanged) {
+        let bucket = RuleCacheBucket {
+            fingerprint: fingerprint.clone(),
+            entries: evaluation.entries.clone(),
+        };
+        let write: PendingBucketWrite = store.pending_python_rules_bucket(&fingerprint, &bucket)?;
+        match control.deferred_bucket {
+            None => write.publish()?,
+            Some(deferred) => {
+                let earlier: Option<PendingBucketWrite> = deferred.borrow_mut().take();
+                *deferred.borrow_mut() = Some(match earlier {
+                    Some(earlier) => earlier.then(write),
+                    None => write,
+                });
+            }
+        }
+    }
+    Ok(evaluation)
+}
+
+/// Built-in rules other than SQLClean and the Python rules, which read neither models nor the model cache.
+fn reads_models(rule: &RuleMetadata) -> bool {
+    !rule.custom && !rule.code.starts_with("SQLCLEAN") && !rule.scope.evaluates_python()
+}
+
 fn native_rule_pool(items: usize) -> Result<rayon::ThreadPool, String> {
     rayon::ThreadPoolBuilder::new()
         .num_threads(NATIVE_RULE_WORKERS.min(items))
@@ -311,13 +361,20 @@ fn scoped_faults(
     Ok(faults)
 }
 
-/// Fingerprint model-rule inputs; suppressions and graph-edge exceptions never reach model rules.
+/// Fingerprint model-rule inputs; suppressions, graph-edge exceptions and Python-rule settings never reach model rules.
 fn model_rules_fingerprint(
     selected: &[&RuleMetadata],
     config: &RulesConfig,
     dialect: &str,
 ) -> Result<String, String> {
     let model_config = RulesConfig {
+        select: config.select.as_deref().map(model_selectors),
+        rule_options: config
+            .rule_options
+            .iter()
+            .filter(|(code, _)| !code.starts_with(PYTHON_RULE_PREFIX))
+            .map(|(code, options)| (code.clone(), options.clone()))
+            .collect(),
         rule_exceptions: Vec::new(),
         rule_ignores: Vec::new(),
         graph_edge_exceptions: Vec::new(),
@@ -325,6 +382,28 @@ fn model_rules_fingerprint(
         ..config.clone()
     };
     fingerprint::fingerprint(selected, &model_config, dialect)
+}
+
+/// The selectors outside the Python family, which alone can name model rules.
+fn model_selectors(selectors: &[String]) -> Vec<String> {
+    selectors
+        .iter()
+        .filter(|selector| !selector.starts_with(PYTHON_RULE_PREFIX))
+        .cloned()
+        .collect()
+}
+
+/// The only configuration the Python rules read: their own options.
+fn python_config(config: &RulesConfig) -> RulesConfig {
+    RulesConfig {
+        rule_options: config
+            .rule_options
+            .iter()
+            .filter(|(code, _)| code.starts_with(PYTHON_RULE_PREFIX))
+            .map(|(code, options)| (code.clone(), options.clone()))
+            .collect(),
+        ..RulesConfig::default()
+    }
 }
 
 #[cfg(test)]
@@ -407,7 +486,14 @@ fn evaluated_request(
 
     let cache_enabled = request.config.cache.enabled;
     let model_rules_fingerprint = cache_enabled
-        .then(|| model_rules_fingerprint(&selected, &request.config, &request.dialect))
+        .then(|| {
+            let model_rules: Vec<&RuleMetadata> = selected
+                .iter()
+                .copied()
+                .filter(|rule| !rule.scope.evaluates_python())
+                .collect();
+            model_rules_fingerprint(&model_rules, &request.config, &request.dialect)
+        })
         .transpose()?
         .unwrap_or_default();
     let cache = cache_enabled
@@ -440,9 +526,22 @@ fn evaluated_request(
         },
         control,
     )?;
-    let cache_hits = native.hits;
-    let cache_misses = native.misses;
+    let mut cache_hits = native.hits;
+    let mut cache_misses = native.misses;
     raw_faults.extend(native.faults);
+    if selected.iter().any(|rule| rule.scope.evaluates_python()) {
+        let python = evaluate_python_phase(&request, &selected, cache.as_ref(), control)?;
+        raw_faults.extend(scoped_faults(
+            &selected_by_code,
+            python.faults,
+            RuleScope::evaluates_python,
+        )?);
+        cache_hits += python.hits;
+        cache_misses += python.misses;
+        if control.cancelled() {
+            return Err(CANCELLED.to_owned());
+        }
+    }
     let built_in_ms = built_in_started.elapsed().as_millis() as u64;
     validate_exception_paths(&request)?;
     let faults = if request.defer_suppressions {

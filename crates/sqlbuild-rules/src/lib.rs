@@ -13,6 +13,7 @@ pub mod fix_verification;
 pub mod lint_text;
 pub mod models;
 pub mod project_tree;
+pub mod python_rules;
 pub mod query_facts;
 pub mod relation_keys;
 pub mod rule_cache;

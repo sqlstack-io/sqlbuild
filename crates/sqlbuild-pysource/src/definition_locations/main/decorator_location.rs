@@ -1,12 +1,13 @@
 //! Where a named decorator of a function sits in a module source.
 
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
 use crate::cpython_tree::main::parse_cpython_module::parse_cpython_module;
 use crate::cpython_tree::main::source_position::source_position;
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::{CpythonNode, ParsedSource};
+use crate::definition_locations::_helpers::decorators::decorator_name;
 use crate::definition_locations::constants::MISSING_DECORATOR_LOCATION;
 
 /// The `lineno` and byte `col_offset` of the first `@decorator` in `ast.walk` order, else `(1, 1)`.
@@ -30,16 +31,4 @@ pub fn decorator_location(
         }
     }
     MISSING_DECORATOR_LOCATION
-}
-
-fn decorator_name(expression: &Expr) -> Option<&str> {
-    let target: &Expr = match expression {
-        Expr::Call(call) => &call.func,
-        _ => expression,
-    };
-    match target {
-        Expr::Name(name) => Some(name.id.as_str()),
-        Expr::Attribute(attribute) => Some(attribute.attr.as_str()),
-        _ => None,
-    }
 }

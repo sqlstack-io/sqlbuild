@@ -9,6 +9,8 @@ rust-version.workspace = true
 
 [dependencies]
 blake3.workspace = true
+fensu-facts.workspace = true
+fensu-native.workspace = true
 fensu-policy.workspace = true
 globset.workspace = true
 sqlquack-parse.workspace = true
@@ -23,6 +25,8 @@ sqlbuild-analysis.workspace = true
 sqlbuild-attachments.workspace = true
 sqlbuild-cache.workspace = true
 sqlbuild-core.workspace = true
+sqlbuild-discovery.workspace = true
+sqlbuild-pysource.workspace = true
 sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlclean.workspace = true

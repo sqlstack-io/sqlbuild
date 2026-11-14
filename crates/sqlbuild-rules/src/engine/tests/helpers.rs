@@ -521,6 +521,12 @@ pub(crate) fn cached_paths(project_dir: &TempDir) -> Result<Vec<String>, String>
 
 const SPECULATIVE_CODE_IDENTITY: &str = "speculative-rows-test-build";
 pub(crate) const SPECULATIVE_CACHE_FILE: &str = "target/rules-cache/bulk/native.json";
+pub(crate) const SPECULATIVE_PYTHON_CACHE_FILE: &str = "target/rules-cache/bulk/python.json";
+/// A project Python file with an unannotated parameter, so the Python rules write their cache.
+const SPECULATIVE_PYTHON_FILE: (&str, &str) = (
+    "hooks/python/notify.py",
+    "def send(count) -> None:\n    pass\n",
+);
 const SPECULATIVE_MEMO_FILE: &str = "target/rules-cache/bulk/native-response.json";
 
 pub(crate) fn speculative_rows_request(
@@ -528,6 +534,11 @@ pub(crate) fn speculative_rows_request(
     cache_enabled: bool,
     models: &[Value],
 ) -> Result<RowsRequest, String> {
+    let (python_path, python_text) = SPECULATIVE_PYTHON_FILE;
+    let python_file: PathBuf = project_dir.join(python_path);
+    std::fs::create_dir_all(python_file.parent().unwrap_or(project_dir))
+        .map_err(|error| error.to_string())?;
+    std::fs::write(&python_file, python_text).map_err(|error| error.to_string())?;
     let mut request: Value = speculative_request_json(project_dir, cache_enabled);
     request["models"] = Value::Array(models.to_vec());
     let request: EvaluateRequest =
@@ -549,7 +560,7 @@ fn speculative_request_json(project_dir: &Path, cache_enabled: bool) -> Value {
         "version": 1,
         "project_dir": project_dir,
         "dialect": "duckdb",
-        "config": {"select": ["SQBR"], "domains": ["commerce"], "cache": {"enabled": cache_enabled}},
+        "config": {"select": ["SQBR", "SQBRPYTHON101"], "domains": ["commerce"], "cache": {"enabled": cache_enabled}},
         "models": [],
         "defer_suppressions": true
     })
@@ -577,11 +588,15 @@ pub(crate) fn evaluation_summary(
 }
 
 pub(crate) fn written_rules_files(project_dir: &Path) -> Vec<PathBuf> {
-    [SPECULATIVE_CACHE_FILE, SPECULATIVE_MEMO_FILE]
-        .iter()
-        .map(|file| project_dir.join(file))
-        .filter(|path| path.is_file())
-        .collect()
+    [
+        SPECULATIVE_CACHE_FILE,
+        SPECULATIVE_PYTHON_CACHE_FILE,
+        SPECULATIVE_MEMO_FILE,
+    ]
+    .iter()
+    .map(|file| project_dir.join(file))
+    .filter(|path| path.is_file())
+    .collect()
 }
 
 /// Discard a speculation after it ran a while; it never reports stopping.

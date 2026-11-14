@@ -1,0 +1,16 @@
+{
+  "select": ["SQBRPYTHON", "SQBRPYTHON306"],
+  "findings": [
+    ["SQBRPYTHON101", "hooks/python/alert.py", 4, 11],
+    ["SQBRPYTHON613", "python/inventory/__init__.py", 1, 1],
+    ["SQBRPYTHON002", "python/inventory/common/__init__.py", 1, 1],
+    ["SQBRPYTHON306", "python/inventory/common/stock.py", 4, 1],
+    ["SQBRPYTHON305", "python/inventory/main/publish.py", 1, 1],
+    ["SQBRPYTHON306", "python/inventory/main/publish.py", 4, 1],
+    ["SQBRPYTHON617", "python/inventory/restock/main.py", 1, 1],
+    ["SQBRPYTHON306", "python/inventory/restock/main.py", 4, 1],
+    ["SQBRPYTHON306", "python/inventory/restock/main.py", 9, 1],
+    ["SQBRPYTHON001", "python/report.py", 1, 1],
+    ["SQBRPYTHON614", "python/report.py", 1, 1]
+  ]
+}

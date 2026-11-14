@@ -49,6 +49,11 @@ XSQBR001      → XSQBR
 Exact codes select one Rule. Families select every matching Rule, whether or not it is enabled by
 default. `ignore` uses the same matching semantics and takes precedence over `select`.
 
+The Python Rules are the exception. `SQBR` does not select them: they run only when a selector names
+`SQBRPYTHON` or one of its codes, as in `select = ["SQBR", "SQBRPYTHON"]`. `SQBRPYTHON` selects the
+Python Rules that are enabled by default, and the others need their exact code. `ignore = ["SQBR"]`
+still turns them off. See [Python Rules](python-rules.md#selecting-the-python-rules).
+
 A selector that matches no Rule fails with `C000`. `SQBRTEST105` (scenario description) was retired
 when descriptions became the compile error `P010`
 ([Descriptions](../models/configuration.md#descriptions)); remove it from `select` and
@@ -82,6 +87,9 @@ reviewed exceptions. Listed tests are not flagged and still count toward `SQBRTE
 `allowed_qualifiers`, a list of `{ qualifier, reason }` or `{ paths, reason }` tables with an
 optional `domain`; `qualifier` and `paths` accept globs. See
 [Published-layer Rules](published-layer-rules.md).
+
+The Python Rules take whole-number limits such as `max_arguments` for `SQBRPYTHON504`; see
+[Python Rules](python-rules.md#rule-options).
 
 Unknown Rule codes, option names, and invalid option values fail configuration.
 
