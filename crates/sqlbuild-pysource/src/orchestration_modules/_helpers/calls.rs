@@ -53,9 +53,7 @@ pub(crate) fn imported_names(body: &[Stmt]) -> Vec<(String, String, TextSize)> {
 
 /// The dotted names a top-level `import sqlbuild.orchestration [as x]` or `from sqlbuild import orchestration [as x]` binds the module to.
 pub(crate) fn module_names(body: &[Stmt]) -> BTreeSet<String> {
-    let (package, module) = ORCHESTRATION_MODULE
-        .rsplit_once('.')
-        .unwrap_or_default();
+    let (package, module) = ORCHESTRATION_MODULE.rsplit_once('.').unwrap_or_default();
     let mut names: BTreeSet<String> = BTreeSet::new();
     for statement in body {
         match statement {

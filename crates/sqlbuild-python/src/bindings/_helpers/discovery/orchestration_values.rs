@@ -29,7 +29,12 @@ pub(crate) fn check_orchestration_values(
         .jobs
         .iter()
         .map(|(path, job)| (path, &job.run))
-        .chain(inventory.groups.iter().map(|(path, group)| (path, &group.run)));
+        .chain(
+            inventory
+                .groups
+                .iter()
+                .map(|(path, group)| (path, &group.run)),
+        );
     for (path, run) in runs {
         schedule_values(run).map_err(|error| failure(path, error))?;
     }

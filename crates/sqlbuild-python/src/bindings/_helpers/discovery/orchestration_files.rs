@@ -23,7 +23,8 @@ pub(crate) fn orchestration_declarations(
     let tree = ProjectTree::new(&root);
     let version = py.version_info();
     let inventory = py.detach(|| orchestration_inventory(&tree, (version.major, version.minor)));
-    let inventory = inventory.map_err(|failure| orchestration_error(&tree, project_dir, failure))?;
+    let inventory =
+        inventory.map_err(|failure| orchestration_error(&tree, project_dir, failure))?;
     check_orchestration_values(py, &inventory).map_err(|failure| failure_error(py, failure))?;
     Ok(inventory)
 }
