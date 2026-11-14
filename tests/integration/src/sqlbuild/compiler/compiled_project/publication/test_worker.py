@@ -427,6 +427,68 @@ def test_given_a_stale_source_when_a_worker_builds_then_blocked_nodes_finish_ski
     "test_case",
     [
         WorkerExecutionTestCase(
+            description="a failing seed audit fails its seed, and what reads it is skipped",
+            model_sql="SELECT 3 AS amount",
+            warehouse_query="SELECT count(*) FROM duckdb_tables() WHERE table_name='coded_orders'",
+            expected_status="partial",
+            expected_rows=[(0,)],
+            files={
+                "seeds/order_codes.csv": "code\nA\nZ\n",
+                "seeds/order_codes.yml": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/worker_failed_seed_audit.yml"
+                ).read_text(),
+                "models/coded_orders.sql": (
+                    "MODEL (description 'Coded orders.', materialized table);\n"
+                    'SELECT code FROM __seed("order_codes")\n'
+                ),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, schedule\n"
+                    'annual_orders = job("annual_orders", '
+                    'select="orders order_codes coded_orders", '
+                    'description="Build orders.", '
+                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
+                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                ),
+            },
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_with_the_audit_error(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, str | None, str | None]] = control.execute(
+                "SELECT n.node_key, n.status, n.error_code, "
+                "json_extract(e.payload, '$.change.change.error_message') "
+                "FROM sqb_run_nodes n LEFT JOIN recall_events e "
+                "ON e.storage_id=n.finished_storage_id "
+                "WHERE n.run_id=? AND n.kind='node' ORDER BY n.node_key",
+                (run["run_id"],),
+            ).fetchall()
+        assert nodes == [
+            ("model:coded_orders", "skipped", None, None),
+            ("model:orders", "success", None, None),
+            (
+                "seed:order_codes",
+                "failed",
+                "R006",
+                "audit for seed 'order_codes' failed after loading with severity level: error",
+            ),
+        ], worker.log.read_text()
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
             description="opposing parent and independent child limits",
             model_sql="SELECT 11 AS amount",
             warehouse_query="SELECT amount FROM orders UNION ALL SELECT amount FROM inventory ORDER BY amount",

@@ -10,6 +10,7 @@ use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
 use crate::runs::_helpers::requests::rerun::frozen_rerun;
+use crate::runs::_helpers::requests::run_id::refuse_derived_run_id;
 use crate::runs::constants::RERUN_AUDIT_TAG;
 use crate::runs::models::{RerunRequest, RunRequest};
 use crate::store::errors::ControlError;
@@ -22,6 +23,7 @@ pub(crate) async fn request_rerun_in(
     (context, credentials): (&AuditContext, Option<Uuid>),
     request: &RerunRequest,
 ) -> Result<(ControlTransaction, bool), ControlError> {
+    refuse_derived_run_id(request.run_id)?;
     let mut context = context.clone();
     let mut prepared = None;
     if let Some(credentials) = credentials {
