@@ -1,0 +1,10 @@
+CREATE INDEX IF NOT EXISTS sqb_jobs_snapshot ON sqb_jobs(snapshot_id);
+CREATE INDEX IF NOT EXISTS sqb_triggers_snapshot ON sqb_triggers(snapshot_id);
+CREATE INDEX IF NOT EXISTS sqb_triggers_removed ON sqb_triggers(removed_in_snapshot_id) WHERE removed_in_snapshot_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS sqb_runs_trigger ON sqb_runs(trigger_id) WHERE trigger_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS sqb_runs_rerun_of ON sqb_runs(rerun_of_run_id) WHERE rerun_of_run_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS sqb_location_work_session ON sqb_location_work(session_id) WHERE session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS sqb_location_work_snapshot ON sqb_location_work(snapshot_id);
+CREATE INDEX IF NOT EXISTS sqb_run_requests_run ON sqb_run_requests(run_id);
+CREATE INDEX IF NOT EXISTS sqb_warehouse_fingerprints_text ON sqb_warehouse_fingerprints(definition_text_hash);
+CREATE INDEX IF NOT EXISTS sqb_role_assignments_location ON sqb_role_assignments(location_id);

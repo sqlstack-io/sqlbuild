@@ -133,3 +133,16 @@ def read_databricks_usage(
     return DatabricksAdapter().relation_usage(
         connection=connection, relations=relations, window_seconds=window_seconds
     )
+
+
+class RecordingDatabricksAdapter(DatabricksAdapter):
+    """Databricks adapter that records each statement instead of running it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.executed: list[str] = []
+
+    def execute(self, *, connection: Any, sql: str, **kwargs: Any) -> Any:
+        del connection, kwargs
+        self.executed.append(sql)
+        return None
