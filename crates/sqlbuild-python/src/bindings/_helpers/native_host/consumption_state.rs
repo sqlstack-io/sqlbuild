@@ -13,6 +13,7 @@ use sqlbuild_state::consumption::constants::{
 };
 use sqlbuild_state::consumption::main::executions_by_id_sql::executions_by_id_sql;
 use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
+use sqlbuild_state::consumption::main::recent_executions::recent_executions;
 use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_sql;
 use sqlbuild_state::consumption::models::{
     ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
@@ -22,6 +23,7 @@ use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
 
@@ -467,6 +469,14 @@ impl ConsumptionConnection {
         py: Python<'_>,
         location: &Location,
     ) -> PyResult<Vec<ConsumptionRow>> {
+        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
+            return Ok(recent_executions(
+                &copy
+                    .get()
+                    .consumption((location.database.as_deref(), &location.schema)),
+                RECENT_EXECUTIONS,
+            ));
+        }
         read_recent(self.adapter.bind(py), &self.connected(py)?, location)
     }
 
@@ -476,6 +486,13 @@ impl ConsumptionConnection {
         location: &Location,
         execution_ids: &[&str],
     ) -> PyResult<Vec<ConsumptionRow>> {
+        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
+            let mut rows: Vec<ConsumptionRow> = copy
+                .get()
+                .consumption((location.database.as_deref(), &location.schema));
+            rows.retain(|row| execution_ids.contains(&row.row.execution_id.as_str()));
+            return Ok(rows);
+        }
         read_executions(
             self.adapter.bind(py),
             &self.connected(py)?,

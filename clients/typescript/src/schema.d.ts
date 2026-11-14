@@ -2512,6 +2512,8 @@ export interface components {
         };
         /** @description What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly. */
         PreviewCopy: {
+            /** @description Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it. */
+            consumption?: components["schemas"]["WarehouseConsumptionRecord"][];
             fingerprints: components["schemas"]["WarehouseFingerprintRecord"][];
             latest_runs: components["schemas"]["PreviewLatestRun"][];
             observations: components["schemas"]["WarehouseObservationRecord"][];
@@ -2521,6 +2523,8 @@ export interface components {
         };
         /** @description A location asks for the mirrored copy a plan preview plans from, as its fenced reader. */
         PreviewCopyRead: {
+            /** @description Whether the copy carries consumption history; sent only when set, as older servers reject it. */
+            consumption?: boolean;
             /** Format: int64 */
             generation: number;
             /** Format: uuid */
@@ -3381,6 +3385,27 @@ export interface components {
             relation_type: string;
             state_database?: string | null;
             state_schema: string;
+        };
+        /** @description One input version an execution consumed, or the row marking that the execution started. */
+        WarehouseConsumptionRecord: {
+            execution_id?: string | null;
+            /** Format: int64 */
+            input_count?: number | null;
+            input_kind?: string | null;
+            input_name?: string | null;
+            input_version?: string | null;
+            node_name?: string | null;
+            node_type?: string | null;
+            phase?: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            run_id?: string | null;
+            state_database?: string | null;
+            state_schema: string;
+            target_database?: string | null;
+            target_name?: string | null;
+            target_schema?: string | null;
+            version_hash?: string | null;
         };
         /** @description Fingerprints remain history here; latest-row selection belongs to the existing planner reader. */
         WarehouseFingerprintRecord: {

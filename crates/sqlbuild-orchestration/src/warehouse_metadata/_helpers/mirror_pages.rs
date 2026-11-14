@@ -36,6 +36,9 @@ const LATEST_RUNS_SQL: &str = "SELECT record_json FROM (SELECT record_json, ROW_
     WHERE location_id=$1 AND target=$2 AND record_json ->> 'phase'='succeeded' \
     AND record_json ->> 'run_id' IS NOT NULL) runs WHERE newest=1 \
     ORDER BY record_json ->> 'node_type', record_json ->> 'node_name'";
+/// Every consumption row the warehouse still keeps, which complete scans bound.
+const CONSUMPTION_SQL: &str = "SELECT record_json FROM sqb_warehouse_consumption \
+    WHERE location_id=$1 AND target=$2 ORDER BY observed_at, event_id";
 const OBSERVATIONS_SQL: &str = "SELECT record_json FROM (SELECT record_json, kind, node, ROW_NUMBER() OVER \
     (PARTITION BY state_database, state_schema, kind, node ORDER BY observed_at DESC, event_id DESC) AS newest \
     FROM sqb_warehouse_observations WHERE location_id=$1 AND target=$2) observations WHERE newest=1 \
@@ -145,6 +148,14 @@ pub(crate) async fn preview_latest_runs(
         }
     }
     Ok((transaction, runs))
+}
+
+/// Every mirrored consumption row: a build reads the newest executions and any older one by ID.
+pub(crate) async fn preview_consumption(
+    transaction: ControlTransaction,
+    scope: (Uuid, &str),
+) -> Result<(ControlTransaction, Vec<WarehouseConsumptionRecord>), ControlError> {
+    mirrored(transaction, CONSUMPTION_SQL, scope).await
 }
 
 /// Each node's newest observation of each kind.
