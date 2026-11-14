@@ -73,3 +73,12 @@ fn directory_role(directory: &str) -> Option<&'static str> {
         .find(|(name, _)| *name == directory)
         .map(|(_, role)| *role)
 }
+
+/// Fensu's anchor of a package folder: its `__init__.py`, else its first Python file in path order.
+pub(crate) fn package_anchor<'a>(sources: &'a [PythonSource], package: &str) -> Option<&'a str> {
+    let initializer: String = format!("{package}/{INIT_FILE}");
+    let prefix: String = format!("{package}/");
+    let mut paths = sources.iter().map(|source| source.relative_path.as_str());
+    let first: Option<&str> = paths.clone().find(|path| path.starts_with(&prefix));
+    paths.find(|path| *path == initializer).or(first)
+}

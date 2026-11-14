@@ -872,3 +872,24 @@ pub(crate) const NODE_DECORATORS: [&str; 5] = ["loader", "task", "asset", "check
 pub(crate) const ENTRYPOINT_KIND: &str = "sqlbuild";
 /// Fensu's family of naming-contract rules, which read the naming contracts.
 pub(crate) const NAMING_FAMILY: &str = "naming";
+/// Folders named after node kinds, which belong inside a domain rather than directly under `python/`.
+pub(crate) const NODE_KIND_DIRECTORIES: [&str; 10] = [
+    "loaders",
+    "loader",
+    "tasks",
+    "task",
+    "assets",
+    "asset",
+    "checks",
+    "check",
+    "factories",
+    "factory",
+];
+/// Fensu's banned generic package names (FFR204, private in its crate), plus `general`.
+pub(crate) const GENERIC_PACKAGE_NAMES: [&str; 9] = [
+    "base", "common", "general", "helpers", "lib", "misc", "shared", "util", "utils",
+];
+/// The one generic name allowed, and only directly under `python/`.
+pub(crate) const SHARED_UTILITIES_PACKAGE: &str = "utils";
+pub(crate) const PROJECT_ROOT_ALLOWLIST_CODE: &str = "SQBRPYTHON001";
+pub(crate) const RUNTIME_PACKAGE_OWNER_NAMES_CODE: &str = "SQBRPYTHON002";

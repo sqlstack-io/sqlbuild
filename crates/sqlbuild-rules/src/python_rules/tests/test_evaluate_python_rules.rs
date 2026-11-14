@@ -17,6 +17,40 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
             expected_faults: vec![("SQBRPYTHON101", "hooks/python/notify.py", 4, 18)],
         },
         PythonRunTestCase {
+            description: "python/ holds only domains, utils/ and __init__.py; folders report on their anchor",
+            files: &[
+                ("python/__init__.py", ""),
+                ("python/report.py", "\"\"\"Report.\"\"\"\n"),
+                ("python/loaders/orders.py", "\"\"\"Orders.\"\"\"\n"),
+                ("python/_helpers/Alpha.py", "\"\"\"Alpha.\"\"\"\n"),
+                ("python/_helpers/__init__.py", ""),
+                ("python/orders/daily/node.py", "\"\"\"Daily.\"\"\"\n"),
+                ("python/utils/currency/format.py", "\"\"\"Format.\"\"\"\n"),
+            ],
+            config: json!({ "select": ["SQBRPYTHON001"] }),
+            expected_faults: vec![
+                ("SQBRPYTHON001", "python/_helpers/__init__.py", 1, 1),
+                ("SQBRPYTHON001", "python/loaders/orders.py", 1, 1),
+                ("SQBRPYTHON001", "python/report.py", 1, 1),
+            ],
+        },
+        PythonRunTestCase {
+            description: "generic package names report once per package, except utils/ at the root",
+            files: &[
+                ("python/orders/common/b.py", "\"\"\"B.\"\"\"\n"),
+                ("python/orders/common/a.py", "\"\"\"A.\"\"\"\n"),
+                ("python/utils/currency/format.py", "\"\"\"Format.\"\"\"\n"),
+                ("python/utils/shared/text.py", "\"\"\"Text.\"\"\"\n"),
+                ("python/helpers/rows.py", "\"\"\"Rows.\"\"\"\n"),
+            ],
+            config: json!({ "select": ["SQBRPYTHON002"] }),
+            expected_faults: vec![
+                ("SQBRPYTHON002", "python/helpers/rows.py", 1, 1),
+                ("SQBRPYTHON002", "python/orders/common/a.py", 1, 1),
+                ("SQBRPYTHON002", "python/utils/shared/text.py", 1, 1),
+            ],
+        },
+        PythonRunTestCase {
             description: "package-only rules skip files outside python/",
             files: &[
                 ("python/report.py", "\"\"\"Report.\"\"\"\n"),

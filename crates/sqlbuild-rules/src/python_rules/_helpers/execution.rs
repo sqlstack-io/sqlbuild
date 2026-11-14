@@ -56,22 +56,13 @@ pub(crate) fn call_faults(
     let queries: Vec<&NativeProjectQuery> =
         calls.iter().flat_map(|call| call.queries.iter()).collect();
     let index = repository_index(Path::new(&inputs.request.project_dir), &queries)?;
-    let mut faults: Vec<Fault> = calls
+    Ok(calls
         .into_par_iter()
         .map(|call| call_rows(call, inputs, &index, plane))
         .collect::<Result<Vec<Vec<Fault>>, String>>()?
         .into_iter()
         .flatten()
-        .collect();
-    faults.sort_by(|left, right| {
-        (&left.path, left.line, left.column, &left.code).cmp(&(
-            &right.path,
-            right.line,
-            right.column,
-            &right.code,
-        ))
-    });
-    Ok(faults)
+        .collect())
 }
 
 fn call_rows(

@@ -8,8 +8,8 @@ use fensu_facts::snapshot::models::{
 };
 use fensu_native::NativeProjectQuery;
 
+use crate::python_rules::_helpers::placement::package_anchor;
 use crate::python_rules::_helpers::programs::Programs;
-use crate::python_rules::constants::INIT_FILE;
 
 const TRUE_TEXT: &str = "true";
 const FALSE_TEXT: &str = "false";
@@ -98,7 +98,7 @@ fn answer(
             None => false,
         })],
         "package_anchor" => vec![bool_text(
-            package_anchor(programs, path).is_some_and(|anchor| anchor == query.argument),
+            package_anchor(programs.sources, path).is_some_and(|anchor| anchor == query.argument),
         )],
         kind => {
             return Err(format!(
@@ -119,24 +119,6 @@ fn filesystem_query(query: &NativeProjectQuery) -> RepositoryObservationQuery {
         pattern,
         recursive,
     }
-}
-
-/// Fensu's anchor of a package folder: its `__init__.py`, else its first Python file in path order.
-fn package_anchor<'a>(programs: &Programs<'a>, package: &str) -> Option<&'a str> {
-    let initializer: String = format!("{package}/{INIT_FILE}");
-    if programs.index_of(&initializer).is_some() {
-        return programs
-            .sources
-            .iter()
-            .map(|source| source.relative_path.as_str())
-            .find(|path| *path == initializer);
-    }
-    let prefix: String = format!("{package}/");
-    programs
-        .sources
-        .iter()
-        .map(|source| source.relative_path.as_str())
-        .find(|path| path.starts_with(&prefix))
 }
 
 /// A project-relative path; Fensu spells paths below a top-level root with a leading `/`.
