@@ -94,12 +94,13 @@ def test_given_packaged_services_when_redeployed_and_restarted_then_pinned_runs_
                 stack.docker("inspect", "--format", "{{json .Mounts}}", worker).stdout
             )
             assert {mount["Destination"] for mount in mounts} == {"/warehouse"}
-            assert (
+            # Podman reports a named network's NetworkMode as `bridge`, so check the attachment.
+            networks: dict[str, Any] = json.loads(
                 stack.docker(
-                    "inspect", "--format", "{{.HostConfig.NetworkMode}}", worker
-                ).stdout.strip()
-                == f"{stack.name}_workers"
+                    "inspect", "--format", "{{json .NetworkSettings.Networks}}", worker
+                ).stdout
             )
+            assert set(networks) == {f"{stack.name}_workers"}
             assert (
                 stack.compose(
                     "exec",
@@ -196,9 +197,12 @@ def test_given_packaged_services_when_redeployed_and_restarted_then_pinned_runs_
 
             # Even a valid location bearer cannot publish without physical image evidence.
             stack.compose("rm", "--force", "location")
+            # Docker CLI 29 sends a zero process limit that Podman applies; -1 is unlimited on both.
             unavailable: subprocess.CompletedProcess[str] = stack.docker(
                 "run",
                 "--rm",
+                "--pids-limit",
+                "-1",
                 "--network",
                 f"{stack.name}_workers",
                 "--env",

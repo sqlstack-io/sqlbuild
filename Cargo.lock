@@ -4251,6 +4251,7 @@ dependencies = [
  "sqlbuild-rules",
  "tempfile",
  "tokio",
+ "toml",
  "uuid",
 ]
 

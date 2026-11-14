@@ -33,7 +33,10 @@ pub(crate) fn parse_native_invocation(arguments: &[OsString]) -> Result<NativePa
     if needs_python_width
         && !outcome.parsed.as_ref().is_ok_and(|namespace| {
             text(namespace, "command").as_deref() == Some("location")
-                && text(namespace, "location_command").as_deref() == Some("serve")
+                && matches!(
+                    text(namespace, "location_command").as_deref(),
+                    Some("serve" | "health")
+                )
         })
     {
         return Err(PythonNeeded::Arguments);
