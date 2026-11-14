@@ -1231,7 +1231,8 @@ function changedKey(key: string): string {
  * it, except nodes a triggered job without the change refreshes on its own, and what reads those.
  */
 function changedDecision(selection: string[], changed: Map<string, string>): PlanChanged {
-	const selected = new Set(selection.filter(isWritable));
+	// The decision covers only models and seeds, as the CLI's does.
+	const selected = new Set(selection.filter((k) => isWritable(k) && ['view', 'table', 'incremental', 'seed'].includes(snapshotNode(k)?.kind ?? '')));
 	// A node belongs to jobs, not groups; a job counts as triggered when it or a group it is in has a trigger.
 	const triggered = new Set(TRIGGER_DEFS.flatMap((t) => (t.jobKey ? [t.jobKey] : [])));
 	const jobs = JOB_DEFS.filter((j) => j.kind === 'job' && (triggered.has(j.key) || JOB_DEFS.some((g) => g.kind === 'group' && triggered.has(g.key) && g.members.includes(j.key)))).map((j) => ({
@@ -1240,26 +1241,30 @@ function changedDecision(selection: string[], changed: Map<string, string>): Pla
 	}));
 	/** Each running node's changed root. */
 	const root = new Map<string, string>([...changed.keys()].filter((k) => selected.has(k)).map((k) => [k, k]));
-	const held = new Set<string>();
+	/** Each held-back node's changed root, which a node reading it is held from too. */
+	const held = new Map<string, string>();
 	const decision: PlanChanged = { counts: ['definition'], reach: 'job', runs: [...root.keys()].map((k) => ({ node: changedKey(k), reason: changed.get(k)!, downstream_of: null })), held_back: [], unchanged: [] };
 	for (const node of SNAPSHOT_NODES) {
 		if (!selected.has(node.key) || root.has(node.key)) continue;
 		const heldUpstream = node.upstream.find((u) => held.has(u));
 		const runningUpstream = node.upstream.find((u) => root.has(u));
-		if (heldUpstream) {
-			held.add(node.key);
+		const origin = heldUpstream ? held.get(heldUpstream) : runningUpstream ? root.get(runningUpstream) : undefined;
+		if (!origin) {
+			decision.unchanged.push(changedKey(node.key));
+			continue;
+		}
+		// As in the CLI, a triggered job without the change refreshes the node itself before it counts as reading a held node.
+		const owners = jobs.filter((j) => j.nodes.has(node.key));
+		if (owners.length && !owners.some((j) => j.nodes.has(origin))) {
+			held.set(node.key, origin);
+			decision.held_back.push({ node: changedKey(node.key), refreshed_by: owners.map((j) => j.key) });
+		} else if (heldUpstream) {
+			held.set(node.key, origin);
 			decision.held_back.push({ node: changedKey(node.key), reads: changedKey(heldUpstream) });
-		} else if (runningUpstream) {
-			const origin = root.get(runningUpstream)!;
-			const owners = jobs.filter((j) => j.nodes.has(node.key));
-			if (owners.length && !owners.some((j) => j.nodes.has(origin))) {
-				held.add(node.key);
-				decision.held_back.push({ node: changedKey(node.key), refreshed_by: owners.map((j) => j.key) });
-			} else {
-				root.set(node.key, origin);
-				decision.runs.push({ node: changedKey(node.key), reason: `upstream model ${origin} runs`, downstream_of: changedKey(origin) });
-			}
-		} else decision.unchanged.push(changedKey(node.key));
+		} else {
+			root.set(node.key, origin);
+			decision.runs.push({ node: changedKey(node.key), reason: `upstream model ${origin} runs`, downstream_of: changedKey(origin) });
+		}
 	}
 	return decision;
 }

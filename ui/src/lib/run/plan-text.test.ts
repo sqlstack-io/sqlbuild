@@ -143,21 +143,38 @@ describe('plan sentence', () => {
 		expect(changedPolicyLine(reach.changed!)).toBe('Counting: definition (source data not counted) · reach: job');
 		expect(changedPolicyLine({ ...reach.changed!, counts: ['definition', 'source_data'], reach: 'all' })).toBe('Counting: definition, source data · reach: all');
 		expect(planSentence(reach)).toBe(
-			'4 models build: stg_orders changed since its last build and the other 3 models read a changed model. 3 models wait for their job\'s own run. 1 unchanged node is skipped by --changed.'
+			'4 models build: stg_orders changed since its last build and the other 3 models read a change upstream. 3 models wait for their job\'s own run. 1 unchanged node is skipped by --changed.'
 		);
 	});
 
-	it("says what refreshes a held-back node: its own or its group's next run, or that every trigger is paused", () => {
+	it('names the models that run under --changed for their own reason, not as reading a change', () => {
+		const first = plan([model('orders'), model('order_count', { action: 'incremental_append', reason: 'normal_incremental' })], {
+			changed: {
+				counts: ['definition'],
+				reach: 'job',
+				runs: [
+					{ node: 'model:order_count', reason: 'no completed record', downstream_of: null },
+					{ node: 'model:orders', reason: 'no completed record', downstream_of: null }
+				],
+				held_back: [],
+				unchanged: []
+			}
+		});
+		expect(planSentence(first)).toBe('2 models build: orders and order_count run for their own reason.');
+		expect(planSections(first).find((s) => s.title === 'Models')?.entries.map((e) => e.detail.at(-1))).toEqual(['no completed record', 'no completed record']);
+	});
+
+	it("says what refreshes a held-back node: the named job's next run, its sensor, or that it is paused", () => {
 		const now = Date.parse('2026-01-01T00:00:00Z');
-		const jobs = [
-			{ key: 'finance_daily', kind: 'job' as const, members: null },
-			{ key: 'nightly', kind: 'group' as const, members: ['finance_daily', 'crm'] }
-		];
-		const trigger = (jobKey: string, state: 'running' | 'paused', nextDueAt: string | null) => ({ jobKey, state, nextDueAt });
-		expect(jobRefreshText('finance_daily', jobs, [trigger('finance_daily', 'running', '2026-01-01T05:00:00Z'), trigger('nightly', 'running', '2026-01-01T02:00:00Z')], now)).toBe('job finance_daily · next run in 2h');
-		expect(jobRefreshText('finance_daily', jobs, [trigger('finance_daily', 'paused', '2026-01-01T05:00:00Z'), trigger('nightly', 'paused', null)], now)).toBe('job finance_daily is paused');
-		expect(jobRefreshText('finance_daily', jobs, [trigger('finance_daily', 'paused', '2026-01-01T05:00:00Z'), trigger('finance_daily', 'running', null)], now)).toBe('job finance_daily · when its sensor fires');
-		expect(jobRefreshText('crm', jobs, [trigger('finance_daily', 'running', '2026-01-01T05:00:00Z')], now)).toBe('job crm');
+		type Kind = 'schedule' | 'sensor';
+		const trigger = (jobKey: string, state: 'running' | 'paused', nextDueAt: string | null, type: Kind = 'schedule') => ({ jobKey, type, state, nextDueAt });
+		// A group's schedule says nothing about a job whose own trigger is paused; the plan names the group itself when it matters.
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', '2026-01-01T05:00:00Z'), trigger('nightly', 'running', '2026-01-01T02:00:00Z')], now)).toBe('job finance_daily is paused');
+		expect(jobRefreshText('nightly', [trigger('nightly', 'running', '2026-01-01T02:00:00Z'), trigger('nightly', 'running', '2026-01-01T05:00:00Z')], now)).toBe('job nightly · next run in 2h');
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', null), trigger('finance_daily', 'running', null, 'sensor')], now)).toBe('job finance_daily · when its sensor fires');
+		// A running schedule with no next run, such as a finished calendar, is not a sensor.
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'running', null)], now)).toBe('job finance_daily');
+		expect(jobRefreshText('crm', [trigger('finance_daily', 'running', '2026-01-01T05:00:00Z')], now)).toBe('job crm');
 	});
 });
 

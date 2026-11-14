@@ -333,8 +333,8 @@
 		return true;
 	}
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
-	/** Stale nodes with a change of their own or upstream, counted as the Overview counts them. */
-	const changedCount = $derived(catalogNodes.filter((c) => matchesFilterStatus(c, 'changed')).length);
+	/** Nodes whose own definition changed, which `sqb build --changed` starts from. */
+	const changedCount = $derived(catalogNodes.filter((c) => c.stale?.some((r) => r.reason === 'changed')).length);
 	const kindOptions = $derived(NODE_KINDS.filter((k) => catalogNodes.some((n) => n.kind === k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: catalogNodes.filter((n) => n.kind === k).length })));
 	const groupOptions = $derived([...new Set(catalogNodes.flatMap((n) => (n.group === null ? [] : [n.group])))].map((g) => ({ value: g, label: g, count: catalogNodes.filter((n) => n.group === g).length })));
 	const statusOptions = [

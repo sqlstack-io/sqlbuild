@@ -20,7 +20,7 @@
 	import PlanReport from '$lib/run/plan-report.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { builtModels, changedModelKeys, jobRefreshText, planSentence } from '$lib/run/plan-text';
+	import { builtModels, builtSeeds, changedModelKeys, jobRefreshText, planSentence } from '$lib/run/plan-text';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
@@ -28,9 +28,8 @@
 	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs', 'node_status']);
 	const checkList = createResource((client, scope) => client.listChecks(scope), ['checks']);
 	// A `--changed` plan names the job whose own run refreshes what it holds back, with that job's schedule.
-	const jobList = createResource((client, scope) => client.listJobs(scope), ['jobs']);
 	const triggerList = createResource((client, scope) => client.listTriggers(scope), ['triggers']);
-	const refresh = (job: string) => jobRefreshText(job, jobList.data ?? [], triggerList.data ?? [], app.now);
+	const refresh = (job: string) => jobRefreshText(job, triggerList.data ?? [], app.now);
 
 	let cmd = $state(page.url.searchParams.get('cmd') ?? 'sqb build');
 	let cmdEl = $state<HTMLInputElement>();
@@ -149,7 +148,7 @@
 	/** The recorded checks on the models and seeds the plan builds, which run after them. */
 	const planChecks = $derived.by(() => {
 		if (!plan) return [];
-		const built = new Set([...builtModels(plan).map((m) => m.name), ...plan.seeds.map((s) => s.name)]);
+		const built = new Set([...builtModels(plan).map((m) => m.name), ...builtSeeds(plan).map((s) => s.name)]);
 		return (checkList.data ?? []).filter((c) => (c.attachment === 'model' || c.attachment === 'seed') && !!c.node && built.has(c.node.slice(c.node.indexOf(':') + 1)));
 	});
 	/** The tab shown: a replan with no checks leaves the Checks tab for the plan. */

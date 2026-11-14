@@ -2,7 +2,7 @@
 // terminal read the same: work that runs first, one section per change reason with each model's detail,
 // then the routine models, functions, seeds and warnings.
 
-import type { Job, PlanChanged, PlanDocument, PlanModel, Trigger } from '$lib/api';
+import type { PlanChanged, PlanDocument, PlanModel, Trigger } from '$lib/api';
 import { formatIn } from '$lib/format/time';
 
 export type PlanEntry = {
@@ -44,7 +44,7 @@ function runsUnderChanged(plan: PlanDocument, key: string): boolean {
 }
 
 /** The seeds the run loads or reports on: under `--changed`, only those it runs. */
-const builtSeeds = (plan: PlanDocument) => plan.seeds.filter((s) => runsUnderChanged(plan, `seed:${s.name}`));
+export const builtSeeds = (plan: PlanDocument) => plan.seeds.filter((s) => runsUnderChanged(plan, `seed:${s.name}`));
 
 /** The model's materialization as the CLI labels it, such as `view` or `delete_insert (timestamp)`. */
 export function materializationLabel(m: PlanModel): string {
@@ -140,9 +140,12 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	} else {
 		const starts = plan.synced_copy?.cursor_window_starts ?? {};
 		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason, starts[m.name])), true);
-		// Under --changed a routine model runs because a model it reads changed.
-		const upstream = new Map((plan.changed?.runs ?? []).flatMap((r) => (r.downstream_of ? [[keyName(r.node), keyName(r.downstream_of)]] : [])));
-		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => ({ name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(upstream.has(m.name) ? [`reads ${upstream.get(m.name)}`] : [])] })));
+		// Under --changed a routine model runs because something it reads changed, or for its own reason, such as no completed record.
+		const why = changedRuns(plan);
+		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => {
+			const run = why.get(m.name);
+			return { name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(run ? [run.downstream_of ? `reads ${keyName(run.downstream_of)}` : run.reason] : [])] };
+		}));
 	}
 	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry));
 	const seedLabel: Record<string, string> = { first_run: 'first_run', config_changed: 'seed_changed', no_change: 'current' };
@@ -150,6 +153,9 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	add('Python', plan.python_nodes.map((p) => ({ name: p.name, value: `${p.kind} · ${p.identity_status}`, detail: [] })));
 	return sections;
 }
+
+/** The `--changed` run of each model, by name. */
+const changedRuns = (plan: PlanDocument) => new Map((plan.changed?.runs ?? []).map((r) => [keyName(r.node), r]));
 
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -187,15 +193,18 @@ export function planSentence(plan: PlanDocument): string {
 	if (isFullRefresh(plan)) return `${builds} from scratch, replacing what was built.${after}`;
 	const changed = active.filter((m) => !ROUTINE.has(m.reason) && m.reason !== 'first_run');
 	const fresh = active.filter((m) => m.reason === 'first_run');
-	// Under --changed every routine model runs because it reads a changed one, so none is counted as just taking new rows.
+	// Under --changed a routine model runs because something upstream changed or for its own reason, never just to take new rows.
+	const why = changedRuns(plan);
+	const own = plan.changed ? active.filter((m) => ROUTINE.has(m.reason) && !why.get(m.name)?.downstream_of) : [];
 	const rows = plan.changed ? [] : active.filter((m) => m.reason === 'normal_incremental');
-	const usual = active.filter((m) => (plan.changed ? ROUTINE.has(m.reason) : m.reason === 'no_change'));
+	const usual = active.filter((m) => (plan.changed ? ROUTINE.has(m.reason) && !!why.get(m.name)?.downstream_of : m.reason === 'no_change'));
 	const parts = [
 		changed.length && `${few(changed, 'model')} changed since ${changed.length === 1 ? 'its' : 'their'} last build`,
 		fresh.length && `${few(fresh, 'model')} ${fresh.length === 1 ? 'builds' : 'build'} for the first time`,
+		own.length && `${few(own, 'model')} ${own.length === 1 ? 'runs for its' : 'run for their'} own reason`,
 		rows.length && `${count(rows.length, 'incremental model takes', 'incremental models take')} new rows`
 	].filter((p): p is string => !!p);
-	if (usual.length && plan.changed) parts.push(`${parts.length ? 'the other ' : ''}${count(usual.length, 'model reads', 'models read')} a changed model`);
+	if (usual.length && plan.changed) parts.push(`${parts.length ? 'the other ' : ''}${count(usual.length, 'model reads', 'models read')} a change upstream`);
 	else if (usual.length) parts.push(parts.length ? `the other ${usual.length} ${usual.length === 1 ? 'is' : 'are'} recreated as usual` : `none changed since ${usual.length === 1 ? 'its' : 'their'} last build`);
 	const detail = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
 	return `${builds}: ${detail}.${after}`;
@@ -222,13 +231,12 @@ export function changedSections(changed: PlanChanged, refresh: (job: string) => 
 	return sections;
 }
 
-/** What refreshes a node held back for `job`: the next run of a schedule on it or a group it is in, or that they are paused. */
-export function jobRefreshText(job: string, jobs: Pick<Job, 'key' | 'kind' | 'members'>[], triggers: Pick<Trigger, 'jobKey' | 'state' | 'nextDueAt'>[], now: number): string {
-	const owners = new Set([job, ...jobs.filter((j) => j.kind === 'group' && j.members?.includes(job)).map((j) => j.key)]);
-	const mine = triggers.filter((t) => t.jobKey !== null && owners.has(t.jobKey));
+/** What refreshes a node held back for `job` (a job or group the plan names): its next scheduled run, its sensor, or that it is paused. */
+export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | 'type' | 'state' | 'nextDueAt'>[], now: number): string {
+	const mine = triggers.filter((t) => t.jobKey === job);
 	const live = mine.filter((t) => t.state === 'running');
 	if (mine.length && !live.length) return `job ${job} is paused`;
 	const next = live.flatMap((t) => (t.nextDueAt ? [t.nextDueAt] : [])).sort()[0];
 	if (next) return `job ${job} · next run ${formatIn(next, now)}`;
-	return live.length ? `job ${job} · when its sensor fires` : `job ${job}`;
+	return live.some((t) => t.type === 'sensor') ? `job ${job} · when its sensor fires` : `job ${job}`;
 }
