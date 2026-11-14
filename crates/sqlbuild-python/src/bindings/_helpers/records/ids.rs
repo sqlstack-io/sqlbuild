@@ -618,6 +618,7 @@ native_ids! {
         NonHermeticRule => "NonHermeticRuleError",
         OpaqueModuleState => "OpaqueModuleStateError",
         PlannerInput => "PlannerInputError",
+        OrchestrationDeclaration => "OrchestrationDeclarationError",
         ProjectCompile => "ProjectCompileError",
         ProjectConfig => "ProjectConfigError",
         ProjectPath => "ProjectPathError",

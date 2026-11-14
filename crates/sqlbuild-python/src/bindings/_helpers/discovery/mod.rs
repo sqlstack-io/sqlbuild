@@ -17,6 +17,7 @@ pub(crate) mod key_checks;
 pub(crate) mod locations;
 pub(crate) mod model_file_record;
 pub(crate) mod model_records;
+pub(crate) mod orchestration_files;
 pub(crate) mod project_config;
 pub(crate) mod project_facts;
 pub(crate) mod project_files;

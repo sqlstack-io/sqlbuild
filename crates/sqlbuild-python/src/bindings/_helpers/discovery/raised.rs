@@ -19,7 +19,7 @@ const OS_MODULE: &str = "os";
 const DECODE_ENCODING: &str = "utf-8";
 
 /// The exception class of each native failure kind.
-const FAILURE_CLASSES: [(&str, ErrorId); 13] = [
+const FAILURE_CLASSES: [(&str, ErrorId); 14] = [
     ("model_sql", ErrorId::ModelSqlParse),
     ("declaration", ErrorId::DeclarationParse),
     ("sql_test", ErrorId::SqlTestParse),
@@ -33,6 +33,7 @@ const FAILURE_CLASSES: [(&str, ErrorId); 13] = [
     ("conflict", ErrorId::DiscoveryConflict),
     ("seed", ErrorId::SeedDiscovery),
     ("python_path", ErrorId::ProjectPythonPath),
+    ("orchestration", ErrorId::OrchestrationDeclaration),
 ];
 
 fn raised(result: PyResult<Bound<'_, PyAny>>) -> PyErr {

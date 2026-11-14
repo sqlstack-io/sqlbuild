@@ -141,6 +141,15 @@ pub(crate) const COMPILER_ERRORS: &[ErrorSpec] = &[
         fixed: &[],
     },
     ErrorSpec {
+        name: "OrchestrationDeclarationError",
+        parent: "DiscoveryError",
+        doc: "Raised when an orchestration job, job group, calendar or sensor declaration is invalid.",
+        class_attributes: &[("code", ClassValue::Text("D017"))],
+        required: &[],
+        optional: &[],
+        fixed: &[],
+    },
+    ErrorSpec {
         name: "ProjectPythonPathError",
         parent: "DiscoveryError",
         doc: "Raised when project-owned Python lives outside a supported extension root.",

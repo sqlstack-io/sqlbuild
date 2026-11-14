@@ -5,8 +5,8 @@ use crate::project_validation::models::{
 use crate::project_validation::tests::helpers::{collision, declared, model, named};
 use crate::project_validation::tests::test_types::ValidationTestCase;
 
-const RENAME_DECLARATION: &str = " (a job, job group or sensor takes its name from its first \
-     argument, and a calendar schedule from the function it decorates)";
+const RENAME_DECLARATION: &str = " (a job or job group takes its name from `name` in its TOML \
+     file, and a calendar or sensor from its `name` argument)";
 
 #[test]
 fn given_orchestration_names_when_validating_then_they_share_the_project_namespace() {
@@ -19,7 +19,7 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
                     declared("refresh_orders", "job"),
                     declared("nightly", "job group"),
                     declared("orders_arrived", "sensor"),
-                    declared("fulfillment_calendar", "calendar schedule"),
+                    declared("fulfillment_calendar", "calendar"),
                 ],
                 ..ProjectFacts::default()
             },
@@ -55,15 +55,15 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
             ),
         },
         ValidationTestCase {
-            description: "a calendar schedule named like a provider",
+            description: "a calendar named like a provider",
             facts: ProjectFacts {
                 providers: vec![named("fulfillment", "providers/fulfillment.py")],
-                orchestration: vec![declared("fulfillment", "calendar schedule")],
+                orchestration: vec![declared("fulfillment", "calendar")],
                 ..ProjectFacts::default()
             },
             expected_failure: collision(
                 "Project resource name 'fulfillment' is declared as both provider in \
-                 providers/fulfillment.py and calendar schedule in orchestration/daily.py",
+                 providers/fulfillment.py and calendar in orchestration/daily.py",
                 RENAME_DECLARATION,
             ),
         },
