@@ -7,6 +7,7 @@ from dataclasses import replace
 import pytest
 
 from sqlbuild._native import (
+    DefaultsConfig,
     DiscoveredLoaderFunction,
     DiscoveredProjectInputs,
     LocalConfig,
@@ -139,6 +140,26 @@ def test_given_intermediate_loader_when_selecting_then_parses_destination_with_e
             connection={"database": "connection_db", "schema": "connection_schema"},
             expected_defaults=("connection_db", "connection_schema"),
         ),
+        LoaderDefaultResolutionTestCase(
+            description="project defaults come before the connection namespace",
+            adapter="postgres",
+            connection={"database": "connection_db", "schema": "connection_schema"},
+            project_defaults=("defaults_db", "defaults_schema"),
+            expected_defaults=("defaults_db", "defaults_schema"),
+        ),
+        LoaderDefaultResolutionTestCase(
+            description="explicit-target adapters never take the connection namespace",
+            adapter="snowflake",
+            connection={"database": "CONNECTION_DB", "schema": "CONNECTION_SCHEMA"},
+            expected_defaults=(None, None),
+        ),
+        LoaderDefaultResolutionTestCase(
+            description="explicit-target adapters take the project defaults",
+            adapter="snowflake",
+            connection={"database": "CONNECTION_DB", "schema": "CONNECTION_SCHEMA"},
+            project_defaults=("DEFAULTS_DB", "DEFAULTS_SCHEMA"),
+            expected_defaults=("DEFAULTS_DB", "DEFAULTS_SCHEMA"),
+        ),
     ),
     ids=lambda case: case.description,
 )
@@ -150,6 +171,9 @@ def test_given_connection_namespace_when_resolving_load_defaults_then_matches_co
             name="demo",
             adapter=test_case.adapter,
             connection=test_case.connection,
+            defaults=DefaultsConfig(
+                database=test_case.project_defaults[0], schema=test_case.project_defaults[1]
+            ),
         ),
         local_config=LocalConfig(),
     )

@@ -116,10 +116,12 @@ database = ":memory:"
 ```
 
 A `database` or `schema` on a connection, named or a top-level `[connection]`, doesn't decide where
-models are built; set them on the target or in `[defaults]`. Managed loaders and the janitor use
-the same location as models: the target's `database` and `schema`, then `[defaults]`. On
+models are built; set them on the target or in `[defaults]`. Intermediate loaders and the janitor
+use the same location as models: the target's `database` and `schema`, then `[defaults]`. On
 Snowflake, BigQuery and Databricks they never use the connection's values. On the other adapters,
-the connection's values fill in when neither the target nor `[defaults]` sets one.
+the connection's values fill in when neither the target nor `[defaults]` sets one. Managed sources
+load into their own `database` and `schema`, then the target's, as described in
+[Targets](#targets).
 
 A target that names an unknown connection fails when the configuration loads, before anything
 connects.

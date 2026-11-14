@@ -59,6 +59,7 @@ class DatabricksRenderDeleteInsertCursorTestCase:
     cursor_end: str
     columns: tuple[str, ...] | None
     expected_statements: tuple[str, ...]
+    unique_key: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -201,3 +202,10 @@ class DatabricksSchemaExistsTestCase:
     rows: list[tuple[object, ...]]
     expected_exists: bool
     expected_query_fragment: str
+
+
+@dataclass(frozen=True)
+class DatabricksFreshnessBatchErrorTestCase:
+    description: str
+    batch_error: Exception
+    expected_match: str

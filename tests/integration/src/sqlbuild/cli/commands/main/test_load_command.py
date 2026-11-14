@@ -3959,6 +3959,36 @@ def raw_inferred(ctx):
             expected_row=("12345678-1234-5678-1234-567812345678", Decimal("12.50")),
             expected_column_types={"order_ref": "VARCHAR", "price": "DECIMAL(6,2)"},
         ),
+        LoadCommandInferredColumnsTestCase(
+            description="wide decimals stay exact beside values written with an exponent",
+            project_files={
+                "sqlbuild_project.toml": _PROJECT_FILE,
+                "sources/raw.yml": """
+sources:
+  - name: raw_inferred
+    description: Test source raw_inferred.
+    managed: true
+    write_strategy: table
+    columns:
+      - name: order_ref
+        type: VARCHAR
+""".strip()
+                + "\n",
+                "python/loaders/raw.py": """
+from decimal import Decimal
+
+from sqlbuild.loaders import loader
+
+@loader
+def raw_inferred(ctx):
+    '''Test loader raw_inferred.'''
+    yield {"order_ref": "a_wide", "price": Decimal("12345678901234567890.123")}
+    yield {"order_ref": "b_tiny", "price": Decimal("1E-7")}
+""",
+            },
+            expected_row=("a_wide", Decimal("12345678901234567890.123")),
+            expected_column_types={"order_ref": "VARCHAR", "price": "DECIMAL(27,7)"},
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -3977,7 +4007,7 @@ def test_given_decimal_and_declared_values_when_running_load_then_keeps_their_ty
     connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
     try:
         row: tuple[object, ...] | None = connection.execute(
-            "SELECT order_ref, price FROM raw_inferred ORDER BY price LIMIT 1"
+            "SELECT order_ref, price FROM raw_inferred ORDER BY order_ref NULLS LAST LIMIT 1"
         ).fetchone()
         column_rows: list[tuple[str, str]] = connection.execute(
             "SELECT column_name, data_type FROM information_schema.columns "

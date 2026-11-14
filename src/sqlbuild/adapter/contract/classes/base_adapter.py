@@ -1514,7 +1514,8 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             stmt: str
             for stmt in statements:
                 cursor: Any = self.execute(connection=connection, sql=stmt)
-                affected = self.affected_row_count(cursor=cursor)
+                if stmt.startswith("INSERT"):
+                    affected = self.affected_row_count(cursor=cursor)
         return affected
 
     def merge(
@@ -2053,7 +2054,9 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             return "NULL"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return _quote_sql_string(value.isoformat())

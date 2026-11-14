@@ -136,6 +136,7 @@ from sqlbuild.adapters.databricks.constants import (
     DETAILED_TABLE_INFORMATION_MARKER,
     NON_ROW_RESULT_COLUMN_NAMES,
     RELATION_NOT_FOUND_ERROR_CLASSES,
+    SERVER_OPERATION_ERROR_CLASS_NAME,
     STRING_LITERAL_ESCAPES,
     TABLE_RELATION_METADATA_TYPES,
     TEMPORARY_FUNCTION_PREFIX,
@@ -698,6 +699,10 @@ class DatabricksAdapter(
             cursor.execute(" UNION ALL ".join(selects))
             rows: list[tuple[Any, ...]] = list(cursor.fetchall())
         except Exception as error:
+            if not any(
+                kind.__name__ == SERVER_OPERATION_ERROR_CLASS_NAME for kind in type(error).__mro__
+            ):
+                raise
             if len(requests) == 1:
                 reason: str = (str(error).strip().splitlines() or [type(error).__name__])[0]
                 return {
@@ -860,7 +865,9 @@ class DatabricksAdapter(
             return "NULL"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return self._quote_sql_string(value.isoformat())
@@ -1819,11 +1826,13 @@ class DatabricksAdapter(
             f"{quoted_cursor_column} >= {start_bound} AND {quoted_cursor_column} < {end_bound}"
         )
         if unique_key:
+            key_delete, *insert_statements = self.render_delete_insert(
+                destination=destination, sql=sql, unique_key=unique_key, columns=columns
+            )
+            key_match: str = key_delete.removeprefix(f"DELETE FROM {destination} WHERE ")
             return (
-                f"DELETE FROM {destination} WHERE {replace_where}",
-                *self.render_delete_insert(
-                    destination=destination, sql=sql, unique_key=unique_key, columns=columns
-                ),
+                f"DELETE FROM {destination} WHERE ({replace_where}) OR {key_match}",
+                *insert_statements,
             )
         return (f"INSERT INTO {destination}{column_list} REPLACE WHERE {replace_where} {sql}",)
 

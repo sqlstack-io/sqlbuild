@@ -19,6 +19,7 @@ from sqlbuild.compiler.compile.types import FunctionLanguage
 from tests.unit.src.sqlbuild.adapters.databricks._test_types import (
     DatabricksDeltaDetailAgeTestCase,
     DatabricksExpressionInferenceProfileTestCase,
+    DatabricksFreshnessBatchErrorTestCase,
     DatabricksMergeExclusionTestCase,
     DatabricksPruneSqlTestCase,
     DatabricksPythonFunctionSupportTestCase,
@@ -37,6 +38,8 @@ from tests.unit.src.sqlbuild.adapters.databricks.helpers import (
     FailingDatabricksMetadataCursor,
     FakeDatabricksMetadataConnection,
     FakeDatabricksMetadataCursor,
+    RequestError,
+    ServerOperationError,
 )
 
 
@@ -263,13 +266,13 @@ def test_given_view_in_freshness_batch_when_getting_metadata_then_only_the_view_
         database="main", schema="raw", name="orders_v"
     )
     batch_cursor: FakeDatabricksMetadataCursor = FailingDatabricksMetadataCursor(
-        execute_error=RuntimeError(test_case.view_error)
+        execute_error=ServerOperationError(test_case.view_error)
     )
     orders_cursor: FakeDatabricksMetadataCursor = FakeDatabricksMetadataCursor(
         rows=[("main", "raw", "orders", test_case.delta_version)]
     )
     view_cursor: FakeDatabricksMetadataCursor = FailingDatabricksMetadataCursor(
-        execute_error=RuntimeError(test_case.view_error)
+        execute_error=ServerOperationError(test_case.view_error)
     )
     connection: FakeDatabricksMetadataConnection = FakeDatabricksMetadataConnection(
         (batch_cursor, orders_cursor, view_cursor)
@@ -290,6 +293,34 @@ def test_given_view_in_freshness_batch_when_getting_metadata_then_only_the_view_
     assert "information_schema" not in "".join(
         cursor.executed_sql or "" for cursor in connection.returned_cursors
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DatabricksFreshnessBatchErrorTestCase(
+            description="a lost connection fails the check instead of marking sources unknown",
+            batch_error=RequestError("connection reset"),
+            expected_match="connection reset",
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_request_error_in_freshness_batch_when_getting_metadata_then_it_is_raised(
+    test_case: DatabricksFreshnessBatchErrorTestCase,
+) -> None:
+    adapter: DatabricksAdapter = DatabricksAdapter()
+    requests: tuple[TableFreshnessRequest, ...] = (
+        TableFreshnessRequest(database="main", schema="raw", name="orders"),
+        TableFreshnessRequest(database="main", schema="raw", name="customers"),
+    )
+    connection: FakeDatabricksMetadataConnection = FakeDatabricksMetadataConnection(
+        (FailingDatabricksMetadataCursor(execute_error=test_case.batch_error),)
+    )
+
+    with pytest.raises(type(test_case.batch_error), match=test_case.expected_match):
+        adapter.get_tables_freshness_metadata(connection=connection, requests=requests)
+    assert len(connection.returned_cursors) == 1
 
 
 @pytest.mark.parametrize(
@@ -324,6 +355,24 @@ def test_given_view_in_freshness_batch_when_getting_metadata_then_only_the_view_
                 "SELECT id, status FROM `workspace`.`test`.`orders__delta`",
             ),
         ),
+        DatabricksRenderDeleteInsertCursorTestCase(
+            description="keyed cursor deletes the window and the delta keys in one statement",
+            target="`workspace`.`test`.`orders`",
+            sql="SELECT id, status FROM `workspace`.`test`.`orders__delta`",
+            cursor_column="id",
+            cursor_start="1",
+            cursor_end="10",
+            columns=("id", "status"),
+            unique_key=("id",),
+            expected_statements=(
+                "DELETE FROM `workspace`.`test`.`orders` WHERE (`id` >= 1 AND `id` < 10) "
+                "OR EXISTS (SELECT 1 FROM (SELECT id, status FROM "
+                "`workspace`.`test`.`orders__delta`) AS __source "
+                "WHERE `workspace`.`test`.`orders`.`id` = __source.`id`)",
+                "INSERT INTO `workspace`.`test`.`orders` (`id`, `status`) "
+                "SELECT id, status FROM `workspace`.`test`.`orders__delta`",
+            ),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -339,6 +388,7 @@ def test_given_cursor_delete_insert_when_rendering_then_databricks_uses_replace_
         cursor_start=test_case.cursor_start,
         cursor_end=test_case.cursor_end,
         columns=test_case.columns,
+        unique_key=test_case.unique_key,
     )
 
     assert statements == test_case.expected_statements

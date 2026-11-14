@@ -390,7 +390,8 @@ missed or don't count:
 
 - queries on other replicas or shards, which matters on ClickHouse Cloud and behind load-balanced
   replicas. When `system.clusters` shows other replicas of the connected server's shard, the preview
-  says `usage read from this server only; other replicas not checked`;
+  says `usage read from this server only; other replicas not checked`, and `keep_in_use` stops
+  with `C503` because the usage is incomplete;
 - queries ClickHouse answers from metadata without logging the table, such as a plain `count()`;
 - readers whose settings profile turns `log_queries` off or samples it with
   `log_queries_probability`. When `log_queries` is off for the janitor's own connection, usage isn't

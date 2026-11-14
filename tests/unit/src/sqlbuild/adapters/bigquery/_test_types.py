@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 
 from sqlbuild._native import InferredNullability
 from sqlbuild.adapter.contract.models import (
@@ -282,3 +283,19 @@ class BigQueryGoogleSqlRenderingTestCase:
     description: str
     render: Callable[[BigQueryAdapter], str | tuple[str, ...]]
     expected_sql: str | tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BigQueryKeyedCursorMergeTestCase:
+    description: str
+    unique_key: tuple[str, ...]
+    columns: tuple[str, ...]
+    expected_statements: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BigQueryLoaderDecimalRowTestCase:
+    description: str
+    value: Decimal
+    column_type: str
+    expected_sql: str

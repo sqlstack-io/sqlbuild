@@ -140,9 +140,16 @@ explicitly:
 database = ":memory:"
 ```
 
-A `database` or `schema` on a connection doesn't decide where models are built; set them on the
-target. A target that names an unknown connection fails when the configuration loads, before
-anything connects.
+A `database` or `schema` on a connection, named or a top-level `[connection]`, doesn't decide where
+models are built; set them on the target or in `[defaults]`. Intermediate loaders and the janitor
+use the same location as models: the target's `database` and `schema`, then `[defaults]`. On
+Snowflake, BigQuery and Databricks they never use the connection's values. On the other adapters,
+the connection's values fill in when neither the target nor `[defaults]` sets one. Managed sources
+load into their own `database` and `schema`, then the target's, as described in
+[Targets](#targets).
+
+A target that names an unknown connection fails when the configuration loads, before anything
+connects.
 
 ## Targets
 
@@ -614,7 +621,7 @@ keep_in_use = false
 | `exclude_patterns` | `[]` | Glob patterns for relations to skip |
 | `direct_state_history_versions` | `20` | How many state-history rows to keep per identity in `_sqlbuild_fingerprints` and `_sqlbuild_source_freshness`, and how many builds of each model and seed to keep in `_sqlbuild_consumption` |
 | `in_use_window` | `"7d"` | How far back the janitor looks for reads of each relation it would archive. A fixed duration such as `"7d"` or `"36h"`. See [Relations in use](../cli/janitor.md#relations-in-use) |
-| `keep_in_use` | `false` | Keep relations read within `in_use_window` instead of archiving them. `--keep-in-use` turns it on for one run |
+| `keep_in_use` | `false` | Keep relations read within `in_use_window` instead of archiving them. `--keep-in-use` turns it on for one run. Stops with `C503` when usage can't be read in full |
 
 See [janitor](../cli/janitor.md) for the archive and delete lifecycle.
 

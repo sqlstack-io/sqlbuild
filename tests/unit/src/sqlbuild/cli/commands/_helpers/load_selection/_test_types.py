@@ -29,3 +29,4 @@ class LoaderDefaultResolutionTestCase:
     adapter: str
     connection: dict[str, object]
     expected_defaults: tuple[str | None, str | None]
+    project_defaults: tuple[str | None, str | None] = (None, None)

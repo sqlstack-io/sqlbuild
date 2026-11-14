@@ -2020,7 +2020,9 @@ class PostgresAdapter(
             return f"{self._quote_sql_string(json.dumps(value, sort_keys=True))}::JSONB"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return self._quote_sql_string(value.isoformat())

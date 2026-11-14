@@ -15,6 +15,8 @@ use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
+use crate::bindings::_helpers::compile_attachment::target::project_location;
+use crate::bindings::_helpers::compile_driver::targets::requires_explicit_targets;
 use crate::bindings::_helpers::contracts::spec_resolution::loader_destination_parts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::native_host::host;
@@ -230,23 +232,18 @@ fn non_empty_text<'py>(value: Option<Bound<'py, PyAny>>) -> PyResult<Option<Boun
     Ok(stripped.is_truthy()?.then_some(stripped))
 }
 
-/// `target_value or fallback`, reading the target field when there is a target.
-fn first_truthy<'py>(
+/// The target's value for `field`, or `None` when there is no target.
+fn target_value<'py>(
     target_config: &Bound<'py, PyAny>,
     field: &str,
-    fallback: Option<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = target_config.py();
-    if !target_config.is_none() {
-        let value: Bound<'py, PyAny> = native_field(target_config, field)?;
-        if value.is_truthy()? {
-            return Ok(value);
-        }
+    if target_config.is_none() {
+        return Ok(target_config.clone());
     }
-    Ok(fallback.unwrap_or_else(|| py.None().into_bound(py)))
+    native_field(target_config, field)
 }
 
-/// Intermediate loader defaults: the target namespace, else the connection's (no database on DuckDB).
+/// Intermediate loader defaults: the project location models use (see `project_location`).
 pub(crate) fn loader_defaults<'py>(
     discovered: &Bound<'py, PyAny>,
     (selected_target, target_config, cli_vars): (
@@ -274,13 +271,22 @@ pub(crate) fn loader_defaults<'py>(
     } else {
         non_empty_text(connection.get_item("database")?)?
     };
+    let explicit: bool = requires_explicit_targets(&adapter_name)?;
+    let defaults: Bound<'py, PyAny> =
+        native_field(&native_field(discovered, "project_config")?, "defaults")?;
+    let location = |field: &str, fallback: Option<Bound<'py, PyAny>>| {
+        project_location(
+            (
+                target_value(target_config, field)?,
+                native_field(&defaults, field)?,
+            ),
+            fallback.into_iter().collect(),
+            explicit,
+        )
+    };
     Ok(LoaderDefaults {
-        database: first_truthy(target_config, "database", connection_database)?,
-        schema: first_truthy(
-            target_config,
-            "schema",
-            non_empty_text(connection.get_item("schema")?)?,
-        )?,
+        database: location("database", connection_database)?,
+        schema: location("schema", non_empty_text(connection.get_item("schema")?)?)?,
     })
 }
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 
@@ -22,6 +23,7 @@ from sqlbuild.adapter.contract.models import (
 from sqlbuild.adapter.contract.types import (
     CursorKind,
     FunctionNullabilityRule,
+    LoaderLogicalType,
     TableFreshnessStatus,
 )
 from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
@@ -39,6 +41,8 @@ from tests.unit.src.sqlbuild.adapters.bigquery._test_types import (
     BigQueryDmlLifecycleTestCase,
     BigQueryExecutionErrorTestCase,
     BigQueryExpressionInferenceProfileTestCase,
+    BigQueryKeyedCursorMergeTestCase,
+    BigQueryLoaderDecimalRowTestCase,
     BigQueryMergeExclusionTestCase,
     BigQueryPruneSqlTestCase,
     BigQueryQueryTestCase,
@@ -898,6 +902,47 @@ def test_given_delete_insert_cursor_when_rendering_then_bigquery_uses_merge(
 @pytest.mark.parametrize(
     "test_case",
     [
+        BigQueryKeyedCursorMergeTestCase(
+            description="one merge replaces the delta keys and deletes the rest of the window",
+            unique_key=("order_id",),
+            columns=("order_id", "status", "updated_at"),
+            expected_statements=(
+                "MERGE INTO `example-project.dev.orders` AS __target USING "
+                "(SELECT order_id, status, updated_at FROM delta_orders) AS __source "
+                "ON __target.`order_id` = __source.`order_id` "
+                "WHEN MATCHED THEN UPDATE SET `status` = __source.`status`, "
+                "`updated_at` = __source.`updated_at` "
+                "WHEN NOT MATCHED THEN INSERT (`order_id`, `status`, `updated_at`) "
+                "VALUES (__source.`order_id`, __source.`status`, __source.`updated_at`) "
+                "WHEN NOT MATCHED BY SOURCE AND __target.`updated_at` >= "
+                "TIMESTAMP '2026-01-01T00:00:00' AND __target.`updated_at` < "
+                "TIMESTAMP '2026-01-02T00:00:00' THEN DELETE",
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_keyed_cursor_window_when_rendering_then_bigquery_replaces_it_in_one_merge(
+    test_case: BigQueryKeyedCursorMergeTestCase,
+) -> None:
+    adapter: BigQueryAdapter = BigQueryAdapter()
+
+    statements: tuple[str, ...] = adapter.render_delete_insert_cursor(
+        destination="example-project.dev.orders",
+        sql="SELECT order_id, status, updated_at FROM delta_orders",
+        cursor_column="updated_at",
+        cursor_start="2026-01-01T00:00:00",
+        cursor_end="2026-01-02T00:00:00",
+        columns=test_case.columns,
+        unique_key=test_case.unique_key,
+    )
+
+    assert statements == test_case.expected_statements
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         BigQueryMergeExclusionTestCase(
             description="bigquery selective merge",
             expected_update_assignment="`status` = __source.`status`",
@@ -1152,3 +1197,36 @@ def test_given_listed_relations_when_adding_age_metadata_then_bigquery_reads_eac
         "SELECT table_id, TIMESTAMP_MILLIS(creation_time), "
         "TIMESTAMP_MILLIS(last_modified_time) FROM `example-project.dev_orders.__TABLES__`",
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        BigQueryLoaderDecimalRowTestCase(
+            description="a wide decimal in exponent form casts exactly to bignumeric",
+            value=Decimal("1.23456789012E-2"),
+            column_type="BIGNUMERIC(40, 13)",
+            expected_sql="SELECT CAST('0.0123456789012' AS BIGNUMERIC) AS `amount`",
+        ),
+        BigQueryLoaderDecimalRowTestCase(
+            description="a numeric decimal casts from a string, not a float literal",
+            value=Decimal("12.50"),
+            column_type="NUMERIC(4, 2)",
+            expected_sql="SELECT CAST('12.50' AS NUMERIC) AS `amount`",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_decimal_loader_value_when_rendering_rows_then_bigquery_casts_it_exactly(
+    test_case: BigQueryLoaderDecimalRowTestCase,
+) -> None:
+    adapter: BigQueryAdapter = BigQueryAdapter()
+
+    rendered_sql: str = adapter.render_loader_rows_select(
+        rows=({"amount": test_case.value},),
+        column_names=("amount",),
+        column_sql_types={"amount": test_case.column_type},
+        inferred_types={"amount": LoaderLogicalType.DECIMAL},
+    )
+
+    assert rendered_sql == test_case.expected_sql

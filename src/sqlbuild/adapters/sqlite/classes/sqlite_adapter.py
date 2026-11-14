@@ -1288,7 +1288,8 @@ class SqliteAdapter(
             stmt: str
             for stmt in statements:
                 cursor: Any = self.execute(connection=connection, sql=stmt)
-                affected = self.affected_row_count(cursor=cursor)
+                if stmt.startswith(INSERT_KEYWORD):
+                    affected = self.affected_row_count(cursor=cursor)
         return affected
 
     def merge(
@@ -2291,7 +2292,9 @@ class SqliteAdapter(
             return _quote_sql_string(json.dumps(value, sort_keys=True))
         if isinstance(value, bool):
             return "1" if value else "0"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime):
             return _quote_sql_string(canonical_timestamp_text(value.isoformat()))

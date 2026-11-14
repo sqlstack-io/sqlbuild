@@ -1136,7 +1136,9 @@ class BigQueryAdapter(
             return f"JSON {self._quote_sql_string(json.dumps(value, sort_keys=True))}"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return self._quote_sql_string(format(value, "f"))
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return self._quote_sql_string(value.isoformat())
@@ -1820,6 +1822,8 @@ class BigQueryAdapter(
         cursor_type: str | None = None,
         unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
+        """Replace a cursor window; with a key and columns, one MERGE also replaces delta keys."""
+
         insert_clause: str = "INSERT ROW"
         if columns is not None:
             column_list: str = ", ".join(self.render_identifier(column) for column in columns)
@@ -1833,6 +1837,14 @@ class BigQueryAdapter(
             f"AND __target.{self.render_identifier(cursor_column)} < "
             f"{self._render_cursor_bound_string(cursor_end)}"
         )
+        if unique_key and columns is not None:
+            (merge_sql,) = self.render_merge(
+                destination=self._quote_identifier_path(destination),
+                sql=sql,
+                unique_key=unique_key,
+                source_columns=columns,
+            )
+            return (f"{merge_sql} WHEN NOT MATCHED BY SOURCE AND {cursor_filter} THEN DELETE",)
         if unique_key:
             return (
                 f"DELETE FROM {self._quote_identifier_path(destination)} AS __target "
@@ -3114,6 +3126,8 @@ class BigQueryAdapter(
             return DATETIME_TYPE_NAME
         if any(token in normalized for token in ("FLOAT", "DOUBLE", "REAL")):
             return FLOAT_WIRE_TYPE_NAME
+        if any(token in normalized for token in ("BIGNUMERIC", "BIGDECIMAL")):
+            return "BIGNUMERIC"
         if any(token in normalized for token in ("DECIMAL", "NUMERIC", "NUMBER")):
             return "NUMERIC"
         if INTEGER_TYPE_TOKEN in normalized:

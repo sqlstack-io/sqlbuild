@@ -426,3 +426,11 @@ class SnowflakeSchemaExistsTestCase:
     cursor: object
     expected_exists: bool
     expected_sql_fragment: str
+
+
+@dataclass(frozen=True)
+class SnowflakeKeyedCursorDeleteInsertTestCase:
+    description: str
+    unique_key: tuple[str, ...]
+    expected_prefixes: tuple[str, ...]
+    expected_inserted: int
