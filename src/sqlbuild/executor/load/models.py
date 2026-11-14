@@ -17,13 +17,12 @@ from sqlbuild.adapter.contract.types import LoaderLogicalType
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
 )
-from sqlbuild.compiler.python_nodes.types import PythonNodeKind, SkipMode
+from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.load.constants import LOADER_RELATION_QUALIFIER_SEPARATOR
 from sqlbuild.executor.load.types import LoadProgressCallback
-from sqlbuild.executor.node_results.models import NodeResultEnvelope
+from sqlbuild.executor.node_results.classes.dependency_result_reader import DependencyResultReader
 from sqlbuild.executor.python_nodes.classes.runtime_relation_guard import RuntimeRelationGuard
-from sqlbuild.executor.python_nodes.constants import MISSING_DEFAULT
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.provider.main.runtime import ProviderContainer, _empty_provider_container
 from sqlbuild.python_nodes.models import SqlResourceRef
@@ -95,7 +94,7 @@ class LoaderResult:
 
 
 @dataclass(frozen=True)
-class LoaderContext:
+class LoaderContext(DependencyResultReader):
     """Runtime context passed to a source loader function."""
 
     adapter: BaseAdapter
@@ -164,44 +163,6 @@ class LoaderContext:
             materialized=materialized,
         )
 
-    def result_of(
-        self,
-        *,
-        node_function: Callable[..., object],
-        run_id: str | None = None,
-        default: object = MISSING_DEFAULT,
-    ) -> NodeResultEnvelope | object:
-        """Return the latest persisted upstream result by Python node function reference."""
-
-        if self.result_store is None:
-            if default is not MISSING_DEFAULT:
-                return default
-            raise ExecutorInputError("No Python node result store is available")
-        node_type, node_name = self._result_dependency_identity(node_function)
-        return self.result_store.result_of(
-            node_type=node_type,
-            node_name=node_name,
-            run_id=run_id,
-            default=default,
-        )
-
-    def results_of(
-        self,
-        *,
-        node_function: Callable[..., object],
-        limit: int,
-    ) -> tuple[NodeResultEnvelope, ...]:
-        """Return persisted successful upstream result history, newest first."""
-
-        if self.result_store is None:
-            return ()
-        node_type, node_name = self._result_dependency_identity(node_function)
-        return self.result_store.results_of(
-            node_type=node_type,
-            node_name=node_name,
-            limit=limit,
-        )
-
     def qualify_name(
         self,
         *,
@@ -250,24 +211,6 @@ class LoaderContext:
             self.relation_guard.record_resolved(
                 SqlResourceRef(kind=SqlResourceRefKind.SOURCE, name=relation_ref.name)
             )
-
-    def _result_dependency_identity(self, node_function: Callable[..., object]) -> tuple[str, str]:
-        task_definition: object = getattr(node_function, "__sqlbuild_task__", None)
-        if task_definition is not None:
-            return PythonNodeKind.TASK.value, self._definition_name(task_definition)
-        asset_definition: object = getattr(node_function, "__sqlbuild_asset__", None)
-        if asset_definition is not None:
-            return PythonNodeKind.ASSET.value, self._definition_name(asset_definition)
-        loader_definition: object = getattr(node_function, "__sqlbuild_loader__", None)
-        if loader_definition is not None:
-            return PythonNodeKind.LOADER.value, self._definition_name(loader_definition)
-        raise ExecutorInputError("Python node result dependency must be a task, asset, or loader")
-
-    def _definition_name(self, definition: object) -> str:
-        name: object = getattr(definition, "name", None)
-        if isinstance(name, str):
-            return name
-        raise ExecutorInputError("Python node result dependency has no resolved name")
 
 
 @dataclass(frozen=True)

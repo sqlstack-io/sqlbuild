@@ -17,7 +17,9 @@ use crate::python_selection::constants::{
     UNIT_TEST_ONLY_TEST_AND_BUILD, UNKNOWN_NAME_CODE, UNKNOWN_PATH_CODE, UNKNOWN_TAG_CODE,
     UNMAPPED_KIND_CODE,
 };
-use crate::python_selection::models::{NodeIndex, PythonSelectionGraph, PythonSelectionNode};
+use crate::python_selection::models::{
+    NodeIndex, PythonSelectionGraph, PythonSelectionNode, SelectionContext, SqlSelectionGraph,
+};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT as PYTHON_NODE_PATH_ROOT;
 
 pub(crate) type Names = BTreeSet<String>;
@@ -57,6 +59,19 @@ fn keyed(rows: &[(String, Vec<String>)]) -> HashMap<&str, &[String]> {
     rows.iter()
         .map(|(name, values)| (name.as_str(), values.as_slice()))
         .collect()
+}
+
+impl<'graph> SelectionContext<'graph> {
+    pub(crate) fn new(
+        sql: SqlSelectionGraph<'graph>,
+        python: &'graph PythonSelectionGraph,
+    ) -> Self {
+        Self {
+            sql,
+            nodes: NodeIndex::new(python),
+            sql_names: sql_names(sql.graph),
+        }
+    }
 }
 
 impl<'graph> NodeIndex<'graph> {

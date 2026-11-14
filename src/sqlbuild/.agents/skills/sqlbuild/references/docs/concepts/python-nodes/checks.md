@@ -120,7 +120,11 @@ Checks do not support `columns`, `column_lineage`, or `retry`.
 
 ## Running checks
 
-Checks run automatically at the end of `sqb build` when all their Python and SQL dependencies ran in that build. They are skipped when `--no-audits` is passed. To run checks on their own, use [`sqb check`](../../cli/check.md):
+Checks run automatically at the end of `sqb build` when all their Python and SQL dependencies ran in that build. They are skipped when `--no-audits` is passed.
+
+A `sqb build` selector that matches a check must also select the nodes the check depends on. Otherwise the build fails with an error that names the check and the missing node; select that node too, or narrow the selector so it no longer matches the check. A check on a source that no loader writes never runs in a build, so a selector that matches it fails too; run that check with `sqb check`. Jobs and server runs resolve selectors the same way.
+
+To run checks on their own, use [`sqb check`](../../cli/check.md):
 
 ```bash
 # Run all checks

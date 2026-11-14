@@ -1,6 +1,7 @@
 """Runtime node result storage constants."""
 
 from sqlbuild._native import StateSqlValueType
+from sqlbuild.compiler.python_nodes.types import PythonNodeKind
 
 NODE_RESULT_MATERIALIZED_TRUE_VALUE: str = "true"
 
@@ -36,3 +37,9 @@ NODE_RESULT_COLUMN_TYPES: dict[str, StateSqlValueType] = {
     **{column: StateSqlValueType.STRING for column in NODE_RESULT_COLUMNS},
     COLUMN_TIMESTAMP: StateSqlValueType.TEXT_TIMESTAMP,
 }
+
+RESULT_DEPENDENCY_ATTRIBUTES: tuple[tuple[str, str], ...] = (
+    ("__sqlbuild_task__", PythonNodeKind.TASK.value),
+    ("__sqlbuild_asset__", PythonNodeKind.ASSET.value),
+    ("__sqlbuild_loader__", PythonNodeKind.LOADER.value),
+)
