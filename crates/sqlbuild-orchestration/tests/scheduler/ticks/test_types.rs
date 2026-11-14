@@ -82,6 +82,49 @@ impl crate::scheduler::types::RunLauncher for CycleRecorder<'_> {
     }
 }
 
+/// Fences the first lease it polls with, and stops the loop once it polls under a newer epoch.
+pub(crate) struct FencingLauncher<'a> {
+    pub(crate) epochs: &'a mut Vec<i64>,
+    pub(crate) stop: &'a tokio::sync::watch::Sender<bool>,
+}
+
+impl crate::scheduler::types::RunLauncher for FencingLauncher<'_> {
+    async fn poll(
+        &mut self,
+        store: &crate::store::models::ControlStore,
+        lease: Option<&crate::scheduler::models::SchedulerLease>,
+    ) -> Result<(), crate::store::errors::ControlError> {
+        let Some(lease) = lease else {
+            return Ok(());
+        };
+        self.epochs.push(lease.epoch);
+        if self.epochs.len() > 1 {
+            if self.epochs.windows(2).any(|pair| pair[1] > pair[0]) {
+                self.stop.send_replace(true);
+            }
+            return Ok(());
+        }
+        crate::store::tests::lease_helpers::expire_lease(store).await;
+        crate::scheduler::main::renew_lease::renew_lease(store, lease)
+            .await
+            .map(drop)
+    }
+
+    async fn shutdown(
+        &mut self,
+        _store: &crate::store::models::ControlStore,
+        _lease: Option<&crate::scheduler::models::SchedulerLease>,
+    ) -> Result<(), crate::store::errors::ControlError> {
+        Ok(())
+    }
+}
+
+pub(crate) struct FencedLoopTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_rejoined: bool,
+}
+
 pub(crate) struct TickRetentionTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

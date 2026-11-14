@@ -2,6 +2,8 @@
 
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
+#[path = "test_crash_recovery.rs"]
+mod test_crash_recovery;
 #[path = "test_foreign_key_indexes.rs"]
 mod test_foreign_key_indexes;
 #[path = "test_store_upgrade.rs"]
