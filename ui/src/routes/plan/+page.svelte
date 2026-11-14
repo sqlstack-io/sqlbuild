@@ -8,7 +8,7 @@
 	import { page } from '$app/state';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
-	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument } from '$lib/api';
+	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument, PlatformEvent } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { kindLine } from '$lib/build-area/labels';
@@ -20,7 +20,7 @@
 	import PlanReport from '$lib/run/plan-report.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { builtModels, builtSeeds, changedModelKeys, jobRefreshText, planSentence } from '$lib/run/plan-text';
+	import { builtModels, builtSeeds, changedModelKeys, jobRefreshText } from '$lib/run/plan-text';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
@@ -29,7 +29,8 @@
 	const checkList = createResource((client, scope) => client.listChecks(scope), ['checks']);
 	// A `--changed` plan names the job whose own run refreshes what it holds back, with that job's schedule.
 	const triggerList = createResource((client, scope) => client.listTriggers(scope), ['triggers']);
-	const refresh = (job: string) => jobRefreshText(job, triggerList.data ?? [], app.now);
+	const schedulerStopped = $derived(app.platformEvents.some((e) => e.active && e.kind === 'scheduler_no_leader'));
+	const refresh = (job: string) => jobRefreshText(job, triggerList.data ?? [], app.now, schedulerStopped);
 
 	let cmd = $state(page.url.searchParams.get('cmd') ?? 'sqb build');
 	let cmdEl = $state<HTMLInputElement>();
@@ -244,6 +245,17 @@
 					(planned ? (settled.typing ? 'Finish the option you are typing' : undefined) : (planError?.key === requestKey ? planError.message : 'Waiting for the plan')))
 	);
 
+	/** The banner shows only problems that stop this run or touch what it builds; the rest stay on the Overview. */
+	const planRelations = $derived(new Set((plan?.models ?? []).flatMap((m) => [m.name, m.qualified_name?.split('.').at(-1)]).filter((n): n is string => !!n).map((n) => n.toLowerCase())));
+	function affectsPlan(event: PlatformEvent): boolean {
+		if (event.kind === 'scheduler_no_leader') return true;
+		if (event.locationId !== app.location?.id) return false;
+		if (event.kind === 'location_broken') return true;
+		if (event.kind === 'launch_failed') return !!job && event.subject === job;
+		if (event.kind === 'warehouse_sync_failed') return !!event.subject && planRelations.has(event.subject.toLowerCase().split('.').at(-1)!);
+		return false;
+	}
+
 	async function launch() {
 		const scope = app.scope;
 		if (!scope || !canLaunch) return;
@@ -263,7 +275,7 @@
 	}
 </script>
 
-<AppTopbar title="Plan" />
+<AppTopbar title="Plan" events={affectsPlan} />
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="cmd">
@@ -318,9 +330,7 @@
 		<div class="main sb-scroll" class:stale={!!shown && (!!problem || !fresh || (planning && !!plan))}>
 			{#if shown?.verb}
 				<div class="summary">
-					{#if shown.verb === 'build'}
-						{#if plan}<span class="sentence">{planSentence(plan)}</span>{/if}
-					{:else}
+					{#if shown.verb !== 'build'}
 						<b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
 					{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code" title="Option">{value === true ? name : `${name}=${value}`}</span>{/each}
@@ -589,16 +599,6 @@
 		color: var(--foreground);
 		font-weight: 600;
 	}
-	.sentence {
-		flex-basis: 100%;
-		margin-bottom: 6px;
-		color: var(--foreground);
-		font-size: 13px;
-		text-wrap: pretty;
-	}
-	.sentence + .tabs {
-		margin-left: 0;
-	}
 	.summary span {
 		color: var(--sb-text-faint);
 	}
@@ -616,6 +616,9 @@
 		display: flex;
 		gap: 14px;
 		margin-left: 18px;
+	}
+	.tabs:first-child {
+		margin-left: 0;
 	}
 	.tabs button {
 		padding: 2px 0;

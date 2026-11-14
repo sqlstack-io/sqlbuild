@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { actionText, changedPolicyLine, changedSections, jobRefreshText, planSections, planSentence } from './plan-text';
+import { actionText, changedSections, jobRefreshText, looseWarnings, planSections, warningText } from './plan-text';
 
 const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	name,
@@ -71,35 +71,37 @@ describe('plan text, as sqb plan prints it', () => {
 		]);
 	});
 
+	it("shows a model's warning with the changed model it names, keeps the rest for the warnings list, and leaves out the forward-only advice", () => {
+		const forward = "events: the model's SQL changed, so already-built dates keep their old results - only new dates will use the new query.";
+		const p = plan(
+			[model('events', { reason: 'query_changed', materialization_type: 'incremental' }), model('orders', { reason: 'query_changed' }), model('event_counts')],
+			{ warnings: [{ severity: 'warning', message: forward }, { severity: 'warning', message: 'lag', model_name: 'orders' }, { severity: 'warning', message: 'event_counts: routine' }, { severity: 'error', message: 'no model named here' }] }
+		);
+		const sections = planSections(p);
+		expect(sections[0].entries.map((e) => [e.name, e.warnings?.map(warningText)])).toEqual([
+			['events', undefined],
+			['orders', ['Lag']]
+		]);
+		// Only changed models carry warnings; one about a routine model, or about no model, is listed on its own.
+		expect(looseWarnings(p, sections).map((w) => w.message)).toEqual(['event_counts: routine', 'no model named here']);
+	});
+
+	it('shows a warning once, under the first entry for its model, when the model is in more than one changed section', () => {
+		const lag = { severity: 'warning', message: 'lag', model_name: 'orders' };
+		const p = plan([model('orders', { reason: 'query_changed' })], { warnings: [lag], retention: [{ model: 'orders', action: 'drop' }] });
+		expect(planSections(p).flatMap((s) => s.entries.map((e) => [s.title, e.warnings?.length ?? 0]))).toEqual([
+			['Retention', 1],
+			['Query changed', 0]
+		]);
+	});
+
 	it('collapses a plan that is all full refresh into counts by materialization', () => {
 		const full = plan([model('a', { reason: 'full_refresh' }), model('b', { reason: 'full_refresh' }), model('v', { reason: 'full_refresh', materialization_type: 'view' })]);
 		expect(planSections(full)).toEqual([{ title: 'Full refresh', changed: true, entries: [{ name: 'table', value: '2 models', detail: [] }, { name: 'view', value: '1 model', detail: [] }] }]);
-		expect(planSentence(full)).toBe('3 models build from scratch, replacing what was built.');
 	});
 });
 
-describe('plan sentence', () => {
-	const incremental = { reason: 'normal_incremental', materialization_type: 'incremental' } as const;
-
-	it('names a changed model, counts the ones taking new rows, and calls the rest usual', () => {
-		const p = plan([model('orders', { reason: 'query_changed' }), model('events', incremental), model('visits', incremental), model('a'), model('b'), model('c', { action: 'skip' })]);
-		expect(planSentence(p)).toBe('5 models build: orders changed since its last build, 2 incremental models take new rows and the other 2 are recreated as usual. 1 disabled model is skipped.');
-	});
-
-	it('counts many changes, says first builds apart, and says when nothing changed', () => {
-		const changed = ['a', 'b', 'c'].map((n) => model(n, { reason: 'config_changed' }));
-		expect(planSentence(plan([...changed, model('new', { reason: 'first_run' })]))).toBe('4 models build: 3 models changed since their last build and new builds for the first time.');
-		expect(planSentence(plan([model('a'), model('b')], { source_loads: [{ name: 'raw', kind: 'source', is_reload: false }] }))).toBe('2 models build: none changed since their last build. 1 source loads first.');
-		expect(planSentence(plan([model('a', { action: 'skip', reason: 'disabled' })]))).toBe('Nothing to build. 1 disabled model is skipped.');
-	});
-
-	it('says what runs when no model builds', () => {
-		const seeds = [{ name: 'carriers', reason: 'first_run' }, { name: 'regions', reason: 'no_change' }];
-		expect(planSentence(plan([], { seeds }))).toBe('No models build. 1 seed loads.');
-		const functions = [{ name: 'margin', language: 'sql', reason: 'definition_changed' }, { name: 'tax', language: 'sql', reason: 'no_change' }];
-		expect(planSentence(plan([], { functions }))).toBe('No models build. 1 changed function is recreated.');
-	});
-
+describe('plan under --changed', () => {
 	// The reach fixture's `sqb plan --changed --json` after stg_orders is redefined: finance_daily holds two models back.
 	const reach = plan(
 		[
@@ -132,7 +134,7 @@ describe('plan sentence', () => {
 		}
 	);
 
-	it('under --changed lists only what runs, then what waits for its job and what is skipped, as sqb plan does', () => {
+	it('lists only what runs, then what waits for its job and, collapsed, what is skipped, as sqb plan does', () => {
 		const sections = [...planSections(reach), ...changedSections(reach.changed!, (job) => `job ${job}`)];
 		expect(sections.map((s) => [s.title, s.entries.map((e) => `${e.name}: ${e.value}${e.detail.length ? ` (${e.detail.join(', ')})` : ''}`)])).toEqual([
 			['Query changed', ['stg_orders: continue forward']],
@@ -140,11 +142,10 @@ describe('plan sentence', () => {
 			['Held back', ['fct_revenue: job finance_daily', 'rpt_pnl: job finance_daily', 'summary: reads fct_revenue, which is held back']],
 			['Unchanged', ['stg_customers: skipped by --changed']]
 		]);
-		expect(changedPolicyLine(reach.changed!)).toBe('Counting: definition (source data not counted) · reach: job');
-		expect(changedPolicyLine({ ...reach.changed!, counts: ['definition', 'source_data'], reach: 'all' })).toBe('Counting: definition, source data · reach: all');
-		expect(planSentence(reach)).toBe(
-			'4 models build: stg_orders changed since its last build and the other 3 models read a change upstream. 3 models wait for their job\'s own run. 1 unchanged node is skipped by --changed.'
-		);
+		expect(changedSections(reach.changed!, (job) => job).map((s) => [s.title, !!s.collapsed])).toEqual([
+			['Held back', false],
+			['Unchanged', true]
+		]);
 	});
 
 	it('names the models that run under --changed for their own reason, not as reading a change', () => {
@@ -160,7 +161,6 @@ describe('plan sentence', () => {
 				unchanged: []
 			}
 		});
-		expect(planSentence(first)).toBe('2 models build: orders and order_count run for their own reason.');
 		expect(planSections(first).find((s) => s.title === 'Models')?.entries.map((e) => e.detail.at(-1))).toEqual(['no completed record', 'no completed record']);
 	});
 
@@ -171,6 +171,12 @@ describe('plan sentence', () => {
 		// A group's schedule says nothing about a job whose own trigger is paused; the plan names the group itself when it matters.
 		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', '2026-01-01T05:00:00Z'), trigger('nightly', 'running', '2026-01-01T02:00:00Z')], now)).toBe('job finance_daily is paused');
 		expect(jobRefreshText('nightly', [trigger('nightly', 'running', '2026-01-01T02:00:00Z'), trigger('nightly', 'running', '2026-01-01T05:00:00Z')], now)).toBe('job nightly · next run in 2h');
+		// While no server runs the scheduler, neither a schedule nor a sensor starts the job, so it shows no countdown.
+		const stopped = true;
+		expect(jobRefreshText('nightly', [trigger('nightly', 'running', '2026-01-01T02:00:00Z')], now, stopped)).toBe('job nightly · can’t start until the scheduler is running again');
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'running', null, 'sensor')], now, stopped)).toBe('job finance_daily · can’t start until the scheduler is running again');
+		// A paused job stays paused whether or not the scheduler runs.
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', '2026-01-01T05:00:00Z')], now, stopped)).toBe('job finance_daily is paused');
 		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', null), trigger('finance_daily', 'running', null, 'sensor')], now)).toBe('job finance_daily · when its sensor fires');
 		// A running schedule with no next run, such as a finished calendar, is not a sensor.
 		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'running', null)], now)).toBe('job finance_daily');

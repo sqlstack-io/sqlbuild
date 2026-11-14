@@ -13,12 +13,11 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
-	import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
-	import { attentionRank, attentionView, type AttentionTone } from '$lib/build-area/attention';
+	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
 	import type { AttentionItem } from '$lib/api';
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
@@ -38,9 +37,7 @@
 		stale: HistoryIcon,
 		info: InfoIcon
 	};
-	const viewed = $derived(
-		(data?.attention ?? []).map((item) => ({ item, view: attentionView(item, app.now) })).sort((a, b) => attentionRank(a.view.tone) - attentionRank(b.view.tone))
-	);
+	const viewed = $derived(attentionViews(data?.attention ?? [], app.now));
 	const acknowledgementOf = (item: AttentionItem) => ('acknowledged' in item ? item.acknowledged : null);
 	// Acknowledged problems no longer need attention: they leave the count and the banner's tone.
 	const issues = $derived(viewed.filter(({ item }) => !acknowledgementOf(item)));
@@ -62,8 +59,7 @@
 			acknowledging = null;
 		}
 	}
-	const stale = $derived(data?.attention.find((i) => i.kind === 'stale_models'));
-	const staleSelection = $derived(stale && stale.kind === 'stale_models' ? [...new Set([...stale.changed, ...stale.behind])] : []);
+	const staleListed = $derived(issues.some(({ item }) => item.kind === 'stale_models'));
 	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
 	const loaded = $derived(data !== null);
 	const healthTone = $derived(
@@ -83,7 +79,8 @@
 
 </script>
 
-<AppTopbar title="Overview">
+<!-- The alerts below list every platform problem, so the banner would only repeat them. -->
+<AppTopbar title="Overview" events={() => false}>
 	<Button variant="outline" size="sm" onclick={() => overview.refresh()}>↻ Refresh</Button>
 </AppTopbar>
 
@@ -115,13 +112,14 @@
 							<span>{overview.error ? 'Couldn’t check its health' : 'Checking…'}</span>
 						{:else}
 							<strong>{issues.length ? `${app.location?.name} needs attention` : `${app.location?.name} is healthy`}</strong>
-							<span>{issues.length ? `${issues.length} ${issues.length === 1 ? 'item' : 'items'} · ${latestText}` : latestText}</span>
+							<span>{issues.length > 1 ? `${issues.length} items · ${latestText}` : latestText}</span>
 						{/if}
 					</div>
 					{#if m}
 						<div class="health-facts">
-							{#if m.stale?.changed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
-							{#if m.stale?.behind}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
+							<!-- The out-of-date alert below already counts these. -->
+							{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
+							{#if m.stale?.behind && !staleListed}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
 							{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
 						</div>
 					{/if}
@@ -133,21 +131,27 @@
 							{@const Glyph = attentionIcon[view.tone]}
 							<div class="issue">
 								<span class="issue-icon {view.tone}"><Glyph size={14} /></span>
-								<a class="issue-title" href={to(view.href)}>{view.title}</a>
-								<span class="issue-detail" title={view.detail}>{view.detail}</span>
-								<small>{view.since}</small>
-								<span class="issue-actions">
-									{#if item.kind === 'stale_models'}
-										<!-- Changed models open the plan of `sqb build --changed`, so the UI's build is the CLI's; stale ones are still rebuilt by name. -->
-										{#if item.changed.length}
-											<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build changed</GatedButton>
-										{/if}
-										<GatedButton requires="run.adhoc" size="xs" variant={item.changed.length ? 'outline' : 'default'} onclick={() => goto(to(planHref(staleSelection)))}>Rebuild {staleSelection.length}</GatedButton>
+								<div class="issue-copy">
+									<a class="issue-title" href={to(view.href)}>{view.title}</a>
+									<p class="issue-detail">{view.detail}</p>
+									{#if view.consequences.length}
+										<ul class="consequences" aria-label="Caused by this">
+											{#each view.consequences as c, i (i)}<li><a href={to(c.href)}>{c.text}</a></li>{/each}
+										</ul>
 									{/if}
+								</div>
+								<small>{view.since}</small>
+								<span class="issue-ack">
 									{#if 'acknowledged' in item && canAcknowledge}
 										<button class="ack" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
 											<BellOffIcon size={13} />Acknowledge
 										</button>
+									{/if}
+								</span>
+								<span class="issue-actions">
+									{#if view.build}
+										{@const build = view.build}
+										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(build.href))}>{build.label}</GatedButton>
 									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>
@@ -161,21 +165,25 @@
 							<ChevronRightIcon size={13} class={showHandled ? 'open' : ''} />Acknowledged · {handled.length}
 						</button>
 						{#if showHandled}
+							<div class="handled-rows">
 							{#each handled as { item, view } (view.key)}
 								{@const ack = acknowledgementOf(item)}
 								<div class="issue muted">
 									<span class="issue-icon info"><BellOffIcon size={13} /></span>
-									<a class="issue-title" href={to(view.href)}>{view.title}</a>
-									<span class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)}` : ''}</span>
+									<div class="issue-copy">
+										<a class="issue-title" href={to(view.href)}>{view.title}</a>
+										<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)}` : ''}</p>
+									</div>
 									<small>{view.since}</small>
-									<span class="issue-actions">
+									<span class="issue-ack">
 										{#if 'acknowledged' in item && canAcknowledge}
 											<button class="undo" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, false)}>Undo</button>
 										{/if}
-										<a href={to(view.href)}>{view.action} →</a>
 									</span>
+									<span class="issue-actions"><a href={to(view.href)}>{view.action} →</a></span>
 								</div>
 							{/each}
+							</div>
 						{/if}
 					</div>
 				{/if}
@@ -284,14 +292,24 @@
 	.health { overflow: hidden; border-color: color-mix(in srgb, var(--tone) 30%, var(--border)); border-left: 3px solid var(--tone); }
 	.health-head { display: flex; min-height: 49px; align-items: center; padding: 8px 13px; }
 	.issues { border-top: 1px solid color-mix(in srgb, var(--tone) 18%, var(--border)); }
-	.issue { display: grid; grid-template-columns: 22px auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 40px; padding: 0 14px 0 17px; border-top: 1px solid var(--inner-line); font-size: 12.5px; }
+	/* Rows share the columns, so times, Acknowledge and links line up down the list. */
+	/* The icon track is max-content so it also holds the rows' left padding, which a subgrid adds to its edge track. */
+	.issues, .handled-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto auto; column-gap: 10px; }
+	.issue { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: start; padding: 9px 14px 9px 17px; border-top: 1px solid var(--inner-line); font-size: 12.5px; }
 	.issue:first-child { border-top: 0; }
 	.issue:hover { background: var(--sb-hover); }
-	.issue-title { font-weight: 600; white-space: nowrap; }
+	.issue > :not(.issue-copy, .issue-icon) { min-height: 22px; display: flex; align-items: center; }
+	.issue-copy { min-width: 0; padding-top: 2px; }
+	.issue-title { font-weight: 600; }
 	.issue-title:hover { text-decoration: underline; }
-	.issue-detail { overflow: hidden; color: var(--muted-foreground); text-overflow: ellipsis; white-space: nowrap; }
-	.issue small { color: var(--sb-text-faint); font-size: 12px; white-space: nowrap; }
-	.issue-actions { display: flex; min-width: 120px; align-items: center; justify-content: flex-end; gap: 10px; }
+	.issue-detail { margin: 2px 0 0; color: var(--muted-foreground); overflow-wrap: anywhere; }
+	.consequences { margin: 4px 0 0; padding: 0; list-style: none; }
+	.consequences li { position: relative; padding-left: 14px; color: var(--muted-foreground); overflow-wrap: anywhere; }
+	.consequences li::before { position: absolute; left: 2px; content: '↳'; color: var(--sb-text-faint); }
+	.consequences a:hover { color: var(--foreground); text-decoration: underline; }
+	.issue small { justify-content: flex-end; color: var(--sb-text-faint); font-size: 12px; white-space: nowrap; }
+	.issue-ack { justify-content: flex-end; }
+	.issue-actions { justify-content: flex-end; gap: 10px; }
 	.issue-actions a { color: var(--primary); font-weight: 500; white-space: nowrap; }
 	.ack { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 2px; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
 	.ack:hover:not(:disabled) { border-color: var(--border-strong); color: var(--foreground); }
