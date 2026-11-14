@@ -189,50 +189,10 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
     live_run: subprocess.CompletedProcess[str] = live_plan(project, _SELECTION)
     assert live_run.returncode == 0, live_run.stderr
     live: dict[str, Any] = json.loads(live_run.stdout)
-    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
     log: Path = tmp_path / "location.log"
-    started: datetime = datetime.now(UTC)
-    with (
-        snapshot_api(tmp_path / "control") as api,
-        location_process(
-            [
-                str(Path(sys.executable).with_name("sqb")),
-                "--project-dir",
-                str(project),
-                "location",
-                "serve",
-                "--server",
-                api.url,
-                "--location-id",
-                api.location_id,
-                "--target",
-                "development",
-            ],
-            log,
-            tmp_path / "location.stdout",
-            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
-        ) as location,
-    ):
-        _ = wait_for_generation(api, "development", 1, location, log)
-        _ = wait_for_warehouse_sync_health(
-            api,
-            {"failure": None, "tables": ["catalog", "consumption", "fingerprints", "observations"]},
-            location,
-            log,
-            after=started,
-        )
-        lock: duckdb.DuckDBPyConnection = hold_write_lock(project / "warehouse.db")
-        try:
-            refused: subprocess.CompletedProcess[str] = live_plan(project, _SELECTION)
-            request_id: str = request_plan(control, _SELECTION)
-            result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
-        finally:
-            lock.close()
+    refused, preview = _plan_from_copy(tmp_path, project, {})
 
     assert refused.returncode != 0
-    outcome: dict[str, Any] = result["result_json"]["outcome"]
-    assert outcome["kind"] == "plan", outcome
-    preview: dict[str, Any] = outcome["document"]
     assert "synced_copy" in preview, log.read_text()
     synced: dict[str, Any] = preview.pop("synced_copy")
     assert synced["synced_at"] is not None
@@ -269,3 +229,87 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
         _ = live_models.pop(name)
     assert preview_models == live_models
     assert preview == live
+
+
+def test_given_an_edited_model_when_a_changed_plan_is_requested_then_the_copy_names_what_changed(
+    tmp_path: Path,
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(project_dir=project, files=_PROJECT_FILES)
+    built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
+    assert built.returncode == 0, built.stderr
+    edited: str = _PROJECT_FILES["models/order_count.sql"].replace(
+        "AS order_count", "AS order_count, 1 AS batch"
+    )
+    write_files(project_dir=project, files={"models/order_count.sql": edited})
+    live_run: subprocess.CompletedProcess[str] = live_plan(project, _SELECTION, "--changed")
+    assert live_run.returncode == 0, live_run.stderr
+
+    refused, preview = _plan_from_copy(tmp_path, project, {"changed": True})
+
+    assert refused.returncode != 0
+    assert preview.get("changed") == {
+        "counts": ["definition"],
+        "reach": "job",
+        "runs": [
+            {
+                "node": "model:order_count",
+                "reason": "planner change (query_changed)",
+                "downstream_of": None,
+            }
+        ],
+        "held_back": [],
+        "unchanged": ["model:daily_orders", "model:orders", "model:refunds"],
+    }, (tmp_path / "location.log").read_text()
+    assert preview["changed"] == json.loads(live_run.stdout)["changed"]
+
+
+def _plan_from_copy(
+    tmp_path: Path, project: Path, settings: dict[str, object]
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+    """Sync `project` to a location, lock its warehouse, then plan `_SELECTION` from the copy.
+
+    Returns the refused live plan run while the lock was held and the location's plan document.
+    """
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+    started: datetime = datetime.now(UTC)
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "development", 1, location, log)
+        _ = wait_for_warehouse_sync_health(
+            api,
+            {"failure": None, "tables": ["catalog", "consumption", "fingerprints", "observations"]},
+            location,
+            log,
+            after=started,
+        )
+        lock: duckdb.DuckDBPyConnection = hold_write_lock(project / "warehouse.db")
+        try:
+            refused: subprocess.CompletedProcess[str] = live_plan(project, _SELECTION)
+            request_id: str = request_plan(control, _SELECTION, settings)
+            result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
+        finally:
+            lock.close()
+    outcome: dict[str, Any] = result["result_json"]["outcome"]
+    assert outcome["kind"] == "plan", outcome
+    return refused, outcome["document"]

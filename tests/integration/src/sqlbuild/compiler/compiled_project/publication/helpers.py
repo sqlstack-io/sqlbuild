@@ -1534,12 +1534,14 @@ def run_sqb(project: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def live_plan(project: Path, selection: list[str]) -> subprocess.CompletedProcess[str]:
-    """Run `sqb plan --json` against the warehouse for node keys such as `model:orders`."""
+def live_plan(project: Path, selection: list[str], *flags: str) -> subprocess.CompletedProcess[str]:
+    """Run `sqb plan --json` with `flags` on the warehouse for node keys such as `model:orders`."""
     selected: list[str] = []
     for key in selection:
         selected.extend(("--select", key.split(":")[1]))
-    return run_sqb(project, "plan", "--target", "development", "--json", "--no-color", *selected)
+    return run_sqb(
+        project, "plan", "--target", "development", "--json", "--no-color", *flags, *selected
+    )
 
 
 def hold_write_lock(database: Path) -> duckdb.DuckDBPyConnection:

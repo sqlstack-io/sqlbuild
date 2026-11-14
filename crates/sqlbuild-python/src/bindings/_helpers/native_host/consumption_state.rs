@@ -22,6 +22,7 @@ use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
 
@@ -452,6 +453,9 @@ impl ConsumptionConnection {
         py: Python<'_>,
         location: &Location,
     ) -> PyResult<Vec<ConsumptionRow>> {
+        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
+            return Ok(copy.get().consumption(location));
+        }
         read_recent(self.adapter.bind(py), &self.connected(py)?, location)
     }
 
@@ -461,6 +465,11 @@ impl ConsumptionConnection {
         location: &Location,
         execution_ids: &[&str],
     ) -> PyResult<Vec<ConsumptionRow>> {
+        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
+            let mut rows: Vec<ConsumptionRow> = copy.get().consumption(location);
+            rows.retain(|row| execution_ids.contains(&row.row.execution_id.as_str()));
+            return Ok(rows);
+        }
         read_executions(
             self.adapter.bind(py),
             &self.connected(py)?,

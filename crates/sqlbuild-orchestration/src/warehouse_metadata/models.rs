@@ -466,6 +466,9 @@ pub struct PreviewCopy {
     pub fingerprints: Vec<WarehouseFingerprintRecord>,
     pub latest_runs: Vec<PreviewLatestRun>,
     pub observations: Vec<WarehouseObservationRecord>,
+    /// Rows of each relation's newest executions, which `--changed` decides from.
+    #[serde(default)]
+    pub consumption: Vec<WarehouseConsumptionRecord>,
 }
 
 /// Private interpreter input; cursor values are data and receive adapter literal rendering.

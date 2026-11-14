@@ -8,6 +8,8 @@ use crate::platform::models::{LocationHealthReport, LocationWorkClient};
 use crate::warehouse_metadata::models::{PreviewCopy, PreviewCopyRead};
 
 const NODE: &str = "preview_copy_orders";
+/// A relation with more executions than a build reads; only its newest eight are copied.
+const BUSY_NODE: &str = "preview_copy_customers";
 
 async fn post(client: &Client, (url, bearer): (&str, &str), body: Value) {
     let response = client
@@ -106,6 +108,21 @@ pub(crate) async fn preview_copy_scope(
         ),
     )
     .await;
+    let mut busy: Vec<Value> = Vec::new();
+    for execution in 1..=10 {
+        let finished: u32 = if execution == 1 { 20 } else { execution };
+        for (phase, hour, minute) in [("started", execution, 0), ("succeeded", finished, 30)] {
+            let mut row = consumption(
+                &format!("busy-execution-{execution:02}"),
+                (phase, &format!("busy-run-{execution:02}")),
+                &format!("2026-03-02T{hour:02}:{minute:02}:00Z"),
+            );
+            row["node_name"] = json!(BUSY_NODE);
+            row["target_name"] = json!(BUSY_NODE);
+            busy.push(row);
+        }
+    }
+    post(client, (&metadata, bearer), batch("consumption", busy)).await;
     post(
         client,
         (&metadata, bearer),
@@ -174,6 +191,30 @@ pub(crate) async fn preview_copy_scope(
         )
     };
     let unsynced = copy().await;
+    let mut busy_executions: Vec<String> = unsynced
+        .consumption
+        .iter()
+        .filter(|row| row.target_name.as_deref() == Some(BUSY_NODE))
+        .filter_map(|row| row.execution_id.clone())
+        .collect();
+    busy_executions.dedup();
+    assert_eq!(
+        busy_executions,
+        (3..=10)
+            .map(|execution| format!("busy-execution-{execution:02}"))
+            .collect::<Vec<_>>(),
+        "each relation's newest eight executions by start, every row of each, oldest first; \
+         the first execution finished last but started first"
+    );
+    assert_eq!(
+        unsynced
+            .consumption
+            .iter()
+            .filter(|row| row.target_name.as_deref() == Some(BUSY_NODE))
+            .count(),
+        16,
+        "both rows of each copied execution"
+    );
     assert_eq!(unsynced.synced_at, None, "nothing synced cleanly yet");
     assert_eq!(
         ours(&unsynced),

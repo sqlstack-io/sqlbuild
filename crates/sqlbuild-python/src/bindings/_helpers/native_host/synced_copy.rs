@@ -17,10 +17,14 @@ use sqlbuild_cache::digest::main::sha256_hex::sha256_hex;
 use sqlbuild_core::constants::{FINGERPRINT_TABLE_NAME, STATE_TABLE_NAMES};
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_orchestration::warehouse_metadata::models::{PreviewCopy, WarehouseCatalogRecord};
+use sqlbuild_state::consumption::models::{
+    ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
+};
 use sqlbuild_state::execution_history::constants::MEMORY_PATH;
 use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
+use crate::bindings::_helpers::native_host::consumption_state::Location;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, SqliteCursor};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -248,6 +252,49 @@ impl SyncedCopyAdapter {
             }
         }
         None
+    }
+
+    /// The copied consumption rows of the table in `location`, each relation's newest executions.
+    pub(crate) fn consumption(&self, location: &Location) -> Vec<ConsumptionRow> {
+        let mut rows: Vec<ConsumptionRow> = Vec::new();
+        for record in &self.copy.consumption {
+            if !same(Some(&record.state_schema), Some(&location.schema))
+                || !(location.database.is_none()
+                    || record.state_database.is_none()
+                    || same(
+                        record.state_database.as_deref(),
+                        location.database.as_deref(),
+                    ))
+            {
+                continue;
+            }
+            let text = |value: &Option<String>| value.clone().unwrap_or_default();
+            rows.push(ConsumptionRow {
+                row: ConsumptionAppend {
+                    execution_id: text(&record.execution_id),
+                    phase: text(&record.phase),
+                    run_id: text(&record.run_id),
+                    node: NodeKey {
+                        kind: text(&record.node_type),
+                        name: text(&record.node_name),
+                    },
+                    relation: RelationKey {
+                        database: record.target_database.clone(),
+                        schema: text(&record.target_schema),
+                        name: text(&record.target_name),
+                    },
+                    version_hash: text(&record.version_hash),
+                    input_count: record.input_count.unwrap_or(-1),
+                    input: record.input_kind.clone().map(|kind| ConsumedInput {
+                        kind,
+                        name: text(&record.input_name),
+                        version: text(&record.input_version),
+                    }),
+                },
+                recorded_at: record.recorded_at.timestamp_micros(),
+            });
+        }
+        rows
     }
 
     /// The source's columns as last described, only when it described exactly `sql`.
