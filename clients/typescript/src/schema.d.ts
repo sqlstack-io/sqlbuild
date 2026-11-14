@@ -1450,7 +1450,10 @@ export interface components {
             /** Format: int64 */
             priority: number;
             reason: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description A new random (UUID v4) or time-ordered (UUID v7) ID; name-based (v5) IDs are refused as the server derives those.
+             */
             run_id: string;
             target: string;
         };
@@ -1883,7 +1886,10 @@ export interface components {
             /** Format: int64 */
             priority: number;
             reason: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description A new random (UUID v4) or time-ordered (UUID v7) ID; name-based (v5) IDs are refused as the server derives those.
+             */
             run_id: string;
             /** @description Narrow the job with `sqb build` selectors; only nodes already in the job can remain. */
             select?: string[];
@@ -2684,7 +2690,10 @@ export interface components {
             /** Format: int64 */
             priority: number;
             reason: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description A new random (UUID v4) or time-ordered (UUID v7) ID; name-based (v5) IDs are refused as the server derives those.
+             */
             run_id: string;
             /** Format: uuid */
             source_run_id: string;
@@ -6040,6 +6049,14 @@ export interface operations {
                     "application/json": components["schemas"]["MutationResponse"];
                 };
             };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Session rejected */
             401: {
                 headers: {
@@ -6198,6 +6215,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Session rejected */

@@ -12,6 +12,7 @@ use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
+use crate::runs::_helpers::requests::run_id::refuse_derived_run_id;
 use crate::runs::constants::MANUAL_JOB_AUDIT_TAG;
 use crate::runs::main::frozen_job_request::frozen_job_request;
 use crate::runs::models::{JobRunRequest, RunWindow};
@@ -26,6 +27,7 @@ pub(crate) async fn request_job_run_in(
     (context, credentials): (&AuditContext, Option<Uuid>),
     (planner, request): (Option<&dyn CommandPlanner>, &JobRunRequest),
 ) -> Result<(ControlTransaction, bool), ControlError> {
+    refuse_derived_run_id(request.run_id)?;
     let mut context = context.clone();
     let scope = PermissionScope {
         action: Action::JobRun,
