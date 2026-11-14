@@ -35,7 +35,7 @@ use sqlbuild_analysis::diff_selection::main::raw_query_shape::raw_query_shape;
 use sqlbuild_analysis::diff_selection::models::RawQueryShape;
 
 const GENERIC_DIALECT: &str = "generic";
-const NAMESPACELESS_ADAPTERS: [&str; 2] = ["duckdb", "motherduck"];
+pub(crate) const NAMESPACELESS_ADAPTERS: [&str; 2] = ["duckdb", "motherduck"];
 
 fn failure(py: Python<'_>, message: String, code: &str, help: Option<&str>) -> PyErr {
     cli_error(

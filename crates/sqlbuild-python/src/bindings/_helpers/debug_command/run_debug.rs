@@ -41,6 +41,7 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
 use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::record_class;
@@ -298,6 +299,8 @@ fn build_report(
     })?;
     let connection_config: Bound<'_, PyDict> =
         effective_connection(&context, (&adapter_name, &base_connection))?.cast_into()?;
+    let namespace_adapter: String = adapter_name.str()?.extract()?;
+    let namespaceless: bool = NAMESPACELESS_ADAPTERS.contains(&namespace_adapter.as_str());
     let namespace: Bound<'_, PyTuple> = build_effective_target_namespace(
         py,
         Some(keywords(
@@ -309,6 +312,7 @@ fn build_report(
                     "connection_database",
                     connection_config
                         .get_item("database")?
+                        .filter(|_| !namespaceless)
                         .unwrap_or_else(|| py.None().into_bound(py)),
                 ),
                 (
