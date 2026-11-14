@@ -171,7 +171,12 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
         self.recovered_epoch = None;
         drop(writeln!(
             std::io::stderr().lock(),
-            "Control store unavailable; the scheduler retries: {error}"
+            "{}; the scheduler retries: {error}",
+            if matches!(error, ControlError::Fenced) {
+                "Scheduler lease lost"
+            } else {
+                "Control store unavailable"
+            }
         ));
     }
 }
