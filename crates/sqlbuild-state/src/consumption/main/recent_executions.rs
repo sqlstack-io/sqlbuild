@@ -4,8 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::consumption::models::{ConsumptionRow, RelationKey};
 
-/// Rows of the newest `limit` executions per relation, timing each execution by its earliest row,
-/// as `recent_executions_sql` selects them in the warehouse.
+/// Rows of the newest `limit` executions per relation by earliest row, as `recent_executions_sql`.
 pub fn recent_executions(rows: &[ConsumptionRow], limit: usize) -> Vec<ConsumptionRow> {
     let mut started: BTreeMap<(&RelationKey, &str), i64> = BTreeMap::new();
     for row in rows {

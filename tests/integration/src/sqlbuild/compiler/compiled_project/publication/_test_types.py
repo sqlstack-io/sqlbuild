@@ -409,6 +409,14 @@ class AdhocRunTestCase:
 
 
 @dataclass(frozen=True)
+class ChangedPlanPreviewTestCase:
+    description: str
+    edited_model: str
+    edit: tuple[str, str]
+    expected_changed: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class PlanPreviewTestCase:
     description: str
     edited_files: dict[str, str]

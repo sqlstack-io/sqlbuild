@@ -435,8 +435,7 @@ pub struct WarehouseSyncDue {
 pub struct PreviewCopyRead {
     pub session_id: Uuid,
     pub generation: i64,
-    /// Whether the copy carries consumption history, which only `--changed` plans read; sent only
-    /// when set, so other plans still reach servers that predate it.
+    /// Whether the copy carries consumption history; sent only when set, as older servers reject it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub consumption: bool,
 }
@@ -470,8 +469,7 @@ pub struct PreviewCopy {
     pub fingerprints: Vec<WarehouseFingerprintRecord>,
     pub latest_runs: Vec<PreviewLatestRun>,
     pub observations: Vec<WarehouseObservationRecord>,
-    /// Every mirrored consumption row when the read asked for them; locations that never ask
-    /// never receive the field.
+    /// Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub consumption: Vec<WarehouseConsumptionRecord>,
 }

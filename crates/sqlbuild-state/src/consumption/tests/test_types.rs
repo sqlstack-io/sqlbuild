@@ -87,6 +87,14 @@ pub(crate) struct Scenario {
     pub(crate) clock: i64,
 }
 
+pub(crate) struct RecentExecutionsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) rows: Vec<ConsumptionRow>,
+    pub(crate) limit: usize,
+    pub(crate) expected_executions: Vec<&'static str>,
+    pub(crate) expected_rows: usize,
+}
+
 pub(crate) struct DecideTestCase {
     pub(crate) description: &'static str,
     pub(crate) outcomes: Vec<(String, crate::consumption::models::ChangedOutcome)>,

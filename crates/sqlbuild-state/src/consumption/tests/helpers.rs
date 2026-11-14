@@ -761,3 +761,27 @@ pub(crate) fn two_jobs() -> Scenario {
 
 pub(crate) const JOB_A: (&str, &[&str]) = ("job_a", &["stg_orders", "int_orders"]);
 pub(crate) const JOB_B: (&str, &[&str]) = ("job_b", &["fct_revenue", "rpt_pnl"]);
+
+/// One succeeded row of `execution`, writing the `main` relation named `relation`.
+pub(crate) fn recorded_row(relation: &str, execution: &str, recorded_at: i64) -> ConsumptionRow {
+    ConsumptionRow {
+        row: ConsumptionAppend {
+            execution_id: execution.into(),
+            phase: "succeeded".into(),
+            run_id: format!("run-{execution}"),
+            node: NodeKey {
+                kind: "model".into(),
+                name: relation.into(),
+            },
+            relation: RelationKey {
+                database: None,
+                schema: "main".into(),
+                name: relation.into(),
+            },
+            version_hash: "version".into(),
+            input_count: 0,
+            input: None,
+        },
+        recorded_at,
+    }
+}

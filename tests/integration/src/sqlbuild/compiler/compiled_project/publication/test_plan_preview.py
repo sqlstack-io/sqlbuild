@@ -1,10 +1,7 @@
 """A location plans from the server's synced copy and never opens the warehouse to do it."""
 
 import json
-import os
 import subprocess
-import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
@@ -13,20 +10,13 @@ import duckdb
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    ChangedPlanPreviewTestCase,
     PlanPreviewTestCase,
 )
-from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
-    request_plan,
-)
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
-    hold_write_lock,
     live_plan,
-    location_process,
+    plan_from_copy,
     run_sqb,
-    snapshot_api,
-    wait_for_generation,
-    wait_for_location_work,
-    wait_for_warehouse_sync_health,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
@@ -190,7 +180,7 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
     assert live_run.returncode == 0, live_run.stderr
     live: dict[str, Any] = json.loads(live_run.stdout)
     log: Path = tmp_path / "location.log"
-    refused, preview = _plan_from_copy(tmp_path, project, {})
+    refused, preview = plan_from_copy(tmp_path, project, _SELECTION, {})
 
     assert refused.returncode != 0
     assert "synced_copy" in preview, log.read_text()
@@ -231,85 +221,46 @@ def test_given_a_synced_location_when_a_plan_is_requested_then_it_plans_from_the
     assert preview == live
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ChangedPlanPreviewTestCase(
+            description="an edited model is the only change the copy names",
+            edited_model="models/order_count.sql",
+            edit=("AS order_count", "AS order_count, 1 AS batch"),
+            expected_changed={
+                "counts": ["definition"],
+                "reach": "job",
+                "runs": [
+                    {
+                        "node": "model:order_count",
+                        "reason": "planner change (query_changed)",
+                        "downstream_of": None,
+                    }
+                ],
+                "held_back": [],
+                "unchanged": ["model:daily_orders", "model:orders", "model:refunds"],
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_an_edited_model_when_a_changed_plan_is_requested_then_the_copy_names_what_changed(
-    tmp_path: Path,
+    test_case: ChangedPlanPreviewTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
     write_files(project_dir=project, files=_PROJECT_FILES)
     built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
     assert built.returncode == 0, built.stderr
-    edited: str = _PROJECT_FILES["models/order_count.sql"].replace(
-        "AS order_count", "AS order_count, 1 AS batch"
-    )
-    write_files(project_dir=project, files={"models/order_count.sql": edited})
+    edited: str = _PROJECT_FILES[test_case.edited_model].replace(*test_case.edit)
+    write_files(project_dir=project, files={test_case.edited_model: edited})
     live_run: subprocess.CompletedProcess[str] = live_plan(project, _SELECTION, "--changed")
     assert live_run.returncode == 0, live_run.stderr
 
-    refused, preview = _plan_from_copy(tmp_path, project, {"changed": True})
+    refused, preview = plan_from_copy(tmp_path, project, _SELECTION, {"changed": True})
 
     assert refused.returncode != 0
-    assert preview.get("changed") == {
-        "counts": ["definition"],
-        "reach": "job",
-        "runs": [
-            {
-                "node": "model:order_count",
-                "reason": "planner change (query_changed)",
-                "downstream_of": None,
-            }
-        ],
-        "held_back": [],
-        "unchanged": ["model:daily_orders", "model:orders", "model:refunds"],
-    }, (tmp_path / "location.log").read_text()
+    assert preview.get("changed") == test_case.expected_changed, (
+        tmp_path / "location.log"
+    ).read_text()
     assert preview["changed"] == json.loads(live_run.stdout)["changed"]
-
-
-def _plan_from_copy(
-    tmp_path: Path, project: Path, settings: dict[str, object]
-) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
-    """Sync `project` to a location, lock its warehouse, then plan `_SELECTION` from the copy.
-
-    Returns the refused live plan run while the lock was held and the location's plan document.
-    """
-    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
-    log: Path = tmp_path / "location.log"
-    started: datetime = datetime.now(UTC)
-    with (
-        snapshot_api(tmp_path / "control") as api,
-        location_process(
-            [
-                str(Path(sys.executable).with_name("sqb")),
-                "--project-dir",
-                str(project),
-                "location",
-                "serve",
-                "--server",
-                api.url,
-                "--location-id",
-                api.location_id,
-                "--target",
-                "development",
-            ],
-            log,
-            tmp_path / "location.stdout",
-            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
-        ) as location,
-    ):
-        _ = wait_for_generation(api, "development", 1, location, log)
-        _ = wait_for_warehouse_sync_health(
-            api,
-            {"failure": None, "tables": ["catalog", "consumption", "fingerprints", "observations"]},
-            location,
-            log,
-            after=started,
-        )
-        lock: duckdb.DuckDBPyConnection = hold_write_lock(project / "warehouse.db")
-        try:
-            refused: subprocess.CompletedProcess[str] = live_plan(project, _SELECTION)
-            request_id: str = request_plan(control, _SELECTION, settings)
-            result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
-        finally:
-            lock.close()
-    outcome: dict[str, Any] = result["result_json"]["outcome"]
-    assert outcome["kind"] == "plan", outcome
-    return refused, outcome["document"]

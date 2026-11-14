@@ -456,7 +456,9 @@ impl ConsumptionConnection {
     ) -> PyResult<Vec<ConsumptionRow>> {
         if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
             return Ok(recent_executions(
-                &copy.get().consumption(location),
+                &copy
+                    .get()
+                    .consumption((location.database.as_deref(), &location.schema)),
                 RECENT_EXECUTIONS,
             ));
         }
@@ -470,7 +472,9 @@ impl ConsumptionConnection {
         execution_ids: &[&str],
     ) -> PyResult<Vec<ConsumptionRow>> {
         if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
-            let mut rows: Vec<ConsumptionRow> = copy.get().consumption(location);
+            let mut rows: Vec<ConsumptionRow> = copy
+                .get()
+                .consumption((location.database.as_deref(), &location.schema));
             rows.retain(|row| execution_ids.contains(&row.row.execution_id.as_str()));
             return Ok(rows);
         }

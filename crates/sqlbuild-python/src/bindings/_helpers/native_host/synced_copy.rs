@@ -24,7 +24,6 @@ use sqlbuild_state::execution_history::constants::MEMORY_PATH;
 use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
-use crate::bindings::_helpers::native_host::consumption_state::Location;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, SqliteCursor};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -254,17 +253,17 @@ impl SyncedCopyAdapter {
         None
     }
 
-    /// Every copied consumption row of the table in `location`.
-    pub(crate) fn consumption(&self, location: &Location) -> Vec<ConsumptionRow> {
+    /// Every copied consumption row of the table in `(database, schema)`.
+    pub(crate) fn consumption(
+        &self,
+        (database, schema): (Option<&str>, &str),
+    ) -> Vec<ConsumptionRow> {
         let mut rows: Vec<ConsumptionRow> = Vec::new();
         for record in &self.copy.consumption {
-            if !same(Some(&record.state_schema), Some(&location.schema))
-                || !(location.database.is_none()
+            if !same(Some(&record.state_schema), Some(schema))
+                || !(database.is_none()
                     || record.state_database.is_none()
-                    || same(
-                        record.state_database.as_deref(),
-                        location.database.as_deref(),
-                    ))
+                    || same(record.state_database.as_deref(), database))
             {
                 continue;
             }
