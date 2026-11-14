@@ -29,7 +29,8 @@
 	const checkList = createResource((client, scope) => client.listChecks(scope), ['checks']);
 	// A `--changed` plan names the job whose own run refreshes what it holds back, with that job's schedule.
 	const triggerList = createResource((client, scope) => client.listTriggers(scope), ['triggers']);
-	const refresh = (job: string) => jobRefreshText(job, triggerList.data ?? [], app.now);
+	const schedulerStopped = $derived(app.platformEvents.some((e) => e.active && e.kind === 'scheduler_no_leader'));
+	const refresh = (job: string) => jobRefreshText(job, triggerList.data ?? [], app.now, schedulerStopped);
 
 	let cmd = $state(page.url.searchParams.get('cmd') ?? 'sqb build');
 	let cmdEl = $state<HTMLInputElement>();
