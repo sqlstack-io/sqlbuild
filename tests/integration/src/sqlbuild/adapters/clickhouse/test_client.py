@@ -430,6 +430,14 @@ def test_given_framework_state_ddl_when_creating_then_clickhouse_accepts_every_t
             window=("2026-01-15", "2026-02-10"),
         ),
         ClickHouseRewriteTestCase(
+            description="keyed cursor window also replaces a key from another partition (partitioned)",
+            strategy="keyed_cursor",
+            partition_by=_PARTITIONED,
+            initial_rows=INITIAL_ORDERS,
+            incoming_rows=((1, "ada", 11, "2026-01-21"), (9, "iv", 90, "2026-01-22")),
+            window=("2026-01-15", "2026-02-10"),
+        ),
+        ClickHouseRewriteTestCase(
             description="empty window clears its rows (partitioned)",
             strategy="cursor",
             partition_by=_PARTITIONED,
@@ -469,6 +477,14 @@ def test_given_framework_state_ddl_when_creating_then_clickhouse_accepts_every_t
             partition_by=_UNPARTITIONED,
             initial_rows=INITIAL_ORDERS,
             incoming_rows=((9, "iv", 90, "2026-01-21"),),
+            window=("2026-01-15", "2026-02-10"),
+        ),
+        ClickHouseRewriteTestCase(
+            description="keyed cursor window also replaces a key from another partition (unpartitioned)",
+            strategy="keyed_cursor",
+            partition_by=_UNPARTITIONED,
+            initial_rows=INITIAL_ORDERS,
+            incoming_rows=((1, "ada", 11, "2026-01-21"), (9, "iv", 90, "2026-01-22")),
             window=("2026-01-15", "2026-02-10"),
         ),
         ClickHouseRewriteTestCase(

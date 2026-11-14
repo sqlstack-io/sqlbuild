@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlbuild._native import (
     CursorBounds,
+    IncrementalMode,
     IncrementalStrategy,
     ModelPlanEntry,
     OnSchemaChange,
@@ -875,6 +876,16 @@ def _apply_schema_change(
     return ()
 
 
+def _cursor_replacement_key(
+    *, entry: ModelPlanEntry, unique_key: tuple[str, ...]
+) -> tuple[str, ...]:
+    """The key whose rows a cursor delete_insert also replaces; a microbatch keeps its window."""
+
+    if entry.incremental_mode == IncrementalMode.MICROBATCH:
+        return ()
+    return unique_key
+
+
 def _execute_dml(
     *,
     adapter: BaseAdapter,
@@ -926,6 +937,7 @@ def _execute_dml(
                 columns=dml_columns,
                 statement_recorder=statement_recorder,
                 cursor_type=entry.cursor_type,
+                unique_key=_cursor_replacement_key(entry=entry, unique_key=unique_key),
             )
         return adapter.delete_insert(
             connection=connection,

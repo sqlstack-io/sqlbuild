@@ -4,6 +4,7 @@ import json
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
 
@@ -3927,6 +3928,70 @@ def test_given_generator_loader_with_inferred_columns_when_running_load_then_wri
 @pytest.mark.parametrize(
     "test_case",
     [
+        LoadCommandInferredColumnsTestCase(
+            description="decimals keep their precision and declared columns take any value",
+            project_files={
+                "sqlbuild_project.toml": _PROJECT_FILE,
+                "sources/raw.yml": """
+sources:
+  - name: raw_inferred
+    description: Test source raw_inferred.
+    managed: true
+    write_strategy: table
+    columns:
+      - name: order_ref
+        type: VARCHAR
+""".strip()
+                + "\n",
+                "python/loaders/raw.py": """
+from decimal import Decimal
+from uuid import UUID
+
+from sqlbuild.loaders import loader
+
+@loader
+def raw_inferred(ctx):
+    '''Test loader raw_inferred.'''
+    yield {"order_ref": UUID("12345678-1234-5678-1234-567812345678"), "price": Decimal("12.50")}
+    yield {"order_ref": None, "price": Decimal("1234.5")}
+""",
+            },
+            expected_row=("12345678-1234-5678-1234-567812345678", Decimal("12.50")),
+            expected_column_types={"order_ref": "VARCHAR", "price": "DECIMAL(6,2)"},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_decimal_and_declared_values_when_running_load_then_keeps_their_types(
+    test_case: LoadCommandInferredColumnsTestCase,
+    tmp_path: Path,
+    write_repo_files: Callable[[Path, dict[str, str]], None],
+) -> None:
+    write_repo_files(tmp_path, test_case.project_files)
+
+    exit_code: int = run_load_command(
+        request=LoadCommandRequest(project_dir=tmp_path, no_color=True)
+    )
+
+    assert exit_code == 0
+    connection: DuckDBPyConnection = duckdb.connect(str(tmp_path / "demo.duckdb"))
+    try:
+        row: tuple[object, ...] | None = connection.execute(
+            "SELECT order_ref, price FROM raw_inferred ORDER BY price LIMIT 1"
+        ).fetchone()
+        column_rows: list[tuple[str, str]] = connection.execute(
+            "SELECT column_name, data_type FROM information_schema.columns "
+            "WHERE table_name = 'raw_inferred'"
+        ).fetchall()
+    finally:
+        connection.close()
+    assert row == test_case.expected_row
+    assert dict(column_rows) == test_case.expected_column_types
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         LoadCommandMultipleYieldTestCase(
             description="loads every row yielded by a generator loader",
             project_files={
@@ -4513,6 +4578,66 @@ def raw_conflict(ctx):
             },
             expected_exit_code=1,
             expected_stdout_fragment="conflicting types for column 'id'",
+        ),
+        LoadCommandFailureTestCase(
+            description="fails clearly when an undeclared column holds an unrecognised type",
+            project_files={
+                "sqlbuild_project.toml": _PROJECT_FILE,
+                "sources/raw.yml": """
+sources:
+  - name: raw_unknown_type
+    description: Test source raw_unknown_type.
+    managed: true
+    write_strategy: table
+""".strip()
+                + "\n",
+                "python/loaders/raw.py": """
+from uuid import UUID
+
+from sqlbuild.loaders import loader
+
+@loader
+def raw_unknown_type(ctx):
+    '''Test loader raw_unknown_type.'''
+    return [{"id": 1, "order_ref": UUID("12345678-1234-5678-1234-567812345678")}]
+""",
+            },
+            expected_exit_code=1,
+            expected_stdout_fragment=(
+                "Source loader returned a UUID value for column 'order_ref', which has no "
+                "declared type"
+            ),
+        ),
+        LoadCommandFailureTestCase(
+            description="fails clearly when a later batch needs a wider decimal",
+            project_files={
+                "sqlbuild_project.toml": _PROJECT_FILE,
+                "sources/raw.yml": """
+sources:
+  - name: raw_wider_decimal
+    description: Test source raw_wider_decimal.
+    managed: true
+    write_strategy: table
+    load_batch_size: 1
+""".strip()
+                + "\n",
+                "python/loaders/raw.py": """
+from decimal import Decimal
+
+from sqlbuild.loaders import loader
+
+@loader
+def raw_wider_decimal(ctx):
+    '''Test loader raw_wider_decimal.'''
+    yield {"price": Decimal("1.5")}
+    yield {"price": Decimal("123.25")}
+""",
+            },
+            expected_exit_code=1,
+            expected_stdout_fragment=(
+                "Source loader column 'price' needs DECIMAL(5, 2), wider than the "
+                "DECIMAL(2, 1) its earlier rows gave it"
+            ),
         ),
         LoadCommandFailureTestCase(
             description="fails when loader returns rows without write strategy",

@@ -32,7 +32,9 @@ class MotherDuckAdapter(
     adapter_name: ClassVar[str] = BuiltinAdapter.MOTHERDUCK.value
     sql_analysis_dialect_name: ClassVar[str | None] = "duckdb"
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "BOOLEAN"
@@ -40,6 +42,8 @@ class MotherDuckAdapter(
                 return "BIGINT"
             case LoaderLogicalType.FLOAT:
                 return "DOUBLE"
+            case LoaderLogicalType.DECIMAL:
+                return f"DECIMAL({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "VARCHAR"
             case LoaderLogicalType.TIMESTAMP:

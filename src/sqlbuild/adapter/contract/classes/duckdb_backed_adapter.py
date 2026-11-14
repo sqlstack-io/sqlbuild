@@ -414,7 +414,9 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
 
         return self.render_identifier(name)
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "BOOLEAN"
@@ -422,6 +424,8 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
                 return "BIGINT"
             case LoaderLogicalType.FLOAT:
                 return "DOUBLE"
+            case LoaderLogicalType.DECIMAL:
+                return f"DECIMAL({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "VARCHAR"
             case LoaderLogicalType.TIMESTAMP:
@@ -1603,6 +1607,7 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         delete_sql: str = (
             f"DELETE FROM {destination} "
@@ -1610,6 +1615,13 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
             f"{self._quote_sql_string(cursor_start)} "
             f"AND {self.render_identifier(cursor_column)} < {self._quote_sql_string(cursor_end)}"
         )
+        if unique_key:
+            return (
+                delete_sql,
+                *self.render_delete_insert(
+                    destination=destination, sql=sql, unique_key=unique_key, columns=columns
+                ),
+            )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
         )
@@ -2050,6 +2062,7 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> int | None:
         statements: tuple[str, ...] = self.render_delete_insert_cursor(
             destination=destination,
@@ -2059,6 +2072,7 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
         affected: int | None = None

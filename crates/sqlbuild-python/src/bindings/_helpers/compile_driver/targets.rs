@@ -390,16 +390,19 @@ fn validate_project_targets<'py>(
     )
 }
 
+/// Whether the adapter needs every model and seed database and schema resolved.
+pub(crate) fn requires_explicit_targets(adapter_name: &Bound<'_, PyAny>) -> PyResult<bool> {
+    Ok(text_or_none(adapter_name)?
+        .as_deref()
+        .is_some_and(|name| EXPLICIT_TARGET_ADAPTERS.contains(&name)))
+}
+
 /// `validate_project_targets` with its arguments.
 pub(crate) fn project_targets(
     adapter_name: &Bound<'_, PyAny>,
     project: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
-    let name: Option<String> = text_or_none(adapter_name)?;
-    if !name
-        .as_deref()
-        .is_some_and(|name| EXPLICIT_TARGET_ADAPTERS.contains(&name))
-    {
+    if !requires_explicit_targets(adapter_name)? {
         return Ok(());
     }
     let adapter_label: String = adapter_name.str()?.to_cow()?.into_owned();

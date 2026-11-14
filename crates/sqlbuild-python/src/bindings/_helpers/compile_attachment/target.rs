@@ -3,12 +3,15 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
+use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
 use crate::bindings::_helpers::compile_attachment::effective_config::project_vars;
 use crate::bindings::_helpers::compile_command::constants::{
     COMPILE_CACHE_DISABLE_ENV_VAR, COMPILE_CACHE_DISABLE_VALUE, RETIRED_CACHE_DIRECTORY_NAMES,
 };
+use crate::bindings::_helpers::compile_driver::targets::requires_explicit_targets;
+use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
@@ -121,16 +124,27 @@ fn optional_string<'py>(
     })
 }
 
-/// `first or second or third`.
-fn first_truthy<'py>(values: [Bound<'py, PyAny>; 3]) -> PyResult<Bound<'py, PyAny>> {
-    let [first, second, third] = values;
-    if first.is_truthy()? {
-        return Ok(first);
+/// A project-level location as models resolve it: target, then `[defaults]`, then any fallback.
+pub(crate) fn project_location<'py>(
+    (target, default): (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    fallbacks: Vec<Bound<'py, PyAny>>,
+    explicit: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = target.py();
+    if target.is_truthy()? && !target.eq(PRESERVE_TARGET_VALUE)? {
+        return Ok(target);
     }
-    if second.is_truthy()? {
-        return Ok(second);
+    if default.is_truthy()? {
+        return Ok(default);
     }
-    Ok(third)
+    if !explicit {
+        for fallback in fallbacks {
+            if fallback.is_truthy()? {
+                return Ok(fallback);
+            }
+        }
+    }
+    Ok(py.None().into_bound(py))
 }
 
 /// Resolve the target and its effective database/schema without compiling resources.
@@ -170,18 +184,34 @@ pub(crate) fn build_effective_target_namespace<'py>(
         }
         native_field(&target_config, key)
     };
+    let project_config: Bound<'py, PyAny> = native_field(discovered_inputs, "project_config")?;
+    let defaults: Bound<'py, PyAny> = native_field(&project_config, "defaults")?;
+    let explicit: bool = requires_explicit_targets(&resolve_effective_adapter_name(
+        &project_config,
+        &native_field(discovered_inputs, "local_config")?,
+    )?)?;
     let values: Bound<'py, PyDict> = PyDict::new(py);
     values.set_item(
         DATABASE_KEY,
-        first_truthy([
-            target_value(DATABASE_KEY)?,
-            connection_database,
-            default_database,
-        ])?,
+        project_location(
+            (
+                target_value(DATABASE_KEY)?,
+                native_field(&defaults, DATABASE_KEY)?,
+            ),
+            vec![connection_database, default_database],
+            explicit,
+        )?,
     )?;
     values.set_item(
         SCHEMA_KEY,
-        first_truthy([target_value(SCHEMA_KEY)?, connection_schema, default_schema])?,
+        project_location(
+            (
+                target_value(SCHEMA_KEY)?,
+                native_field(&defaults, SCHEMA_KEY)?,
+            ),
+            vec![connection_schema, default_schema],
+            explicit,
+        )?,
     )?;
     let run_id: Bound<'py, PyAny> = run_id(&py.None().into_bound(py))?;
     let resolved: Bound<'py, PyDict> =

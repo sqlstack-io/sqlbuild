@@ -847,6 +847,7 @@ class UsageJanitorDuckDbAdapter(DuckDbAdapter):
                 for relation in relations
                 if relation.name in reads
             ),
+            notices=tuple(settings["notices"]),
         )
 """
 
@@ -907,10 +908,12 @@ def write_usage_settings(
     unavailable: str | None = None,
     via: Mapping[str, tuple[str, ...]] = MappingProxyType({}),
     failure: str | None = None,
+    notices: tuple[str, ...] = (),
 ) -> None:
     """Run janitor on the usage adapter: who read which relation, or why usage is unavailable.
 
-    A relation in `via` was read only through the named objects; `failure` makes the read fail.
+    A relation in `via` was read only through the named objects; `failure` makes the read fail;
+    `notices` say what a completed check left out.
     """
 
     (project_dir / "sqlbuild_local.toml").write_text(
@@ -931,6 +934,7 @@ def write_usage_settings(
                 },
                 "unavailable": unavailable,
                 "failure": failure,
+                "notices": list(notices),
             }
         ),
         encoding="utf-8",

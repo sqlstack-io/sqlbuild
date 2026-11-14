@@ -383,6 +383,16 @@ def test_given_contract_type_when_casting_then_sqlite_renders_storage_form(
             ),
             expected_rows=((1, "placed"), (3, "placed"), (9, "placed")),
         ),
+        SqliteStrategyTestCase(
+            description="keyed cursor delete_insert also replaces a key whose cursor moved",
+            strategy="keyed_cursor",
+            select_columns="order_id, status",
+            source_sql=(
+                "SELECT 1 AS order_id, 10 AS customer_id, 13 AS amount, "
+                "'2026-01-02 15:00:00' AS ordered_at, 'shipped' AS status"
+            ),
+            expected_rows=((1, "shipped"), (3, "placed")),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -419,6 +429,11 @@ def test_given_strategy_when_writing_incrementally_then_sqlite_produces_expected
         SqliteAtomicityTestCase(
             description="a failing cursor window leaves the target unchanged",
             strategy="cursor",
+            expected_rows=((1,), (2,), (3,)),
+        ),
+        SqliteAtomicityTestCase(
+            description="a failing keyed cursor window leaves the target unchanged",
+            strategy="keyed_cursor",
             expected_rows=((1,), (2,), (3,)),
         ),
         SqliteAtomicityTestCase(

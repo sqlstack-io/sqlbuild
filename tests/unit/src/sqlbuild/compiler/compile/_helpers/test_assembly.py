@@ -782,6 +782,40 @@ schema = "connection_schema"
             expected_effective_target_database="target_db",
             expected_effective_target_schema="target_schema",
         ),
+        AssembleCompiledProjectEffectiveTargetTestCase(
+            description="prefers defaults location over connection fallback",
+            project_toml="""
+name = "demo"
+adapter = "postgres"
+default_target = "dev"
+
+[defaults]
+database = "defaults_db"
+schema = "defaults_schema"
+
+[targets.dev.connection]
+database = "connection_db"
+schema = "connection_schema"
+""".strip()
+            + "\n",
+            expected_effective_target_database="defaults_db",
+            expected_effective_target_schema="defaults_schema",
+        ),
+        AssembleCompiledProjectEffectiveTargetTestCase(
+            description="never falls back to the connection location on snowflake",
+            project_toml="""
+name = "demo"
+adapter = "snowflake"
+default_target = "dev"
+
+[targets.dev.connection]
+database = "connection_db"
+schema = "connection_schema"
+""".strip()
+            + "\n",
+            expected_effective_target_database=None,
+            expected_effective_target_schema=None,
+        ),
     ),
     ids=lambda case: case.description,
 )

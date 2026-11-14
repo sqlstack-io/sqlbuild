@@ -970,7 +970,9 @@ class SqlServerAdapter(
             case FrameworkType.TIMESTAMP:
                 return "DATETIME2"
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "BIT"
@@ -978,6 +980,8 @@ class SqlServerAdapter(
                 return "BIGINT"
             case LoaderLogicalType.FLOAT:
                 return "FLOAT"
+            case LoaderLogicalType.DECIMAL:
+                return f"DECIMAL({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "NVARCHAR(MAX)"
             case LoaderLogicalType.TIMESTAMP:
@@ -1351,6 +1355,7 @@ class SqlServerAdapter(
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> None:
         statements: tuple[str, ...] = self.render_delete_insert_cursor(
             destination=destination,
@@ -1360,6 +1365,7 @@ class SqlServerAdapter(
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
         with self.transaction(connection):
@@ -2310,6 +2316,7 @@ class SqlServerAdapter(
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         start_literal: str = self.render_cursor_bound_literal(
             value=cursor_start, cursor_type=cursor_type
@@ -2322,6 +2329,13 @@ class SqlServerAdapter(
             f"WHERE {self.render_identifier(cursor_column)} >= {start_literal} "
             f"AND {self.render_identifier(cursor_column)} < {end_literal}"
         )
+        if unique_key:
+            return (
+                delete_sql,
+                *self.render_delete_insert(
+                    destination=destination, sql=sql, unique_key=unique_key, columns=columns
+                ),
+            )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
         )

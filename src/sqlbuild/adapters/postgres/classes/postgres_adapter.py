@@ -640,6 +640,7 @@ class PostgresAdapter(
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         quoted_cursor_column: str = self.render_identifier(cursor_column)
         delete_sql: str = (
@@ -647,6 +648,13 @@ class PostgresAdapter(
             f"{self._quote_sql_string(cursor_start)} "
             f"AND {quoted_cursor_column} < {self._quote_sql_string(cursor_end)}"
         )
+        if unique_key:
+            return (
+                delete_sql,
+                *self.render_delete_insert(
+                    destination=destination, sql=sql, unique_key=unique_key, columns=columns
+                ),
+            )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
         )
@@ -1278,6 +1286,7 @@ class PostgresAdapter(
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> None:
         statements: tuple[str, ...] = self.render_delete_insert_cursor(
             destination=destination,
@@ -1287,6 +1296,7 @@ class PostgresAdapter(
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
         with self.transaction(connection):
@@ -1967,7 +1977,9 @@ class PostgresAdapter(
 
         return self.render_identifier(name)
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "BOOLEAN"
@@ -1975,6 +1987,8 @@ class PostgresAdapter(
                 return "BIGINT"
             case LoaderLogicalType.FLOAT:
                 return "DOUBLE PRECISION"
+            case LoaderLogicalType.DECIMAL:
+                return f"NUMERIC({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "TEXT"
             case LoaderLogicalType.TIMESTAMP:

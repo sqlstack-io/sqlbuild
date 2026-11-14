@@ -59,3 +59,5 @@ STRING_LITERAL_ESCAPES: dict[int, str] = str.maketrans(
 IDENTIFIER_ESCAPES: dict[int, str] = str.maketrans(
     {"\\": "\\\\", "`": "\\`", "\n": "\\n", "\r": "\\r"}
 )
+NUMERIC_INTEGER_DIGITS: int = 29
+NUMERIC_FRACTION_DIGITS: int = 9

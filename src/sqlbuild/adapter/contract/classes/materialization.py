@@ -170,6 +170,7 @@ class MaterializationMixin(ABC):
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> int | None:
         """Delete rows by cursor range then insert from a SELECT statement."""
         ...

@@ -125,10 +125,11 @@ class DatabricksTableFreshnessBatchTestCase:
 
 
 @dataclass(frozen=True)
-class DatabricksTableFreshnessFallbackTestCase:
+class DatabricksTableFreshnessMixedBatchTestCase:
     description: str
-    expected_data_versions: tuple[datetime, ...]
-    expected_query_fragments: tuple[str, ...]
+    delta_version: datetime
+    view_error: str
+    expected_view_message: str
 
 
 @dataclass(frozen=True)

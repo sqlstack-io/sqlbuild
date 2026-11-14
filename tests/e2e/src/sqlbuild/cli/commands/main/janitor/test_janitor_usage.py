@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.janitor._test_types import (
+    JanitorKeepInUseIncompleteE2ETestCase,
     JanitorUsageE2ETestCase,
     JanitorUsageFailureE2ETestCase,
     JanitorUsageJsonE2ETestCase,
@@ -50,17 +51,6 @@ FIVE_READERS: tuple[str, ...] = ("svc_reporting", "alice", "bob", "carol", "dave
                 "  relations to archive   3\n",
                 "\n  usage not checked: unsupported adapter\n",
                 "Relations to archive",
-                "\u2713 Janitor completed  archived 3, deleted 1, pruned 2",
-            ),
-            expected_archived=3,
-        ),
-        JanitorUsageUncheckedE2ETestCase(
-            description="--keep-in-use without a usage source warns and archives everything",
-            janitor_command=(*APPROVED_JANITOR, "--keep-in-use"),
-            expected_ordered_lines=(
-                "  usage not checked: unsupported adapter\n"
-                "  nothing kept in use: no usage could be checked, so relations in use are "
-                "archived too\n",
                 "\u2713 Janitor completed  archived 3, deleted 1, pruned 2",
             ),
             expected_archived=3,
@@ -401,6 +391,58 @@ def test_given_failing_usage_source_when_running_janitor_then_failure_line_is_pr
     assert result.returncode != 0, result.stdout
     assert_in_order(output=result.stdout + result.stderr, lines=test_case.expected_ordered_lines)
     assert "Janitor preview" not in result.stdout
+    assert len(list_archive_names(db_path=project_dir / "janitor.duckdb")) == 1
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        JanitorKeepInUseIncompleteE2ETestCase(
+            description="--keep-in-use stops when usage cannot be read",
+            reads={},
+            unavailable="cannot read access history",
+            notices=(),
+            expected_error=(
+                "keep_in_use needs the usage of every relation to archive, but usage was not "
+                "checked: cannot read access history; nothing was archived"
+            ),
+        ),
+        JanitorKeepInUseIncompleteE2ETestCase(
+            description="--keep-in-use stops when usage is only partly read",
+            reads={"old_orders_000": (("alice",), 3)},
+            unavailable=None,
+            notices=("view chains not followed: grant the dependency role",),
+            expected_error=(
+                "keep_in_use needs the usage of every relation to archive, but usage was only "
+                "partly checked: view chains not followed: grant the dependency role; nothing "
+                "was archived"
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_incomplete_usage_when_keeping_in_use_then_janitor_stops_and_archives_nothing(
+    test_case: JanitorKeepInUseIncompleteE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_usage_janitor_project(
+        tmp_path=tmp_path, project_name="janitor_keep_incomplete", stale_tables=2
+    )
+    write_usage_settings(
+        project_dir=project_dir,
+        reads=test_case.reads,
+        unavailable=test_case.unavailable,
+        notices=test_case.notices,
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=(*APPROVED_JANITOR, "--keep-in-use"), project_dir=project_dir
+    )
+
+    assert result.returncode != 0, result.stdout
+    output: str = " ".join((result.stdout + result.stderr).split())
+    assert test_case.expected_error in output, output
+    assert "Relation usage check incomplete. (" in result.stdout + result.stderr
+    assert "Janitor completed" not in result.stdout
     assert len(list_archive_names(db_path=project_dir / "janitor.duckdb")) == 1
 
 
