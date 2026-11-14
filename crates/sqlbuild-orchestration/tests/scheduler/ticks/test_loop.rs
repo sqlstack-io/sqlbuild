@@ -140,7 +140,7 @@ fn given_a_leader_fenced_mid_cycle_when_the_loop_continues_then_it_rejoins_the_e
             .await;
 
             finished
-                .unwrap_or_else(|_| Ok(()))
+                .expect("the scheduler stops once it leads again")
                 .expect("a fenced leader keeps the scheduler running");
             assert_eq!(
                 epochs.windows(2).any(|pair| pair[1] > pair[0]),
