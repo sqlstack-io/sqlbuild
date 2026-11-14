@@ -1,11 +1,11 @@
-//! One maintenance role per server: health alerts every cycle, bounded retention every minute.
+//! One maintenance role per server: health alerts and WAL resets every cycle, retention every minute.
 
 use std::time::{Duration, Instant};
 
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::platform::_helpers::retention::retain;
+use crate::platform::_helpers::retention::{retain, wal_checkpoint};
 use crate::platform::_helpers::watchdog::scan_health;
 use crate::platform::models::RetentionPolicies;
 use crate::store::errors::ControlError;
@@ -43,6 +43,11 @@ pub async fn run_maintenance(
                 Err(error) => return Err(error),
             }
             retained_at = Some(Instant::now());
+        }
+        match wal_checkpoint(store).await {
+            Ok(()) => {}
+            Err(error) if error.transient() => {}
+            Err(error) => return Err(error),
         }
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(30)) => {},
