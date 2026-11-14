@@ -320,9 +320,15 @@ pub(crate) fn loader_write_schemas<'py>(
 ) -> PyResult<()> {
     let mut intermediate_loaders: HashSet<String> = HashSet::new();
     for entry in entries {
-        if native_field(entry, "meta")?
-            .call_method1("get", (LOADER_NODE_KEY,))?
-            .is_truthy()?
+        let meta: Bound<'py, PyAny> = native_field(entry, "meta")?;
+        let flag: Option<Bound<'py, PyAny>> = match meta.downcast::<PyDict>() {
+            Ok(meta) => meta.get_item(LOADER_NODE_KEY)?,
+            Err(_) => None,
+        };
+        if flag
+            .map(|flag| flag.is_truthy())
+            .transpose()?
+            .unwrap_or(false)
         {
             intermediate_loaders.insert(native_field(entry, "name")?.extract()?);
         }
