@@ -66,6 +66,28 @@ METADATA: dict[str, Any] = {
     "documents": {},
 }
 
+PYTHON_PIPELINE_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
+    "models/stg_orders.sql": (
+        "MODEL (description 'Staged orders.', tags [orders]);\n\nSELECT 1 AS order_id\n"
+    ),
+    "models/orders.sql": (
+        "MODEL (description 'Orders.', tags [orders]);\n\n"
+        'SELECT order_id FROM __ref("stg_orders")\n'
+    ),
+    "python/orders/partner_export/node.py": (
+        "from sqlbuild.assets import asset\nfrom sqlbuild.refs import model\n\n\n"
+        "@asset(depends_on=model('orders'), tags=['orders'], description='Partner order file.')\n"
+        "def partner_orders_file(ctx):\n    return None\n"
+    ),
+    "python/fulfillment/carrier_sync/node.py": (
+        "from python.orders.partner_export.node import partner_orders_file\n"
+        "from sqlbuild.tasks import task\n\n\n"
+        "@task(depends_on=partner_orders_file, tags=['orders'], description='Book collection.')\n"
+        "def request_carrier_collection(ctx):\n    return None\n"
+    ),
+}
+
 TYPE_PROOF_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRCONTRACT105"]\n\n'

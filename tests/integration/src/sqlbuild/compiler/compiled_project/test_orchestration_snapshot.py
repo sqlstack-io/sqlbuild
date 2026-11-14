@@ -44,12 +44,14 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotLineageTestCase,
     SnapshotProvidersTestCase,
     SnapshotRejectionTestCase,
+    PythonJobSelectionTestCase,
     SnapshotScheduleTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
     METADATA,
     PARITY_FILES,
+    PYTHON_PIPELINE_FILES,
     TYPE_PROOF_FILES,
     published_texts,
 )
@@ -1846,3 +1848,60 @@ def test_given_broken_declaration_modules_when_compiling_then_no_partial_snapsho
                 project_dir=tmp_path,
                 discovered_inputs=discovered,
             )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonJobSelectionTestCase(
+            description="a model selector selects models",
+            select="+orders",
+            expected_selection=("model:orders", "model:stg_orders"),
+        ),
+        PythonJobSelectionTestCase(
+            description="a task selector selects the task",
+            select="task:request_carrier_collection",
+            expected_selection=("task:request_carrier_collection",),
+        ),
+        PythonJobSelectionTestCase(
+            description="a python folder selects every node under it",
+            select="python/orders",
+            expected_selection=("asset:partner_orders_file",),
+        ),
+        PythonJobSelectionTestCase(
+            description="a tag shared by models and Python nodes selects both",
+            select="tag:orders",
+            expected_selection=(
+                "asset:partner_orders_file",
+                "model:orders",
+                "model:stg_orders",
+                "task:request_carrier_collection",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_python_selectors_when_publishing_jobs_then_selections_match_the_cli(
+    tmp_path: Path, test_case: PythonJobSelectionTestCase
+) -> None:
+    write_files(project_dir=tmp_path, files=PYTHON_PIPELINE_FILES)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discovered,
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+
+    snapshot: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=project,
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            declarations=[job("orders_job", description="Orders.", select=test_case.select)],
+            discovered_inputs=discovered,
+        ).to_json()
+    )
+
+    assert snapshot["documents"]["jobs"]["orders_job"]["selection"] == list(
+        test_case.expected_selection
+    )
