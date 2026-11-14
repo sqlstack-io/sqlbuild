@@ -154,33 +154,29 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	const seedLabel: Record<string, string> = { first_run: 'first_run', config_changed: 'seed_changed', no_change: 'current' };
 	add('Seeds', builtSeeds(plan).map((s) => ({ name: s.name, value: seedLabel[s.reason] ?? '', detail: [] })));
 	add('Python', plan.python_nodes.map((p) => ({ name: p.name, value: `${p.kind} · ${p.identity_status}`, detail: [] })));
+	// A planner warning names its model in `model_name`, or opens its message with it as the CLI prints it; it shows once, with the first entry for that model.
+	const claimed = new Set<PlanWarning>();
 	for (const entry of sections.filter((s) => s.changed).flatMap((s) => s.entries)) {
-		// A planner warning names its model in `model_name`, or opens its message with it as the CLI prints it.
-		const mine = plan.warnings.filter((w) => (w.model_name ?? w.message.split(':', 1)[0]) === entry.name);
+		const mine = plan.warnings.filter((w) => !claimed.has(w) && (w.model_name ?? w.message.split(':', 1)[0]) === entry.name && !FORWARD_ONLY.test(w.message));
+		mine.forEach((w) => claimed.add(w));
 		if (mine.length) entry.warnings = mine;
 	}
 	return sections;
 }
 
-/** The forward-only replay warning, `sqb plan`'s long advice in a sentence and the ways to reprocess. */
+/** The planner's forward-only replay advice, which the page leaves out: the model's action already says it continues forward. */
 const FORWARD_ONLY = /already-built dates keep their old results/;
-export const REPROCESS_OPTIONS = [
-	'replay_on_change full: rebuild every date with the new SQL',
-	'replay_on_change bounded-<duration>, such as bounded-14d: reprocess just that window',
-	'Leave it forward-only, the default: existing dates stay as they are'
-];
 
-/** A warning shown under its model: one sentence, and for the forward-only warning, how to reprocess. */
-export function warningView(w: PlanWarning): { text: string; reprocess: boolean } {
-	if (FORWARD_ONLY.test(w.message)) return { text: 'Already-built dates keep their old results; only new dates use the new query.', reprocess: true };
+/** A warning shown under its model, without the model name the CLI opens it with. */
+export function warningText(w: PlanWarning): string {
 	const text = w.model_name ? w.message : w.message.slice(w.message.indexOf(':') + 1).trim();
-	return { text: text.charAt(0).toUpperCase() + text.slice(1), reprocess: false };
+	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** The warnings no changed model shows with it, listed on their own after the plan. */
+/** The warnings no changed model shows with it, listed on their own after the plan; never the forward-only advice. */
 export function looseWarnings(plan: PlanDocument, sections: PlanSection[]): PlanWarning[] {
 	const shown = new Set(sections.flatMap((s) => s.entries.flatMap((e) => e.warnings ?? [])));
-	return plan.warnings.filter((w) => !shown.has(w));
+	return plan.warnings.filter((w) => !shown.has(w) && !FORWARD_ONLY.test(w.message));
 }
 
 /** The `--changed` run of each model, by name. */
@@ -190,27 +186,6 @@ const changedRuns = (plan: PlanDocument) => new Map((plan.changed?.runs ?? []).m
 export function changedModelKeys(plan: PlanDocument): string[] {
 	return builtModels(plan).filter((m) => !ROUTINE.has(m.reason)).map((m) => `model:${m.name}`);
 }
-
-/** What `--changed` counted as a change and how far a change reaches, the CLI's `Counting: … · reach: …` line in words. */
-export function changedRule(changed: PlanChanged): string {
-	const counted = changed.counts.includes('source_data')
-		? changed.counts.includes('definition')
-			? 'definition and source data changes'
-			: 'source data changes, not definition changes'
-		: 'definition changes, not source data';
-	const reach = changed.reach === 'all' ? 'builds everything downstream of a change' : 'stops at models another scheduled job refreshes';
-	return `--changed counts ${counted}, and ${reach}.`;
-}
-
-/** What a preview couldn't know, in words; the run checks each against the warehouse before it builds. */
-const UNKNOWN_WORDS: Record<string, string> = {
-	'source freshness': 'whether sources are fresh enough',
-	retention: 'what retention removes',
-	'column rename support': 'whether the warehouse can rename columns in place',
-	'sources outside mirrored schemas': 'sources in schemas the server doesn’t sync',
-	'table types': 'what type each existing table is'
-};
-export const unknownWords = (item: string) => UNKNOWN_WORDS[item] ?? item;
 
 /** The Held back and Unchanged sections of a `--changed` plan; `refresh` words what refreshes a job's nodes. */
 export function changedSections(changed: PlanChanged, refresh: (job: string) => string): PlanSection[] {

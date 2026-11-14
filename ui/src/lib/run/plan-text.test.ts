@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { actionText, changedRule, changedSections, jobRefreshText, looseWarnings, planSections, unknownWords, warningView } from './plan-text';
+import { actionText, changedSections, jobRefreshText, looseWarnings, planSections, warningText } from './plan-text';
 
 const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	name,
@@ -71,29 +71,28 @@ describe('plan text, as sqb plan prints it', () => {
 		]);
 	});
 
-	it("shows a model's warning with the changed model it names, and keeps the rest for the warnings list", () => {
+	it("shows a model's warning with the changed model it names, keeps the rest for the warnings list, and leaves out the forward-only advice", () => {
 		const forward = "events: the model's SQL changed, so already-built dates keep their old results - only new dates will use the new query.";
 		const p = plan(
 			[model('events', { reason: 'query_changed', materialization_type: 'incremental' }), model('orders', { reason: 'query_changed' }), model('event_counts')],
 			{ warnings: [{ severity: 'warning', message: forward }, { severity: 'warning', message: 'lag', model_name: 'orders' }, { severity: 'warning', message: 'event_counts: routine' }, { severity: 'error', message: 'no model named here' }] }
 		);
 		const sections = planSections(p);
-		expect(sections[0].entries.map((e) => [e.name, e.warnings?.map((w) => w.message)])).toEqual([
-			['events', [forward]],
-			['orders', ['lag']]
+		expect(sections[0].entries.map((e) => [e.name, e.warnings?.map(warningText)])).toEqual([
+			['events', undefined],
+			['orders', ['Lag']]
 		]);
 		// Only changed models carry warnings; one about a routine model, or about no model, is listed on its own.
 		expect(looseWarnings(p, sections).map((w) => w.message)).toEqual(['event_counts: routine', 'no model named here']);
-		// The forward-only warning reads as one sentence with the ways to reprocess behind a toggle; others lose the model name.
-		expect(sections[0].entries.flatMap((e) => (e.warnings ?? []).map(warningView))).toEqual([
-			{ text: 'Already-built dates keep their old results; only new dates use the new query.', reprocess: true },
-			{ text: 'Lag', reprocess: false }
-		]);
 	});
 
-	it('words what a preview cannot know, and keeps an item it has no words for', () => {
-		expect(unknownWords('sources outside mirrored schemas')).toBe('sources in schemas the server doesn’t sync');
-		expect(unknownWords('cursor window of orders')).toBe('cursor window of orders');
+	it('shows a warning once, under the first entry for its model, when the model is in more than one changed section', () => {
+		const lag = { severity: 'warning', message: 'lag', model_name: 'orders' };
+		const p = plan([model('orders', { reason: 'query_changed' })], { warnings: [lag], retention: [{ model: 'orders', action: 'drop' }] });
+		expect(planSections(p).flatMap((s) => s.entries.map((e) => [s.title, e.warnings?.length ?? 0]))).toEqual([
+			['Retention', 1],
+			['Query changed', 0]
+		]);
 	});
 
 	it('collapses a plan that is all full refresh into counts by materialization', () => {
@@ -147,9 +146,6 @@ describe('plan under --changed', () => {
 			['Held back', false],
 			['Unchanged', true]
 		]);
-		expect(changedRule(reach.changed!)).toBe('--changed counts definition changes, not source data, and stops at models another scheduled job refreshes.');
-		expect(changedRule({ ...reach.changed!, counts: ['definition', 'source_data'], reach: 'all' })).toBe('--changed counts definition and source data changes, and builds everything downstream of a change.');
-		expect(changedRule({ ...reach.changed!, counts: ['source_data'] })).toBe('--changed counts source data changes, not definition changes, and stops at models another scheduled job refreshes.');
 	});
 
 	it('names the models that run under --changed for their own reason, not as reading a change', () => {

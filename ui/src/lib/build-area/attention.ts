@@ -6,6 +6,7 @@ import { eventKindLabel, problemHref } from '$lib/platform/labels';
 import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
 import { shortName } from '$lib/build-area/labels';
+import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
 
 export type AttentionTone = 'error' | 'warning' | 'stale' | 'info';
 
@@ -22,6 +23,8 @@ export type AttentionView = {
 	href: string;
 	action: string;
 	consequences: Consequence[];
+	/** The one build an out-of-date alert offers: `sqb build --changed` when anything changed, else a rebuild of the nodes behind. */
+	build?: { label: string; href: string };
 };
 
 /** A heartbeat gap shorter than this reads as a pause, not an outage: the run carries on when its worker reports again. */
@@ -55,7 +58,7 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				tone: outage ? 'warning' : 'info',
 				title: outage ? `${name} is unresponsive` : `${name} missed a heartbeat`,
 				detail: item.lastHeartbeatAt
-					? `Its worker last reported ${formatAgo(item.lastHeartbeatAt, now)}.${outage ? '' : ' The run carries on when the worker reports again.'}`
+					? `Its worker last reported ${formatAgo(item.lastHeartbeatAt, now)}.`
 					: (item.run.statusReason ?? 'Its worker hasn’t reported since the run started.'),
 				since: formatAgo(item.lastHeartbeatAt ?? item.run.startedAt, now),
 				href: `/runs/${item.run.id}`,
@@ -81,7 +84,8 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				since: '',
 				href: '/catalog?stale=1',
 				action: 'View in catalog',
-				consequences: []
+				consequences: [],
+				build: item.changed.length ? { label: 'Build what changed', href: CHANGED_PLAN_HREF } : { label: `Rebuild ${all.length}`, href: planHref(all) }
 			};
 		}
 		case 'stale_sources':
@@ -140,6 +144,7 @@ const waitRun = (wait: QueueWait): string | null => ('runId' in wait ? wait.runI
  * The cause an item follows from, by the key of the alert that names that cause, or null when it stands alone:
  * a schedule is overdue because its location stopped checking in, or else because no server runs the scheduler;
  * a run waits in the queue because an unresponsive run of its job, or one it waits for, holds it up.
+ * An acknowledged cause leaves the list, so nothing is grouped under it.
  */
 function causeOf(item: AttentionItem, items: AttentionItem[]): string | null {
 	if (item.kind === 'platform_event' && item.event.kind === 'tick_overdue') {
@@ -151,7 +156,7 @@ function causeOf(item: AttentionItem, items: AttentionItem[]): string | null {
 	}
 	if (item.kind === 'queue_blocked') {
 		const held = new Set(item.waits.map(waitRun));
-		const stuck = items.find((i) => i.kind === 'run_unresponsive' && ((item.jobKey !== null && i.run.jobKey === item.jobKey) || held.has(i.run.id)));
+		const stuck = items.find((i) => i.kind === 'run_unresponsive' && !i.acknowledged && ((item.jobKey !== null && i.run.jobKey === item.jobKey) || held.has(i.run.id)));
 		return stuck && stuck.kind === 'run_unresponsive' ? `unresponsive:${stuck.run.id}` : null;
 	}
 	return null;

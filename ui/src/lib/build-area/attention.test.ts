@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AttentionItem, AttentionRun, PlatformEvent } from '$lib/api';
 import { attentionViews } from './attention';
+import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
 
 const now = Date.parse('2026-01-01T12:00:00Z');
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -52,10 +53,26 @@ describe('overview alerts', () => {
 		]);
 	});
 
+	it('keeps a queued run as its own alert when the unresponsive run that holds it up is acknowledged', () => {
+		const handled: AttentionItem = { ...unresponsive('r1', 'nightly', 1), acknowledged: { by: 'sam', at: ago(1) } } as AttentionItem;
+		const views = attentionViews([handled, queued('q1', 'nightly', [])], now);
+		expect(views.map(({ view }) => [view.key, view.consequences.length])).toEqual([
+			['queue:q1', 0],
+			['unresponsive:r1', 0]
+		]);
+	});
+
 	it('words a short heartbeat gap as a pause and a long one as an outage', () => {
 		const [outage, pause] = attentionViews([unresponsive('short', 'a', 1), unresponsive('long', 'b', 6)], now).sort((x, y) => x.view.key.localeCompare(y.view.key));
 		expect([outage.view.title, outage.view.tone]).toEqual(['b is unresponsive', 'warning']);
 		expect([pause.view.title, pause.view.tone]).toEqual(['a missed a heartbeat', 'info']);
+	});
+
+	it('offers one build: what changed when anything changed, else a rebuild of the nodes behind', () => {
+		const build = (changed: string[], behind: string[]) => attentionViews([{ kind: 'stale_models', changed, behind }], now)[0].view.build;
+		expect(build(['model:a'], ['model:a', 'model:b'])).toEqual({ label: 'Build what changed', href: CHANGED_PLAN_HREF });
+		// `--changed` would build nothing when nodes are only behind, so the rebuild names them.
+		expect(build([], ['model:b', 'model:c'])).toEqual({ label: 'Rebuild 2', href: planHref(['model:b', 'model:c']) });
 	});
 
 	it('states how many nodes are out of date, counting a node both changed and behind once', () => {
