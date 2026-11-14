@@ -26,6 +26,8 @@ export const PERMISSIONS: Record<Capability, PermissionInfo> = {
 	},
 	'run.prioritise': { label: 'Put runs ahead of the queue', description: 'Start or rerun a run with a priority above 0, so it is claimed before waiting runs.', risk: 'operate' },
 	'run.warehouse': { label: 'Choose a run’s warehouse', description: 'Start an ad-hoc run on another warehouse configured for the target, which can change cost and speed.', risk: 'operate' },
+	'run.vars': { label: 'Set variables for a run', description: 'Start an ad-hoc run with --vars, which compiles different SQL than the published project.', risk: 'changes_data' },
+	'run.load': { label: 'Load sources on request', description: 'Start an ad-hoc load, or a build with --load or --reload, which runs source loaders against the warehouse.', risk: 'changes_data' },
 	'trigger.toggle': { label: 'Pause and resume schedules and sensors', description: 'Stop or restart automatic runs.', risk: 'operate' },
 	'sensor.reset_cursor': { label: 'Reset where a sensor is up to', description: 'Move a sensor’s position so it looks at events again.', risk: 'operate' },
 	'run.adhoc': { label: 'Run ad-hoc commands', description: 'Run sqb build and other commands on any selection of nodes outside a declared job, writing to the warehouse.', risk: 'changes_data' },

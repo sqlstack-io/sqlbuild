@@ -1410,7 +1410,7 @@ export interface components {
          * @description Closed permission vocabulary; unknown actions fail deserialization.
          * @enum {string}
          */
-        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "run.warehouse" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "run.warehouse" | "run.vars" | "run.load" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
         /** @description What launching the command would run and whether this person may launch it. */
         AdhocCheck: {
             /** @description Why the command cannot run regardless of permissions, such as a refused flag or an unknown selector. */
@@ -2785,6 +2785,12 @@ export interface components {
             kind: "check_finished";
             node_key: string;
             outcome: components["schemas"]["NodeOutcome"];
+        } | {
+            /** @enum {string} */
+            kind: "compiled";
+            node_hashes: {
+                [key: string]: string;
+            };
         } | {
             /** @enum {string} */
             kind: "unresponsive";

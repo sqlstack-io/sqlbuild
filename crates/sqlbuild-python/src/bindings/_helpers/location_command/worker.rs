@@ -15,10 +15,13 @@ use sqlbuild_cli::dispatch::main::command_dispatch::command_dispatch;
 use sqlbuild_cli::dispatch::models::Dispatch;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_orchestration::runs::models::{
-    RunCommand, RunKind, RunOutcome, RunRequest, RunWindow,
+    RunChange, RunCommand, RunKind, RunOutcome, RunRequest, RunWindow,
 };
+use sqlbuild_orchestration::snapshots::main::node_hashes::node_hashes;
+use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::audit_command::command::run_audit;
+use crate::bindings::_helpers::boundary::config_values::json_value_to_python;
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, within};
 use crate::bindings::_helpers::build_command::command::run_build;
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
@@ -34,11 +37,13 @@ use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestr
 use crate::bindings::_helpers::compiled_views::project_reads::sql_tests;
 use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
+use crate::bindings::_helpers::location_command::command::compile_snapshot;
 use crate::bindings::_helpers::location_command::constants::{
     CHANGED_SETTING, COMMAND_IMPLEMENTATIONS, JOB_RUN_COUNTS, JOB_RUN_REACH, REACH_SETTING,
     SQL_TEST_NODE_KIND,
 };
 use crate::bindings::_helpers::native_host::host::entry;
+use crate::bindings::_helpers::query_command::project::ProjectAdapter;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::records::fields::{field, replaced};
@@ -302,12 +307,39 @@ fn run_cancellable<'py>(
     result
 }
 
+/// Compile the verified project again with an ad-hoc run's variables and record its nodes' hashes on the run.
+fn record_compiled_vars<'py>(
+    py: Python<'py>,
+    (owner, frozen): (&Bound<'py, NativeOrchestrationWorker>, &RunRequest),
+    (arguments, input, project): (&KeywordArguments<'py>, &SnapshotInput, &ProjectAdapter<'py>),
+) -> PyResult<()> {
+    let Some(vars) = frozen
+        .settings
+        .get("vars")
+        .filter(|_| frozen.kind == RunKind::Adhoc)
+    else {
+        return Ok(());
+    };
+    write_stderr(py, "Compiling with the run's variables...\n")?;
+    let vars = json_value_to_python(py, vars)?;
+    let (compiled, _) = compile_snapshot(py, arguments, (input, project), Some(&vars))?;
+    let node_hashes: BTreeMap<String, String> = node_hashes(&compiled.input)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?
+        .into_iter()
+        .filter(|(key, _)| frozen.selection.contains(key) || frozen.write_set.contains(key))
+        .collect();
+    owner
+        .get()
+        .change(py, "compiled", RunChange::Compiled { node_hashes })
+}
+
 pub(super) fn execute_worker<'py>(
     py: Python<'py>,
-    (snapshot, discovered, blocked): (&NativeOrchestrationSnapshot, Bound<'py, PyAny>, NodeKeys),
-    arguments: &KeywordArguments<'py>,
+    (snapshot, project, blocked): (&NativeOrchestrationSnapshot, ProjectAdapter<'py>, NodeKeys),
+    (arguments, input): (&KeywordArguments<'py>, &SnapshotInput),
     (bearer, identity, recall): (&str, (String, String), Option<&InvocationRecall>),
 ) -> PyResult<i32> {
+    let discovered = project.discovered.clone();
     write_stderr(py, "Verifying frozen run inputs...\n")?;
     let owner = Bound::new(
         py,
@@ -344,6 +376,7 @@ pub(super) fn execute_worker<'py>(
             write_stderr(py, &format!("Run refused: {reason}\n"))?;
             return Err(PyValueError::new_err(reason));
         }
+        record_compiled_vars(py, (&owner, &frozen), (arguments, input, &project))?;
         let (request, scope) = command_request(py, &discovered, arguments, &owner)?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
         within(&scope, |_| {

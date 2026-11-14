@@ -1111,20 +1111,26 @@ export class MockOperate {
 				? resolution.nodes.filter((n) => snapshotNode(n)?.kind === 'seed')
 				: parts.verb === 'freshness'
 					? [...new Set(resolution.nodes.flatMap((n) => [n, ...ancestors(n)]).filter(isSource))]
-					: resolution.nodes;
-		if (!selection.length) return refused(parts.verb === 'seed' ? 'the selectors match no seeds in the current publication' : 'no sources are selected or upstream of the selection');
+					: parts.verb === 'load'
+						? resolution.nodes.filter(isSource)
+						: resolution.nodes;
+		const empty = { seed: 'the selectors match no seeds in the current publication', load: 'the selectors match no managed sources in the current publication' } as Partial<Record<LaunchVerb, string>>;
+		if (!selection.length) return refused(empty[parts.verb] ?? 'no sources are selected or upstream of the selection');
 		const writable = selection.filter((n) => !isSource(n));
 		const writeSet =
 			parts.verb === 'build'
 				? writable.filter((n) => !(parts.flags['--no-load'] && snapshotNode(n)?.kind === 'loader'))
 				: parts.verb === 'seed'
 					? writable.filter((n) => snapshotNode(n)?.kind === 'seed')
-					: [];
+					: parts.verb === 'load'
+						? selection
+						: [];
 		const scopeTerms = ADHOC_SCOPE[this.#ctx.role()];
 		const granted = scopeTerms === null ? null : new Set(writeSetOf(scopeTerms.length ? scopeTerms : ['__none__'], []));
 		const covered = this.#ctx.can('run.adhoc') && (granted === null || selection.every((n) => granted.has(n)));
 		const decide = (action: Capability, allowed: boolean): AdhocPermission => ({ action, allowed, reason: allowed ? null : `missing ${action} permission for this target` });
-		const gates = [...new Set(Object.keys(parts.flags).flatMap((f) => flagSpec(parts.verb, f)?.requires ?? []))];
+		const verbGate: Capability[] = parts.verb === 'load' ? ['run.load'] : [];
+		const gates = [...new Set([...Object.keys(parts.flags).flatMap((f) => flagSpec(parts.verb, f)?.requires ?? []), ...verbGate])];
 		const permissions = [
 			decide('run.adhoc', covered),
 			...gates.map((action) => decide(action, this.#ctx.can(action))),
