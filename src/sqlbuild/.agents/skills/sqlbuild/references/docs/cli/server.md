@@ -368,12 +368,14 @@ command selects (`selection`), the nodes it writes (`write_set`), the options th
 command that can't run whatever your permissions, and `launchable` is `true` when the launch
 would be accepted. A dry run queues nothing and records no audit entry.
 
-To launch, `POST /api/control/runs/adhoc` with the same fields plus a new `run_id` and a
-`reason`. The response is `{"applied": true}`; sending the same `run_id` again returns
-`{"applied": false}` and starts nothing. The server resolves selectors against the current
-publication, and the worker runs exactly the resolved nodes, from the project it verified against
-that publication; files that change on the location after that check are not used. The target is
-always the one in the request.
+To launch, `POST /api/control/runs/adhoc` with the same fields plus a `reason` and a new `run_id`,
+a random (version 4) or time-ordered (version 7) UUID. The response is `{"applied": true}`;
+sending the same `run_id` again returns `{"applied": false}` and starts nothing. Job runs and
+reruns take a `run_id` the same way. The server refuses a name-based (version 5) `run_id` with a
+400, because it derives those IDs for the runs it starts itself. The server resolves selectors
+against the current publication, and the worker runs exactly the resolved nodes, from the project
+it verified against that publication; files that change on the location after that check are not
+used. The target is always the one in the request.
 
 | Verb | What the worker runs |
 | --- | --- |

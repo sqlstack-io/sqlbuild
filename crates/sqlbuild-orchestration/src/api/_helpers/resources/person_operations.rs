@@ -67,7 +67,8 @@ pub(crate) async fn statistics(
 
 #[utoipa::path(post, path = "/api/control/runs", operation_id = "requestJobRun",
     params(("x-sqb-csrf" = String, Header)), request_body = JobRunRequest,
-    responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
+    responses((status = 200, body = MutationResponse),
+        (status = 400, body = crate::api::models::ApiErrorBody), (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request_job(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
@@ -148,7 +149,8 @@ pub(crate) async fn cancel_run(
 
 #[utoipa::path(post, path = "/api/control/runs/rerun", operation_id = "rerunPersonRun",
     params(("x-sqb-csrf" = String, Header)), request_body = RerunRequest,
-    responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
+    responses((status = 200, body = MutationResponse),
+        (status = 400, body = crate::api::models::ApiErrorBody), (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn rerun(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
