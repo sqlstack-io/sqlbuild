@@ -6,15 +6,13 @@ use crate::_helpers::reading::read_authored_text;
 use crate::constants::{ORCHESTRATION_DIRECTORY, PYTHON_FILE_SUFFIX};
 use crate::models::{DiscoveryFailure, FailureKind};
 use crate::orchestration_files::_helpers::python_modules::module_declaration;
-use crate::orchestration_files::_helpers::read_group_file::read_group_file;
-use crate::orchestration_files::_helpers::read_job_file::read_job_file;
 use crate::orchestration_files::constants::{
     BYTECODE_DIRECTORY, CALENDARS_DIRECTORY, GROUPS_DIRECTORY, HIDDEN_PREFIX, JOBS_DIRECTORY,
     ROLE_DIRECTORIES, SENSORS_DIRECTORY, TOML_FILE_SUFFIX, TOML_JOBS_HELP,
 };
 use crate::orchestration_files::errors::FileError;
 use crate::orchestration_files::models::{
-    FilePosition, GroupFile, JobFile, NamedModule, OrchestrationFailure, PythonModules,
+    FilePosition, NamedModule, OrchestrationFailure, PythonModules,
 };
 use crate::tree::main::children::children;
 use crate::tree::main::rglob::rglob;
@@ -134,30 +132,18 @@ fn role_files(
     Ok(kept)
 }
 
-/// Every job file with its path.
-pub(crate) fn read_jobs(
+/// Every TOML file below one role folder, read by `reader`, with its path.
+pub(crate) fn read_toml_files<T>(
     tree: &ProjectTree,
-) -> Result<Vec<(String, JobFile)>, OrchestrationFailure> {
-    let mut jobs: Vec<(String, JobFile)> = Vec::new();
-    for path in role_files(tree, JOBS_DIRECTORY, TOML_FILE_SUFFIX)? {
-        let job: JobFile =
-            read_job_file(&read(tree, &path)?).map_err(|error| failure(&path, error))?;
-        jobs.push((path, job));
+    role: &str,
+    reader: fn(&str) -> Result<T, FileError>,
+) -> Result<Vec<(String, T)>, OrchestrationFailure> {
+    let mut files: Vec<(String, T)> = Vec::new();
+    for path in role_files(tree, role, TOML_FILE_SUFFIX)? {
+        let file: T = reader(&read(tree, &path)?).map_err(|error| failure(&path, error))?;
+        files.push((path, file));
     }
-    Ok(jobs)
-}
-
-/// Every job group file with its path.
-pub(crate) fn read_groups(
-    tree: &ProjectTree,
-) -> Result<Vec<(String, GroupFile)>, OrchestrationFailure> {
-    let mut groups: Vec<(String, GroupFile)> = Vec::new();
-    for path in role_files(tree, GROUPS_DIRECTORY, TOML_FILE_SUFFIX)? {
-        let group: GroupFile =
-            read_group_file(&read(tree, &path)?).map_err(|error| failure(&path, error))?;
-        groups.push((path, group));
-    }
-    Ok(groups)
+    Ok(files)
 }
 
 /// Every calendar and sensor module, read without importing it.

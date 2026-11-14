@@ -2,9 +2,12 @@
 
 use crate::constants::ORCHESTRATION_DIRECTORY;
 use crate::orchestration_files::_helpers::inventory_files::{
-    check_top_level, failure, read_groups, read_jobs, read_python_modules,
+    check_top_level, failure, read_python_modules, read_toml_files,
 };
+use crate::orchestration_files::_helpers::read_group_file::read_group_file;
+use crate::orchestration_files::_helpers::read_job_file::read_job_file;
 use crate::orchestration_files::_helpers::references::check_references;
+use crate::orchestration_files::constants::{GROUPS_DIRECTORY, JOBS_DIRECTORY};
 use crate::orchestration_files::models::{
     GroupFile, JobFile, OrchestrationFailure, OrchestrationInventory, PythonModules,
 };
@@ -19,8 +22,9 @@ pub fn orchestration_inventory(
         return Ok(OrchestrationInventory::default());
     }
     check_top_level(tree)?;
-    let jobs: Vec<(String, JobFile)> = read_jobs(tree)?;
-    let groups: Vec<(String, GroupFile)> = read_groups(tree)?;
+    let jobs: Vec<(String, JobFile)> = read_toml_files(tree, JOBS_DIRECTORY, read_job_file)?;
+    let groups: Vec<(String, GroupFile)> =
+        read_toml_files(tree, GROUPS_DIRECTORY, read_group_file)?;
     let PythonModules {
         calendars,
         sensors,
