@@ -339,6 +339,9 @@ jobs:
       # every group before it merges, so a passing fast core reports as Verify and each pull
       # request runs the heavy suites once, in the queue. Unsetting the variable restores the old
       # behaviour.
+      # GitHub takes the required Verify from the newest Verify check suite on the head. Re-running
+      # an older suite never repaints it: to recover a head whose newest suite reported another
+      # name, start a new suite (push, or remove and re-add full-verify), not a rerun.
       # The label and draft state come from the pull request as it is now, not the event payload:
       # `gh pr create --label` can deliver `labeled` before `opened`, and the later run cancels the
       # earlier one, so the surviving run must still see the label.
@@ -372,26 +375,55 @@ jobs:
     if: ${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify') }}
     runs-on: ubuntu-24.04
     steps:
+      # Release Please pushes its version bump before release-please.yml refreshes Cargo.lock and
+      # uv.lock in a commit of its own, so a bump head always disagrees with its lockfiles. That
+      # head waits for the refresh commit, whose run checks the lockfiles; the release checks
+      # also confirm them with --locked before they report Verify on the head.
+      - name: Wait for the release lockfile refresh
+        id: release
+        if: >-
+          github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && startsWith(github.event.pull_request.head.ref, 'release-please--branches--')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          subject="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}" \
+            --jq '.commit.message | split("\n")[0]')"
+          if [[ "${subject}" != "chore: refresh release lockfiles" ]]; then
+            echo "pending=true" >> "${GITHUB_OUTPUT}"
+            echo "Version bump ${HEAD_SHA}: the lockfile refresh commit's run checks the lockfiles" \
+              | tee -a "${GITHUB_STEP_SUMMARY}"
+          fi
       - uses: actions/checkout@v4
+        if: steps.release.outputs.pending != 'true'
       - uses: ./.github/actions/setup-uv
+        if: steps.release.outputs.pending != 'true'
         with:
           version: "0.12.3"
       - uses: dtolnay/rust-toolchain@master
+        if: steps.release.outputs.pending != 'true'
         with:
           toolchain: stable
       - name: Install Python
+        if: steps.release.outputs.pending != 'true'
         run: uv python install 3.12
       - name: Verify lockfile
+        if: steps.release.outputs.pending != 'true'
         run: uv lock --check --python 3.12
       - name: Verify native workspace lockfile
+        if: steps.release.outputs.pending != 'true'
         run: cargo metadata --locked --format-version 1 > /dev/null
 
-  checks:
-    name: Static checks and unit + integration tests
+  # The extension and CLI build once here; the static job and every test shard install these
+  # wheels instead of compiling them again.
+  native_build:
+    name: Build the extension and CLI wheels
     needs: [changes, lockfile]
     if: needs.changes.outputs.checks == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-uv
@@ -413,8 +445,57 @@ jobs:
           save-if: false
       - name: Install Python
         run: uv python install 3.12
-      - name: Install dependencies
-        run: uv sync --locked --all-groups --all-extras
+      - name: Install the build tools without building the packages
+        run: uv sync --locked --all-groups --all-extras --no-install-package sqlbuild --no-install-package sqlbuild-cli
+      - name: Build the extension and CLI wheels
+        run: |
+          uv run --no-sync maturin build --release --compatibility linux --out dist
+          uv run --no-sync maturin build --manifest-path crates/sqlbuild-cli/Cargo.toml --release --compatibility linux --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verify-native-wheels
+          path: dist/*.whl
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+          overwrite: true
+
+  checks:
+    name: Static checks
+    needs: [changes, lockfile, native_build]
+    if: needs.changes.outputs.checks == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # A syncing `uv run` would replace the installed wheels with a fresh editable build.
+      UV_NO_SYNC: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-uv
+        with:
+          version: "0.12.3"
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            Cargo.lock
+      # Clippy in check-ci builds its own check artifacts from the same cache as the native checks.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: verify-checks
+          save-if: false
+      - name: Install Python
+        run: uv python install 3.12
+      - name: Install dependencies without building the packages
+        run: uv sync --locked --all-groups --all-extras --no-install-package sqlbuild --no-install-package sqlbuild-cli
+      - uses: actions/download-artifact@v4
+        with:
+          name: verify-native-wheels
+          path: dist
+      - name: Install the prebuilt extension and CLI
+        run: uv pip install --no-deps dist/*.whl
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -428,6 +509,46 @@ jobs:
         run: make check-ci
         env:
           DUPES_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'origin/main' }}
+
+  tests:
+    # check-test-shards, part of the static checks, proves the shards run every test once.
+    name: Unit + integration tests (${{ matrix.name }})
+    needs: [changes, lockfile, native_build]
+    if: needs.changes.outputs.checks == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            target: test-shard-core
+            workers: "4"
+          - name: publication
+            target: test-shard-publication
+            workers: "2"
+          - name: warehouse history
+            target: test-shard-history
+            workers: "4"
+    env:
+      UV_NO_SYNC: "1"
+      PYTEST_XDIST_AUTO_NUM_WORKERS: ${{ matrix.workers }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-uv
+        with:
+          version: "0.12.3"
+          enable-cache: true
+      - name: Install Python
+        run: uv python install 3.12
+      - name: Install dependencies without building the packages
+        run: uv sync --locked --all-groups --all-extras --no-install-package sqlbuild --no-install-package sqlbuild-cli
+      - uses: actions/download-artifact@v4
+        with:
+          name: verify-native-wheels
+          path: dist
+      - name: Install the prebuilt extension and CLI
+        run: uv pip install --no-deps dist/*.whl
       - name: Prepare Docker worker tests
         run: |
           docker info > /dev/null
@@ -435,7 +556,7 @@ jobs:
       - name: Run unit and integration tests
         env:
           SQLBUILD_REQUIRE_DOCKER_TESTS: "1"
-        run: make test
+        run: make ${{ matrix.target }}
 
   native_checks:
     name: Native workspace checks
@@ -1330,7 +1451,9 @@ jobs:
       [
         changes,
         lockfile,
+        native_build,
         checks,
+        tests,
         native_checks,
         e2e_shards,
         compiler_differential,
@@ -1358,7 +1481,9 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           CHECKS_SELECTED: ${{ needs.changes.outputs.checks }}
           LOCKFILE_RESULT: ${{ needs.lockfile.result }}
+          NATIVE_BUILD_RESULT: ${{ needs.native_build.result }}
           CHECKS_RESULT: ${{ needs.checks.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
           NATIVE_CHECKS_RESULT: ${{ needs.native_checks.result }}
           E2E_SHARDS_RESULT: ${{ needs.e2e_shards.result }}
           COMPILER_DIFFERENTIAL_RESULT: ${{ needs.compiler_differential.result }}
@@ -1399,7 +1524,7 @@ jobs:
             echo "Required classification or lockfile checks did not pass" >&2
             exit 1
           fi
-          for result in "${CHECKS_RESULT}" "${NATIVE_CHECKS_RESULT}"; do
+          for result in "${NATIVE_BUILD_RESULT}" "${CHECKS_RESULT}" "${TESTS_RESULT}" "${NATIVE_CHECKS_RESULT}"; do
             if [[ "${result}" != "success" ]] && \
                ! [[ "${CHECKS_SELECTED}" == "false" && "${result}" == "skipped" ]]; then
               echo "Required static or native checks did not pass: ${result}" >&2
