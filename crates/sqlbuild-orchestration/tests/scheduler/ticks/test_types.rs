@@ -83,8 +83,10 @@ impl crate::scheduler::types::RunLauncher for CycleRecorder<'_> {
 }
 
 /// Expires its lease and renews it on the first leader poll, so a real fence reaches the loop.
+/// Fences the first lease it polls with, and stops the loop once it polls under a newer epoch.
 pub(crate) struct FencingLauncher<'a> {
     pub(crate) epochs: &'a mut Vec<i64>,
+    pub(crate) stop: &'a tokio::sync::watch::Sender<bool>,
 }
 
 impl crate::scheduler::types::RunLauncher for FencingLauncher<'_> {
@@ -98,6 +100,9 @@ impl crate::scheduler::types::RunLauncher for FencingLauncher<'_> {
         };
         self.epochs.push(lease.epoch);
         if self.epochs.len() > 1 {
+            if self.epochs.windows(2).any(|pair| pair[1] > pair[0]) {
+                self.stop.send_replace(true);
+            }
             return Ok(());
         }
         crate::store::tests::lease_helpers::expire_lease(store).await;

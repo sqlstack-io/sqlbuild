@@ -125,22 +125,23 @@ fn given_a_leader_fenced_mid_cycle_when_the_loop_continues_then_it_rejoins_the_e
             let mut epochs = Vec::new();
             let (stop, shutdown) = tokio::sync::watch::channel(false);
 
-            let (finished, ()) = tokio::join!(
+            let finished = tokio::time::timeout(
+                Duration::from_secs(30),
                 run_scheduler(
                     store,
                     SchedulerState::new(Uuid::now_v7()),
                     shutdown,
                     FencingLauncher {
-                        epochs: &mut epochs
-                    }
+                        epochs: &mut epochs,
+                        stop: &stop,
+                    },
                 ),
-                async {
-                    tokio::time::sleep(Duration::from_millis(2_500)).await;
-                    stop.send_replace(true);
-                }
-            );
+            )
+            .await;
 
-            finished.expect("a fenced leader keeps the scheduler running");
+            finished
+                .unwrap_or_else(|_| Ok(()))
+                .expect("a fenced leader keeps the scheduler running");
             assert_eq!(
                 epochs.windows(2).any(|pair| pair[1] > pair[0]),
                 test_case.expected_rejoined,

@@ -152,7 +152,7 @@ sqlite3 control.sqlite3 ".backup '/backups/control.sqlite3'"
 | SQLite | A copy of the database file together with its `-wal` file | No; stop the server first |
 | PostgreSQL | `pg_dump` | Yes |
 
-- Never copy the SQLite `.db` file alone. Recent commits can still be in the `-wal` file next to
+- Never copy the SQLite database file alone. Recent commits can still be in the `-wal` file next to
   it, so the copy misses them.
 - Restore a backup while the server is stopped, and delete any `-wal` and `-shm` files left beside
   the database you replace.
