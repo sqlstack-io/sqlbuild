@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.226.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.226.0...v0.226.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **ui:** cut noise from the overview alerts and the plan page ([#1480](https://github.com/sqlstack-io/sqlbuild/issues/1480)) ([6d34620](https://github.com/sqlstack-io/sqlbuild/commit/6d3462053f41c5dc61d41b092f0453f628ea6d2a))
+
 ## [0.226.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.225.0...v0.226.0) (2026-11-14)
 
 
