@@ -166,6 +166,121 @@ In `.env`, set `DOCKER_SOCKET` to the socket path and `DOCKER_GID` to
 `podman compose`. Check that it uses Docker Compose: `podman compose version` prints
 `Docker Compose version`.
 
+## Run as Podman Quadlet units
+
+Quadlet runs the server and a location as systemd services, without Compose. These rootful units
+use the socket group set up in [Run on Podman](#run-on-podman) and images you built or pulled.
+
+Name the location container in the server's launcher, in `/etc/sqlbuild/server.toml`:
+
+```toml
+[server]
+host = "0.0.0.0"
+port = 8000
+
+[[launchers.docker]]
+location = "orders"
+target = "development"
+server_url = "http://sqlbuild-server:8000"
+max_workers = 1
+socket = "/var/run/docker.sock"
+location_container = "orders-location"
+executable = "/usr/local/bin/sqb"
+```
+
+Store the control database URL and, after `sqb admin create-location orders` and
+`sqb admin issue-location-token`, the location's bearer as Podman secrets:
+
+```sh
+printf '%s' "$SQLBUILD_CONTROL_DATABASE_URL" | sudo podman secret create sqlbuild-control-database-url -
+printf '%s' "$SQLBUILD_LOCATION_TOKEN" | sudo podman secret create sqlbuild-orders-location-token -
+```
+
+Put these three files in `/etc/containers/systemd/`. `/etc/containers/systemd/sqlbuild.network`:
+
+```ini
+[Network]
+NetworkName=sqlbuild
+```
+
+`/etc/containers/systemd/sqlbuild-server.container`, with `GroupAdd` set to
+`getent group sqlbuild-socket | cut -d: -f3`:
+
+```ini
+[Unit]
+Description=SQLBuild server and scheduler
+Requires=podman.socket
+After=podman.socket network-online.target
+
+[Container]
+Image=localhost/sqlbuild-server:0.224.0
+ContainerName=sqlbuild-server
+Network=sqlbuild.network
+PublishPort=127.0.0.1:8000:8000
+Volume=/etc/sqlbuild/server.toml:/etc/sqlbuild/server.toml:ro
+Volume=/run/podman/podman.sock:/var/run/docker.sock
+GroupAdd=993
+SecurityLabelDisable=true
+Secret=sqlbuild-control-database-url,type=env,target=SQLBUILD_CONTROL_DATABASE_URL
+HealthCmd=curl --fail --silent --output /dev/null http://localhost:8000/api/openapi.json
+HealthInterval=10s
+HealthStartPeriod=30s
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/containers/systemd/orders-location.container`, with the `location_id` that
+`create-location` returned:
+
+```ini
+[Unit]
+Description=SQLBuild orders code location
+Wants=sqlbuild-server.service
+After=sqlbuild-server.service
+
+[Container]
+Image=localhost/sqlbuild-orders:0.224.0
+ContainerName=orders-location
+Network=sqlbuild.network
+Volume=sqlbuild-warehouse:/warehouse
+Secret=sqlbuild-orders-location-token,type=env,target=SQLBUILD_LOCATION_TOKEN
+Exec=location serve --server http://sqlbuild-server:8000 --location-id 00000000-0000-0000-0000-000000000001 --target development
+HealthCmd=sqb location health --server http://sqlbuild-server:8000 --location-id 00000000-0000-0000-0000-000000000001 --target development
+HealthInterval=30s
+HealthStartPeriod=60s
+PodmanArgs=--cpus 2 --memory 1g
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then load and start them:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl start orders-location.service
+sudo podman healthcheck run orders-location
+```
+
+- `ContainerName=` must equal the launcher's `location_container`: the server finds the location's
+  image, mounts, network and limits through that container, and workers join its network.
+- Write the location ID literally in `Exec=` and `HealthCmd=`. systemd expands `${...}` in those
+  lines from the service's environment, not the container's.
+- `Restart=always` restarts either container when it exits. The location only `Wants=` the server,
+  so a server restart leaves it running; it checks in again when the server is back.
+- The server resolves launcher locations when it starts. To add a location, create it, add its
+  launcher and container unit, then restart the server: `sudo systemctl restart sqlbuild-server`.
+- `SecurityLabelDisable=true` lets the server use the socket on SELinux hosts.
+
 ## Credentials, identity, and platform events
 
 Rotate a location credential with `docker compose run --rm --no-deps server admin rotate-token
