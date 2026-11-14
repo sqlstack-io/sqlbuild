@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Configure the server
 - Serve over HTTPS
 - Receive platform events
+- Back up the control database
 - Upgrade
 - Set retention
 - Grant roles to OIDC groups (beta)
@@ -153,6 +154,26 @@ ad-hoc runs. Each `message` is the node's error text with credentials redacted, 
 characters, and `null` when the worker reported none. It can quote warehouse data, so treat the
 webhook like other run evidence. `run_failed` events appear only in the webhook, not in the
 server's platform history.
+
+## Back up the control database
+
+With no `SQLBUILD_CONTROL_DATABASE_URL`, the server keeps its control database in one SQLite file.
+Back it up with SQLite's online backup while the server runs:
+
+```bash
+sqlite3 control.sqlite3 ".backup '/backups/control.sqlite3'"
+```
+
+| Store | Back up with | While the server runs |
+| --- | --- | --- |
+| SQLite | `sqlite3 <file> ".backup '<copy>'"` or the SQLite backup API | Yes |
+| SQLite | A copy of the database file together with its `-wal` file | No; stop the server first |
+| PostgreSQL | `pg_dump` | Yes |
+
+- Never copy the SQLite database file alone. Recent commits can still be in the `-wal` file next to
+  it, so the copy misses them.
+- Restore a backup while the server is stopped, and delete any `-wal` and `-shm` files left beside
+  the database you replace.
 
 ## Upgrade
 
