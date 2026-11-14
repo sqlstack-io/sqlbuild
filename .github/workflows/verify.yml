@@ -1253,6 +1253,8 @@ jobs:
       # The Docker CLI and its Compose plugin drive rootful Podman through its API socket.
       DOCKER_HOST: unix:///run/podman/podman.sock
       DOCKER_SOCKET: /run/podman/podman.sock
+      # Podman has no BuildKit API: buildx would build in its own container and never load the image.
+      DOCKER_BUILDKIT: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-uv
