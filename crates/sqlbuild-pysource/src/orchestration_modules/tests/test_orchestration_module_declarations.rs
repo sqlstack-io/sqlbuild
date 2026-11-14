@@ -65,6 +65,33 @@ fn given_orchestration_modules_when_scanning_then_reads_declarations_and_removed
             }),
         },
         ScanTestCase {
+            description: "a condition bound to a module-level name is followed, and one whose select is unpacked cannot be counted",
+            contents: "from sqlbuild.orchestration import node_event, sensor\nFAILED = node_event(select=\"a b c d\", kinds=[\"failure\"])\nOPTIONS = {\"select\": \"a\"}\nc = sensor(\"c_sensor\", description=\"d\", when=FAILED, run=\"c_job\")\nd = sensor(\"d_sensor\", description=\"d\", when=node_event(**OPTIONS), run=\"d_job\")\n",
+            expected_module: Some(ModuleDeclarations {
+                declarations: vec![
+                    PythonDeclaration {
+                        selections: vec![text("a b c d", 2, 28)],
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("c_sensor", 4, 12),
+                            at(4, 5),
+                            vec![("run", text("c_job", 4, 58))],
+                        )
+                    },
+                    PythonDeclaration {
+                        selections: vec![non_literal(5, 46)],
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("d_sensor", 5, 12),
+                            at(5, 5),
+                            vec![("run", text("d_job", 5, 73))],
+                        )
+                    },
+                ],
+                removed_imports: Vec::new(),
+            }),
+        },
+        ScanTestCase {
             description: "non-literal names and jobs keep their positions without values",
             contents: "import sqlbuild.orchestration as orchestration\n\nNAME = \"x_sensor\"\nJOB = \"x_job\"\nx = orchestration.sensor(name=NAME, description=\"d\", run=JOB)\n",
             expected_module: Some(ModuleDeclarations {

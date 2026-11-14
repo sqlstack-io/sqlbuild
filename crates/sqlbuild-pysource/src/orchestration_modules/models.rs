@@ -1,5 +1,11 @@
 //! The orchestration declarations a Python module makes, read without running it.
 
+use std::collections::{BTreeMap, BTreeSet};
+
+use ruff_python_ast::Expr;
+
+use crate::cpython_tree::models::SourceLines;
+
 /// What a module-level `calendar(...)` or `sensor(...)` call declares.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PythonDeclarationKind {
@@ -42,4 +48,13 @@ pub struct ModuleDeclarations {
     pub declarations: Vec<PythonDeclaration>,
     /// Each removed authoring name the module imports from `sqlbuild.orchestration`.
     pub removed_imports: Vec<(String, SourcePosition)>,
+}
+
+/// The names a module's authoring calls resolve against: its imports, imported modules and module-level bindings.
+#[derive(Debug)]
+pub(crate) struct ModuleScope<'a> {
+    pub(crate) imported: BTreeMap<&'a str, &'a str>,
+    pub(crate) modules: BTreeSet<String>,
+    pub(crate) assignments: BTreeMap<&'a str, &'a Expr>,
+    pub(crate) lines: &'a SourceLines,
 }

@@ -3574,8 +3574,8 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
                 (
                     "SQBRORCHESTRATION101",
                     "orchestration/sensors/on_orders_failure_sensor.py",
-                    8,
-                    28,
+                    6,
+                    12,
                 ),
             ),
             expected_text="job 'orders_listed_job' names 4 nodes in its selection (limit 3)",
@@ -3595,8 +3595,8 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
                 (
                     "SQBRORCHESTRATION101",
                     "orchestration/sensors/on_orders_failure_sensor.py",
-                    8,
-                    28,
+                    6,
+                    12,
                 ),
             ),
             expected_text="sensor 'on_orders_failure_sensor' names 4 nodes in its selection",
