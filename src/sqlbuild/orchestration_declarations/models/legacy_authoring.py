@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Literal
 
+from sqlbuild._native import declaration_site
 from sqlbuild.orchestration_declarations.models.authoring import (
     NodeEventCondition,
     PlatformEventCondition,
@@ -62,6 +63,10 @@ class Job:
     overlap: Literal["queue", "skip"] = field(default="queue", kw_only=True)
     on_failure: OnFailure | None = field(default=None, kw_only=True)
     resources: Resources | None = field(default=None, kw_only=True)
+    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_declared_at", declaration_site())
 
 
 @dataclass(frozen=True, eq=False)
@@ -77,6 +82,10 @@ class JobGroup:
     owner: str | None = field(default=None, kw_only=True)
     overlap: Literal["queue", "skip"] = field(default="queue", kw_only=True)
     on_failure: OnFailure | None = field(default=None, kw_only=True)
+    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_declared_at", declaration_site())
 
 
 @dataclass(frozen=True, kw_only=True, eq=False)
@@ -91,6 +100,10 @@ class CalendarSchedule:
     default_status: Literal["running", "paused"] = "running"
     targets: tuple[str, ...] = ()
     function: Callable[..., Iterable[datetime]] | None = field(default=None, repr=False)
+    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_declared_at", declaration_site())
 
     def __call__(self, function: Callable[..., Iterable[datetime]]) -> CalendarSchedule:
         return replace(self, function=function)
@@ -127,6 +140,10 @@ class Sensor:
     function: Callable[..., Iterable[RunRequest] | SkipReason] | None = field(
         default=None, repr=False, kw_only=True
     )
+    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_declared_at", declaration_site())
 
     def __call__(self, function: Callable[..., Iterable[RunRequest] | SkipReason]) -> Sensor:
         return replace(self, function=function)
