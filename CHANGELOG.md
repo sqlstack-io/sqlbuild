@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.224.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.223.0...v0.224.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **server:** --launchers, --oidc-config and --trusted-proxy-config are replaced by sqb server --config server.toml with [[launchers.docker]], [[launchers.local]], [oidc] and [trusted_proxy] sections. The old flags fail with a pointer to --config.
+
+### Features
+
+* publish Python nodes for jobs, roles and server runs ([#1472](https://github.com/sqlstack-io/sqlbuild/issues/1472)) ([2909eda](https://github.com/sqlstack-io/sqlbuild/commit/2909edafaac51adc6dee780105f018fa60d1f390))
+* **server:** configure the server with server.toml and run workers on Podman ([#1470](https://github.com/sqlstack-io/sqlbuild/issues/1470)) ([88cbbd1](https://github.com/sqlstack-io/sqlbuild/commit/88cbbd1cc5339bbb4813855df78e5bc5fb0719b3))
+
+
+### Bug Fixes
+
+* **worker:** fail a function whose unit test fails, and name it on downstream skips ([#1471](https://github.com/sqlstack-io/sqlbuild/issues/1471)) ([4502c30](https://github.com/sqlstack-io/sqlbuild/commit/4502c306ff68aad46bc882891a4852c7d0f637a5))
+
 ## [0.223.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.222.0...v0.223.0) (2026-11-14)
 
 
