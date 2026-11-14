@@ -46,7 +46,7 @@ fn given_an_unlaunchable_committed_claim_when_recovering_then_rejection_retries_
         runtime.block_on(async {
         let mut control = start_control(&["server", "--port", "0", "--no-scheduler"]);
         let url = api_ready(&mut control).await;
-        let (worker, baseline, _) = claim_worker_run(&control, test_case.image_id).await;
+        let (worker, _, _) = claim_worker_run(&control, test_case.image_id).await;
         let connection =
             rusqlite::Connection::open(control.directory.path().join(".sqlbuild/control.sqlite3"))
                 .expect("observe durable ownership");
@@ -58,7 +58,7 @@ fn given_an_unlaunchable_committed_claim_when_recovering_then_rejection_retries_
              CREATE TRIGGER reject_recovery_publication BEFORE INSERT ON recall_events
              WHEN NEW.event_type='{}' BEGIN SELECT RAISE(ABORT, 'synthetic unavailable publication'); END;", test_case.failure_event
         )).expect("expire the departed leader and interrupt durable publication");
-        let mut replacement = start_recovery_scheduler(&control, &url, baseline.location_id);
+        let mut replacement = start_recovery_scheduler(&control, &url, "orders");
         wait_for_worker_log(&mut replacement, "Retrying worker shutdown publication").await;
         let held: (i64, i64) = connection.query_row(
             "SELECT (SELECT COUNT(*) FROM sqb_write_claims), (SELECT COUNT(*) FROM sqb_runs WHERE worker_instance IS NOT NULL)",

@@ -11,7 +11,7 @@ use serde_json::Value;
 use sqlbuild_analysis::graph::models::JobSelection;
 use sqlbuild_discovery::project_validation::models::OrchestrationNameFact;
 use sqlbuild_host::entries::models::UserCodeHost;
-use sqlbuild_orchestration::declarations::models::{DeclaredAt, OnFailure, Overlap};
+use sqlbuild_orchestration::declarations::models::{DeclaredAt, OnFailure, Overlap, RunResources};
 
 use crate::bindings::_helpers::native_host::constants::{
     AUTHORING_MODULE, CALENDAR_LABEL, CONSTRUCTING_MODULES, GROUP_LABEL, JOB_LABEL, MAX_RETRIES,
@@ -37,6 +37,7 @@ pub(crate) struct AuthoredJob {
     pub(crate) owner: Option<String>,
     pub(crate) overlap: String,
     pub(crate) on_failure: Option<Py<PyAny>>,
+    pub(crate) resources: Option<Py<PyAny>>,
 }
 
 #[derive(FromPyObject, PartialEq, Eq, PartialOrd, Ord)]
@@ -209,6 +210,36 @@ pub(crate) fn run_controls(
         overlap,
         on_failure,
     })
+}
+
+/// Refuse a memory size Docker cannot read and CPUs or a process limit that is not positive.
+pub(crate) fn job_resources(
+    name: &str,
+    resources: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Option<RunResources>> {
+    let Some(resources) = resources else {
+        return Ok(None);
+    };
+    let mut written = serde_json::Map::new();
+    for field in ["memory", "cpus", "pids"] {
+        let value = authored_setting(&resources.getattr(field)?)?;
+        if !value.is_null() {
+            written.insert(field.into(), value);
+        }
+    }
+    let invalid = |reason: String| PyValueError::new_err(format!("job {name} resources: {reason}"));
+    let resources: RunResources = serde_json::from_value(Value::Object(written))
+        .map_err(|error| invalid(error.to_string()))?;
+    if resources
+        .cpus
+        .is_some_and(|cpus| !cpus.is_normal() || cpus.is_sign_negative())
+    {
+        return Err(invalid("cpus must be a positive number".into()));
+    }
+    if resources.pids == Some(0) {
+        return Err(invalid("pids must be a positive whole number".into()));
+    }
+    Ok(Some(resources))
 }
 
 /// Only module execution crosses into Python; discovery and collection stay native.

@@ -1,6 +1,6 @@
 [package]
 name = "sqlbuild-cli"
-version = "0.222.0"
+version = "0.223.0"
 description = "The native `sqb` executable: reused compiles and Python-free commands served without Python, every other command handed to the Python CLI."
 edition.workspace = true
 license-file = "LICENSE"
@@ -39,6 +39,7 @@ sqlbuild-process-ownership.workspace = true
 sqlbuild-recall.workspace = true
 sqlbuild-rules.workspace = true
 tokio.workspace = true
+toml.workspace = true
 uuid.workspace = true
 
 [target.'cfg(unix)'.dependencies]

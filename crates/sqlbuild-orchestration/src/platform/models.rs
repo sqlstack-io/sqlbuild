@@ -73,11 +73,80 @@ pub struct LocationHealthReport {
     pub health: LocationHealth,
 }
 
+/// Narrows a location's health history to one target, so other targets' traffic cannot crowd it out.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LocationHealthQuery {
+    pub target: Option<String>,
+}
+
 /// Receipt time belongs to the server; consumers derive freshness rather than storing availability.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LocationHealthObservation {
     pub received_at: DateTime<Utc>,
     pub report: LocationHealthReport,
+}
+
+/// One target's state from its newest health observations, as the web UI shows it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocationState {
+    Healthy,
+    /// The warehouse connection check after the last load failed.
+    Degraded,
+    /// The last load failed, so runs use the previous snapshot.
+    FallingBack,
+    /// No instance has checked in for 90 seconds.
+    Broken,
+}
+
+impl LocationState {
+    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then a failed load, then a failed connection.
+    #[must_use]
+    pub fn of(
+        observations: &[LocationHealthObservation],
+        (target, now): (&str, DateTime<Utc>),
+    ) -> Self {
+        let own: Vec<&LocationHealthObservation> = observations
+            .iter()
+            .filter(|observation| observation.report.target == target)
+            .collect();
+        let silence =
+            chrono::TimeDelta::seconds(crate::platform::constants::LOCATION_SILENCE_SECONDS);
+        if !own
+            .iter()
+            .any(|observation| now - observation.received_at <= silence)
+        {
+            return Self::Broken;
+        }
+        let mut failed: Option<(DateTime<Utc>, i64)> = None;
+        let mut connection: Option<(DateTime<Utc>, i64, bool)> = None;
+        for observation in own {
+            let seen = observation.received_at;
+            match observation.report.health {
+                LocationHealth::CompileFailed { generation }
+                    if failed.is_none_or(|(at, _)| seen > at) =>
+                {
+                    failed = Some((seen, generation));
+                }
+                LocationHealth::Connection {
+                    generation,
+                    healthy,
+                } if connection.is_none_or(|(at, _, _)| seen > at) => {
+                    connection = Some((seen, generation, healthy));
+                }
+                _ => {}
+            }
+        }
+        match (failed, connection) {
+            (Some((_, failed)), Some((_, connected, _))) if failed >= connected => {
+                Self::FallingBack
+            }
+            (Some(_), None) => Self::FallingBack,
+            (_, Some((_, _, false))) => Self::Degraded,
+            _ => Self::Healthy,
+        }
+    }
 }
 
 /// Only named location operations cross this boundary, never arbitrary SQL or Python.

@@ -6309,7 +6309,10 @@ export interface operations {
     };
     read_location_health: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only this target's observations */
+                target?: string;
+            };
             header?: never;
             path: {
                 location_id: string;

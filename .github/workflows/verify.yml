@@ -50,6 +50,7 @@ jobs:
       wheels: ${{ steps.scope.outputs.wheels }}
       recovery: ${{ steps.scope.outputs.recovery }}
       ui: ${{ steps.scope.outputs.ui }}
+      podman: ${{ steps.scope.outputs.podman }}
       cold_models: ${{ steps.tiers.outputs.cold_models }}
       dense_models: ${{ steps.tiers.outputs.dense_models }}
       cache_models: ${{ steps.tiers.outputs.cache_models }}
@@ -79,11 +80,12 @@ jobs:
               echo "clickhouse=$9"
               echo "recovery=${10}"
               echo "ui=${11}"
+              echo "podman=${12}"
             } >> "${GITHUB_OUTPUT}"
           }
 
           if [[ "${EVENT_NAME}" != "pull_request" && "${EVENT_NAME}" != "merge_group" ]]; then
-            write_scope true true true true true true true true true true true
+            write_scope true true true true true true true true true true true true
             exit 0
           fi
 
@@ -95,7 +97,7 @@ jobs:
           if [[ -z "${BASE_SHA}" || -z "${HEAD_SHA}" ]] || \
              ! git diff --name-only -z "${BASE_SHA}...${HEAD_SHA}" > "${changed_paths}"; then
             echo "Could not diff ${BASE_SHA:-<none>}...${HEAD_SHA:-<none>}; running every suite" >&2
-            write_scope true true true true true true true true true true true
+            write_scope true true true true true true true true true true true true
             exit 0
           fi
 
@@ -144,7 +146,7 @@ jobs:
                 && "${HEAD_REF}" == release-please--branches--* ]]; } && release_metadata_only; then
             echo "The change is only release metadata; skipping the suites" \
               | tee -a "${GITHUB_STEP_SUMMARY}"
-            write_scope false false false false false false false false false false false
+            write_scope false false false false false false false false false false false false
             exit 0
           fi
 
@@ -158,6 +160,7 @@ jobs:
           compiler_differential=false
           recovery=false
           ui=false
+          podman=false
           broad=false
           changed=false
           # A change that only touches the website, root-level Markdown, the README demo GIFs or the
@@ -202,6 +205,14 @@ jobs:
             case "${path}" in
               crates/sqlbuild-orchestration/*|crates/sqlbuild-process-ownership/*|crates/sqlbuild-cli/*|Cargo.toml|Cargo.lock|.github/workflows/verify.yml)
                 recovery=true
+                ;;
+            esac
+            case "${path}" in
+              # The reference stack and the Docker launcher, which Podman serves through its
+              # Docker-compatible API.
+              # Every path here also selects the wheels the job installs.
+              deploy/Dockerfile|deploy/project/*|deploy/compose*|compose.yml|.dockerignore|crates/sqlbuild-cli/src/workers/*|crates/sqlbuild-cli/src/server_config/*|tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py|tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/*|.github/workflows/verify.yml)
+                podman=true
                 ;;
             esac
             case "${path}" in
@@ -271,7 +282,7 @@ jobs:
           done < "${changed_paths}"
 
           if [[ "${changed}" != "true" ]]; then
-            write_scope true true true true true true true true true true true
+            write_scope true true true true true true true true true true true true
             exit 0
           fi
 
@@ -298,7 +309,8 @@ jobs:
             "${compiler_differential}" \
             "${clickhouse}" \
             "${recovery}" \
-            "${ui}"
+            "${ui}" \
+            "${podman}"
 
       # Pull requests and merge groups run the 3k-model compile jobs and the 1k dense job; the
       # nightly run and manual runs add 5k and 10k. Budgets and ratio gates are the same in both.
@@ -1231,6 +1243,46 @@ jobs:
       - name: Verify packaged Compose deployment and operational recovery
         run: make test-compose-packaged
 
+  podman:
+    name: Packaged Compose lifecycle on Podman
+    needs: [changes, lockfile, wheels]
+    if: needs.changes.outputs.podman == 'true' && needs.changes.outputs.wheels == 'true' && needs.changes.outputs.full == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      # The Docker CLI and its Compose plugin drive rootful Podman through its API socket.
+      DOCKER_HOST: unix:///run/podman/podman.sock
+      DOCKER_SOCKET: /run/podman/podman.sock
+      # Podman has no BuildKit API: buildx would build in its own container and never load the image.
+      DOCKER_BUILDKIT: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-uv
+        with:
+          version: "0.12.3"
+          enable-cache: true
+      - name: Install Python test dependencies without rebuilding the packages
+        run: |
+          uv python install 3.12
+          uv sync --locked --all-groups --all-extras --no-install-package sqlbuild --no-install-package sqlbuild-cli
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-wheel-linux-x86_64
+          path: dist
+      - name: Install the same wheels used by the images
+        run: uv pip install --no-deps dist/*.whl
+      - name: Start the Podman API socket with group access for the runner
+        run: |
+          sudo systemctl start podman.socket
+          sudo chmod 0711 /run/podman
+          sudo chgrp "$(id -g)" /run/podman/podman.sock
+          sudo chmod 0660 /run/podman/podman.sock
+          podman --version
+          docker version --format 'Podman API {{.Server.Version}}'
+          docker compose version
+      - name: Verify packaged Compose deployment and operational recovery
+        run: make test-compose-packaged
+
   ui:
     name: UI checks and unit tests
     needs: changes
@@ -1296,6 +1348,7 @@ jobs:
         clickhouse,
         wheels,
         compose,
+        podman,
         ui,
       ]
     runs-on: ubuntu-24.04
@@ -1323,6 +1376,7 @@ jobs:
           CLICKHOUSE_RESULT: ${{ needs.clickhouse.result }}
           WHEELS_RESULT: ${{ needs.wheels.result }}
           COMPOSE_RESULT: ${{ needs.compose.result }}
+          PODMAN_RESULT: ${{ needs.podman.result }}
           UI_SELECTED: ${{ needs.changes.outputs.ui }}
           UI_RESULT: ${{ needs.ui.result }}
           LABEL_ONLY: ${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify' }}
@@ -1335,6 +1389,7 @@ jobs:
           POSTGRES_SELECTED: ${{ needs.changes.outputs.postgres }}
           CLICKHOUSE_SELECTED: ${{ needs.changes.outputs.clickhouse }}
           WHEELS_SELECTED: ${{ needs.changes.outputs.wheels }}
+          PODMAN_SELECTED: ${{ needs.changes.outputs.podman }}
         run: |
           if [[ "${LABEL_ONLY}" == "true" ]]; then
             echo "A label other than full-verify changed; this run verifies nothing"
@@ -1371,7 +1426,8 @@ jobs:
             "${POSTGRES_RESULT}" \
             "${CLICKHOUSE_RESULT}" \
             "${WHEELS_RESULT}" \
-            "${COMPOSE_RESULT}"; do
+            "${COMPOSE_RESULT}" \
+            "${PODMAN_RESULT}"; do
             if [[ "${result}" != "success" && "${result}" != "skipped" ]]; then
               echo "A selected verification suite did not pass: ${result}" >&2
               exit 1
@@ -1398,7 +1454,8 @@ jobs:
               "${POSTGRES_SELECTED}:${POSTGRES_RESULT}" \
               "${CLICKHOUSE_SELECTED}:${CLICKHOUSE_RESULT}" \
               "${WHEELS_SELECTED}:${WHEELS_RESULT}" \
-              "${WHEELS_SELECTED}:${COMPOSE_RESULT}"; do
+              "${WHEELS_SELECTED}:${COMPOSE_RESULT}" \
+              "${PODMAN_SELECTED}:${PODMAN_RESULT}"; do
               if [[ "${pair%%:*}" == "true" && "${pair#*:}" != "success" ]]; then
                 echo "A suite this change needs did not run to success: ${pair#*:}" >&2
                 exit 1

@@ -29,7 +29,9 @@ class ComposeStack:
         self.environment = os.environ | {
             "COMPOSE_PROJECT_NAME": self.name,
             "SQLBUILD_PORT": "0",
-            "DOCKER_GID": str(Path("/var/run/docker.sock").stat().st_gid),
+            "DOCKER_GID": str(
+                Path(os.environ.get("DOCKER_SOCKET", "/var/run/docker.sock")).stat().st_gid
+            ),
             "POSTGRES_PASSWORD": password,
             "SQLBUILD_CONTROL_DATABASE_URL": f"postgresql://sqlbuild:{password}@postgres:5432/sqlbuild",
             "SQLBUILD_SERVER_IMAGE": os.environ.get(
