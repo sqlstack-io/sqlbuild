@@ -114,6 +114,12 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                     "orchestration/jobs/orders_job.toml:3:10:",
                     "unknown selector type 'tagg' in 'tagg:finance'",
                 ),
+                (
+                    "an empty intersection part is reported at the selector",
+                    'select = "tag:finance,"\n',
+                    "orchestration/jobs/orders_job.toml:3:10:",
+                    "empty selector",
+                ),
             )
         ),
         PythonProjectLayoutCompileTestCase(

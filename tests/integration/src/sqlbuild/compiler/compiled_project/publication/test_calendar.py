@@ -59,7 +59,9 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             "positive fixed duration",
             horizon="999999999999999999999999999d",
         ),
-        CalendarRejectionTestCase("unknown zone", "[]", "IANA timezone", timezone="Unknown/Orders"),
+        CalendarRejectionTestCase(
+            "unknown zone", "[]", "is not an IANA time zone", timezone="Unknown/Orders"
+        ),
     ],
     ids=lambda case: case.description,
 )

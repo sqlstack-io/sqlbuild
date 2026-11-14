@@ -202,6 +202,9 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | `files cannot sit directly in orchestration/` | Move jobs and groups to TOML files in `orchestration/jobs/` or `orchestration/job_groups/` |
 | `` `job` was removed from sqlbuild.orchestration`` | Declare the job in TOML and name it in the sensor's `run` |
 | `declares a second sensor; each module declares exactly one` | Split the module |
+| `schedule cron: invalid cron expression: Pattern must have 5 fields when seconds are disallowed.` | Write a five-field cron, such as `0 2 * * *` |
+| `job nightly_orders_job resources: cpus must be a positive number` | Set `cpus` above zero |
+| `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
 
 Details:
 
@@ -209,5 +212,6 @@ Details:
   a job selector never imports a calendar or sensor module.
 - A job or group declared with `targets` is selectable only when the command's target is one of
   them, as on the server.
-- A job's resources are checked when a location publishes, such as
-  `job nightly_orders_job resources: cpus must be a positive number`.
+- Selectors are checked for syntax at compile. A selector that names a node the project does not
+  have fails when a location publishes, such as `job nightly_orders_job: unknown selector name
+  'order_total'`.

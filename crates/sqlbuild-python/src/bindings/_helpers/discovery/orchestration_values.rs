@@ -101,8 +101,7 @@ fn selector_syntax(selector: &Positioned<String>) -> Result<(), ValueError> {
     let parts = selector
         .value
         .split_whitespace()
-        .flat_map(|token| token.split(','))
-        .filter(|part| !part.is_empty());
+        .flat_map(|token| token.split(','));
     for part in parts {
         parse_selector(part).map_err(|error| (selector.position, error.message))?;
     }
