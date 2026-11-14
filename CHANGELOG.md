@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.225.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.224.0...v0.225.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* turn silent fallbacks into clear errors ([#1473](https://github.com/sqlstack-io/sqlbuild/issues/1473))
+
+### Bug Fixes
+
+* turn silent fallbacks into clear errors ([#1473](https://github.com/sqlstack-io/sqlbuild/issues/1473)) ([b4b19c8](https://github.com/sqlstack-io/sqlbuild/commit/b4b19c849878c2844c005e3e8b61f4464b39f67c))
+
 ## [0.224.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.223.0...v0.224.0) (2026-11-14)
 
 
