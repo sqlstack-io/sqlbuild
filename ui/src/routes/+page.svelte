@@ -13,7 +13,6 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
-	import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo } from '$lib/format/time';
@@ -60,9 +59,7 @@
 			acknowledging = null;
 		}
 	}
-	const stale = $derived(data?.attention.find((i) => i.kind === 'stale_models'));
 	const staleListed = $derived(issues.some(({ item }) => item.kind === 'stale_models'));
-	const staleSelection = $derived(stale && stale.kind === 'stale_models' ? [...new Set([...stale.changed, ...stale.behind])] : []);
 	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
 	const loaded = $derived(data !== null);
 	const healthTone = $derived(
@@ -139,25 +136,22 @@
 									<p class="issue-detail">{view.detail}</p>
 									{#if view.consequences.length}
 										<ul class="consequences" aria-label="Caused by this">
-											{#each view.consequences as c (c.text)}<li><a href={to(c.href)}>{c.text}</a></li>{/each}
+											{#each view.consequences as c, i (i)}<li><a href={to(c.href)}>{c.text}</a></li>{/each}
 										</ul>
 									{/if}
 								</div>
 								<small>{view.since}</small>
 								<span class="issue-ack">
 									{#if 'acknowledged' in item && canAcknowledge}
-										<button class="ack" title="Mark this run as handled for everyone; recorded in the audit log. Other alerts clear when their cause is fixed." disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
+										<button class="ack" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
 											<BellOffIcon size={13} />Acknowledge
 										</button>
 									{/if}
 								</span>
 								<span class="issue-actions">
-									{#if item.kind === 'stale_models'}
-										<!-- Build changed opens the plan of `sqb build --changed`, so the UI's build is the CLI's; Rebuild names every out-of-date node. -->
-										{#if item.changed.length}
-											<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build what changed</GatedButton>
-										{/if}
-										<GatedButton requires="run.adhoc" size="xs" variant={item.changed.length ? 'outline' : 'default'} onclick={() => goto(to(planHref(staleSelection)))}>Rebuild all {staleSelection.length}</GatedButton>
+									{#if view.build}
+										{@const build = view.build}
+										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(build.href))}>{build.label}</GatedButton>
 									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>
@@ -299,11 +293,12 @@
 	.health-head { display: flex; min-height: 49px; align-items: center; padding: 8px 13px; }
 	.issues { border-top: 1px solid color-mix(in srgb, var(--tone) 18%, var(--border)); }
 	/* Rows share the columns, so times, Acknowledge and links line up down the list. */
-	.issues, .handled-rows { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto; column-gap: 12px; }
+	/* The icon track is max-content so it also holds the rows' left padding, which a subgrid adds to its edge track. */
+	.issues, .handled-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto auto; column-gap: 10px; }
 	.issue { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: start; padding: 9px 14px 9px 17px; border-top: 1px solid var(--inner-line); font-size: 12.5px; }
 	.issue:first-child { border-top: 0; }
 	.issue:hover { background: var(--sb-hover); }
-	.issue > :not(.issue-copy) { min-height: 22px; display: flex; align-items: center; }
+	.issue > :not(.issue-copy, .issue-icon) { min-height: 22px; display: flex; align-items: center; }
 	.issue-copy { min-width: 0; padding-top: 2px; }
 	.issue-title { font-weight: 600; }
 	.issue-title:hover { text-decoration: underline; }

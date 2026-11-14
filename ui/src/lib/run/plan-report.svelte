@@ -3,9 +3,7 @@
 	// then the routine models.
 	import { to } from '$lib/paths';
 	import type { PlanDocument } from '$lib/api';
-	import { formatAgo } from '$lib/format/time';
-	import { app } from '$lib/state/app.svelte';
-	import { REPROCESS_OPTIONS, changedRule, changedSections, looseWarnings, planSections, unknownWords, warningView, type PlanEntry } from './plan-text';
+	import { changedSections, looseWarnings, planSections, warningText, type PlanEntry } from './plan-text';
 
 	/** `refresh` words what refreshes the nodes a `--changed` plan holds back for a job. */
 	let { plan, refresh = (job: string) => `job ${job}` }: { plan: PlanDocument; refresh?: (job: string) => string } = $props();
@@ -21,21 +19,6 @@
 </script>
 
 <div class="report">
-	{#if plan.synced_copy}
-		{@const copy = plan.synced_copy}
-		<section class="preview">
-			<p>
-				A preview from warehouse metadata {#if copy.synced_at}synced <time datetime={copy.synced_at} title={copy.synced_at}>{formatAgo(copy.synced_at, app.now)}</time>{:else}that hasn’t fully synced yet{/if}. The run checks the warehouse again before it builds.
-			</p>
-			{#if copy.unknown_until_run.length}
-				<details class="unknown">
-					<summary>What the preview can’t know yet</summary>
-					<ul>{#each copy.unknown_until_run as item (item)}<li>{unknownWords(item)}</li>{/each}</ul>
-				</details>
-			{/if}
-		</section>
-	{/if}
-	{#if plan.changed}<p class="policy" data-testid="changed-policy">{changedRule(plan.changed)}</p>{/if}
 	{#each sections as s (s.title)}
 		{#if s.collapsed && !expanded[s.title]}
 			<button class="collapsed" aria-expanded="false" onclick={() => (expanded[s.title] = true)}>
@@ -54,18 +37,7 @@
 						<span class="value" class:accent={s.changed}>{e.value}</span>
 					</div>
 					{#each e.detail as d, i (i)}<div class="detail">{d}</div>{/each}
-					{#each e.warnings ?? [] as w, i (i)}
-						{@const view = warningView(w)}
-						<div class="entry-warning" class:err={w.severity === 'error'}>
-							<p>{view.text}</p>
-							{#if view.reprocess}
-								<details>
-									<summary>How to reprocess</summary>
-									<ul>{#each REPROCESS_OPTIONS as option (option)}<li>{option}</li>{/each}</ul>
-								</details>
-							{/if}
-						</div>
-					{/each}
+					{#each e.warnings ?? [] as w, i (i)}<p class="entry-warning" class:err={w.severity === 'error'}>{warningText(w)}</p>{/each}
 					{#if hasDiff}
 						{#if e.schema?.length}
 							<div class="detail">schema diff:</div>
@@ -108,11 +80,6 @@
 		gap: 18px;
 		font-size: 12.5px;
 	}
-	.policy {
-		margin: 0;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
 	.collapsed {
 		display: flex;
 		align-items: center;
@@ -141,21 +108,6 @@
 	}
 	.entry-warning.err {
 		border-left-color: var(--sb-error);
-	}
-	.entry-warning p {
-		margin: 0;
-	}
-	.entry-warning summary {
-		margin-top: 2px;
-		color: var(--primary);
-		font-size: 11.5px;
-		cursor: pointer;
-	}
-	.entry-warning ul {
-		margin: 4px 0 2px;
-		padding-left: 16px;
-		list-style: disc;
-		color: var(--muted-foreground);
 	}
 	h4 {
 		display: flex;
@@ -257,34 +209,6 @@
 	}
 	.warning.err {
 		border-left-color: var(--sb-error);
-	}
-	.preview {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		padding: 8px 10px;
-		border: 1px solid var(--border);
-		border-left: 2px solid var(--primary);
-		border-radius: 2px;
-		background: var(--sb-inset);
-		color: var(--muted-foreground);
-	}
-	.preview p {
-		margin: 0;
-	}
-	.preview time {
-		color: var(--foreground);
-	}
-	.unknown summary {
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		cursor: pointer;
-	}
-	.unknown ul {
-		margin: 4px 0 0;
-		padding-left: 16px;
-		list-style: disc;
-		font-size: 12px;
 	}
 	code {
 		color: var(--sb-text-faint);
