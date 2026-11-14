@@ -333,6 +333,103 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 ),
             ],
         ),
+        WorkerExecutionTestCase(
+            "a failing function test fails its function, and the models calling it are skipped because of it",
+            "SELECT 3 AS amount",
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
+            "partial",
+            [(0,)],
+            files={
+                "functions/sql/udf__order_band.sql": (
+                    "FUNCTION (description 'Size band of an order amount.', "
+                    "arguments (amount INT), returns VARCHAR);\n"
+                    "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
+                ),
+                "models/raw_orders.sql": (
+                    "MODEL (description 'Raw orders.', materialized table);\n"
+                    "SELECT 1 AS order_id, 10 AS amount\n"
+                ),
+                "models/stg_orders.sql": (
+                    "MODEL (description 'Staged orders.', materialized table);\n"
+                    'SELECT order_id, __udf("udf__order_band")(amount) AS band FROM __ref("raw_orders")\n'
+                ),
+                "models/order_totals.sql": (
+                    "MODEL (description 'Order totals.', materialized table);\n"
+                    'SELECT band, COUNT(*) AS orders FROM __ref("stg_orders") GROUP BY band\n'
+                ),
+                "tests/unit/test_udf__order_band.sql": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/worker_failed_function_test.sql"
+                ).read_text(),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, schedule\n"
+                    'annual_orders = job("annual_orders", '
+                    'select="orders raw_orders udf__order_band stg_orders order_totals", '
+                    'description="Build orders.", '
+                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
+                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                ),
+            },
+            expected_run_nodes=[
+                ("model:order_totals", "skipped", None, "udf:udf__order_band", None),
+                ("model:orders", "success", None, None, None),
+                ("model:raw_orders", "success", None, None, None),
+                ("model:stg_orders", "skipped", None, "udf:udf__order_band", None),
+                (
+                    "udf:udf__order_band",
+                    "failed",
+                    "T003",
+                    None,
+                    "test 'udf__order_band__labels_amounts' failed for models: udf "
+                    "udf__order_band__labels_amounts",
+                ),
+            ],
+        ),
+        WorkerExecutionTestCase(
+            "a passing function test releases its function, and the models calling it build",
+            "SELECT 3 AS amount",
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
+            "success",
+            [(2,)],
+            files={
+                "functions/sql/udf__order_band.sql": (
+                    "FUNCTION (description 'Size band of an order amount.', "
+                    "arguments (amount INT), returns VARCHAR);\n"
+                    "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
+                ),
+                "models/raw_orders.sql": (
+                    "MODEL (description 'Raw orders.', materialized table);\n"
+                    "SELECT 1 AS order_id, 10 AS amount\n"
+                ),
+                "models/stg_orders.sql": (
+                    "MODEL (description 'Staged orders.', materialized table);\n"
+                    'SELECT order_id, __udf("udf__order_band")(amount) AS band FROM __ref("raw_orders")\n'
+                ),
+                "models/order_totals.sql": (
+                    "MODEL (description 'Order totals.', materialized table);\n"
+                    'SELECT band, COUNT(*) AS orders FROM __ref("stg_orders") GROUP BY band\n'
+                ),
+                "tests/unit/test_udf__order_band.sql": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/worker_failed_function_test.sql"
+                )
+                .read_text()
+                .replace("(5, 'large')", "(5, 'small')"),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, schedule\n"
+                    'annual_orders = job("annual_orders", '
+                    'select="orders raw_orders udf__order_band stg_orders order_totals", '
+                    'description="Build orders.", '
+                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
+                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                ),
+            },
+            expected_run_nodes=[
+                ("model:order_totals", "success", None, None, None),
+                ("model:orders", "success", None, None, None),
+                ("model:raw_orders", "success", None, None, None),
+                ("model:stg_orders", "success", None, None, None),
+                ("udf:udf__order_band", "success", None, None, None),
+            ],
+        ),
     ],
     ids=lambda case: case.description,
 )
