@@ -1518,7 +1518,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="a group declaring after is refused and names the group",
+            description="a group declaring after is refused at its module",
             files={
                 "orchestration/jobs.py": (
                     "from sqlbuild.orchestration import job, job_group\n"
@@ -1530,8 +1530,8 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             },
             expected_error=ValueError,
             expected_message=re.escape(
-                "job group 'daily' declares after, which is no longer supported: groups order "
-                "jobs only by lineage. Declare the dependency on the nodes instead"
+                "Failed to import orchestration file orchestration/jobs.py: JobGroup.__init__() "
+                "got an unexpected keyword argument 'after'"
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
