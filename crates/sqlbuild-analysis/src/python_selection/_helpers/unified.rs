@@ -102,15 +102,20 @@ pub(crate) fn run_selection(
         .filter(|atom| !is_check(atom))
         .collect();
     validate_selected_dependencies(context, &runnable)?;
+    Ok(selection(context, sql_keys(&runnable), &runnable))
+}
+
+/// The SQL keys, with the source each selected intermediate loader writes, and the selected Python node names.
+fn selection(context: &SelectionContext<'_>, sql: Vec<ObjectKey>, atoms: &Atoms) -> RunSelection {
     let terminal: HashSet<&str> = context
         .sql
         .sources
         .iter()
         .filter_map(|(_, loader)| loader.as_deref())
         .collect();
-    let mut keys: BTreeSet<ObjectKey> = sql_keys(&runnable).into_iter().collect();
+    let mut keys: BTreeSet<ObjectKey> = sql.into_iter().collect();
     let mut names: Vec<String> = Vec::new();
-    for atom in &runnable {
+    for atom in atoms {
         let Atom::Python(name) = atom else {
             continue;
         };
@@ -119,10 +124,29 @@ pub(crate) fn run_selection(
         }
         names.push(name.clone());
     }
-    Ok(RunSelection {
+    RunSelection {
         sql_keys: keys.into_iter().collect(),
         python_node_names: names,
-    })
+    }
+}
+
+/// The SQL keys with their build functions and the Python node names, checks included, that selectors name; nothing is refused.
+pub(crate) fn node_selection(
+    context: &SelectionContext<'_>,
+    select: &[String],
+    exclude: &[String],
+) -> Result<RunSelection, SelectorError> {
+    validate_boundaries(context)?;
+    let selected: Atoms = groups(context, select)?
+        .difference(&groups(context, exclude)?)
+        .cloned()
+        .collect();
+    let sql: Vec<ObjectKey> = build_resources(
+        context.sql.graph,
+        &sql_keys(&selected),
+        BuildResources::SELECTION,
+    );
+    Ok(selection(context, sql, &selected))
 }
 
 fn groups(context: &SelectionContext<'_>, raw_groups: &[String]) -> Resolved {

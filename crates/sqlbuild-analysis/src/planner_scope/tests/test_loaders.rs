@@ -147,8 +147,8 @@ fn given_loader_chains_and_unmanaged_reads_when_listing_node_loads_then_only_dec
             expected_loads: vec![("model:orders", vec!["source:raw_returns"])],
         },
         NodeLoadsTestCase {
-            // stage_orders has no declaring source, so a run that loads it still fails in the worker.
-            description: "a chain keeps declared loaders behind an intermediate one and drops the intermediate",
+            // stage_orders has no declaring source; the snapshot publishes it as source:stage_orders.
+            description: "a chain keeps an intermediate loader and the declared loaders behind it",
             loaders: vec![
                 ("raw_orders", vec!["stage_orders"]),
                 ("stage_orders", vec!["raw_customers"]),
@@ -162,7 +162,10 @@ fn given_loader_chains_and_unmanaged_reads_when_listing_node_loads_then_only_dec
                 ("source:raw_orders", vec![]),
                 ("source:raw_customers", vec![]),
             ],
-            expected_loads: vec![("source:raw_orders", vec!["source:raw_customers"])],
+            expected_loads: vec![(
+                "source:raw_orders",
+                vec!["source:stage_orders", "source:raw_customers"],
+            )],
         },
     ];
     let key = |text: &str| {

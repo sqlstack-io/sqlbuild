@@ -1789,7 +1789,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                 .replace('("orders",)', '("unknown_*",)')
             },
             expected_error=ValueError,
-            expected_message="unknown selector pattern",
+            expected_message="executed_successfully: unknown selector name 'unknown_\\*'",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="invalid execution selector syntax fails closed",
@@ -1859,9 +1859,19 @@ def test_given_broken_declaration_modules_when_compiling_then_no_partial_snapsho
             expected_selection=("model:orders", "model:stg_orders"),
         ),
         PythonJobSelectionTestCase(
-            description="a task selector selects the task",
-            select="task:request_carrier_collection",
-            expected_selection=("task:request_carrier_collection",),
+            description="typed selectors select the task and the asset it depends on",
+            select="task:request_carrier_collection asset:partner_orders_file",
+            expected_selection=("asset:partner_orders_file", "task:request_carrier_collection"),
+        ),
+        PythonJobSelectionTestCase(
+            description="upstream of a task crosses its Python and SQL dependencies",
+            select="+task:request_carrier_collection",
+            expected_selection=(
+                "asset:partner_orders_file",
+                "model:orders",
+                "model:stg_orders",
+                "task:request_carrier_collection",
+            ),
         ),
         PythonJobSelectionTestCase(
             description="a python folder selects every node under it",

@@ -289,3 +289,126 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
         );
     }
 }
+
+#[test]
+fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_command_line() {
+    let resources = [
+        resource("model:stg_orders", &[], &["orders"], Some("models/staging")),
+        resource(
+            "model:orders",
+            &["model:stg_orders"],
+            &["orders"],
+            Some("models/marts"),
+        ),
+        resource("model:customers", &[], &[], Some("models/marts")),
+        resource(
+            "asset:partner_orders_file",
+            &["model:orders"],
+            &["orders"],
+            Some("python/orders/partner_export"),
+        ),
+        resource(
+            "task:request_carrier_collection",
+            &["asset:partner_orders_file"],
+            &["orders"],
+            Some("python/fulfillment/carrier_sync"),
+        ),
+    ];
+    let jobs: PublishedJobs = BTreeMap::new();
+    let test_cases = [
+        AdhocPlanTestCase {
+            description: "typed selectors select the Python nodes",
+            command: &[
+                "build",
+                "--select",
+                "task:request_carrier_collection",
+                "asset:partner_orders_file",
+            ],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "a task without the Python node it depends on is refused, as on the command line",
+            command: &["build", "--select", "task:request_carrier_collection"],
+            expected_plan: Err("depends on unselected Python node 'partner_orders_file'"),
+        },
+        AdhocPlanTestCase {
+            description: "a python folder selects the nodes under it",
+            command: &["build", "--select", "python/orders"],
+            expected_plan: Ok((&["asset:partner_orders_file"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a tag shared by models and Python nodes selects both",
+            command: &["build", "--select", "tag:orders"],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "model:orders",
+                    "model:stg_orders",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "upstream of a task crosses its Python and SQL dependencies",
+            command: &["build", "--select", "+task:request_carrier_collection"],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "model:orders",
+                    "model:stg_orders",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "downstream of a model reaches the Python nodes that read it",
+            command: &["build", "--select", "orders+", "--exclude", "stg_orders"],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "model:orders",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+    ];
+    let planner = adhoc_planner();
+    for test_case in test_cases {
+        let command: Vec<String> = test_case
+            .command
+            .iter()
+            .map(|token| (*token).to_owned())
+            .collect();
+        let actual = planner
+            .plan(&command, (&resources, &jobs))
+            .map(|plan| {
+                (
+                    plan.selection.into_iter().collect::<Vec<String>>(),
+                    json!(plan.settings),
+                )
+            })
+            .map_err(|error| {
+                test_case
+                    .expected_plan
+                    .as_ref()
+                    .err()
+                    .filter(|fragment| error.contains(**fragment))
+                    .map_or(error.clone(), |fragment| (*fragment).to_owned())
+            });
+        assert_eq!(
+            actual,
+            owned_plan(&test_case.expected_plan),
+            "{}",
+            test_case.description
+        );
+    }
+}

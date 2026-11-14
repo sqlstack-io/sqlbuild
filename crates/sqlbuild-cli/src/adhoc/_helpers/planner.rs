@@ -3,11 +3,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value as Json, json};
+use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::build_project_graph::build_project_graph;
-use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::graph::models::{GraphResource, JobSelection};
+use sqlbuild_analysis::python_selection::main::published_python_graph::published_python_graph;
+use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
+use sqlbuild_analysis::python_selection::models::{PublishedPythonNode, SqlSelectionGraph};
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource};
 use sqlbuild_orchestration::runs::types::{CommandPlanner, PublishedJobs};
@@ -203,17 +206,79 @@ fn resolved(
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let graph_resources: Vec<GraphResource> = resources.iter().filter_map(graph_resource).collect();
+    let (python, sql): (Vec<&PlannerResource>, Vec<&PlannerResource>) = resources
+        .iter()
+        .partition(|resource| python_kind(&resource.key).is_some());
+    let graph_resources: Vec<GraphResource> = sql
+        .iter()
+        .filter_map(|resource| graph_resource(resource))
+        .collect();
     let mut graph = build_project_graph(&graph_resources);
     let selectors: Vec<String> = select.iter().chain(exclude).cloned().collect();
-    if selectors_need_jobs(&graph, &selectors, &[]) {
+    let node_names: Vec<&str> = python
+        .iter()
+        .filter_map(|resource| object_key(&resource.key).map(|_| name_of(&resource.key)))
+        .collect();
+    if selectors_need_jobs(&graph, &selectors, &node_names) {
         graph = attach_jobs(graph, published_jobs(jobs));
     }
-    Ok(resolve_selectors(&graph, select, exclude)
-        .map_err(|error| format!("{}: {}", error.code, error.message))?
+    let sources: Vec<(String, Option<String>)> = sql
+        .iter()
+        .filter(|resource| resource.key.starts_with("source:"))
+        .map(|resource| (name_of(&resource.key).to_owned(), resource.loader.clone()))
+        .collect();
+    let nodes: Vec<PublishedPythonNode> = python
+        .iter()
+        .filter_map(|resource| {
+            Some(PublishedPythonNode {
+                name: name_of(&resource.key).to_owned(),
+                kind: python_kind(&resource.key)?.to_owned(),
+                tags: resource.tags.clone(),
+                folder: resource.folder.clone().unwrap_or_else(|| ".".to_owned()),
+                deps: resource
+                    .deps
+                    .iter()
+                    .filter_map(|dep| object_key(dep))
+                    .collect(),
+            })
+        })
+        .collect();
+    let python_graph = published_python_graph(&nodes);
+    let selection = resolve_python_sql_run_selection(
+        SqlSelectionGraph {
+            graph: &graph,
+            sources: &sources,
+        },
+        &python_graph,
+        select,
+        exclude,
+    )
+    .map_err(|error| format!("{}: {}", error.code, error.message))?;
+    let kinds: BTreeMap<&str, &str> = nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node.kind.as_str()))
+        .collect();
+    Ok(selection
+        .sql_keys
         .into_iter()
         .map(|(kind, name)| format!("{kind}:{name}"))
+        .chain(
+            selection
+                .python_node_names
+                .iter()
+                .filter_map(|name| Some(format!("{}:{name}", kinds.get(name.as_str())?))),
+        )
         .collect())
+}
+
+/// The Python node kind of a published key, such as `task` for `task:export_orders`.
+fn python_kind(key: &str) -> Option<&'static str> {
+    let (kind, _) = key.split_once(':')?;
+    PYTHON_NODE_KINDS.into_iter().find(|python| *python == kind)
+}
+
+fn name_of(key: &str) -> &str {
+    key.split_once(':').map_or(key, |(_, name)| name)
 }
 
 /// Published jobs as already-resolved graph selections.

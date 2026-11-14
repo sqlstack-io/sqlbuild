@@ -13,6 +13,7 @@ pub(super) fn resource(
         deps: deps.iter().map(|dep| (*dep).to_owned()).collect(),
         tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
         folder: folder.map(str::to_owned),
+        loader: None,
     }
 }
 

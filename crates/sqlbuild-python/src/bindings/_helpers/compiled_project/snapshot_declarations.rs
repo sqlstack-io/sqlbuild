@@ -6,7 +6,6 @@ use std::path::Path;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use serde_json::Value;
-use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_core::constants::PYTHON_INIT_MODULE_STEM;
@@ -20,6 +19,7 @@ use sqlbuild_orchestration::declarations::models::{
 };
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
+use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, declared_at, module_jobs,
     run_controls,
@@ -60,7 +60,7 @@ pub(crate) fn discover_declarations<'py>(
 pub(crate) fn compile_declarations(
     py: Python<'_>,
     mut input: SnapshotInput,
-    (project_dir, graph): (&Path, &ProjectGraph),
+    (project_dir, graph, selected): (&Path, &ProjectGraph, &ProjectSelection),
     declarations: Vec<AuthoredDeclaration>,
 ) -> PyResult<SnapshotInput> {
     if declarations.is_empty() {
@@ -113,12 +113,9 @@ pub(crate) fn compile_declarations(
                 job.name
             )));
         }
-        let selection: BTreeSet<String> =
-            resolve_selectors(graph, &tokens(&job.select), &tokens(&job.exclude))
-                .map_err(|error| PyValueError::new_err(error.message))?
-                .into_iter()
-                .map(|(kind, name)| format!("{kind}:{name}"))
-                .collect();
+        let selection: BTreeSet<String> = selected
+            .run_keys(graph, &tokens(&job.select), &tokens(&job.exclude))
+            .map_err(|error| PyValueError::new_err(format!("job {}: {error}", job.name)))?;
         let declared_at: Option<DeclaredAt> = declared_at(project_dir, job.declared_at)?;
         let controls = run_controls(
             &job.name,
@@ -229,7 +226,7 @@ pub(crate) fn compile_declarations(
         ..
     } = compile_sensors(
         py,
-        (project_dir, &input, graph),
+        (project_dir, &input, (graph, selected)),
         authored_sensors,
         compile_calendars(
             py,

@@ -5,7 +5,7 @@ use crate::planner_scope::constants::{MODEL, SOURCE};
 use crate::planner_scope::models::LoaderGraph;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Managed sources each model's execution deps read and each managed source's declared loader chain, as `expand_loaders` keys them.
+/// Managed sources each model's execution deps read and each managed source's loader chain, intermediate loaders included, as `expand_loaders` keys them.
 pub fn node_loads(
     graph: &LoaderGraph,
     upstream: &[(ObjectKey, Vec<ObjectKey>)],
@@ -24,7 +24,6 @@ pub fn node_loads(
             graph
                 .upstream(chain)
                 .iter()
-                .filter(|name| !graph.intermediate(name))
                 .map(|name| graph.key(name))
                 .collect()
         } else {

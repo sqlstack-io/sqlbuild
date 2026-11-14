@@ -8,6 +8,7 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyString;
 use serde_json::Value;
+use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
 use sqlbuild_cli::argv::main::command_settings_arguments::command_settings_arguments;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_cli::dispatch::main::command_dispatch::command_dispatch;
@@ -148,10 +149,15 @@ fn command_request<'py>(
         if execution.skipped_nodes.contains_key(key) {
             continue;
         }
-        let (_, name) = key
+        let (kind, name) = key
             .split_once(':')
             .ok_or_else(|| PyValueError::new_err("frozen run contains an invalid node key"))?;
-        argv.extend([PyString::new(py, "--select"), PyString::new(py, name)]);
+        let selector = if PYTHON_NODE_KINDS.contains(&kind) {
+            key.as_str()
+        } else {
+            name
+        };
+        argv.extend([PyString::new(py, "--select"), PyString::new(py, selector)]);
     }
     let parsed = parse_cli_invocation(py, argv, false)?;
     let args = field(&parsed, "args")?;

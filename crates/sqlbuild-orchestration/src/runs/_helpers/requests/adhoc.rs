@@ -30,6 +30,10 @@ use crate::store::models::{ControlTransaction, Parameter};
 
 /// Graph kinds in the order the CLI builds its project graph: models, sources, seeds, then functions.
 const GRAPH_KINDS: [&str; 5] = ["model", "source", "seed", "udf", "table_fn"];
+/// Python node kinds, in the order the CLI discovers them.
+const PYTHON_NODE_KINDS: [&str; 4] = ["task", "asset", "loader", "check"];
+/// Marks the source node an intermediate loader writes, which the CLI's SQL graph does not list.
+const INTERMEDIATE_LOADER_FIELD: &str = "intermediate_loader";
 
 /// The frozen request and its verb, or why the command cannot run; `run_id` comes from the caller.
 pub(crate) async fn frozen_adhoc_request(
@@ -141,23 +145,26 @@ pub(crate) async fn publication_plan(
     ))
 }
 
-/// The selector graph rebuilt from published definitions, in the CLI's kind order.
+/// The selector graph rebuilt from published definitions, in the CLI's kind order; sources intermediate loaders write are selected through their loader.
 fn planner_resources(
     nodes: &std::collections::BTreeMap<String, SnapshotNode>,
 ) -> Vec<PlannerResource> {
     let mut resources: Vec<PlannerResource> = Vec::new();
-    for kind in GRAPH_KINDS {
+    for kind in GRAPH_KINDS.iter().chain(&PYTHON_NODE_KINDS) {
         for (key, node) in nodes {
-            if node.kind != kind {
+            let definition = &node.definition;
+            if node.kind != *kind || definition.get(INTERMEDIATE_LOADER_FIELD).is_some() {
                 continue;
             }
-            let definition = &node.definition;
-            let (tags, folder) = match kind {
+            let (tags, folder) = match *kind {
                 "model" => (
                     definition.pointer("/config/tags"),
                     Some(model_folder(definition)),
                 ),
                 "seed" => (definition.pointer("/schema/tags"), None),
+                _ if PYTHON_NODE_KINDS.contains(kind) => {
+                    (definition.get("tags"), Some(model_folder(definition)))
+                }
                 _ => (definition.get("tags"), None),
             };
             resources.push(PlannerResource {
@@ -165,6 +172,10 @@ fn planner_resources(
                 deps: texts(definition.get("deps")),
                 tags: texts(tags),
                 folder,
+                loader: definition
+                    .pointer("/entry/loader")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
             });
         }
     }
