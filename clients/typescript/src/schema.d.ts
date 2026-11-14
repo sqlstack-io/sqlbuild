@@ -2398,10 +2398,7 @@ export interface components {
         };
         /** @description What the mirror knows as of `synced_at`; `None` when a required table never synced cleanly. */
         PreviewCopy: {
-            /**
-             * @description Every mirrored consumption row when the read asked for them; locations that never ask
-             *     never receive the field.
-             */
+            /** @description Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it. */
             consumption?: components["schemas"]["WarehouseConsumptionRecord"][];
             fingerprints: components["schemas"]["WarehouseFingerprintRecord"][];
             latest_runs: components["schemas"]["PreviewLatestRun"][];
@@ -2412,10 +2409,7 @@ export interface components {
         };
         /** @description A location asks for the mirrored copy a plan preview plans from, as its fenced reader. */
         PreviewCopyRead: {
-            /**
-             * @description Whether the copy carries consumption history, which only `--changed` plans read; sent only
-             *     when set, so other plans still reach servers that predate it.
-             */
+            /** @description Whether the copy carries consumption history; sent only when set, as older servers reject it. */
             consumption?: boolean;
             /** Format: int64 */
             generation: number;
