@@ -1442,6 +1442,10 @@ paths = ["crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connectio
 reason = "Two Python entry points with different keyword contracts, project and named target, delegate to project_connection_config."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs"]
+reason = "Two Python entry points with different keyword contracts, selected and referenced loader entries, delegate to selection_request and LoadProject."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-cli/src/native_commands/main/_location_metadata.rs", "crates/sqlbuild-cli/src/native_commands/main/_location_work.rs"]
 reason = "Metadata sync keeps its pending page for retry and work polling drops the failed request; each reports its own failure."
 

@@ -42,8 +42,8 @@ const DEFAULTS_HELP_PURPOSE: &str = "to set project-wide defaults";
 const NAMED_TARGET_HELP_PURPOSE: &str = "to build this target into that schema";
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_runtime_config;
+use crate::bindings::_helpers::compile_attachment::target::resolved_target;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::discovery::guidance::setting_help;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -148,26 +148,20 @@ fn project_setting_help(
 
 /// Require shared-warehouse named targets to choose a schema strategy.
 #[pyfunction]
-#[pyo3(signature = (**options))]
+#[pyo3(signature = (*, discovered_inputs, adapter, selected_target, cli_vars = None))]
 fn validate_named_target_schema_strategy<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
+    discovered_inputs: &Bound<'py, PyAny>,
+    adapter: &Bound<'py, PyAny>,
+    selected_target: &Bound<'py, PyAny>,
+    cli_vars: Option<Bound<'py, PyAny>>,
 ) -> Result<(), PyErr> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "validate_named_target_schema_strategy",
-        options,
-        (
-            &["discovered_inputs", "adapter", "selected_target"],
-            &["cli_vars"],
-        ),
-    )?;
+    let py: Python<'py> = discovered_inputs.py();
     named_target_schema_strategy(
-        &arguments.value("discovered_inputs")?,
-        &arguments.value("adapter")?,
+        discovered_inputs,
+        adapter,
         (
-            &arguments.value("selected_target")?,
-            &arguments.value("cli_vars")?,
+            selected_target,
+            &cli_vars.unwrap_or_else(|| py.None().into_bound(py)),
         ),
     )
 }
@@ -182,10 +176,10 @@ pub(crate) fn named_target_schema_strategy(
     if native_field(adapter, "allows_implicit_managed_write_schema")?.is_truthy()? {
         return Ok(());
     }
-    let Some((target_name, target_config)) = selected_target_config(discovered, selected_target)?
-    else {
+    let (target_name, target_config) = resolved_target(discovered, selected_target)?;
+    if target_name.is_none() {
         return Ok(());
-    };
+    }
     let schema: Option<String> = text_or_none(&native_field(&target_config, "schema")?)?;
     if schema.is_some_and(|schema| !python_strip(&schema).is_empty()) {
         return Ok(());
@@ -647,9 +641,10 @@ pub(crate) fn preserved_loader_schemas(
     loaders: &HashSet<String>,
 ) -> PyResult<()> {
     let py: Python<'_> = discovered.py();
-    let Some((_, target_config)) = selected_target_config(discovered, selected_target)? else {
+    let (target_name, target_config) = resolved_target(discovered, selected_target)?;
+    if target_name.is_none() {
         return Ok(());
-    };
+    }
     if !text_or_none(&native_field(&target_config, "schema")?)?
         .is_some_and(|schema| python_strip(&schema) == PRESERVE_TARGET_VALUE)
     {
@@ -674,30 +669,6 @@ pub(crate) fn preserved_loader_schemas(
         ));
     }
     Ok(())
-}
-
-/// The selected target's name and configuration, or `None` when no named target is selected.
-fn selected_target_config<'py>(
-    discovered: &Bound<'py, PyAny>,
-    selected_target: &Bound<'py, PyAny>,
-) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
-    let py: Python<'py> = discovered.py();
-    let project_config: Bound<'py, PyAny> = native_field(discovered, "project_config")?;
-    let local_config: Bound<'py, PyAny> = native_field(discovered, "local_config")?;
-    let target_name: Bound<'py, PyAny> = resolve_target_name(
-        py,
-        &project_config.clone(),
-        &local_config.clone(),
-        &selected_target.clone(),
-    )
-    .and_then(|value| value.into_bound_py_any(py))?;
-    if target_name.is_none() {
-        return Ok(None);
-    }
-    let target_config: Bound<'py, PyAny> =
-        resolve_target_config(py, &project_config, &local_config, &target_name.clone())
-            .and_then(|value| value.into_bound_py_any(py))?;
-    Ok(Some((target_name, target_config)))
 }
 
 /// Raise when neither the resource nor the project names a physical write schema.

@@ -459,11 +459,33 @@ fn names(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     value.extract()
 }
 
-fn passed_defaults<'py>(arguments: &KeywordArguments<'py>) -> PyResult<LoaderDefaults<'py>> {
-    Ok(LoaderDefaults {
+/// A Python selection request's arguments, the project it names and its loader defaults.
+fn selection_request<'py>(
+    py: Python<'py>,
+    (function, required): (&str, &[&str]),
+    options: Option<Bound<'py, PyDict>>,
+) -> PyResult<(KeywordArguments<'py>, LoadProject<'py>, LoaderDefaults<'py>)> {
+    let arguments: KeywordArguments<'py> = KeywordArguments::read(
+        py,
+        function,
+        options,
+        (
+            required,
+            &["loader_default_database", "loader_default_schema"],
+        ),
+    )?;
+    let project: LoadProject<'py> = LoadProject::new(
+        &arguments.value("discovered_inputs")?,
+        (
+            &arguments.value("target_config")?,
+            &py.None().into_bound(py),
+        ),
+    )?;
+    let defaults: LoaderDefaults<'py> = LoaderDefaults {
         database: arguments.value("loader_default_database")?,
         schema: arguments.value("loader_default_schema")?,
-    })
+    };
+    Ok((arguments, project, defaults))
 }
 
 /// Select source and intermediate loader execution entries for `sqb load`.
@@ -473,26 +495,20 @@ fn select_load_entries_entry<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
+    let (arguments, project, defaults) = selection_request(
         py,
-        "select_load_entries",
-        options,
         (
+            "select_load_entries",
             &["discovered_inputs", "select", "exclude", "target_config"],
-            &["loader_default_database", "loader_default_schema"],
         ),
-    )?;
-    let target_config: Bound<'py, PyAny> = arguments.value("target_config")?;
-    let project: LoadProject<'py> = LoadProject::new(
-        &arguments.value("discovered_inputs")?,
-        (&target_config, &py.None().into_bound(py)),
+        options,
     )?;
     let entries: Vec<Bound<'py, PyAny>> = project.selected_entries(
         (
             &names(&arguments.value("select")?)?,
             &names(&arguments.value("exclude")?)?,
         ),
-        &passed_defaults(&arguments)?,
+        &defaults,
     )?;
     PyTuple::new(py, entries)
 }
@@ -504,28 +520,19 @@ fn select_load_reference_entries<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
+    let (arguments, project, defaults) = selection_request(
         py,
-        "select_load_reference_entries",
-        options,
         (
+            "select_load_reference_entries",
             &["discovered_inputs", "selected_sources", "target_config"],
-            &["loader_default_database", "loader_default_schema"],
         ),
-    )?;
-    let target_config: Bound<'py, PyAny> = arguments.value("target_config")?;
-    let project: LoadProject<'py> = LoadProject::new(
-        &arguments.value("discovered_inputs")?,
-        (&target_config, &py.None().into_bound(py)),
+        options,
     )?;
     let selected: Vec<Bound<'py, PyAny>> = arguments
         .value("selected_sources")?
         .try_iter()?
         .collect::<PyResult<_>>()?;
-    PyTuple::new(
-        py,
-        project.reference_entries(&selected, &passed_defaults(&arguments)?)?,
-    )
+    PyTuple::new(py, project.reference_entries(&selected, &defaults)?)
 }
 
 /// The default database and schema intermediate loader tables are written to.
