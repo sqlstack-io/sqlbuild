@@ -1,18 +1,13 @@
 //! The calendars and sensors a module declares, and the job names they use, without importing it.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use ruff_python_ast::Expr;
 use ruff_text_size::TextSize;
 
 use crate::cpython_tree::main::parse_cpython_module::parse_cpython_module;
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::{CpythonNode, ParsedSource};
-use crate::orchestration_modules::_helpers::calls::{
-    authoring_call, imported_names, module_names, position,
-};
-use crate::orchestration_modules::_helpers::conditions::module_assignments;
-use crate::orchestration_modules::_helpers::declarations::call_declaration;
+use crate::orchestration_modules::_helpers::calls::{authoring_call, imported_names, position};
+use crate::orchestration_modules::_helpers::declarations::{call_declaration, module_scope};
 use crate::orchestration_modules::constants::{CALENDAR_CALL, REMOVED_NAMES, SENSOR_CALL};
 use crate::orchestration_modules::models::{
     ModuleDeclarations, ModuleScope, PythonDeclaration, PythonDeclarationKind, SourcePosition,
@@ -26,22 +21,12 @@ pub fn orchestration_module_declarations(
 ) -> Option<ModuleDeclarations> {
     let parsed: ParsedSource = parse_cpython_module(contents, python_version)?;
     let imports: Vec<(String, String, TextSize)> = imported_names(&parsed.module.body);
-    let imported: BTreeMap<&str, &str> = imports
-        .iter()
-        .map(|(local, name, _)| (local.as_str(), name.as_str()))
-        .collect();
-    let modules: BTreeSet<String> = module_names(&parsed.module.body);
     let removed_imports: Vec<(String, SourcePosition)> = imports
         .iter()
         .filter(|(_, name, _)| REMOVED_NAMES.contains(&name.as_str()))
         .map(|(_, name, start)| (name.clone(), position(&parsed.lines, *start)))
         .collect();
-    let scope: ModuleScope<'_> = ModuleScope {
-        imported,
-        modules,
-        assignments: module_assignments(&parsed.module.body),
-        lines: &parsed.lines,
-    };
+    let scope: ModuleScope<'_> = module_scope(&parsed, contents, &imports);
     let mut declarations: Vec<PythonDeclaration> = Vec::new();
     for node in walk_breadth_first(parsed.module.body.iter().map(CpythonNode::Stmt).collect()) {
         let CpythonNode::Expr(Expr::Call(call)) = node else {

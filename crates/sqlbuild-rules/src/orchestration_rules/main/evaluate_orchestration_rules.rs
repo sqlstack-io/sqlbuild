@@ -39,6 +39,16 @@ fn selection_fault(
     (limit, run_names): (u32, &BTreeSet<&str>),
 ) -> Option<Fault> {
     let OrchestrationSelection { owner, name, .. } = selection;
+    if let Some(what) = &selection.unresolved {
+        return Some(fault(
+            rule,
+            selection,
+            format!(
+                "{owner} '{name}' has a condition the rule cannot resolve: {what}, so the nodes it selects cannot be counted"
+            ),
+            "Add an exact rule exception for this file with a reason.".to_owned(),
+        ));
+    }
     let Some(text) = &selection.selection else {
         return Some(fault(
             rule,

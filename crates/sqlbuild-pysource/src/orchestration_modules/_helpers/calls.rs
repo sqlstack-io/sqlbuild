@@ -8,15 +8,17 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::cpython_tree::main::source_position::source_position;
 use crate::cpython_tree::models::SourceLines;
 use crate::orchestration_modules::constants::{
-    CALENDAR_CALL, ORCHESTRATION_MODULE, RUN_EVENT_CALL, SELECTING_CONDITION_CALLS, SENSOR_CALL,
+    CALENDAR_CALL, ORCHESTRATION_MODULE, PLATFORM_EVENT_CALL, RUN_EVENT_CALL,
+    SELECTING_CONDITION_CALLS, SENSOR_CALL,
 };
 use crate::orchestration_modules::models::{LiteralArgument, SourcePosition};
 
-/// The calls a module's `calendar`, `sensor`, `run_event` and selecting condition names can make.
-const AUTHORING_CALLS: [&str; 6] = [
+/// The calls a module's `calendar`, `sensor` and condition names can make.
+const AUTHORING_CALLS: [&str; 7] = [
     CALENDAR_CALL,
     SENSOR_CALL,
     RUN_EVENT_CALL,
+    PLATFORM_EVENT_CALL,
     SELECTING_CONDITION_CALLS[0],
     SELECTING_CONDITION_CALLS[1],
     SELECTING_CONDITION_CALLS[2],
@@ -103,7 +105,7 @@ fn dotted(expression: &Expr) -> Option<String> {
     }
 }
 
-/// Which authoring call `call` is: an imported `calendar`, `sensor` or `run_event`, or one reached as an attribute of the orchestration module.
+/// Which authoring call `call` is: an imported `calendar`, `sensor` or condition, or one reached as an attribute of the orchestration module.
 pub(crate) fn authoring_call(
     call: &ExprCall,
     (imported, modules): (&BTreeMap<&str, &str>, &BTreeSet<String>),

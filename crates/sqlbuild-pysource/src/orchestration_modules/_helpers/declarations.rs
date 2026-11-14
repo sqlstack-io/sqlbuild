@@ -1,21 +1,43 @@
 //! The declaration each orchestration authoring call makes, with the selections its conditions name.
 
+use std::collections::BTreeMap;
+
 use ruff_python_ast::{Expr, ExprCall};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
-use crate::cpython_tree::models::{CpythonNode, SourceLines};
+use crate::cpython_tree::models::{CpythonNode, ParsedSource, SourceLines};
 use crate::orchestration_modules::_helpers::calls::{
-    authoring_call, literal, literal_strings, position,
+    authoring_call, literal, literal_strings, module_names, position,
 };
-use crate::orchestration_modules::_helpers::conditions::condition_nodes;
+use crate::orchestration_modules::_helpers::conditions::{
+    condition_source, module_assignments, module_imports,
+};
 use crate::orchestration_modules::constants::{
-    JOB_KEYWORD, NAME_KEYWORD, RUN_EVENT_CALL, RUN_KEYWORD, SELECT_KEYWORD,
-    SELECTING_CONDITION_CALLS, TARGETS_KEYWORD,
+    JOB_KEYWORD, NAME_KEYWORD, RUN_EVENT_CALL, RUN_KEYWORD, TARGETS_KEYWORD, WHEN_KEYWORD,
 };
 use crate::orchestration_modules::models::{
-    LiteralArgument, ModuleScope, PythonDeclaration, PythonDeclarationKind,
+    ConditionSource, LiteralArgument, ModuleScope, PythonDeclaration, PythonDeclarationKind,
 };
+
+/// The names `parsed`'s authoring calls and conditions resolve against, with `imports` from `imported_names`.
+pub(crate) fn module_scope<'a>(
+    parsed: &'a ParsedSource,
+    contents: &'a str,
+    imports: &'a [(String, String, TextSize)],
+) -> ModuleScope<'a> {
+    ModuleScope {
+        imported: imports
+            .iter()
+            .map(|(local, name, _)| (local.as_str(), name.as_str()))
+            .collect::<BTreeMap<&str, &str>>(),
+        modules: module_names(&parsed.module.body),
+        assignments: module_assignments(&parsed.module.body),
+        imports: module_imports(&parsed.module.body),
+        lines: &parsed.lines,
+        contents,
+    }
+}
 
 /// The declaration one `calendar(...)` or `sensor(...)` call makes.
 pub(crate) fn call_declaration<'a>(
@@ -32,10 +54,10 @@ pub(crate) fn call_declaration<'a>(
         Some(targets) => literal_strings(&targets.value),
         None => Some(Vec::new()),
     };
-    let (job_references, selections) = if kind == PythonDeclarationKind::Sensor {
+    let (job_references, condition) = if kind == PythonDeclarationKind::Sensor {
         sensor_references(call, scope)
     } else {
-        (Vec::new(), Vec::new())
+        (Vec::new(), None)
     };
     PythonDeclaration {
         kind,
@@ -43,15 +65,18 @@ pub(crate) fn call_declaration<'a>(
         position: position(lines, call.range().start()),
         job_references,
         targets,
-        selections,
+        condition,
     }
 }
 
-/// The sensor's `run` job, the jobs its run events name, and the `select` of each condition that selects nodes.
+/// The sensor's `run` job, the jobs its run events name, and what its `when` condition selects.
 fn sensor_references<'a>(
     call: &'a ExprCall,
     scope: &ModuleScope<'a>,
-) -> (Vec<(&'static str, LiteralArgument)>, Vec<LiteralArgument>) {
+) -> (
+    Vec<(&'static str, LiteralArgument)>,
+    Option<ConditionSource>,
+) {
     let lines: &SourceLines = scope.lines;
     let mut job_references: Vec<(&'static str, LiteralArgument)> = Vec::new();
     if let Some(run) = call.arguments.find_keyword(RUN_KEYWORD) {
@@ -79,28 +104,9 @@ fn sensor_references<'a>(
             job_references.push((RUN_EVENT_CALL, literal(&job.value, lines)));
         }
     }
-    let selections: Vec<LiteralArgument> = condition_nodes(conditions, &scope.assignments)
-        .into_iter()
-        .filter_map(|node| condition_selection(node, scope))
-        .collect();
-    (job_references, selections)
-}
-
-/// The `select` of a node-selecting condition call; one with no `select` keyword, such as `**options`, cannot be counted.
-fn condition_selection(node: CpythonNode<'_>, scope: &ModuleScope<'_>) -> Option<LiteralArgument> {
-    let lines: &SourceLines = scope.lines;
-    let CpythonNode::Expr(Expr::Call(call)) = node else {
-        return None;
-    };
-    let name: &str = authoring_call(call, (&scope.imported, &scope.modules))?;
-    if !SELECTING_CONDITION_CALLS.contains(&name) {
-        return None;
-    }
-    Some(match call.arguments.find_keyword(SELECT_KEYWORD) {
-        Some(select) => literal(&select.value, lines),
-        None => LiteralArgument {
-            value: None,
-            position: position(lines, call.range().start()),
-        },
-    })
+    let condition: Option<ConditionSource> = call
+        .arguments
+        .find_keyword(WHEN_KEYWORD)
+        .and_then(|when| condition_source(&when.value, call.range().start(), scope));
+    (job_references, condition)
 }

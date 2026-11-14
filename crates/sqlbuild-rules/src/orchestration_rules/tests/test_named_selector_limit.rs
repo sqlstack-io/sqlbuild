@@ -110,6 +110,59 @@ fn given_job_and_sensor_selections_when_evaluating_then_more_named_nodes_than_th
             ],
         },
         NamedSelectorLimitTestCase {
+            description: "imports of project names are followed, platform events are skipped, and what cannot be resolved is reported",
+            files: vec![
+                export_job(),
+                (
+                    "orchestration/sensors/orders/_conditions.py",
+                    "from sqlbuild.orchestration import node_event, platform_event\nLATE = node_event(select=\"a b c d\", kinds=[])\nTICK = platform_event(kinds=[])\n".to_owned(),
+                ),
+                (
+                    "orchestration/sensors/orders/late.py",
+                    format!(
+                        "from orchestration.sensors.orders._conditions import LATE\n{}",
+                        sensor("orders_late", "LATE")
+                    ),
+                ),
+                (
+                    "orchestration/sensors/orders/tick.py",
+                    format!("from ._conditions import TICK\n{}", sensor("orders_tick", "TICK")),
+                ),
+                (
+                    "orchestration/sensors/orders/built.py",
+                    sensor("orders_built", "make_condition(\"orders\")"),
+                ),
+                (
+                    "orchestration/sensors/orders/shared.py",
+                    format!(
+                        "from shared_conditions import READY\n{}",
+                        sensor("orders_shared", "READY")
+                    ),
+                ),
+            ],
+            config: selected.clone(),
+            expected_findings: vec![
+                (
+                    "orchestration/sensors/orders/built.py",
+                    4,
+                    73,
+                    "sensor 'orders_built_sensor' has a condition the rule cannot resolve: `make_condition(...)` is a function call, so the nodes it selects cannot be counted",
+                ),
+                (
+                    "orchestration/sensors/orders/late.py",
+                    5,
+                    71,
+                    "sensor 'orders_late_sensor' names 4 nodes in its selection (limit 3)",
+                ),
+                (
+                    "orchestration/sensors/orders/shared.py",
+                    5,
+                    75,
+                    "sensor 'orders_shared_sensor' has a condition the rule cannot resolve: `READY` is imported from `shared_conditions`, which is not a project module, so the nodes it selects cannot be counted",
+                ),
+            ],
+        },
+        NamedSelectorLimitTestCase {
             description: "an exact rule exception for the file removes its finding",
             files: vec![
                 export_job(),

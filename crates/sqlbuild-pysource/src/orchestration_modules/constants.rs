@@ -6,6 +6,12 @@ pub(crate) const CALENDAR_CALL: &str = "calendar";
 pub(crate) const SENSOR_CALL: &str = "sensor";
 /// The sensor condition that names the job whose runs it watches.
 pub(crate) const RUN_EVENT_CALL: &str = "run_event";
+/// The sensor condition that watches platform events and selects no nodes.
+pub(crate) const PLATFORM_EVENT_CALL: &str = "platform_event";
+/// The sensor keyword holding its one condition.
+pub(crate) const WHEN_KEYWORD: &str = "when";
+/// The longest source excerpt a finding quotes.
+pub(crate) const EXCERPT_LIMIT: usize = 60;
 /// Sensor conditions that select the nodes or sources they watch.
 pub(crate) const SELECTING_CONDITION_CALLS: [&str; 3] =
     ["node_event", "source_new_data", "source_stale"];

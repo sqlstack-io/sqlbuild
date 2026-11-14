@@ -7,6 +7,7 @@ use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_discovery::tree::models::ProjectTree;
 
 use crate::models::EvaluateRequest;
+use crate::orchestration_rules::_helpers::imports::ImportReader;
 use crate::orchestration_rules::_helpers::selections::facts;
 use crate::orchestration_rules::constants::NAMED_SELECTOR_LIMIT_CODE;
 use crate::orchestration_rules::models::OrchestrationFacts;
@@ -20,5 +21,11 @@ pub(crate) fn orchestration_facts(request: &EvaluateRequest) -> Result<Orchestra
     let tree = ProjectTree::new(Path::new(&request.project_dir));
     let inventory: OrchestrationInventory = orchestration_inventory(&tree, request.python_version)
         .map_err(|failure| format!("cannot read the orchestration declarations: {failure:?}"))?;
-    Ok(facts(inventory))
+    Ok(facts(
+        inventory,
+        &ImportReader {
+            tree: &tree,
+            python_version: request.python_version,
+        },
+    ))
 }

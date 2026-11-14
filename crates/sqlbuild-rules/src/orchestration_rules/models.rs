@@ -11,6 +11,9 @@ pub struct OrchestrationSelection {
     pub name: String,
     /// The selection text; `None` for a sensor condition whose `select` is not a string literal.
     pub selection: Option<String>,
+    /// What the rule could not resolve to reach the selection, when it could not.
+    #[serde(default)]
+    pub unresolved: Option<String>,
     pub line: u64,
     pub column: u64,
 }

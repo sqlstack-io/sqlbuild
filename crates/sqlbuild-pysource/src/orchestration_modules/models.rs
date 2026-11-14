@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use ruff_python_ast::Expr;
+use ruff_text_size::TextSize;
 
 use crate::cpython_tree::models::SourceLines;
 
@@ -38,8 +39,27 @@ pub struct PythonDeclaration {
     pub job_references: Vec<(&'static str, LiteralArgument)>,
     /// A sensor's `targets`: empty when omitted, `None` when not a literal tuple or list of strings.
     pub targets: Option<Vec<String>>,
-    /// The `select=` of each `node_event`, `source_new_data` and `source_stale` condition of a sensor.
-    pub selections: Vec<LiteralArgument>,
+    /// What a sensor's `when` selects, as far as its own module shows; `None` for a condition that selects no nodes.
+    pub condition: Option<ConditionSource>,
+}
+
+/// Where a sensor condition's selection comes from.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ConditionSource {
+    /// The `select` of a `node_event`, `source_new_data` or `source_stale` call; `None` when not a string literal.
+    Selection(LiteralArgument),
+    /// A name imported from `module`, `level` packages up for a relative import, to resolve there.
+    Imported {
+        module: String,
+        level: u32,
+        name: String,
+        position: SourcePosition,
+    },
+    /// A value the reader cannot follow, described for the finding.
+    Unresolvable {
+        what: String,
+        position: SourcePosition,
+    },
 }
 
 /// The orchestration facts of one module.
@@ -55,6 +75,10 @@ pub struct ModuleDeclarations {
 pub(crate) struct ModuleScope<'a> {
     pub(crate) imported: BTreeMap<&'a str, &'a str>,
     pub(crate) modules: BTreeSet<String>,
-    pub(crate) assignments: BTreeMap<&'a str, &'a Expr>,
+    /// Each module-level name's bindings, in source order.
+    pub(crate) assignments: BTreeMap<&'a str, Vec<(TextSize, &'a Expr)>>,
+    /// Each name a module-level `from ... import` binds, with its module, relative level and imported name.
+    pub(crate) imports: BTreeMap<&'a str, (String, u32, &'a str)>,
     pub(crate) lines: &'a SourceLines,
+    pub(crate) contents: &'a str,
 }

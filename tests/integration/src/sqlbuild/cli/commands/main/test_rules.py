@@ -3557,14 +3557,20 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
     [
         NamedSelectorIntegrationTestCase(
             description=(
-                "listed jobs and sensor conditions over the limit and a computed sensor select "
-                "fail; folders, expansions, globs, intersections and job names pass"
+                "listed jobs and sensor conditions over the limit, bound or imported, and computed "
+                "sensor conditions fail; folders, globs, job names and platform events pass"
             ),
             rules_toml=_NAMED_SELECTOR_SELECT,
             expected_exit_code=1,
             expected_findings=(
                 ("SQBRORCHESTRATION101", "orchestration/jobs/orders_listed_job.toml", 4, 10),
                 ("SQBRORCHESTRATION101", "orchestration/jobs/orders_repair_job.toml", 4, 10),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_built_sensor.py",
+                    10,
+                    10,
+                ),
                 (
                     "SQBRORCHESTRATION101",
                     "orchestration/sensors/on_orders_computed_sensor.py",
@@ -3576,6 +3582,12 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
                     "orchestration/sensors/on_orders_failure_sensor.py",
                     6,
                     12,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_landed_sensor.py",
+                    10,
+                    10,
                 ),
             ),
             expected_text="job 'orders_listed_job' names 4 nodes in its selection (limit 3)",
@@ -3588,6 +3600,12 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
                 ("SQBRORCHESTRATION101", "orchestration/jobs/orders_listed_job.toml", 4, 10),
                 (
                     "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_built_sensor.py",
+                    10,
+                    10,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
                     "orchestration/sensors/on_orders_computed_sensor.py",
                     10,
                     28,
@@ -3598,11 +3616,17 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
                     6,
                     12,
                 ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_landed_sensor.py",
+                    10,
+                    10,
+                ),
             ),
             expected_text="sensor 'on_orders_failure_sensor' names 4 nodes in its selection",
         ),
         NamedSelectorIntegrationTestCase(
-            description="a raised limit passes every list but still reports a computed select",
+            description="a raised limit passes every list but still reports computed conditions",
             rules_toml=(
                 _NAMED_SELECTOR_SELECT
                 + "\n[rules.rule_options.SQBRORCHESTRATION101]\nmax_named_selectors = 4\n"
@@ -3611,12 +3635,18 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
             expected_findings=(
                 (
                     "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_built_sensor.py",
+                    10,
+                    10,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
                     "orchestration/sensors/on_orders_computed_sensor.py",
                     10,
                     28,
                 ),
             ),
-            expected_text="is not a string literal",
+            expected_text="`landed_after(...)` is a function call",
         ),
     ],
     ids=lambda case: case.description,

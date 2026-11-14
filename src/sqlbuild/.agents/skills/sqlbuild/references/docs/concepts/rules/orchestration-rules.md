@@ -70,14 +70,25 @@ reason = "Rebuilds the four order models after a late payments load."
 
 See [Findings and exceptions](findings-and-exceptions.md#exact-exceptions).
 
-## Sensor selections that are not a literal
+## Sensor conditions the Rule cannot count
 
-The Rule counts only a `select` written as a quoted string. A sensor condition whose `select` is a
-variable or an expression is reported, because its nodes cannot be counted:
+The Rule reads a sensor's `when` without running the module. It follows a name bound at module
+level, in the sensor's file or in a project module the sensor imports it from, to the condition
+call that name holds.
+
+| `when` value | Result |
+| --- | --- |
+| A selecting condition whose `select` is a quoted string | Counted |
+| A `platform_event` or `run_event` condition, written inline or held in a name | Not checked |
+| A selecting condition whose `select` is a variable or an expression | Reported |
+| A call to any other function, such as a helper that builds the condition | Reported |
+| A name imported from outside the project, or not bound at module level | Reported |
+
+A reported condition names what the Rule could not resolve:
 
 ```text
-error[SQBRORCHESTRATION101]: sensor 'on_new_orders_sensor' has a condition select that is not a string literal, so the nodes it names cannot be counted
+error[SQBRORCHESTRATION101]: sensor 'on_orders_built_sensor' has a condition the rule cannot resolve: `landed_after(...)` is a function call, so the nodes it selects cannot be counted
 ```
 
-Write the selection as a quoted string. If it must be computed, add an exact rule exception for the
-sensor's file with a reason.
+To keep a condition the Rule cannot count, add an exact rule exception for the sensor's file with a
+reason.
