@@ -1,7 +1,8 @@
 //! Native database handles and bound values shared by control-plane operations.
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -13,8 +14,32 @@ use uuid::Uuid;
 /// An installation's control store. Workers and locations never receive this handle.
 #[derive(Clone, Debug)]
 pub enum ControlStore {
-    Sqlite(PathBuf),
+    Sqlite(SqliteStore),
     Postgres(sqlx_postgres::PgPool),
+}
+
+/// A SQLite store's file, and an idle connection held while any handle lives.
+///
+/// Without it the next transaction's connection would be the file's first and rebuild the WAL
+/// index, which restarts checkpointing from the start of the WAL, so the WAL would never reset.
+#[derive(Clone, Debug)]
+pub struct SqliteStore {
+    pub(crate) path: PathBuf,
+    pub(crate) _keeper: Arc<Mutex<rusqlite::Connection>>,
+}
+
+impl std::ops::Deref for SqliteStore {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl AsRef<Path> for SqliteStore {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
 }
 
 /// The first copy wins; duplicate events retain their original storage cursor.

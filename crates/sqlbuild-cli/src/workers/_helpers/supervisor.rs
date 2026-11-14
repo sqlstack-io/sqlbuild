@@ -173,7 +173,7 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
             std::io::stderr().lock(),
             "{}; the scheduler retries: {error}",
             if matches!(error, ControlError::Fenced) {
-                "Scheduler lease lost"
+                "Scheduler fenced"
             } else {
                 "Control store unavailable"
             }

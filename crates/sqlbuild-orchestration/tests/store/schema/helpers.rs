@@ -10,7 +10,7 @@ use crate::store::main::commit::commit;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::open_store::open_store;
 use crate::store::main::query::query;
-use crate::store::models::TransactionMode;
+use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::store_helpers::run;
 use crate::store::types::Row;
 
@@ -91,5 +91,33 @@ pub(crate) fn surviving_locations(path: &Path) -> usize {
         .expect("count locations");
         commit(transaction).await.expect("finish read");
         usize::try_from(rows[0]["locations"].as_i64().expect("count")).expect("count")
+    })
+}
+
+/// Commit `commits` rows of `bytes` each, one transaction at a time with none overlapping; return the WAL bytes.
+pub(crate) fn wal_bytes_after_sequential_writes(path: &Path, commits: usize, bytes: usize) -> u64 {
+    run(async {
+        let store = open_store(path.to_str().expect("UTF-8 path"))
+            .await
+            .expect("open store");
+        let transaction = begin(&store, TransactionMode::Write).await.expect("begin");
+        let (transaction, _) = query(transaction, "CREATE TABLE wal_probe (payload TEXT)", vec![])
+            .await
+            .expect("create probe table");
+        commit(transaction).await.expect("commit table");
+        for index in 0..commits {
+            let transaction = begin(&store, TransactionMode::Write).await.expect("begin");
+            let (transaction, _) = query(
+                transaction,
+                "INSERT INTO wal_probe (payload) VALUES ($1)",
+                vec![Parameter::Text(format!("{index:0>bytes$}"))],
+            )
+            .await
+            .expect("write probe row");
+            commit(transaction).await.expect("commit probe row");
+        }
+        let mut wal = path.as_os_str().to_owned();
+        wal.push("-wal");
+        std::fs::metadata(wal).map_or(0, |metadata| metadata.len())
     })
 }
