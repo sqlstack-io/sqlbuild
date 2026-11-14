@@ -14,7 +14,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import DenseCo
 
 @pytest.mark.parametrize(
     "test_case",
-    (DenseCompileFixtureTestCase("joins unions macros and functions", 64, 129, 134),),
+    (DenseCompileFixtureTestCase("joins unions macros and functions", 64, 131, 134),),
     ids=lambda case: case.description,
 )
 def test_given_dense_fixture_when_compiling_and_testing_then_all_rules_and_rows_pass(
