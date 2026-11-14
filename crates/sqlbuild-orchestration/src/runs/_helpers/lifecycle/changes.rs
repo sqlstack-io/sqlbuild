@@ -70,6 +70,7 @@ pub(crate) fn validate_authority(
                 | RunChange::NodeFinished { .. }
                 | RunChange::CheckStarted { .. }
                 | RunChange::CheckFinished { .. }
+                | RunChange::Compiled { .. }
         ),
         RunAuthority::Worker { run_id, claim_id } => {
             run_id == request.run_id
@@ -81,6 +82,7 @@ pub(crate) fn validate_authority(
                         | RunChange::NodeFinished { .. }
                         | RunChange::CheckStarted { .. }
                         | RunChange::CheckFinished { .. }
+                        | RunChange::Compiled { .. }
                         | RunChange::Recovered
                         | RunChange::Finished {
                             outcome: RunOutcome::Success
@@ -130,7 +132,8 @@ pub(crate) fn validate_change(
         RunChange::NodeStarted { .. }
         | RunChange::NodeFinished { .. }
         | RunChange::CheckStarted { .. }
-        | RunChange::CheckFinished { .. } => {
+        | RunChange::CheckFinished { .. }
+        | RunChange::Compiled { .. } => {
             matches!(state.status, Running | Unresponsive)
         }
         RunChange::Unresponsive => state.status == Running,

@@ -537,7 +537,7 @@ export type SnapshotNode = {
 
 // ---- ad-hoc runs (the plan page) ----
 
-export type LaunchVerb = 'build' | 'test' | 'seed' | 'audit' | 'freshness';
+export type LaunchVerb = 'build' | 'test' | 'seed' | 'audit' | 'freshness' | 'load';
 
 /** A command as argument tokens after `sqb`, never shell text; the server resolves its selectors. */
 export type AdhocRunRequest = {

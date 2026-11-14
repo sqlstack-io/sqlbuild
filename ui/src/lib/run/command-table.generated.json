@@ -105,6 +105,15 @@
 					"description": "Process at most this many microbatches per incremental model"
 				},
 				{
+					"flag": "--load",
+					"aliases": [],
+					"type": "bool",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.load",
+					"description": "Load managed sources before building"
+				},
+				{
 					"flag": "--no-load",
 					"aliases": [],
 					"type": "bool",
@@ -112,6 +121,15 @@
 					"repeatable": false,
 					"requires": null,
 					"description": "Skip loaders"
+				},
+				{
+					"flag": "--reload",
+					"aliases": [],
+					"type": "bool",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.load",
+					"description": "Reload managed sources (loaders get is_reload=True)"
 				},
 				{
 					"flag": "--fail-fast",
@@ -238,6 +256,15 @@
 					"description": "Selector expression to leave out"
 				},
 				{
+					"flag": "--vars",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.vars",
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
+				},
+				{
 					"flag": "--warehouse",
 					"aliases": [],
 					"type": "string",
@@ -309,6 +336,15 @@
 					"description": "Selector expression to leave out"
 				},
 				{
+					"flag": "--vars",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.vars",
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
+				},
+				{
 					"flag": "--warehouse",
 					"aliases": [],
 					"type": "string",
@@ -353,6 +389,15 @@
 					"description": "Selector expression to leave out"
 				},
 				{
+					"flag": "--vars",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.vars",
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
+				},
+				{
 					"flag": "--warehouse",
 					"aliases": [],
 					"type": "string",
@@ -395,6 +440,15 @@
 					"repeatable": true,
 					"requires": null,
 					"description": "Selector expression to leave out"
+				},
+				{
+					"flag": "--vars",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.vars",
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
 				},
 				{
 					"flag": "--warehouse",
@@ -457,6 +511,131 @@
 					"repeatable": true,
 					"requires": null,
 					"description": "Selector expression to leave out"
+				},
+				{
+					"flag": "--vars",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.vars",
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
+				},
+				{
+					"flag": "--warehouse",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.warehouse",
+					"description": "warehouse for this invocation; overrides the target's command-group warehouse and the connection warehouse"
+				}
+			]
+		},
+		{
+			"name": "load",
+			"description": "Run the loaders of managed sources",
+			"flags": [
+				{
+					"flag": "--reload",
+					"aliases": [],
+					"type": "bool",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.load",
+					"description": "Reload managed sources (loaders get is_reload=True)"
+				},
+				{
+					"flag": "--concurrency",
+					"aliases": [],
+					"type": "int",
+					"choices": null,
+					"repeatable": false,
+					"requires": null,
+					"description": "Nodes to run in parallel within this run"
+				},
+				{
+					"flag": "--select",
+					"aliases": [
+						"-s"
+					],
+					"type": "selector",
+					"choices": null,
+					"repeatable": true,
+					"requires": null,
+					"description": "Selector expression, e.g. +fact_orders, tag:finance, path:models/marts/"
+				},
+				{
+					"flag": "--exclude",
+					"aliases": [],
+					"type": "selector",
+					"choices": null,
+					"repeatable": true,
+					"requires": null,
+					"description": "Selector expression to leave out"
+				},
+				{
+					"flag": "--start-cursor",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.rewrite_history",
+					"description": "override the start cursor, typed from the selected models' cursor type"
+				},
+				{
+					"flag": "--end-cursor",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.rewrite_history",
+					"description": "override the end cursor, typed from the selected models' cursor type"
+				},
+				{
+					"flag": "--start-cursor-ts",
+					"aliases": [],
+					"type": "timestamp",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.rewrite_history",
+					"description": "timestamp start cursor override"
+				},
+				{
+					"flag": "--end-cursor-ts",
+					"aliases": [],
+					"type": "timestamp",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.rewrite_history",
+					"description": "timestamp end cursor override"
+				},
+				{
+					"flag": "--start-cursor-int",
+					"aliases": [],
+					"type": "int",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.rewrite_history",
+					"description": "integer start cursor override"
+				},
+				{
+					"flag": "--end-cursor-int",
+					"aliases": [],
+					"type": "int",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.rewrite_history",
+					"description": "integer end cursor override"
+				},
+				{
+					"flag": "--vars",
+					"aliases": [],
+					"type": "string",
+					"choices": null,
+					"repeatable": false,
+					"requires": "run.vars",
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
 				},
 				{
 					"flag": "--warehouse",

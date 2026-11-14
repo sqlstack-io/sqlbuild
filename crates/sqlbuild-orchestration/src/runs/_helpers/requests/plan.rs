@@ -4,20 +4,21 @@ use chrono::Duration;
 use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::credentials::models::{AuditContext, DefaultRole};
+use crate::authorization::main::authorize_person::authorize_person;
+use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::platform::constants::{LOCATION_SILENCE_SECONDS, PLAN_EXPIRY_SECONDS, PLAN_QUEUE_LIMIT};
 use crate::platform::main::enqueue_location_work::enqueue_location_work;
 use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkRequest, PlanRequest};
 use crate::runs::_helpers::requests::adhoc::frozen_adhoc_request;
-use crate::runs::constants::{PLAN_IGNORED_SETTING, PLAN_REASON};
+use crate::runs::constants::{LOAD_VERB, PLAN_IGNORED_SETTING, PLAN_REASON, VARS_SETTING};
 use crate::runs::models::{AdhocCheckRequest, RunCommand};
 use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Needs view on every current node; a refused command, a silent location or a full queue queues nothing.
+/// Needs view on every current node, and run.vars for variables; a refused command, a silent location or a full queue queues nothing.
 pub(in crate::runs) async fn request_plan_in(
     transaction: ControlTransaction,
     (context, principal_id, planner): (&AuditContext, Uuid, &dyn CommandPlanner),
@@ -57,11 +58,28 @@ pub(in crate::runs) async fn request_plan_in(
     )
     .await?;
     let (verb, frozen) = frozen.map_err(ControlError::Invalid)?;
-    if frozen.command != RunCommand::Build {
+    if frozen.command != RunCommand::Build || verb == LOAD_VERB {
         return Err(ControlError::Invalid(format!(
             "sqb plan previews builds; sqb {verb} cannot be planned"
         )));
     }
+    let (transaction, context) = if frozen.settings.contains_key(VARS_SETTING) {
+        let scope = PermissionScope {
+            action: Action::RunVars,
+            location_id: Some(location_id),
+            target: Some(target.to_owned()),
+            nodes: frozen.selection.union(&frozen.write_set).cloned().collect(),
+        };
+        authorize_person(
+            transaction,
+            (&context, principal_id),
+            &scope,
+            DefaultRole::None,
+        )
+        .await?
+    } else {
+        (transaction, context)
+    };
     let now = transaction.now;
     let (transaction, rows) = query(transaction,
             "SELECT \

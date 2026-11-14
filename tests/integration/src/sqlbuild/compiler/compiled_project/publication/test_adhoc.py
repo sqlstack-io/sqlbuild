@@ -10,11 +10,13 @@ import duckdb
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    AdhocLoadVarsTestCase,
     AdhocRunTestCase,
     AdhocVerbTestCase,
     WorkerExecutionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    LOADED_ORDER_FILES,
     duckdb_rows,
     scheduled_worker,
     security_audit_rows,
@@ -150,14 +152,14 @@ def test_given_an_ad_hoc_command_when_checked_and_launched_then_the_worker_runs_
                 body=scope
                 | {
                     "run_id": str(uuid4()),
-                    "command": ["build", "--vars", "{}"],
-                    "reason": "Try variables",
+                    "command": ["build", "--debug"],
+                    "reason": "Try debug output",
                     "priority": 0,
                 },
                 session=session,
             )
         assert refused.value.code == 400
-        assert "--vars is not available for ad-hoc runs" in refused.value.read().decode()
+        assert "--debug is not available for ad-hoc runs" in refused.value.read().decode()
         run_id: str = str(uuid4())
         launch: dict[str, Any] = scope | {
             "run_id": run_id,
@@ -379,3 +381,168 @@ def test_given_an_ad_hoc_verb_when_the_checkout_changes_after_verification_then_
         )
         for name, text in test_case.rewrites.items():
             assert (worker.project / name).read_text() == text, "the checkout changed under the run"
+
+
+INVENTORY_TABLES: str = (
+    "SELECT count(*) FROM information_schema.tables WHERE table_name='raw_inventory'"
+)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AdhocLoadVarsTestCase(
+            description="a developer's plain build of a managed source loads it under run.adhoc",
+            person="developer",
+            command=["build", "--select", "raw_inventory"],
+            expected_permissions=[["run.adhoc", True]],
+            expected_refusal=None,
+            expected_inventory_tables=1,
+        ),
+        AdhocLoadVarsTestCase(
+            description="a developer may not load on request",
+            person="developer",
+            command=["load", "--select", "raw_inventory"],
+            expected_permissions=[["run.adhoc", True], ["run.load", False]],
+            expected_refusal=403,
+            expected_inventory_tables=0,
+        ),
+        AdhocLoadVarsTestCase(
+            description="a developer may not reload",
+            person="developer",
+            command=["build", "--select", "raw_inventory", "--reload"],
+            expected_permissions=[["run.adhoc", True], ["run.load", False]],
+            expected_refusal=403,
+            expected_inventory_tables=0,
+        ),
+        AdhocLoadVarsTestCase(
+            description="an admin's load runs only the selected source's loader",
+            person="admin",
+            command=["load", "--select", "raw_inventory"],
+            expected_permissions=[["run.adhoc", True], ["run.load", True]],
+            expected_refusal=None,
+            expected_inventory_tables=1,
+        ),
+        AdhocLoadVarsTestCase(
+            description="a developer may not set variables",
+            person="developer",
+            command=["build", "--select", "daily_customers", "--vars", '{"day": 7}'],
+            expected_permissions=[["run.adhoc", True], ["run.vars", False]],
+            expected_refusal=403,
+            expected_inventory_tables=0,
+        ),
+        AdhocLoadVarsTestCase(
+            description="an admin's variables compile on the worker and their hashes are recorded",
+            person="admin",
+            command=["build", "--select", "daily_customers", "--vars", '{"day": 7}'],
+            expected_permissions=[["run.adhoc", True], ["run.vars", True]],
+            expected_refusal=None,
+            expected_inventory_tables=0,
+            day_query="SELECT day FROM daily_customers",
+            expected_day_rows=[(7,)],
+            expected_compiled=[True],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_ad_hoc_loads_and_variables_when_launched_then_only_permitted_people_run_them(
+    test_case: AdhocLoadVarsTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker_case: WorkerExecutionTestCase = WorkerExecutionTestCase(
+        description=test_case.description,
+        model_sql="SELECT 5 AS amount",
+        warehouse_query="SELECT amount FROM orders",
+        expected_status="success",
+        expected_rows=[(5,)],
+        files=LOADED_ORDER_FILES
+        | {
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                '[targets.development]\nschema = "main"\n'
+                '[vars]\nday = "0"\n'
+            ),
+            "models/daily_customers.sql": (
+                "MODEL (description 'Customers of one day.', materialized table);\n"
+                "SELECT @@day AS day\n"
+            ),
+        },
+    )
+    with scheduled_worker(
+        tmp_path,
+        monkeypatch,
+        worker_case,
+        server_arguments=("--password-origin", "https://control.example.com"),
+    ) as worker:
+        scheduled: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert scheduled["status"] == "success", worker.log.read_text()
+        admin: dict[str, Any] = provision_person(
+            tmp_path / "control", "create-user", "orders-admin"
+        )
+        developer: dict[str, Any] = provision_person(
+            tmp_path / "control", "create-principal", "orders-developer"
+        )
+        sessions: dict[str, tuple[str, str]] = {
+            "admin": person_login(worker.api, admin["name"]),
+            "developer": person_login(worker.api, developer["name"]),
+        }
+        assert person_request(
+            worker.api,
+            "/api/admin/roles",
+            body={
+                "principal_id": developer["principal_id"],
+                "role": "developer",
+                "location_id": worker.api.location_id,
+                "target": "development",
+            },
+            session=sessions["admin"],
+        ) == {"applied": True}
+        session: tuple[str, str] = sessions[test_case.person]
+        scope: dict[str, Any] = {"location_id": worker.api.location_id, "target": "development"}
+        check: dict[str, Any] = person_request(
+            worker.api,
+            "/api/control/runs/adhoc/check",
+            body=scope | {"command": test_case.command, "priority": 0},
+            session=session,
+        )
+        assert [
+            [permission["action"], permission["allowed"]] for permission in check["permissions"]
+        ] == test_case.expected_permissions
+        run_id: str = str(uuid4())
+        launch: dict[str, Any] = scope | {
+            "run_id": run_id,
+            "command": test_case.command,
+            "reason": "Load or compile on request",
+            "priority": 0,
+        }
+        try:
+            refusal: int | None = None
+            assert person_request(
+                worker.api, "/api/control/runs/adhoc", body=launch, session=session
+            ) == {"applied": True}
+            completed: dict[str, Any] = wait_for_run(
+                worker.api, worker.process, worker.log, run_id=run_id
+            )
+            assert completed["status"] == "success", worker.log.read_text()
+        except HTTPError as error:
+            refusal = error.code
+        assert refusal == test_case.expected_refusal
+        assert duckdb_rows(worker.project / "warehouse.duckdb", INVENTORY_TABLES) == [
+            (test_case.expected_inventory_tables,)
+        ]
+        assert (
+            duckdb_rows(worker.project / "warehouse.duckdb", test_case.day_query)
+            == test_case.expected_day_rows
+        )
+        compiled: list[tuple[Any, ...]] = sqlite_rows(
+            worker.control_store,
+            "SELECT json_extract(payload, '$.change.change.node_hashes.\"model:daily_customers\"'), "
+            "(SELECT node_hash FROM sqb_snapshot_nodes WHERE node_key='model:daily_customers' "
+            "LIMIT 1) FROM recall_events "
+            f"WHERE event_type='run_compiled' AND run_id='{run_id}'",
+        )
+        assert [hashes[0] != hashes[1] for hashes in compiled] == test_case.expected_compiled, (
+            "the worker records the hash its variables compiled, not the published one"
+        )
