@@ -53,6 +53,11 @@ fn given_target_error_when_formatting_then_matches_python_message() {
             error: TargetError::NamedTargetSchema("ci".to_owned()),
             expected_message: "Named target 'ci' must explicitly set schema to a nonblank literal or 'preserve'. Resource schemas, defaults, and connection schemas do not select a named target schema strategy.",
         },
+        MessageTestCase {
+            description: "an intermediate loader under a preserved target schema",
+            error: TargetError::PreservedLoaderSchema("raw_orders".to_owned()),
+            expected_message: "Intermediate loader 'raw_orders' would write to a schema named 'preserve'. The target's schema 'preserve' keeps each model's own schema, and a loader has none, so its destination must name a schema.",
+        },
     ];
 
     for test_case in test_cases {

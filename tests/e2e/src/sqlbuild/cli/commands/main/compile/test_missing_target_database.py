@@ -133,6 +133,55 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             expected_example_count=1,
             command=("--no-color", "load", "--select", "raw_orders"),
         ),
+        MissingTargetDatabaseTestCase(
+            description="a loader under a preserved target schema stops compile",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
+            ),
+            extra_files={
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error=(
+                "error[S103]: Intermediate loader 'raw_orders' would write to a schema named "
+                "'preserve'. The target's schema 'preserve' keeps each model's own schema, and a "
+                "loader has none, so its destination must name a schema.\n"
+                "  = help: to choose where it writes, set its destination in its @loader "
+                "decorator:\n"
+                '            @loader(destination="my_schema.__loader__raw_orders")\n'
+            ),
+            expected_example_count=0,
+        ),
+        MissingTargetDatabaseTestCase(
+            description="sqb load stops a loader under a preserved target schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
+            ),
+            extra_files={
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error=(
+                "error[S103]: Intermediate loader 'raw_orders' would write to a schema named "
+                "'preserve'. The target's schema 'preserve' keeps each model's own schema, and a "
+                "loader has none, so its destination must name a schema.\n"
+                "  = help: to choose where it writes, set its destination in its @loader "
+                "decorator:\n"
+                '            @loader(destination="my_schema.__loader__raw_orders")\n'
+            ),
+            expected_example_count=0,
+            command=("--no-color", "load", "--select", "raw_orders"),
+        ),
     ),
     ids=lambda case: case.description,
 )
