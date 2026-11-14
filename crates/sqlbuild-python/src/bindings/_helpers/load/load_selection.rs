@@ -51,7 +51,7 @@ pub(crate) struct LoadProject<'py> {
     graph: LoadGraph,
 }
 
-/// Every declared source with the target's database and schema filled in where unset.
+/// Every declared source with the target's database and schema, or a managed source's loader_schema, filled in where unset.
 pub(crate) fn environment_sources<'py>(
     discovered: &Bound<'py, PyAny>,
     target_config: &Bound<'py, PyAny>,
@@ -62,10 +62,19 @@ pub(crate) fn environment_sources<'py>(
         for source in native_field(&source_file?, "source_entries")?.try_iter()? {
             let source: Bound<'py, PyAny> = source?;
             let changes: Bound<'py, PyDict> = PyDict::new(py);
+            let managed: bool = native_field(&source, "managed")?.is_truthy()?;
             for field in ["database", "schema"] {
                 let value: Bound<'py, PyAny> = native_field(&source, field)?;
                 let effective: Bound<'py, PyAny> = if !value.is_none() || target_config.is_none() {
                     value
+                } else if managed && field == "schema" {
+                    let loader_schema: Bound<'py, PyAny> =
+                        native_field(target_config, "loader_schema")?;
+                    if loader_schema.is_truthy()? {
+                        loader_schema
+                    } else {
+                        native_field(target_config, field)?
+                    }
                 } else {
                     native_field(target_config, field)?
                 };
@@ -352,11 +361,14 @@ pub(crate) fn loader_write_schemas<'py>(
         if native_field(entry, "loader")?.is_none() {
             continue;
         }
+        let name: String = native_field(entry, "name")?.extract()?;
+        let kind: &str = if intermediate_loaders.contains(&name) {
+            "Intermediate loader"
+        } else {
+            "Managed source"
+        };
         managed_write_schema(
-            &format!(
-                "Intermediate loader '{}'",
-                native_field(entry, "name")?.str()?
-            ),
+            &format!("{kind} '{name}'"),
             &native_field(entry, "schema")?,
             (None, Some(&ignored)),
         )?;
