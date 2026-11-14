@@ -74,3 +74,19 @@ pub(crate) fn literal(expression: &Expr, lines: &SourceLines) -> LiteralArgument
         position: position(lines, expression.range().start()),
     }
 }
+
+/// `expression` as a literal tuple or list of strings; `None` for anything else.
+pub(crate) fn literal_strings(expression: &Expr) -> Option<Vec<String>> {
+    let elements = match expression {
+        Expr::Tuple(tuple) => &tuple.elts,
+        Expr::List(list) => &list.elts,
+        _ => return None,
+    };
+    elements
+        .iter()
+        .map(|element| match element {
+            Expr::StringLiteral(literal) => Some(literal.value.to_str().to_owned()),
+            _ => None,
+        })
+        .collect()
+}

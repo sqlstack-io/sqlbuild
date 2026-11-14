@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
+use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
 use sqlbuild_host::entries::models::UserCodeHost;
@@ -11,7 +12,8 @@ use sqlbuild_orchestration::sensors::models::{
 };
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
-use crate::bindings::_helpers::compiled_project::snapshot_declarations::discover_declarations;
+use crate::bindings::_helpers::compiled_project::snapshot_declarations::python_declarations;
+use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
 use crate::bindings::_helpers::native_host::constants::SENSOR_CONTEXT_PARAMETER;
@@ -35,7 +37,8 @@ pub(crate) fn evaluate_sensor(
     let authoring = py.import("sqlbuild.orchestration_declarations.models.authoring")?;
     let sensor_class = authoring.getattr("Sensor")?;
     let mut matches: Vec<Bound<'_, PyAny>> = Vec::new();
-    for (declaration, _) in discover_declarations(py, project_dir)? {
+    let inventory = orchestration_declarations(project_dir.into_pyobject(py)?.as_any())?;
+    for declaration in python_declarations(py, project_dir, &inventory)? {
         if declaration.is_instance(&sensor_class)?
             && declaration.getattr("name")?.extract::<String>()? == *name
         {
@@ -50,11 +53,7 @@ pub(crate) fn evaluate_sensor(
     let targets: Vec<String> = sensor.getattr("targets")?.extract()?;
     if !sensor.getattr("when")?.is_none()
         || (!targets.is_empty() && !targets.contains(&evaluation.target))
-        || sensor
-            .getattr("run")?
-            .getattr("name")?
-            .extract::<String>()?
-            != evaluation.definition.job_key
+        || sensor.getattr("run")?.extract::<String>()? != evaluation.definition.job_key
     {
         return Err(PyValueError::new_err("custom sensor definition changed"));
     }

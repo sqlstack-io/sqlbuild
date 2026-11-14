@@ -5,22 +5,21 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
+use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector, ProjectGraph};
 use sqlbuild_cli::native_commands::main::effective_target::effective_target;
+use sqlbuild_discovery::orchestration_files::models::{OrchestrationInventory, RunFile};
 
 use crate::bindings::_helpers::compiled_project::constants::{
-    JOB_SELECTOR_KINDS, SELECTOR_INTERSECTION,
+    JOB_SELECTOR_KINDS, SELECTOR_INTERSECTION, SENSOR_RUN_ARGUMENT,
 };
-use crate::bindings::_helpers::compiled_project::snapshot_declarations::discover_declarations;
-use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    job_selections, triggered_job_names,
-};
+use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
 
 /// Each job and group's selection, and the names of those a schedule or sensor starts.
 type Catalog = (BTreeMap<String, JobSelection>, BTreeSet<String>);
@@ -154,15 +153,65 @@ fn job_catalog(py: Python<'_>) -> PyResult<Option<Catalog>> {
     };
     let target: Option<String> =
         effective_target(&project_dir, selected_target).map_err(PyValueError::new_err)?;
-    let roots: Vec<(Bound<'_, PyAny>, String)> = discover_declarations(py, &project_dir)?;
-    let catalog: Catalog = (
-        job_selections(py, &roots, target.as_deref())?,
-        triggered_job_names(py, &roots, target.as_deref())?,
-    );
+    let inventory: OrchestrationInventory =
+        orchestration_declarations(project_dir.clone().into_pyobject(py)?.as_any())?;
+    let catalog: Catalog = inventory_catalog(&inventory, target.as_deref());
     JOB_SCOPE.with(|scope| {
         if let Some(scope) = scope.borrow_mut().as_mut() {
             scope.catalog = Some(catalog.clone());
         }
     });
     Ok(Some(catalog))
+}
+
+/// Each job's selector tokens and each group's members declared for `target`, and the names a schedule or sensor starts there.
+fn inventory_catalog(inventory: &OrchestrationInventory, target: Option<&str>) -> Catalog {
+    let declared_for = |targets: &[String]| {
+        targets.is_empty() || target.is_some_and(|target| targets.iter().any(|name| name == target))
+    };
+    let tokens = |value: &str| value.split_whitespace().map(str::to_owned).collect();
+    let mut catalog: BTreeMap<String, JobSelection> = BTreeMap::new();
+    let mut triggered: BTreeSet<String> = BTreeSet::new();
+    let mut add = |run: &RunFile, selection: JobSelection| {
+        if declared_for(&run.targets) {
+            if run.schedule.is_some() {
+                triggered.insert(run.name.value.clone());
+            }
+            catalog.insert(run.name.value.clone(), selection);
+        }
+    };
+    for (_, job) in &inventory.jobs {
+        add(
+            &job.run,
+            JobSelection::Job {
+                select: tokens(&job.select.value),
+                exclude: job
+                    .exclude
+                    .as_ref()
+                    .map(|exclude| tokens(&exclude.value))
+                    .unwrap_or_default(),
+            },
+        );
+    }
+    for (_, group) in &inventory.groups {
+        add(
+            &group.run,
+            JobSelection::Group {
+                members: group.jobs.iter().map(|job| job.value.clone()).collect(),
+            },
+        );
+    }
+    for sensor in &inventory.sensors {
+        // A sensor whose targets are not literals counts for every target.
+        if sensor.targets.as_deref().is_none_or(declared_for) {
+            triggered.extend(
+                sensor
+                    .job_references
+                    .iter()
+                    .filter(|(argument, _)| *argument == SENSOR_RUN_ARGUMENT)
+                    .map(|(_, job)| job.value.clone()),
+            );
+        }
+    }
+    (catalog, triggered)
 }

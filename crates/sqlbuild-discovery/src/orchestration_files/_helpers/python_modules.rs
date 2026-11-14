@@ -139,12 +139,15 @@ pub(crate) fn module_declaration(
     let job_references = declaration
         .job_references
         .into_iter()
-        .map(|(argument, value)| literal(value, &format!("sensor {argument} job")))
+        .map(|(argument, value)| {
+            Ok((argument, literal(value, &format!("sensor {argument} job"))?))
+        })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Some(NamedModule {
         name: name.value,
         path: String::new(),
         position: name.position,
         job_references,
+        targets: declaration.targets,
     }))
 }

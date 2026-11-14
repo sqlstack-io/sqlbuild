@@ -12,75 +12,6 @@ from sqlbuild.orchestration_declarations.types import NodeEventKind, PlatformEve
 
 
 @dataclass(frozen=True, kw_only=True)
-class Schedule:
-    """Cron with an RFC 3339 start; missed times collapse into one run of the latest."""
-
-    cron: str
-    timezone: str
-    starts_at: str | None = None
-    default_status: Literal["running", "paused"] = "running"
-
-
-@dataclass(frozen=True, kw_only=True)
-class OnFailure:
-    """Rerun a failed or partial run from failure, `retries` times, `retry_delay_seconds` apart."""
-
-    retries: int
-    retry_delay_seconds: int = 0
-
-
-@dataclass(frozen=True, kw_only=True)
-class Resources:
-    """Worker container limits for a job; memory is bytes or a size such as "512m" or "2g"."""
-
-    memory: int | str | None = None
-    cpus: float | None = None
-    pids: int | None = None
-
-
-@dataclass(frozen=True, eq=False)
-class Job:
-    """A named selection to execute, optionally on a wall-clock schedule."""
-
-    name: str
-    description: str = field(kw_only=True)
-    select: str = field(kw_only=True)
-    exclude: str = field(default="", kw_only=True)
-    settings: dict[str, object] = field(default_factory=dict, kw_only=True)
-    concurrency: int | None = field(default=None, kw_only=True)
-    concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
-    schedule: Schedule | None = field(default=None, kw_only=True)
-    targets: tuple[str, ...] = field(default=(), kw_only=True)
-    owner: str | None = field(default=None, kw_only=True)
-    overlap: Literal["queue", "skip"] = field(default="queue", kw_only=True)
-    on_failure: OnFailure | None = field(default=None, kw_only=True)
-    resources: Resources | None = field(default=None, kw_only=True)
-    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "_declared_at", declaration_site())
-
-
-@dataclass(frozen=True, eq=False)
-class JobGroup:
-    """Jobs ordered by the lineage between the nodes they build."""
-
-    name: str
-    description: str = field(kw_only=True)
-    jobs: Sequence[Job] = field(kw_only=True)
-    concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
-    schedule: Schedule | None = field(default=None, kw_only=True)
-    targets: tuple[str, ...] = field(default=(), kw_only=True)
-    owner: str | None = field(default=None, kw_only=True)
-    overlap: Literal["queue", "skip"] = field(default="queue", kw_only=True)
-    on_failure: OnFailure | None = field(default=None, kw_only=True)
-    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "_declared_at", declaration_site())
-
-
-@dataclass(frozen=True, kw_only=True)
 class CalendarWindow:
     """Timezone-aware, half-open interval for an upcoming calendar evaluation."""
 
@@ -89,23 +20,22 @@ class CalendarWindow:
 
 
 @dataclass(frozen=True, kw_only=True, eq=False)
-class CalendarSchedule:
-    """Decorate a location callback returning upcoming timezone-aware datetimes."""
+class Calendar:
+    """Decorate a location callback returning upcoming timezone-aware datetimes.
 
-    job: Job | JobGroup
+    Jobs and job groups name the calendar in their TOML `schedule`, which also sets the timezone.
+    """
+
+    name: str
     description: str
     horizon: str
-    timezone: str
-    starts_at: str | None = None
-    default_status: Literal["running", "paused"] = "running"
-    targets: tuple[str, ...] = ()
     function: Callable[..., Iterable[datetime]] | None = field(default=None, repr=False)
     _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "_declared_at", declaration_site())
 
-    def __call__(self, function: Callable[..., Iterable[datetime]]) -> CalendarSchedule:
+    def __call__(self, function: Callable[..., Iterable[datetime]]) -> Calendar:
         return replace(self, function=function)
 
 
@@ -119,9 +49,12 @@ class PlatformEventCondition:
 
 @dataclass(frozen=True, kw_only=True)
 class RunEventCondition:
-    """Match scoped terminal outcomes, optionally requiring genuinely executed successful nodes."""
+    """Match scoped terminal outcomes of the named job or job group.
 
-    job: Job | JobGroup
+    `executed_successfully` optionally requires nodes that genuinely executed and succeeded.
+    """
+
+    job: str
     kinds: Sequence[RunEventKind]
     executed_successfully: Sequence[str] | None = None
     kind: Literal["run_event"] = field(default="run_event", init=False)
@@ -167,7 +100,7 @@ class Sensor:
         | SourceStaleCondition
         | None
     ) = field(default=None, kw_only=True)
-    run: Job | JobGroup = field(kw_only=True)
+    run: str = field(kw_only=True)
     minimum_interval_seconds: int = field(default=30, kw_only=True)
     default_status: Literal["running", "paused"] = field(default="running", kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)

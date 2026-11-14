@@ -137,7 +137,7 @@ pub(crate) fn check_references(inventory: &OrchestrationInventory) -> Result<(),
         }
     }
     for module in &inventory.sensors {
-        for reference in &module.job_references {
+        for (_, reference) in &module.job_references {
             member(
                 &module.path,
                 reference,

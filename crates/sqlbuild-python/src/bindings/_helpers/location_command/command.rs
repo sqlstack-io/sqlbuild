@@ -145,11 +145,10 @@ fn compile_location<'py>(
         project_dir.extract()?,
         (
             discovered.clone(),
-            arguments
+            !arguments
                 .value("action")?
                 .extract::<Option<String>>()?
-                .is_some_and(|action| action == EXECUTE_ACTION)
-                .then(Vec::new),
+                .is_some_and(|action| action == EXECUTE_ACTION),
         ),
     )?;
     status(py, "Location snapshot compiled.")?;

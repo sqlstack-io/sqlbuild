@@ -1,13 +1,12 @@
 //! Authored trigger controls and bounded calendars evaluated only in the location interpreter.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use chrono::{DateTime, TimeDelta, Timelike, Utc};
 use chrono_tz::Tz;
-use pyo3::FromPyObject;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
 use serde_json::{Value, json};
 use sqlbuild_analysis::graph::models::ProjectGraph;
@@ -27,53 +26,17 @@ use crate::bindings::_helpers::native_host::constants::{
 };
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    AuthoredSensor, authored_setting, declared_at,
+    AuthoredSensor, declared_at,
 };
 use crate::bindings::_helpers::native_host::orchestration_environment::{
     callback_code_hash, orchestration_code_hash,
 };
 
-#[derive(FromPyObject)]
-struct AuthoredControls {
-    #[pyo3(from_py_with = authored_setting)]
-    starts_at: Value,
-    default_status: String,
-}
-
-fn compile_trigger(
-    authored: &Bound<'_, PyAny>,
-    job_key: &str,
-    description: &str,
-    schedule: Schedule,
-) -> PyResult<TriggerDefinition> {
-    let controls = authored.extract::<AuthoredControls>()?;
-    Ok(TriggerDefinition {
-        description: description.into(),
-        job_key: job_key.into(),
-        schedule,
-        starts_at: serde_json::from_value(controls.starts_at)
-            .map_err(|error| PyValueError::new_err(format!("starts_at: {error}")))?,
-        default_status: serde_json::from_value(Value::String(controls.default_status))
-            .map_err(|error| PyValueError::new_err(format!("default_status: {error}")))?,
-        targets: BTreeSet::new(),
-        declared_at: None,
-    })
-}
-
-pub(crate) fn compile_cron(
-    authored: &Bound<'_, PyAny>,
-    name: &str,
-    description: &str,
-) -> PyResult<TriggerDefinition> {
-    compile_trigger(
-        authored,
-        name,
-        description,
-        Schedule::Cron {
-            expression: authored.getattr("cron")?.extract()?,
-            timezone: authored.getattr("timezone")?.extract()?,
-        },
-    )
+/// A job's or group's schedule on a named calendar, as its trigger before the calendar's times fill it.
+pub(crate) struct CalendarRequest {
+    pub(crate) calendar: String,
+    pub(crate) timezone: String,
+    pub(crate) trigger: TriggerDefinition,
 }
 
 fn horizon(value: &str) -> PyResult<TimeDelta> {
@@ -105,13 +68,12 @@ fn horizon(value: &str) -> PyResult<TimeDelta> {
 }
 
 fn calendar_times(
-    authored: &Bound<'_, PyAny>,
+    (authored, timezone): (&Bound<'_, PyAny>, &str),
     session: &Bound<'_, PyAny>,
     providers: &Bound<'_, PyDict>,
     start: DateTime<Utc>,
 ) -> PyResult<Schedule> {
     let py = authored.py();
-    let timezone: String = authored.getattr("timezone")?.extract()?;
     timezone
         .parse::<Tz>()
         .map_err(|_| PyValueError::new_err("calendar timezone must be an IANA timezone"))?;
@@ -184,42 +146,14 @@ fn calendar_times(
     })
 }
 
-/// The name and description of each calendar that decorates a function.
-pub(crate) fn calendar_descriptions(
-    py: Python<'_>,
-    calendars: &[Py<PyAny>],
-) -> PyResult<Vec<(String, String)>> {
-    let mut described: Vec<(String, String)> = Vec::new();
-    for calendar in calendars {
-        let calendar: &Bound<'_, PyAny> = calendar.bind(py);
-        let function: Bound<'_, PyAny> = calendar.getattr("function")?;
-        if !function.is_none() {
-            described.push((
-                function.getattr("__name__")?.extract()?,
-                calendar.getattr("description")?.extract()?,
-            ));
-        }
-    }
-    Ok(described)
-}
-
+/// Each calendar request's trigger, with each (calendar, timezone) pair evaluated once.
 pub(crate) fn compile_calendars(
     py: Python<'_>,
-    (project_dir, target): (&Path, &str),
-    authored: Vec<Py<PyAny>>,
+    project_dir: &Path,
+    (calendars, requests): (&BTreeMap<String, Bound<'_, PyAny>>, Vec<CalendarRequest>),
     mut definitions: Definitions,
 ) -> PyResult<Definitions> {
-    let mut calendars: Vec<Py<PyAny>> = Vec::new();
-    for calendar in authored {
-        let targets = calendar
-            .bind(py)
-            .getattr("targets")?
-            .extract::<Vec<String>>()?;
-        if targets.is_empty() || targets.iter().any(|value| value == target) {
-            calendars.push(calendar);
-        }
-    }
-    if calendars.is_empty() {
+    if requests.is_empty() {
         return Ok(definitions);
     }
     let providers =
@@ -237,33 +171,37 @@ pub(crate) fn compile_calendars(
         .with_nanosecond(now.timestamp_subsec_micros() * 1_000)
         .ok_or_else(|| PyValueError::new_err("calendar clock is out of range"))?;
     within(&session, |_| {
-        for calendar in calendars {
-            let calendar = calendar.bind(py);
-            let name: String = calendar
-                .getattr("function")?
-                .getattr("__name__")?
-                .extract()?;
-            let job_key: String = calendar.getattr("job")?.getattr("name")?.extract()?;
-            let description: String = calendar.getattr("description")?.extract()?;
-            if description.trim().is_empty()
-                || (!definitions.jobs.contains_key(&job_key)
-                    && !definitions.groups.contains_key(&job_key))
-            {
-                return Err(PyValueError::new_err(format!(
-                    "calendar {name} needs a description and a published job"
-                )));
-            }
-            let schedule = calendar_times(calendar, &session, &by_name, start)?;
-            let mut trigger = compile_trigger(calendar, &job_key, &description, schedule)?;
+        let mut evaluated: BTreeMap<(String, String), Schedule> = BTreeMap::new();
+        for request in requests {
+            let key = (request.calendar.clone(), request.timezone.clone());
+            let schedule = match evaluated.get(&key) {
+                Some(schedule) => schedule.clone(),
+                None => {
+                    let calendar = calendars.get(&request.calendar).ok_or_else(|| {
+                        PyValueError::new_err(format!(
+                            "calendar '{}' is not declared by a calendar module",
+                            request.calendar
+                        ))
+                    })?;
+                    let schedule = calendar_times(
+                        (calendar, &request.timezone),
+                        &session,
+                        &by_name,
+                        start,
+                    )
+                    .map_err(|error| {
+                        PyValueError::new_err(format!("calendar '{}': {error}", request.calendar))
+                    })?;
+                    evaluated.insert(key, schedule.clone());
+                    schedule
+                }
+            };
+            let mut trigger = TriggerDefinition {
+                schedule,
+                ..request.trigger
+            };
             trigger.starts_at.get_or_insert(start);
-            trigger.targets = calendar
-                .getattr("targets")?
-                .extract::<Vec<String>>()?
-                .into_iter()
-                .collect();
-            trigger.declared_at =
-                declared_at(project_dir, calendar.getattr("_declared_at")?.extract()?)?;
-            definitions.triggers.insert(name, trigger);
+            definitions.triggers.insert(trigger.job_key.clone(), trigger);
         }
         Ok(definitions)
     })
@@ -294,7 +232,7 @@ pub(crate) fn compile_sensors(
                     condition["kinds"] = json!(when.kinds);
                 }
                 if let Some(job) = when.job {
-                    condition["job_key"] = json!(job.name);
+                    condition["job_key"] = json!(job);
                 }
                 if let Some(select) = when.select {
                     let selectors: Vec<String> =
@@ -317,7 +255,7 @@ pub(crate) fn compile_sensors(
         };
         let definition: SensorDefinition = serde_json::from_value(json!({
             "description": sensor.description,
-            "job_key": sensor.run.name,
+            "job_key": sensor.run,
             "when": condition,
             "minimum_interval_seconds": sensor.minimum_interval_seconds,
             "default_status": sensor.default_status,

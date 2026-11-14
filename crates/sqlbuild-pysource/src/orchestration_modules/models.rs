@@ -30,6 +30,8 @@ pub struct PythonDeclaration {
     pub position: SourcePosition,
     /// `run=` of a sensor, then each `run_event(job=...)`, labelled by the argument.
     pub job_references: Vec<(&'static str, LiteralArgument)>,
+    /// A sensor's `targets`: empty when omitted, `None` when not a literal tuple or list of strings.
+    pub targets: Option<Vec<String>>,
 }
 
 /// The orchestration facts of one module.

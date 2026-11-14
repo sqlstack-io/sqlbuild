@@ -9,11 +9,11 @@ use crate::cpython_tree::main::parse_cpython_module::parse_cpython_module;
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::{CpythonNode, ParsedSource};
 use crate::orchestration_modules::_helpers::calls::{
-    authoring_call, imported_names, literal, position,
+    authoring_call, imported_names, literal, literal_strings, position,
 };
 use crate::orchestration_modules::constants::{
     CALENDAR_CALL, JOB_KEYWORD, NAME_KEYWORD, REMOVED_NAMES, RUN_EVENT_CALL, RUN_KEYWORD,
-    SENSOR_CALL,
+    SENSOR_CALL, TARGETS_KEYWORD,
 };
 use crate::orchestration_modules::models::{
     LiteralArgument, ModuleDeclarations, PythonDeclaration, PythonDeclarationKind,
@@ -51,6 +51,10 @@ pub fn orchestration_module_declarations(
             .find_argument_value(NAME_KEYWORD, 0)
             .map(|value| literal(value, &parsed.lines));
         let mut job_references: Vec<(&'static str, LiteralArgument)> = Vec::new();
+        let targets: Option<Vec<String>> = match call.arguments.find_keyword(TARGETS_KEYWORD) {
+            Some(targets) => literal_strings(&targets.value),
+            None => Some(Vec::new()),
+        };
         if kind == PythonDeclarationKind::Sensor {
             if let Some(run) = call.arguments.find_keyword(RUN_KEYWORD) {
                 job_references.push((RUN_KEYWORD, literal(&run.value, &parsed.lines)));
@@ -84,6 +88,7 @@ pub fn orchestration_module_declarations(
             name,
             position: position(&parsed.lines, call.range().start()),
             job_references,
+            targets,
         });
     }
     declarations

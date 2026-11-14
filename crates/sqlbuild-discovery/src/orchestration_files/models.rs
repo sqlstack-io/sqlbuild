@@ -109,8 +109,10 @@ pub struct NamedModule {
     pub name: String,
     pub path: String,
     pub position: FilePosition,
-    /// The jobs and groups a sensor starts or watches; empty for a calendar.
-    pub job_references: Vec<Positioned<String>>,
+    /// The jobs and groups a sensor starts (`run`) or watches (`run_event`); empty for a calendar.
+    pub job_references: Vec<(&'static str, Positioned<String>)>,
+    /// A sensor's targets: empty for every target, `None` when they are not written as literals.
+    pub targets: Option<Vec<String>>,
 }
 
 /// Every orchestration declaration in a project, checked for layout, names and references.

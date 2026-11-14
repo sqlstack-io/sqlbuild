@@ -1,8 +1,7 @@
-"""Delegate authoring-record compilation to the native retained snapshot owner."""
+"""Delegate snapshot compilation to the native retained snapshot owner."""
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from pathlib import Path
 
 from sqlbuild._native import (
@@ -11,12 +10,6 @@ from sqlbuild._native import (
     build_orchestration_snapshot,
 )
 from sqlbuild.compiler.compile.types import CompiledProjectView
-from sqlbuild.orchestration_declarations.models.authoring import (
-    CalendarSchedule,
-    Job,
-    JobGroup,
-    Sensor,
-)
 
 
 def compile_snapshot(
@@ -25,13 +18,11 @@ def compile_snapshot(
     metadata_json: str,
     project_dir: Path,
     discovered_inputs: DiscoveredProjectInputs,
-    declarations: Sequence[Job | JobGroup | CalendarSchedule | Sensor] | None = None,
 ) -> NativeOrchestrationSnapshot:
-    """Compile authoring records and retained project facts into a data-only snapshot."""
+    """Compile the orchestration declarations and retained facts into a data-only snapshot."""
     return build_orchestration_snapshot(
         project,
         metadata_json,
         project_dir,
         discovered_inputs=discovered_inputs,
-        declarations=declarations,
     )

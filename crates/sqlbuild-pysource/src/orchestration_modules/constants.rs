@@ -12,6 +12,8 @@ pub(crate) const NAME_KEYWORD: &str = "name";
 pub(crate) const RUN_KEYWORD: &str = "run";
 /// The `run_event` keyword naming the job it watches.
 pub(crate) const JOB_KEYWORD: &str = "job";
+/// The sensor keyword naming the targets it publishes for.
+pub(crate) const TARGETS_KEYWORD: &str = "targets";
 /// The public module the authoring API is imported from.
 pub(crate) const ORCHESTRATION_MODULE: &str = "sqlbuild.orchestration";
 /// Authoring names that TOML declarations replaced.

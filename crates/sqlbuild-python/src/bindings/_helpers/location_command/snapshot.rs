@@ -10,13 +10,14 @@ use pyo3::{IntoPyObject, pyfunction};
 use serde_json::{Value, json};
 use sqlbuild_analysis::planner_scope::main::node_loads::node_loads;
 use sqlbuild_core::models::DiagnosticSeverity;
+use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_discovery::project_validation::main::validate_orchestration_names::validate_orchestration_names;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
-    compile_declarations, discover_declarations,
+    compile_declarations, python_declarations,
 };
 use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
@@ -27,9 +28,7 @@ use crate::bindings::_helpers::discovery::project_validation::validation_error;
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
 use crate::bindings::_helpers::location_command::snapshot_providers::providers_document;
-use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    collect_declarations, orchestration_names,
-};
+use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
 use crate::bindings::_helpers::native_host::orchestration_environment::environment_hash;
 use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_identity::identities::direct_model_version_identities;
@@ -39,9 +38,6 @@ use crate::bindings::_helpers::records::fields::field;
 
 /// The Python node kind whose functions load sources.
 const LOADER_KIND: &str = "loader";
-
-/// Where declarations passed to the snapshot directly are reported as declared.
-const DECLARATIONS_ARGUMENT: &str = "declarations argument";
 
 /// Compile catalog nodes and identities in the location, never in the server.
 #[pyfunction]
@@ -56,28 +52,22 @@ pub(crate) fn build_orchestration_snapshot<'py>(
         project.py(),
         "build_orchestration_snapshot",
         options,
-        (&["discovered_inputs"], &["declarations"]),
+        (&["discovered_inputs"], &[]),
     )?;
-    let declarations = arguments.value("declarations")?;
     orchestration_snapshot(
         project,
         metadata_json,
         project_dir,
-        (
-            arguments.value("discovered_inputs")?,
-            (!declarations.is_none())
-                .then(|| declarations.extract())
-                .transpose()?,
-        ),
+        (arguments.value("discovered_inputs")?, true),
     )
 }
 
-/// Compile the snapshot from the project, its discovery, and the declarations passed directly, if any.
+/// Compile the snapshot from the project, its discovery and, when `declared`, its orchestration declarations.
 pub(crate) fn orchestration_snapshot<'py>(
     project: PyRef<'py, NativeProjectView>,
     metadata_json: &str,
     project_dir: PathBuf,
-    (discovered_inputs, declarations): (Bound<'py, PyAny>, Option<Vec<Bound<'py, PyAny>>>),
+    (discovered_inputs, declared): (Bound<'py, PyAny>, bool),
 ) -> PyResult<NativeOrchestrationSnapshot> {
     let py = project.py();
     let mut input: SnapshotInput = serde_json::from_str(metadata_json)
@@ -121,31 +111,23 @@ pub(crate) fn orchestration_snapshot<'py>(
     if let Some(providers) = providers_document(&discovered_inputs, &input.nodes)? {
         input.documents.insert("providers".into(), providers);
     }
-    let declarations = match declarations {
-        Some(declarations) => declarations
-            .into_iter()
-            .map(|declaration| (declaration, DECLARATIONS_ARGUMENT.to_owned()))
-            .collect(),
-        None => discover_declarations(py, &project_dir)?,
-    };
     let graph = project.lineage_graph(py)?;
-    if !declarations.is_empty() {
+    let inventory = if declared {
+        orchestration_declarations(project_dir.clone().into_pyobject(py)?.as_any())?
+    } else {
+        OrchestrationInventory::default()
+    };
+    if !inventory.is_empty() {
         let mut facts =
             project_facts(py, &discovered_inputs, named_node_rows(&discovered_inputs)?)?;
-        facts.orchestration = orchestration_names(py, &declarations)?;
+        facts.orchestration = inventory.names();
         validate_orchestration_names(&facts).map_err(|failure| validation_error(py, failure))?;
-        let authored = collect_declarations(
-            py,
-            declarations
-                .into_iter()
-                .map(|(declaration, _)| declaration)
-                .collect(),
-        )?;
+        let declarations = python_declarations(py, &project_dir, &inventory)?;
         input = compile_declarations(
             py,
             input,
             (&project_dir, graph.bind(py).get().graph(), &selected),
-            authored,
+            (&inventory, declarations),
         )?;
     }
     input = compile_project_roles(

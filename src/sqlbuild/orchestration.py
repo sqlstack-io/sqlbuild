@@ -1,24 +1,21 @@
-"""Public authoring and snapshot compilation API for orchestration declarations."""
+"""Public authoring and snapshot compilation API for orchestration declarations.
+
+Jobs, job groups and their schedules are TOML files under `orchestration/jobs/` and
+`orchestration/job_groups/`; calendars and sensors are declared here.
+"""
 
 from sqlbuild.orchestration_declarations.main.compile_snapshot import compile_snapshot
-from sqlbuild.orchestration_declarations.models.authoring import (
-    CalendarSchedule as calendar_schedule,
-)
+from sqlbuild.orchestration_declarations.models.authoring import Calendar as calendar
 from sqlbuild.orchestration_declarations.models.authoring import (
     CalendarWindow,
     RunRequest,
     SkipReason,
 )
-from sqlbuild.orchestration_declarations.models.authoring import Job as job
-from sqlbuild.orchestration_declarations.models.authoring import JobGroup as job_group
 from sqlbuild.orchestration_declarations.models.authoring import NodeEventCondition as node_event
-from sqlbuild.orchestration_declarations.models.authoring import OnFailure as on_failure
 from sqlbuild.orchestration_declarations.models.authoring import (
     PlatformEventCondition as platform_event,
 )
-from sqlbuild.orchestration_declarations.models.authoring import Resources as resources
 from sqlbuild.orchestration_declarations.models.authoring import RunEventCondition as run_event
-from sqlbuild.orchestration_declarations.models.authoring import Schedule as schedule
 from sqlbuild.orchestration_declarations.models.authoring import Sensor as sensor
 from sqlbuild.orchestration_declarations.models.authoring import (
     SourceNewDataCondition as source_new_data,
@@ -37,16 +34,11 @@ __all__ = (
     "RunRequest",
     "SensorContext",
     "SkipReason",
-    "calendar_schedule",
+    "calendar",
     "compile_snapshot",
-    "job",
-    "job_group",
     "node_event",
-    "on_failure",
     "platform_event",
-    "resources",
     "run_event",
-    "schedule",
     "sensor",
     "source_new_data",
     "source_stale",
