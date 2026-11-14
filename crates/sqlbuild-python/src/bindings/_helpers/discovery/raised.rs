@@ -113,13 +113,22 @@ pub(crate) fn stage_error(
         StageFailure::Unlistable {
             relative_path,
             error,
-        } => match path_object(project_dir.py(), tree, relative_path)
-            .and_then(|relative| project_dir.div(relative.bind(project_dir.py())))
-        {
-            Ok(directory) => read_error(error, &directory),
-            Err(error) => error,
-        },
+        } => relative_read_error((tree, project_dir), relative_path, error),
         StageFailure::Internal(reason) => PyRuntimeError::new_err(reason),
+    }
+}
+
+/// `read_error` for `relative_path` below `project_dir`, or the error building that path raised.
+pub(crate) fn relative_read_error(
+    (tree, project_dir): (&ProjectTree, &Bound<'_, PyAny>),
+    relative_path: String,
+    failure: ReadFailure,
+) -> PyErr {
+    match path_object(project_dir.py(), tree, relative_path)
+        .and_then(|relative| project_dir.div(relative.bind(project_dir.py())))
+    {
+        Ok(path) => read_error(failure, &path),
+        Err(error) => error,
     }
 }
 
