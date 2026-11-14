@@ -151,3 +151,79 @@ pub(crate) fn check_references(inventory: &OrchestrationInventory) -> Result<(),
     }
     Ok(())
 }
+
+/// Each renames-file section maps old names that no longer exist onto names declared now.
+pub(crate) fn check_renames(inventory: &OrchestrationInventory) -> Result<(), ReferenceError> {
+    let Some((path, renames)) = &inventory.renames else {
+        return Ok(());
+    };
+    let runs: BTreeSet<&str> = inventory
+        .jobs
+        .iter()
+        .map(|(_, job)| &job.run)
+        .chain(inventory.groups.iter().map(|(_, group)| &group.run))
+        .map(|run| run.name.value.as_str())
+        .collect();
+    let scheduled: BTreeSet<&str> = inventory
+        .jobs
+        .iter()
+        .map(|(_, job)| &job.run)
+        .chain(inventory.groups.iter().map(|(_, group)| &group.run))
+        .filter(|run| run.schedule.is_some())
+        .map(|run| run.name.value.as_str())
+        .collect();
+    let sensors: BTreeSet<&str> = inventory
+        .sensors
+        .iter()
+        .map(|module| module.name.as_str())
+        .collect();
+    let names = inventory.names();
+    let declared: BTreeSet<&str> = names.iter().map(|fact| fact.name.as_str()).collect();
+    for (section, pairs, known, wanted) in [
+        ("jobs", &renames.jobs, &runs, "a declared job or job group"),
+        ("sensors", &renames.sensors, &sensors, "a declared sensor"),
+        (
+            "triggers",
+            &renames.triggers,
+            &scheduled,
+            "a job or job group with a schedule",
+        ),
+    ] {
+        for (old, new) in pairs {
+            if !known.contains(new.value.as_str()) {
+                return Err((
+                    path.clone(),
+                    at(
+                        new.position,
+                        format!(
+                            "[{section}] renames '{}' to '{}', which is not {wanted}",
+                            old.value, new.value
+                        ),
+                        None,
+                    ),
+                ));
+            }
+            // A trigger's old name only has to be free among triggers: it was a calendar function's name.
+            let taken: &BTreeSet<&str> = if section == "triggers" {
+                &scheduled
+            } else {
+                &declared
+            };
+            let old_declared: bool = taken.contains(old.value.as_str());
+            if old_declared {
+                return Err((
+                    path.clone(),
+                    at(
+                        old.position,
+                        format!(
+                            "[{section}] renames '{}', which is still declared",
+                            old.value
+                        ),
+                        Some("remove the pair, or finish the rename in the declaration".to_owned()),
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}

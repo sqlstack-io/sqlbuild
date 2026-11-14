@@ -55,3 +55,7 @@ pub(crate) const BYTECODE_DIRECTORY: &str = "__pycache__";
 /// The prefix of hidden files and folders, and of private support modules.
 pub(crate) const HIDDEN_PREFIX: char = '.';
 pub(crate) const PRIVATE_PREFIX: char = '_';
+/// The file `sqb migrate orchestration` writes in `orchestration/`, mapping old names to new.
+pub const RENAMES_FILE: &str = "renames.toml";
+/// The sections of the renames file: jobs and groups, sensors, and schedule triggers.
+pub const RENAME_SECTIONS: [&str; 3] = ["jobs", "sensors", "triggers"];

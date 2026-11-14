@@ -183,15 +183,14 @@ pub(crate) fn compile_calendars(
                             request.calendar
                         ))
                     })?;
-                    let schedule = calendar_times(
-                        (calendar, &request.timezone),
-                        &session,
-                        &by_name,
-                        start,
-                    )
-                    .map_err(|error| {
-                        PyValueError::new_err(format!("calendar '{}': {error}", request.calendar))
-                    })?;
+                    let schedule =
+                        calendar_times((calendar, &request.timezone), &session, &by_name, start)
+                            .map_err(|error| {
+                                PyValueError::new_err(format!(
+                                    "calendar '{}': {error}",
+                                    request.calendar
+                                ))
+                            })?;
                     evaluated.insert(key, schedule.clone());
                     schedule
                 }
@@ -201,7 +200,9 @@ pub(crate) fn compile_calendars(
                 ..request.trigger
             };
             trigger.starts_at.get_or_insert(start);
-            definitions.triggers.insert(trigger.job_key.clone(), trigger);
+            definitions
+                .triggers
+                .insert(trigger.job_key.clone(), trigger);
         }
         Ok(definitions)
     })

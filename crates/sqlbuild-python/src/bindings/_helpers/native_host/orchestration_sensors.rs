@@ -2,8 +2,8 @@
 
 use std::path::Path;
 
-use pyo3::exceptions::PyValueError;
 use pyo3::IntoPyObject;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
 use sqlbuild_host::entries::models::UserCodeHost;
@@ -13,9 +13,9 @@ use sqlbuild_orchestration::sensors::models::{
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::python_declarations;
-use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
+use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
 use crate::bindings::_helpers::native_host::constants::SENSOR_CONTEXT_PARAMETER;
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_environment::{

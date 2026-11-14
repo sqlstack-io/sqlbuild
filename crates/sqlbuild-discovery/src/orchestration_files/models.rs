@@ -115,6 +115,40 @@ pub struct NamedModule {
     pub targets: Option<Vec<String>>,
 }
 
+/// One section of the renames file: each old name and the name it became, where each is written.
+pub type RenamePairs = Vec<(Positioned<String>, Positioned<String>)>;
+
+/// The renames file: old names of jobs and groups, sensors, and schedule triggers, and their new names.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RenameMap {
+    pub jobs: RenamePairs,
+    pub sensors: RenamePairs,
+    pub triggers: RenamePairs,
+}
+
+impl RenameMap {
+    /// The map as the snapshot document the server applies: `{section: {old: new}}`.
+    #[must_use]
+    pub fn document(&self) -> serde_json::Value {
+        let section = |pairs: &RenamePairs| {
+            pairs
+                .iter()
+                .map(|(old, new)| {
+                    (
+                        old.value.clone(),
+                        serde_json::Value::String(new.value.clone()),
+                    )
+                })
+                .collect::<serde_json::Map<_, _>>()
+        };
+        serde_json::json!({
+            "jobs": section(&self.jobs),
+            "sensors": section(&self.sensors),
+            "triggers": section(&self.triggers),
+        })
+    }
+}
+
 /// Every orchestration declaration in a project, checked for layout, names and references.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct OrchestrationInventory {
@@ -124,6 +158,8 @@ pub struct OrchestrationInventory {
     pub sensors: Vec<NamedModule>,
     /// Every Python module under `calendars/` and `sensors/`, which publication imports.
     pub modules: Vec<String>,
+    /// The renames file and its path, when the project has one.
+    pub renames: Option<(String, RenameMap)>,
 }
 
 impl OrchestrationInventory {

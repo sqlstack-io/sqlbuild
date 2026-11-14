@@ -21,6 +21,9 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
+
+/// The snapshot document carrying the renames file, which the server applies to stored state.
+const RENAMES_DOCUMENT: &str = "renames";
 use crate::bindings::_helpers::native_host::constants::{AUTHORING_MODULE, SENSOR_CLASS};
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     AuthoredSensor, module_declarations, run_controls, run_resources,
@@ -142,7 +145,10 @@ pub(crate) fn compile_declarations(
             authored_sensors.push(declaration.extract()?);
         } else {
             let name: String = declaration.getattr("name")?.extract()?;
-            if authored_calendars.insert(name.clone(), declaration).is_some() {
+            if authored_calendars
+                .insert(name.clone(), declaration)
+                .is_some()
+            {
                 return Err(PyValueError::new_err(format!(
                     "calendar '{name}' is declared twice"
                 )));
@@ -166,7 +172,11 @@ pub(crate) fn compile_declarations(
             .map(|sensor| ("sensor", sensor.name.clone(), sensor.description.clone())),
     );
     for (name, calendar) in &authored_calendars {
-        described.push(("calendar", name.clone(), calendar.getattr("description")?.extract()?));
+        described.push((
+            "calendar",
+            name.clone(),
+            calendar.getattr("description")?.extract()?,
+        ));
     }
     for (kind, name, description) in described {
         let limit: i64 = format.max_description_lines;
@@ -314,6 +324,11 @@ pub(crate) fn compile_declarations(
             key.into(),
             document.map_err(|error| PyValueError::new_err(error.to_string()))?,
         );
+    }
+    if let Some((_, renames)) = &inventory.renames {
+        input
+            .documents
+            .insert(RENAMES_DOCUMENT.into(), renames.document());
     }
     snapshot_definitions(&input).map_err(|error| PyValueError::new_err(error.to_string()))?;
     Ok(input)

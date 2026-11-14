@@ -6,13 +6,14 @@ use crate::_helpers::reading::read_authored_text;
 use crate::constants::{ORCHESTRATION_DIRECTORY, PYTHON_FILE_SUFFIX};
 use crate::models::{DiscoveryFailure, FailureKind};
 use crate::orchestration_files::_helpers::python_modules::module_declaration;
-use crate::orchestration_files::_helpers::references::check_references;
+use crate::orchestration_files::_helpers::references::{check_references, check_renames};
 use crate::orchestration_files::constants::{
     BYTECODE_DIRECTORY, CALENDARS_DIRECTORY, GROUPS_DIRECTORY, HIDDEN_PREFIX, JOBS_DIRECTORY,
-    SENSORS_DIRECTORY, TOML_FILE_SUFFIX,
+    RENAMES_FILE, SENSORS_DIRECTORY, TOML_FILE_SUFFIX,
 };
 use crate::orchestration_files::main::read_group_file::read_group_file;
 use crate::orchestration_files::main::read_job_file::read_job_file;
+use crate::orchestration_files::main::read_renames_file::read_renames_file;
 use crate::orchestration_files::models::{
     FileError, FilePosition, OrchestrationFailure, OrchestrationInventory,
 };
@@ -112,10 +113,16 @@ pub fn orchestration_inventory(
         if ignored(&entry) {
             continue;
         }
+        if !entry.is_dir && entry.name == RENAMES_FILE {
+            let renames =
+                read_renames_file(&read(tree, &path)?).map_err(|error| failure(&path, error))?;
+            inventory.renames = Some((path, renames));
+            continue;
+        }
         if !entry.is_dir {
             return Err(layout(
                 &path,
-                "files cannot sit directly in orchestration/".to_owned(),
+                format!("files cannot sit directly in orchestration/, except {RENAMES_FILE}"),
                 Some(format!(
                     "move it into one of orchestration/{}/",
                     ROLE_DIRECTORIES.join("/, orchestration/")
@@ -161,5 +168,6 @@ pub fn orchestration_inventory(
         }
     }
     check_references(&inventory).map_err(|(path, error)| failure(&path, error))?;
+    check_renames(&inventory).map_err(|(path, error)| failure(&path, error))?;
     Ok(inventory)
 }
