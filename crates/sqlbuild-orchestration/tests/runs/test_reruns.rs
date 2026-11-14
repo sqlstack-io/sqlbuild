@@ -68,12 +68,11 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 .get_mut("orders")
                 .expect("orders model")
                 .definition = json!({"materialization": "table", "deps": ["source:raw_orders"]});
-            // Lineage orders the group: products reads orders, and inventory reads products.
-            input
-                .nodes
-                .get_mut("products")
-                .expect("products model")
-                .definition["deps"] = json!(["orders"]);
+            // Lineage orders the group: shipments reads orders and inventory reads products, so
+            // marts waits for staging only through completed, never directly.
+            let mut shipments = input.nodes["products"].clone();
+            shipments.definition["deps"] = json!(["orders"]);
+            input.nodes.insert("shipments".into(), shipments);
             input
                 .nodes
                 .get_mut("inventory")
@@ -82,11 +81,11 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             input.documents.insert("jobs".into(), json!({
                 "staging": {"description": "Stage orders", "selection": ["orders", "customers"], "concurrency_groups": ["warehouse"], "settings": {"vars": {"batch": 23}}},
                 "marts": {"description": "Build inventory", "selection": ["inventory"], "concurrency_groups": ["inventory_limit"]},
-                "completed": {"description": "Build products", "selection": ["products"]}
+                "completed": {"description": "Build products and shipments", "selection": ["products", "shipments"]}
             }));
             input.documents.insert("groups".into(), json!({"daily_orders": {
-                "description": "Build daily orders", "selection": ["customers", "orders", "inventory", "products"],
-                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["completed", "staging"], "completed": ["staging"]}
+                "description": "Build daily orders", "selection": ["customers", "orders", "inventory", "products", "shipments"],
+                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["completed"], "completed": ["staging"]}
             }}));
             let published = publish_snapshot(store, &input).await.expect("publish");
             let source_id = Uuid::now_v7();
@@ -142,6 +141,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 .expect("admit source");
             let node_outcomes = BTreeMap::from([
                 ("products", NodeOutcome::Success),
+                ("shipments", NodeOutcome::Success),
                 ("orders", NodeOutcome::Failed),
                 ("customers", NodeOutcome::Cancelled),
                 ("inventory", NodeOutcome::Skipped),
@@ -276,9 +276,15 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                         ..retry.clone()
                     },
                     expected_applied: true,
-                    expected_selection: ["orders", "inventory", "customers", "products"]
-                        .map(str::to_owned)
-                        .into(),
+                    expected_selection: [
+                        "orders",
+                        "inventory",
+                        "customers",
+                        "products",
+                        "shipments",
+                    ]
+                    .map(str::to_owned)
+                    .into(),
                     expected_jobs: &["staging", "completed", "marts"],
                 },
             ] {
