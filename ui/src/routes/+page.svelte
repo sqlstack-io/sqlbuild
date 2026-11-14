@@ -13,7 +13,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
-	import { planHref } from '$lib/run/command';
+	import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo } from '$lib/format/time';
@@ -138,7 +138,11 @@
 								<small>{view.since}</small>
 								<span class="issue-actions">
 									{#if item.kind === 'stale_models'}
-										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(planHref(staleSelection)))}>Rebuild {staleSelection.length}</GatedButton>
+										<!-- Changed models open the plan of `sqb build --changed`, so the UI's build is the CLI's; stale ones are still rebuilt by name. -->
+										{#if item.changed.length}
+											<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build changed</GatedButton>
+										{/if}
+										<GatedButton requires="run.adhoc" size="xs" variant={item.changed.length ? 'outline' : 'default'} onclick={() => goto(to(planHref(staleSelection)))}>Rebuild {staleSelection.length}</GatedButton>
 									{/if}
 									{#if 'acknowledged' in item && canAcknowledge}
 										<button class="ack" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>

@@ -359,6 +359,18 @@ const node = (key: string, op: NodeChange['op'], detail: string, extra: Partial<
 
 export const DEPLOYS: DeploySpec[] = [
 	{
+		generation: 43,
+		gitRevision: 'c41e9b2',
+		gitDirty: false,
+		gitAuthor: ALEX.displayName,
+		minutesAgo: 6,
+		publishedBy: CI_ACCOUNT,
+		nodes: [node('fact_orders', 'changed', 'SQL changed: refunded payments now net out of order revenue', { columns: [{ name: 'net_revenue', op: 'changed', detail: 'expression changed' }] })],
+		orchestration: [],
+		roles: [],
+		environment: null
+	},
+	{
 		generation: 42,
 		gitRevision: '7d2e41a',
 		gitDirty: false,
