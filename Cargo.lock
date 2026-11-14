@@ -4288,12 +4288,16 @@ version = "0.0.0"
 dependencies = [
  "junction",
  "rayon",
+ "serde",
+ "serde_json",
  "sqlbuild-cache",
  "sqlbuild-config",
  "sqlbuild-core",
  "sqlbuild-model-config",
+ "sqlbuild-pysource",
  "sqlbuild-sqltext",
  "tempfile",
+ "toml",
 ]
 
 [[package]]
