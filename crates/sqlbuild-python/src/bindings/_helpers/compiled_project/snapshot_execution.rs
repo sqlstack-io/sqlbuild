@@ -190,6 +190,7 @@ impl WorkerBuild {
         Ok(())
     }
 
+    /// A skip in a build names the failed node upstream of it; a test or audit run that raised skips what it never checked, with no cause.
     fn complete(
         &self,
         py: Python<'_>,
@@ -211,7 +212,6 @@ impl WorkerBuild {
         {
             return Ok(());
         }
-        // A test or audit run that raised skips what it never checked, not what a failed check reads.
         let skipped_because_of = match outcome {
             NodeOutcome::Skipped => match self.execution.skipped_nodes.get(key) {
                 Some(cause) => Some(cause.clone()),
@@ -384,16 +384,15 @@ impl WorkerBuild {
         Ok(None)
     }
 
-    /// A failing SQL test blocks the models it covers, so they finish failed with its error rather than as bare skips.
+    /// A failing SQL test, found by its compiled name such as `parent [case]`, fails the models it blocks with its error.
     fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
         let py = result.py();
-        let outcome: String = field(result, "outcome")?.getattr("value")?.extract()?;
+        let outcome: String = field(result, "outcome")?.str()?.extract()?;
         if SqlTestOutcome::from_value(&outcome) == Some(SqlTestOutcome::Pass)
             || self.worker.bind(py).get().refresh_cancellation(py)?
         {
             return Ok(());
         }
-        // The snapshot keys a parameterised case by its compiled name, not by the file and block the result reports.
         let name: String = field(result, "test_name")?.extract()?;
         let key = format!("{SQL_TEST_KEY_PREFIX}{name}");
         let error: Option<String> = match result.getattr_opt("error_code")? {

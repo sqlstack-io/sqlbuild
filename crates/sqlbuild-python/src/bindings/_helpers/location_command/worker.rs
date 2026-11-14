@@ -34,8 +34,7 @@ use crate::bindings::_helpers::compiled_views::project_reads::sql_tests;
 use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::constants::{
-    BLOCKED_TEST_TARGETS, CHANGED_SETTING, COMMAND_IMPLEMENTATIONS, JOB_RUN_COUNTS, JOB_RUN_REACH,
-    REACH_SETTING,
+    CHANGED_SETTING, COMMAND_IMPLEMENTATIONS, JOB_RUN_COUNTS, JOB_RUN_REACH, REACH_SETTING,
 };
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::recall::console::write_stderr;
@@ -76,25 +75,20 @@ fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
     attached
 }
 
-/// Each compiled SQL test with the models a failure of it blocks in a build, as the scheduler's `scope_deps` names them.
+/// Each compiled SQL test with the models a failure of it blocks in a build: its expected, assertion and reference targets, as the scheduler's `scope_deps` names them.
 pub(super) fn blocked_nodes(project: &Bound<'_, PyAny>) -> PyResult<NodeKeys> {
     let mut blocked: NodeKeys = BTreeMap::new();
     for test in sql_tests(project)?.try_iter()? {
         let test = test?;
         let name: String = field(&field(&test, "key")?, "name")?.extract()?;
-        let mut models: Vec<String> = Vec::new();
-        for list in BLOCKED_TEST_TARGETS {
-            let Some(names) = test.getattr_opt(list)? else {
-                continue;
-            };
-            for name in names.extract::<Vec<String>>()? {
-                let model = format!("model:{name}");
-                if !models.contains(&model) {
-                    models.push(model);
-                }
-            }
-        }
-        blocked.insert(format!("{SQL_TEST_KEY_PREFIX}{name}"), models);
+        let models: Vec<String> = field(&test, "target_model_names")?.extract()?;
+        blocked.insert(
+            format!("{SQL_TEST_KEY_PREFIX}{name}"),
+            models
+                .into_iter()
+                .map(|model| format!("model:{model}"))
+                .collect(),
+        );
     }
     Ok(blocked)
 }
