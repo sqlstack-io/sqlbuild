@@ -7,9 +7,11 @@ import pytest
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
     SnowflakeKeyedCursorDeleteInsertTestCase,
+    SnowflakeKeyedDeleteInsertFailureTestCase,
 )
 from tests.unit.src.sqlbuild.adapters.snowflake.helpers import (
     RecordingSnowflakeAdapter,
+    fail_statement,
 )
 
 
@@ -66,3 +68,43 @@ def test_given_cursor_window_when_replacing_then_snowflake_commits_deletes_with_
         for statement, prefix in zip(adapter.executed, test_case.expected_prefixes, strict=True)
     )
     assert inserted == test_case.expected_inserted
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakeKeyedDeleteInsertFailureTestCase(
+            description="a failing insert rolls the key delete back",
+            failing_keyword="INSERT",
+            expected_prefixes=(
+                "CREATE",
+                "BEGIN",
+                "DELETE FROM ANALYTICS.MARTS.ORDERS USING",
+                "INSERT",
+                "ROLLBACK",
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_failure_after_delete_when_keyed_delete_insert_then_snowflake_rolls_back(
+    test_case: SnowflakeKeyedDeleteInsertFailureTestCase,
+) -> None:
+    adapter: RecordingSnowflakeAdapter = RecordingSnowflakeAdapter(
+        failures={test_case.failing_keyword: fail_statement}
+    )
+
+    with pytest.raises(RuntimeError, match="statement failed"):
+        adapter.delete_insert(
+            connection=object(),
+            destination="ANALYTICS.MARTS.ORDERS",
+            sql="SELECT * FROM ANALYTICS.MARTS.ORDERS__DELTA",
+            unique_key=("order_id",),
+            statement_recorder=StatementRecorder(),
+        )
+
+    assert len(adapter.executed) == len(test_case.expected_prefixes)
+    assert all(
+        statement.startswith(prefix)
+        for statement, prefix in zip(adapter.executed, test_case.expected_prefixes, strict=True)
+    )

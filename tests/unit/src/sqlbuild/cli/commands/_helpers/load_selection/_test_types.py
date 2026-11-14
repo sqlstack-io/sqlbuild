@@ -31,3 +31,5 @@ class LoaderDefaultResolutionTestCase:
     expected_defaults: tuple[str | None, str | None]
     project_defaults: tuple[str | None, str | None] = (None, None)
     connections: dict[str, dict[str, object]] = field(default_factory=dict)
+    project_vars: dict[str, str] = field(default_factory=dict)
+    cli_vars: dict[str, object] | None = None

@@ -9,6 +9,15 @@ use crate::store::types::Row;
 
 pub(crate) const SCHEMA: &str = include_str!("../schema.sql");
 
+/// Additive indexes, created on every open and kept out of the digest so old stores gain them.
+pub(crate) const INDEXES: &str = include_str!("../indexes.sql");
+
+pub(crate) fn statements(sql: &str) -> impl Iterator<Item = &str> {
+    sql.split(';')
+        .map(str::trim)
+        .filter(|statement| !statement.is_empty())
+}
+
 pub(crate) fn schema_digest(store: &ControlStore) -> String {
     sha256_hex(format!("{}\n{SCHEMA}", recall_schema(store).join(";\n")).as_bytes())
 }

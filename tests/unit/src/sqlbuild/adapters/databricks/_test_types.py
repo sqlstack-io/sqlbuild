@@ -209,3 +209,11 @@ class DatabricksFreshnessBatchErrorTestCase:
     description: str
     batch_error: Exception
     expected_match: str
+
+
+@dataclass(frozen=True)
+class DatabricksKeyedDeleteInsertTestCase:
+    description: str
+    unique_key: tuple[str, ...]
+    columns: tuple[str, ...]
+    expected_statements: tuple[str, ...]

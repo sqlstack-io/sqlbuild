@@ -167,6 +167,23 @@ def test_given_intermediate_loader_when_selecting_then_parses_destination_with_e
             project_defaults=("DEFAULTS_DB", "DEFAULTS_SCHEMA"),
             expected_defaults=("DEFAULTS_DB", "DEFAULTS_SCHEMA"),
         ),
+        LoaderDefaultResolutionTestCase(
+            description="templated project defaults expand project vars as models do",
+            adapter="postgres",
+            connection={"database": "connection_db", "schema": "connection_schema"},
+            project_defaults=("${warehouse_db}", "orders_${environment}"),
+            project_vars={"warehouse_db": "analytics", "environment": "dev"},
+            expected_defaults=("analytics", "orders_dev"),
+        ),
+        LoaderDefaultResolutionTestCase(
+            description="command-line vars override project vars in templated defaults",
+            adapter="postgres",
+            connection={"database": "connection_db", "schema": "connection_schema"},
+            project_defaults=(None, "orders_${environment}"),
+            project_vars={"environment": "dev"},
+            cli_vars={"environment": "ci"},
+            expected_defaults=("connection_db", "orders_ci"),
+        ),
     ),
     ids=lambda case: case.description,
 )
@@ -182,6 +199,7 @@ def test_given_connection_namespace_when_resolving_load_defaults_then_matches_co
             defaults=DefaultsConfig(
                 database=test_case.project_defaults[0], schema=test_case.project_defaults[1]
             ),
+            vars=test_case.project_vars,
         ),
         local_config=LocalConfig(),
     )
@@ -190,7 +208,7 @@ def test_given_connection_namespace_when_resolving_load_defaults_then_matches_co
         discovered_inputs=discovered_inputs,
         selected_target=None,
         target_config=None,
-        cli_vars=None,
+        cli_vars=test_case.cli_vars,
     )
 
     assert defaults == test_case.expected_defaults

@@ -434,3 +434,10 @@ class SnowflakeKeyedCursorDeleteInsertTestCase:
     unique_key: tuple[str, ...]
     expected_prefixes: tuple[str, ...]
     expected_inserted: int
+
+
+@dataclass(frozen=True)
+class SnowflakeKeyedDeleteInsertFailureTestCase:
+    description: str
+    failing_keyword: str
+    expected_prefixes: tuple[str, ...]

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass
 from io import StringIO
 from itertools import cycle, islice
-from types import ModuleType, SimpleNamespace
+from types import MappingProxyType, ModuleType, SimpleNamespace
 from typing import Any
 
 from sqlbuild._native import NativeProgressProjector
@@ -687,11 +687,25 @@ def prefix_listing_statements(warehouse: RecordingSnowflakeWarehouse) -> tuple[s
 class RecordingSnowflakeAdapter(SnowflakeAdapter):
     """Snowflake adapter that records each statement instead of running it."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, *, failures: Mapping[str, Callable[[], None]] = MappingProxyType({})
+    ) -> None:
         super().__init__()
         self.executed: list[str] = []
+        self.failures: Mapping[str, Callable[[], None]] = failures
 
     def execute(self, *, connection: Any, sql: str, **kwargs: Any) -> Any:
         del connection, kwargs
         self.executed.append(sql)
+        self.failures.get(sql.split(" ", 1)[0], _succeed)()
         return SimpleNamespace(rowcount=3)
+
+
+def _succeed() -> None:
+    """A statement that runs without error."""
+
+
+def fail_statement() -> None:
+    """A statement the warehouse rejects."""
+
+    raise RuntimeError("statement failed")

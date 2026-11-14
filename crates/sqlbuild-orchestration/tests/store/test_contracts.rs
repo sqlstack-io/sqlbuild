@@ -12,14 +12,14 @@ pub(crate) mod lease_helpers;
 pub(crate) mod logical_state;
 #[path = "replicas/helpers.rs"]
 pub(crate) mod replica_helpers;
+#[path = "schema/test_contracts.rs"]
+mod schema;
 #[path = "helpers.rs"]
 pub(crate) mod store_helpers;
 #[path = "test_types.rs"]
 pub(crate) mod store_test_types;
 #[path = "recall/test_contract.rs"]
 mod test_contract;
-#[path = "schema/test_foreign_key_indexes.rs"]
-mod test_foreign_key_indexes;
 #[path = "recall/test_types.rs"]
 mod test_types;
 #[path = "recall/test_views.rs"]
