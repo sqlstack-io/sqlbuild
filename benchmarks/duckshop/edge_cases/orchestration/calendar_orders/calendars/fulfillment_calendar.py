@@ -9,4 +9,5 @@ from sqlbuild.orchestration import calendar
     horizon="8s",
 )
 def fulfillment_calendar(window, fulfillment):
-    return fulfillment.upcoming(window)
+    # A provider method named `calendar` is not a second calendar declaration.
+    return fulfillment.calendar(window)

@@ -84,6 +84,24 @@ fn given_job_selectors_when_models_are_renamed_or_moved_then_exact_parts_follow(
             ],
         },
         JobSelectorTestCase {
+            description: "a folder moving into one that holds other models stays and is reported",
+            models: &[
+                (
+                    "orders",
+                    "models/staging/orders.sql",
+                    "orders",
+                    "models/marts/orders.sql",
+                ),
+                STAYS,
+            ],
+            job: "name = \"x_job\"\nselect = \"models/staging\"\nexclude = \"models/staging\"\n",
+            expected_job: "name = \"x_job\"\nselect = \"models/staging\"\nexclude = \"models/staging\"\n",
+            expected_manual: &[
+                "2:10 this job selects folder 'models/staging', and orders moved out of it; check the job still selects what it should",
+                "3:11 this job selects folder 'models/staging', and orders moved out of it; check the job still selects what it should",
+            ],
+        },
+        JobSelectorTestCase {
             description: "a multi-line selector is reported instead of rewritten",
             models: &[(
                 "orders",

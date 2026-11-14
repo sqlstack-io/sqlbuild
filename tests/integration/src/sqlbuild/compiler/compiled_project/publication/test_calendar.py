@@ -169,7 +169,7 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
                 "    def record(self, value):\n"
                 "        with Path(os.environ['SQLBUILD_CALENDAR_EVALUATIONS']).open('a') as out:\n"
                 "            out.write(json.dumps(value | {'pid': os.getpid()}) + '\\n')\n"
-                "    def upcoming(self, window):\n"
+                "    def calendar(self, window):\n"
                 "        self.record({'phase': 'evaluate', 'start': window.start.isoformat(), 'end': window.end.isoformat(), 'zone': window.start.tzinfo.key})\n"
                 "        data = json.loads(Path(os.environ['SQLBUILD_FULFILLMENT_DATA']).read_text())\n"
                 "        if data.get('fail'):\n            raise ValueError('synthetic calendar unavailable')\n"

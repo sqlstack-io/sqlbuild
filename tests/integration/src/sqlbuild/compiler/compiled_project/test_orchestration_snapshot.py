@@ -44,7 +44,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
     METADATA,
     PARITY_FILES,
-    PYTHON_PIPELINE_FILES,
     TYPE_PROOF_FILES,
     duckshop_orchestration,
     published_texts,
@@ -1481,7 +1480,28 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             description="group members are jobs, not nested groups",
             files=duckshop_orchestration("nested_groups"),
             expected_error=ValueError,
-            expected_message="daily_orders_job_group",
+            expected_message=(
+                "names 'daily_orders_job_group', which is not a job in orchestration/jobs/"
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a sensor import does not define is refused, not dropped",
+            files={
+                "orchestration/jobs/refresh_orders_job.toml": (
+                    'name = "refresh_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
+                ),
+                "orchestration/sensors/overdue_sensor.py": (
+                    "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
+                    "SENSORS = {'overdue': sensor('overdue_sensor', description='Catch up.', "
+                    "when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]), "
+                    "run='refresh_orders_job')}\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message=(
+                "sensor 'overdue_sensor' is declared here, but importing the module does not "
+                "define it"
+            ),
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="a polling sensor needs an actual callback",

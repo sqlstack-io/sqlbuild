@@ -100,7 +100,7 @@ fn schedule(text: &str, raw: Spanned<RawSchedule>) -> Result<ScheduleFile, FileE
     let start: usize = raw.span().start;
     let raw: RawSchedule = raw.into_inner();
     let source: ScheduleSource = match (raw.cron, raw.calendar) {
-        (Some(cron), None) => ScheduleSource::Cron(cron),
+        (Some(cron), None) => ScheduleSource::Cron(positioned(text, cron)),
         (None, Some(calendar)) => {
             ScheduleSource::Calendar(nonblank(text, calendar, "schedule calendar")?)
         }
@@ -114,8 +114,8 @@ fn schedule(text: &str, raw: Spanned<RawSchedule>) -> Result<ScheduleFile, FileE
     };
     Ok(ScheduleFile {
         source,
-        timezone: raw.timezone,
-        starts_at: raw.starts_at,
+        timezone: positioned(text, raw.timezone),
+        starts_at: raw.starts_at.map(|starts_at| positioned(text, starts_at)),
         default_status: raw.default_status,
     })
 }

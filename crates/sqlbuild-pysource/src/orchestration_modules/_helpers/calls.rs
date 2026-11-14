@@ -1,6 +1,6 @@
 //! Orchestration authoring calls and their literal arguments, read from the ruff tree.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ruff_python_ast::{Expr, ExprCall, Stmt};
 use ruff_text_size::{Ranged, TextSize};
@@ -51,14 +51,63 @@ pub(crate) fn imported_names(body: &[Stmt]) -> Vec<(String, String, TextSize)> {
     imported
 }
 
-/// Which authoring call `call` is: an imported `calendar`, `sensor` or `run_event`, or one reached as an attribute.
+/// The dotted names a top-level `import sqlbuild.orchestration [as x]` or `from sqlbuild import orchestration [as x]` binds the module to.
+pub(crate) fn module_names(body: &[Stmt]) -> BTreeSet<String> {
+    let (package, module) = ORCHESTRATION_MODULE
+        .rsplit_once('.')
+        .unwrap_or_default();
+    let mut names: BTreeSet<String> = BTreeSet::new();
+    for statement in body {
+        match statement {
+            Stmt::Import(import) => names.extend(
+                import
+                    .names
+                    .iter()
+                    .filter(|alias| alias.name.as_str() == ORCHESTRATION_MODULE)
+                    .map(|alias| alias.asname.as_ref().unwrap_or(&alias.name).to_string()),
+            ),
+            Stmt::ImportFrom(import)
+                if import.level == 0
+                    && import
+                        .module
+                        .as_ref()
+                        .is_some_and(|name| name.as_str() == package) =>
+            {
+                names.extend(
+                    import
+                        .names
+                        .iter()
+                        .filter(|alias| alias.name.as_str() == module)
+                        .map(|alias| alias.asname.as_ref().unwrap_or(&alias.name).to_string()),
+                );
+            }
+            _ => {}
+        }
+    }
+    names
+}
+
+/// `expression` as dotted text when it is a name or a chain of attributes on one.
+fn dotted(expression: &Expr) -> Option<String> {
+    match expression {
+        Expr::Name(name) => Some(name.id.to_string()),
+        Expr::Attribute(attribute) => {
+            Some(format!("{}.{}", dotted(&attribute.value)?, attribute.attr))
+        }
+        _ => None,
+    }
+}
+
+/// Which authoring call `call` is: an imported `calendar`, `sensor` or `run_event`, or one reached as an attribute of the orchestration module.
 pub(crate) fn authoring_call(
     call: &ExprCall,
-    imported: &BTreeMap<&str, &str>,
+    (imported, modules): (&BTreeMap<&str, &str>, &BTreeSet<String>),
 ) -> Option<&'static str> {
     let name: &str = match call.func.as_ref() {
         Expr::Name(name) => imported.get(name.id.as_str())?,
-        Expr::Attribute(attribute) => attribute.attr.as_str(),
+        Expr::Attribute(attribute) if modules.contains(&dotted(&attribute.value)?) => {
+            attribute.attr.as_str()
+        }
         _ => return None,
     };
     AUTHORING_CALLS.into_iter().find(|call| *call == name)

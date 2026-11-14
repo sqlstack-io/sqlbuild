@@ -152,12 +152,23 @@ fn changes(models: &[ModelFacts], renamed: &[(&ModelFacts, &str, &str)]) -> Chan
             to.strip_suffix(rest).map(str::to_owned)
         };
         let targets: Vec<Option<String>> = below.iter().map(|model| moved_to(model)).collect();
+        // A destination that keeps or receives other models would widen the selector to them.
+        let shared = |to: &String| {
+            models.iter().any(|model| {
+                let lands: String = destinations
+                    .get(model.path.as_str())
+                    .cloned()
+                    .unwrap_or_else(|| parent(&model.path));
+                within(&lands, to) && !within(&parent(&model.path), &folder)
+            })
+        };
         let whole = targets
             .first()
             .cloned()
             .flatten()
             .filter(|to| *to != folder && !within(to, &folder))
-            .filter(|to| targets.iter().all(|target| target.as_ref() == Some(to)));
+            .filter(|to| targets.iter().all(|target| target.as_ref() == Some(to)))
+            .filter(|to| !shared(to));
         match whole {
             Some(to) => {
                 folders.insert(folder, to);

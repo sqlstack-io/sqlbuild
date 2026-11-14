@@ -41,6 +41,13 @@ _PROJECT_FILES: dict[str, str] = {
     "orchestration/job_groups/daily_job_group.toml": (
         'name = "daily_job_group"\ndescription = "Everything."\njobs = ["nightly_job", "crm_job"]\n'
     ),
+    "orchestration/sensors/overdue_sensor.py": (
+        "from pathlib import Path\n"
+        "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
+        "Path(__file__).parents[2].joinpath('sensor_imported').write_text('yes')\n"
+        "overdue = sensor('overdue_sensor', description='Catch up.', "
+        "when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]), run='nightly_job')\n"
+    ),
 }
 
 
@@ -91,6 +98,12 @@ _PROJECT_FILES: dict[str, str] = {
             expected_tables=frozenset({"customers"}),
         ),
         JobSelectorBuildTestCase(
+            description="model selectors build without job declarations",
+            build_args=("--select", "+orders"),
+            expected_exit_code=0,
+            expected_tables=frozenset({"orders", "stg_orders"}),
+        ),
+        JobSelectorBuildTestCase(
             description="an unknown job suggests a known one",
             build_args=("--select", "job:nightyl"),
             expected_exit_code=1,
@@ -117,6 +130,7 @@ def test_given_declared_jobs_when_building_by_job_then_only_their_nodes_build(
 
     assert exit_code == test_case.expected_exit_code, captured
     assert test_case.expected_fragment in captured
+    assert not (tmp_path / "sensor_imported").exists()
     with duckdb.connect(str(tmp_path / "demo.duckdb")) as warehouse:
         rows: list[tuple[str]] = warehouse.sql(
             "SELECT table_name FROM duckdb_tables() "

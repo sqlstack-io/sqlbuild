@@ -1639,22 +1639,6 @@ INTERMEDIATE_LOADER_FILES: dict[str, str] = {
 }
 
 
-INTERMEDIATE_LOADER_FILES: dict[str, str] = {
-    "sources/shipments.yml": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.yml"
-    ).read_text(),
-    "python/loaders/shipments.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.py"
-    ).read_text(),
-    "models/orders.sql": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_orders.sql"
-    ).read_text(),
-    "orchestration/orders.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.py"
-    ).read_text(),
-}
-
-
 def without_loads(control: sqlite3.Connection, node_key: str) -> None:
     """Drop a published node's `loads` in place; its content address and the worker's check stay."""
     for node_hash, body in control.execute(

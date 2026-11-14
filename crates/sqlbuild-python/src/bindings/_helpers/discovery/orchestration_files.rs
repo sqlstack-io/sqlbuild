@@ -9,6 +9,7 @@ use sqlbuild_discovery::orchestration_files::models::{
 };
 use sqlbuild_discovery::tree::models::ProjectTree;
 
+use crate::bindings::_helpers::discovery::orchestration_values::check_orchestration_values;
 use crate::bindings::_helpers::discovery::project_files::path_object;
 use crate::bindings::_helpers::discovery::raised::{failure_error, read_error, stage_error};
 
@@ -21,7 +22,9 @@ pub(crate) fn orchestration_declarations(
     let tree = ProjectTree::new(&root);
     let version = py.version_info();
     let inventory = py.detach(|| orchestration_inventory(&tree, (version.major, version.minor)));
-    inventory.map_err(|failure| orchestration_error(&tree, project_dir, failure))
+    let inventory = inventory.map_err(|failure| orchestration_error(&tree, project_dir, failure))?;
+    check_orchestration_values(py, &inventory).map_err(|failure| failure_error(py, failure))?;
+    Ok(inventory)
 }
 
 fn orchestration_error(

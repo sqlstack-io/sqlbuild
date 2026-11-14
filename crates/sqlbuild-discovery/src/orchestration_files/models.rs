@@ -57,7 +57,7 @@ pub struct FileError {
 /// What starts a job or group on its own: a cron expression or a named calendar.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScheduleSource {
-    Cron(String),
+    Cron(Positioned<String>),
     Calendar(Positioned<String>),
 }
 
@@ -65,9 +65,9 @@ pub enum ScheduleSource {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScheduleFile {
     pub source: ScheduleSource,
-    pub timezone: String,
-    /// RFC 3339 as written; publication parses it.
-    pub starts_at: Option<String>,
+    pub timezone: Positioned<String>,
+    /// RFC 3339 as written; compile checks it and publication parses it.
+    pub starts_at: Option<Positioned<String>>,
     pub default_status: InitialStatus,
 }
 
@@ -90,10 +90,12 @@ pub struct JobFile {
     pub run: RunFile,
     pub select: Positioned<String>,
     pub exclude: Option<Positioned<String>>,
-    /// Worker container limits as written; publication checks their values.
+    /// Worker container limits as written; compile checks their values.
     pub resources: Option<Positioned<serde_json::Map<String, serde_json::Value>>>,
     /// `sqb build` flags by name, as JSON values.
     pub settings: BTreeMap<String, serde_json::Value>,
+    /// Where each setting's value is written.
+    pub setting_positions: BTreeMap<String, FilePosition>,
 }
 
 /// One `orchestration/job_groups/**.toml` file.

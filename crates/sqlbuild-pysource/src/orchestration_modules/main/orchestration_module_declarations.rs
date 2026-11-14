@@ -1,6 +1,6 @@
 //! The calendars and sensors a module declares, and the job names they use, without importing it.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextSize};
@@ -9,7 +9,7 @@ use crate::cpython_tree::main::parse_cpython_module::parse_cpython_module;
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::{CpythonNode, ParsedSource};
 use crate::orchestration_modules::_helpers::calls::{
-    authoring_call, imported_names, literal, literal_strings, position,
+    authoring_call, imported_names, literal, literal_strings, module_names, position,
 };
 use crate::orchestration_modules::constants::{
     CALENDAR_CALL, JOB_KEYWORD, NAME_KEYWORD, REMOVED_NAMES, RUN_EVENT_CALL, RUN_KEYWORD,
@@ -31,6 +31,7 @@ pub fn orchestration_module_declarations(
         .iter()
         .map(|(local, name, _)| (local.as_str(), name.as_str()))
         .collect();
+    let modules: BTreeSet<String> = module_names(&parsed.module.body);
     let removed_imports = imports
         .iter()
         .filter(|(_, name, _)| REMOVED_NAMES.contains(&name.as_str()))
@@ -41,7 +42,7 @@ pub fn orchestration_module_declarations(
         let CpythonNode::Expr(Expr::Call(call)) = node else {
             continue;
         };
-        let kind = match authoring_call(call, &imported) {
+        let kind = match authoring_call(call, (&imported, &modules)) {
             Some(CALENDAR_CALL) => PythonDeclarationKind::Calendar,
             Some(SENSOR_CALL) => PythonDeclarationKind::Sensor,
             _ => continue,
@@ -75,7 +76,7 @@ pub fn orchestration_module_declarations(
                 let CpythonNode::Expr(Expr::Call(inner)) = inner else {
                     continue;
                 };
-                if authoring_call(inner, &imported) != Some(RUN_EVENT_CALL) {
+                if authoring_call(inner, (&imported, &modules)) != Some(RUN_EVENT_CALL) {
                     continue;
                 }
                 if let Some(job) = inner.arguments.find_keyword(JOB_KEYWORD) {

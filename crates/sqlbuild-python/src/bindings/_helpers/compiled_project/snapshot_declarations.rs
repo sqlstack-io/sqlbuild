@@ -9,7 +9,7 @@ use serde_json::Value;
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_discovery::orchestration_files::models::{
-    FilePosition, InitialStatus, OrchestrationInventory, RunFile, ScheduleSource,
+    FilePosition, InitialStatus, NamedModule, OrchestrationInventory, RunFile, ScheduleSource,
 };
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::group_dependencies::group_dependencies;
@@ -77,7 +77,7 @@ fn run_schedule(
     let starts_at = schedule
         .starts_at
         .as_ref()
-        .map(|starts_at| serde_json::from_value(Value::String(starts_at.clone())))
+        .map(|starts_at| serde_json::from_value(Value::String(starts_at.value.clone())))
         .transpose()
         .map_err(|error| PyValueError::new_err(format!("{path}: schedule starts_at: {error}")))?;
     let trigger = TriggerDefinition {
@@ -85,7 +85,7 @@ fn run_schedule(
         job_key: name.to_owned(),
         schedule: Schedule::Cron {
             expression: String::new(),
-            timezone: schedule.timezone.clone(),
+            timezone: schedule.timezone.value.clone(),
         },
         starts_at,
         default_status: match schedule.default_status {
@@ -101,8 +101,8 @@ fn run_schedule(
                 name.to_owned(),
                 TriggerDefinition {
                     schedule: Schedule::Cron {
-                        expression: expression.clone(),
-                        timezone: schedule.timezone.clone(),
+                        expression: expression.value.clone(),
+                        timezone: schedule.timezone.value.clone(),
                     },
                     ..trigger
                 },
@@ -110,9 +110,35 @@ fn run_schedule(
         }
         ScheduleSource::Calendar(calendar) => calendars.push(CalendarRequest {
             calendar: calendar.value.clone(),
-            timezone: schedule.timezone.clone(),
+            timezone: schedule.timezone.value.clone(),
             trigger,
         }),
+    }
+    Ok(())
+}
+
+/// Refuse a calendar or sensor that compile declared but import did not define, or the reverse.
+fn matching_imports(
+    (kind, declared): (&str, &[NamedModule]),
+    imported: BTreeSet<&str>,
+) -> PyResult<()> {
+    if let Some(module) = declared
+        .iter()
+        .find(|module| !imported.contains(module.name.as_str()))
+    {
+        let FilePosition { line, column } = module.position;
+        return Err(PyValueError::new_err(format!(
+            "{}:{line}:{column}: {kind} '{}' is declared here, but importing the module does not \
+             define it; assign it to a module-level name or list",
+            module.path, module.name
+        )));
+    }
+    let names: BTreeSet<&str> = declared.iter().map(|module| module.name.as_str()).collect();
+    if let Some(name) = imported.difference(&names).next() {
+        return Err(PyValueError::new_err(format!(
+            "{kind} '{name}' is defined when its module is imported, but no module under \
+             orchestration/ declares it with a literal name; call {kind}(...) in the module itself"
+        )));
     }
     Ok(())
 }
@@ -152,6 +178,17 @@ pub(crate) fn compile_declarations(
             }
         }
     }
+    matching_imports(
+        ("calendar", &inventory.calendars),
+        authored_calendars.keys().map(String::as_str).collect(),
+    )?;
+    matching_imports(
+        ("sensor", &inventory.sensors),
+        authored_sensors
+            .iter()
+            .map(|sensor| sensor.name.as_str())
+            .collect(),
+    )?;
     let format: FormatSettings =
         resolve_format_settings(project_dir).map_err(PyValueError::new_err)?;
     let mut described: Vec<(&str, String, String)> = Vec::new();

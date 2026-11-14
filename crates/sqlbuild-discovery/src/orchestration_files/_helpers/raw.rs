@@ -1,5 +1,7 @@
 //! The file shapes serde reads before their values are checked.
 
+use std::collections::BTreeMap;
+
 use serde::Deserialize;
 use toml::Spanned;
 
@@ -8,10 +10,10 @@ use crate::orchestration_files::models::{InitialStatus, Overlap};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSchedule {
-    pub(crate) cron: Option<String>,
+    pub(crate) cron: Option<Spanned<String>>,
     pub(crate) calendar: Option<Spanned<String>>,
-    pub(crate) timezone: String,
-    pub(crate) starts_at: Option<String>,
+    pub(crate) timezone: Spanned<String>,
+    pub(crate) starts_at: Option<Spanned<String>>,
     #[serde(default)]
     pub(crate) default_status: InitialStatus,
 }
@@ -46,7 +48,7 @@ pub(crate) struct RawJob {
     pub(crate) exclude: Option<Spanned<String>>,
     pub(crate) resources: Option<Spanned<toml::Table>>,
     #[serde(default)]
-    pub(crate) settings: toml::Table,
+    pub(crate) settings: BTreeMap<String, Spanned<toml::Value>>,
 }
 
 /// The group-only fields; the shared ones are read as `RawRun` from the same text.

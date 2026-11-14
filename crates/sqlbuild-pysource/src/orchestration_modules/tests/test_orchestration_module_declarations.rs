@@ -95,3 +95,28 @@ fn given_syntax_error_when_scanning_then_returns_none() {
         None
     );
 }
+
+#[test]
+fn given_other_objects_calendar_and_sensor_methods_when_scanning_then_only_orchestration_calls_declare() {
+    let module = scan(
+        "import calendar\nfrom sqlbuild.orchestration import calendar as declare\n\n@declare(name=\"days_calendar\", description=\"d\", horizon=\"7d\")\ndef days(window, exchange):\n    calendar.calendar(2026)\n    return exchange.calendar(window.start)\n",
+    );
+    assert_eq!(module.declarations.len(), 1);
+    assert_eq!(module.declarations[0].name, Some(text("days_calendar", 4, 15)));
+}
+
+#[test]
+fn given_orchestration_module_attributes_when_scanning_then_each_import_form_declares() {
+    let module = scan(
+        "import sqlbuild.orchestration\nfrom sqlbuild import orchestration as authoring\n\na = sqlbuild.orchestration.sensor(\"a_sensor\", description=\"d\", run=\"a_job\")\nb = authoring.sensor(\"b_sensor\", description=\"d\", run=\"b_job\")\n",
+    );
+    let names: Vec<Option<String>> = module
+        .declarations
+        .iter()
+        .map(|declaration| declaration.name.as_ref().and_then(|name| name.value.clone()))
+        .collect();
+    assert_eq!(
+        names,
+        vec![Some("a_sensor".to_owned()), Some("b_sensor".to_owned())]
+    );
+}
