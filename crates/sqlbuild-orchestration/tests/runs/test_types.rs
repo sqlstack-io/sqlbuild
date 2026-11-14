@@ -194,6 +194,22 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
                         .insert("load_sources".into(), serde_json::json!(false));
                     continue;
                 }
+                "--load" | "--reload" => {
+                    let name = if token == "--load" {
+                        "load_sources"
+                    } else {
+                        "reload"
+                    };
+                    plan.settings.insert(name.into(), serde_json::json!(true));
+                    continue;
+                }
+                "--vars" => {
+                    let text = tokens.next().ok_or("--vars needs a JSON object")?;
+                    let vars: serde_json::Value =
+                        serde_json::from_str(text).map_err(|error| error.to_string())?;
+                    plan.settings.insert("vars".into(), vars);
+                    continue;
+                }
                 "--warehouse" => {
                     let name = tokens.next().ok_or("--warehouse needs a name")?;
                     plan.settings
@@ -223,6 +239,11 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
                 .collect();
         }
         plan.selection.retain(|key| !excluded.contains(key));
+        // As the CLI's planner: a load is a build of its sources with loading on.
+        if plan.verb == "load" && !plan.settings.contains_key("reload") {
+            plan.settings
+                .insert("load_sources".into(), serde_json::json!(true));
+        }
         Ok(plan)
     }
 }

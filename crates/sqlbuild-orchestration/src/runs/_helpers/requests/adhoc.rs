@@ -64,7 +64,13 @@ pub(crate) async fn frozen_adhoc_request(
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
-    let Some(command) = RunCommand::of_verb(&plan.verb) else {
+    // A load runs as a build of its managed sources, so the worker's verified build path enforces its write set.
+    let verb = if plan.verb == "load" {
+        "build"
+    } else {
+        plan.verb.as_str()
+    };
+    let Some(command) = RunCommand::of_verb(verb) else {
         let refusal = format!("workers do not run sqb {}", plan.verb);
         return Ok((transaction, Err(refusal)));
     };
@@ -85,7 +91,7 @@ pub(crate) async fn frozen_adhoc_request(
         .and_then(|row| row["image_id"].as_str())
         .map(str::to_owned);
     let write_set: BTreeSet<String> = match plan.verb.as_str() {
-        "build" => writers,
+        "build" | "load" => writers,
         "seed" => writers
             .into_iter()
             .filter(|key| key.starts_with("seed:"))

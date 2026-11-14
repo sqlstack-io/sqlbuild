@@ -162,9 +162,33 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             expected_plan: Ok((&["model:customers"], json!({}))),
         },
         AdhocPlanTestCase {
-            description: "variables are refused",
-            command: &["build", "--vars", "{\"day\": 1}"],
-            expected_plan: Err("--vars is not available for ad-hoc runs"),
+            description: "variables become a JSON object setting, as a job's",
+            command: &[
+                "build",
+                "-s",
+                "customers",
+                "--vars",
+                "{\"day\": 1, \"region\": \"eu\"}",
+            ],
+            expected_plan: Ok((
+                &["model:customers"],
+                json!({"vars": {"day": 1, "region": "eu"}}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "empty variables are no variables",
+            command: &["build", "-s", "customers", "--vars", "{}"],
+            expected_plan: Ok((&["model:customers"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "variables must be an object",
+            command: &["build", "--vars", "[1]"],
+            expected_plan: Err("--vars must be a JSON object"),
+        },
+        AdhocPlanTestCase {
+            description: "variables must be JSON",
+            command: &["build", "--vars", "{day: 1}"],
+            expected_plan: Err("--vars must be valid JSON"),
         },
         AdhocPlanTestCase {
             description: "a selector file is refused",
@@ -172,9 +196,14 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             expected_plan: Err("--select-file is not available"),
         },
         AdhocPlanTestCase {
-            description: "loading sources is refused",
-            command: &["build", "--load"],
-            expected_plan: Err("--load is not available"),
+            description: "--load becomes a setting for the server to gate",
+            command: &["build", "-s", "customers", "--load"],
+            expected_plan: Ok((&["model:customers"], json!({"load_sources": true}))),
+        },
+        AdhocPlanTestCase {
+            description: "--reload becomes a setting for the server to gate",
+            command: &["build", "-s", "customers", "--reload"],
+            expected_plan: Ok((&["model:customers"], json!({"reload": true}))),
         },
         AdhocPlanTestCase {
             description: "another target is refused",
@@ -217,9 +246,9 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             expected_plan: Err("returns"),
         },
         AdhocPlanTestCase {
-            description: "loads are not ad-hoc runs yet",
+            description: "a load needs managed sources",
             command: &["load"],
-            expected_plan: Err("sqb load is not available as an ad-hoc run"),
+            expected_plan: Err("the selectors match no managed sources"),
         },
         AdhocPlanTestCase {
             description: "commands that are not runs are refused",
@@ -470,6 +499,30 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             description: "an intermediate loader runs as the source it writes",
             command: &["build", "--select", "loader:stage_shipments"],
             expected_plan: Ok((&["source:stage_shipments"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a load without selectors runs every managed source as a build without tests or audits",
+            command: &["load"],
+            expected_plan: Ok((
+                &["source:raw_shipments", "source:stage_shipments"],
+                json!({"load_sources": true, "run_audits": false, "run_tests": false}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "a load selects a source by name and leaves the models that read it",
+            command: &[
+                "load",
+                "--select",
+                "raw_shipments",
+                "+shipments",
+                "--reload",
+                "--vars",
+                "{\"day\": 1}",
+            ],
+            expected_plan: Ok((
+                &["source:raw_shipments", "source:stage_shipments"],
+                json!({"reload": true, "run_audits": false, "run_tests": false, "vars": {"day": 1}}),
+            )),
         },
         AdhocPlanTestCase {
             description: "test selects only the SQL nodes a tag shared with Python nodes matches",
