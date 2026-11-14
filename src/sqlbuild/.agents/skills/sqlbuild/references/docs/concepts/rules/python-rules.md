@@ -108,9 +108,10 @@ The other size limits check every function.
 ## Unreachable definitions
 
 `SQBRPYTHON306` reports functions, classes and module values that nothing SQLBuild loads can reach.
-SQLBuild loads every decorated node function under `python/` (`@loader`, `@task`, `@asset`, `@check`
-and `@factory`) and everything defined outside `python/`, such as hooks and providers. A definition
-reached only through them is live.
+SQLBuild loads every decorated function under `python/` (`@loader`, `@task`, `@asset`, `@check`,
+`@factory` and `@audit_factory`) and everything defined outside `python/`, such as hooks and
+providers. A definition reached only through them is live. Imports through folders without an
+`__init__.py` count too.
 
 Code that SQLBuild loads in a way the Rule cannot follow, such as by name at run time, needs a rule
 exception with a reason:

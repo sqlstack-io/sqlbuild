@@ -866,8 +866,17 @@ pub(crate) const NAMING_CONTRACTS: [(&str, &str); 10] = [
     ("as_*", "returns-value"),
     ("iter_*", "returns-iterator"),
 ];
-/// Decorators whose top-level functions SQLBuild loads, making their module an entry point.
-pub(crate) const NODE_DECORATORS: [&str; 5] = ["loader", "task", "asset", "check", "factory"];
+/// Decorators whose top-level functions SQLBuild loads from `python/`, making their module an entry point.
+pub(crate) const LOADED_DECORATORS: [&str; 6] = [
+    "loader",
+    "task",
+    "asset",
+    "check",
+    "factory",
+    "audit_factory",
+];
+/// Fensu codes whose own remediation names settings SQLBuild does not have, so the catalogue's is used.
+pub(crate) const CATALOGUE_REMEDIATION_CODES: [&str; 1] = [fensu::DEAD_DEFINITION_CODE];
 /// The entry-point kind recorded for modules SQLBuild loads.
 pub(crate) const ENTRYPOINT_KIND: &str = "sqlbuild";
 /// Fensu's family of naming-contract rules, which read the naming contracts.

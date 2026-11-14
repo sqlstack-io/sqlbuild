@@ -196,6 +196,30 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
             config: json!({ "select": ["SQBRPYTHON306"] }),
             expected_faults: vec![("SQBRPYTHON306", "python/orders/_helpers/unused.py", 1, 1)],
         },
+        PythonRunTestCase {
+            description: "an audit factory under python/ is loaded",
+            files: &[(
+                "python/orders/quality/factories.py",
+                "@audit_factory\ndef order_quality() -> list:\n    return []\n",
+            )],
+            config: json!({ "select": ["SQBRPYTHON306"] }),
+            expected_faults: vec![],
+        },
+        PythonRunTestCase {
+            description: "a submodule imported from a folder without __init__.py is used",
+            files: &[
+                (
+                    "python/orders/_tables.py",
+                    "TABLES: int = 1\nUNUSED: int = 2\n",
+                ),
+                (
+                    "python/orders/node.py",
+                    "from python.orders import _tables\n\n\n@task\ndef count() -> int:\n    return _tables.TABLES\n",
+                ),
+            ],
+            config: json!({ "select": ["SQBRPYTHON306"] }),
+            expected_faults: vec![("SQBRPYTHON306", "python/orders/_tables.py", 2, 1)],
+        },
     ];
     for test_case in test_cases {
         let faults = python_rule_faults(test_case.files, test_case.config.clone());

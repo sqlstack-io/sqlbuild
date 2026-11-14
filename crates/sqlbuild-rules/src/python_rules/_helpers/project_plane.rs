@@ -1,6 +1,9 @@
 //! Every project module at once, for the rules that judge how modules use each other.
 
+use std::collections::BTreeSet;
 use std::path::Path;
+
+use fensu_facts::ProgramHandle;
 
 use fensu_native::rules::constants::{DEAD_DEFINITION_CODE, PUBLIC_MAIN_ENTRY_EXTERNAL_USE_CODE};
 use fensu_native::{NativeProjectModule, NativeProjectPlane};
@@ -9,7 +12,7 @@ use sqlbuild_pysource::definition_locations::main::decorated_functions::decorate
 use crate::models::EvaluateRequest;
 use crate::python_rules::_helpers::programs::Programs;
 use crate::python_rules::constants::{
-    ENTRYPOINT_KIND, INIT_FILE, NODE_DECORATORS, PACKAGE_ROOT, ROOT_SCOPE,
+    ENTRYPOINT_KIND, INIT_FILE, LOADED_DECORATORS, PACKAGE_ROOT, ROOT_SCOPE,
 };
 use crate::python_rules::models::{PythonRuleSpec, PythonTarget};
 
@@ -53,7 +56,7 @@ fn project_plane(
         let loaded: Vec<String> = if target.package {
             decorated_functions(
                 &programs.sources[target.source].text,
-                &NODE_DECORATORS,
+                &LOADED_DECORATORS,
                 python_version,
             )
         } else {
@@ -84,7 +87,45 @@ fn project_plane(
             module.with_ownership(None, None)
         });
     }
+    modules.extend(namespace_packages(targets, ownership_root, python_version)?);
     Ok((NativeProjectPlane::new(modules, entry_modules), entrypoints))
+}
+
+/// An empty package module for each folder under `python/` without `__init__.py`, so its submodules resolve.
+fn namespace_packages(
+    targets: &[PythonTarget],
+    ownership_root: &str,
+    python_version: (u8, u8),
+) -> Result<Vec<NativeProjectModule>, String> {
+    let paths: BTreeSet<&str> = targets
+        .iter()
+        .map(|target| target.repository_path.as_str())
+        .collect();
+    let folders: BTreeSet<&str> = targets
+        .iter()
+        .filter(|target| target.package)
+        .flat_map(|target| {
+            target
+                .repository_path
+                .match_indices('/')
+                .map(|(end, _)| &target.repository_path[..end])
+        })
+        .filter(|folder| !paths.contains(format!("{folder}/{INIT_FILE}").as_str()))
+        .collect();
+    let empty = ProgramHandle::parse_source("", python_version.0, python_version.1)
+        .map_err(|failure| format!("cannot parse an empty Python module: {failure:?}"))?;
+    Ok(folders
+        .into_iter()
+        .map(|folder| {
+            NativeProjectModule::new(
+                format!("{folder}/{INIT_FILE}"),
+                ROOT_SCOPE.to_owned(),
+                folder.split('/').map(str::to_owned).collect(),
+                empty.clone(),
+            )
+            .with_ownership(Some(1), Some(ownership_root.to_owned()))
+        })
+        .collect())
 }
 
 /// The dotted-name parts of the module at project-relative `path`.

@@ -4,7 +4,7 @@ use fensu_native::NativeFaultRow;
 
 use crate::models::Fault;
 use crate::python_rules::_helpers::programs::Programs;
-use crate::python_rules::constants::{PACKAGE_ROOT, PYTHON_RULES};
+use crate::python_rules::constants::{CATALOGUE_REMEDIATION_CODES, PACKAGE_ROOT, PYTHON_RULES};
 use crate::python_rules::models::{PythonFiles, PythonRuleSpec, PythonTarget};
 
 /// `row` under its `SQBRPYTHON` code on its file, or none when a `python/` rule reports outside `python/`.
@@ -39,6 +39,7 @@ pub(crate) fn python_fault(
         message: row.message.unwrap_or_else(|| rule.message.to_owned()),
         remediation: row
             .remediation
+            .filter(|_| !CATALOGUE_REMEDIATION_CODES.contains(&row.code.as_str()))
             .unwrap_or_else(|| rule.remediation.to_owned()),
     }))
 }
