@@ -7,10 +7,12 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import duckdb
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     ConnectionLocationTestCase,
+    ManagedSourceLoaderLocationTestCase,
     MissingTargetDatabaseTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
@@ -215,3 +217,56 @@ def test_given_connection_location_when_compiling_then_models_build_there(
     assert [model["qualified_name"] for model in payload["resources"]["models"]] == [
         test_case.expected_qualified_name
     ], test_case.description
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        ManagedSourceLoaderLocationTestCase(
+            description="build loads the managed source into the target loader schema",
+            command=("--no-color", "build"),
+            expected_rows=((1,),),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_ignored_connection_schema_when_building_managed_source_then_loader_schema_is_used(
+    test_case: ManagedSourceLoaderLocationTestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="orders",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n[connection]\n'
+                'database = "dev.duckdb"\nschema = "landing"\n\n'
+                '[connections.archive]\ndatabase = "archive.duckdb"\n\n'
+                '[targets.dev]\nloader_schema = "raw"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Test model orders.', materialized view, "
+                'schema staging);\n\nSELECT order_id FROM __source("raw_orders")\n'
+            ),
+            "sources/raw.yml": (
+                "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+                "    managed: true\n    write_strategy: table\n"
+                "    columns:\n      - name: order_id\n        type: INTEGER\n"
+            ),
+            "python/loaders/orders.py": (
+                "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+            ),
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=test_case.command, project_dir=project_dir
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    with duckdb.connect(str(project_dir / "dev.duckdb"), read_only=True) as connection:
+        rows: list[tuple[object, ...]] = connection.execute(
+            "SELECT order_id FROM raw.raw_orders"
+        ).fetchall()
+    assert tuple(rows) == test_case.expected_rows

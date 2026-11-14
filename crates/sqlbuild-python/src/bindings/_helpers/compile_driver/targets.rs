@@ -1,6 +1,6 @@
 //! Adapter-aware target namespace validation of a compile.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -598,10 +598,21 @@ pub(crate) fn managed_write_schemas(
     if ignored.is_none() {
         return Ok(());
     }
+    let mut source_loaders: HashSet<String> = HashSet::new();
+    for source in native_field(project, "sources")?.try_iter()? {
+        if let Some(loader) = text_or_none(&native_field(
+            &native_field(&source?, "source_entry")?,
+            "loader",
+        )?)? {
+            source_loaders.insert(loader);
+        }
+    }
     for loader in native_field(project, "loader_functions")?.try_iter()? {
         let loader: Bound<'_, PyAny> = loader?;
         let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
-        if destination.is_some_and(|destination| destination.contains('.')) {
+        if destination.is_some_and(|destination| destination.contains('.'))
+            || source_loaders.contains(&native_field(&loader, "name")?.extract::<String>()?)
+        {
             continue;
         }
         managed_write_schema(

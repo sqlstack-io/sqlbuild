@@ -1433,3 +1433,12 @@ class ConnectionLocationTestCase:
     description: str
     project_toml: str
     expected_qualified_name: str
+
+
+@dataclass(frozen=True)
+class ManagedSourceLoaderLocationTestCase:
+    """A command that runs a managed source's loader and the rows its loader schema must hold."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_rows: tuple[tuple[object, ...], ...]

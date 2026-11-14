@@ -156,7 +156,7 @@ def test_given_local_and_cli_overrides_when_building_then_precedence_picks_the_r
             project_toml=_ONE_CONNECTION_PROJECT,
             argv=("debug", "--no-connection"),
             expected_exit_code=0,
-            expected_output_fragments=("connection: local", "shop.duckdb"),
+            expected_output_fragments=("connection: local", "database: not configured"),
         ),
         DefaultConnectionCliTestCase(
             description="build fails at config load among several named connections",
