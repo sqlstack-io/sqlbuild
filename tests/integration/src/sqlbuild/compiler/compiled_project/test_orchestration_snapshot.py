@@ -1505,6 +1505,19 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_message="callbacks with when are not supported yet",
         ),
         SnapshotDiscoveryRejectionTestCase(
+            description="a job description past max_description_lines cannot publish",
+            files={
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job\n"
+                    "daily = job('daily', description='Build orders. ' * 100, select='orders')\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message=re.escape(
+                "job 'daily' description exceeds 10 lines; shorten it to 10 lines"
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
             description="a group declaring after is refused and names the group",
             files={
                 "orchestration/jobs.py": (

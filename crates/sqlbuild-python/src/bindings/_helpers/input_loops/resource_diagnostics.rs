@@ -19,6 +19,7 @@ use sqlbuild_analysis::resource_diagnostics::main::yaml_help::yaml_help;
 use sqlbuild_analysis::resource_diagnostics::models::{CursorModel, HeaderHelp};
 use sqlbuild_discovery::yaml_files::main::yaml_entry_lines::yaml_entry_lines;
 use sqlbuild_pysource::definition_locations::main::decorator_location::decorator_location;
+use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
 use sqlbuild_sqltext::compiler::main::model_header_entry_span::model_header_entry_span;
 
 use crate::bindings::_helpers::compile_context::delta::{
@@ -35,6 +36,7 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::models::ReferenceRow;
 
 const MISSING_DESCRIPTION_CODE: &str = "P010";
+const DESCRIPTION_LENGTH_CODE: &str = "P027";
 const CURSOR_WITHOUT_INPUTS_CODE: &str = "P011";
 const ORPHAN_FACTORY_CODE: &str = "C216";
 const AUDIT_FACTORIES_KEY: &str = "audit_factories";
@@ -149,6 +151,37 @@ impl<'py> Diagnostics<'_, 'py> {
         Ok(Some(self.diagnostic(
             (MISSING_DESCRIPTION_CODE, "error"),
             (&message, Some(help)),
+            (resource_type, name),
+            location()?,
+        )?))
+    }
+
+    /// P010 for a Python `kind` `name` without a description, or P027 when it wraps past the limit.
+    fn described_python(
+        &self,
+        resource: (&str, &str, Option<&str>),
+        description: Option<&str>,
+        location: impl FnOnce() -> PyResult<Bound<'py, PyAny>>,
+        help: &str,
+    ) -> PyResult<Option<Bound<'py, PyAny>>> {
+        let (kind, name, resource_type) = resource;
+        let (limit, line_width) = self.settings.description_limit;
+        let Some(text) =
+            description.filter(|_| missing_description(kind, name, description).is_none())
+        else {
+            return self.described(resource, description, location, help);
+        };
+        if description_line_count(text, line_width) <= limit {
+            return Ok(None);
+        }
+        Ok(Some(self.diagnostic(
+            (DESCRIPTION_LENGTH_CODE, "error"),
+            (
+                &format!("{kind} '{name}' description exceeds {limit} lines"),
+                Some(&format!(
+                    "Shorten the description to {limit} lines; move detail into documentation."
+                )),
+            ),
             (resource_type, name),
             location()?,
         )?))
@@ -367,7 +400,7 @@ fn missing_descriptions<'py>(
         let text = description
             .as_ref()
             .map(|description| docstring_text(description.bind(py)));
-        found.push(diagnostics.described(
+        found.push(diagnostics.described_python(
             (kind, name, None),
             text.as_deref(),
             || location.bind(py).call0(),
@@ -456,7 +489,7 @@ fn function_description<'py>(
             ),
             &[format!("@udf(description=\"What {name} returns\", ...)")],
         );
-        return diagnostics.described(
+        return diagnostics.described_python(
             ("function", name, Some(resource_type)),
             attached.description.as_deref(),
             || {

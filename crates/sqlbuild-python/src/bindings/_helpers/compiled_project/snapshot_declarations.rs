@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use serde_json::Value;
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
@@ -27,6 +27,9 @@ use crate::bindings::_helpers::native_host::orchestration_declarations::{
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     compile_calendars, compile_cron, compile_sensors,
 };
+use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
+use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
+use sqlbuild_rules::lint_text::models::FormatSettings;
 
 /// Dedicated declaration modules, imported by publication and by selectors that name a job.
 pub(crate) fn discover_declarations<'py>(
@@ -85,6 +88,45 @@ pub(crate) fn compile_declarations(
             AuthoredDeclaration::Group(group) => authored_groups.push(group),
             AuthoredDeclaration::Calendar(calendar) => authored_calendars.push(calendar),
             AuthoredDeclaration::Sensor(sensor) => authored_sensors.push(sensor),
+        }
+    }
+    let format: FormatSettings =
+        resolve_format_settings(project_dir).map_err(PyValueError::new_err)?;
+    let mut described: Vec<(&str, String, String)> = Vec::new();
+    described.extend(
+        authored_jobs
+            .iter()
+            .map(|job| ("job", job.name.clone(), job.description.clone())),
+    );
+    described.extend(
+        authored_groups
+            .iter()
+            .map(|group| ("job group", group.name.clone(), group.description.clone())),
+    );
+    described.extend(
+        authored_sensors
+            .iter()
+            .map(|sensor| ("sensor", sensor.name.clone(), sensor.description.clone())),
+    );
+    for calendar in &authored_calendars {
+        let calendar: &Bound<'_, PyAny> = calendar.bind(py);
+        described.push((
+            "calendar schedule",
+            calendar
+                .getattr("function")?
+                .getattr("__name__")?
+                .extract()?,
+            calendar.getattr("description")?.extract()?,
+        ));
+    }
+    for (kind, name, description) in described {
+        let limit: i64 = format.max_description_lines;
+        let lines: usize = description_line_count(&description, format.line_width);
+        if i64::try_from(lines).unwrap_or(i64::MAX) > limit {
+            return Err(PyValueError::new_err(format!(
+                "{kind} '{name}' description exceeds {limit} lines; shorten it to {limit} lines \
+                 and move detail into documentation"
+            )));
         }
     }
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();

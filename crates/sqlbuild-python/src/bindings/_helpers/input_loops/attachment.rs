@@ -1,13 +1,17 @@
 //! Seeds, functions, sources, SQL tests, scenarios and audits attached from discovered inputs.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyCFunction, PyDict, PyDictMethods, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_attachments::audits::constants::BUILTIN_AUDITS;
 use sqlbuild_host::compile_context::main::record_compile_timing::record_compile_timing;
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost, UserCodeHost};
+use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
+use sqlbuild_rules::lint_text::models::FormatSettings;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditBlockRow;
@@ -564,6 +568,7 @@ fn diagnostic_settings<'py>(
         .collect::<PyResult<_>>()?;
     settings.set_item("sql_hooks", hooks)?;
     settings.set_item("loaders", loader_rows(discovered)?)?;
+    settings.set_item("description_limit", description_limit(discovered)?)?;
     settings.set_item(
         "python_resources",
         call_with(
@@ -575,6 +580,17 @@ fn diagnostic_settings<'py>(
         )?,
     )?;
     Ok(settings)
+}
+
+/// The project's `max_description_lines` and `line_width`, as `sqb format` resolves them.
+fn description_limit(discovered: &Bound<'_, PyAny>) -> PyResult<(usize, i64)> {
+    let directory: Option<PathBuf> = native_field(discovered, "project_dir")?.extract()?;
+    let settings: FormatSettings =
+        resolve_format_settings(&directory.unwrap_or_default()).map_err(PyValueError::new_err)?;
+    Ok((
+        usize::try_from(settings.max_description_lines).unwrap_or(0),
+        settings.line_width,
+    ))
 }
 
 /// Attach every SQL test case, scenario and audit, then report every resource diagnostic.
