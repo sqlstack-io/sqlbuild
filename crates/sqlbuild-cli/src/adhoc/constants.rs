@@ -6,6 +6,12 @@ pub(crate) const ADHOC_VERBS: [&str; 5] = ["build", "test", "seed", "audit", "fr
 /// The verb whose settings must also form valid job settings.
 pub(crate) const BUILD_VERB: &str = "build";
 
+/// Verbs that select SQL unit tests by `test:` or by name, as on the command line.
+pub(crate) const UNIT_TEST_VERBS: [&str; 2] = ["build", "test"];
+
+/// The published kind of a SQL unit test.
+pub(crate) const SQL_TEST_KIND: &str = "sql_test";
+
 /// The verb that runs only the seeds of its selection.
 pub(crate) const SEED_VERB: &str = "seed";
 
@@ -20,6 +26,9 @@ pub(crate) const CHANGED_COUNTS_DEST: &str = "changed_counts";
 
 /// The job setting `--changed` becomes.
 pub(crate) const CHANGED_DEST: &str = "changed";
+
+/// The destination `--no-python` clears; only a build with Python nodes resolves them.
+pub(crate) const INCLUDE_PYTHON_DEST: &str = "include_python";
 
 /// The destination `--load` and `--no-load` share; only `--no-load` is accepted.
 pub(crate) const LOAD_SOURCES_DEST: &str = "load_sources";

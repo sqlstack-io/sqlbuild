@@ -33,3 +33,6 @@ pub(crate) const REACH_SETTING: &str = "reach";
 pub(crate) const JOB_RUN_REACH: &str = "all";
 /// What a job run with `changed: True` counts when `[changes] counts` is not set: every change.
 pub(crate) const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];
+
+/// A SQL unit test's published kind; a frozen run selects it back with `test:<name>`.
+pub(crate) const SQL_TEST_NODE_KIND: &str = "sql_test";

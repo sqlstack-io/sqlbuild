@@ -127,7 +127,7 @@ def export_orders(ctx):
 - `ctx.skip(reason, mode=...)` skips the node. `mode` accepts `"soft"` (default, skips only this node) or `"hard"` (also blocks dependents), as a string or the `SkipMode` enum from `sqlbuild.tasks`/`sqlbuild.assets`.
 - Assets may pass `materialized=True`/`False` to record whether an artifact was produced.
 
-Downstream nodes run only if at least one upstream succeeded. If all upstreams are skipped, the downstream is skipped. A failed or hard-skipped upstream blocks its dependents.
+Within one run, downstream nodes run only if at least one upstream succeeded. If all upstreams are skipped, the downstream is skipped. A failed or hard-skipped upstream blocks its dependents.
 
 ## Result persistence
 
@@ -141,7 +141,7 @@ Python nodes are selected like SQL resources, by bare name or typed selector:
 sqb build --select export_orders          # bare name
 sqb build --select task:export_orders      # typed
 sqb build --select asset:orders_export
-sqb build --select check:check_orders
+sqb build --select export_orders check:check_orders_exported  # a check with the node it checks
 sqb build --select tag:exports             # by tag
 sqb build --select +orders_export           # with upstreams
 ```
@@ -160,6 +160,18 @@ part of the run gates the node: it waits for that model, seed, or source load, a
 dependency fails or is skipped. A dependency that is not part of the run (not selected, or an
 unmanaged source) is read as it currently exists, so `sqb build --select task:export_orders` runs
 the task against the relations already in the warehouse.
+
+Python dependencies follow the same rule. A task or asset selected without its Python upstream
+reads that upstream's latest successful result through `ctx.result_of`. If the upstream has never
+succeeded for the target, the node fails with an error that names the upstream, for example:
+
+```text
+Upstream task 'prepare_orders' has no successful result to read. Build it first with
+'sqb build --select task:prepare_orders', or build both with 'sqb build --select +asset:export_orders'.
+```
+
+Jobs, sensors, roles and ad-hoc runs on the server resolve selectors the same way, so a job can
+select one Python node and a job group orders it after the job that builds its upstream.
 
 The commands differ in what they include by default:
 

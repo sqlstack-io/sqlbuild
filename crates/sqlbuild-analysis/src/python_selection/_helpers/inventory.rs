@@ -2,6 +2,9 @@
 
 use std::collections::HashMap;
 
+use crate::assembly::project::types::ObjectKey;
+use crate::definition_changes::constants::PYTHON_NODE_KINDS;
+
 use crate::python_selection::constants::{CURRENT_DIRECTORY, ROOT_DIRECTORY};
 use crate::python_selection::models::{InventoryIndexes, InventoryNode};
 
@@ -82,4 +85,18 @@ pub(crate) fn indexes(nodes: &[InventoryNode]) -> InventoryIndexes {
         tags: tags.rows,
         paths: paths.rows,
     }
+}
+
+/// A published node's dependency keys split into its Python upstream names and its SQL keys.
+pub(crate) fn split_published_deps(deps: &[ObjectKey]) -> (Vec<String>, Vec<ObjectKey>) {
+    let mut python: Vec<String> = Vec::new();
+    let mut sql: Vec<ObjectKey> = Vec::new();
+    for (kind, name) in deps {
+        if PYTHON_NODE_KINDS.contains(&kind.as_str()) {
+            python.push(name.clone());
+        } else {
+            sql.push((kind.clone(), name.clone()));
+        }
+    }
+    (python, sql)
 }

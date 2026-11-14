@@ -1,6 +1,6 @@
 //! Location publication assembles catalog data and planner-owned local identities.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use pyo3::exceptions::PyValueError;
@@ -24,6 +24,7 @@ use crate::bindings::_helpers::compiled_project::snapshot_roles::compile_project
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::discovery::project_facts::{named_node_rows, project_facts};
 use crate::bindings::_helpers::discovery::project_validation::validation_error;
+use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
 use crate::bindings::_helpers::location_command::snapshot_providers::providers_document;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
@@ -35,6 +36,9 @@ use crate::bindings::_helpers::planner_identity::identities::direct_model_versio
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
 use crate::bindings::_helpers::planner_scope::values::project_graph;
 use crate::bindings::_helpers::records::fields::field;
+
+/// The Python node kind whose functions load sources.
+const LOADER_KIND: &str = "loader";
 
 /// Where declarations passed to the snapshot directly are reported as declared.
 const DECLARATIONS_ARGUMENT: &str = "declarations argument";
@@ -111,6 +115,9 @@ pub(crate) fn orchestration_snapshot<'py>(
     }
     input.nodes = resource_nodes(py, &project, &owner, input.nodes)?;
     drop(owner);
+    let selected =
+        ProjectSelection::new((&project).into_pyobject(py)?.as_any(), &discovered_inputs)?;
+    input.nodes = python_nodes(&selected, input.nodes)?;
     if let Some(providers) = providers_document(&discovered_inputs, &input.nodes)? {
         input.documents.insert("providers".into(), providers);
     }
@@ -137,11 +144,15 @@ pub(crate) fn orchestration_snapshot<'py>(
         input = compile_declarations(
             py,
             input,
-            (&project_dir, graph.bind(py).get().graph()),
+            (&project_dir, graph.bind(py).get().graph(), &selected),
             authored,
         )?;
     }
-    input = compile_project_roles(py, input, (&project_dir, graph.bind(py).get().graph()))?;
+    input = compile_project_roles(
+        py,
+        input,
+        (&project_dir, graph.bind(py).get().graph(), &selected),
+    )?;
     let project = project.into_pyobject(py)?;
     if let Some(lineage) = column_lineage_document(project.as_any())? {
         input.documents.insert("lineage".into(), lineage);
@@ -149,6 +160,77 @@ pub(crate) fn orchestration_snapshot<'py>(
     input.nodes = identity_nodes(project.as_any(), input.nodes)?;
     input.nodes = load_nodes(project.as_any(), input.nodes)?;
     Ok(NativeOrchestrationSnapshot { input })
+}
+
+/// Python nodes publish their `deps` and tags, and each intermediate loader publishes the source it writes, so the server orders, selects and grants them as the CLI does.
+fn python_nodes(
+    selected: &ProjectSelection,
+    mut nodes: BTreeMap<String, SnapshotNode>,
+) -> PyResult<BTreeMap<String, SnapshotNode>> {
+    let graph = &selected.nodes;
+    let mut tags: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (tag, names) in &graph.tags {
+        for name in names {
+            tags.entry(name.as_str()).or_default().push(tag.as_str());
+        }
+    }
+    let upstream: BTreeMap<&str, &[String]> = graph
+        .upstream
+        .iter()
+        .map(|(name, names)| (name.as_str(), names.as_slice()))
+        .collect();
+    let mut outputs: Vec<(String, SnapshotNode)> = Vec::new();
+    for node in &graph.nodes {
+        let key = format!("{}:{}", node.kind, node.name);
+        let Some(published) = nodes.get_mut(&key) else {
+            return Err(PyValueError::new_err(format!(
+                "Python node {key} is missing from the snapshot"
+            )));
+        };
+        let deps: BTreeSet<String> = upstream
+            .get(node.name.as_str())
+            .into_iter()
+            .flat_map(|names| names.iter())
+            .filter_map(|name| selected.node_key(name))
+            .chain(
+                node.sql_deps
+                    .iter()
+                    .map(|(kind, name)| format!("{kind}:{name}")),
+            )
+            .collect();
+        published.definition["deps"] = json!(deps);
+        published.definition["tags"] =
+            json!(tags.get(node.name.as_str()).cloned().unwrap_or_default());
+        if node.kind == LOADER_KIND && selected.intermediate_loader(&node.name) {
+            let mut definition = json!({
+                "name": node.name,
+                "entry": {"loader": node.name},
+                "intermediate_loader": true,
+                "deps": [key],
+            });
+            if let Some(path) = published.definition.get("path") {
+                definition["path"] = path.clone();
+            }
+            outputs.push((
+                format!("source:{}", node.name),
+                SnapshotNode {
+                    kind: "source".into(),
+                    definition,
+                    raw_sql: None,
+                    compiled_sql: None,
+                    python_source: None,
+                },
+            ));
+        }
+    }
+    for (key, node) in outputs {
+        if nodes.insert(key.clone(), node).is_some() {
+            return Err(PyValueError::new_err(format!(
+                "intermediate loader {key} collides with a published node"
+            )));
+        }
+    }
+    Ok(nodes)
 }
 
 fn identity_nodes(

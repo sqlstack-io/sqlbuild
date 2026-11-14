@@ -52,6 +52,19 @@ pub struct InventoryNode {
     pub upstream: Vec<String>,
 }
 
+/// One Python node as a published snapshot lists it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PublishedPythonNode {
+    pub name: String,
+    /// `task`, `asset`, `loader` or `check`.
+    pub kind: String,
+    pub tags: Vec<String>,
+    /// The folder of the node's file relative to the project, in POSIX form.
+    pub folder: String,
+    /// The Python nodes and SQL resources it depends on, as published keys.
+    pub deps: Vec<ObjectKey>,
+}
+
 /// Python's `PythonNodeGraph` edges and indexes, each in Python's dict order.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct InventoryIndexes {

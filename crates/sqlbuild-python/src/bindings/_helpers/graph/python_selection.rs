@@ -1,5 +1,8 @@
 //! Python node and unified SQL/Python selector resolution, and the Python node graph indexes.
 
+use std::borrow::Cow;
+use std::collections::BTreeSet;
+
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -7,9 +10,13 @@ use pyo3::types::{PyDict, PyFrozenSet};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::errors::SelectorError;
+use sqlbuild_analysis::graph::models::ProjectGraph;
+use sqlbuild_analysis::python_selection::main::attach_python_jobs::attach_python_jobs;
 use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python_node_graph_indexes as graph_indexes;
+use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
 use sqlbuild_analysis::python_selection::main::resolve_python_node_excludes::resolve_python_node_excludes;
 use sqlbuild_analysis::python_selection::main::resolve_python_node_selectors::resolve_python_node_selectors;
+use sqlbuild_analysis::python_selection::main::resolve_python_sql_nodes::resolve_python_sql_nodes;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection as run_selection;
 use sqlbuild_analysis::python_selection::models::{
     InventoryIndexes, InventoryNode, PythonSelectionGraph, PythonSelectionNode, RunSelection,
@@ -17,8 +24,9 @@ use sqlbuild_analysis::python_selection::models::{
 };
 
 use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::compiled_project::job_catalog::graph_with_jobs;
+use crate::bindings::_helpers::compiled_project::job_catalog::needed_jobs;
 use crate::bindings::_helpers::graph::project_graph::{CompiledProjectGraph, NativeProjectGraph};
+use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_items;
@@ -128,6 +136,101 @@ fn project_sources(project: &Bound<'_, PyAny>) -> PyResult<Vec<(String, Option<S
         .collect()
 }
 
+/// A compiled project's sources and discovered Python nodes, which publication resolves selectors over.
+pub(crate) struct ProjectSelection {
+    sources: Vec<(String, Option<String>)>,
+    pub(crate) nodes: PythonSelectionGraph,
+}
+
+impl ProjectSelection {
+    pub(crate) fn new(
+        project: &Bound<'_, PyAny>,
+        discovered_inputs: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            sources: project_sources(project)?,
+            nodes: selection_graph(&python_node_graph(discovered_inputs)?)?,
+        })
+    }
+
+    /// The `kind:name` keys `sqb build --select` runs for these selectors.
+    pub(crate) fn run_keys(
+        &self,
+        graph: &ProjectGraph,
+        select: &[String],
+        exclude: &[String],
+    ) -> Result<BTreeSet<String>, String> {
+        self.keys(run_selection(self.sql(graph), &self.nodes, select, exclude))
+    }
+
+    /// The `kind:name` keys these selectors name, Python checks included.
+    pub(crate) fn node_keys(
+        &self,
+        graph: &ProjectGraph,
+        select: &[String],
+        exclude: &[String],
+    ) -> Result<BTreeSet<String>, String> {
+        self.keys(resolve_python_sql_nodes(
+            self.sql(graph),
+            &self.nodes,
+            select,
+            exclude,
+        ))
+    }
+
+    /// The published key of a Python node, such as `task:export_orders`.
+    pub(crate) fn node_key(&self, name: &str) -> Option<String> {
+        self.nodes
+            .nodes
+            .iter()
+            .rev()
+            .find(|node| node.name == name)
+            .map(|node| format!("{}:{name}", node.kind))
+    }
+
+    /// The key a selected Python node's run reports under; a loader reports as the source it writes.
+    fn run_key(&self, name: &str) -> Option<String> {
+        let node = self
+            .nodes
+            .nodes
+            .iter()
+            .rev()
+            .find(|node| node.name == name)?;
+        Some(python_run_key(&self.sources, (&node.kind, name)))
+    }
+
+    /// Whether a loader writes no declared source and so runs only as part of another loader's chain.
+    pub(crate) fn intermediate_loader(&self, name: &str) -> bool {
+        !self
+            .sources
+            .iter()
+            .any(|(_, loader)| loader.as_deref() == Some(name))
+    }
+
+    fn sql<'graph>(&'graph self, graph: &'graph ProjectGraph) -> SqlSelectionGraph<'graph> {
+        SqlSelectionGraph {
+            graph,
+            sources: &self.sources,
+        }
+    }
+
+    fn keys(
+        &self,
+        selection: Result<RunSelection, SelectorError>,
+    ) -> Result<BTreeSet<String>, String> {
+        let selection: RunSelection = selection.map_err(|error| error.message)?;
+        let mut keys: BTreeSet<String> = selection
+            .sql_keys
+            .into_iter()
+            .map(|(kind, name)| format!("{kind}:{name}"))
+            .collect();
+        for name in &selection.python_node_names {
+            keys.extend(self.run_key(name));
+        }
+        Ok(keys)
+    }
+}
+
 /// The Python node names `select` minus `exclude` resolve to; every node when unselected.
 pub(crate) fn python_node_names<'py>(
     graph: &Bound<'py, PyAny>,
@@ -183,7 +286,18 @@ pub(crate) fn resolve_python_sql_run_selection(
     let nodes: PythonSelectionGraph = selection_graph(python_graph)?;
     let node_names: Vec<&str> = nodes.nodes.iter().map(|node| node.name.as_str()).collect();
     let selectors: Vec<String> = select.iter().chain(&exclude).cloned().collect();
-    let graph = graph_with_jobs(py, native.get().graph(), &selectors, &node_names)?;
+    let graph: Cow<'_, ProjectGraph> =
+        match needed_jobs(py, native.get().graph(), &selectors, &node_names)? {
+            Some(catalog) => Cow::Owned(attach_python_jobs(
+                SqlSelectionGraph {
+                    graph: native.get().graph(),
+                    sources: &sources,
+                },
+                &nodes,
+                catalog,
+            )),
+            None => Cow::Borrowed(native.get().graph()),
+        };
     let selection: RunSelection = compiler_guard(|| {
         Ok(run_selection(
             SqlSelectionGraph {

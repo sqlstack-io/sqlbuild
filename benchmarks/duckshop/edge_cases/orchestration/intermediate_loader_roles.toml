@@ -1,0 +1,15 @@
+# Roles over a loader chain whose middle loader no source declares: running the job needs a grant
+# on the intermediate loader's node as well as the model and the source it feeds.
+[roles.shipments_runner]
+description = "Run the shipments build, including its staging loader"
+
+[[roles.shipments_runner.grants]]
+nodes = ["orders", "source:raw_shipments", "loader:stage_shipments"]
+permissions = ["job.run"]
+
+[roles.orders_runner]
+description = "Run the orders build without the staging loader"
+
+[[roles.orders_runner.grants]]
+nodes = ["orders", "source:raw_shipments"]
+permissions = ["job.run"]

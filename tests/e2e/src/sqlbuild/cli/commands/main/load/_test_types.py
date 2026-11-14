@@ -127,3 +127,11 @@ class LoaderRelationGuardE2ETestCase:
     enforce_explicit: bool
     expected_warnings: tuple[str, ...]
     expected_final_line_prefix: str
+
+
+@dataclass(frozen=True)
+class IntermediateLoaderDefaultE2ETestCase:
+    description: str
+    command: tuple[str, ...]
+    expected_intermediate_rows: tuple[tuple[object, ...], ...]
+    expected_terminal_rows: tuple[tuple[object, ...], ...]

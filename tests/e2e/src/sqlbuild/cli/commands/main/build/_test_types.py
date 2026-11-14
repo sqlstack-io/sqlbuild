@@ -1622,3 +1622,13 @@ class ChangedTwoUpE2ETestCase:
     warehouse: ChangedWarehouse
     expected_crm_run: frozenset[str]
     expected_downstream: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PythonUpstreamResultE2ETestCase:
+    """A Python node selected without its Python upstream, before and after the upstream builds."""
+
+    description: str
+    select: str
+    upstream_select: str
+    expected_error: str

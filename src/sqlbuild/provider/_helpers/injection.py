@@ -73,7 +73,12 @@ def call_with_provider_injection(
         if not context_bound and parameter.default is inspect.Parameter.empty:
             kwargs[parameter.name] = context
             context_bound = True
-    return function(**kwargs)
+    positional: list[object] = []
+    for parameter in signature.parameters.values():
+        if parameter.kind != inspect.Parameter.POSITIONAL_ONLY or parameter.name not in kwargs:
+            break
+        positional.append(kwargs.pop(parameter.name))
+    return function(*positional, **kwargs)
 
 
 def _provider_for_parameter(

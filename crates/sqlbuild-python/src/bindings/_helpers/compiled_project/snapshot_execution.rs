@@ -324,12 +324,15 @@ impl WorkerBuild {
         self.complete(py, key, (outcome, None, (None, None)))
     }
 
-    /// A test or audit the snapshot records has started; the node it attaches to starts with it.
+    /// A test or audit the snapshot records has started; a selected SQL test reports as a node.
     pub(crate) fn start_attached(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         self.check_cancelled(py)?;
         let Some(nodes) = self.attached.get(key) else {
             return Ok(());
         };
+        if self.execution.claim.request.selection.contains(key) {
+            return self.start_key(py, key);
+        }
         if self
             .checks
             .lock()
@@ -377,7 +380,11 @@ impl WorkerBuild {
         } else {
             outcome
         };
-        self.finish_check(py, key, outcome)?;
+        if self.execution.claim.request.selection.contains(key) {
+            self.complete(py, key, (outcome, None, (None, None)))?;
+        } else {
+            self.finish_check(py, key, outcome)?;
+        }
         if outcome == NodeOutcome::Skipped {
             return Ok(());
         }
@@ -413,27 +420,33 @@ impl WorkerBuild {
         Ok(None)
     }
 
-    /// A failing SQL test, found by its compiled name such as `parent [case]`, fails the nodes it blocks with its error; each test that reports releases a function waiting on its tests.
+    /// A selected SQL test completes itself; a failing one, found by its compiled name such as `parent [case]`, fails the nodes it blocks; each test that reports releases a function waiting on its tests.
     fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
         let py = result.py();
         let outcome: String = field(result, "outcome")?.str()?.extract()?;
+        let passed = SqlTestOutcome::from_value(&outcome) == Some(SqlTestOutcome::Pass);
+        let cancelled = !passed && self.worker.bind(py).get().refresh_cancellation(py)?;
         let name: String = field(result, "test_name")?.extract()?;
         let key = format!("{SQL_TEST_KEY_PREFIX}{name}");
-        if SqlTestOutcome::from_value(&outcome) != Some(SqlTestOutcome::Pass)
-            && !self.worker.bind(py).get().refresh_cancellation(py)?
-        {
-            let error: Option<String> = match result.getattr_opt("error_code")? {
-                Some(value) => value.extract()?,
-                None => None,
-            };
-            let message: Option<String> = match result.getattr_opt("error_message")? {
-                Some(value) => value.extract()?,
-                None => None,
-            };
-            for node in self.blocked.get(&key).into_iter().flatten() {
+        let error: Option<String> = match result.getattr_opt("error_code")? {
+            Some(value) => value.extract()?,
+            None => None,
+        };
+        let message: Option<String> = match result.getattr_opt("error_message")? {
+            Some(value) => value.extract()?,
+            None => None,
+        };
+        let node = match (passed, cancelled) {
+            (true, _) => NodeOutcome::Success,
+            (false, true) => NodeOutcome::Cancelled,
+            (false, false) => NodeOutcome::Failed,
+        };
+        self.complete(py, &key, (node, None, (error.clone(), message.clone())))?;
+        if !passed && !cancelled {
+            for model in self.blocked.get(&key).into_iter().flatten() {
                 self.complete(
                     py,
-                    node,
+                    model,
                     (NodeOutcome::Failed, None, (error.clone(), message.clone())),
                 )?;
             }

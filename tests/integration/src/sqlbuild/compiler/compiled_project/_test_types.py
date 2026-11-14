@@ -263,6 +263,41 @@ class SnapshotProvidersTestCase:
 
 
 @dataclass(frozen=True)
+class PythonJobSelectionTestCase:
+    description: str
+    select: str
+    expected_selection: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PythonJobGroupTestCase:
+    description: str
+    jobs: tuple[tuple[str, str], ...]
+    expected_groups: dict[str, dict[str, list[str]]]
+
+
+@dataclass(frozen=True)
+class PythonJobGroupCycleTestCase:
+    description: str
+    jobs: tuple[tuple[str, str], ...]
+    expected_message: str
+
+
+@dataclass(frozen=True)
+class PythonCheckJobTestCase:
+    description: str
+    select: str
+    expected_selection: list[str]
+
+
+@dataclass(frozen=True)
+class PythonCheckJobRejectionTestCase:
+    description: str
+    select: str
+    expected_message: str
+
+
+@dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
     schedule: Schedule

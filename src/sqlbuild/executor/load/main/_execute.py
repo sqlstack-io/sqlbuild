@@ -26,7 +26,7 @@ from sqlbuild.executor.load._helpers.cursors import (
     infer_cursor_kind,
     load_staging_cursor_bounds,
 )
-from sqlbuild.executor.load._helpers.execution import load_resource_kind
+from sqlbuild.executor.load._helpers.execution import load_resource_kind, row_write_entry
 from sqlbuild.executor.load._helpers.external import execute_external_source_load
 from sqlbuild.executor.load._helpers.loader_invocation import (
     build_loader_context,
@@ -176,6 +176,7 @@ def _execute_source_load(
                 )
                 if early_result is not None:
                     return early_result
+                source_entry = row_write_entry(source_entry)
                 rows_loaded: int = write_loader_rows_to_staging(
                     loader_return_value=raw_rows,
                     source_entry=source_entry,

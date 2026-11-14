@@ -10,6 +10,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.load._test_types import (
     ChainedLoaderFailureE2ETestCase,
     ChainedLoaderPruningE2ETestCase,
     ChainedLoaderSelectionE2ETestCase,
+    IntermediateLoaderDefaultE2ETestCase,
     IntermediateLoaderStrategyE2ETestCase,
     LoaderWaffleShopE2ETestCase,
     SourceLoaderErrorE2ETestCase,
@@ -1189,6 +1190,65 @@ def test_given_chained_loader_project_when_intermediate_uses_strategy_then_appli
     )
     assert tuple(intermediate_rows) == test_case.expected_intermediate_rows
     assert tuple(terminal_rows) == test_case.expected_terminal_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        IntermediateLoaderDefaultE2ETestCase(
+            description="sqb load writes the docs' intermediate loader as a table",
+            command=("--no-color", "load", "--select", "+raw_account_metrics"),
+            expected_intermediate_rows=((1, "Pawnee Parks"), (2, "Eagleton")),
+            expected_terminal_rows=((1, "active"), (2, "active")),
+        ),
+        IntermediateLoaderDefaultE2ETestCase(
+            description="sqb build writes the docs' intermediate loader as a table",
+            command=("--no-color", "build", "--select", "+source:raw_account_metrics"),
+            expected_intermediate_rows=((1, "Pawnee Parks"), (2, "Eagleton")),
+            expected_terminal_rows=((1, "active"), (2, "active")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_intermediate_loader_without_write_strategy_when_loading_twice_then_rows_replace_a_table(
+    tmp_path: Path,
+    test_case: IntermediateLoaderDefaultE2ETestCase,
+) -> None:
+    edge_cases: Path = Path("benchmarks/duckshop/edge_cases/loaders")
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="source_loader_schema_behavior",
+        repo_files=build_schema_behavior_project_files(
+            source_yaml=(edge_cases / "intermediate_default_accounts.yml").read_text(),
+            loader_py=(edge_cases / "intermediate_default_accounts.py").read_text(),
+        ),
+    )
+    db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
+
+    results: list[subprocess.CompletedProcess[str]] = [
+        run_sqb(command=test_case.command, project_dir=project_dir) for _ in range(2)
+    ]
+
+    for result in results:
+        assert result.returncode == 0, test_case.description + result.stdout + result.stderr
+    assert (
+        tuple(
+            query_duckdb(
+                db_path=db_path,
+                sql="SELECT account_id, account_name FROM __loader__raw_accounts ORDER BY 1",
+            )
+        )
+        == test_case.expected_intermediate_rows
+    )
+    assert (
+        tuple(
+            query_duckdb(
+                db_path=db_path,
+                sql="SELECT account_id, metric FROM raw_account_metrics ORDER BY 1",
+            )
+        )
+        == test_case.expected_terminal_rows
+    )
 
 
 @pytest.mark.parametrize(

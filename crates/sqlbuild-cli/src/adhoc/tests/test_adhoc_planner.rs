@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
+use sqlbuild_orchestration::runs::models::PlannerResource;
 use sqlbuild_orchestration::runs::types::PublishedJobs;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
@@ -28,6 +29,7 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
         resource("model:customers", &[], &[], Some("models/staging")),
         resource("source:shop.raw_orders", &[], &[], None),
         resource("seed:currencies", &[], &[], None),
+        resource("sql_test:orders_keep_amounts", &["model:orders"], &[], None),
     ];
     let jobs: PublishedJobs = BTreeMap::from([
         (
@@ -230,6 +232,40 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             expected_plan: Ok((&["model:orders"], json!({"case": "happy_path"}))),
         },
         AdhocPlanTestCase {
+            description: "test: selects one unit test",
+            command: &["test", "--select", "test:orders_keep_amounts"],
+            expected_plan: Ok((&["sql_test:orders_keep_amounts"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a unit test's bare name selects it, as on the command line",
+            command: &["test", "--select", "orders_keep_amounts"],
+            expected_plan: Ok((&["sql_test:orders_keep_amounts"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "build selects a model and a unit test together",
+            command: &["build", "--select", "customers", "test:orders_keep_amounts"],
+            expected_plan: Ok((
+                &["model:customers", "sql_test:orders_keep_amounts"],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "excluding a unit test is refused, since a run freezes only what it selects",
+            command: &[
+                "test",
+                "--select",
+                "orders",
+                "--exclude",
+                "test:orders_keep_amounts",
+            ],
+            expected_plan: Err("an ad-hoc run cannot exclude unit tests"),
+        },
+        AdhocPlanTestCase {
+            description: "audit refuses unit-test selectors as the command line does",
+            command: &["audit", "--select", "test:orders_keep_amounts"],
+            expected_plan: Err("selects a unit test"),
+        },
+        AdhocPlanTestCase {
             description: "audit settings come from the audit parser",
             command: &["audit", "-s", "orders", "--concurrency", "2"],
             expected_plan: Ok((&["model:orders"], json!({"concurrency": 2}))),
@@ -256,6 +292,207 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             description: "freshness excludes the sources an excluded model reads",
             command: &["freshness", "--exclude", "orders"],
             expected_plan: Err("no sources are selected or upstream of the selection"),
+        },
+    ];
+    let planner = adhoc_planner();
+    for test_case in test_cases {
+        let command: Vec<String> = test_case
+            .command
+            .iter()
+            .map(|token| (*token).to_owned())
+            .collect();
+        let actual = planner
+            .plan(&command, (&resources, &jobs))
+            .map(|plan| {
+                (
+                    plan.selection.into_iter().collect::<Vec<String>>(),
+                    json!(plan.settings),
+                )
+            })
+            .map_err(|error| {
+                test_case
+                    .expected_plan
+                    .as_ref()
+                    .err()
+                    .filter(|fragment| error.contains(**fragment))
+                    .map_or(error.clone(), |fragment| (*fragment).to_owned())
+            });
+        assert_eq!(
+            actual,
+            owned_plan(&test_case.expected_plan),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_command_line() {
+    let resources = [
+        resource("model:stg_orders", &[], &["orders"], Some("models/staging")),
+        resource(
+            "model:orders",
+            &["model:stg_orders"],
+            &["orders"],
+            Some("models/marts"),
+        ),
+        resource("model:customers", &[], &[], Some("models/marts")),
+        resource(
+            "asset:partner_orders_file",
+            &["model:orders"],
+            &["orders"],
+            Some("python/orders/partner_export"),
+        ),
+        resource(
+            "task:request_carrier_collection",
+            &["asset:partner_orders_file"],
+            &["orders"],
+            Some("python/fulfillment/carrier_sync"),
+        ),
+        PlannerResource {
+            loader: Some("raw_shipments".to_owned()),
+            ..resource("source:raw_shipments", &[], &[], None)
+        },
+        resource(
+            "model:shipments",
+            &["source:raw_shipments"],
+            &[],
+            Some("models/marts"),
+        ),
+        resource(
+            "loader:raw_shipments",
+            &["loader:stage_shipments"],
+            &[],
+            Some("python/loaders"),
+        ),
+        resource("loader:stage_shipments", &[], &[], Some("python/loaders")),
+    ];
+    let jobs: PublishedJobs = BTreeMap::from([(
+        "carrier_sync".to_owned(),
+        BTreeSet::from(["task:request_carrier_collection".to_owned()]),
+    )]);
+    let test_cases = [
+        AdhocPlanTestCase {
+            description: "a published job selects its Python nodes",
+            command: &["build", "--select", "job:carrier_sync"],
+            expected_plan: Ok((&["task:request_carrier_collection"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "upstream of a published job crosses its Python node's dependencies",
+            command: &["build", "--select", "+job:carrier_sync"],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "model:orders",
+                    "model:stg_orders",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "typed selectors select the Python nodes",
+            command: &[
+                "build",
+                "--select",
+                "task:request_carrier_collection",
+                "asset:partner_orders_file",
+            ],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "a task runs without the Python node it depends on, as on the command line",
+            command: &["build", "--select", "task:request_carrier_collection"],
+            expected_plan: Ok((&["task:request_carrier_collection"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a python folder selects the nodes under it",
+            command: &["build", "--select", "python/orders"],
+            expected_plan: Ok((&["asset:partner_orders_file"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a tag shared by models and Python nodes selects both",
+            command: &["build", "--select", "tag:orders"],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "model:orders",
+                    "model:stg_orders",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "upstream of a task crosses its Python and SQL dependencies",
+            command: &["build", "--select", "+task:request_carrier_collection"],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "model:orders",
+                    "model:stg_orders",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "downstream of a model reaches the Python nodes that read it",
+            command: &["build", "--select", "orders+", "--exclude", "stg_orders"],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "model:orders",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "upstream of a model runs its source's loader chain as the sources they write",
+            command: &["build", "--select", "+shipments"],
+            expected_plan: Ok((
+                &[
+                    "model:shipments",
+                    "source:raw_shipments",
+                    "source:stage_shipments",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "an intermediate loader runs as the source it writes",
+            command: &["build", "--select", "loader:stage_shipments"],
+            expected_plan: Ok((&["source:stage_shipments"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "test selects only the SQL nodes a tag shared with Python nodes matches",
+            command: &["test", "--select", "tag:orders"],
+            expected_plan: Ok((&["model:orders", "model:stg_orders"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "test downstream of a model stops at the Python nodes that read it",
+            command: &["test", "--select", "orders+", "--exclude", "stg_orders"],
+            expected_plan: Ok((&["model:orders"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a build without Python nodes selects only the SQL nodes a shared tag matches",
+            command: &["build", "--no-python", "--select", "tag:orders"],
+            expected_plan: Ok((
+                &["model:orders", "model:stg_orders"],
+                json!({"include_python": false}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "test of a job with only Python nodes has nothing to test",
+            command: &["test", "--select", "job:carrier_sync"],
+            expected_plan: Err("the selectors match no nodes in the current publication"),
         },
     ];
     let planner = adhoc_planner();

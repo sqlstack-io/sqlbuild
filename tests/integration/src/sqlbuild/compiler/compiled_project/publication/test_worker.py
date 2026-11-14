@@ -30,6 +30,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     CheckExecutionTestCase,
+    ClaimedLoadTestCase,
     ClaimedWorker,
     GroupExecutionTestCase,
     SnapshotWorkerTestCase,
@@ -37,6 +38,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     WorkerExecutionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    INTERMEDIATE_LOADER_FILES,
     LOADED_ORDER_FILES,
     cancel_running_statement,
     claimed_worker,
@@ -924,26 +926,55 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
 @pytest.mark.parametrize(
     "test_case",
     [
-        WorkerExecutionTestCase(
+        ClaimedLoadTestCase(
             "a tag-selected job claims its loader chain and hook-read source, not unread ones",
             "",
             "SELECT amount FROM orders",
             "success",
             [(7,)],
             files=LOADED_ORDER_FILES,
-        )
+            expected_write_set=frozenset(
+                {"model:orders", "source:raw_orders", "source:raw_customers", "source:raw_returns"}
+            ),
+        ),
+        ClaimedLoadTestCase(
+            "a job claims an intermediate loader no source declares",
+            "",
+            "SELECT amount FROM orders",
+            "success",
+            [(9,)],
+            files=INTERMEDIATE_LOADER_FILES,
+            expected_write_set=frozenset(
+                {"model:orders", "source:raw_shipments", "source:stage_shipments"}
+            ),
+        ),
+        ClaimedLoadTestCase(
+            "a job reaching a managed source through + runs the source's loader",
+            "",
+            "SELECT amount FROM orders",
+            "success",
+            [(9,)],
+            files=INTERMEDIATE_LOADER_FILES
+            | {
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/upstream_loaded_orders.py"
+                ).read_text()
+            },
+            expected_node_count=3,
+            expected_write_set=frozenset(
+                {"model:orders", "source:raw_shipments", "source:stage_shipments"}
+            ),
+        ),
     ],
     ids=lambda case: case.description,
 )
 def test_given_loads_when_a_worker_executes_then_the_run_claims_exactly_what_it_loads(
-    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    test_case: ClaimedLoadTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = worker_result(worker, test_case)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
-        assert run_write_set(worker.control_store, run["run_id"]) == frozenset(
-            {"model:orders", "source:raw_orders", "source:raw_customers", "source:raw_returns"}
-        )
+        assert run_write_set(worker.control_store, run["run_id"]) == test_case.expected_write_set
 
 
 @pytest.mark.parametrize(
@@ -957,27 +988,6 @@ def test_given_loads_when_a_worker_executes_then_the_run_claims_exactly_what_it_
             expected_write_set=frozenset(
                 {"model:orders", "source:raw_orders", "source:raw_customers"}
             ),
-        ),
-        UnclaimedLoadTestCase(
-            # A known gap: no snapshot node exists for an intermediate loader, so `loads` leaves it out.
-            "an intermediate loader no source declares is never claimed, so the run still fails",
-            files={
-                "sources/shipments.yml": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.yml"
-                ).read_text(),
-                "python/loaders/shipments.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.py"
-                ).read_text(),
-                "models/orders.sql": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_orders.sql"
-                ).read_text(),
-                "orchestration/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.py"
-                ).read_text(),
-            },
-            store_edit=lambda _: None,
-            refused_writer="source:stage_shipments",
-            expected_write_set=frozenset({"model:orders", "source:raw_shipments"}),
         ),
     ],
     ids=lambda case: case.description,

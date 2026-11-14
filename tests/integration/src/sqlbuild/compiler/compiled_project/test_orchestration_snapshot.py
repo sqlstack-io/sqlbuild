@@ -32,8 +32,13 @@ from sqlbuild.orchestration import (
     schedule,
     sensor,
 )
-from sqlbuild.orchestration_declarations.models.authoring import Job
+from sqlbuild.orchestration_declarations.models.authoring import Job, JobGroup
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
+    PythonCheckJobRejectionTestCase,
+    PythonCheckJobTestCase,
+    PythonJobGroupCycleTestCase,
+    PythonJobGroupTestCase,
+    PythonJobSelectionTestCase,
     SnapshotCatalogTestCase,
     SnapshotDeclarationRejectionTestCase,
     SnapshotDiscoveryRejectionTestCase,
@@ -50,8 +55,10 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
     METADATA,
     PARITY_FILES,
+    PYTHON_PIPELINE_FILES,
     TYPE_PROOF_FILES,
     published_texts,
+    python_pipeline_snapshot,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
@@ -1787,7 +1794,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                 .replace('("orders",)', '("unknown_*",)')
             },
             expected_error=ValueError,
-            expected_message="unknown selector pattern",
+            expected_message="executed_successfully: unknown selector name 'unknown_\\*'",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="invalid execution selector syntax fails closed",
@@ -1846,3 +1853,196 @@ def test_given_broken_declaration_modules_when_compiling_then_no_partial_snapsho
                 project_dir=tmp_path,
                 discovered_inputs=discovered,
             )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonJobSelectionTestCase(
+            description="a model selector selects models",
+            select="+orders",
+            expected_selection=("model:orders", "model:stg_orders"),
+        ),
+        PythonJobSelectionTestCase(
+            description="a task selector selects only the task",
+            select="task:request_carrier_collection",
+            expected_selection=("task:request_carrier_collection",),
+        ),
+        PythonJobSelectionTestCase(
+            description="typed selectors select the task and the asset it depends on",
+            select="task:request_carrier_collection asset:partner_orders_file",
+            expected_selection=("asset:partner_orders_file", "task:request_carrier_collection"),
+        ),
+        PythonJobSelectionTestCase(
+            description="upstream of a task crosses its Python and SQL dependencies",
+            select="+task:request_carrier_collection",
+            expected_selection=(
+                "asset:partner_orders_file",
+                "model:orders",
+                "model:stg_orders",
+                "task:request_carrier_collection",
+            ),
+        ),
+        PythonJobSelectionTestCase(
+            description="a python folder selects every node under it",
+            select="python/orders",
+            expected_selection=("asset:partner_orders_file",),
+        ),
+        PythonJobSelectionTestCase(
+            description="a tag shared by models and Python nodes selects both",
+            select="tag:orders",
+            expected_selection=(
+                "asset:partner_orders_file",
+                "model:orders",
+                "model:stg_orders",
+                "task:request_carrier_collection",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_python_selectors_when_publishing_jobs_then_selections_match_the_cli(
+    tmp_path: Path, test_case: PythonJobSelectionTestCase
+) -> None:
+    write_files(project_dir=tmp_path, files=PYTHON_PIPELINE_FILES)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discovered,
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+
+    snapshot: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=project,
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            declarations=[job("orders_job", description="Orders.", select=test_case.select)],
+            discovered_inputs=discovered,
+        ).to_json()
+    )
+
+    assert snapshot["documents"]["jobs"]["orders_job"]["selection"] == list(
+        test_case.expected_selection
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonJobGroupTestCase(
+            description="a job waits for the job building the Python node its task depends on",
+            jobs=(
+                ("orders_export_job", "python/orders/partner_export"),
+                ("carrier_sync_job", "python/fulfillment/carrier_sync"),
+            ),
+            expected_groups={
+                "orders_nightly": {
+                    "carrier_sync_job": ["orders_export_job"],
+                    "orders_export_job": [],
+                }
+            },
+        ),
+        PythonJobGroupTestCase(
+            description="a Python node's SQL dependency orders it after the model's job",
+            jobs=(("orders_export_job", "asset:partner_orders_file"), ("models_job", "+orders")),
+            expected_groups={
+                "orders_nightly": {"models_job": [], "orders_export_job": ["models_job"]}
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_python_dependencies_across_jobs_when_publishing_a_group_then_jobs_wait_for_them(
+    tmp_path: Path, test_case: PythonJobGroupTestCase
+) -> None:
+    jobs: list[Job] = [
+        job(name, description="Orders.", select=select) for name, select in test_case.jobs
+    ]
+    group: JobGroup = job_group("orders_nightly", description="Nightly orders.", jobs=jobs)
+
+    snapshot: dict[str, Any] = json.loads(
+        python_pipeline_snapshot(tmp_path, [*jobs, group]).to_json()
+    )
+
+    assert {
+        name: definition["jobs"] for name, definition in snapshot["documents"]["groups"].items()
+    } == test_case.expected_groups
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonJobGroupCycleTestCase(
+            description="a Python edge that closes a cycle names both jobs and the edges",
+            jobs=(
+                ("staging_job", "stg_orders task:request_carrier_collection"),
+                ("export_job", "asset:partner_orders_file"),
+            ),
+            expected_message=(
+                "group dependencies contain a cycle in job group orders_nightly: "
+                "export_job waits for staging_job (model:orders reads model:stg_orders); "
+                "staging_job waits for export_job "
+                "(task:request_carrier_collection reads asset:partner_orders_file)"
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_python_dependency_cycle_across_jobs_when_publishing_a_group_then_it_is_rejected(
+    tmp_path: Path, test_case: PythonJobGroupCycleTestCase
+) -> None:
+    jobs: list[Job] = [
+        job(name, description="Orders.", select=select) for name, select in test_case.jobs
+    ]
+    group: JobGroup = job_group("orders_nightly", description="Nightly orders.", jobs=jobs)
+
+    with pytest.raises(ValueError, match=re.escape(test_case.expected_message)):
+        python_pipeline_snapshot(tmp_path, [*jobs, group])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonCheckJobTestCase(
+            description="a job matching a check and the model it checks publishes the model",
+            select="tag:order_checks orders",
+            expected_selection=["model:orders"],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_job_matching_a_check_and_its_node_when_publishing_then_the_check_runs_with_it(
+    tmp_path: Path, test_case: PythonCheckJobTestCase
+) -> None:
+    nightly: Job = job("nightly_orders", description="Orders.", select=test_case.select)
+
+    snapshot: dict[str, Any] = json.loads(python_pipeline_snapshot(tmp_path, [nightly]).to_json())
+
+    assert snapshot["documents"]["jobs"]["nightly_orders"]["selection"] == (
+        test_case.expected_selection
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonCheckJobRejectionTestCase(
+            description="a job matching a check without the model it checks names both",
+            select="tag:order_checks",
+            expected_message=(
+                "job nightly_orders: Python check 'orders_present' checks model:orders, which "
+                "the selection does not include; select it too, or narrow the selector so it no "
+                "longer matches the check."
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_job_matching_a_check_without_its_node_when_publishing_then_it_is_rejected(
+    tmp_path: Path, test_case: PythonCheckJobRejectionTestCase
+) -> None:
+    nightly: Job = job("nightly_orders", description="Orders.", select=test_case.select)
+
+    with pytest.raises(ValueError, match=re.escape(test_case.expected_message)):
+        python_pipeline_snapshot(tmp_path, [nightly])

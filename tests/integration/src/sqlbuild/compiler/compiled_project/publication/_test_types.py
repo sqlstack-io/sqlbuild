@@ -133,6 +133,12 @@ class WorkerExecutionTestCase:
 
 
 @dataclass(frozen=True)
+class ClaimedLoadTestCase(WorkerExecutionTestCase):
+    description: str
+    expected_write_set: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
 class UnclaimedLoadTestCase:
     description: str
     files: dict[str, str]
@@ -372,6 +378,13 @@ class ProjectRolesTestCase:
     expected_denial: str
 
 
+@dataclass(frozen=True)
+class ProjectRoleRunTestCase:
+    description: str
+    role: str
+    expected_response: tuple[int, Any]
+
+
 @dataclass(frozen=True, kw_only=True)
 class ChangedJobTestCase(WorkerExecutionTestCase):
     description: str
@@ -396,6 +409,8 @@ class AdhocVerbTestCase:
     # Files the worker's checkout gains after it verified the final run, which must not run.
     rewrites: dict[str, str] = field(default_factory=dict)
     expected_status: str = "success"
+    # Files that replace the published project's own before publication.
+    files: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

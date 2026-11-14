@@ -82,7 +82,7 @@ sqb build --select source:raw__orders
 
 ### Job
 
-Select the nodes a job or job group declared under `orchestration/` builds. Job names are globally
+Select the SQL and Python nodes a job or job group declared under `orchestration/` builds. Job names are globally
 unique, so a bare name works; `job:` is the explicit form and accepts glob patterns:
 
 ```bash

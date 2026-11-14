@@ -763,13 +763,14 @@ pub struct AdhocCheckRequest {
     pub priority: i64,
 }
 
-/// One graph resource selectors resolve over: its `kind:name` key, upstream keys, tags and model folder.
+/// One SQL resource or Python node selectors resolve over: its `kind:name` key, upstream keys, tags, file folder and a source's loader.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlannerResource {
     pub key: String,
     pub deps: Vec<String>,
     pub tags: Vec<String>,
     pub folder: Option<String>,
+    pub loader: Option<String>,
 }
 
 /// A parsed command: its verb, the exact node keys it selects and the flags it sets, by parser destination.

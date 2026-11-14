@@ -261,6 +261,34 @@ REWRITE_CHECKOUT: str = (
             rewrites={"tests/unit/test_customers.sql": CUSTOMERS_TEST.format(expected=2)},
         ),
         AdhocVerbTestCase(
+            description="test: runs only the selected verified SQL test",
+            prerequisites=[],
+            command=["test", "--select", "test:customers_have_ids"],
+            expected_selection=["sql_test:customers_have_ids"],
+            expected_run_nodes=[("sql_test:customers_have_ids", "node", "success")],
+            rewrites={"tests/unit/test_customers.sql": CUSTOMERS_TEST.format(expected=2)},
+        ),
+        AdhocVerbTestCase(
+            description="build test: runs and reports only the selected verified SQL test",
+            prerequisites=[],
+            command=["build", "--select", "test:customers_have_ids"],
+            expected_selection=["sql_test:customers_have_ids"],
+            expected_run_nodes=[("sql_test:customers_have_ids", "node", "success")],
+            rewrites={"tests/unit/test_customers.sql": CUSTOMERS_TEST.format(expected=2)},
+        ),
+        AdhocVerbTestCase(
+            description="test of a model and its failing SQL test fails both",
+            prerequisites=[],
+            command=["test", "--select", "customers", "test:customers_have_ids"],
+            expected_selection=["model:customers", "sql_test:customers_have_ids"],
+            expected_run_nodes=[
+                ("model:customers", "node", "failed"),
+                ("sql_test:customers_have_ids", "node", "failed"),
+            ],
+            files={"tests/unit/test_customers.sql": CUSTOMERS_TEST.format(expected=2)},
+            expected_status="failed",
+        ),
+        AdhocVerbTestCase(
             description="freshness observes the verified sources upstream of the selection",
             prerequisites=[],
             command=["freshness", "--select", "raw_orders"],
@@ -295,7 +323,8 @@ def test_given_an_ad_hoc_verb_when_the_checkout_changes_after_verification_then_
             "seeds/seeds.yml": SEEDS_YML.format(region_type="VARCHAR"),
             "sources/raw.yml": SOURCES_YML.format(table="raw_orders"),
             "python/rewrite_checkout.py": REWRITE_CHECKOUT,
-        },
+        }
+        | test_case.files,
     )
     with scheduled_worker(
         tmp_path,

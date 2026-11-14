@@ -3,19 +3,26 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value as Json, json};
+use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::build_project_graph::build_project_graph;
-use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::graph::models::{GraphResource, JobSelection};
+use sqlbuild_analysis::planner_selection::main::split_unit_test_selectors::split_unit_test_selectors;
+use sqlbuild_analysis::planner_selection::models::{SelectorGroups, UnitTestSelectorNames};
+use sqlbuild_analysis::python_selection::main::published_python_graph::published_python_graph;
+use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
+use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
+use sqlbuild_analysis::python_selection::models::{PublishedPythonNode, SqlSelectionGraph};
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource};
 use sqlbuild_orchestration::runs::types::{CommandPlanner, PublishedJobs};
 
 use crate::adhoc::constants::{
     ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, CHANGED_COUNTS_DEST, CHANGED_DEST, COMMAND_DEST,
-    FRESHNESS_VERB, INTEGER_CONVERTERS, LOAD_SOURCES_DEST, POSITIVE_INTEGER_CONVERTER,
-    REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS,
+    FRESHNESS_VERB, INCLUDE_PYTHON_DEST, INTEGER_CONVERTERS, LOAD_SOURCES_DEST,
+    POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS, SQL_TEST_KIND,
+    UNIT_TEST_VERBS,
 };
 use crate::argv::main::command_settings_arguments::command_settings_arguments;
 use crate::argv::main::job_settings_arguments::job_settings_arguments;
@@ -81,7 +88,11 @@ impl CommandPlanner for CliPlanner {
                 seeds
             }
             FRESHNESS_VERB => freshness_sources(publication, &select, &exclude)?,
-            _ => resolve(publication, &select, &exclude)?,
+            _ => {
+                let python = verb == BUILD_VERB
+                    && settings.get(INCLUDE_PYTHON_DEST) != Some(&Json::Bool(false));
+                resolve_with_tests((verb, python), publication, &select, &exclude)?
+            }
         };
         Ok(CommandPlan {
             verb: verb.clone(),
@@ -191,36 +202,161 @@ fn resolve(
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let selected: BTreeSet<String> = resolved(publication, select, exclude)?;
+    let selected: BTreeSet<String> = resolved(publication, select, exclude, false)?;
     if selected.is_empty() {
         return Err("the selectors match no nodes in the current publication".into());
     }
     Ok(selected)
 }
 
-fn resolved(
+/// [`resolve`] with `test:` and unit-test names selecting `sql_test:` keys, as `sqb test` does.
+fn resolve_with_tests(
+    (verb, python): (&str, bool),
     (resources, jobs): (&[PlannerResource], &PublishedJobs),
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let graph_resources: Vec<GraphResource> = resources.iter().filter_map(graph_resource).collect();
+    let names = UnitTestSelectorNames {
+        tests: resources
+            .iter()
+            .filter(|resource| is_sql_test(resource))
+            .map(|resource| name_of(&resource.key).to_owned())
+            .collect(),
+        resources: resources
+            .iter()
+            .filter(|resource| !is_sql_test(resource))
+            .map(|resource| name_of(&resource.key).to_owned())
+            .chain(jobs.keys().cloned())
+            .collect(),
+    };
+    let split = split_unit_test_selectors(
+        SelectorGroups { select, exclude },
+        &names,
+        UNIT_TEST_VERBS.contains(&verb),
+    )
+    .map_err(|error| format!("{}: {}", error.code, error.message))?;
+    if !split.excluded_test_names.is_empty() {
+        return Err(
+            "an ad-hoc run cannot exclude unit tests; select the unit tests to run instead".into(),
+        );
+    }
+    let mut keys: BTreeSet<String> = if split.models_selected {
+        resolved((resources, jobs), &split.select, &split.exclude, python)?
+    } else {
+        BTreeSet::new()
+    };
+    keys.extend(
+        split
+            .test_names
+            .iter()
+            .map(|name| format!("{SQL_TEST_KIND}:{name}")),
+    );
+    if keys.is_empty() {
+        return Err("the selectors match no nodes in the current publication".into());
+    }
+    Ok(keys)
+}
+
+fn is_sql_test(resource: &PlannerResource) -> bool {
+    resource.key.split_once(':').map(|(kind, _)| kind) == Some(SQL_TEST_KIND)
+}
+
+/// The published keys the selectors match; Python nodes only when the command runs them.
+fn resolved(
+    (resources, jobs): (&[PlannerResource], &PublishedJobs),
+    select: &[String],
+    exclude: &[String],
+    include_python: bool,
+) -> Result<BTreeSet<String>, String> {
+    let (mut python, sql): (Vec<&PlannerResource>, Vec<&PlannerResource>) = resources
+        .iter()
+        .filter(|resource| !is_sql_test(resource))
+        .partition(|resource| python_kind(&resource.key).is_some());
+    if !include_python {
+        python.clear();
+    }
+    let graph_resources: Vec<GraphResource> = sql
+        .iter()
+        .filter_map(|resource| graph_resource(resource))
+        .collect();
     let mut graph = build_project_graph(&graph_resources);
     let selectors: Vec<String> = select.iter().chain(exclude).cloned().collect();
-    if selectors_need_jobs(&graph, &selectors, &[]) {
-        graph = attach_jobs(graph, published_jobs(jobs));
+    let node_names: Vec<&str> = python
+        .iter()
+        .map(|resource| name_of(&resource.key))
+        .collect();
+    if selectors_need_jobs(&graph, &selectors, &node_names) {
+        graph = attach_jobs(graph, published_jobs(jobs, include_python));
     }
-    Ok(resolve_selectors(&graph, select, exclude)
-        .map_err(|error| format!("{}: {}", error.code, error.message))?
+    let sources: Vec<(String, Option<String>)> = sql
+        .iter()
+        .filter(|resource| resource.key.starts_with("source:"))
+        .map(|resource| (name_of(&resource.key).to_owned(), resource.loader.clone()))
+        .collect();
+    let nodes: Vec<PublishedPythonNode> = python
+        .iter()
+        .filter_map(|resource| published_python_node(resource))
+        .collect();
+    let python_graph = published_python_graph(&nodes);
+    let selection = resolve_python_sql_run_selection(
+        SqlSelectionGraph {
+            graph: &graph,
+            sources: &sources,
+        },
+        &python_graph,
+        select,
+        exclude,
+    )
+    .map_err(|error| format!("{}: {}", error.code, error.message))?;
+    let kinds: BTreeMap<&str, &str> = nodes
+        .iter()
+        .map(|node| (node.name.as_str(), node.kind.as_str()))
+        .collect();
+    Ok(selection
+        .sql_keys
         .into_iter()
         .map(|(kind, name)| format!("{kind}:{name}"))
+        .chain(
+            selection.python_node_names.iter().filter_map(|name| {
+                Some(python_run_key(&sources, (kinds.get(name.as_str())?, name)))
+            }),
+        )
         .collect())
 }
 
+/// The Python node kind of a published key, such as `task` for `task:export_orders`.
+fn python_kind(key: &str) -> Option<&'static str> {
+    let (kind, _) = key.split_once(':')?;
+    PYTHON_NODE_KINDS.into_iter().find(|python| *python == kind)
+}
+
+fn published_python_node(resource: &PlannerResource) -> Option<PublishedPythonNode> {
+    Some(PublishedPythonNode {
+        name: name_of(&resource.key).to_owned(),
+        kind: python_kind(&resource.key)?.to_owned(),
+        tags: resource.tags.clone(),
+        folder: resource.folder.clone().unwrap_or_else(|| ".".to_owned()),
+        deps: resource
+            .deps
+            .iter()
+            .filter_map(|dep| object_key(dep))
+            .collect(),
+    })
+}
+
+fn name_of(key: &str) -> &str {
+    key.split_once(':').map_or(key, |(_, name)| name)
+}
+
 /// Published jobs as already-resolved graph selections.
-fn published_jobs(jobs: &PublishedJobs) -> BTreeMap<String, JobSelection> {
+fn published_jobs(jobs: &PublishedJobs, include_python: bool) -> BTreeMap<String, JobSelection> {
     let mut selections: BTreeMap<String, JobSelection> = BTreeMap::new();
     for (name, keys) in jobs {
-        let keys: Vec<(String, String)> = keys.iter().filter_map(|key| object_key(key)).collect();
+        let keys: Vec<(String, String)> = keys
+            .iter()
+            .filter(|key| include_python || python_kind(key).is_none())
+            .filter_map(|key| object_key(key))
+            .collect();
         selections.insert(name.clone(), JobSelection::Resolved { keys });
     }
     selections
@@ -233,11 +369,11 @@ fn freshness_sources(
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
     let selected: BTreeSet<String> =
-        upstream_sources(publication.0, &resolved(publication, select, &[])?);
+        upstream_sources(publication.0, &resolved(publication, select, &[], false)?);
     let excluded: BTreeSet<String> = if exclude.is_empty() {
         BTreeSet::new()
     } else {
-        upstream_sources(publication.0, &resolved(publication, exclude, &[])?)
+        upstream_sources(publication.0, &resolved(publication, exclude, &[], false)?)
     };
     let sources: BTreeSet<String> = selected.difference(&excluded).cloned().collect();
     if sources.is_empty() {

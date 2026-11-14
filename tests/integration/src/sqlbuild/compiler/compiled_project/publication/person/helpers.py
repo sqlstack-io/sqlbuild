@@ -265,6 +265,22 @@ def person_request(
         return json.load(response)
 
 
+def request_person_run(
+    api: SnapshotApi, session: tuple[str, str], body: dict[str, Any]
+) -> tuple[int, Any]:
+    """A person's run request: the response on success, else the denial without its decision."""
+    request: Request = Request(
+        api.url + "/api/control/runs",
+        data=json.dumps(body).encode(),
+        headers=person_headers(session),
+    )
+    try:
+        with urlopen(request, timeout=5) as response:
+            return 200, json.load(response)
+    except HTTPError as denied:
+        return denied.code, json.load(denied)["error"].split("; decision ")[0]
+
+
 def person_login(api: SnapshotApi, name: str) -> tuple[str, str]:
     request: Request = Request(
         api.url + "/api/auth/password/login",
