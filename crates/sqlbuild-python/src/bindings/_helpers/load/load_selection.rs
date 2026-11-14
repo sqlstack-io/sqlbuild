@@ -1,12 +1,16 @@
 //! Resolve which loaders and sources `sqb load` runs, as `SourceEntry` objects.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::assembly::project::errors::AssemblyError;
+use sqlbuild_analysis::assembly::project::main::preserved_logical_namespace::preserved_logical_namespace;
+use sqlbuild_analysis::assembly::project::models::TargetNamespace;
 use sqlbuild_core::load_command::errors::UnknownLoadSelector;
 use sqlbuild_core::load_command::main::load_reference_loaders::load_reference_loaders;
 use sqlbuild_core::load_command::main::select_load_entries::select_load_entries as select_entries;
@@ -14,21 +18,27 @@ use sqlbuild_core::load_command::models::{LoadEntry, LoadGraph};
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
+use crate::bindings::_helpers::compile_attachment::effective_config::{
+    build_effective_connection_config, build_effective_runtime_config,
+};
 use crate::bindings::_helpers::compile_attachment::target::{
     connection_is_default_target, project_location,
 };
-use crate::bindings::_helpers::compile_driver::targets::managed_write_schema;
+use crate::bindings::_helpers::compile_driver::targets::{
+    expanded_loader_namespace, managed_write_schema, preserved_loader_schemas,
+};
 use crate::bindings::_helpers::contracts::spec_resolution::loader_destination_parts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use crate::bindings::_helpers::model_config::template_data::early_model_templates;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
+use crate::bindings::_helpers::records::construct::{new_helped_error, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::replaced_keywords;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 
 const LOADER_NODE_KEY: &str = "sqlbuild_loader_node";
+const COMPILE_INPUT_CODE: &str = "P001";
 const LOADER_TABLE_PREFIX: &str = "__loader__";
 const UNKNOWN_SELECTOR_CODE: &str = "C901";
 const UNKNOWN_SELECTOR_HELP: &str = "Use exact managed source names or loader function names.";
@@ -46,10 +56,10 @@ pub(crate) struct LoadProject<'py> {
     graph: LoadGraph,
 }
 
-/// Every declared source with the target's database and schema filled in where unset.
+/// Every declared source with the target's database and schema, or a managed source's loader_schema expanded with `vars`, filled in where unset.
 pub(crate) fn environment_sources<'py>(
     discovered: &Bound<'py, PyAny>,
-    target_config: &Bound<'py, PyAny>,
+    (target_config, vars): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let py: Python<'py> = discovered.py();
     let mut sources: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -57,13 +67,40 @@ pub(crate) fn environment_sources<'py>(
         for source in native_field(&source_file?, "source_entries")?.try_iter()? {
             let source: Bound<'py, PyAny> = source?;
             let changes: Bound<'py, PyDict> = PyDict::new(py);
-            for field in ["database", "schema"] {
+            let managed: bool = native_field(&source, "managed")?.is_truthy()?;
+            if managed && !target_config.is_none() {
+                preserved_source_namespace(&source, target_config)?;
+            }
+            for (field, loader_first) in [("database", false), ("schema", managed)] {
                 let value: Bound<'py, PyAny> = native_field(&source, field)?;
-                let effective: Bound<'py, PyAny> = if !value.is_none() || target_config.is_none() {
+                let fallback: bool = value.is_none() && !target_config.is_none();
+                let effective: Bound<'py, PyAny> = if !fallback {
                     value
+                } else if loader_first {
+                    let loader_schema: Bound<'py, PyAny> =
+                        native_field(target_config, "loader_schema")?;
+                    if loader_schema.is_truthy()? {
+                        loader_schema
+                    } else {
+                        native_field(target_config, field)?
+                    }
                 } else {
                     native_field(target_config, field)?
                 };
+                let effective: Bound<'py, PyAny> =
+                    if managed && fallback && !vars.is_none() && !effective.is_none() {
+                        let location: Bound<'py, PyDict> = PyDict::new(py);
+                        location.set_item(field, effective)?;
+                        let expanded: Bound<'py, PyAny> =
+                            expanded_loader_namespace(location.as_any(), vars)?.get_item(field)?;
+                        if expanded.is_none() {
+                            expanded
+                        } else {
+                            expanded.str()?.into_any()
+                        }
+                    } else {
+                        effective
+                    };
                 changes.set_item(field, effective)?;
             }
             sources.push(replaced_keywords(&source, &changes)?);
@@ -72,13 +109,53 @@ pub(crate) fn environment_sources<'py>(
     Ok(sources)
 }
 
+/// Raise build's error when a managed source has no schema of its own and its target value is `preserve`.
+fn preserved_source_namespace(
+    source: &Bound<'_, PyAny>,
+    target_config: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let text = |record: &Bound<'_, PyAny>, field: &str| -> PyResult<Option<String>> {
+        native_field(record, field)?.extract()
+    };
+    let loader_schema: Option<String> =
+        text(target_config, "loader_schema")?.filter(|value| !value.is_empty());
+    let target: TargetNamespace = TargetNamespace {
+        database: text(target_config, "database")?,
+        schema: loader_schema.clone().or(text(target_config, "schema")?),
+        loader_schema,
+    };
+    let label: String = format!(
+        "Managed source '{}'",
+        text(source, "name")?.unwrap_or_default()
+    );
+    match preserved_logical_namespace(
+        &label,
+        Some(&target),
+        (
+            text(source, "database")?.as_ref(),
+            text(source, "schema")?.as_ref(),
+        ),
+    ) {
+        Ok(()) => Ok(()),
+        Err(AssemblyError::CompileInput { message, help }) => Err(new_helped_error(
+            source.py(),
+            ErrorId::CompileInput,
+            (message, COMPILE_INPUT_CODE),
+            help.as_deref(),
+        )),
+        Err(other) => Err(PyValueError::new_err(format!("{other:?}"))),
+    }
+}
+
 impl<'py> LoadProject<'py> {
+    /// The load project, with `vars` expanding managed sources' target locations, or None.
     pub(crate) fn new(
         discovered: &Bound<'py, PyAny>,
-        target_config: &Bound<'py, PyAny>,
+        (target_config, vars): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     ) -> PyResult<Self> {
         let py: Python<'py> = discovered.py();
-        let sources: Vec<Bound<'py, PyAny>> = environment_sources(discovered, target_config)?;
+        let sources: Vec<Bound<'py, PyAny>> =
+            environment_sources(discovered, (target_config, vars))?;
         let mut graph: LoadGraph = LoadGraph::default();
         for source in &sources {
             let loader: Bound<'py, PyAny> = native_field(source, "loader")?;
@@ -285,18 +362,63 @@ pub(crate) fn loader_defaults<'py>(
             connection_value.into_iter().filter(|_| inline).collect(),
         )
     };
+    let values: Bound<'py, PyDict> = PyDict::new(py);
+    values.set_item("database", location("database", connection_database)?)?;
+    values.set_item(
+        "schema",
+        location("schema", non_empty_text(connection.get_item("schema")?)?)?,
+    )?;
+    let runtime: Bound<'py, PyTuple> = build_effective_runtime_config(
+        discovered,
+        Some(selected_target.clone()).filter(|value| !value.is_none()),
+        Some(cli_vars.clone()).filter(|value| !value.is_none()),
+    )?;
+    let resolved: Bound<'py, PyAny> = early_model_templates(
+        values.as_any(),
+        &runtime.get_item(1)?,
+        (&runtime.get_item(0)?, &runtime.get_item(2)?),
+    )?;
     Ok(LoaderDefaults {
-        database: location("database", connection_database)?,
-        schema: location("schema", non_empty_text(connection.get_item("schema")?)?)?,
+        database: resolved.get_item("database")?,
+        schema: resolved.get_item("schema")?,
     })
 }
 
-/// Raise when a selected loader has no schema because the connection's schema is not used.
+/// The project, target and command-line vars that expand a managed source's target location.
+pub(crate) fn target_vars<'py>(
+    discovered: &Bound<'py, PyAny>,
+    (selected_target, cli_vars): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Bound<'py, PyAny>> {
+    build_effective_runtime_config(
+        discovered,
+        Some(selected_target.clone()).filter(|value| !value.is_none()),
+        Some(cli_vars.clone()).filter(|value| !value.is_none()),
+    )?
+    .get_item(1)
+}
+
+/// Raise when a selected loader would write to `preserve` or lost its schema to an ignored connection.
 pub(crate) fn loader_write_schemas<'py>(
     discovered: &Bound<'py, PyAny>,
     (selected_target, cli_vars): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     entries: &[Bound<'py, PyAny>],
 ) -> PyResult<()> {
+    let mut intermediate_loaders: HashSet<String> = HashSet::new();
+    for entry in entries {
+        let meta: Bound<'py, PyAny> = native_field(entry, "meta")?;
+        let flag: Option<Bound<'py, PyAny>> = match meta.downcast::<PyDict>() {
+            Ok(meta) => meta.get_item(LOADER_NODE_KEY)?,
+            Err(_) => None,
+        };
+        if flag
+            .map(|flag| flag.is_truthy())
+            .transpose()?
+            .unwrap_or(false)
+        {
+            intermediate_loaders.insert(native_field(entry, "name")?.extract()?);
+        }
+    }
+    preserved_loader_schemas(discovered, selected_target, &intermediate_loaders)?;
     if connection_is_default_target(discovered)? {
         return Ok(());
     }
@@ -315,11 +437,14 @@ pub(crate) fn loader_write_schemas<'py>(
         if native_field(entry, "loader")?.is_none() {
             continue;
         }
+        let name: String = native_field(entry, "name")?.extract()?;
+        let kind: &str = if intermediate_loaders.contains(&name) {
+            "Intermediate loader"
+        } else {
+            "Managed source"
+        };
         managed_write_schema(
-            &format!(
-                "Intermediate loader '{}'",
-                native_field(entry, "name")?.str()?
-            ),
+            &format!("{kind} '{name}'"),
             &native_field(entry, "schema")?,
             (None, Some(&ignored)),
         )?;
@@ -334,11 +459,33 @@ fn names(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     value.extract()
 }
 
-fn passed_defaults<'py>(arguments: &KeywordArguments<'py>) -> PyResult<LoaderDefaults<'py>> {
-    Ok(LoaderDefaults {
+/// A Python selection request's arguments, the project it names and its loader defaults.
+fn selection_request<'py>(
+    py: Python<'py>,
+    (function, required): (&str, &[&str]),
+    options: Option<Bound<'py, PyDict>>,
+) -> PyResult<(KeywordArguments<'py>, LoadProject<'py>, LoaderDefaults<'py>)> {
+    let arguments: KeywordArguments<'py> = KeywordArguments::read(
+        py,
+        function,
+        options,
+        (
+            required,
+            &["loader_default_database", "loader_default_schema"],
+        ),
+    )?;
+    let project: LoadProject<'py> = LoadProject::new(
+        &arguments.value("discovered_inputs")?,
+        (
+            &arguments.value("target_config")?,
+            &py.None().into_bound(py),
+        ),
+    )?;
+    let defaults: LoaderDefaults<'py> = LoaderDefaults {
         database: arguments.value("loader_default_database")?,
         schema: arguments.value("loader_default_schema")?,
-    })
+    };
+    Ok((arguments, project, defaults))
 }
 
 /// Select source and intermediate loader execution entries for `sqb load`.
@@ -348,25 +495,20 @@ fn select_load_entries_entry<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
+    let (arguments, project, defaults) = selection_request(
         py,
-        "select_load_entries",
-        options,
         (
+            "select_load_entries",
             &["discovered_inputs", "select", "exclude", "target_config"],
-            &["loader_default_database", "loader_default_schema"],
         ),
-    )?;
-    let project: LoadProject<'py> = LoadProject::new(
-        &arguments.value("discovered_inputs")?,
-        &arguments.value("target_config")?,
+        options,
     )?;
     let entries: Vec<Bound<'py, PyAny>> = project.selected_entries(
         (
             &names(&arguments.value("select")?)?,
             &names(&arguments.value("exclude")?)?,
         ),
-        &passed_defaults(&arguments)?,
+        &defaults,
     )?;
     PyTuple::new(py, entries)
 }
@@ -378,27 +520,19 @@ fn select_load_reference_entries<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
+    let (arguments, project, defaults) = selection_request(
         py,
-        "select_load_reference_entries",
-        options,
         (
+            "select_load_reference_entries",
             &["discovered_inputs", "selected_sources", "target_config"],
-            &["loader_default_database", "loader_default_schema"],
         ),
-    )?;
-    let project: LoadProject<'py> = LoadProject::new(
-        &arguments.value("discovered_inputs")?,
-        &arguments.value("target_config")?,
+        options,
     )?;
     let selected: Vec<Bound<'py, PyAny>> = arguments
         .value("selected_sources")?
         .try_iter()?
         .collect::<PyResult<_>>()?;
-    PyTuple::new(
-        py,
-        project.reference_entries(&selected, &passed_defaults(&arguments)?)?,
-    )
+    PyTuple::new(py, project.reference_entries(&selected, &defaults)?)
 }
 
 /// The default database and schema intermediate loader tables are written to.

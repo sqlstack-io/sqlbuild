@@ -1,6 +1,6 @@
 //! Drain a bounded due-trigger page, renewing the lease between persisted evaluations.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -42,13 +42,14 @@ pub(crate) async fn drain_due_triggers(
     Ok((lease, cycle))
 }
 
-/// Shorten the cycle wait to the next running trigger's due time, never below zero.
+/// Shorten the wait to the next due time, never below zero, measured from the returned instant.
 pub(crate) async fn wait_for_next_due(
     store: &ControlStore,
     wait_for: Duration,
-) -> Result<Duration, ControlError> {
+) -> Result<(Duration, Instant), ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
     let now = transaction.now;
+    let read_at = Instant::now();
     let (transaction, rows) = query(transaction,
         "SELECT MIN(s.next_due_at) AS next_due_at FROM sqb_trigger_state s JOIN sqb_triggers t ON t.trigger_id=s.trigger_id \
          JOIN sqb_locations l ON l.location_id=t.location_id \
@@ -56,10 +57,11 @@ pub(crate) async fn wait_for_next_due(
     let next: Option<DateTime<Utc>> = serde_json::from_value(rows[0]["next_due_at"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     commit(transaction).await?;
-    Ok(next.map_or(wait_for, |next| {
+    let wait_for = next.map_or(wait_for, |next| {
         (next - now)
             .to_std()
             .unwrap_or(Duration::ZERO)
             .min(wait_for)
-    }))
+    });
+    Ok((wait_for, read_at))
 }

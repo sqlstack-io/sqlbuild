@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use tokio::sync::watch;
+use tokio::time::Instant;
 
 use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
 use crate::scheduler::models::SchedulerState;
@@ -24,23 +25,25 @@ pub async fn run_scheduler(
                 Ok((next_state, cycle)) => {
                     state = next_state;
                     last_lease = state.lease.clone();
+                    launcher.cycled(&cycle);
                     launcher
                         .poll(store, state.lease.as_ref())
                         .await
-                        .map(|()| cycle.wait_for)
+                        .map(|()| Instant::from_std(cycle.wait_from + cycle.wait_for))
                 }
                 Err(error) => Err(error),
             };
-            let wait_for = match polled {
-                Ok(wait_for) => wait_for,
+            let retry = Instant::now() + Duration::from_secs(1);
+            let due = match polled {
+                Ok(due) => due.min(retry),
                 Err(error) if error.transient() => {
                     launcher.retrying(&error);
-                    Duration::from_secs(1)
+                    retry
                 }
                 Err(error) => return Err(error),
             };
             tokio::select! {
-                _ = tokio::time::sleep(wait_for.min(Duration::from_secs(1))) => {},
+                _ = tokio::time::sleep_until(due) => {},
                 result = shutdown.changed() => { if result.is_err() { break; } },
             }
         }

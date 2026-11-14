@@ -257,14 +257,7 @@ def generated_pipeline():
     db_path: Path = project_dir / "factory_nodes_project.duckdb"
 
     run_result: subprocess.CompletedProcess[str] = run_sqb(
-        command=(
-            "--no-color",
-            "build",
-            "--no-tests",
-            "--no-audits",
-            "--select",
-            "+asset:orders_export",
-        ),
+        command=("--no-color", "build", "--no-tests", "--select", "+asset:orders_export"),
         project_dir=project_dir,
     )
     bare_result: subprocess.CompletedProcess[str] = run_sqb(
@@ -2260,14 +2253,7 @@ def test_given_check_selector_when_running_build_then_check_needs_its_checked_no
     )
 
     result: subprocess.CompletedProcess[str] = run_sqb(
-        command=(
-            "--no-color",
-            "build",
-            "--no-tests",
-            "--no-audits",
-            "--select",
-            *test_case.select,
-        ),
+        command=("--no-color", "build", "--no-tests", "--select", *test_case.select),
         project_dir=project_dir,
     )
 

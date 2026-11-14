@@ -6,6 +6,7 @@ from typing import Any, cast
 import pytest
 
 from sqlbuild._native import FunctionArgument, FunctionReturnColumn, InferredNullability
+from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import (
     ExpressionInferenceProfile,
     RelationInfo,
@@ -20,6 +21,7 @@ from tests.unit.src.sqlbuild.adapters.databricks._test_types import (
     DatabricksDeltaDetailAgeTestCase,
     DatabricksExpressionInferenceProfileTestCase,
     DatabricksFreshnessBatchErrorTestCase,
+    DatabricksKeyedDeleteInsertTestCase,
     DatabricksMergeExclusionTestCase,
     DatabricksPruneSqlTestCase,
     DatabricksPythonFunctionSupportTestCase,
@@ -38,6 +40,7 @@ from tests.unit.src.sqlbuild.adapters.databricks.helpers import (
     FailingDatabricksMetadataCursor,
     FakeDatabricksMetadataConnection,
     FakeDatabricksMetadataCursor,
+    RecordingDatabricksAdapter,
     RequestError,
     ServerOperationError,
 )
@@ -356,21 +359,26 @@ def test_given_request_error_in_freshness_batch_when_getting_metadata_then_it_is
             ),
         ),
         DatabricksRenderDeleteInsertCursorTestCase(
-            description="keyed cursor deletes the window and the delta keys in one statement",
+            description="keyed cursor replaces the window and the delta keys in one merge",
             target="`workspace`.`test`.`orders`",
             sql="SELECT id, status FROM `workspace`.`test`.`orders__delta`",
             cursor_column="id",
             cursor_start="1",
             cursor_end="10",
             columns=("id", "status"),
-            unique_key=("id",),
+            unique_key=("ID",),
             expected_statements=(
-                "DELETE FROM `workspace`.`test`.`orders` WHERE (`id` >= 1 AND `id` < 10) "
-                "OR EXISTS (SELECT 1 FROM (SELECT id, status FROM "
-                "`workspace`.`test`.`orders__delta`) AS __source "
-                "WHERE `workspace`.`test`.`orders`.`id` = __source.`id`)",
-                "INSERT INTO `workspace`.`test`.`orders` (`id`, `status`) "
-                "SELECT id, status FROM `workspace`.`test`.`orders__delta`",
+                "MERGE INTO `workspace`.`test`.`orders` AS __target USING ("
+                "SELECT `id`, `status`, 'insert' AS __sqlbuild_op FROM "
+                "(SELECT id, status FROM `workspace`.`test`.`orders__delta`) AS __delta "
+                "UNION ALL SELECT DISTINCT `id`, NULL, 'delete' AS __sqlbuild_op FROM "
+                "(SELECT id, status FROM `workspace`.`test`.`orders__delta`) AS __delta) "
+                "AS __source ON __source.__sqlbuild_op = 'delete' "
+                "AND __target.`ID` = __source.`ID` WHEN MATCHED THEN DELETE "
+                "WHEN NOT MATCHED AND __source.__sqlbuild_op = 'insert' THEN INSERT "
+                "(`id`, `status`) VALUES (__source.`id`, __source.`status`) "
+                "WHEN NOT MATCHED BY SOURCE AND __target.`id` >= 1 AND __target.`id` < 10 "
+                "THEN DELETE",
             ),
         ),
     ],
@@ -847,3 +855,42 @@ def test_given_databricks_schema_when_checking_existence_then_current_catalog_is
     assert exists is test_case.expected_exists, test_case.description
     assert cursor.executed_sql is not None
     assert test_case.expected_query_fragment in cursor.executed_sql, test_case.description
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DatabricksKeyedDeleteInsertTestCase(
+            description="keyed delete_insert runs one merge, so no failure leaves rows deleted",
+            unique_key=("order_id",),
+            columns=("order_id", "status"),
+            expected_statements=(
+                "MERGE INTO `main`.`marts`.`orders` AS __target USING ("
+                "SELECT `order_id`, `status`, 'insert' AS __sqlbuild_op FROM "
+                "(SELECT order_id, status FROM delta) AS __delta UNION ALL "
+                "SELECT DISTINCT `order_id`, NULL, 'delete' AS __sqlbuild_op FROM "
+                "(SELECT order_id, status FROM delta) AS __delta) AS __source "
+                "ON __source.__sqlbuild_op = 'delete' "
+                "AND __target.`order_id` = __source.`order_id` WHEN MATCHED THEN DELETE "
+                "WHEN NOT MATCHED AND __source.__sqlbuild_op = 'insert' THEN INSERT "
+                "(`order_id`, `status`) VALUES (__source.`order_id`, __source.`status`)",
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_keyed_delete_insert_when_writing_then_databricks_runs_one_merge(
+    test_case: DatabricksKeyedDeleteInsertTestCase,
+) -> None:
+    adapter: RecordingDatabricksAdapter = RecordingDatabricksAdapter()
+
+    adapter.delete_insert(
+        connection=object(),
+        destination="`main`.`marts`.`orders`",
+        sql="SELECT order_id, status FROM delta",
+        unique_key=test_case.unique_key,
+        columns=test_case.columns,
+        statement_recorder=StatementRecorder(),
+    )
+
+    assert tuple(adapter.executed) == test_case.expected_statements

@@ -1,0 +1,271 @@
+{
+ "commands": [
+  {
+   "label": "compile",
+   "exit_code": 1,
+   "diagnostics": [
+    {
+     "phase": "compile",
+     "severity": "error",
+     "code": "P027",
+     "message": "task 'export_orders' description exceeds 10 lines",
+     "resource_name": "export_orders",
+     "path": "python/tasks/exports.py",
+     "line": 4,
+     "column": 1,
+     "location": {
+      "path": "python/tasks/exports.py",
+      "line": 4,
+      "column": 1
+     },
+     "help": "Shorten the description to 10 lines; move detail into documentation."
+    }
+   ]
+  }
+ ],
+ "compiled": {
+  "models/marts/customer_totals.sql": [
+   "SELECT customer_id, SUM(amount) AS total_amount",
+   "FROM __ref(\"stg_orders\")",
+   "GROUP BY customer_id",
+   ""
+  ],
+  "models/staging/stg_orders.sql": [
+   "SELECT order_id, customer_id, amount, status",
+   "FROM __source(\"raw_orders\")",
+   ""
+  ]
+ },
+ "manifest": {
+  "nodes": {
+   "model.failure_corpus.customer_totals": {
+    "database": null,
+    "schema": "main",
+    "name": "customer_totals",
+    "resource_type": "model",
+    "package_name": "failure_corpus",
+    "path": "models/marts/customer_totals.sql",
+    "original_file_path": "models/marts/customer_totals.sql",
+    "unique_id": "model.failure_corpus.customer_totals",
+    "fqn": [
+     "failure_corpus",
+     "models",
+     "marts",
+     "customer_totals"
+    ],
+    "alias": "customer_totals",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": null,
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "view",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Order totals per customer",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "main.customer_totals",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.failure_corpus.stg_orders"
+     ]
+    }
+   },
+   "model.failure_corpus.stg_orders": {
+    "database": null,
+    "schema": "main",
+    "name": "stg_orders",
+    "resource_type": "model",
+    "package_name": "failure_corpus",
+    "path": "models/staging/stg_orders.sql",
+    "original_file_path": "models/staging/stg_orders.sql",
+    "unique_id": "model.failure_corpus.stg_orders",
+    "fqn": [
+     "failure_corpus",
+     "models",
+     "staging",
+     "stg_orders"
+    ],
+    "alias": "stg_orders",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": null,
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "view",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Staged orders",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "main.stg_orders",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "source.failure_corpus.raw_orders"
+     ]
+    }
+   }
+  },
+  "sources": {
+   "source.failure_corpus.raw_orders": {
+    "database": null,
+    "schema": "",
+    "name": "raw_orders",
+    "resource_type": "source",
+    "package_name": "failure_corpus",
+    "path": "sources/raw.yml",
+    "original_file_path": "sources/raw.yml",
+    "unique_id": "source.failure_corpus.raw_orders",
+    "fqn": [
+     "failure_corpus",
+     "raw_orders"
+    ],
+    "source_name": "raw_orders",
+    "source_description": "",
+    "loader": "",
+    "identifier": "raw_orders",
+    "quoting": {},
+    "loaded_at_field": null,
+    "freshness": null,
+    "external": null,
+    "description": "Orders feed.",
+    "columns": {
+     "order_id": {
+      "name": "order_id",
+      "description": "",
+      "meta": {},
+      "data_type": "INTEGER",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "customer_id": {
+      "name": "customer_id",
+      "description": "",
+      "meta": {},
+      "data_type": "INTEGER",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "amount": {
+      "name": "amount",
+      "description": "",
+      "meta": {},
+      "data_type": "DOUBLE",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "status": {
+      "name": "status",
+      "description": "",
+      "meta": {},
+      "data_type": "VARCHAR",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "source_meta": {},
+    "tags": [],
+    "config": {},
+    "patch_path": null,
+    "unrendered_config": {},
+    "relation_name": null
+   }
+  },
+  "macros": {},
+  "exposures": {},
+  "metrics": {},
+  "groups": {},
+  "selectors": {},
+  "disabled": {},
+  "parent_map": {
+   "model.failure_corpus.customer_totals": [
+    "model.failure_corpus.stg_orders"
+   ],
+   "model.failure_corpus.stg_orders": [
+    "source.failure_corpus.raw_orders"
+   ],
+   "source.failure_corpus.raw_orders": []
+  },
+  "group_map": {},
+  "docs": {},
+  "saved_queries": {},
+  "semantic_models": {},
+  "unit_tests": {}
+ }
+}

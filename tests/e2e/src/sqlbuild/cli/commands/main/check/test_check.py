@@ -178,7 +178,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import query_duckdb, run
             project_kind="terminal_loader",
         ),
         CheckCommandTestCase(
-            description="build without tests or audits still executes Python checks",
+            description="build without tests or audits skips Python checks",
             command=(
                 "--no-color",
                 "build",
@@ -188,11 +188,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import query_duckdb, run
                 "tag:failure",
             ),
             expected_returncode=0,
-            expected_stdout_fragments=(
-                "Execution  sqb build",
-                "Python checks",
-                "check_orders_export",
-            ),
+            expected_stdout_fragments=("Execution  sqb build",),
+            expected_absent_fragments=("Python checks", "check_orders_export"),
         ),
         CheckCommandTestCase(
             description="audit remains SQL audit only",

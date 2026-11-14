@@ -23,7 +23,7 @@ const DATABASE_KEY: &str = "database";
 const SCHEMA_KEY: &str = "schema";
 
 /// The selected target's name and merged config, or `(None, None)`.
-fn resolved_target<'py>(
+pub(crate) fn resolved_target<'py>(
     discovered: &Bound<'py, PyAny>,
     selected_target: &Bound<'py, PyAny>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {

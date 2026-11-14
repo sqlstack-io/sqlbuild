@@ -10,7 +10,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_analysis::assembly::target_checks::constants::{
     LOADER_COLLISION_CODE, MANAGED_WRITE_SCHEMA_CODE, MISSING_TARGET_PARTS_CODE,
-    NAMED_TARGET_SCHEMA_CODE,
+    NAMED_TARGET_SCHEMA_CODE, PRESERVE_TARGET_VALUE,
 };
 use sqlbuild_analysis::assembly::target_checks::errors::TargetError;
 use sqlbuild_analysis::assembly::target_checks::main::explicit_write_schema::explicit_write_schema;
@@ -42,8 +42,8 @@ const DEFAULTS_HELP_PURPOSE: &str = "to set project-wide defaults";
 const NAMED_TARGET_HELP_PURPOSE: &str = "to build this target into that schema";
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_runtime_config;
+use crate::bindings::_helpers::compile_attachment::target::resolved_target;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::discovery::guidance::setting_help;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -148,21 +148,21 @@ fn project_setting_help(
 
 /// Require shared-warehouse named targets to choose a schema strategy.
 #[pyfunction]
-#[pyo3(signature = (**options))]
+#[pyo3(signature = (*, discovered_inputs, adapter, selected_target, cli_vars = None))]
 fn validate_named_target_schema_strategy<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
+    discovered_inputs: &Bound<'py, PyAny>,
+    adapter: &Bound<'py, PyAny>,
+    selected_target: &Bound<'py, PyAny>,
+    cli_vars: Option<Bound<'py, PyAny>>,
 ) -> Result<(), PyErr> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "validate_named_target_schema_strategy",
-        options,
-        (&["discovered_inputs", "adapter", "selected_target"], &[]),
-    )?;
+    let py: Python<'py> = discovered_inputs.py();
     named_target_schema_strategy(
-        &arguments.value("discovered_inputs")?,
-        &arguments.value("adapter")?,
-        &arguments.value("selected_target")?,
+        discovered_inputs,
+        adapter,
+        (
+            selected_target,
+            &cli_vars.unwrap_or_else(|| py.None().into_bound(py)),
+        ),
     )
 }
 
@@ -170,35 +170,28 @@ fn validate_named_target_schema_strategy<'py>(
 pub(crate) fn named_target_schema_strategy(
     discovered: &Bound<'_, PyAny>,
     adapter: &Bound<'_, PyAny>,
-    selected_target: &Bound<'_, PyAny>,
+    (selected_target, cli_vars): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
 ) -> PyResult<()> {
     let py: Python<'_> = discovered.py();
     if native_field(adapter, "allows_implicit_managed_write_schema")?.is_truthy()? {
         return Ok(());
     }
-    let project_config: Bound<'_, PyAny> = native_field(discovered, "project_config")?;
-    let local_config: Bound<'_, PyAny> = native_field(discovered, "local_config")?;
-    let target_name: Bound<'_, PyAny> = resolve_target_name(
-        py,
-        &project_config.clone(),
-        &local_config.clone(),
-        &selected_target.clone(),
-    )
-    .and_then(|value| value.into_bound_py_any(py))?;
+    let (target_name, target_config) = resolved_target(discovered, selected_target)?;
     if target_name.is_none() {
         return Ok(());
     }
-    let target_config: Bound<'_, PyAny> =
-        resolve_target_config(py, &project_config, &local_config, &target_name.clone())
-            .and_then(|value| value.into_bound_py_any(py))?;
     let schema: Option<String> = text_or_none(&native_field(&target_config, "schema")?)?;
     if schema.is_some_and(|schema| !python_strip(&schema).is_empty()) {
         return Ok(());
     }
     let name: String = target_name.str()?.to_cow()?.into_owned();
     let mut message: String = target_error_message(&TargetError::NamedTargetSchema(name.clone()));
-    let connection: Bound<'_, PyAny> =
-        build_effective_connection_config(discovered, Some(target_name), None, false)?;
+    let connection: Bound<'_, PyAny> = build_effective_connection_config(
+        discovered,
+        Some(target_name),
+        Some(cli_vars.clone()).filter(|value| !value.is_none()),
+        false,
+    )?;
     let help: Option<String> = match text_or_none(&mapping_get(&connection, "schema")?)? {
         Some(value) => {
             message.push_str(&ignored_connection_note("schema", &value));
@@ -403,18 +396,7 @@ fn managed_source_namespace(
     let value: Bound<'_, PyDict> = PyDict::new(py);
     pyo3::types::PyDictMethods::set_item(&value, "database", database)?;
     pyo3::types::PyDictMethods::set_item(&value, "schema", schema)?;
-    let expanded: Bound<'_, PyAny> = expanded_template_data(
-        value.as_any(),
-        (effective_vars.downcast()?, &PyDict::new(py)),
-        (
-            TemplateOptions {
-                allow_context: false,
-                preserve_context_tokens: false,
-                preserve_unknown_context: false,
-            },
-            LOADER_NAMESPACE_LABEL,
-        ),
-    )?;
+    let expanded: Bound<'_, PyAny> = expanded_loader_namespace(value.as_any(), effective_vars)?;
     let part = |key: &str| -> PyResult<Option<String>> {
         let value: Bound<'_, PyAny> = expanded.get_item(key)?;
         if value.is_none() {
@@ -423,6 +405,25 @@ fn managed_source_namespace(
         Ok(Some(value.str()?.to_cow()?.into_owned()))
     };
     Ok((part("database")?, part("schema")?))
+}
+
+/// A managed source's `database` and `schema` with project vars expanded and no context templates.
+pub(crate) fn expanded_loader_namespace<'py>(
+    value: &Bound<'py, PyAny>,
+    effective_vars: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    expanded_template_data(
+        value,
+        (effective_vars.downcast()?, &PyDict::new(value.py())),
+        (
+            TemplateOptions {
+                allow_context: false,
+                preserve_context_tokens: false,
+                preserve_unknown_context: false,
+            },
+            LOADER_NAMESPACE_LABEL,
+        ),
+    )
 }
 
 /// Validate compiled model and seed locations for the effective adapter.
@@ -598,15 +599,7 @@ pub(crate) fn managed_write_schemas(
     if ignored.is_none() {
         return Ok(());
     }
-    let mut source_loaders: HashSet<String> = HashSet::new();
-    for source in native_field(project, "sources")?.try_iter()? {
-        if let Some(loader) = text_or_none(&native_field(
-            &native_field(&source?, "source_entry")?,
-            "loader",
-        )?)? {
-            source_loaders.insert(loader);
-        }
-    }
+    let source_loaders: HashSet<String> = managed_source_loaders(project)?;
     for loader in native_field(project, "loader_functions")?.try_iter()? {
         let loader: Bound<'_, PyAny> = loader?;
         let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
@@ -623,6 +616,57 @@ pub(crate) fn managed_write_schemas(
             &loader.py().None().into_bound(loader.py()),
             (project_schema.as_deref(), ignored.as_deref()),
         )?;
+    }
+    Ok(())
+}
+
+/// The loader names that load managed sources, which write to the source's own location.
+pub(crate) fn managed_source_loaders(project: &Bound<'_, PyAny>) -> PyResult<HashSet<String>> {
+    let mut loaders: HashSet<String> = HashSet::new();
+    for source in native_field(project, "sources")?.try_iter()? {
+        if let Some(loader) = text_or_none(&native_field(
+            &native_field(&source?, "source_entry")?,
+            "loader",
+        )?)? {
+            loaders.insert(loader);
+        }
+    }
+    Ok(loaders)
+}
+
+/// Raise when the selected target's schema is `preserve` and one of `loaders` names no schema.
+pub(crate) fn preserved_loader_schemas(
+    discovered: &Bound<'_, PyAny>,
+    selected_target: &Bound<'_, PyAny>,
+    loaders: &HashSet<String>,
+) -> PyResult<()> {
+    let py: Python<'_> = discovered.py();
+    let (target_name, target_config) = resolved_target(discovered, selected_target)?;
+    if target_name.is_none() {
+        return Ok(());
+    }
+    if !text_or_none(&native_field(&target_config, "schema")?)?
+        .is_some_and(|schema| python_strip(&schema) == PRESERVE_TARGET_VALUE)
+    {
+        return Ok(());
+    }
+    for loader in native_field(discovered, "loader_functions")?.try_iter()? {
+        let loader: Bound<'_, PyAny> = loader?;
+        let name: String = native_field(&loader, "name")?.extract()?;
+        let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
+        if !loaders.contains(&name) || destination.as_deref().is_some_and(|d| d.contains('.')) {
+            continue;
+        }
+        let table: String = destination.unwrap_or_else(|| format!("__loader__{name}"));
+        return Err(planner_error(
+            py,
+            target_error_message(&TargetError::PreservedLoaderSchema(name)),
+            MANAGED_WRITE_SCHEMA_CODE,
+            Some(format!(
+                "to choose where it writes, set its destination in its @loader decorator:\n            \
+                 @loader(destination=\"my_schema.{table}\")"
+            )),
+        ));
     }
     Ok(())
 }

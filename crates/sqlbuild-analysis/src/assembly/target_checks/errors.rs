@@ -13,4 +13,6 @@ pub enum TargetError {
     ManagedWriteSchema(String),
     /// A named target without an explicit schema.
     NamedTargetSchema(String),
+    /// An intermediate loader, by name, whose schema resolves to the target's `preserve`.
+    PreservedLoaderSchema(String),
 }

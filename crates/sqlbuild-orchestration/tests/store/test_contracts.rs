@@ -12,6 +12,8 @@ pub(crate) mod lease_helpers;
 pub(crate) mod logical_state;
 #[path = "replicas/helpers.rs"]
 pub(crate) mod replica_helpers;
+#[path = "schema/test_contracts.rs"]
+mod schema;
 #[path = "helpers.rs"]
 pub(crate) mod store_helpers;
 #[path = "test_types.rs"]
