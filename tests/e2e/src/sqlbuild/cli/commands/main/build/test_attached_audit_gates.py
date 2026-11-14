@@ -182,11 +182,11 @@ def test_given_attached_audit_reading_another_resource_when_building_then_it_gat
             expected_summary="PASS=1  WARN=0  FAIL=1  INSUFFICIENT=0  SKIP=1  TOTAL=3",
         ),
         AttachedAuditGateSummaryE2ETestCase(
-            description="failing seed audit counts as a failure",
+            description="failing seed audit fails its seed",
             target_kind="seed",
             order_code="Z",
             expected_exit_code=1,
-            expected_summary="PASS=2  WARN=0  FAIL=1  INSUFFICIENT=0  SKIP=1  TOTAL=4",
+            expected_summary="PASS=1  WARN=0  FAIL=2  INSUFFICIENT=0  SKIP=1  TOTAL=4",
         ),
     ],
     ids=lambda case: case.description,

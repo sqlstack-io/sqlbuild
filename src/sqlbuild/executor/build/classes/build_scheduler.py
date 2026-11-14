@@ -104,6 +104,7 @@ from sqlbuild.executor.migrations.main._complete_old_name_views import complete_
 from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
 from sqlbuild.executor.run.classes.fingerprint_writes import FingerprintWrites
 from sqlbuild.executor.run.classes.runtime_watermark_resolver import RuntimeWatermarkResolver
+from sqlbuild.executor.run.constants import RUN_AUDIT_FAILED_CODE
 from sqlbuild.executor.run.models import (
     BatchWindow,
     BoundViewGuard,
@@ -1346,12 +1347,20 @@ class BuildScheduler:
         failed: bool = False
 
         if isinstance(result, SeedExecutionResult):
+            if result.status == ExecutionStatus.SUCCESS and self._run_seed_audits(key=key):
+                result = dataclasses.replace(
+                    result,
+                    status=ExecutionStatus.FAILED,
+                    error_code=RUN_AUDIT_FAILED_CODE,
+                    error_message=(
+                        f"audit for seed '{result.seed_name}' failed after loading "
+                        "with severity level: error"
+                    ),
+                )
             self._seed_results.append(result)
             if self._on_node_complete is not None:
                 self._on_node_complete(result)
             failed = result.status == ExecutionStatus.FAILED
-            if result.status == ExecutionStatus.SUCCESS and self._run_seed_audits(key=key):
-                failed = True
 
         elif isinstance(result, SqlTestExecutionResult):
             self._test_results.append(result)
