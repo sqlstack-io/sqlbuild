@@ -49,6 +49,7 @@ fn given_four_times_the_modules_when_finding_unreachable_definitions_then_time_g
         config: json!({ "select": ["SQBRPYTHON", "SQBRPYTHON306"] }),
         growth: 4,
         pairs: 5,
+        expected_unreachable_definitions: 2001,
         expected_max_ratio: 6.5,
     }];
     for test_case in test_cases {
@@ -57,6 +58,13 @@ fn given_four_times_the_modules_when_finding_unreachable_definitions_then_time_g
             test_case.growth * test_case.units,
             test_case.growth * test_case.noisy_files,
             test_case.functions,
+        );
+        let (codes, _) = timed_python_codes(&large, test_case.config.clone()).expect("rules run");
+        let unreachable: usize = codes.iter().filter(|code| *code == "SQBRPYTHON306").count();
+        assert_eq!(
+            unreachable, test_case.expected_unreachable_definitions,
+            "{}",
+            test_case.description
         );
         let ratio: f64 = median_growth(&small, &large, &test_case.config, test_case.pairs);
         assert!(

@@ -82,6 +82,7 @@ pub(super) struct PythonGrowthTestCase {
     pub(super) config: serde_json::Value,
     pub(super) growth: usize,
     pub(super) pairs: usize,
+    pub(super) expected_unreachable_definitions: usize,
     pub(super) expected_max_ratio: f64,
 }
 
