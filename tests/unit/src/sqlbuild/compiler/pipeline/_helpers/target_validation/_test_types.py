@@ -19,6 +19,7 @@ class ValidateManagedWriteSchemaTestCase:
     target_schema: str | None
     effective_connection: dict[str, object]
     expected_error_fragment: str | None
+    effective_target_schema: str | None = None
 
 
 @dataclass(frozen=True)
