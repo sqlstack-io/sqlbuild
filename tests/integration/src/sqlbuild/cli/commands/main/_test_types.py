@@ -1381,5 +1381,4 @@ class JobSelectorBuildTestCase:
     build_args: tuple[str, ...]
     expected_exit_code: int
     expected_tables: frozenset[str]
-    expected_jobs_imported: bool
     expected_fragment: str = ""

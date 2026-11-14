@@ -1,0 +1,4 @@
+# Layer jobs that share a function wait for each other only by lineage.
+name = "layered_orders_job_group"
+description = "Build staging, then marts."
+jobs = ["marts_layer_job", "staging_layer_job"]

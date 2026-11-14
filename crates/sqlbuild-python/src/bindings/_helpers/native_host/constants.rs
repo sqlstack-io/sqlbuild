@@ -3,7 +3,6 @@
 /// The calendar's evaluation window is supplied by the host, not a provider.
 pub(crate) const CALENDAR_WINDOW_PARAMETER: &str = "window";
 
-pub(crate) const RUN_EVENT_CONDITION: &str = "run_event";
 pub(crate) const SOURCE_NEW_DATA_CONDITION: &str = "source_new_data";
 pub(crate) const SOURCE_STALE_CONDITION: &str = "source_stale";
 
@@ -14,15 +13,9 @@ pub(crate) const AUTHORING_MODULE: &str = "sqlbuild.orchestration_declarations.m
 /// Frames of these modules construct declarations on the author's behalf.
 pub(crate) const CONSTRUCTING_MODULES: [&str; 2] = [AUTHORING_MODULE, "dataclasses"];
 
-/// Kinds named in the global unique-name check.
-pub(crate) const JOB_LABEL: &str = "job";
-pub(crate) const GROUP_LABEL: &str = "job group";
-pub(crate) const SENSOR_LABEL: &str = "sensor";
-pub(crate) const CALENDAR_LABEL: &str = "calendar schedule";
+/// The authoring classes publication imports calendar and sensor modules for.
+pub(crate) const CALENDAR_CLASS: &str = "Calendar";
+pub(crate) const SENSOR_CLASS: &str = "Sensor";
 
 /// Pages one bounded state-history SELECT streams before the scan continues from its cursor.
 pub(crate) const HISTORY_STREAM_PAGES: usize = 50;
-/// Inclusive bounds on a job's `on_failure` retries.
-pub(crate) const MAX_RETRIES: (u64, u64) = (1, 10);
-/// Inclusive bounds on a job's `on_failure` retry delay, in seconds: up to 24 hours.
-pub(crate) const MAX_RETRY_DELAY: (u64, u64) = (0, 86_400);

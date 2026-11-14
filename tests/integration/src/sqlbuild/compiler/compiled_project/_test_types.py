@@ -3,17 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
-from sqlbuild.orchestration_declarations.models.authoring import (
-    CalendarSchedule,
-    Job,
-    JobGroup,
-    OnFailure,
-    Schedule,
-    Sensor,
-)
 
 
 @dataclass(frozen=True)
@@ -300,7 +291,8 @@ class PythonCheckJobRejectionTestCase:
 @dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
-    schedule: Schedule
+    schedule: str
+    expected_timezone: str
     expected_selection: tuple[str, ...]
     expected_controls: dict[str, object] = field(
         default_factory=lambda: {
@@ -313,18 +305,10 @@ class SnapshotScheduleTestCase:
 @dataclass(frozen=True)
 class SnapshotDeclarationRejectionTestCase:
     description: str
-    job_description: str = "Orders."
-    select: str = "orders"
-    cron: str = "0 2 * * *"
-    timezone: str = "UTC"
-    settings: dict[str, object] = field(default_factory=dict)
-    concurrency: int | None = None
+    expected_message: str
+    fields: dict[str, str] = field(default_factory=dict)
+    tables: str = ""
     copies: int = 1
-    expected_message: str = ""
-    schedule: Schedule | None = None
-    owner: str | None = None
-    overlap: Any = "queue"
-    on_failure: OnFailure | None = None
 
 
 @dataclass(frozen=True)
@@ -332,7 +316,6 @@ class SnapshotDiscoveryTestCase:
     description: str
     files: dict[str, str]
     expected_jobs: tuple[str, ...]
-    declarations: tuple[Job | JobGroup | CalendarSchedule | Sensor, ...] | None = None
     expected_groups: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     expected_sensors: dict[str, dict[str, object]] = field(default_factory=dict)
     expected_schedules: tuple[str, ...] = ()

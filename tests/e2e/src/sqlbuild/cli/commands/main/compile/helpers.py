@@ -5588,3 +5588,14 @@ def truncate_sql_test_cache(project_dir: Path) -> None:
     for cache in sorted((project_dir / "target/cache").rglob("sql-test-artifacts.json")):
         text: str = cache.read_text()
         _ = cache.write_text(text[: len(text) // 2])
+
+
+def orders_job_project(job_values: str) -> dict[str, str]:
+    """Return a one-model project whose `orders_job` TOML file continues with `job_values`."""
+    return {
+        "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
+        "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+        "orchestration/jobs/orders_job.toml": (
+            'name = "orders_job"\ndescription = "Orders."\n' + job_values
+        ),
+    }

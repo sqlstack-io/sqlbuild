@@ -20,3 +20,4 @@ sqlbuild-model-config.workspace = true
 sqlbuild-pysource.workspace = true
 sqlbuild-sqltext.workspace = true
 tempfile.workspace = true
+toml.workspace = true

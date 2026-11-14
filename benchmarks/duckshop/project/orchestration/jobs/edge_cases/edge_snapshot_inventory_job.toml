@@ -1,0 +1,4 @@
+name = "edge_snapshot_inventory_job"
+description = "Exercise a child limit independent of its parent."
+select = "tag:edge_case"
+concurrency_groups = ["edge_products_limit"]

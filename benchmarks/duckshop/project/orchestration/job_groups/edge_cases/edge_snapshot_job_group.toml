@@ -1,0 +1,3 @@
+name = "edge_snapshot_job_group"
+description = "Run the edge-case refresh as a group that sensors start and observe."
+jobs = ["edge_snapshot_orders_job"]

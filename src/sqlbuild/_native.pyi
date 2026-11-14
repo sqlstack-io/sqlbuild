@@ -1777,7 +1777,6 @@ def build_orchestration_snapshot(
     project_dir: Path,
     *,
     discovered_inputs: DiscoveredProjectInputs,
-    declarations: Sequence[object] | None = None,
 ) -> NativeOrchestrationSnapshot: ...
 def run_location_command(
     *,
@@ -8450,6 +8449,9 @@ class SqlHookParseError(DiscoveryError):
 
 class EventExporterDiscoveryError(DiscoveryError):
     """Raised when project lifecycle event exporters are invalid."""
+
+class OrchestrationDeclarationError(DiscoveryError):
+    """Raised when an orchestration job, job group, calendar or sensor declaration is invalid."""
 
 class ProjectPythonPathError(DiscoveryError):
     """Raised when project-owned Python lives outside a supported extension root."""

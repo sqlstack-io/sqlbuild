@@ -1,9 +1,9 @@
 {
   "description": "Three minutely cron jobs start ten hours back with the default latest catch-up. Two installed schedulers catch up while being SIGKILLed at seeded random moments; every lapse of a killed leader's lease is simulated. After a final uninterrupted scheduler, each trigger has ticked its latest due minute exactly once and nothing off schedule, each tick requests or is covered by exactly one run, and every requested run has one request event.",
   "jobs": [
-    "refresh_orders",
-    "refresh_customers",
-    "refresh_inventory"
+    "refresh_orders_job",
+    "refresh_customers_job",
+    "refresh_inventory_job"
   ],
   "backlog_minutes": 600,
   "rounds": 16,

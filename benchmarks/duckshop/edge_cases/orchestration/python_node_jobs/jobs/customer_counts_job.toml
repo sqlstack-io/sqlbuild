@@ -1,0 +1,4 @@
+# Jobs whose selections are Python nodes, which `--select job:<name>` must select as published.
+name = "customer_counts_job"
+description = "Count customers."
+select = "task:count_customers asset:customers_extract"

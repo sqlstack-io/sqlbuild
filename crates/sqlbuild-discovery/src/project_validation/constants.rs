@@ -14,5 +14,5 @@ pub(crate) const INITIAL_SEED_READ_BYTES: u64 = 64 * 1024;
 pub(crate) const RECORDS_FOR_MANY_ROWS: usize = 3;
 
 /// How a colliding orchestration declaration is renamed, added to its name conflict.
-pub(crate) const ORCHESTRATION_RENAME_ADVICE: &str = " (a job, job group or sensor takes its name \
-     from its first argument, and a calendar schedule from the function it decorates)";
+pub(crate) const ORCHESTRATION_RENAME_ADVICE: &str = " (a job or job group takes its name from \
+     `name` in its TOML file, and a calendar or sensor from its `name` argument)";

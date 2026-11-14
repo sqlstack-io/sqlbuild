@@ -698,3 +698,8 @@ SIBLING_OWNERS: dict[str, str] = {
         for folder, name in (("fin_a", "a"), ("fin_b", "b"), ("core", "c"))
     },
 }
+
+
+def refresh_job(select: str) -> str:
+    """Return a job file whose `select` is the TOML value `select`."""
+    return f'name = "orders_refresh_job"\ndescription = "Refresh orders."\nselect = {select}\n'

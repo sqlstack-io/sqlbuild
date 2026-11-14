@@ -1,0 +1,4 @@
+# A job may not reuse another resource's name: jobs share the project's one resource namespace.
+name = "orders_job"
+description = "Build orders."
+select = "orders"

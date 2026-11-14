@@ -1,0 +1,4 @@
+name = "edge_inventory_job_group"
+description = "Complete inventory without reserving its child's product limit."
+jobs = ["edge_snapshot_inventory_job"]
+concurrency_groups = ["edge_inventory_limit"]

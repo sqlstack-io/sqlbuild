@@ -167,7 +167,7 @@ def test_given_a_job_loading_an_intermediate_loader_when_a_role_runs_it_then_the
             "run_id": str(uuid4()),
             "location_id": api.location_id,
             "target": "development",
-            "job_key": "annual_orders",
+            "job_key": "annual_orders_job",
             "reason": "Refresh shipments",
             "priority": 0,
         }

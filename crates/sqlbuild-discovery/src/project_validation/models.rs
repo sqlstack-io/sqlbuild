@@ -178,7 +178,7 @@ pub struct ProjectFacts {
     pub project_model_paths: Option<Vec<String>>,
     /// Python's `csv.field_size_limit()`, or `None` for its default.
     pub csv_field_limit: Option<usize>,
-    /// Jobs, job groups, sensors and calendar schedules, known only when a location publishes.
+    /// Jobs, job groups, calendars and sensors, read from `orchestration/` without importing it.
     pub orchestration: Vec<OrchestrationNameFact>,
 }
 
@@ -188,7 +188,7 @@ pub(crate) struct DeclaredName<'a> {
     pub(crate) name: &'a str,
     pub(crate) kind: &'a str,
     pub(crate) path: &'a str,
-    /// A job, job group, sensor or calendar schedule, whose conflicts say how it is named.
+    /// A job, job group, calendar or sensor, whose conflicts say how it is named.
     pub(crate) orchestration: bool,
 }
 

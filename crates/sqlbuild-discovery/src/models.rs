@@ -30,6 +30,8 @@ pub enum FailureKind {
     Conflict,
     /// `SeedDiscoveryError` (D008).
     Seed,
+    /// `OrchestrationDeclarationError` (D017).
+    Orchestration,
 }
 
 impl FailureKind {
@@ -48,6 +50,7 @@ impl FailureKind {
             Self::ResourceIdentity => "resource_identity",
             Self::Conflict => "conflict",
             Self::Seed => "seed",
+            Self::Orchestration => "orchestration",
         }
     }
 }

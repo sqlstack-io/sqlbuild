@@ -94,7 +94,8 @@
 				"label": "Review a branch",
 				"link": "/docs/cli/review/"
 			},
-			"docs/concepts/column-lineage"
+			"docs/concepts/column-lineage",
+			"docs/concepts/orchestration"
 		]
 	},
 	{
