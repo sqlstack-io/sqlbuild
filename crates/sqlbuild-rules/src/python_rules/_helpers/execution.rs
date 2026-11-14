@@ -4,9 +4,11 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use fensu_facts::snapshot::models::RepositoryObservationIndex;
+use fensu_native::rules::constants::DEAD_DEFINITION_CODE;
 use fensu_native::{
-    NativeExecutionRule, NativeExecutionTarget, NativeProjectPlane, NativeProjectQuery,
-    NativeRuleContext, evaluate_core_rules, plan_core_rule_queries, plan_execution_owners,
+    NativeDeadCodeContext, NativeExecutionRule, NativeExecutionTarget, NativeProjectPlane,
+    NativeProjectQuery, NativeRuleContext, evaluate_core_rules, plan_core_rule_queries,
+    plan_execution_owners,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -206,8 +208,10 @@ fn file_calls<'a>(plan: &FilePlan<'a>, inputs: &CallInputs<'_>) -> Result<Vec<Ru
         .calls
         .iter()
         .map(|(codes, thresholds)| {
+            let dead_code: NativeDeadCodeContext = dead_code_context(codes, inputs);
             let context = NativeRuleContext {
                 thresholds: thresholds.clone(),
+                dead_code,
                 ..base.clone()
             };
             RuleCall {
@@ -217,6 +221,15 @@ fn file_calls<'a>(plan: &FilePlan<'a>, inputs: &CallInputs<'_>) -> Result<Vec<Ru
             }
         })
         .collect())
+}
+
+/// The loaded definitions for a call running the dead-code rule; other calls skip copying them per file.
+fn dead_code_context(codes: &[String], inputs: &CallInputs<'_>) -> NativeDeadCodeContext {
+    if codes.iter().any(|code| code == DEAD_DEFINITION_CODE) {
+        inputs.settings.dead_code.clone()
+    } else {
+        NativeDeadCodeContext::default()
+    }
 }
 
 fn project_query((kind, path, argument): &(String, String, String)) -> NativeProjectQuery {

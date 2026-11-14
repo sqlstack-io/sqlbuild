@@ -65,7 +65,7 @@ pub(crate) fn context_settings(
     }
 }
 
-/// The context of `target`, without thresholds or observations.
+/// The context of `target`, without thresholds, observations or the dead-code context.
 pub(crate) fn rule_context(target: &PythonTarget, settings: &ContextSettings) -> NativeRuleContext {
     let shared = NativeRuleContext {
         scope: ROOT_SCOPE.to_owned(),
@@ -89,7 +89,6 @@ pub(crate) fn rule_context(target: &PythonTarget, settings: &ContextSettings) ->
         };
     }
     NativeRuleContext {
-        dead_code: settings.dead_code.clone(),
         role: target.role.clone(),
         is_main_module: target.is_main_module,
         is_entry_module: target.is_entry_module,

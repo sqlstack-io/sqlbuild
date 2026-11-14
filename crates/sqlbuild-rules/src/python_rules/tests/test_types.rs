@@ -63,3 +63,13 @@ pub(super) struct PythonCacheTestCase {
     pub(super) changed_config: serde_json::Value,
     pub(super) expected_runs: CachedRuns,
 }
+
+pub(super) struct PythonScalingTestCase {
+    pub(super) description: &'static str,
+    pub(super) units: usize,
+    pub(super) noisy_files: usize,
+    pub(super) functions: usize,
+    pub(super) config: serde_json::Value,
+    pub(super) expected_annotation_faults: usize,
+    pub(super) expected_max_duration: std::time::Duration,
+}

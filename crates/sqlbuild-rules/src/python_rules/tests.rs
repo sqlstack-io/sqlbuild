@@ -6,5 +6,7 @@ mod helpers;
 mod python_cache;
 #[path = "tests/test_python_catalogue.rs"]
 mod python_catalogue;
+#[path = "tests/test_python_scaling.rs"]
+mod python_scaling;
 #[path = "tests/test_types.rs"]
 mod test_types;

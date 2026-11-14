@@ -149,14 +149,68 @@ pub(super) fn cached_runs(
     })
 }
 
-fn write_files(root: &std::path::Path, files: &[(&str, &str)]) -> Result<(), String> {
+fn write_files<P: AsRef<str>, C: AsRef<str>>(
+    root: &std::path::Path,
+    files: &[(P, C)],
+) -> Result<(), String> {
     for (path, contents) in files {
-        let file = root.join(path);
+        let file = root.join(path.as_ref());
         std::fs::create_dir_all(file.parent().expect("parent"))
             .map_err(|error| error.to_string())?;
-        std::fs::write(&file, contents).map_err(|error| error.to_string())?;
+        std::fs::write(&file, contents.as_ref()).map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+/// A project of `units` small domain entry modules sharing one helper, plus `noisy_files` hooks of `functions` unannotated functions each.
+pub(super) fn scaling_project(
+    units: usize,
+    noisy_files: usize,
+    functions: usize,
+) -> Vec<(String, String)> {
+    let helper = (
+        "python/utils/text/join.py".to_owned(),
+        "\"\"\"Join text.\"\"\"\n\n\ndef joined(value: str) -> str:\n    \"\"\"Return the value.\"\"\"\n    return value\n".to_owned(),
+    );
+    let modules = (0..units).map(|unit| {
+        (
+            format!("python/domain_{}/unit_{unit}/main.py", unit % 50),
+            format!(
+                "\"\"\"Unit {unit}.\"\"\"\n\nfrom python.utils.text.join import joined\n\n\ndef run_{unit}(value: str) -> str:\n    \"\"\"Run unit {unit}.\"\"\"\n    return joined(value)\n"
+            ),
+        )
+    });
+    let noisy = (0..noisy_files).map(|file| {
+        let body: String = (0..functions)
+            .map(|function| {
+                format!("def alert_{function}(ctx, reason):\n    print(ctx, reason)\n\n\n")
+            })
+            .collect();
+        (format!("hooks/python/alert_{file}.py"), body)
+    });
+    std::iter::once(helper)
+        .chain(modules)
+        .chain(noisy)
+        .collect()
+}
+
+/// The codes of the Python faults `files` produce under `config` with the cache off, and how long evaluation took.
+pub(super) fn timed_python_codes(
+    files: &[(String, String)],
+    config: serde_json::Value,
+) -> Result<(Vec<String>, std::time::Duration), String> {
+    let directory = tempfile::tempdir().map_err(|error| error.to_string())?;
+    write_files(directory.path(), files)?;
+    let mut config = config;
+    config["cache"] = serde_json::json!({ "enabled": false });
+    let started = std::time::Instant::now();
+    let evaluation = cached_run(directory.path(), config)?;
+    let elapsed = started.elapsed();
+    let codes = python_codes(&evaluation)
+        .into_iter()
+        .map(|(code, _)| code)
+        .collect();
+    Ok((codes, elapsed))
 }
 
 fn cached_run(
