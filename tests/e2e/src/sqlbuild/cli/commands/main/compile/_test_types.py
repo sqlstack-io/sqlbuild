@@ -1242,6 +1242,7 @@ class MissingTargetDatabaseTestCase:
     project_toml: str
     expected_error: str
     expected_example_count: int
+    extra_files: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -1425,8 +1426,8 @@ class PythonMacroArgumentErrorTestCase:
 
 
 @dataclass(frozen=True)
-class InlineConnectionLocationTestCase:
-    """A project whose only location is its inline connection, and where its models build."""
+class ConnectionLocationTestCase:
+    """A project's connection and defaults, and where its models build."""
 
     description: str
     project_toml: str

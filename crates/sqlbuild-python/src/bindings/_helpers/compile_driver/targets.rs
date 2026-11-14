@@ -173,6 +173,9 @@ pub(crate) fn named_target_schema_strategy(
     selected_target: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
     let py: Python<'_> = discovered.py();
+    if native_field(adapter, "allows_implicit_managed_write_schema")?.is_truthy()? {
+        return Ok(());
+    }
     let project_config: Bound<'_, PyAny> = native_field(discovered, "project_config")?;
     let local_config: Bound<'_, PyAny> = native_field(discovered, "local_config")?;
     let target_name: Bound<'_, PyAny> = resolve_target_name(
@@ -197,9 +200,6 @@ pub(crate) fn named_target_schema_strategy(
     let connection: Bound<'_, PyAny> =
         build_effective_connection_config(discovered, Some(target_name), None, false)?;
     let help: Option<String> = match text_or_none(&mapping_get(&connection, "schema")?)? {
-        None if native_field(adapter, "allows_implicit_managed_write_schema")?.is_truthy()? => {
-            return Ok(());
-        }
         Some(value) => {
             message.push_str(&ignored_connection_note("schema", &value));
             Some(project_setting_help(
@@ -592,6 +592,24 @@ pub(crate) fn managed_write_schemas(
                 native_field(&source, "name")?.str()?.to_cow()?
             ),
             &native_field(&entry, "schema")?,
+            (project_schema.as_deref(), ignored.as_deref()),
+        )?;
+    }
+    if ignored.is_none() {
+        return Ok(());
+    }
+    for loader in native_field(project, "loader_functions")?.try_iter()? {
+        let loader: Bound<'_, PyAny> = loader?;
+        let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
+        if destination.is_some_and(|destination| destination.contains('.')) {
+            continue;
+        }
+        managed_write_schema(
+            &format!(
+                "Intermediate loader '{}'",
+                native_field(&loader, "name")?.str()?.to_cow()?
+            ),
+            &loader.py().None().into_bound(loader.py()),
             (project_schema.as_deref(), ignored.as_deref()),
         )?;
     }

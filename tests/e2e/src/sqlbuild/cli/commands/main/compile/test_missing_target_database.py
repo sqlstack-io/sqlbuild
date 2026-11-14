@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
-    InlineConnectionLocationTestCase,
+    ConnectionLocationTestCase,
     MissingTargetDatabaseTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
@@ -72,10 +72,39 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             ),
             expected_example_count=0,
         ),
+        MissingTargetDatabaseTestCase(
+            description="an ignored connection schema stops a bare intermediate loader",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\n\n[connection]\n'
+                'database = "dev.duckdb"\nschema = "raw"\n\n'
+                '[connections.archive]\ndatabase = "archive.duckdb"\n'
+            ),
+            extra_files={
+                "models/orders.sql": (
+                    "MODEL (description 'Test model orders.', materialized view, "
+                    "schema staging);\n\nSELECT 1 AS order_id\n"
+                ),
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error=(
+                "error[S103]: Intermediate loader 'raw_orders' has no explicitly resolved "
+                "physical write schema. Set schema on the resource or its defaults, selected "
+                "target, loader_schema, or connection. The connection's schema 'raw' is not used "
+                "because the project defines named connections or targets.\n"
+                "  = help: to set project-wide defaults, set this in sqlbuild_project.toml:\n"
+                "            [defaults]\n"
+                '            schema = "raw"\n'
+            ),
+            expected_example_count=1,
+        ),
     ),
     ids=lambda case: case.description,
 )
-def test_given_snowflake_model_without_location_when_compiling_then_error_names_the_setting(
+def test_given_model_without_location_when_compiling_then_error_names_the_setting(
     test_case: MissingTargetDatabaseTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_inline_project(
@@ -87,7 +116,8 @@ def test_given_snowflake_model_without_location_when_compiling_then_error_names_
                 "MODEL (description 'Test model orders.', materialized view);\n\n"
                 "SELECT 1 AS order_id\n"
             ),
-        },
+        }
+        | test_case.extra_files,
     )
 
     result: subprocess.CompletedProcess[str] = run_sqb(
@@ -102,7 +132,7 @@ def test_given_snowflake_model_without_location_when_compiling_then_error_names_
 @pytest.mark.parametrize(
     "test_case",
     (
-        InlineConnectionLocationTestCase(
+        ConnectionLocationTestCase(
             description="an inline connection database and schema place snowflake models",
             project_toml=(
                 'name = "orders"\nadapter = "snowflake"\n\n[connection]\naccount = "example"\n'
@@ -110,7 +140,7 @@ def test_given_snowflake_model_without_location_when_compiling_then_error_names_
             ),
             expected_qualified_name="ANALYTICS.ORDERS.orders",
         ),
-        InlineConnectionLocationTestCase(
+        ConnectionLocationTestCase(
             description="an inline connection schema places bigquery models beside defaults",
             project_toml=(
                 'name = "orders"\nadapter = "bigquery"\n\n[connection]\n'
@@ -119,11 +149,20 @@ def test_given_snowflake_model_without_location_when_compiling_then_error_names_
             ),
             expected_qualified_name="`example-project.orders.orders`",
         ),
+        ConnectionLocationTestCase(
+            description="a duckdb target without a schema builds into the defaults schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\npath = "dev.duckdb"\nschema = "raw"\n\n'
+                '[defaults]\nschema = "analytics"\n\n[targets.dev]\n'
+            ),
+            expected_qualified_name="analytics.orders",
+        ),
     ),
     ids=lambda case: case.description,
 )
-def test_given_inline_connection_location_when_compiling_then_models_build_there(
-    test_case: InlineConnectionLocationTestCase, tmp_path: Path
+def test_given_connection_location_when_compiling_then_models_build_there(
+    test_case: ConnectionLocationTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,

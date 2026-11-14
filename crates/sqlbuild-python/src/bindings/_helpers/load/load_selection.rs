@@ -7,7 +7,6 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_core::load_command::errors::UnknownLoadSelector;
 use sqlbuild_core::load_command::main::load_reference_loaders::load_reference_loaders;
 use sqlbuild_core::load_command::main::select_load_entries::select_load_entries as select_entries;
@@ -277,14 +276,9 @@ pub(crate) fn loader_defaults<'py>(
     let defaults: Bound<'py, PyAny> =
         native_field(&native_field(discovered, "project_config")?, "defaults")?;
     let location = |field: &str, connection_value: Option<Bound<'py, PyAny>>| {
-        let target: Bound<'py, PyAny> = target_value(target_config, field)?;
         project_location(
             (
-                if target.eq(PRESERVE_TARGET_VALUE)? {
-                    py.None().into_bound(py)
-                } else {
-                    target
-                },
+                target_value(target_config, field)?,
                 native_field(&defaults, field)?,
             ),
             connection_value.into_iter().filter(|_| inline).collect(),

@@ -849,6 +849,23 @@ database = "example-project"
             expected_effective_target_schema="orders",
         ),
         AssembleCompiledProjectEffectiveTargetTestCase(
+            description="a preserved target schema reaches models and loaders alike",
+            project_toml="""
+name = "demo"
+adapter = "duckdb"
+default_target = "dev"
+
+[defaults]
+schema = "analytics"
+
+[targets.dev]
+schema = "preserve"
+""".strip()
+            + "\n",
+            expected_effective_target_database=None,
+            expected_effective_target_schema="preserve",
+        ),
+        AssembleCompiledProjectEffectiveTargetTestCase(
             description="a top-level connection beside named targets is not used",
             project_toml="""
 name = "demo"
