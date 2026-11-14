@@ -162,6 +162,21 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	return sections;
 }
 
+/** The forward-only replay warning, `sqb plan`'s long advice in a sentence and the ways to reprocess. */
+const FORWARD_ONLY = /already-built dates keep their old results/;
+export const REPROCESS_OPTIONS = [
+	'replay_on_change full: rebuild every date with the new SQL',
+	'replay_on_change bounded-<duration>, such as bounded-14d: reprocess just that window',
+	'Leave it forward-only, the default: existing dates stay as they are'
+];
+
+/** A warning shown under its model: one sentence, and for the forward-only warning, how to reprocess. */
+export function warningView(w: PlanWarning): { text: string; reprocess: boolean } {
+	if (FORWARD_ONLY.test(w.message)) return { text: 'Already-built dates keep their old results; only new dates use the new query.', reprocess: true };
+	const text = w.model_name ? w.message : w.message.slice(w.message.indexOf(':') + 1).trim();
+	return { text: text.charAt(0).toUpperCase() + text.slice(1), reprocess: false };
+}
+
 /** The warnings no changed model shows with it, listed on their own after the plan. */
 export function looseWarnings(plan: PlanDocument, sections: PlanSection[]): PlanWarning[] {
 	const shown = new Set(sections.flatMap((s) => s.entries.flatMap((e) => e.warnings ?? [])));
@@ -184,7 +199,7 @@ export function changedRule(changed: PlanChanged): string {
 			: 'source data changes, not definition changes'
 		: 'definition changes, not source data';
 	const reach = changed.reach === 'all' ? 'builds everything downstream of a change' : 'stops at models another scheduled job refreshes';
-	return `--changed counts ${counted}, and ${reach} (reach: ${changed.reach}).`;
+	return `--changed counts ${counted}, and ${reach}.`;
 }
 
 /** What a preview couldn't know, in words; the run checks each against the warehouse before it builds. */
