@@ -365,7 +365,10 @@ export const DEPLOYS: DeploySpec[] = [
 		gitAuthor: ALEX.displayName,
 		minutesAgo: 6,
 		publishedBy: CI_ACCOUNT,
-		nodes: [node('fact_orders', 'changed', 'SQL changed: refunded payments now net out of order revenue', { columns: [{ name: 'net_revenue', op: 'changed', detail: 'expression changed' }] })],
+		nodes: [
+			node('fact_orders', 'changed', 'SQL changed: refunded payments now net out of order revenue', { columns: [{ name: 'net_revenue', op: 'changed', detail: 'expression changed' }] }),
+			node('customer_status', 'changed', 'SQL changed: lapsed customers now need 120 days without an order', { columns: [{ name: 'status', op: 'changed', detail: 'expression changed' }] })
+		],
 		orchestration: [],
 		roles: [],
 		environment: null

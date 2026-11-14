@@ -2,7 +2,7 @@
 	import SunIcon from '@lucide/svelte/icons/sun';
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import type { Snippet } from 'svelte';
-	import type { ConnectionState } from '$lib/api';
+	import type { ConnectionState, PlatformEvent } from '$lib/api';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { targetWords } from '$lib/platform/labels';
@@ -10,8 +10,9 @@
 	import PlatformEventBanner from './shell/platform-event-banner.svelte';
 	import WarehouseSyncStatus from './shell/warehouse-sync-status.svelte';
 
-	type Props = { title: string; children?: Snippet };
-	let { title, children }: Props = $props();
+	/** `events` picks the platform problems the banner shows on this page; by default, all of them. */
+	type Props = { title: string; children?: Snippet; events?: (event: PlatformEvent) => boolean };
+	let { title, children, events }: Props = $props();
 
 	const connectionTone: Record<ConnectionState, string> = {
 		live: 'var(--sb-success)',
@@ -73,7 +74,7 @@
 		</button>
 	</div>
 </div>
-<PlatformEventBanner />
+<PlatformEventBanner only={events} />
 
 <style>
 	.connection {

@@ -683,8 +683,15 @@ export class MockOperate {
 			cursor_window_starts: Object.fromEntries(models.filter((m) => m.materialization_type === 'incremental' && reason !== 'full_refresh').map((m) => [m.name, windowStart])),
 			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas']
 		};
+		// The planner's forward-only warning, in its words, for an incremental model whose query changed.
+		const warnings = models
+			.filter((m) => m.materialization_type === 'incremental' && m.reason === 'query_changed' && m.backfill.action === 'forward')
+			.map((m) => ({
+				severity: 'warning',
+				message: `${m.name}: the model's SQL changed, so already-built dates keep their old results - only new dates will use the new query. To apply the change to existing data, choose how much to reprocess: replay_on_change full (rebuild every date with the new SQL), replay_on_change bounded-<duration> e.g. bounded-14d (reprocess just that window), or leave it forward-only (existing dates as-is, new dates use the new query - the default). If this model's output does not depend on the SQL that changed, this is safe to ignore.`
+			}));
 		return this.#ctx.reply({
-			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision },
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings, migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision },
 			error: null
 		});
 	}
