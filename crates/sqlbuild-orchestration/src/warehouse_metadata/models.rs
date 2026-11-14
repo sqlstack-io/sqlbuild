@@ -435,8 +435,9 @@ pub struct WarehouseSyncDue {
 pub struct PreviewCopyRead {
     pub session_id: Uuid,
     pub generation: i64,
-    /// Whether the copy carries consumption history, which only `--changed` plans read.
-    #[serde(default)]
+    /// Whether the copy carries consumption history, which only `--changed` plans read; sent only
+    /// when set, so other plans still reach servers that predate it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub consumption: bool,
 }
 

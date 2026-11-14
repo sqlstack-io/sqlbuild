@@ -2412,7 +2412,10 @@ export interface components {
         };
         /** @description A location asks for the mirrored copy a plan preview plans from, as its fenced reader. */
         PreviewCopyRead: {
-            /** @description Whether the copy carries consumption history, which only `--changed` plans read. */
+            /**
+             * @description Whether the copy carries consumption history, which only `--changed` plans read; sent only
+             *     when set, so other plans still reach servers that predate it.
+             */
             consumption?: boolean;
             /** Format: int64 */
             generation: number;
