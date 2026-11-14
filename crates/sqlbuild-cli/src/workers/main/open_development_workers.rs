@@ -16,6 +16,7 @@ pub(crate) fn open_development_workers(
     Ok(Workers {
         configuration: Launchers {
             local: vec![LocalLauncher {
+                location: String::new(),
                 location_id,
                 target,
                 server_url,

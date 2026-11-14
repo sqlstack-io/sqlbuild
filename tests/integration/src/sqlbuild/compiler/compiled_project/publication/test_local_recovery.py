@@ -71,8 +71,8 @@ def test_given_a_running_local_worker_when_scheduler_dies_then_restart_adopts_an
                     "scheduler",
                     "--database-env",
                     "SQLBUILD_SCHEDULER_TEST_STORE",
-                    "--launchers",
-                    str(tmp_path / "launchers.json"),
+                    "--config",
+                    str(tmp_path / "server.toml"),
                 ],
                 log,
                 tmp_path / "replacement-scheduler.stdout",
@@ -157,8 +157,8 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
             "scheduler",
             "--database-env",
             "SQLBUILD_SCHEDULER_TEST_STORE",
-            "--launchers",
-            str(tmp_path / "launchers.json"),
+            "--config",
+            str(tmp_path / "server.toml"),
         ]
         handle: int = os.pidfd_open(pid)
         try:
@@ -288,8 +288,8 @@ def test_given_a_worker_lost_with_its_scheduler_when_restarted_then_the_run_fail
                 "scheduler",
                 "--database-env",
                 "SQLBUILD_SCHEDULER_TEST_STORE",
-                "--launchers",
-                str(tmp_path / "launchers.json"),
+                "--config",
+                str(tmp_path / "server.toml"),
             ],
             log,
             tmp_path / "replacement-scheduler.stdout",

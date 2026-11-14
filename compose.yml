@@ -31,8 +31,8 @@ services:
     volumes:
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     configs:
-      - source: launchers
-        target: /etc/sqlbuild/launchers.json
+      - source: server
+        target: /etc/sqlbuild/server.toml
     ports:
       - "${SQLBUILD_BIND_ADDRESS:-127.0.0.1}:${SQLBUILD_PORT:-8000}:8000"
     healthcheck:
@@ -68,9 +68,20 @@ services:
     networks: [workers]
 
 configs:
-  launchers:
+  server:
     content: |
-      {"docker":[{"location_id":"${SQLBUILD_LOCATION_ID}","target":"development","server_url":"http://server:8000","max_workers":1,"socket":"/var/run/docker.sock","location_container":"${COMPOSE_PROJECT_NAME:-sqlbuild}-location","executable":"/usr/local/bin/sqb"}]}
+      [server]
+      host = "0.0.0.0"
+      port = 8000
+
+      [[launchers.docker]]
+      location = "orders"
+      target = "development"
+      server_url = "http://server:8000"
+      max_workers = 1
+      socket = "/var/run/docker.sock"
+      location_container = "${COMPOSE_PROJECT_NAME:-sqlbuild}-location"
+      executable = "/usr/local/bin/sqb"
 
 volumes:
   control:

@@ -25,4 +25,4 @@ RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates
 COPY --from=runtime /usr/local/bin/sqb /usr/local/bin/sqb
 USER 10001:10001
 ENTRYPOINT ["sqb"]
-CMD ["server", "--host", "0.0.0.0", "--port", "8000", "--launchers", "/etc/sqlbuild/launchers.json"]
+CMD ["server", "--config", "/etc/sqlbuild/server.toml"]

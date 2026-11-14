@@ -26,6 +26,7 @@ use crate::native_commands::constants::{
     SKILLS_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
+use crate::server_config::models::{ServerConfig, ServerSection};
 use crate::native_commands::models::{
     ControlAdmin, CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions,
     SkillsOptions,
@@ -247,19 +248,22 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
 pub(crate) fn control_address(
     namespace: &Namespace,
     standalone: bool,
+    server: &ServerSection,
 ) -> Result<Option<SocketAddr>, ControlError> {
     if standalone {
         return Ok(None);
     }
-    let host: IpAddr = text(namespace, "control_host")
-        .unwrap_or_else(|| "127.0.0.1".into())
-        .parse()
-        .map_err(|_| ControlError::Invalid("--host must be an IP address".into()))?;
+    let host = match text(namespace, "control_host") {
+        Some(host) => host
+            .parse()
+            .map_err(|_| ControlError::Invalid("--host must be an IP address".into()))?,
+        None => server.host.unwrap_or(IpAddr::from([127, 0, 0, 1])),
+    };
     let port = match namespace.get("control_port") {
         Some(Value::Int(value)) => value
             .parse::<u16>()
             .map_err(|_| ControlError::Invalid("--port must be between 0 and 65535".into()))?,
-        _ => 8000,
+        _ => server.port.unwrap_or(8000),
     };
     Ok(Some(SocketAddr::new(host, port)))
 }
@@ -268,29 +272,53 @@ pub(crate) fn control_address(
 pub(crate) fn control_api_settings(
     namespace: &Namespace,
     standalone: bool,
+    config: &ServerConfig,
 ) -> Result<(ApiAuthentication, ServerFacts), ControlError> {
-    let statistics = match retention_setting(namespace, "statistics-retention-days")? {
+    let retention = &config.retention;
+    let statistics = match retention_setting(
+        namespace,
+        "statistics-retention-days",
+        ("statistics_days", retention.statistics_days),
+    )? {
         Some(days) => StatisticsRetention::days(days)?,
         None => StatisticsRetention::default(),
     };
-    let audit = match retention_setting(namespace, "audit-retention-days")? {
+    let audit = match retention_setting(
+        namespace,
+        "audit-retention-days",
+        ("audit_days", retention.audit_days),
+    )? {
         Some(days) => AuditRetention::days(days)?,
         None => AuditRetention::default(),
     };
-    let snapshots = match retention_setting(namespace, "snapshot-retention-count")? {
+    let snapshots = match retention_setting(
+        namespace,
+        "snapshot-retention-count",
+        ("snapshot_count", retention.snapshot_count),
+    )? {
         Some(count) => SnapshotRetention::count(count)?,
         None => SnapshotRetention::default(),
     };
     let defaults = RunLogRetention::default();
     let run_logs = RunLogRetention::new(
-        retention_setting(namespace, "run-log-retention-days")?.unwrap_or(defaults.days()),
-        retention_setting(namespace, "run-log-retention-count")?.unwrap_or(defaults.count()),
+        retention_setting(
+            namespace,
+            "run-log-retention-days",
+            ("run_log_days", retention.run_log_days),
+        )?
+        .unwrap_or(defaults.days()),
+        retention_setting(
+            namespace,
+            "run-log-retention-count",
+            ("run_log_count", retention.run_log_count),
+        )?
+        .unwrap_or(defaults.count()),
     )?;
     Ok((
-        control_authentication(namespace)?,
+        control_authentication(namespace, config)?,
         ServerFacts {
             version: env!("CARGO_PKG_VERSION").into(),
-            scheduler: standalone || !flag(namespace, "control_no_scheduler"),
+            scheduler: scheduler_enabled(namespace, standalone, &config.server),
             audit,
             statistics,
             snapshots,
@@ -299,8 +327,21 @@ pub(crate) fn control_api_settings(
     ))
 }
 
-/// Zero and out-of-range values name the flag before any type-specific check runs.
-fn retention_setting(namespace: &Namespace, flag: &str) -> Result<Option<u16>, ControlError> {
+/// `--no-scheduler` wins over `[server] scheduler`; the standalone scheduler always schedules.
+pub(crate) fn scheduler_enabled(
+    namespace: &Namespace,
+    standalone: bool,
+    server: &ServerSection,
+) -> bool {
+    standalone || !flag(namespace, "control_no_scheduler") && server.scheduler.unwrap_or(true)
+}
+
+/// Zero and out-of-range values name the flag, or the `[retention]` key, before any type-specific check runs.
+fn retention_setting(
+    namespace: &Namespace,
+    flag: &str,
+    (key, file): (&str, Option<u16>),
+) -> Result<Option<u16>, ControlError> {
     match namespace.get(&format!("control_{}", flag.replace('-', "_"))) {
         Some(Value::Int(value)) => match value.parse::<u16>() {
             Ok(setting) if setting > 0 => Ok(Some(setting)),
@@ -308,21 +349,22 @@ fn retention_setting(namespace: &Namespace, flag: &str) -> Result<Option<u16>, C
                 "--{flag} must be between 1 and 65535"
             ))),
         },
-        _ => Ok(None),
+        _ => match file {
+            Some(0) => Err(ControlError::Invalid(format!(
+                "[retention] {key} must be between 1 and 65535"
+            ))),
+            setting => Ok(setting),
+        },
     }
 }
 
-fn control_authentication(namespace: &Namespace) -> Result<ApiAuthentication, ControlError> {
-    let password = text(namespace, "control_password_origin");
-    let proxy = authentication_settings(
-        text(namespace, "control_trusted_proxy_config"),
-        ("trusted-proxy", "origin, trusted_peers and identities"),
-    )?;
-    let oidc = authentication_settings(
-        text(namespace, "control_oidc_config"),
-        ("OIDC", "origin, issuer, client_id and identities"),
-    )?;
-    let login = match (password, proxy, oidc) {
+fn control_authentication(
+    namespace: &Namespace,
+    config: &ServerConfig,
+) -> Result<ApiAuthentication, ControlError> {
+    let password =
+        text(namespace, "control_password_origin").or_else(|| config.server.password_origin.clone());
+    let login = match (password, config.trusted_proxy.clone(), config.oidc.clone()) {
         (None, None, None) => HumanLogin::None,
         (Some(origin), None, None) => HumanLogin::Password(origin),
         (None, Some(settings), None) => HumanLogin::TrustedProxy(settings),
@@ -341,34 +383,22 @@ fn control_authentication(namespace: &Namespace) -> Result<ApiAuthentication, Co
     };
     Ok(ApiAuthentication {
         login,
-        default_role: serde_json::from_value(json!(
-            text(namespace, "control_default_role").unwrap_or_else(|| "none".into())
-        ))
+        default_role: serde_json::from_value(json!(text(namespace, "control_default_role")
+            .or_else(|| config.server.default_role.clone())
+            .unwrap_or_else(|| "none".into())))
         .map_err(|_| ControlError::Invalid("default role must be none or viewer".into()))?,
     })
 }
 
-fn authentication_settings<T: serde::de::DeserializeOwned>(
-    path: Option<String>,
-    (mechanism, fields): (&str, &str),
-) -> Result<Option<T>, ControlError> {
-    path.map(|path| {
-        let document = std::fs::read_to_string(path).map_err(|_| {
-            ControlError::Invalid(format!("could not read {mechanism} configuration"))
-        })?;
-        serde_json::from_str(&document).map_err(|_| {
-            ControlError::Invalid(format!(
-                "{mechanism} configuration requires valid JSON with {fields}"
-            ))
-        })
-    })
-    .transpose()
+/// The variable naming the control database: `--database-env`, then `[server] database_env`.
+pub(crate) fn control_database_variable(namespace: &Namespace, server: &ServerSection) -> String {
+    text(namespace, "control_database_env")
+        .or_else(|| server.database_env.clone())
+        .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into())
 }
 
-pub(crate) fn control_database(namespace: &Namespace) -> Result<String, ControlError> {
-    let variable = text(namespace, "control_database_env")
-        .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into());
-    match std::env::var(&variable) {
+pub(crate) fn control_database(namespace: &Namespace, variable: &str) -> Result<String, ControlError> {
+    match std::env::var(variable) {
         Ok(value) => Ok(value),
         Err(std::env::VarError::NotPresent) => Ok(PathBuf::from(
             text(namespace, "project_dir").unwrap_or_else(|| ".".into()),

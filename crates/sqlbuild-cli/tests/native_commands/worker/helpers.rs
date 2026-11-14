@@ -290,23 +290,24 @@ pub(crate) fn disconnect_worker(_worker: WorkerControl, control: &mut TestContro
 pub(crate) fn start_recovery_scheduler(
     control: &TestControl,
     url: &str,
-    location_id: Uuid,
+    location: &str,
 ) -> TestControl {
     let directory = tempfile::tempdir().expect("recovery scheduler logs");
-    let configuration = directory.path().join("launchers.json");
-    let launcher = serde_json::json!({"docker": [{
-        "location_id": location_id, "target": "development", "server_url": url,
-        "max_workers": 1, "socket": directory.path().join("docker.sock"),
-        "location_container": "orders-location", "executable": "sqb"
-    }]});
-    std::fs::write(&configuration, launcher.to_string()).expect("Docker scope configuration");
+    let configuration = directory.path().join("server.toml");
+    let launcher = format!(
+        "[[launchers.docker]]\nlocation = {}\ntarget = \"development\"\nserver_url = {}\nmax_workers = 1\nsocket = {}\nlocation_container = \"orders-location\"\nexecutable = \"sqb\"\n",
+        serde_json::json!(location),
+        serde_json::json!(url),
+        serde_json::json!(directory.path().join("docker.sock")),
+    );
+    std::fs::write(&configuration, launcher).expect("Docker scope configuration");
     let stderr = directory.path().join("scheduler.log");
     let child = Command::new(isolated_binary(directory.path()))
         .args([
             "scheduler",
             "--database-env",
             "SQLBUILD_RECOVERY_TEST_STORE",
-            "--launchers",
+            "--config",
         ])
         .arg(configuration)
         .current_dir(directory.path())

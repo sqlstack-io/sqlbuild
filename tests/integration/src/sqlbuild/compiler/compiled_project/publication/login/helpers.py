@@ -20,6 +20,10 @@ from urllib.error import HTTPError
 from urllib.parse import SplitResult, parse_qs, urlencode, urlsplit
 from urllib.request import HTTPCookieProcessor, HTTPSHandler, Request, build_opener
 
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    write_server_config,
+)
+
 
 @contextmanager
 def gateway(root: Path) -> Iterator[tuple[str, Path, dict[str, str]]]:
@@ -179,14 +183,14 @@ def authentication_arguments(
             client_id="orders-control",
             certificate_authority=str(certificate),
         )
-        flag = "--oidc-config"
+        section = "oidc"
     else:
         assert mode == "proxy"
         configuration["trusted_peers"] = ["127.0.0.1"]
-        flag = "--trusted-proxy-config"
-    path: Path = certificate.parent / "authentication.json"
-    path.write_text(json.dumps(configuration))
-    return flag, str(path)
+        section = "trusted_proxy"
+    path: Path = certificate.parent / "server.toml"
+    write_server_config(path, {section: configuration})
+    return "--config", str(path)
 
 
 def sign_in(client: Any, origin: str, mode: str, username: str, password: str) -> str:
