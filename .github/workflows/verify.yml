@@ -377,8 +377,9 @@ jobs:
     steps:
       # Release Please pushes its version bump before release-please.yml refreshes Cargo.lock and
       # uv.lock in a commit of its own, so a bump head always disagrees with its lockfiles. That
-      # head waits for the refresh commit, whose run checks the lockfiles; the release checks
-      # also confirm them with --locked before they report Verify on the head.
+      # head waits for the refresh commit, whose run checks the lockfiles. The refresh step itself
+      # runs cargo metadata --locked and uv sync --locked before it commits, and the merge queue
+      # always checks the lockfiles.
       - name: Wait for the release lockfile refresh
         id: release
         if: >-
@@ -457,7 +458,8 @@ jobs:
           path: dist/*.whl
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          # Long enough for "Re-run failed jobs" on a shard, which reuses this run's wheels.
+          retention-days: 3
           overwrite: true
 
   checks:
@@ -511,7 +513,8 @@ jobs:
           DUPES_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'origin/main' }}
 
   tests:
-    # check-test-shards, part of the static checks, proves the shards run every test once.
+    # check-test-shards, part of the static checks, proves that the TEST_SHARD_*_PATHS lists in
+    # the Makefile run every test once; each of those lists needs an entry here.
     name: Unit + integration tests (${{ matrix.name }})
     needs: [changes, lockfile, native_build]
     if: needs.changes.outputs.checks == 'true'
