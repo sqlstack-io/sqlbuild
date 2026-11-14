@@ -31,12 +31,38 @@ from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback, Executio
 
 
 @dataclass(frozen=True)
+class DecimalShape:
+    """The digits a decimal column keeps before and after its point."""
+
+    integer_digits: int
+    scale: int
+
+    @property
+    def precision(self) -> int:
+        """The total digits, at least one."""
+
+        return max(self.integer_digits + self.scale, 1)
+
+    def widened(self, other: DecimalShape) -> DecimalShape:
+        """The narrowest shape holding the values of both."""
+
+        return DecimalShape(
+            integer_digits=max(self.integer_digits, other.integer_digits),
+            scale=max(self.scale, other.scale),
+        )
+
+    def __str__(self) -> str:
+        return f"DECIMAL({self.precision}, {self.scale})"
+
+
+@dataclass(frozen=True)
 class LoaderRowsSchema:
     """Tracked schema state for one or more loader row batches."""
 
     column_names: tuple[str, ...]
     inferred_types: dict[str, LoaderLogicalType]
     added_columns: tuple[ColumnInfo, ...]
+    decimal_shapes: dict[str, DecimalShape]
 
 
 @dataclass(frozen=True)

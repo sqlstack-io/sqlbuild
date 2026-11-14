@@ -1191,6 +1191,7 @@ class SnowflakeAdapter(
         cursor_end: str,
         columns: tuple[str, ...] | None = None,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         quoted_cursor_column: str = self.render_identifier(cursor_column)
         delete_sql: str = (
@@ -1198,6 +1199,12 @@ class SnowflakeAdapter(
             f"{self._quote_sql_string(cursor_start)} "
             f"AND {quoted_cursor_column} < {self._quote_sql_string(cursor_end)}"
         )
+        if unique_key:
+            keyed: tuple[str, ...] = self.render_delete_insert(
+                destination=destination, sql=sql, unique_key=unique_key, columns=columns
+            )
+            staged: int = sum(1 for statement in keyed if statement.startswith("CREATE "))
+            return (*keyed[:staged], delete_sql, *keyed[staged:])
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
         )
@@ -1573,7 +1580,10 @@ class SnowflakeAdapter(
         columns: tuple[str, ...] | None = None,
         statement_recorder: StatementRecorder,
         cursor_type: str | None = None,
+        unique_key: tuple[str, ...] = (),
     ) -> int | None:
+        """Replace a cursor window; staging DDL runs outside the transaction, which DDL commits."""
+
         statements: tuple[str, ...] = self.render_delete_insert_cursor(
             destination=destination,
             sql=sql,
@@ -1582,10 +1592,21 @@ class SnowflakeAdapter(
             cursor_end=cursor_end,
             columns=columns,
             cursor_type=cursor_type,
+            unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
+        staged: tuple[str, ...] = tuple(s for s in statements if s.startswith("CREATE "))
+        dropped: tuple[str, ...] = tuple(s for s in statements if s.startswith("DROP "))
+        for statement in staged:
+            self.execute(connection=connection, sql=statement)
         with self.transaction(connection):
-            return self._inserted_rows(connection=connection, statements=statements)
+            inserted: int | None = self._inserted_rows(
+                connection=connection,
+                statements=tuple(s for s in statements if s not in staged and s not in dropped),
+            )
+        for statement in dropped:
+            self.execute(connection=connection, sql=statement)
+        return inserted
 
     def _inserted_rows(self, *, connection: Any, statements: tuple[str, ...]) -> int | None:
         """Run DML statements; the rows the INSERT among them wrote, as Snowflake reports them."""
@@ -1625,7 +1646,9 @@ class SnowflakeAdapter(
 
         return '"' + name.replace('"', '""') + '"'
 
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
+    def render_loader_logical_type(
+        self, *, type_name: LoaderLogicalType, precision: int = 38, scale: int = 0
+    ) -> str:
         match type_name:
             case LoaderLogicalType.BOOLEAN:
                 return "BOOLEAN"
@@ -1633,6 +1656,8 @@ class SnowflakeAdapter(
                 return "BIGINT"
             case LoaderLogicalType.FLOAT:
                 return "DOUBLE"
+            case LoaderLogicalType.DECIMAL:
+                return f"NUMBER({precision}, {scale})"
             case LoaderLogicalType.STRING:
                 return "VARCHAR"
             case LoaderLogicalType.TIMESTAMP:
@@ -1663,7 +1688,9 @@ class SnowflakeAdapter(
             return "NULL"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
+        if isinstance(value, Decimal):
+            return format(value, "f")
+        if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):
             return self._quote_sql_string(value.isoformat())

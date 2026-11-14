@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/loaders/
 - How it works
 - Defining a loader
 - Binding to a source
+- Column types
 - Write strategies
 - Self-managed loaders
 - Loader context
@@ -78,6 +79,34 @@ Models reference managed sources the same way as any other source:
 ```sql
 SELECT id, name FROM __source("raw_customers")
 ```
+
+## Column types
+
+A column declared in the source's `columns` with a `type` gets that type, whatever Python values the
+loader returns for it. SQLBuild infers the type of every other column from its values:
+
+| Python value | Column type |
+|--------------|-------------|
+| `bool` | Boolean |
+| `int` | 64-bit integer |
+| `float` | Double |
+| `Decimal` | Decimal with the precision and scale of the column's values, up to 38 digits |
+| `str` | String |
+| `datetime` | Timestamp |
+| `date` | Date |
+| `dict` or `list` | JSON |
+
+For example, `Decimal("12.50")` and `Decimal("1234.5")` in one column give `DECIMAL(6, 2)`, written
+in the adapter's own type, such as `NUMBER(6, 2)` on Snowflake.
+
+Details:
+
+- A value of any other type, such as a `UUID`, `bytes` or `time`, stops the load with an error
+  naming the column and the type. Declare the column's `type`, or convert the value first.
+- Values of different types in one undeclared column, such as `float` and `Decimal`, stop the load.
+- SQLBuild writes rows in batches of `load_batch_size` rows (10,000 by default), and a decimal
+  column's width comes from the first batch that has it. A later value that needs more digits stops
+  the load instead of being rounded; declare the column's `type` to allow it.
 
 ## Write strategies
 

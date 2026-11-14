@@ -15,7 +15,7 @@ use crate::bindings::_helpers::compile_driver::target_defaults::{
 };
 use crate::bindings::_helpers::compile_driver::targets::{
     managed_loader_target_isolation, managed_write_schemas, named_target_schema_strategy,
-    project_targets,
+    project_targets, requires_explicit_targets,
 };
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
@@ -216,19 +216,26 @@ fn targeted_project<'py>(
     } else {
         adapter.call_method0("default_schema")?
     };
-    let defaults: TargetDefaults<'py> = TargetDefaults {
-        default_schema,
-        default_database: adapter.call_method0("default_database")?,
-        render_qualified_name: native_field(adapter, "render_qualified_name")?,
-        python_functions_inherit_default_namespace: adapter
-            .call_method0("python_functions_inherit_default_namespace")?,
-    };
-    let project: Bound<'py, PyAny> = apply_target_defaults(project, &defaults)?;
     let project_config: Bound<'py, PyAny> = native_field(discovered, "project_config")?;
     let local_config: Bound<'py, PyAny> = native_field(discovered, "local_config")?;
     let adapter_name: Bound<'py, PyAny> =
         resolve_effective_adapter_name(&project_config, &local_config.clone())
             .and_then(|value| value.into_bound_py_any(py))?;
+    let effective_database: Bound<'py, PyAny> = native_field(project, "effective_target_database")?;
+    let default_database: Bound<'py, PyAny> =
+        if requires_explicit_targets(&adapter_name)? && effective_database.is_truthy()? {
+            effective_database
+        } else {
+            adapter.call_method0("default_database")?
+        };
+    let defaults: TargetDefaults<'py> = TargetDefaults {
+        default_schema,
+        default_database,
+        render_qualified_name: native_field(adapter, "render_qualified_name")?,
+        python_functions_inherit_default_namespace: adapter
+            .call_method0("python_functions_inherit_default_namespace")?,
+    };
+    let project: Bound<'py, PyAny> = apply_target_defaults(project, &defaults)?;
     project_targets(&adapter_name, &project)?;
     let promotion_key: Bound<'py, PyAny> =
         pyo3::types::PyString::new(py, TABLE_PROMOTION_MODE_SETTING_KEY).into_any();

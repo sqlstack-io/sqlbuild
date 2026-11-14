@@ -121,16 +121,31 @@ fn optional_string<'py>(
     })
 }
 
-/// `first or second or third`.
-fn first_truthy<'py>(values: [Bound<'py, PyAny>; 3]) -> PyResult<Bound<'py, PyAny>> {
-    let [first, second, third] = values;
-    if first.is_truthy()? {
-        return Ok(first);
+/// A project-level location: the target's value, then `[defaults]`, then the first set fallback.
+pub(crate) fn project_location<'py>(
+    (target, default): (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    fallbacks: Vec<Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = target.py();
+    for value in [target, default].into_iter().chain(fallbacks) {
+        if value.is_truthy()? {
+            return Ok(value);
+        }
     }
-    if second.is_truthy()? {
-        return Ok(second);
+    Ok(py.None().into_bound(py))
+}
+
+/// Whether the top-level `[connection]` is the implicit default target: no named connections or targets.
+pub(crate) fn connection_is_default_target(discovered: &Bound<'_, PyAny>) -> PyResult<bool> {
+    for config in ["project_config", "local_config"] {
+        let config: Bound<'_, PyAny> = native_field(discovered, config)?;
+        for field in ["connections", "targets"] {
+            if native_field(&config, field)?.is_truthy()? {
+                return Ok(false);
+            }
+        }
     }
-    Ok(third)
+    Ok(true)
 }
 
 /// Resolve the target and its effective database/schema without compiling resources.
@@ -170,18 +185,37 @@ pub(crate) fn build_effective_target_namespace<'py>(
         }
         native_field(&target_config, key)
     };
+    let project_config: Bound<'py, PyAny> = native_field(discovered_inputs, "project_config")?;
+    let defaults: Bound<'py, PyAny> = native_field(&project_config, "defaults")?;
+    let inline: bool = connection_is_default_target(discovered_inputs)?;
     let values: Bound<'py, PyDict> = PyDict::new(py);
     values.set_item(
         DATABASE_KEY,
-        first_truthy([
-            target_value(DATABASE_KEY)?,
-            connection_database,
-            default_database,
-        ])?,
+        project_location(
+            (
+                target_value(DATABASE_KEY)?,
+                native_field(&defaults, DATABASE_KEY)?,
+            ),
+            [connection_database]
+                .into_iter()
+                .filter(|_| inline)
+                .chain([default_database])
+                .collect(),
+        )?,
     )?;
     values.set_item(
         SCHEMA_KEY,
-        first_truthy([target_value(SCHEMA_KEY)?, connection_schema, default_schema])?,
+        project_location(
+            (
+                target_value(SCHEMA_KEY)?,
+                native_field(&defaults, SCHEMA_KEY)?,
+            ),
+            [connection_schema]
+                .into_iter()
+                .filter(|_| inline)
+                .chain([default_schema])
+                .collect(),
+        )?,
     )?;
     let run_id: Bound<'py, PyAny> = run_id(&py.None().into_bound(py))?;
     let resolved: Bound<'py, PyDict> =

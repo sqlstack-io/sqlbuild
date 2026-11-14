@@ -33,7 +33,7 @@ use crate::bindings::_helpers::load::load_progress::{
     LoadCallbackRelay, LoadProgressReporter, load_result_text,
 };
 use crate::bindings::_helpers::load::load_selection::{
-    LoadProject, LoaderDefaults, loader_defaults,
+    LoadProject, LoaderDefaults, loader_defaults, loader_write_schemas,
 };
 use crate::bindings::_helpers::native_host::connections::connection_failure;
 use crate::bindings::_helpers::native_host::host;
@@ -117,6 +117,11 @@ fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Inv
             &exclude.extract::<Vec<String>>()?,
         ),
         &defaults,
+    )?;
+    loader_write_schemas(
+        &discovered,
+        (&selected_target, &native_field(request, "cli_vars")?),
+        &selected,
     )?;
     let references: Vec<Bound<'py, PyAny>> = project.reference_entries(&selected, &defaults)?;
     let machine_output: bool = native_field(request, "json_output")?.extract()?;

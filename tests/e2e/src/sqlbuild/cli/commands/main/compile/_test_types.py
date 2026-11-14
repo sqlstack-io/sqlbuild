@@ -1242,6 +1242,8 @@ class MissingTargetDatabaseTestCase:
     project_toml: str
     expected_error: str
     expected_example_count: int
+    extra_files: dict[str, str] = field(default_factory=dict)
+    command: tuple[str, ...] = ("--no-color", "compile")
 
 
 @dataclass(frozen=True)
@@ -1422,3 +1424,21 @@ class PythonMacroArgumentErrorTestCase:
     description: str
     call_sql: str
     expected_message: str
+
+
+@dataclass(frozen=True)
+class ConnectionLocationTestCase:
+    """A project's connection and defaults, and where its models build."""
+
+    description: str
+    project_toml: str
+    expected_qualified_name: str
+
+
+@dataclass(frozen=True)
+class ManagedSourceLoaderLocationTestCase:
+    """A command that runs a managed source's loader and the rows its loader schema must hold."""
+
+    description: str
+    command: tuple[str, ...]
+    expected_rows: tuple[tuple[object, ...], ...]

@@ -229,8 +229,18 @@ GRANT SELECT ON system.query_log TO janitor_user;
 
 When usage can't be checked, because the adapter has no source or the role can't read it, the
 preview and the prompt show one notice, such as `usage not checked: unsupported adapter`, and the
-janitor archives as usual. With `keep_in_use` on, a second notice, `nothing kept in use`, says that
-in-use relations are archived too.
+janitor archives as usual.
+
+With `keep_in_use` on, the janitor needs the usage of every relation to archive. When usage can't
+be checked, or the check leaves something out, such as view chains it couldn't follow, it stops
+with `C503` and archives nothing:
+
+```
+error[C503]: keep_in_use needs the usage of every relation to archive, but usage was not checked: unsupported adapter; nothing was archived
+```
+
+Grant the role the access in the table above, or run without `keep_in_use` to archive relations
+whether or not they are read.
 
 See [What counts as a read](#what-counts-as-a-read) for each warehouse's limits.
 
@@ -380,7 +390,8 @@ missed or don't count:
 
 - queries on other replicas or shards, which matters on ClickHouse Cloud and behind load-balanced
   replicas. When `system.clusters` shows other replicas of the connected server's shard, the preview
-  says `usage read from this server only; other replicas not checked`;
+  says `usage read from this server only; other replicas not checked`, and `keep_in_use` stops
+  with `C503` because the usage is incomplete;
 - queries ClickHouse answers from metadata without logging the table, such as a plain `count()`;
 - readers whose settings profile turns `log_queries` off or samples it with
   `log_queries_probability`. When `log_queries` is off for the janitor's own connection, usage isn't

@@ -202,13 +202,12 @@ pub(super) fn kept_usage_plan() -> JanitorPlanText {
 }
 
 /// A plan whose usage was not checked because the adapter has no usage source.
-pub(super) fn unchecked_plan(keep_in_use: bool) -> JanitorPlanText {
+pub(super) fn unchecked_plan() -> JanitorPlanText {
     JanitorPlanText {
         usage_check: Some(UsageCheckText {
             checked: false,
             reason: Some("unsupported adapter".to_owned()),
             window: "7d".to_owned(),
-            keep_in_use,
             ..UsageCheckText::default()
         }),
         ..direct_archive_plan()

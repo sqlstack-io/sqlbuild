@@ -66,24 +66,14 @@ fn given_usage_check_when_rendering_preview_then_in_use_relations_show_readers()
                 "\n  view chains not followed: grant SNOWFLAKE.OBJECT_VIEWER\n",
                 "\nIn use\n",
             ],
-            unexpected_fragments: &["usage not checked", "nothing kept in use"],
+            unexpected_fragments: &["usage not checked"],
         },
         PreviewTestCase {
             description: "an unchecked usage shows one notice and no in-use rows",
-            plan: unchecked_plan(false),
+            plan: unchecked_plan(),
             verbose: false,
             expected_fragments: &["\n  usage not checked: unsupported adapter\n"],
-            unexpected_fragments: &["in use  ", "In use", "nothing kept in use"],
-        },
-        PreviewTestCase {
-            description: "keep_in_use without a usage source warns that nothing is kept",
-            plan: unchecked_plan(true),
-            verbose: false,
-            expected_fragments: &[
-                "  usage not checked: unsupported adapter\n  nothing kept in use: no usage \
-                 could be checked, so relations in use are archived too\n",
-            ],
-            unexpected_fragments: &["Kept (in use)"],
+            unexpected_fragments: &["in use  ", "In use"],
         },
         PreviewTestCase {
             description: "a plan without a usage check renders as before",
@@ -141,16 +131,9 @@ fn given_usage_check_when_prompting_then_prompt_states_in_use_count() {
         },
         UsagePromptTestCase {
             description: "an unchecked usage repeats the notice",
-            plan: unchecked_plan(false),
+            plan: unchecked_plan(),
             expected_fragment: "Janitor will archive 1 and delete 1 objects from dev.\n\
                 Usage not checked: unsupported adapter\nRetention: 14 days\n",
-            expected_phrase: "archive 1 and delete 1 objects from dev",
-        },
-        UsagePromptTestCase {
-            description: "keep_in_use without a usage source repeats the warning",
-            plan: unchecked_plan(true),
-            expected_fragment: "Usage not checked: unsupported adapter\nNothing kept in use: \
-                no usage could be checked, so relations in use are archived too\nRetention",
             expected_phrase: "archive 1 and delete 1 objects from dev",
         },
     ];
@@ -214,7 +197,7 @@ fn given_usage_check_when_formatting_json_then_candidates_carry_in_use() {
         },
         JsonTestCase {
             description: "an unchecked usage leaves in_use null and states the reason",
-            plan: Some(unchecked_plan(false)),
+            plan: Some(unchecked_plan()),
             outcome: JanitorOutcome::Previewed,
             run: None,
             error: None,

@@ -226,3 +226,10 @@ class SqliteStatisticsTestCase:
     description: str
     fixture_name: str
     expected_interactive_row_count: int
+
+
+@dataclass(frozen=True)
+class SqliteCursorRowCountTestCase:
+    description: str
+    unique_key: tuple[str, ...]
+    expected_inserted: int

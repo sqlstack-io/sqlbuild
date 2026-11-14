@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import json
-from datetime import date, datetime
-from decimal import Decimal
 from typing import Any, ClassVar
 from urllib.parse import urlencode
 
@@ -31,38 +28,6 @@ class MotherDuckAdapter(
 
     adapter_name: ClassVar[str] = BuiltinAdapter.MOTHERDUCK.value
     sql_analysis_dialect_name: ClassVar[str | None] = "duckdb"
-
-    def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
-        match type_name:
-            case LoaderLogicalType.BOOLEAN:
-                return "BOOLEAN"
-            case LoaderLogicalType.INTEGER:
-                return "BIGINT"
-            case LoaderLogicalType.FLOAT:
-                return "DOUBLE"
-            case LoaderLogicalType.STRING:
-                return "VARCHAR"
-            case LoaderLogicalType.TIMESTAMP:
-                return "TIMESTAMP"
-            case LoaderLogicalType.DATE:
-                return "DATE"
-            case LoaderLogicalType.JSON:
-                return "JSON"
-
-    def render_loader_value_literal(
-        self, *, value: object, logical_type: LoaderLogicalType | None
-    ) -> str:
-        if value is None:
-            return "NULL"
-        if isinstance(value, bool):
-            return "TRUE" if value else "FALSE"
-        if isinstance(value, int | float | Decimal):
-            return str(value)
-        if isinstance(value, datetime | date):
-            return self._quote_sql_string(value.isoformat())
-        if isinstance(value, dict | list):
-            return self._quote_sql_string(json.dumps(value, sort_keys=True))
-        return self._quote_sql_string(str(value))
 
     def render_loader_rows_select(
         self,

@@ -54,7 +54,7 @@ from tests.unit.src.sqlbuild.executor.load.helpers import LoaderContextTestAdapt
                 'CAST("extra_bool" AS BOOLEAN) AS "extra_bool"',
                 'CAST("extra_int" AS BIGINT) AS "extra_int"',
                 'CAST("extra_float" AS DOUBLE) AS "extra_float"',
-                'CAST("extra_decimal" AS DOUBLE) AS "extra_decimal"',
+                'CAST("extra_decimal" AS DECIMAL(3, 2)) AS "extra_decimal"',
                 'CAST("extra_string" AS VARCHAR) AS "extra_string"',
                 'CAST("extra_timestamp" AS TIMESTAMP) AS "extra_timestamp"',
                 'CAST("extra_date" AS DATE) AS "extra_date"',
