@@ -42,21 +42,21 @@ separate authentication contract, not an inferred privilege of this client.
 ## Authenticate through a trusted proxy
 
 Create a person with `sqb admin create-principal orders-reader`, then put the
-returned `principal_id` in a server-owned JSON file. Subjects are exact ASCII
-upstream identities, not inferred local usernames or email addresses:
+returned `principal_id` in the `[trusted_proxy]` section of the server's
+`server.toml`. Subjects are exact ASCII upstream identities, not inferred local
+usernames or email addresses:
 
-```json
-{
-  "origin": "https://control.example.com",
-  "trusted_peers": ["127.0.0.1"],
-  "identities": {
-    "external-orders-reader": "00000000-0000-0000-0000-000000000001"
-  }
-}
+```toml
+[trusted_proxy]
+origin = "https://control.example.com"
+trusted_peers = ["127.0.0.1"]
+
+[trusted_proxy.identities]
+external-orders-reader = "00000000-0000-0000-0000-000000000001"
 ```
 
 Replace the example UUID with the created person's ID, then start
-`sqb server --trusted-proxy-config proxy.json`. The proxy must terminate HTTPS,
+`sqb server --config server.toml`. The proxy must terminate HTTPS,
 remove any client-supplied `X-SQB-User`, and replace it with the authenticated
 upstream subject. Restrict access to the HTTP backend to the configured proxy
 peers. Trusting loopback also trusts other local processes on that host;
@@ -74,23 +74,22 @@ is inferred from the subject.
 Register an authorization-code client with your HTTPS identity provider, using
 `https://control.example.com/api/auth/oidc/callback` as its redirect URI. Create
 each person through the local control-store-owner administration path and put
-their UUID and exact provider subject in a server-owned JSON configuration:
+their UUID and exact provider subject in the `[oidc]` section of `server.toml`:
 
-```json
-{
-  "origin": "https://control.example.com",
-  "issuer": "https://identity.example.com",
-  "client_id": "orders-control",
-  "identities": {
-    "external-orders-reader": "00000000-0000-0000-0000-000000000001"
-  }
-}
+```toml
+[oidc]
+origin = "https://control.example.com"
+issuer = "https://identity.example.com"
+client_id = "orders-control"
+
+[oidc.identities]
+external-orders-reader = "00000000-0000-0000-0000-000000000001"
 ```
 
-Start `sqb server --oidc-config oidc.json` behind an HTTPS-terminating proxy that
+Start `sqb server --config server.toml` behind an HTTPS-terminating proxy that
 preserves the configured Host and restricts access to the HTTP backend. For a
 confidential client, add `client_secret_env` naming the server environment
-variable holding its secret; never put the secret in the JSON file. To trust a
+variable holding its secret; never put the secret in `server.toml`. To trust a
 private provider CA, add `certificate_authority` pointing to a PEM bundle.
 Relative certificate paths resolve from the server process's working directory.
 TLS verification remains mandatory and upstream HTTP redirects are not followed.

@@ -1,5 +1,6 @@
 """A published schedule executes in a real pinned container, not a mocked launcher."""
 
+import json
 import signal
 import sqlite3
 import sys
@@ -65,6 +66,21 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             },
         ),
         WorkerExecutionTestCase(
+            "launcher defaults and job resources bound the worker, capped by max_memory",
+            "SELECT 41 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(41,)],
+            launcher="docker",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/container_resources_orders.py"
+                ).read_text()
+            },
+            launcher_run={"memory": "768m", "cpus": 2, "pids": 256, "max_memory": "1g"},
+            expected_host_config={"Memory": 1 << 30, "NanoCpus": 500_000_000, "PidsLimit": 256},
+        ),
+        WorkerExecutionTestCase(
             "container warehouse error retains failed node evidence",
             "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS BIGINT) AS amount FROM source",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",
@@ -91,6 +107,27 @@ def test_given_a_scheduled_docker_job_when_published_then_a_pinned_worker_execut
             time.sleep(0.02)
             state = worker_container(worker.docker, worker.api.location_id, run["run_id"])
         assert state["ExitCode"] == {"success": 0, "failed": 1}[test_case.expected_status]
+        name: str = f"sqlbuild-{worker.api.location_id}-{run['run_id']}"
+        host: dict[str, Any] = json.loads(
+            docker_command(worker.docker.socket, "inspect", "--format", "{{json .HostConfig}}", name)
+        )
+        location: dict[str, Any] = json.loads(
+            docker_command(
+                worker.docker.socket,
+                "inspect",
+                "--format",
+                "{{json .HostConfig}}",
+                worker.docker.container,
+            )
+        )
+        assert {key: host[key] for key in test_case.expected_host_config} == (
+            test_case.expected_host_config
+        )
+        assert location["CapDrop"] and location["SecurityOpt"]
+        assert (host["CapDrop"], host["SecurityOpt"]) == (
+            location["CapDrop"],
+            location["SecurityOpt"],
+        )
 
 
 @REQUIRES_DOCKER

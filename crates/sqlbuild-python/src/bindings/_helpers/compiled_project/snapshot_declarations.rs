@@ -22,7 +22,7 @@ use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, declared_at, module_jobs,
-    run_controls,
+    job_resources, run_controls,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     compile_calendars, compile_cron, compile_sensors,
@@ -128,6 +128,10 @@ pub(crate) fn compile_declarations(
                 job.on_failure.as_ref().map(|policy| policy.bind(py)),
             ),
         )?;
+        let resources = job_resources(
+            &job.name,
+            job.resources.as_ref().map(|resources| resources.bind(py)),
+        )?;
         let targets: BTreeSet<String> = job.targets.into_iter().collect();
         if let Some(schedule) = job.schedule {
             triggers.insert(
@@ -153,6 +157,7 @@ pub(crate) fn compile_declarations(
                 owner: controls.owner,
                 overlap: controls.overlap,
                 on_failure: controls.on_failure,
+                resources,
             },
         );
     }
@@ -216,6 +221,7 @@ pub(crate) fn compile_declarations(
                     owner: controls.owner,
                     overlap: controls.overlap,
                     on_failure: controls.on_failure,
+                    resources: None,
                 },
                 jobs: dependencies,
             },

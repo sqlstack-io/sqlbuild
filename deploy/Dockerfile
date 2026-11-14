@@ -1,9 +1,16 @@
-# Build wheels from this checkout before building these images; see deploy/README.md.
+# Install a released SQLBuild (SQLBUILD_SOURCE=release) or this checkout's wheels; see deploy/README.md.
 ARG PYTHON_VERSION=3.12
-FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+ARG SQLBUILD_SOURCE=wheels
+FROM python:${PYTHON_VERSION}-slim-bookworm AS install-release
+ARG SQLBUILD_VERSION
+RUN test -n "$SQLBUILD_VERSION" && python -m pip install --no-cache-dir "sqlbuild==${SQLBUILD_VERSION}"
+
+FROM python:${PYTHON_VERSION}-slim-bookworm AS install-wheels
 COPY dist/*.whl /wheels/
-RUN python -m pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels \
-    && useradd --uid 10001 --create-home sqlbuild \
+RUN python -m pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+
+FROM install-${SQLBUILD_SOURCE} AS runtime
+RUN useradd --uid 10001 --create-home sqlbuild \
     && mkdir -p /project/target /project/logs /warehouse \
     && chown sqlbuild:sqlbuild /project /project/target /project/logs /warehouse
 ENV PYTHONUNBUFFERED=1

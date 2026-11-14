@@ -52,7 +52,27 @@ pub struct JobDefinition {
     pub overlap: Overlap,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_failure: Option<OnFailure>,
+    /// The worker container's limits for this job; the launcher's `max_memory` caps memory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resources: Option<RunResources>,
 }
+
+/// Container limits a job asks for; each unset limit falls back to the launcher's.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunResources {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory: Option<MemorySize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpus: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pids: Option<i64>,
+}
+
+/// Bytes, written as an integer or with a `k`, `m` or `g` suffix (powers of 1024).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(transparent)]
+pub struct MemorySize(pub u64);
 
 /// What a schedule tick or sensor request does while a run of the same job is active; people's requests always queue.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

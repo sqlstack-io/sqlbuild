@@ -4,12 +4,15 @@ use std::path::Path;
 
 use reqwest::{Method, StatusCode};
 use serde_json::{Value, json};
-use sqlbuild_orchestration::runs::models::RunClaim;
+use sqlbuild_orchestration::declarations::main::job_resources::job_resources;
+use sqlbuild_orchestration::declarations::models::RunResources;
+use sqlbuild_orchestration::runs::models::{RunClaim, RunKind};
 use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::store::models::ControlStore;
 
 use crate::workers::_helpers::invocation::{arguments, environment, excluded};
 use crate::workers::constants::IMAGE_ID_HEX_LENGTH;
-use crate::workers::models::{DockerLauncher, DockerWorker, Launcher, WorkerExit};
+use crate::workers::models::{DockerLauncher, DockerWorker, Launcher, RunDefaults, WorkerExit};
 
 impl DockerWorker {
     pub(in crate::workers) fn prepare(
@@ -40,11 +43,17 @@ impl DockerWorker {
 
     pub(in crate::workers) async fn launch(
         &self,
-        location: &DockerLauncher,
+        (store, location): (&ControlStore, &DockerLauncher),
         claim: &RunClaim,
         bearer: &str,
         control_variable: &str,
     ) -> Result<(), ControlError> {
+        let resources = match (&claim.request.kind, &claim.request.job_key) {
+            (RunKind::Job, Some(job_key)) => {
+                job_resources(store, (claim.request.snapshot_id, job_key)).await?
+            }
+            _ => None,
+        };
         let parent: Value = self
             .request(
                 Method::GET,
@@ -85,13 +94,7 @@ impl DockerWorker {
             "Image": self.image_id, "Entrypoint": [location.executable], "Cmd": command,
             "WorkingDir": project, "User": parent["Config"]["User"], "Env": variables,
             "Labels": {"io.sqlbuild.claim-id": self.claim_id.to_string()},
-            "HostConfig": {
-                "NetworkMode": parent["HostConfig"]["NetworkMode"],
-                "VolumesFrom": [location.location_container],
-                "Memory": parent["HostConfig"]["Memory"], "MemorySwap": parent["HostConfig"]["MemorySwap"],
-                "NanoCpus": parent["HostConfig"]["NanoCpus"], "PidsLimit": parent["HostConfig"]["PidsLimit"],
-                "ReadonlyRootfs": parent["HostConfig"]["ReadonlyRootfs"],
-            },
+            "HostConfig": host_config(&parent["HostConfig"], location, resources.unwrap_or_default()),
         });
         self.request(
             Method::POST,
@@ -181,6 +184,45 @@ impl DockerWorker {
         .await
         .map_err(docker_error)
     }
+}
+
+/// The location container's limits and hardening, then the launcher's run defaults, then the job's resources; `max_memory` caps memory.
+/// Only positive limits are sent: Podman reports "no limit" as `0` but reads a `0` it is sent as a limit.
+fn host_config(parent: &Value, location: &DockerLauncher, job: RunResources) -> Value {
+    let RunDefaults {
+        memory,
+        cpus,
+        pids,
+        cgroup_parent,
+        max_memory,
+    } = &location.run;
+    let inherited = |key: &str| parent[key].as_u64().filter(|limit| *limit > 0);
+    let own_memory = inherited("Memory");
+    let memory = match (job.memory.or(*memory).map(|size| size.0).or(own_memory), max_memory) {
+        (Some(bytes), Some(ceiling)) => Some(bytes.min(ceiling.0)),
+        (None, Some(ceiling)) => Some(ceiling.0),
+        (bytes, None) => bytes,
+    };
+    // A changed limit gets no swap beyond it; an unchanged one keeps the location's swap.
+    let swap = if memory == own_memory {
+        inherited("MemorySwap")
+    } else {
+        memory
+    };
+    let nano_cpus = job
+        .cpus
+        .or(*cpus)
+        .map(|cpus| (cpus * 1e9).round() as i64)
+        .or_else(|| inherited("NanoCpus").and_then(|cpus| i64::try_from(cpus).ok()));
+    json!({
+        "NetworkMode": parent["NetworkMode"],
+        "VolumesFrom": [location.location_container],
+        "Memory": memory, "MemorySwap": swap, "NanoCpus": nano_cpus,
+        "PidsLimit": job.pids.or(*pids).or_else(|| inherited("PidsLimit").and_then(|limit| i64::try_from(limit).ok())),
+        "CgroupParent": cgroup_parent.as_deref().or_else(|| parent["CgroupParent"].as_str()).filter(|path| !path.is_empty()),
+        "ReadonlyRootfs": parent["ReadonlyRootfs"],
+        "CapDrop": parent["CapDrop"], "SecurityOpt": parent["SecurityOpt"],
+    })
 }
 
 fn docker_error(error: reqwest::Error) -> ControlError {

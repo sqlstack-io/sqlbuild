@@ -843,6 +843,8 @@ def scheduled_worker(
             "server_url": api.url,
             "max_workers": 1,
         } | deployment.configuration
+        if test_case.launcher_run:
+            launcher["run"] = test_case.launcher_run
         write_server_config(
             configuration,
             {
