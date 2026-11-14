@@ -2,10 +2,10 @@
 	// A plan in the order and words of `sqb plan`: what runs first, each change with its detail and diff,
 	// then the routine models.
 	import { to } from '$lib/paths';
-	import type { PlanDocument } from '$lib/api';
+	import type { PlanDocument, PlanWarning } from '$lib/api';
 	import { formatAgo } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
-	import { changedPolicyLine, changedSections, planSections, type PlanEntry } from './plan-text';
+	import { changedRule, changedSections, looseWarnings, planSections, unknownWords, type PlanEntry } from './plan-text';
 
 	/** `refresh` words what refreshes the nodes a `--changed` plan holds back for a job. */
 	let { plan, refresh = (job: string) => `job ${job}` }: { plan: PlanDocument; refresh?: (job: string) => string } = $props();
@@ -14,6 +14,12 @@
 	/** Rows a section shows before "Show all", as the CLI truncates long sections. */
 	const limit = 50;
 	let expanded = $state<Record<string, boolean>>({});
+	const loose = $derived(looseWarnings(plan, sections));
+	/** A warning shown under its model, without the model name the CLI opens it with. */
+	const warningText = (w: PlanWarning) => {
+		const text = w.model_name ? w.message : w.message.slice(w.message.indexOf(':') + 1).trim();
+		return text.charAt(0).toUpperCase() + text.slice(1);
+	};
 
 	const href = (e: PlanEntry, title: string) => (/^\d+$/.test(e.name) || title.includes('unction') || title.startsWith('Sources') || title.startsWith('Loaders') ? null : to(`/catalog/model:${e.name}`));
 	const diffClass = (line: string) => (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@') ? 'hunk' : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : '');
@@ -24,19 +30,23 @@
 		{@const copy = plan.synced_copy}
 		<section class="preview">
 			<p>
-				Planned from warehouse metadata {#if copy.synced_at}synced <time datetime={copy.synced_at} title={copy.synced_at}>{formatAgo(copy.synced_at, app.now)}</time>{:else}that has not fully synced yet{/if}.
-				The run plans again against the warehouse.
+				A preview from warehouse metadata {#if copy.synced_at}synced <time datetime={copy.synced_at} title={copy.synced_at}>{formatAgo(copy.synced_at, app.now)}</time>{:else}that hasn’t fully synced yet{/if}. The run checks the warehouse again before it builds.
 			</p>
 			{#if copy.unknown_until_run.length}
-				<div class="unknown">
-					<span>Unknown until the run</span>
-					<ul>{#each copy.unknown_until_run as item (item)}<li>{item}</li>{/each}</ul>
-				</div>
+				<details class="unknown">
+					<summary>What the preview can’t know yet</summary>
+					<ul>{#each copy.unknown_until_run as item (item)}<li>{unknownWords(item)}</li>{/each}</ul>
+				</details>
 			{/if}
 		</section>
 	{/if}
-	{#if plan.changed}<p class="policy" data-testid="changed-policy">{changedPolicyLine(plan.changed)}</p>{/if}
+	{#if plan.changed}<p class="policy" data-testid="changed-policy">{changedRule(plan.changed)}</p>{/if}
 	{#each sections as s (s.title)}
+		{#if s.collapsed && !expanded[s.title]}
+			<button class="collapsed" aria-expanded="false" onclick={() => (expanded[s.title] = true)}>
+				<i></i>{s.entries.length} {s.title.toLowerCase()}, {s.entries[0].value} <span>Show</span>
+			</button>
+		{:else}
 		{@const shown = expanded[s.title] ? s.entries : s.entries.slice(0, limit)}
 		<section>
 			<h4><i class:changed={s.changed}></i>{s.title} <span>({s.entries.length})</span></h4>
@@ -49,6 +59,7 @@
 						<span class="value" class:accent={s.changed}>{e.value}</span>
 					</div>
 					{#each e.detail as d, i (i)}<div class="detail">{d}</div>{/each}
+					{#each e.warnings ?? [] as w, i (i)}<p class="entry-warning" class:err={w.severity === 'error'}>{warningText(w)}</p>{/each}
 					{#if hasDiff}
 						{#if e.schema?.length}
 							<div class="detail">schema diff:</div>
@@ -69,11 +80,12 @@
 				<button class="more" onclick={() => (expanded[s.title] = true)}>… and {s.entries.length - shown.length} more</button>
 			{/if}
 		</section>
+		{/if}
 	{/each}
-	{#if plan.warnings.length}
+	{#if loose.length}
 		<section>
-			<h4><i class="warn"></i>Warnings <span>({plan.warnings.length})</span></h4>
-			{#each plan.warnings as w, i (i)}
+			<h4><i class="warn"></i>Warnings <span>({loose.length})</span></h4>
+			{#each loose as w, i (i)}
 				<div class="entry warning" class:err={w.severity === 'error'}>
 					{#if w.model_name}<span class="name">{w.model_name}</span>{/if}
 					<span>{#if w.code}<code>{w.code}</code> {/if}{w.message}</span>
@@ -93,8 +105,36 @@
 	.policy {
 		margin: 0;
 		color: var(--muted-foreground);
-		font-family: var(--font-mono);
 		font-size: 12px;
+	}
+	.collapsed {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 4px 0;
+		border-bottom: 1px solid var(--border);
+		color: var(--muted-foreground);
+		font-size: 12.5px;
+		text-align: left;
+	}
+	.collapsed span {
+		color: var(--primary);
+		font-size: 11.5px;
+	}
+	.collapsed:hover span {
+		text-decoration: underline;
+	}
+	.entry-warning {
+		margin: 4px 0 2px 16px;
+		padding: 4px 8px;
+		border-left: 2px solid var(--sb-warning);
+		background: color-mix(in srgb, var(--sb-warning) 8%, transparent);
+		color: var(--foreground);
+		font-size: 12px;
+		line-height: 17px;
+	}
+	.entry-warning.err {
+		border-left-color: var(--sb-error);
 	}
 	h4 {
 		display: flex;
@@ -214,19 +254,16 @@
 	.preview time {
 		color: var(--foreground);
 	}
-	.unknown span {
+	.unknown summary {
 		color: var(--sb-text-faint);
 		font-size: 11.5px;
+		cursor: pointer;
 	}
 	.unknown ul {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px 14px;
-		margin: 2px 0 0;
-		padding: 0;
-		list-style: none;
-		font-family: var(--font-mono);
-		font-size: 11px;
+		margin: 4px 0 0;
+		padding-left: 16px;
+		list-style: disc;
+		font-size: 12px;
 	}
 	code {
 		color: var(--sb-text-faint);
