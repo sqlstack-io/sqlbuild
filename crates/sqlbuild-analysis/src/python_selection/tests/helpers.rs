@@ -67,6 +67,14 @@ const ORDERS_NODES: &[NodeSpec] = &[
         &[],
         &[],
     ),
+    (
+        "check_raw_customers",
+        "check",
+        "python/checks/customers.py",
+        &["customer_checks"],
+        &[],
+        &[("source", "raw_customers")],
+    ),
 ];
 
 fn owned(values: &[&str]) -> Vec<String> {
@@ -124,6 +132,12 @@ fn orders_sql_graph() -> ProjectGraph {
         },
         GraphResource {
             key: raw_orders,
+            deps: Vec::new(),
+            tags: Vec::new(),
+            folder: None,
+        },
+        GraphResource {
+            key: key(&("source", "raw_customers")),
             deps: Vec::new(),
             tags: Vec::new(),
             folder: None,

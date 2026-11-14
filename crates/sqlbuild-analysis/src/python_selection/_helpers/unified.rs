@@ -102,35 +102,66 @@ pub(crate) fn run_selection(
     Ok(selection(context, sql_keys(&runnable), &runnable))
 }
 
-/// A matched check runs with the nodes it checks, so each of them must be selected too.
+/// The first matched check a build cannot run after the nodes it checks, as an error message.
 fn unselected_checked_nodes(
     context: &SelectionContext<'_>,
     selected: &Atoms,
     checks: &[&str],
 ) -> Option<String> {
-    checks.iter().find_map(|check| {
-        let python = context
-            .nodes
-            .edges(check, EdgeDirection::Upstream)
-            .iter()
-            .filter(|name| !selected.contains(&Atom::Python((*name).clone())))
-            .filter_map(|name| Some(format!("{}:{name}", context.nodes.node(name)?.kind)));
-        let sql = context
-            .nodes
-            .node(check)
-            .map_or(&[][..], |node| &node.sql_deps);
-        let sql = sql
-            .iter()
-            .filter(|key| !selected.contains(&Atom::Sql((*key).clone())))
-            .map(|(kind, name)| format!("{kind}:{name}"));
-        let missing: Vec<String> = python.chain(sql).collect();
-        (!missing.is_empty()).then(|| {
-            format!(
-                "Python check '{check}' checks {}, which the selection does not include; \
-                 select it too, or narrow the selector so it no longer matches the check.",
-                missing.join(", ")
-            )
-        })
+    let loaded: HashSet<&str> = source_loaders(context.sql)
+        .into_iter()
+        .map(|(source, _)| source)
+        .collect();
+    for check in checks {
+        if let Some(message) = unrunnable_check(context, selected, &loaded, check) {
+            return Some(message);
+        }
+    }
+    None
+}
+
+/// Why a build cannot run `check`: it checks a source no loader writes, or an unselected node.
+fn unrunnable_check(
+    context: &SelectionContext<'_>,
+    selected: &Atoms,
+    loaded: &HashSet<&str>,
+    check: &str,
+) -> Option<String> {
+    let sql: &[ObjectKey] = context
+        .nodes
+        .node(check)
+        .map_or(&[][..], |node| &node.sql_deps);
+    let unloaded: Vec<String> = sql
+        .iter()
+        .filter(|(kind, name)| kind == SOURCE_RESOURCE && !loaded.contains(name.as_str()))
+        .map(|(kind, name)| format!("{kind}:{name}"))
+        .collect();
+    if !unloaded.is_empty() {
+        return Some(format!(
+            "Python check '{check}' checks {}, which a build does not load, so the check \
+             would not run; run it with sqb check, or narrow the selector so it no longer \
+             matches the check.",
+            unloaded.join(", ")
+        ));
+    }
+    let missing: Vec<String> = context
+        .nodes
+        .edges(check, EdgeDirection::Upstream)
+        .iter()
+        .filter(|name| !selected.contains(&Atom::Python((*name).clone())))
+        .filter_map(|name| Some(format!("{}:{name}", context.nodes.node(name)?.kind)))
+        .chain(
+            sql.iter()
+                .filter(|key| !selected.contains(&Atom::Sql((*key).clone())))
+                .map(|(kind, name)| format!("{kind}:{name}")),
+        )
+        .collect();
+    (!missing.is_empty()).then(|| {
+        format!(
+            "Python check '{check}' checks {}, which the selection does not include; \
+             select it too, or narrow the selector so it no longer matches the check.",
+            missing.join(", ")
+        )
     })
 }
 

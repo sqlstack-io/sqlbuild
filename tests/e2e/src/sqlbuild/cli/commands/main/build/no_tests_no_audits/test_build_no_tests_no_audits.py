@@ -2204,6 +2204,18 @@ def test_given_model_task_loader_chain_when_running_run_then_command_rejects_bou
             expected_output_fragments=("check     check_orders_export START", "PASS=2"),
             select=("check:check_orders_export", "task:prepare_orders"),
         ),
+        RunE2ETestCase(
+            description="build rejects a selected check on a source no loader writes",
+            expected_exit_code=1,
+            expected_table_names=(),
+            expected_view_names=(),
+            expected_output_fragments=(
+                "Python check 'check_raw_events' checks source:raw_events, which a build does "
+                "not load, so the check would not run; run it with sqb check, or narrow the "
+                "selector so it no longer matches the check.",
+            ),
+            select=("check:check_raw_events", "source:raw_events"),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -2233,6 +2245,16 @@ def test_given_check_selector_when_running_build_then_check_needs_its_checked_no
                 "@task\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    return ctx.result()\n"
+            ),
+            "python/checks/events.py": (
+                "from sqlbuild.checks import check\n"
+                "from sqlbuild.refs import source\n\n"
+                "@check(depends_on=source('raw_events'))\n"
+                "def check_raw_events(ctx):\n"
+                "    '''Test check check_raw_events.'''\n    return ctx.pass_()\n"
+            ),
+            "sources/raw.yml": (
+                "sources:\n  - name: raw_events\n    description: Test source raw_events.\n"
             ),
         },
     )

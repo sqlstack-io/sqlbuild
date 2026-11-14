@@ -113,6 +113,7 @@ fn given_run_selectors_when_resolving_then_selection_matches_python() {
                 &[
                     ("model", "orders"),
                     ("source", "load_events"),
+                    ("source", "raw_customers"),
                     ("source", "raw_orders"),
                 ],
                 &[
@@ -143,6 +144,17 @@ fn given_run_selectors_when_resolving_then_selection_matches_python() {
             select: &["tag:exports"],
             exclude: &[],
             expected_selection: Ok((&[], &["export_orders"])),
+        },
+        RunSelectionTestCase {
+            description: "a check on a source a build does not load is refused even when selected",
+            select: &["tag:customer_checks", "source:raw_customers"],
+            exclude: &[],
+            expected_selection: Err((
+                "S000",
+                "Python check 'check_raw_customers' checks source:raw_customers, which a build \
+                 does not load, so the check would not run; run it with sqb check, or narrow the \
+                 selector so it no longer matches the check.",
+            )),
         },
         RunSelectionTestCase {
             description: "a check whose checked node is unselected names both",
