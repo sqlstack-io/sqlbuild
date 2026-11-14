@@ -1,0 +1,19 @@
+{
+ "commands": [
+  {
+   "label": "compile",
+   "exit_code": 1,
+   "diagnostics": [
+    {
+     "phase": "compile",
+     "severity": "error",
+     "code": "D017",
+     "message": "orchestration/jobs.py:1:1: files cannot sit directly in orchestration/",
+     "help": "jobs, job groups and schedules are TOML files in orchestration/jobs/ and orchestration/job_groups/; see https://sqlbuild.com/docs/concepts/orchestration/"
+    }
+   ]
+  }
+ ],
+ "compiled": {},
+ "manifest": null
+}
