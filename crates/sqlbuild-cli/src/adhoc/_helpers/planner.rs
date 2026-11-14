@@ -8,6 +8,8 @@ use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::build_project_graph::build_project_graph;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::graph::models::{GraphResource, JobSelection};
+use sqlbuild_analysis::planner_selection::main::split_unit_test_selectors::split_unit_test_selectors;
+use sqlbuild_analysis::planner_selection::models::{SelectorGroups, UnitTestSelectorNames};
 use sqlbuild_analysis::python_selection::main::published_python_graph::published_python_graph;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
 use sqlbuild_analysis::python_selection::models::{PublishedPythonNode, SqlSelectionGraph};
@@ -18,7 +20,7 @@ use sqlbuild_orchestration::runs::types::{CommandPlanner, PublishedJobs};
 use crate::adhoc::constants::{
     ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, CHANGED_COUNTS_DEST, CHANGED_DEST, COMMAND_DEST,
     FRESHNESS_VERB, INTEGER_CONVERTERS, LOAD_SOURCES_DEST, POSITIVE_INTEGER_CONVERTER,
-    REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS,
+    REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS, SQL_TEST_KIND, UNIT_TEST_VERBS,
 };
 use crate::argv::main::command_settings_arguments::command_settings_arguments;
 use crate::argv::main::job_settings_arguments::job_settings_arguments;
@@ -84,7 +86,7 @@ impl CommandPlanner for CliPlanner {
                 seeds
             }
             FRESHNESS_VERB => freshness_sources(publication, &select, &exclude)?,
-            _ => resolve(publication, &select, &exclude)?,
+            _ => resolve_with_tests(verb, publication, &select, &exclude)?,
         };
         Ok(CommandPlan {
             verb: verb.clone(),
@@ -201,6 +203,58 @@ fn resolve(
     Ok(selected)
 }
 
+/// [`resolve`] with `test:` and unit-test names selecting `sql_test:` keys, as `sqb test` does.
+fn resolve_with_tests(
+    verb: &str,
+    (resources, jobs): (&[PlannerResource], &PublishedJobs),
+    select: &[String],
+    exclude: &[String],
+) -> Result<BTreeSet<String>, String> {
+    let names = UnitTestSelectorNames {
+        tests: resources
+            .iter()
+            .filter(|resource| is_sql_test(resource))
+            .map(|resource| name_of(&resource.key).to_owned())
+            .collect(),
+        resources: resources
+            .iter()
+            .filter(|resource| !is_sql_test(resource))
+            .map(|resource| name_of(&resource.key).to_owned())
+            .chain(jobs.keys().cloned())
+            .collect(),
+    };
+    let split = split_unit_test_selectors(
+        SelectorGroups { select, exclude },
+        &names,
+        UNIT_TEST_VERBS.contains(&verb),
+    )
+    .map_err(|error| format!("{}: {}", error.code, error.message))?;
+    if !split.excluded_test_names.is_empty() {
+        return Err(
+            "an ad-hoc run cannot exclude unit tests; select the unit tests to run instead".into(),
+        );
+    }
+    let mut keys: BTreeSet<String> = if split.models_selected {
+        resolved((resources, jobs), &split.select, &split.exclude)?
+    } else {
+        BTreeSet::new()
+    };
+    keys.extend(
+        split
+            .test_names
+            .iter()
+            .map(|name| format!("{SQL_TEST_KIND}:{name}")),
+    );
+    if keys.is_empty() {
+        return Err("the selectors match no nodes in the current publication".into());
+    }
+    Ok(keys)
+}
+
+fn is_sql_test(resource: &PlannerResource) -> bool {
+    resource.key.split_once(':').map(|(kind, _)| kind) == Some(SQL_TEST_KIND)
+}
+
 fn resolved(
     (resources, jobs): (&[PlannerResource], &PublishedJobs),
     select: &[String],
@@ -208,6 +262,7 @@ fn resolved(
 ) -> Result<BTreeSet<String>, String> {
     let (python, sql): (Vec<&PlannerResource>, Vec<&PlannerResource>) = resources
         .iter()
+        .filter(|resource| !is_sql_test(resource))
         .partition(|resource| python_kind(&resource.key).is_some());
     let graph_resources: Vec<GraphResource> = sql
         .iter()

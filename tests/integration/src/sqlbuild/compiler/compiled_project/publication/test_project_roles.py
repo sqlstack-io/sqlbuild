@@ -3,13 +3,16 @@
 import subprocess
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    ProjectRoleRunTestCase,
     ProjectRolesTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    INTERMEDIATE_LOADER_FILES,
     publish_generation,
     read_person_sql,
     snapshot_api,
@@ -19,6 +22,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
     person_login,
     person_request,
     provision_person,
+    request_person_run,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
@@ -100,3 +104,72 @@ def test_given_project_roles_when_published_then_person_sql_follows_selector_cov
         assert rewritten.returncode == 0, rewritten.stderr
         assert read_person_sql(api, session, "model:customers") == (200, "model:customers")
         assert read_person_sql(api, session, "model:orders")[0] == 403
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ProjectRoleRunTestCase(
+            description="a role granting the loader chain runs the job",
+            role="shipments_runner",
+            expected_response=(200, {"applied": True}),
+        ),
+        ProjectRoleRunTestCase(
+            description="a role missing the intermediate loader is refused",
+            role="orders_runner",
+            expected_response=(403, "missing job.run permission for this target"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_job_loading_an_intermediate_loader_when_a_role_runs_it_then_the_grant_must_cover_it(
+    test_case: ProjectRoleRunTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                '[targets.development]\nschema = "main"\n'
+            ),
+            "roles.toml": Path(
+                "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_roles.toml"
+            ).read_text(),
+        }
+        | INTERMEDIATE_LOADER_FILES,
+    )
+    with snapshot_api(
+        tmp_path / "control",
+        server_arguments=("--password-origin", "https://control.example.com"),
+    ) as api:
+        published: subprocess.CompletedProcess[str] = publish_generation(project, api, 1)
+        assert published.returncode == 0, published.stderr
+        admin: dict[str, Any] = provision_person(
+            tmp_path / "control", "create-user", "orders-admin"
+        )
+        person: dict[str, Any] = provision_person(
+            tmp_path / "control", "create-principal", "orders-runner"
+        )
+        assert person_request(
+            api,
+            "/api/admin/roles",
+            body={
+                "principal_id": person["principal_id"],
+                "role": test_case.role,
+                "location_id": api.location_id,
+                "target": "development",
+            },
+            session=person_login(api, admin["name"]),
+        ) == {"applied": True}
+        request: dict[str, Any] = {
+            "run_id": str(uuid4()),
+            "location_id": api.location_id,
+            "target": "development",
+            "job_key": "annual_orders",
+            "reason": "Refresh shipments",
+            "priority": 0,
+        }
+        session: tuple[str, str] = person_login(api, person["name"])
+        assert request_person_run(api, session, request) == test_case.expected_response

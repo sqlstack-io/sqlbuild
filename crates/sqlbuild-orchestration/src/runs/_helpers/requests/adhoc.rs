@@ -32,6 +32,10 @@ use crate::store::models::{ControlTransaction, Parameter};
 const GRAPH_KINDS: [&str; 5] = ["model", "source", "seed", "udf", "table_fn"];
 /// Python node kinds, in the order the CLI discovers them.
 const PYTHON_NODE_KINDS: [&str; 4] = ["task", "asset", "loader", "check"];
+/// SQL unit tests, which `test:` selects; each lists the models it tests.
+const SQL_TEST_KIND: &str = "sql_test";
+/// Where a SQL unit test's definition lists the models it tests.
+const SQL_TEST_MODELS_POINTER: &str = "/test/payload/expected_model_names";
 /// Marks the source node an intermediate loader writes, which the CLI's SQL graph does not list.
 const INTERMEDIATE_LOADER_FIELD: &str = "intermediate_loader";
 
@@ -179,6 +183,18 @@ fn planner_resources(
             });
         }
     }
+    resources.extend(
+        nodes
+            .iter()
+            .filter(|(_, node)| node.kind == SQL_TEST_KIND)
+            .map(|(key, node)| PlannerResource {
+                key: key.clone(),
+                deps: tested_models(&node.definition),
+                tags: Vec::new(),
+                folder: None,
+                loader: None,
+            }),
+    );
     resources
 }
 
@@ -191,6 +207,14 @@ fn model_folder(definition: &Value) -> String {
         .replace('\\', "/");
     path.rsplit_once('/')
         .map_or_else(|| ".".to_owned(), |(folder, _)| folder.to_owned())
+}
+
+/// The model keys a SQL unit test tests.
+fn tested_models(definition: &Value) -> Vec<String> {
+    texts(definition.pointer(SQL_TEST_MODELS_POINTER))
+        .into_iter()
+        .map(|model| format!("model:{model}"))
+        .collect()
 }
 
 fn texts(value: Option<&Value>) -> Vec<String> {

@@ -28,6 +28,7 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
         resource("model:customers", &[], &[], Some("models/staging")),
         resource("source:shop.raw_orders", &[], &[], None),
         resource("seed:currencies", &[], &[], None),
+        resource("sql_test:orders_keep_amounts", &["model:orders"], &[], None),
     ];
     let jobs: PublishedJobs = BTreeMap::from([
         (
@@ -230,6 +231,40 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             expected_plan: Ok((&["model:orders"], json!({"case": "happy_path"}))),
         },
         AdhocPlanTestCase {
+            description: "test: selects one unit test",
+            command: &["test", "--select", "test:orders_keep_amounts"],
+            expected_plan: Ok((&["sql_test:orders_keep_amounts"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a unit test's bare name selects it, as on the command line",
+            command: &["test", "--select", "orders_keep_amounts"],
+            expected_plan: Ok((&["sql_test:orders_keep_amounts"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "build selects a model and a unit test together",
+            command: &["build", "--select", "customers", "test:orders_keep_amounts"],
+            expected_plan: Ok((
+                &["model:customers", "sql_test:orders_keep_amounts"],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "excluding a unit test is refused, since a run freezes only what it selects",
+            command: &[
+                "test",
+                "--select",
+                "orders",
+                "--exclude",
+                "test:orders_keep_amounts",
+            ],
+            expected_plan: Err("an ad-hoc run cannot exclude unit tests"),
+        },
+        AdhocPlanTestCase {
+            description: "audit refuses unit-test selectors as the command line does",
+            command: &["audit", "--select", "test:orders_keep_amounts"],
+            expected_plan: Err("selects a unit test"),
+        },
+        AdhocPlanTestCase {
             description: "audit settings come from the audit parser",
             command: &["audit", "-s", "orders", "--concurrency", "2"],
             expected_plan: Ok((&["model:orders"], json!({"concurrency": 2}))),
@@ -314,8 +349,29 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             Some("python/fulfillment/carrier_sync"),
         ),
     ];
-    let jobs: PublishedJobs = BTreeMap::new();
+    let jobs: PublishedJobs = BTreeMap::from([(
+        "carrier_sync".to_owned(),
+        BTreeSet::from(["task:request_carrier_collection".to_owned()]),
+    )]);
     let test_cases = [
+        AdhocPlanTestCase {
+            description: "a published job selects its Python nodes",
+            command: &["build", "--select", "job:carrier_sync"],
+            expected_plan: Ok((&["task:request_carrier_collection"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "upstream of a published job crosses its Python node's dependencies",
+            command: &["build", "--select", "+job:carrier_sync"],
+            expected_plan: Ok((
+                &[
+                    "asset:partner_orders_file",
+                    "model:orders",
+                    "model:stg_orders",
+                    "task:request_carrier_collection",
+                ],
+                json!({}),
+            )),
+        },
         AdhocPlanTestCase {
             description: "typed selectors select the Python nodes",
             command: &[

@@ -371,6 +371,13 @@ class ProjectRolesTestCase:
     expected_denial: str
 
 
+@dataclass(frozen=True)
+class ProjectRoleRunTestCase:
+    description: str
+    role: str
+    expected_response: tuple[int, Any]
+
+
 @dataclass(frozen=True, kw_only=True)
 class ChangedJobTestCase(WorkerExecutionTestCase):
     description: str

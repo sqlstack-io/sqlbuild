@@ -8,17 +8,23 @@ use crate::graph::errors::SelectorError;
 use crate::graph::models::{JobSelection, ProjectGraph};
 
 /// Resolve every job on the graph without jobs attached, as publication does, then attach them.
-pub(crate) fn attach(
+pub(crate) fn attach(graph: ProjectGraph, catalog: BTreeMap<String, JobSelection>) -> ProjectGraph {
+    attach_with(graph, catalog, |graph, select, exclude| {
+        resolve(graph, select, exclude).map(|keys| keys.into_iter().collect())
+    })
+}
+
+/// [`attach`] with each job's selectors resolved by `resolve_job` on the graph without jobs.
+pub(crate) fn attach_with(
     mut graph: ProjectGraph,
     catalog: BTreeMap<String, JobSelection>,
+    resolve_job: impl Fn(&ProjectGraph, &[String], &[String]) -> Result<Keys, SelectorError>,
 ) -> ProjectGraph {
     graph.jobs = None;
     let mut resolved: BTreeMap<String, Result<Keys, SelectorError>> = BTreeMap::new();
     for (name, selection) in &catalog {
         let keys: Result<Keys, SelectorError> = match selection {
-            JobSelection::Job { select, exclude } => {
-                resolve(&graph, select, exclude).map(|keys| keys.into_iter().collect())
-            }
+            JobSelection::Job { select, exclude } => resolve_job(&graph, select, exclude),
             JobSelection::Resolved { keys } => Ok(keys.iter().cloned().collect()),
             JobSelection::Group { .. } => continue,
         };

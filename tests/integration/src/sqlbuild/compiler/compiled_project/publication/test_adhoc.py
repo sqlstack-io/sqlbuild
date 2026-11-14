@@ -261,6 +261,14 @@ REWRITE_CHECKOUT: str = (
             rewrites={"tests/unit/test_customers.sql": CUSTOMERS_TEST.format(expected=2)},
         ),
         AdhocVerbTestCase(
+            description="test: runs only the selected verified SQL test",
+            prerequisites=[],
+            command=["test", "--select", "test:customers_have_ids"],
+            expected_selection=["sql_test:customers_have_ids"],
+            expected_run_nodes=[("sql_test:customers_have_ids", "node", "success")],
+            rewrites={"tests/unit/test_customers.sql": CUSTOMERS_TEST.format(expected=2)},
+        ),
+        AdhocVerbTestCase(
             description="freshness observes the verified sources upstream of the selection",
             prerequisites=[],
             command=["freshness", "--select", "raw_orders"],

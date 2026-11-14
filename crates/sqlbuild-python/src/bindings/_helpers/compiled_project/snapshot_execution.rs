@@ -260,12 +260,15 @@ impl WorkerBuild {
         self.complete(py, key, (outcome, None, (None, None)))
     }
 
-    /// A test or audit the snapshot records has started; the node it attaches to starts with it.
+    /// A test or audit the snapshot records has started; a selected SQL test reports as a node.
     pub(crate) fn start_attached(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         self.check_cancelled(py)?;
         let Some(nodes) = self.attached.get(key) else {
             return Ok(());
         };
+        if self.execution.claim.request.selection.contains(key) {
+            return self.start_key(py, key);
+        }
         if self
             .checks
             .lock()
@@ -313,6 +316,9 @@ impl WorkerBuild {
         } else {
             outcome
         };
+        if self.execution.claim.request.selection.contains(key) {
+            return self.complete(py, key, (outcome, None, (None, None)));
+        }
         self.finish_check(py, key, outcome)?;
         if outcome == NodeOutcome::Skipped {
             return Ok(());

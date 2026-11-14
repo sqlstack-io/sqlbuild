@@ -61,13 +61,23 @@ pub(crate) fn graph_with_jobs<'g>(
     selectors: &[String],
     also_known: &[&str],
 ) -> PyResult<Cow<'g, ProjectGraph>> {
-    if graph.jobs.is_some() || !selectors_need_jobs(graph, selectors, also_known) {
-        return Ok(Cow::Borrowed(graph));
-    }
-    Ok(match job_catalog(py)? {
-        Some((catalog, _)) => Cow::Owned(attach_jobs(graph.clone(), catalog)),
+    Ok(match needed_jobs(py, graph, selectors, also_known)? {
+        Some(catalog) => Cow::Owned(attach_jobs(graph.clone(), catalog)),
         None => Cow::Borrowed(graph),
     })
+}
+
+/// The command's jobs when `selectors` name one and `graph` has none attached yet.
+pub(crate) fn needed_jobs(
+    py: Python<'_>,
+    graph: &ProjectGraph,
+    selectors: &[String],
+    also_known: &[&str],
+) -> PyResult<Option<BTreeMap<String, JobSelection>>> {
+    if graph.jobs.is_some() || !selectors_need_jobs(graph, selectors, also_known) {
+        return Ok(None);
+    }
+    Ok(job_catalog(py)?.map(|(catalog, _)| catalog))
 }
 
 /// The command's job and job group names, loaded on first use; empty outside a command.

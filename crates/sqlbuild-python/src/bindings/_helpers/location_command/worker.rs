@@ -34,6 +34,7 @@ use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::constants::{
     CHANGED_SETTING, COMMAND_IMPLEMENTATIONS, JOB_RUN_COUNTS, JOB_RUN_REACH, REACH_SETTING,
+    SQL_TEST_NODE_KIND,
 };
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::recall::console::write_stderr;
@@ -59,7 +60,7 @@ fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
                 })
                 .into_iter()
                 .collect(),
-            "sql_test" => definition
+            SQL_TEST_NODE_KIND => definition
                 .pointer("/test/payload/expected_model_names")
                 .and_then(Value::as_array)
                 .into_iter()
@@ -152,12 +153,14 @@ fn command_request<'py>(
         let (kind, name) = key
             .split_once(':')
             .ok_or_else(|| PyValueError::new_err("frozen run contains an invalid node key"))?;
-        let selector = if PYTHON_NODE_KINDS.contains(&kind) {
-            key.as_str()
+        let selector: String = if PYTHON_NODE_KINDS.contains(&kind) {
+            key.clone()
+        } else if kind == SQL_TEST_NODE_KIND {
+            format!("test:{name}")
         } else {
-            name
+            name.to_owned()
         };
-        argv.extend([PyString::new(py, "--select"), PyString::new(py, selector)]);
+        argv.extend([PyString::new(py, "--select"), PyString::new(py, &selector)]);
     }
     let parsed = parse_cli_invocation(py, argv, false)?;
     let args = field(&parsed, "args")?;

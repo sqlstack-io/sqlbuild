@@ -7,6 +7,7 @@ use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::text::main::glob_match::glob_match;
 
 use crate::assembly::project::types::ObjectKey;
+use crate::definition_changes::constants::PYTHON_NODE_KINDS;
 use crate::graph::errors::SelectorError;
 use crate::graph::main::build_resources::build_resources;
 use crate::graph::main::edge_keys::edge_keys;
@@ -282,7 +283,8 @@ fn single_side(context: &SelectionContext<'_>, raw: &str) -> Resolved {
     let atoms: Atoms = match kind.as_str() {
         TEST_KIND => return Err(unit_test_error(raw)),
         PATH_KIND => resolve_path(context, raw, &value)?,
-        SEED_KIND | SOURCE_KIND | JOB_KIND => resolve_sql(context, raw)?,
+        SEED_KIND | SOURCE_KIND => resolve_sql(context, raw)?,
+        JOB_KIND => resolve_job(context, raw)?,
         TASK_KIND | ASSET_KIND | LOADER_KIND | CHECK_KIND => {
             return resolve_typed(context, raw, (&kind, &value));
         }
@@ -312,6 +314,48 @@ fn resolve_sql(context: &SelectionContext<'_>, raw: &str) -> Resolved {
         &[raw.to_owned()],
         &[],
     )?))
+}
+
+/// A job's SQL keys and Python nodes, with `+` also expanding them over the Python node graph.
+fn resolve_job(context: &SelectionContext<'_>, raw: &str) -> Resolved {
+    let ParsedSelector::Kind {
+        upstream,
+        downstream,
+        ..
+    } = parse_selector(raw)?
+    else {
+        return resolve_sql(context, raw);
+    };
+    let mut atoms: Atoms = Atoms::new();
+    let mut members: Vec<String> = Vec::new();
+    for atom in resolve_sql(context, raw)? {
+        match atom {
+            Atom::Sql((kind, name))
+                if PYTHON_NODE_KINDS.contains(&kind.as_str())
+                    && context.nodes.node(&name).is_some() =>
+            {
+                members.push(name);
+            }
+            atom => {
+                atoms.insert(atom);
+            }
+        }
+    }
+    let mut names: Names = members.iter().cloned().collect();
+    for (expand, direction) in [
+        (upstream, EdgeDirection::Upstream),
+        (downstream, EdgeDirection::Downstream),
+    ] {
+        if expand {
+            names.extend(
+                context
+                    .nodes
+                    .closure(members.iter().map(String::as_str), direction),
+            );
+        }
+    }
+    atoms.extend(python_atoms(names));
+    Ok(atoms)
 }
 
 fn resolve_python(context: &SelectionContext<'_>, raw: &str) -> Resolved {
@@ -407,7 +451,7 @@ fn resolve_name(context: &SelectionContext<'_>, raw: &str, value: &str) -> Resol
             (true, true) => Err(both_error(value)),
             (true, false) => resolve_sql(context, raw),
             (false, true) => resolve_python(context, raw),
-            (false, false) if is_job(context, value) => resolve_sql(context, raw),
+            (false, false) if is_job(context, value) => resolve_job(context, raw),
             (false, false) => Err(unknown_name(value)),
         };
     }

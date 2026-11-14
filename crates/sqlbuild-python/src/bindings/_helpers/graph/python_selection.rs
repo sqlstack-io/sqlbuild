@@ -1,5 +1,6 @@
 //! Python node and unified SQL/Python selector resolution, and the Python node graph indexes.
 
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 use pyo3::prelude::{
@@ -10,6 +11,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::errors::SelectorError;
 use sqlbuild_analysis::graph::models::ProjectGraph;
+use sqlbuild_analysis::python_selection::main::attach_python_jobs::attach_python_jobs;
 use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python_node_graph_indexes as graph_indexes;
 use sqlbuild_analysis::python_selection::main::resolve_python_node_excludes::resolve_python_node_excludes;
 use sqlbuild_analysis::python_selection::main::resolve_python_node_selectors::resolve_python_node_selectors;
@@ -21,7 +23,7 @@ use sqlbuild_analysis::python_selection::models::{
 };
 
 use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::compiled_project::job_catalog::graph_with_jobs;
+use crate::bindings::_helpers::compiled_project::job_catalog::needed_jobs;
 use crate::bindings::_helpers::graph::project_graph::{CompiledProjectGraph, NativeProjectGraph};
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::records::construct::error_class;
@@ -272,7 +274,18 @@ pub(crate) fn resolve_python_sql_run_selection(
     let nodes: PythonSelectionGraph = selection_graph(python_graph)?;
     let node_names: Vec<&str> = nodes.nodes.iter().map(|node| node.name.as_str()).collect();
     let selectors: Vec<String> = select.iter().chain(&exclude).cloned().collect();
-    let graph = graph_with_jobs(py, native.get().graph(), &selectors, &node_names)?;
+    let graph: Cow<'_, ProjectGraph> =
+        match needed_jobs(py, native.get().graph(), &selectors, &node_names)? {
+            Some(catalog) => Cow::Owned(attach_python_jobs(
+                SqlSelectionGraph {
+                    graph: native.get().graph(),
+                    sources: &sources,
+                },
+                &nodes,
+                catalog,
+            )),
+            None => Cow::Borrowed(native.get().graph()),
+        };
     let selection: RunSelection = compiler_guard(|| {
         Ok(run_selection(
             SqlSelectionGraph {

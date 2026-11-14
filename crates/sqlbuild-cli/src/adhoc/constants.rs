@@ -6,6 +6,12 @@ pub(crate) const ADHOC_VERBS: [&str; 5] = ["build", "test", "seed", "audit", "fr
 /// The verb whose settings must also form valid job settings.
 pub(crate) const BUILD_VERB: &str = "build";
 
+/// Verbs that select SQL unit tests by `test:` or by name, as on the command line.
+pub(crate) const UNIT_TEST_VERBS: [&str; 2] = ["build", "test"];
+
+/// The published kind of a SQL unit test.
+pub(crate) const SQL_TEST_KIND: &str = "sql_test";
+
 /// The verb that runs only the seeds of its selection.
 pub(crate) const SEED_VERB: &str = "seed";
 

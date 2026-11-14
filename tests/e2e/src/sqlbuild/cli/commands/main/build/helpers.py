@@ -895,6 +895,9 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             'MODEL (description "Test model order_summary.", '
             'materialized table);\nSELECT count(*) AS order_count FROM __ref("orders")\n'
         ),
+        "orchestration/jobs.py": Path(
+            "benchmarks/duckshop/edge_cases/orchestration/python_node_jobs.py"
+        ).read_text(),
         "python/tasks/reports.py": (
             "from python.tasks.counts import count_orders\nfrom sqlbuild.tasks import task\n\n\n"
             "@task(depends_on=count_orders)\n"

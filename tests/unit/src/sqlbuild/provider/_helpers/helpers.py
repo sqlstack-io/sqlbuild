@@ -30,6 +30,14 @@ def context_and_provider(ctx: object, slack_provider: SlackProvider) -> tuple[ob
     return ctx, slack_provider.label
 
 
+def positional_only_context(ctx: object, /, *, slack_provider: SlackProvider) -> tuple[object, str]:
+    return ctx, slack_provider.label
+
+
+def keyword_only_provider(ctx: object, *, slack_provider: SlackProvider) -> tuple[object, str]:
+    return ctx, slack_provider.label
+
+
 def provider_only(slack_provider: SlackProvider) -> str:
     return slack_provider.label
 
