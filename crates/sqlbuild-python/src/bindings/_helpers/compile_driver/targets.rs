@@ -402,18 +402,7 @@ fn managed_source_namespace(
     let value: Bound<'_, PyDict> = PyDict::new(py);
     pyo3::types::PyDictMethods::set_item(&value, "database", database)?;
     pyo3::types::PyDictMethods::set_item(&value, "schema", schema)?;
-    let expanded: Bound<'_, PyAny> = expanded_template_data(
-        value.as_any(),
-        (effective_vars.downcast()?, &PyDict::new(py)),
-        (
-            TemplateOptions {
-                allow_context: false,
-                preserve_context_tokens: false,
-                preserve_unknown_context: false,
-            },
-            LOADER_NAMESPACE_LABEL,
-        ),
-    )?;
+    let expanded: Bound<'_, PyAny> = expanded_loader_namespace(value.as_any(), effective_vars)?;
     let part = |key: &str| -> PyResult<Option<String>> {
         let value: Bound<'_, PyAny> = expanded.get_item(key)?;
         if value.is_none() {
@@ -422,6 +411,25 @@ fn managed_source_namespace(
         Ok(Some(value.str()?.to_cow()?.into_owned()))
     };
     Ok((part("database")?, part("schema")?))
+}
+
+/// A managed source's `database` and `schema` with project vars expanded and no context templates.
+pub(crate) fn expanded_loader_namespace<'py>(
+    value: &Bound<'py, PyAny>,
+    effective_vars: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    expanded_template_data(
+        value,
+        (effective_vars.downcast()?, &PyDict::new(value.py())),
+        (
+            TemplateOptions {
+                allow_context: false,
+                preserve_context_tokens: false,
+                preserve_unknown_context: false,
+            },
+            LOADER_NAMESPACE_LABEL,
+        ),
+    )
 }
 
 /// Validate compiled model and seed locations for the effective adapter.
