@@ -1155,7 +1155,6 @@ export class MockOperate {
 				if (a === b) continue;
 				if ([...nodesOf.get(a)!].some((n) => needs.has(n))) ups.push({ jobKey: a, source: 'lineage' });
 			}
-			for (const a of job.after[b] ?? []) if (!ups.some((u) => u.jobKey === a)) ups.push({ jobKey: a, source: 'after' });
 			upstream.set(b, ups);
 		}
 		const stage = new Map<string, number>();
@@ -1176,10 +1175,8 @@ export class MockOperate {
 		const view = latest ? this.#view(latest, scope) : null;
 		const holders = this.#records.filter((r) => HOLDING.has(r.run.status));
 		const resolved = job.kind === 'group' ? jobNodes(key) : resolveJobSelection(job).nodes;
-		const { after, ...rest } = job;
-		void after;
 		return structuredClone({
-			...rest,
+			...job,
 			nodeCount: resolved.filter((n) => snapshotNode(n)?.kind !== 'source').length,
 			resolvedNodes: resolved,
 			lastRun: view ? { id: view.id, status: view.status, startedAt: view.startedAt, endedAt: view.endedAt } : null,

@@ -53,12 +53,18 @@ formatted. `--fix` never skips files. Pass
 
 ## Line width and descriptions
 
-Configure the maximum physical line width in `sqlbuild_project.toml` (the default is `100`):
+Configure the maximum physical line width and the most lines a description may take in
+`sqlbuild_project.toml` (the defaults are `100` and `10`):
 
 ```toml
 [format]
 line_width = 100
+max_description_lines = 10
 ```
+
+A header description longer than `max_description_lines`, once wrapped at the line width, fails
+`sqb format --check` with `description-length`. Python descriptions keep to the same limit at
+compile; see [Descriptions](../concepts/models/configuration.md#descriptions).
 
 `MODEL`, `SCENARIO`, `FUNCTION` and `HOOK` headers need a non-empty `description`. When one is
 missing, `sqb format --check` fails with `description-present`, so pre-commit catches it before

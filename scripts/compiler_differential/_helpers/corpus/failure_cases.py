@@ -170,6 +170,19 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             },
         ),
         failure_case(
+            name="python-node-description-too-long",
+            expected_code="P027",
+            files={
+                "python/tasks/exports.py": (
+                    "from sqlbuild.tasks import TaskContext, task\n\n\n"
+                    "@task\ndef export_orders(ctx: TaskContext):\n"
+                    '    """'
+                    + "\n\n    ".join(f"Orders paragraph {index}." for index in range(6))
+                    + '"""\n    return None\n'
+                )
+            },
+        ),
+        failure_case(
             name="enum-parse",
             expected_code="D013",
             files={"enums/order_status.sql": "ENUM (\n  name order_status,\n  members [,\n);\n"},

@@ -152,6 +152,11 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
             input.generation = 2;
             input.documents.get_mut("jobs").expect("jobs")["marts"]["selection"] =
                 json!(["inventory"]);
+            input
+                .nodes
+                .get_mut("inventory")
+                .expect("inventory")
+                .definition["deps"] = json!(["customers"]);
             input.documents.get_mut("groups").expect("groups")["daily_orders"]["selection"] =
                 json!(["customers", "inventory"]);
             publish_snapshot(store, &input)

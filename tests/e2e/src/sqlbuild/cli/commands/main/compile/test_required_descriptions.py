@@ -22,6 +22,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
     REQUIRED_DESCRIPTIONS_PROJECT,
     compile_inline_files,
+    description_paragraphs,
     hooked_model_file,
     python_node_source,
     require_sql_analysis_output,
@@ -504,6 +505,88 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
     *dict(chain.from_iterable(case.missing_files for case in _CASES)).items(),
     ("models/undescribed_orders.sql", "MODEL (materialized view);\n\nSELECT 1 AS id\n"),
 )
+
+
+# The default max_description_lines is 10: five paragraphs fit in 9 lines, six need 11.
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RequiredDescriptionCase(
+            description="task docstring",
+            missing_files=(
+                (
+                    "python/tasks/refresh_exports.py",
+                    python_node_source(
+                        module="tasks",
+                        decorator="task",
+                        name="refresh_exports",
+                        docstring_line=description_paragraphs(6),
+                    ),
+                ),
+            ),
+            described_files=(
+                (
+                    "python/tasks/refresh_exports.py",
+                    python_node_source(
+                        module="tasks",
+                        decorator="task",
+                        name="refresh_exports",
+                        docstring_line=description_paragraphs(5),
+                    ),
+                ),
+            ),
+            expected_diagnostic=("P027", "python/tasks/refresh_exports.py", 4),
+            expected_message="task 'refresh_exports' description exceeds 10 lines",
+            expected_help_fragments=("Shorten the description to 10 lines",),
+        ),
+        RequiredDescriptionCase(
+            description="asset description argument",
+            missing_files=(
+                (
+                    "python/assets/order_report.py",
+                    python_node_source(
+                        module="assets",
+                        decorator="asset",
+                        name="order_report",
+                        decorator_arguments=f"(description={'Order report. ' * 90!r})",
+                    ),
+                ),
+            ),
+            described_files=(
+                (
+                    "python/assets/order_report.py",
+                    python_node_source(
+                        module="assets",
+                        decorator="asset",
+                        name="order_report",
+                        decorator_arguments=f"(description={'Order report. ' * 60!r})",
+                    ),
+                ),
+            ),
+            expected_diagnostic=("P027", "python/assets/order_report.py", 4),
+            expected_message="asset 'order_report' description exceeds 10 lines",
+            expected_help_fragments=("Shorten the description to 10 lines",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_python_description_past_the_line_limit_when_compiling_then_reports_p027(
+    test_case: RequiredDescriptionCase, tmp_path: Path
+) -> None:
+    too_long: subprocess.CompletedProcess[str] = compile_inline_files(
+        tmp_path=tmp_path / "too_long", files=test_case.missing_files
+    )
+    at_limit: subprocess.CompletedProcess[str] = compile_inline_files(
+        tmp_path=tmp_path / "at_limit", files=test_case.described_files
+    )
+
+    diagnostics, text = require_sql_analysis_output(too_long)
+    assert too_long.returncode == 1, too_long.stdout + too_long.stderr
+    assert diagnostics == (test_case.expected_diagnostic,)
+    assert json.loads(too_long.stdout)["diagnostics"][0]["message"] == test_case.expected_message
+    assert all(fragment in text for fragment in test_case.expected_help_fragments), text
+    assert at_limit.returncode == 0, at_limit.stdout + at_limit.stderr
+    assert require_sql_analysis_output(at_limit)[0] == ()
 
 
 @pytest.mark.parametrize(

@@ -26,7 +26,7 @@ const MARGIN = 24;
 export type JobBox = { jobKey: string; nodes: string[]; lastRun?: RunRef | null };
 
 const edgeStyle = 'stroke: var(--sb-edge); stroke-width: 1.5;';
-const afterStyle = 'stroke: var(--sb-edge); stroke-width: 1.5; stroke-dasharray: 5 4;';
+const waitStyle = 'stroke: var(--sb-edge); stroke-width: 1.5; stroke-dasharray: 5 4;';
 
 export function boxId(jobKey: string): string {
 	return `job:${jobKey}`;
@@ -35,8 +35,9 @@ export function boxId(jobKey: string): string {
 /**
  * Cards for `nodes` and the lineage between them. With `boxes`, a node built by several members sits
  * in the most specific box, the one building the fewest nodes (the earliest on a tie), so a small
- * job inside a broad one keeps its nodes; a declared `after` between two members with no lineage
- * between them is a dashed edge between their boxes. A box in `collapsed` shows only its header,
+ * job inside a broad one keeps its nodes; a member that waits for another with no drawn lineage
+ * between them, because the lineage runs through nodes outside the graph, gets a dashed edge between
+ * their boxes. A box in `collapsed` shows only its header,
  * and lineage to its cards meets the box instead.
  */
 export function jobGraph(
@@ -99,13 +100,13 @@ export function jobGraph(
 	);
 	const jobOf = (id: string) => owner.get(id) ?? id.slice('job:'.length);
 	const linked = new Set(lineage.map((e) => `${jobOf(e.source)}>${jobOf(e.target)}`));
-	const after: Edge[] = members.flatMap((m) =>
+	const waits: Edge[] = members.flatMap((m) =>
 		m.upstream
 			.filter((u) => !linked.has(`${u.jobKey}>${m.jobKey}`) && boxes.some((b) => b.jobKey === u.jobKey))
-			.map((u) => ({ id: `after:${u.jobKey}-${m.jobKey}`, source: boxId(u.jobKey), target: boxId(m.jobKey), type: 'bezier', style: afterStyle }))
+			.map((u) => ({ id: `wait:${u.jobKey}-${m.jobKey}`, source: boxId(u.jobKey), target: boxId(m.jobKey), type: 'bezier', style: waitStyle }))
 	);
 	// Svelte Flow needs a parent before its children.
-	return { nodes: [...boxNodes, ...cards], edges: [...lineage, ...after] };
+	return { nodes: [...boxNodes, ...cards], edges: [...lineage, ...waits] };
 }
 
 /** The most cards a column holds before it wraps, growing with the graph so its shape stays near the canvas's. */
@@ -200,7 +201,7 @@ function layoutLayer(items: Item[], pairs: ReadonlyArray<readonly [string, strin
 
 /**
  * Lays the graph out left to right: first each box's cards, which sizes the box, then the boxes and
- * the cards outside any box, ordered by the lineage and `after` edges between them. Cards use their
+ * the cards outside any box, ordered by the lineage and wait edges between them. Cards use their
  * measured size, and a card's position is relative to its box, as Svelte Flow expects.
  */
 export function layoutJobGraph(nodes: Node[], edges: Edge[]): Node[] {

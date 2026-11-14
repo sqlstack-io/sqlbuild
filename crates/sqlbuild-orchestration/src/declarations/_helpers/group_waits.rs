@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Keep the first reason found for a wait: an explicit `after`, or the first lineage edge.
+/// Keep the first reason found for a wait: the first lineage edge.
 pub(crate) fn record_wait(
     mut reasons: BTreeMap<(String, String), String>,
     (job, dependency): (&str, &str),

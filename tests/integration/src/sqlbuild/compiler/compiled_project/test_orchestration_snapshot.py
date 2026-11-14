@@ -1102,7 +1102,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_jobs=("daily", "staging"),
         ),
         SnapshotDiscoveryTestCase(
-            description="group-only references retain lineage and explicit waits",
+            description="group-only references retain lineage waits",
             files={
                 "orchestration/jobs.py": (
                     "from sqlbuild.orchestration import job, job_group\n"
@@ -1111,14 +1111,14 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "    marts = job('marts', description='Build orders.', select='orders')\n"
                     "    inventory = job('inventory', description='Repeat staging.', select='stg_orders')\n"
                     "    return job_group('daily', description='Ordered jobs.', "
-                    "jobs=[marts, inventory, staging], after={inventory: [staging]})\n"
+                    "jobs=[marts, inventory, staging])\n"
                     "daily = factory()\n"
                 ),
             },
             expected_jobs=("inventory", "marts", "staging"),
             expected_groups={
                 "daily": {
-                    "inventory": ["staging"],
+                    "inventory": [],
                     "marts": ["inventory", "staging"],
                     "staging": [],
                 }
@@ -1505,35 +1505,34 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_message="callbacks with when are not supported yet",
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="explicit group cycles cannot publish",
+            description="a job description past max_description_lines cannot publish",
+            files={
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job\n"
+                    "daily = job('daily', description='Build orders. ' * 100, select='orders')\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message=re.escape(
+                "job 'daily' description exceeds 10 lines; shorten it to 10 lines"
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a group declaring after is refused at its module",
             files={
                 "orchestration/jobs.py": (
                     "from sqlbuild.orchestration import job, job_group\n"
                     "staging = job('staging', description='Stage orders.', select='stg_orders')\n"
                     "marts = job('marts', description='Build orders.', select='orders')\n"
-                    "daily = job_group('daily', description='Cyclic jobs.', "
+                    "daily = job_group('daily', description='Ordered jobs.', "
                     "jobs=[marts, staging], after={staging: [marts]})\n"
                 ),
             },
             expected_error=ValueError,
             expected_message=re.escape(
-                "group dependencies contain a cycle in job group daily: marts waits for staging "
-                "(model:orders reads model:stg_orders); staging waits for marts (declared in after)"
+                "Failed to import orchestration file orchestration/jobs.py: JobGroup.__init__() "
+                "got an unexpected keyword argument 'after'"
             ),
-        ),
-        SnapshotDiscoveryRejectionTestCase(
-            description="group waits cannot refer to nonmember jobs",
-            files={
-                "orchestration/jobs.py": (
-                    "from sqlbuild.orchestration import job, job_group\n"
-                    "staging = job('staging', description='Stage orders.', select='stg_orders')\n"
-                    "marts = job('marts', description='Build orders.', select='orders')\n"
-                    "daily = job_group('daily', description='Unknown upstream.', "
-                    "jobs=[marts], after={marts: [staging]})\n"
-                ),
-            },
-            expected_error=ValueError,
-            expected_message="group needs known jobs and dependencies within its membership",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="distinct objects cannot share a job name",

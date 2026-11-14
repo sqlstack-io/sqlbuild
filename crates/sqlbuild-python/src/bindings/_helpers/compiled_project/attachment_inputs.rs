@@ -226,6 +226,8 @@ pub(crate) struct DiagnosticSettings {
     pub(crate) loaders: HashMap<String, LoaderRow>,
     /// Python-defined resources: kind, name, description, location and help, read by Python.
     pub(crate) python_resources: Vec<PythonResourceRow>,
+    /// The project's `max_description_lines` and `line_width`, which Python descriptions keep to.
+    pub(crate) description_limit: (usize, i64),
 }
 
 /// The orphaned audit factory warnings, then the missing descriptions, then the cursor errors.

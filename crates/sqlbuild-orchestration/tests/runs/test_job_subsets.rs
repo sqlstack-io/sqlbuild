@@ -102,6 +102,12 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
                 ip_address: None,
             };
             let mut input = snapshot(location_id);
+            // Customers read orders, so customer_sync waits for daily_orders.
+            input
+                .nodes
+                .get_mut("customers")
+                .expect("customers model")
+                .definition["deps"] = json!(["orders"]);
             input.documents.insert("jobs".into(), json!({
                 "daily_orders": {"description": "Orders and stock", "selection": ["customers", "inventory", "orders"],
                     "concurrency_groups": ["orders-load"]},

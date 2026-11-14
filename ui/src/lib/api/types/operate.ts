@@ -688,8 +688,8 @@ export type ConcurrencyGroup = {
 
 export type JobGroupMember = {
 	jobKey: string;
-	/** Jobs this member waits for: lineage-derived plus declared `after`; null where the cause isn't reported. */
-	upstream: { jobKey: string; source: 'lineage' | 'after' | null }[];
+	/** Jobs this member waits for, from lineage; null where the cause isn't reported. */
+	upstream: { jobKey: string; source: 'lineage' | null }[];
 	/** Position in the derived order; members in the same stage run side by side. */
 	stage: number;
 };

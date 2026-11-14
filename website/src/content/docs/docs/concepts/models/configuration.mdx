@@ -71,6 +71,11 @@ error[P010]: model 'orders_summary' has no description
 | Loader | `@loader(description="...")` or the function docstring; a loader that feeds a declared source may instead rely on the source's YAML description |
 | Provider | The provider class docstring |
 
+A description may take at most `[format] max_description_lines` lines (default `10`) once wrapped
+at the line width, the same limit `sqb format --check` applies to headers. A longer Python
+description, from a decorator or a docstring, is a `P027` compile error at its declaration. A job,
+job group, sensor or calendar schedule with a longer description cannot publish.
+
 SQL tests, audits, macros, enums, constants, materializations and event or output sinks do not need a
 description. Descriptions do not change fingerprints, so adding or editing one does not rebuild a
 model or redeploy a function (a Python UDF docstring is part of the deployed body, so editing it

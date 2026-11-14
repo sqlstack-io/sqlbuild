@@ -19,6 +19,7 @@ use sqlbuild_analysis::resource_diagnostics::main::yaml_help::yaml_help;
 use sqlbuild_analysis::resource_diagnostics::models::{CursorModel, HeaderHelp};
 use sqlbuild_discovery::yaml_files::main::yaml_entry_lines::yaml_entry_lines;
 use sqlbuild_pysource::definition_locations::main::decorator_location::decorator_location;
+use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
 use sqlbuild_sqltext::compiler::main::model_header_entry_span::model_header_entry_span;
 
 use crate::bindings::_helpers::compile_context::delta::{
@@ -35,6 +36,7 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::models::ReferenceRow;
 
 const MISSING_DESCRIPTION_CODE: &str = "P010";
+const DESCRIPTION_LENGTH_CODE: &str = "P027";
 const CURSOR_WITHOUT_INPUTS_CODE: &str = "P011";
 const ORPHAN_FACTORY_CODE: &str = "C216";
 const AUDIT_FACTORIES_KEY: &str = "audit_factories";
@@ -134,21 +136,35 @@ impl<'py> Diagnostics<'_, 'py> {
             .call((), Some(&fields))
     }
 
-    /// P010 for `kind` `name` when its description is missing or blank.
+    /// P010 when `kind` `name` has no description; for Python, P027 when it wraps past the limit.
     fn described(
         &self,
         resource: (&str, &str, Option<&str>),
-        description: Option<&str>,
+        (description, python): (Option<&str>, bool),
         location: impl FnOnce() -> PyResult<Bound<'py, PyAny>>,
         help: &str,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
         let (kind, name, resource_type) = resource;
-        let Some(message) = missing_description(kind, name, description) else {
-            return Ok(None);
+        let (code, message, help): (&str, String, String) = if let Some(message) =
+            missing_description(kind, name, description)
+        {
+            (MISSING_DESCRIPTION_CODE, message, help.to_owned())
+        } else {
+            let (limit, line_width) = self.settings.description_limit;
+            match description {
+                Some(text) if python && description_line_count(text, line_width) > limit => (
+                    DESCRIPTION_LENGTH_CODE,
+                    format!("{kind} '{name}' description exceeds {limit} lines"),
+                    format!(
+                        "Shorten the description to {limit} lines; move detail into documentation."
+                    ),
+                ),
+                _ => return Ok(None),
+            }
         };
         Ok(Some(self.diagnostic(
-            (MISSING_DESCRIPTION_CODE, "error"),
-            (&message, Some(help)),
+            (code, "error"),
+            (&message, Some(&help)),
             (resource_type, name),
             location()?,
         )?))
@@ -271,7 +287,7 @@ fn missing_descriptions<'py>(
             .and_then(|schema| schema.description.as_deref());
         found.push(diagnostics.described(
             ("model", &name, Some("model")),
-            description,
+            (description, false),
             || diagnostics.header_location(&path, contents),
             &help,
         )?);
@@ -300,7 +316,7 @@ fn missing_descriptions<'py>(
         });
         found.push(diagnostics.described(
             ("scenario", name, Some("sql_scenario")),
-            description.as_deref(),
+            (description.as_deref(), false),
             || diagnostics.header_location(path, contents),
             &help,
         )?);
@@ -322,7 +338,7 @@ fn missing_descriptions<'py>(
         let contents = contents_value.downcast::<PyString>()?.to_str()?;
         found.push(diagnostics.described(
             ("seed", &name, Some("seed")),
-            description.as_deref(),
+            (description.as_deref(), false),
             || diagnostics.yaml_location(&path, contents, &name),
             &yaml_help("seed", &name, &posix(&path)),
         )?);
@@ -351,7 +367,7 @@ fn missing_descriptions<'py>(
         });
         found.push(diagnostics.described(
             ("hook", name, None),
-            description.as_deref(),
+            (description.as_deref(), false),
             || diagnostics.header_location(path, contents),
             &help,
         )?);
@@ -369,7 +385,7 @@ fn missing_descriptions<'py>(
             .map(|description| docstring_text(description.bind(py)));
         found.push(diagnostics.described(
             (kind, name, None),
-            text.as_deref(),
+            (text.as_deref(), true),
             || location.bind(py).call0(),
             help,
         )?);
@@ -423,7 +439,7 @@ fn source_description<'py>(
     }
     diagnostics.described(
         ("source", name, Some("source")),
-        description.as_deref(),
+        (description.as_deref(), false),
         || diagnostics.yaml_location(&path, contents, name),
         &help,
     )
@@ -458,7 +474,7 @@ fn function_description<'py>(
         );
         return diagnostics.described(
             ("function", name, Some(resource_type)),
-            attached.description.as_deref(),
+            (attached.description.as_deref(), true),
             || {
                 let version = py.version_info();
                 let position: (usize, usize) = decorator_location(
@@ -482,7 +498,7 @@ fn function_description<'py>(
     });
     diagnostics.described(
         ("function", name, Some(resource_type)),
-        attached.description.as_deref(),
+        (attached.description.as_deref(), false),
         || diagnostics.header_location(&path, &contents),
         &help,
     )

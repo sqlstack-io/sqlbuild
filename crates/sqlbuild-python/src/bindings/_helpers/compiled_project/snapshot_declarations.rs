@@ -25,8 +25,11 @@ use crate::bindings::_helpers::native_host::orchestration_declarations::{
     module_jobs, run_controls,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
-    compile_calendars, compile_cron, compile_sensors,
+    calendar_descriptions, compile_calendars, compile_cron, compile_sensors,
 };
+use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
+use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
+use sqlbuild_rules::lint_text::models::FormatSettings;
 
 /// Dedicated declaration modules, imported by publication and by selectors that name a job.
 pub(crate) fn discover_declarations<'py>(
@@ -85,6 +88,39 @@ pub(crate) fn compile_declarations(
             AuthoredDeclaration::Group(group) => authored_groups.push(group),
             AuthoredDeclaration::Calendar(calendar) => authored_calendars.push(calendar),
             AuthoredDeclaration::Sensor(sensor) => authored_sensors.push(sensor),
+        }
+    }
+    let format: FormatSettings =
+        resolve_format_settings(project_dir).map_err(PyValueError::new_err)?;
+    let mut described: Vec<(&str, String, String)> = Vec::new();
+    described.extend(
+        authored_jobs
+            .iter()
+            .map(|job| ("job", job.name.clone(), job.description.clone())),
+    );
+    described.extend(
+        authored_groups
+            .iter()
+            .map(|group| ("job group", group.name.clone(), group.description.clone())),
+    );
+    described.extend(
+        authored_sensors
+            .iter()
+            .map(|sensor| ("sensor", sensor.name.clone(), sensor.description.clone())),
+    );
+    described.extend(
+        calendar_descriptions(py, &authored_calendars)?
+            .into_iter()
+            .map(|(name, description)| ("calendar schedule", name, description)),
+    );
+    for (kind, name, description) in described {
+        let limit: i64 = format.max_description_lines;
+        let lines: usize = description_line_count(&description, format.line_width);
+        if i64::try_from(lines).unwrap_or(i64::MAX) > limit {
+            return Err(PyValueError::new_err(format!(
+                "{kind} '{name}' description exceeds {limit} lines; shorten it to {limit} lines \
+                 and move detail into documentation"
+            )));
         }
     }
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();
@@ -167,17 +203,7 @@ pub(crate) fn compile_declarations(
         if members.len() != group.jobs.len() {
             return Err(PyValueError::new_err("group members must be distinct"));
         }
-        let mut after: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        for (job, dependencies) in group.after {
-            after.insert(
-                job.name,
-                dependencies
-                    .into_iter()
-                    .map(|dependency| dependency.name)
-                    .collect(),
-            );
-        }
-        let dependencies = group_dependencies((&group.name, &input), &jobs, (&members, &after))
+        let dependencies = group_dependencies((&group.name, &input), &jobs, &members)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         let selection: BTreeSet<String> = members
             .iter()

@@ -491,12 +491,17 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                 for (index, parent) in test_case.parents.iter().enumerate() {
                     let mut members = serde_json::Map::new();
                     let mut selection = BTreeSet::new();
+                    let mut earlier_nodes: Vec<&str> = Vec::new();
                     for (stage, needs) in parent.children.iter().enumerate() {
                         let name = format!("orders_job_{index}_{stage}");
                         let node =
                             ["orders", "customers", "inventory", "products"][child_count % 4];
                         child_count += 1;
                         selection.insert(node);
+                        // Each stage reads every earlier stage's node, so lineage orders the stages.
+                        input.nodes.get_mut(node).expect("stage node").definition["deps"] =
+                            json!(earlier_nodes);
+                        earlier_nodes.push(node);
                         jobs.insert(name.clone(), json!({"description": "Build a synthetic stage", "selection": [node], "concurrency_groups": needs}));
                         let after: Vec<String> = (0..stage)
                             .map(|earlier| format!("orders_job_{index}_{earlier}"))

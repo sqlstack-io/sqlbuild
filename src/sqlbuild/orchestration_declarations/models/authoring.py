@@ -63,12 +63,11 @@ class Job:
 
 @dataclass(frozen=True, eq=False)
 class JobGroup:
-    """Jobs ordered by compiled lineage and optional explicit dependencies."""
+    """Jobs ordered by the lineage between the nodes they build."""
 
     name: str
     description: str = field(kw_only=True)
     jobs: Sequence[Job] = field(kw_only=True)
-    after: dict[Job, Sequence[Job]] = field(default_factory=dict, kw_only=True)
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)

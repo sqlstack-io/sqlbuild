@@ -37,9 +37,7 @@ type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> 
 type JobDef = Known<
 	Omit<JobDetail, 'nodeCount' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'memberOf' | 'cursorType' | 'groupMembers'>,
 	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
-> & {
-	after: Record<string, string[]>;
-};
+>;
 
 export const CONCURRENCY_LIMITS: Record<string, number> = { warehouse_heavy: 1, 'target:prod': 4 };
 
@@ -62,7 +60,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: null,
 		owner: 'ingest',
 		criticalNodes: [],
-		after: {},
 		declaration: decl(
 			'orchestration/jobs.py',
 			14,
@@ -91,7 +88,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: null,
 		owner: 'data-platform',
 		criticalNodes: ['fact_orders'],
-		after: {},
 		declaration: decl(
 			'orchestration/jobs.py',
 			24,
@@ -124,7 +120,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: ['prod', 'staging'],
 		owner: 'analytics',
 		criticalNodes: [],
-		after: {},
 		declaration: decl(
 			'orchestration/jobs.py',
 			37,
@@ -153,7 +148,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: null,
 		owner: 'analytics',
 		criticalNodes: [],
-		after: {},
 		declaration: decl(
 			'orchestration/activity.py',
 			8,
@@ -184,7 +178,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: ['prod'],
 		owner: 'finance-data',
 		criticalNodes: [],
-		after: {},
 		declaration: decl(
 			'orchestration/finance.py',
 			11,
@@ -215,7 +208,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: null,
 		owner: 'analytics',
 		criticalNodes: [],
-		after: {},
 		declaration: decl(
 			'orchestration/finance.py',
 			23,
@@ -243,7 +235,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: ['prod'],
 		owner: 'analytics',
 		criticalNodes: [],
-		after: {},
 		declaration: decl(
 			'orchestration/reporting.py',
 			6,
@@ -273,7 +264,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: ['prod'],
 		owner: 'data-platform',
 		criticalNodes: ['fact_orders'],
-		after: {},
 		declaration: decl(
 			'orchestration/groups.py',
 			5,
@@ -303,7 +293,6 @@ export const JOB_DEFS: JobDef[] = [
 		targets: ['prod'],
 		owner: 'finance-data',
 		criticalNodes: ['daily_revenue'],
-		after: { customer_segments: ['revenue_refresh'] },
 		declaration: decl(
 			'orchestration/groups.py',
 			16,
@@ -311,8 +300,6 @@ export const JOB_DEFS: JobDef[] = [
     "close_of_business",
     description="Revenue first, then activity and customer segments",
     jobs=[revenue_refresh, activity_microbatch, customer_segments],
-    # Segments read closed revenue through an external lookup lineage can't see.
-    after={customer_segments: [revenue_refresh]},
     on_failure=on_failure(retries=1, retry_delay_seconds=900),
     critical=["daily_revenue"],
     concurrency_groups=[warehouse_heavy],
