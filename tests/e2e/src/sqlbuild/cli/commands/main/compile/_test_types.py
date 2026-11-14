@@ -1437,8 +1437,10 @@ class ConnectionLocationTestCase:
 
 @dataclass(frozen=True)
 class ManagedSourceLoaderLocationTestCase:
-    """A command that runs a managed source's loader and the rows its loader schema must hold."""
+    """A command that runs a managed source's loader and the rows the `raw` schema must hold."""
 
     description: str
+    project_toml: str
+    source_schema: str
     command: tuple[str, ...]
     expected_rows: tuple[tuple[object, ...], ...]
