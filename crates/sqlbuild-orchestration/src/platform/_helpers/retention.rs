@@ -1,14 +1,16 @@
 //! Every retention policy runs in one bounded pass; each part is safe to repeat.
 
 use std::collections::BTreeSet;
+use std::time::Duration;
 
 use chrono::{DateTime, TimeDelta, Utc};
+use rusqlite::config::DbConfig;
 use sqlbuild_recall::schema::constants::INVOCATION_TABLES;
 use sqlbuild_recall::schema::main::table_spec::table_spec;
 
 use crate::credentials::main::audit::prune_audit::prune_audit;
 use crate::platform::constants::{
-    HEARTBEAT_PAGE, HEARTBEAT_RETENTION_DAYS, LOCATION_RETENTION_DAYS,
+    CHECKPOINT_READER_WAIT_MS, HEARTBEAT_PAGE, HEARTBEAT_RETENTION_DAYS, LOCATION_RETENTION_DAYS,
     PLATFORM_ALERT_RETENTION_DAYS, SENSOR_EVALUATION_RETENTION_DAYS,
 };
 use crate::platform::models::RetentionPolicies;
@@ -211,4 +213,20 @@ async fn delete_logs(
         .await?;
     }
     Ok(transaction)
+}
+
+/// Copy the WAL into the database and truncate it, or leave it for the next pass if readers stay.
+pub(crate) async fn wal_checkpoint(store: &ControlStore) -> Result<(), ControlError> {
+    let ControlStore::Sqlite(path) = store else {
+        return Ok(());
+    };
+    let path = path.clone();
+    tokio::task::spawn_blocking(move || {
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, true)?;
+        connection.busy_timeout(Duration::from_millis(CHECKPOINT_READER_WAIT_MS))?;
+        connection.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
+        Ok(())
+    })
+    .await?
 }

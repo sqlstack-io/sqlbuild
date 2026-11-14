@@ -46,6 +46,6 @@ pub(crate) fn open_sqlite(path: PathBuf) -> Result<ControlStore, ControlError> {
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
     connection.busy_timeout(Duration::from_secs(30))?;
-    connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL")?;
+    connection.execute_batch("PRAGMA journal_mode=WAL")?;
     Ok(ControlStore::Sqlite(path))
 }

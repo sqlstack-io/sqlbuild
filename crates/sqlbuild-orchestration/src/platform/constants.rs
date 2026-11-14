@@ -37,3 +37,6 @@ pub(crate) const PLAN_QUEUE_LIMIT: i64 = 4;
 
 /// A location instance unseen for longer than this cannot take a plan; locations report every 30 seconds.
 pub(crate) const LOCATION_SILENCE_SECONDS: i64 = 90;
+
+/// A SQLite WAL reset waits this long for readers while holding the write lock, then retries later.
+pub(crate) const CHECKPOINT_READER_WAIT_MS: u64 = 200;

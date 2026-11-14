@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use chrono::Utc;
 use rusqlite::OpenFlags;
+use rusqlite::config::DbConfig;
 
 use crate::store::_helpers::changes::sqlite_changes;
 use crate::store::errors::ControlError;
@@ -25,8 +26,9 @@ pub(crate) async fn begin(
                         | OpenFlags::SQLITE_OPEN_NO_MUTEX,
                 )?;
                 connection.busy_timeout(Duration::from_secs(30))?;
+                connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, true)?;
                 connection.execute_batch(if mode == TransactionMode::Write {
-                    "PRAGMA foreign_keys=ON; BEGIN IMMEDIATE"
+                    "PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; BEGIN IMMEDIATE"
                 } else {
                     "PRAGMA foreign_keys=ON; PRAGMA query_only=ON; BEGIN"
                 })?;
