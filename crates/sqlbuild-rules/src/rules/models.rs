@@ -80,6 +80,8 @@ pub enum BuiltinOptionKind {
     StringList(&'static [&'static str]),
     /// A list of tables, each checked by the rule's own configuration validation.
     TableList,
+    /// A whole number of at least `minimum`, with the given default.
+    Integer { default: u32, minimum: u32 },
 }
 
 /// One option a built-in rule declares.

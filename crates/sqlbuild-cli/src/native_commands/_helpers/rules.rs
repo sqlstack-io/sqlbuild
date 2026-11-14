@@ -43,6 +43,13 @@ fn option_spec(option: &BuiltinOption) -> OptionSpec {
             OptionValue::Tuple(Vec::new()),
             Some(OptionKind::Other(DICT_TYPE_NAME.to_owned())),
         ),
+        BuiltinOptionKind::Integer { default, .. } => {
+            (OptionKind::Int, OptionValue::Int(i64::from(default)), None)
+        }
+    };
+    let minimum: Option<i64> = match option.kind {
+        BuiltinOptionKind::Integer { minimum, .. } => Some(i64::from(minimum)),
+        _ => None,
     };
     OptionSpec {
         name: option.name.to_owned(),
@@ -50,7 +57,7 @@ fn option_spec(option: &BuiltinOption) -> OptionSpec {
         value_type,
         default,
         choices: Vec::new(),
-        minimum: None,
+        minimum,
         maximum: None,
         minimum_items: None,
         item_type,
@@ -63,6 +70,7 @@ fn option_text(option: &BuiltinOption) -> OptionText {
         BuiltinOptionKind::Boolean => FALSE_REPR.to_owned(),
         BuiltinOptionKind::StringList(defaults) => string_tuple_repr(defaults),
         BuiltinOptionKind::TableList => EMPTY_TUPLE_REPR.to_owned(),
+        BuiltinOptionKind::Integer { default, .. } => default.to_string(),
     };
     OptionText {
         name: option.name.to_owned(),

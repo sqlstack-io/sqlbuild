@@ -4,9 +4,11 @@ use crate::python_rules::tests::helpers::{
     core_rule_faults, distinct_python_codes, is_selected, project_wide_python_rules,
 };
 use crate::python_rules::tests::test_types::{
-    CatalogueTestCase, CoreRuleTestCase, SelectionTestCase,
+    CatalogueTestCase, CoreRuleTestCase, OptionsTestCase, SelectionTestCase,
 };
 use crate::rules::_helpers::catalogue::catalogue;
+use crate::rules::main::builtin_options::builtin_options;
+use crate::rules::models::BuiltinOptionKind;
 
 #[test]
 fn given_the_catalogue_when_listing_python_rules_then_each_has_its_own_project_wide_code() {
@@ -108,6 +110,59 @@ fn given_python_source_when_evaluating_a_fensu_core_rule_then_reports_its_faults
         assert_eq!(
             core_rule_faults(test_case.source, test_case.fensu_code),
             test_case.expected_faults,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_python_rules_when_reading_their_options_then_fensu_thresholds_are_whole_numbers() {
+    let test_cases = [
+        OptionsTestCase {
+            description: "a shape rule declares its one threshold with Fensu's default",
+            code: "SQBRPYTHON501",
+            expected_options: vec![(
+                "max_statements",
+                BuiltinOptionKind::Integer {
+                    default: 40,
+                    minimum: 0,
+                },
+            )],
+        },
+        OptionsTestCase {
+            description: "a package layout rule declares its module count and role depth",
+            code: "SQBRPYTHON610",
+            expected_options: vec![
+                (
+                    "max_helpers_container_modules",
+                    BuiltinOptionKind::Integer {
+                        default: 10,
+                        minimum: 0,
+                    },
+                ),
+                (
+                    "max_role_depth",
+                    BuiltinOptionKind::Integer {
+                        default: 1,
+                        minimum: 0,
+                    },
+                ),
+            ],
+        },
+        OptionsTestCase {
+            description: "a rule without thresholds declares no options",
+            code: "SQBRPYTHON101",
+            expected_options: Vec::new(),
+        },
+    ];
+    for test_case in test_cases {
+        let declared: Vec<(&str, BuiltinOptionKind)> = builtin_options(test_case.code)
+            .into_iter()
+            .map(|option| (option.name, option.kind))
+            .collect();
+        assert_eq!(
+            declared, test_case.expected_options,
             "{}",
             test_case.description
         );

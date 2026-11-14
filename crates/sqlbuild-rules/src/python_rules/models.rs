@@ -21,8 +21,8 @@ pub struct PythonRuleSpec {
     pub owner: &'static str,
     pub applies: PythonFiles,
     pub enabled_by_default: bool,
-    /// Integer options with their defaults, named as Fensu names its thresholds.
-    pub options: &'static [(&'static str, u32)],
+    /// Whole-number options as name, default and description, named as Fensu names its thresholds.
+    pub options: &'static [(&'static str, u32, &'static str)],
     pub message: &'static str,
     pub remediation: &'static str,
 }

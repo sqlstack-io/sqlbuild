@@ -1,4 +1,5 @@
 use crate::models::RuleMetadata;
+use crate::rules::models::BuiltinOptionKind;
 
 pub(super) struct CatalogueTestCase {
     pub(super) description: &'static str,
@@ -18,4 +19,10 @@ pub(super) struct CoreRuleTestCase {
     pub(super) source: &'static str,
     pub(super) fensu_code: &'static str,
     pub(super) expected_faults: Vec<(String, u32)>,
+}
+
+pub(super) struct OptionsTestCase {
+    pub(super) description: &'static str,
+    pub(super) code: &'static str,
+    pub(super) expected_options: Vec<(&'static str, BuiltinOptionKind)>,
 }
