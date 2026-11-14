@@ -5,6 +5,7 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use std::path::PathBuf;
 use std::time::Instant;
 
+use sqlbuild_orchestration::declarations::models::MemorySize;
 use sqlbuild_orchestration::runs::models::RunClaim;
 use tokio::process::Child;
 use uuid::Uuid;
@@ -30,9 +31,10 @@ pub(super) enum WorkerExit {
     Absent,
 }
 
-#[derive(Debug, serde::Deserialize)]
+/// The `[launchers]` section of `server.toml`.
+#[derive(Debug, Default, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Launchers {
+pub(crate) struct Launchers {
     #[serde(default)]
     pub(super) local: Vec<LocalLauncher>,
     #[serde(default)]
@@ -53,6 +55,9 @@ pub(super) struct LauncherScope<'a> {
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct LocalLauncher {
+    /// The location's name; start-up resolves it to `location_id`.
+    pub(super) location: String,
+    #[serde(skip)]
     pub(super) location_id: Uuid,
     pub(super) target: String,
     pub(super) server_url: String,
@@ -65,6 +70,9 @@ pub(super) struct LocalLauncher {
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DockerLauncher {
+    /// The location's name; start-up resolves it to `location_id`.
+    pub(super) location: String,
+    #[serde(skip)]
     pub(super) location_id: Uuid,
     pub(super) target: String,
     pub(super) server_url: String,
@@ -72,6 +80,19 @@ pub(super) struct DockerLauncher {
     pub(super) socket: PathBuf,
     pub(super) location_container: String,
     pub(super) executable: String,
+    #[serde(default)]
+    pub(super) run: RunDefaults,
+}
+
+/// Worker container limits for every run of a launcher; a job's `resources` override them up to `max_memory`.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RunDefaults {
+    pub(super) memory: Option<MemorySize>,
+    pub(super) cpus: Option<f64>,
+    pub(super) pids: Option<u64>,
+    pub(super) cgroup_parent: Option<String>,
+    pub(super) max_memory: Option<MemorySize>,
 }
 
 #[derive(Clone, Copy, Debug)]

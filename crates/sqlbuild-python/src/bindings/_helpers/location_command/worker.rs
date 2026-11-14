@@ -77,20 +77,24 @@ fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
     attached
 }
 
-/// Each compiled SQL test with the models a failure of it blocks in a build: its expected, assertion and reference targets, as the scheduler's `scope_deps` names them.
+/// Each compiled SQL test with the nodes a failure of it blocks in a build: its expected, assertion and reference models, as the scheduler's `scope_deps` names them, and the functions a direct test checks, keyed `udf:` or `table_fn:` like the snapshot.
 pub(super) fn blocked_nodes(project: &Bound<'_, PyAny>) -> PyResult<NodeKeys> {
     let mut blocked: NodeKeys = BTreeMap::new();
     for test in sql_tests(project)?.try_iter()? {
         let test = test?;
         let name: String = field(&field(&test, "key")?, "name")?.extract()?;
         let models: Vec<String> = field(&test, "target_model_names")?.extract()?;
-        blocked.insert(
-            format!("{SQL_TEST_KEY_PREFIX}{name}"),
-            models
-                .into_iter()
-                .map(|model| format!("model:{model}"))
-                .collect(),
-        );
+        let mut keys: Vec<String> = models
+            .into_iter()
+            .map(|model| format!("model:{model}"))
+            .collect();
+        for resource in field(&test, "tested_resources")?.try_iter()? {
+            let resource = resource?;
+            let kind: String = field(&resource, "kind")?.str()?.extract()?;
+            let name: String = field(&resource, "name")?.extract()?;
+            keys.push(format!("{kind}:{name}"));
+        }
+        blocked.insert(format!("{SQL_TEST_KEY_PREFIX}{name}"), keys);
     }
     Ok(blocked)
 }

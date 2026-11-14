@@ -4,12 +4,15 @@ use std::path::Path;
 
 use reqwest::{Method, StatusCode};
 use serde_json::{Value, json};
-use sqlbuild_orchestration::runs::models::RunClaim;
+use sqlbuild_orchestration::declarations::main::job_resources::job_resources;
+use sqlbuild_orchestration::declarations::models::RunResources;
+use sqlbuild_orchestration::runs::models::{RunClaim, RunKind};
 use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::store::models::ControlStore;
 
 use crate::workers::_helpers::invocation::{arguments, environment, excluded};
 use crate::workers::constants::IMAGE_ID_HEX_LENGTH;
-use crate::workers::models::{DockerLauncher, DockerWorker, Launcher, WorkerExit};
+use crate::workers::models::{DockerLauncher, DockerWorker, Launcher, RunDefaults, WorkerExit};
 
 impl DockerWorker {
     pub(in crate::workers) fn prepare(
@@ -40,11 +43,17 @@ impl DockerWorker {
 
     pub(in crate::workers) async fn launch(
         &self,
-        location: &DockerLauncher,
+        (store, location): (&ControlStore, &DockerLauncher),
         claim: &RunClaim,
         bearer: &str,
         control_variable: &str,
     ) -> Result<(), ControlError> {
+        let resources = match (&claim.request.kind, &claim.request.job_key) {
+            (RunKind::Job, Some(job_key)) => {
+                job_resources(store, (claim.request.snapshot_id, job_key)).await?
+            }
+            _ => None,
+        };
         let parent: Value = self
             .request(
                 Method::GET,
@@ -85,13 +94,7 @@ impl DockerWorker {
             "Image": self.image_id, "Entrypoint": [location.executable], "Cmd": command,
             "WorkingDir": project, "User": parent["Config"]["User"], "Env": variables,
             "Labels": {"io.sqlbuild.claim-id": self.claim_id.to_string()},
-            "HostConfig": {
-                "NetworkMode": parent["HostConfig"]["NetworkMode"],
-                "VolumesFrom": [location.location_container],
-                "Memory": parent["HostConfig"]["Memory"], "MemorySwap": parent["HostConfig"]["MemorySwap"],
-                "NanoCpus": parent["HostConfig"]["NanoCpus"], "PidsLimit": parent["HostConfig"]["PidsLimit"],
-                "ReadonlyRootfs": parent["HostConfig"]["ReadonlyRootfs"],
-            },
+            "HostConfig": host_config(&parent, location, resources.unwrap_or_default()),
         });
         self.request(
             Method::POST,
@@ -180,6 +183,79 @@ impl DockerWorker {
         .send()
         .await
         .map_err(docker_error)
+    }
+}
+
+/// The job's resources, then launcher run defaults, then the location container's limits. A job never exceeds `max_memory`, or without it the location container's limits. Only positive limits are sent because Podman applies a zero; the container's unlimited `-1` passes through.
+fn host_config(container: &Value, location: &DockerLauncher, job: RunResources) -> Value {
+    let parent = &container["HostConfig"];
+    let RunDefaults {
+        memory,
+        cpus,
+        pids,
+        cgroup_parent,
+        max_memory,
+    } = &location.run;
+    let inherited = |key: &str| parent[key].as_u64().filter(|limit| *limit > 0);
+    let unlimited_or_inherited = |key: &str| parent[key].as_i64().filter(|limit| *limit != 0);
+    let nanos = |cpus: f64| Some((cpus * 1e9).round() as u64).filter(|nanos| *nanos > 0);
+    let own_memory = inherited("Memory");
+    let max_memory = max_memory.map(|size| size.0);
+    let memory = job
+        .memory
+        .map(|size| at_most(size.0, max_memory.or(own_memory)))
+        .or(memory.map(|size| size.0))
+        .or(own_memory
+            .or(max_memory)
+            .map(|bytes| at_most(bytes, max_memory)));
+    let swap = if memory == own_memory {
+        unlimited_or_inherited("MemorySwap").map(Value::from)
+    } else {
+        memory.map(Value::from)
+    };
+    let own_cpus = inherited("NanoCpus");
+    let nano_cpus = job
+        .cpus
+        .and_then(nanos)
+        .map(|nanos| at_most(nanos, own_cpus))
+        .or_else(|| cpus.and_then(nanos))
+        .or(own_cpus);
+    let pids_limit = job
+        .pids
+        .filter(|limit| *limit > 0)
+        .map(|limit| at_most(limit, inherited("PidsLimit")))
+        .or(*pids)
+        .map(Value::from)
+        .or_else(|| unlimited_or_inherited("PidsLimit").map(Value::from));
+    json!({
+        "NetworkMode": network_mode(container),
+        "VolumesFrom": [location.location_container],
+        "Memory": memory, "MemorySwap": swap, "NanoCpus": nano_cpus, "PidsLimit": pids_limit,
+        "CgroupParent": cgroup_parent.as_deref().or_else(|| parent["CgroupParent"].as_str()).filter(|path| !path.is_empty()),
+        "ReadonlyRootfs": parent["ReadonlyRootfs"],
+        "CapDrop": parent["CapDrop"], "SecurityOpt": parent["SecurityOpt"],
+    })
+}
+
+fn at_most(value: u64, ceiling: Option<u64>) -> u64 {
+    ceiling.map_or(value, |ceiling| value.min(ceiling))
+}
+
+/// The location's network; Podman reports a container on a named network as `bridge`, so take the network's name instead.
+fn network_mode(container: &Value) -> Value {
+    let mode = &container["HostConfig"]["NetworkMode"];
+    if !matches!(mode.as_str(), Some("bridge" | "default")) {
+        return mode.clone();
+    }
+    let named: Vec<&String> = container["NetworkSettings"]["Networks"]
+        .as_object()
+        .into_iter()
+        .flat_map(serde_json::Map::keys)
+        .filter(|name| !matches!(name.as_str(), "bridge" | "podman"))
+        .collect();
+    match named.as_slice() {
+        [name] => json!(name),
+        _ => mode.clone(),
     }
 }
 

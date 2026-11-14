@@ -31,7 +31,7 @@ use crate::native_commands::models::ControlAdmin;
 
 pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlError> {
     let action = control_admin(namespace)?;
-    let store = open_control_store(namespace).await?;
+    let store = open_control_store(namespace, None).await?;
     let context = AuditContext {
         actor: "local-control-store-owner".into(),
         granting_role: "control-store-owner".into(),

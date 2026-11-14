@@ -18,12 +18,13 @@ use crate::native_commands::_helpers::decision::{control_address, flag, text};
 use crate::native_commands::_helpers::execution::run_development_roles;
 use crate::native_commands::_helpers::project_facts::development_target;
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::server_config::models::ServerSection;
 
 pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
     let project =
         std::fs::canonicalize(text(namespace, "project_dir").unwrap_or_else(|| ".".into()))?;
     let target = development_target(&project, text(namespace, "target"))?;
-    let address = control_address(namespace, false)?
+    let address = control_address(namespace, false, &ServerSection::default())?
         .ok_or_else(|| ControlError::Invalid("development address is required".into()))?;
     if !address.ip().is_loopback() {
         return Err(ControlError::Invalid(

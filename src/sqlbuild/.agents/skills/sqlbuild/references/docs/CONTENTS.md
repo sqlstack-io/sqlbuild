@@ -161,4 +161,6 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [sqb dag](cli/dag.md) (`cli/dag`) - Generate the static DAG artifact for Dagster and other integrations.
 - [sqb dbt](cli/dbt.md) (`cli/dbt`) - Coordinate dbt and SQLBuild projects.
 - [sqb server](cli/server.md) (`cli/server`) - Run the control service and scheduler.
+- [sqb location](cli/location.md) (`cli/location`) - Run a code location that publishes a project to the server, and check its health.
+- [sqb dev](cli/dev.md) (`cli/dev`) - Run the server, scheduler and a reloading code location for one project on your machine.
 - [sqb login and logout](cli/login.md) (`cli/login`) - Authorize a bounded CLI session through your server's browser sign-in.

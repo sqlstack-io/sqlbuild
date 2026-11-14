@@ -80,10 +80,10 @@ fn given_accepted_arguments_when_parsing_then_attributes_hold_the_parsed_values(
             expected_value: Value::Str("diff".to_owned()),
         },
         ParsedValueTestCase {
-            description: "server grants no ambient role by default",
+            description: "server leaves the ambient role to server.toml when no option is given",
             argv: &["server"],
             attribute: "control_default_role",
-            expected_value: Value::Str("none".into()),
+            expected_value: Value::None,
         },
         ParsedValueTestCase {
             description: "viewer metadata access requires an explicit server option",
