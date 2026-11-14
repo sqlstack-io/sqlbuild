@@ -443,6 +443,23 @@ class AdhocRunTestCase:
 
 
 @dataclass(frozen=True)
+class AdhocLoadVarsTestCase:
+    """An ad-hoc load or run with variables, who may launch it, and what the worker did."""
+
+    description: str
+    person: Literal["admin", "developer"]
+    command: list[str]
+    expected_permissions: list[list[Any]]
+    # The HTTP status a refused launch returns; None when it launches and succeeds.
+    expected_refusal: int | None
+    expected_inventory_tables: int
+    day_query: str = "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'daily_customers'"
+    expected_day_rows: list[tuple[int]] = field(default_factory=lambda: [(0,)])
+    # One entry per recorded compile: whether its hash differs from the published one.
+    expected_compiled: list[bool] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class ChangedPlanPreviewTestCase:
     description: str
     edited_model: str

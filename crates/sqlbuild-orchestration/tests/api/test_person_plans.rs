@@ -124,6 +124,28 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 description = test_case.description
             );
             assert!(
+                matches!(
+                    ask(store, (&context, viewer), location, &plan_request(&["load", "--select", "customers"])).await,
+                    Err(ControlError::Invalid(message)) if message.contains("cannot be planned")
+                ),
+                "{description}: a load is not a build preview",
+                description = test_case.description
+            );
+            assert!(
+                matches!(
+                    ask(
+                        store,
+                        (&context, viewer),
+                        location,
+                        &plan_request(&["build", "orders", "--vars", r#"{"day": "7"}"#])
+                    )
+                    .await,
+                    Err(ControlError::Denied { .. })
+                ),
+                "{description}: variables change the compile, so planning with them needs run.vars",
+                description = test_case.description
+            );
+            assert!(
                 ask(store, (&context, viewer), location, &first)
                     .await
                     .expect("viewer plans"),
@@ -179,10 +201,10 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             }
             assert!(
                 matches!(
-                    ask(store, (&context, admin), location, &plan_request(&["build", "products"])).await,
+                    ask(store, (&context, admin), location, &plan_request(&["build", "products", "--vars", r#"{"day": "7"}"#])).await,
                     Err(ControlError::Invalid(message)) if message.contains("already waiting")
                 ),
-                "{description}: four plans per target",
+                "{description}: an admin may plan with variables, up to four plans per target",
                 description = test_case.description
             );
             let direct = LocationWorkRequest {

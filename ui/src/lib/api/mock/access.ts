@@ -115,6 +115,8 @@ const PLAIN: Record<Capability, string> = {
 	'run.rewrite_history': 'full refresh or reprocess past data',
 	'run.prioritise': 'run ahead of the queue',
 	'run.warehouse': 'choose the warehouse a run uses',
+	'run.vars': 'set variables for a run',
+	'run.load': 'load sources on request',
 	'trigger.toggle': 'pause and resume schedules and sensors',
 	'sensor.reset_cursor': 'reset where a sensor is up to',
 	'run.adhoc': 'run sqb commands on any selection of nodes',

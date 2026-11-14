@@ -17,7 +17,7 @@ use crate::scheduler::main::{
 use crate::scheduler::models::TickOutcome;
 use crate::scheduler::tests::contracts::helpers::hold_lease;
 use crate::scheduler::tests::contracts::ticks::helpers::{
-    append_covered_tick, calendar_time, shift_schedule, snapshot,
+    append_covered_ticks, calendar_time, shift_schedule, snapshot,
 };
 use crate::scheduler::tests::contracts::ticks::test_types::{
     LatestCatchUpTestCase, TickRetentionTestCase,
@@ -87,17 +87,22 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
             );
             let later = calendar_time(2) + TimeDelta::hours(1);
             let backlog = case["backlog_ticks"].as_i64().expect("backlog");
-            for second in 1..=backlog {
-                append_covered_tick(
-                    store,
-                    trigger_id,
-                    calendar_time(2) + TimeDelta::seconds(second),
-                )
-                .await;
-            }
-            append_covered_tick(store, trigger_id, later).await;
-            // Inserting the backlog one tick at a time can outlast the lease on a slow
-            // machine; the scheduler renews between passes, so the test does too.
+            let started = std::time::Instant::now();
+            append_covered_ticks(
+                store,
+                trigger_id,
+                &(1..=backlog)
+                    .map(|second| calendar_time(2) + TimeDelta::seconds(second))
+                    .chain([later])
+                    .collect::<Vec<_>>(),
+            )
+            .await;
+            println!(
+                "{}: backlog written in {:?}",
+                test_case.description,
+                started.elapsed()
+            );
+            // The scheduler renews between passes, so the test does too.
             let lease = renew_lease(store, &lease).await.expect("renew");
             assert_eq!(prune_ticks(store, &lease).await.expect("recent ticks"), 0);
             shift_schedule(store, trigger_id, shift).await;

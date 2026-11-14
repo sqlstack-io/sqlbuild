@@ -21,6 +21,6 @@ pub trait RunLauncher {
     /// Hears each completed cycle, with its phase timings, before the launcher polls.
     fn cycled(&mut self, _cycle: &SchedulerCycle) {}
 
-    /// Hears each transient store failure the scheduler retries instead of stopping.
+    /// Hears each transient store failure or lost lease the scheduler retries instead of stopping.
     fn retrying(&mut self, _error: &ControlError) {}
 }

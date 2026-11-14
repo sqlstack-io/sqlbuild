@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Configure the server
 - Serve over HTTPS
 - Receive platform events
+- Back up the control database
 - Upgrade
 - Set retention
 - Grant roles to OIDC groups (beta)
@@ -153,6 +154,26 @@ ad-hoc runs. Each `message` is the node's error text with credentials redacted, 
 characters, and `null` when the worker reported none. It can quote warehouse data, so treat the
 webhook like other run evidence. `run_failed` events appear only in the webhook, not in the
 server's platform history.
+
+## Back up the control database
+
+With no `SQLBUILD_CONTROL_DATABASE_URL`, the server keeps its control database in one SQLite file.
+Back it up with SQLite's online backup while the server runs:
+
+```bash
+sqlite3 control.sqlite3 ".backup '/backups/control.sqlite3'"
+```
+
+| Store | Back up with | While the server runs |
+| --- | --- | --- |
+| SQLite | `sqlite3 <file> ".backup '<copy>'"` or the SQLite backup API | Yes |
+| SQLite | A copy of the database file together with its `-wal` file | No; stop the server first |
+| PostgreSQL | `pg_dump` | Yes |
+
+- Never copy the SQLite database file alone. Recent commits can still be in the `-wal` file next to
+  it, so the copy misses them.
+- Restore a backup while the server is stopped, and delete any `-wal` and `-shm` files left beside
+  the database you replace.
 
 ## Upgrade
 
@@ -501,9 +522,12 @@ used. The target is always the one in the request.
 | `audit` | The audits of the selected nodes, against what is already built |
 | `seed` | The selected seeds; other selected nodes are left out |
 | `freshness` | The selected sources and every source upstream of the selection |
+| `load` | The loaders of the selected managed sources, as a build of those sources without tests or audits |
 | Any other verb | Refused |
 
-Only `build` and `seed` write, so `test`, `audit` and `freshness` runs never wait for other runs.
+Only `build`, `seed` and `load` write, so `test`, `audit` and `freshness` runs never wait for other
+runs. A `build` loads the managed sources its models read, as `sqb build` does, under `run.adhoc`
+alone; `--no-load` turns that off.
 A `test` or `audit` run reports each selected node with the worst result of its tests or audits.
 
 Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:` and `test:`, with `+`
@@ -515,6 +539,8 @@ for upstream or downstream nodes. Positional selectors work as on the command li
 | `--full-refresh`, `--start-cursor`, `--end-cursor`, `--start-cursor-ts`, `--end-cursor-ts`, `--start-cursor-int`, `--end-cursor-int` | `build` | `run.rewrite_history` |
 | `--allow-snapshot-full-refresh`, `--allow-snapshot-schema-change`, `--allow-table-type-downgrade`, `--allow-retention-decrease` | `build` | `run.rewrite_history` |
 | `--warehouse` | All | `run.warehouse`, and the warehouse configured for the target on the location |
+| `--vars` | All | `run.vars`, also to preview a plan with them |
+| `--load`, `--reload`, and the `load` verb | `build`, `load` | `run.load` on the sources the run loads |
 | `--max-microbatches`, `--no-load`, `--no-tests`, `--no-audits`, `--no-python`, `--fail-fast`, `--selection-diagnostics`, `--verbose` | `build` | `run.adhoc` |
 | `--concurrency` | `build`, `test`, `seed`, `audit` | `run.adhoc` |
 | `--test-timeout` | `build`, `test` | `run.adhoc` |
@@ -522,14 +548,12 @@ for upstream or downstream nodes. Positional selectors work as on the command li
 | `--state`, `--fail-on-error`, `--fail-on-stale` | `freshness` | `run.adhoc` |
 
 A priority above 0 also needs `run.prioritise`. Among built-in roles only Admin grants
-`run.rewrite_history`, `run.warehouse` and `run.prioritise`. Every other flag is refused with
-its reason:
+`run.rewrite_history`, `run.warehouse`, `run.vars`, `run.load` and `run.prioritise`. Every other
+flag is refused with its reason:
 
 | Refused flags | Reason |
 | --- | --- |
-| `--vars` | Variables change the published SQL |
 | `--defer-to`, `--defer-sources-to`, `--defer-clone-from` | They read another target |
-| `--load`, `--reload` | Source loads are not part of ad-hoc runs |
 | `--allow-missing-migration-origin` | It can lose data |
 | `--no-sql-analysis`, `--no-cache` | Workers verify the published SQL and manage their own cache |
 | `--debug` | It prints executed SQL |
@@ -543,6 +567,10 @@ configures for the target before any statement runs. An unconfigured warehouse f
 the reason `the requested warehouse is not configured for this target on this location; no
 warehouse statement ran`, which the run page shows. A job's own `warehouse` setting is not
 checked this way.
+
+A run with `--vars` is checked against the publication like any other run. The worker then
+compiles the project again with the variables and records the compiled hash of each of the run's
+nodes on the run before any statement runs.
 
 ## Plan builds
 

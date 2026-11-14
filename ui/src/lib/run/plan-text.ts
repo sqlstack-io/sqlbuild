@@ -2,7 +2,7 @@
 // terminal read the same: work that runs first, one section per change reason with each model's detail,
 // then the routine models, functions, seeds and warnings.
 
-import type { PlanChanged, PlanDocument, PlanModel, Trigger } from '$lib/api';
+import type { PlanChanged, PlanDocument, PlanModel, PlanWarning, Trigger } from '$lib/api';
 import { formatIn } from '$lib/format/time';
 
 export type PlanEntry = {
@@ -14,9 +14,12 @@ export type PlanEntry = {
 	queryDiff?: string[];
 	configDiff?: string[];
 	schema?: { sign: '+' | '-' | '~'; text: string }[];
+	/** The plan's warnings about this model, such as the CLI's forward-only replay warning, shown with it. */
+	warnings?: PlanWarning[];
 };
 
-export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolean };
+/** `collapsed` sections show one line, such as "4 unchanged, skipped by --changed", until opened. */
+export type PlanSection = { title: string; entries: PlanEntry[]; changed: boolean; collapsed?: boolean };
 
 /** The change reasons that get their own section, in the CLI's order. */
 const REASON_GROUPS: [string, string][] = [
@@ -151,75 +154,37 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	const seedLabel: Record<string, string> = { first_run: 'first_run', config_changed: 'seed_changed', no_change: 'current' };
 	add('Seeds', builtSeeds(plan).map((s) => ({ name: s.name, value: seedLabel[s.reason] ?? '', detail: [] })));
 	add('Python', plan.python_nodes.map((p) => ({ name: p.name, value: `${p.kind} · ${p.identity_status}`, detail: [] })));
+	// A planner warning names its model in `model_name`, or opens its message with it as the CLI prints it; it shows once, with the first entry for that model.
+	const claimed = new Set<PlanWarning>();
+	for (const entry of sections.filter((s) => s.changed).flatMap((s) => s.entries)) {
+		const mine = plan.warnings.filter((w) => !claimed.has(w) && (w.model_name ?? w.message.split(':', 1)[0]) === entry.name && !FORWARD_ONLY.test(w.message));
+		mine.forEach((w) => claimed.add(w));
+		if (mine.length) entry.warnings = mine;
+	}
 	return sections;
+}
+
+/** The planner's forward-only replay advice, which the page leaves out: the model's action already says it continues forward. */
+const FORWARD_ONLY = /already-built dates keep their old results/;
+
+/** A warning shown under its model, without the model name the CLI opens it with. */
+export function warningText(w: PlanWarning): string {
+	const text = w.model_name ? w.message : w.message.slice(w.message.indexOf(':') + 1).trim();
+	return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The warnings no changed model shows with it, listed on their own after the plan; never the forward-only advice. */
+export function looseWarnings(plan: PlanDocument, sections: PlanSection[]): PlanWarning[] {
+	const shown = new Set(sections.flatMap((s) => s.entries.flatMap((e) => e.warnings ?? [])));
+	return plan.warnings.filter((w) => !shown.has(w) && !FORWARD_ONLY.test(w.message));
 }
 
 /** The `--changed` run of each model, by name. */
 const changedRuns = (plan: PlanDocument) => new Map((plan.changed?.runs ?? []).map((r) => [keyName(r.node), r]));
 
-const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-/** Names a few models, or counts them when there are more than two. */
-const few = (models: PlanModel[], noun: string) => (models.length <= 2 ? models.map((m) => m.name).join(' and ') : count(models.length, noun));
-
-/**
- * What the run does: how many models build, which changed since their last build, which build for the
- * first time, which take new rows and that the rest are recreated as usual, then what else happens.
- */
-export function planSentence(plan: PlanDocument): string {
-	const active = builtModels(plan);
-	// The planner skips only disabled models; seeds it reports as current don't load.
-	const skipped = plan.models.filter((m) => m.action === 'skip').length;
-	const held = plan.changed?.held_back.length ?? 0;
-	const unchanged = plan.changed?.unchanged.length ?? 0;
-	const seeds = builtSeeds(plan).filter((s) => s.reason !== 'no_change').length;
-	const functions = plan.functions.filter((f) => f.reason && f.reason !== 'no_change').length;
-	const runs = [
-		plan.source_loads.length && count(plan.source_loads.length, 'source loads first', 'sources load first'),
-		seeds && count(seeds, 'seed loads', 'seeds load'),
-		functions && count(functions, 'changed function is recreated', 'changed functions are recreated'),
-		plan.python_nodes.length && count(plan.python_nodes.length, 'Python node runs', 'Python nodes run')
-	].filter((p): p is string => !!p);
-	const after = [
-		...runs,
-		...(skipped ? [count(skipped, 'disabled model is skipped', 'disabled models are skipped')] : []),
-		...(held ? [`${count(held, 'model waits', 'models wait')} for ${held === 1 ? 'its' : 'their'} job's own run`] : []),
-		...(unchanged ? [`${count(unchanged, 'unchanged node is', 'unchanged nodes are')} skipped by --changed`] : [])
-	]
-		.map((p) => ` ${p}.`)
-		.join('');
-	if (!active.length) return `${runs.length ? 'No models build.' : 'Nothing to build.'}${after}`;
-	const builds = count(active.length, 'model builds', 'models build');
-	if (isFullRefresh(plan)) return `${builds} from scratch, replacing what was built.${after}`;
-	const changed = active.filter((m) => !ROUTINE.has(m.reason) && m.reason !== 'first_run');
-	const fresh = active.filter((m) => m.reason === 'first_run');
-	// Under --changed a routine model runs because something upstream changed or for its own reason, never just to take new rows.
-	const why = changedRuns(plan);
-	const own = plan.changed ? active.filter((m) => ROUTINE.has(m.reason) && !why.get(m.name)?.downstream_of) : [];
-	const rows = plan.changed ? [] : active.filter((m) => m.reason === 'normal_incremental');
-	const usual = active.filter((m) => (plan.changed ? ROUTINE.has(m.reason) && !!why.get(m.name)?.downstream_of : m.reason === 'no_change'));
-	const parts = [
-		changed.length && `${few(changed, 'model')} changed since ${changed.length === 1 ? 'its' : 'their'} last build`,
-		fresh.length && `${few(fresh, 'model')} ${fresh.length === 1 ? 'builds' : 'build'} for the first time`,
-		own.length && `${few(own, 'model')} ${own.length === 1 ? 'runs for its' : 'run for their'} own reason`,
-		rows.length && `${count(rows.length, 'incremental model takes', 'incremental models take')} new rows`
-	].filter((p): p is string => !!p);
-	if (usual.length && plan.changed) parts.push(`${parts.length ? 'the other ' : ''}${count(usual.length, 'model reads', 'models read')} a change upstream`);
-	else if (usual.length) parts.push(parts.length ? `the other ${usual.length} ${usual.length === 1 ? 'is' : 'are'} recreated as usual` : `none changed since ${usual.length === 1 ? 'its' : 'their'} last build`);
-	const detail = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
-	return `${builds}: ${detail}.${after}`;
-}
-
 /** The models a plan changes, as catalog keys, for drawing just the part of a large selection that matters. */
 export function changedModelKeys(plan: PlanDocument): string[] {
 	return builtModels(plan).filter((m) => !ROUTINE.has(m.reason)).map((m) => `model:${m.name}`);
-}
-
-/** The line `sqb plan --changed` opens with: what counts as a change and how far a change reaches. */
-export function changedPolicyLine(changed: PlanChanged): string {
-	const label = { definition: 'definition', source_data: 'source data' } as const;
-	const uncounted = (['definition', 'source_data'] as const).filter((kind) => !changed.counts.includes(kind)).map((kind) => ` (${label[kind]} not counted)`);
-	return `Counting: ${changed.counts.map((kind) => label[kind]).join(', ')}${uncounted.join('')} · reach: ${changed.reach}`;
 }
 
 /** The Held back and Unchanged sections of a `--changed` plan; `refresh` words what refreshes a job's nodes. */
@@ -227,15 +192,19 @@ export function changedSections(changed: PlanChanged, refresh: (job: string) => 
 	const sections: PlanSection[] = [];
 	const held = changed.held_back.map((h) => ({ name: keyName(h.node), value: 'refreshed_by' in h ? h.refreshed_by.map(refresh).join(' · ') : `reads ${keyName(h.reads)}, which is held back`, detail: [] }));
 	if (held.length) sections.push({ title: 'Held back', entries: held, changed: false });
-	if (changed.unchanged.length) sections.push({ title: 'Unchanged', entries: changed.unchanged.map((key) => ({ name: keyName(key), value: 'skipped by --changed', detail: [] })), changed: false });
+	if (changed.unchanged.length) sections.push({ title: 'Unchanged', entries: changed.unchanged.map((key) => ({ name: keyName(key), value: 'skipped by --changed', detail: [] })), changed: false, collapsed: true });
 	return sections;
 }
 
-/** What refreshes a node held back for `job` (a job or group the plan names): its next scheduled run, its sensor, or that it is paused. */
-export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | 'type' | 'state' | 'nextDueAt'>[], now: number): string {
+/**
+ * What refreshes a node held back for `job` (a job or group the plan names): its next scheduled run, its sensor, or that it is paused.
+ * While no server runs the scheduler, a schedule or sensor starts nothing, so the text says the job waits for it instead.
+ */
+export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | 'type' | 'state' | 'nextDueAt'>[], now: number, schedulerStopped = false): string {
 	const mine = triggers.filter((t) => t.jobKey === job);
 	const live = mine.filter((t) => t.state === 'running');
 	if (mine.length && !live.length) return `job ${job} is paused`;
+	if (schedulerStopped && live.length) return `job ${job} · can’t start until the scheduler is running again`;
 	const next = live.flatMap((t) => (t.nextDueAt ? [t.nextDueAt] : [])).sort()[0];
 	if (next) return `job ${job} · next run ${formatIn(next, now)}`;
 	return live.some((t) => t.type === 'sensor') ? `job ${job} · when its sensor fires` : `job ${job}`;

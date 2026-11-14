@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
+	import { ApiError, DEMO } from '$lib/api';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { CREDIT_PRICE_HINT, costByFolder, formatQueryCost } from '$lib/operate/cost';
@@ -9,10 +10,16 @@
 	const WINDOWS = [7, 30] as const;
 	const TOP = 5;
 	let days = $state<(typeof WINDOWS)[number]>(7);
+	// The demo recording may hold no cost read; that is no cost data, not an error.
+	const unrecorded = (error: unknown) => DEMO && error instanceof ApiError && error.status === 404;
 	const summary = createResource(async (client, scope) => {
 		const window = days;
-		const [cost, nodes] = await Promise.all([client.getCostSummary(scope, window), client.listCatalogNodes(scope)]);
-		return { cost, folders: costByFolder(cost.byNode, nodes) };
+		const cost = await client.getCostSummary(scope, window).catch((error: unknown) => {
+			if (unrecorded(error)) return null;
+			throw error;
+		});
+		if (!cost) return null;
+		return { cost, folders: costByFolder(cost.byNode, await client.listCatalogNodes(scope)) };
 	}, ['runs', 'warehouse_sync', 'snapshot']);
 	const data = $derived(summary.data ?? null);
 	const cost = $derived(data?.cost ?? null);

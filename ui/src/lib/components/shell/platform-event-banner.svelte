@@ -7,9 +7,11 @@
 	import { eventKindLabel, problemHref } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 
+	let { only = () => true }: { only?: (event: PlatformEvent) => boolean } = $props();
+
 	const rank = (e: PlatformEvent) => (e.severity === 'critical' ? 2 : e.severity === 'warning' ? 1 : 0);
 	const events = $derived(
-		app.platformEvents.filter((e) => e.active && e.severity !== 'info').sort((a, b) => rank(b) - rank(a))
+		app.platformEvents.filter((e) => e.active && e.severity !== 'info' && only(e)).sort((a, b) => rank(b) - rank(a))
 	);
 	const critical = $derived(events.some((e) => e.severity === 'critical'));
 	/** Location problems link to the location's page if it exists, else the Locations list; server problems only to server status. */
@@ -29,7 +31,7 @@
 				{@const link = linkOf(event)}
 				<li>
 					<strong>{eventKindLabel[event.kind]}</strong>
-					<span title={event.message}>{event.message}</span>
+					<span>{event.message}</span>
 					<small>{formatAgo(event.occurredAt, app.now)}</small>
 					{#if link}<a href={to(link.href)}>{link.text}</a>{/if}
 				</li>
@@ -80,10 +82,9 @@
 		white-space: nowrap;
 	}
 	li span {
-		overflow: hidden;
+		min-width: 0;
 		color: var(--muted-foreground);
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		overflow-wrap: anywhere;
 	}
 	li small {
 		color: var(--sb-text-faint);

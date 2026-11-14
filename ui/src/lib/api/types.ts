@@ -20,6 +20,8 @@ export const CAPABILITIES = [
 	'run.rewrite_history',
 	'run.prioritise',
 	'run.warehouse',
+	'run.vars',
+	'run.load',
 	'trigger.toggle',
 	'sensor.reset_cursor',
 	'run.adhoc',

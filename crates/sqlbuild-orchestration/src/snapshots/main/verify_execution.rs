@@ -1,9 +1,7 @@
 //! Refuse execution when a worker's local compilation differs from the pinned publication.
 
-use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
-
 use crate::runs::models::RunExecution;
-use crate::snapshots::_helpers::content::node_content;
+use crate::snapshots::main::node_hashes::node_hashes;
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
 
@@ -38,9 +36,8 @@ pub fn verify_execution(
             "worker node set differs from the pinned snapshot".into(),
         ));
     }
-    for (key, node) in &input.nodes {
-        let hash = sha256_hex(&node_content(node)?.definition);
-        if expected.node_hashes.get(key) != Some(&hash) {
+    for (key, hash) in node_hashes(input)? {
+        if expected.node_hashes.get(&key) != Some(&hash) {
             return Err(ControlError::Invalid(
                 "worker node content differs from the pinned snapshot".into(),
             ));

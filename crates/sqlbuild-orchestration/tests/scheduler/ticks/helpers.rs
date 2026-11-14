@@ -406,28 +406,30 @@ pub(crate) async fn shift_schedule(store: &ControlStore, trigger_id: Uuid, days:
 }
 
 /// A later covered tick, as if another due time arrived while the requested run still waited.
-pub(crate) async fn append_covered_tick(
+pub(crate) async fn append_covered_ticks(
     store: &ControlStore,
     trigger_id: Uuid,
-    scheduled_for: DateTime<Utc>,
+    scheduled_for: &[DateTime<Utc>],
 ) {
-    let transaction = begin(store, TransactionMode::Write)
+    let mut transaction = begin(store, TransactionMode::Write)
         .await
-        .expect("covered tick");
-    let (transaction, _) = query(
-        transaction,
-        "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, \
-         run_id, covered_by_run_id) SELECT $1, trigger_id, $2, evaluated_at, epoch, \
-         'covered', NULL, run_id FROM sqb_ticks WHERE trigger_id=$3 AND outcome='requested'",
-        vec![
-            Parameter::Id(Uuid::now_v7()),
-            Parameter::Time(scheduled_for),
-            Parameter::Id(trigger_id),
-        ],
-    )
-    .await
-    .expect("append covered tick");
-    commit(transaction).await.expect("commit covered tick");
+        .expect("covered ticks");
+    for time in scheduled_for {
+        (transaction, _) = query(
+            transaction,
+            "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, \
+             run_id, covered_by_run_id) SELECT $1, trigger_id, $2, evaluated_at, epoch, \
+             'covered', NULL, run_id FROM sqb_ticks WHERE trigger_id=$3 AND outcome='requested'",
+            vec![
+                Parameter::Id(Uuid::now_v7()),
+                Parameter::Time(*time),
+                Parameter::Id(trigger_id),
+            ],
+        )
+        .await
+        .expect("append covered tick");
+    }
+    commit(transaction).await.expect("commit covered ticks");
 }
 
 /// Rewrite one trigger-state column the way an earlier build or a past start would have left it.
