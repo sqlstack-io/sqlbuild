@@ -40,6 +40,10 @@ Model-subject Rules support fine-grained reuse. Editing one model invalidates af
 subjects rather than every Rule invocation. Project-subject Rules run once and are appropriate for
 genuinely project-wide invariants, with correspondingly broader invalidation.
 
+Python Rules are cached per file. Editing a Python file re-checks that file and the files whose
+findings read it, such as an importer checked against the module it imports. `SQBRPYTHON305` and
+`SQBRPYTHON306` read every Python file, so any Python edit re-checks them.
+
 Positive and negative project-tree observations are dependencies. If a Rule observes that a glob
 has no matches, adding a matching file invalidates that result.
 

@@ -256,7 +256,7 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 64] = [
         enabled_by_default: false,
         options: &[],
         message: "definition is unreachable from production roots",
-        remediation: "Investigate the production entry mechanism before deleting code. Preserve deliberate public exports and use reasoned roots for dynamic dispatch.",
+        remediation: "Check how the definition is loaded before deleting it. For code loaded in a way the Rule cannot follow, such as by name at run time, add a rule exception with a reason.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON307",
