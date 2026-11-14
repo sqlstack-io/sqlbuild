@@ -16,12 +16,12 @@ import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './ht
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
 import { timelineOf } from './http-timeline';
-import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
+import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -41,6 +41,9 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'timeline',
 	'listRunEvents',
 	'listRunStatements',
+	'listRunCost',
+	'getCostSummary',
+	'listNodeCosts',
 	'getStatementSql',
 	'listRunOutput',
 	'getRunNodeError',
@@ -382,6 +385,28 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toRunStatements(data, runId);
+		},
+		async listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]> {
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/cost', { params: { path: runPath(scope, runId) } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toRunCostRows(data);
+		},
+		async getCostSummary(scope: Scope, days: number): Promise<CostSummary> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/cost', { params: { path: { location_id: locationId, target }, query: { days } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toCostSummary(data);
+		},
+		async listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/cost', {
+				params: { path: { location_id: locationId, target, node_key: nodeKey }, query: { days } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toNodeBuildCosts(data);
 		},
 		async getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql> {
 			const refusal = `${scope.locationId}|${runId}`;

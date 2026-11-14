@@ -27,7 +27,7 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_core::constants::{
     AUDIT_RESULTS_TABLE_NAME, CONSUMPTION_TABLE_NAME, OBSERVATIONS_TABLE_NAME,
-    SOURCE_FRESHNESS_TABLE_NAME,
+    RESOURCE_COSTS_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
 };
 
 /// The adapter and its open connection.
@@ -500,6 +500,7 @@ pub(crate) fn direct_state_prune_candidates<'py>(
         locations.push((database.clone(), schema.clone(), CONSUMPTION_TABLE_NAME));
         locations.push((database.clone(), schema.clone(), OBSERVATIONS_TABLE_NAME));
         locations.push((database.clone(), schema.clone(), AUDIT_RESULTS_TABLE_NAME));
+        locations.push((database.clone(), schema.clone(), RESOURCE_COSTS_TABLE_NAME));
     }
     let lookup: HashSet<Folded> = relation_lookup(warehouse, &locations)?;
     let mut candidates: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -525,8 +526,14 @@ pub(crate) fn direct_state_prune_candidates<'py>(
                 AUDIT_RESULTS_TABLE_NAME,
                 "render_prune_audit_results_history_sql",
             ),
+            (
+                RESOURCE_COSTS_TABLE_NAME,
+                "render_prune_resource_costs_history_sql",
+            ),
         ] {
-            if !lookup_exists(&lookup, (database.as_deref(), schema, table_name)) {
+            if !lookup_exists(&lookup, (database.as_deref(), schema, table_name))
+                || !warehouse.adapter.hasattr(render)?
+            {
                 continue;
             }
             let prune_sql: Bound<'py, PyAny> = call_with(

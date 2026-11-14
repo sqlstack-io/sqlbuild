@@ -62,7 +62,7 @@ fn resource(value: &Bound<'_, PyAny>) -> PyResult<CostResource> {
     })
 }
 
-fn summary(value: &Bound<'_, PyAny>) -> PyResult<CostSummary> {
+pub(crate) fn summary(value: &Bound<'_, PyAny>) -> PyResult<CostSummary> {
     let mut resources: Vec<CostResource> = Vec::new();
     for item in native_field(value, "resources")?.try_iter()? {
         resources.push(resource(&item?)?);

@@ -818,6 +818,8 @@ const BUILD_COST_FINALIZATION: RecordSpec = RecordSpec {
             FieldDefault::Text("No executable warehouse work was planned for this build."),
         ),
         FieldSpec::new("had_executable_work", FieldDefault::True),
+        FieldSpec::new("target_schema", FieldDefault::None),
+        FieldSpec::new("orchestration_run_id", FieldDefault::None),
     ],
 };
 const CONTRACT_COMMAND_REQUEST: RecordSpec = RecordSpec {

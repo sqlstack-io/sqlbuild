@@ -188,3 +188,45 @@ pub struct MicrobatchCoverage {
 pub struct CoverageQuery {
     pub limit: Option<u32>,
 }
+
+/// Estimated query cost of one group, such as a job, a warehouse size or a node.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CostGroup {
+    /// The group's name; None for builds no server run started, or a resource without a warehouse.
+    pub key: Option<String>,
+    pub credits: f64,
+    /// None when any of the group's observations had no configured credit price.
+    pub usd: Option<f64>,
+    pub seconds: f64,
+    /// Builds that contributed, counted once each.
+    pub runs: i64,
+}
+
+/// A target's estimated query cost over a window, from the latest observation of each run.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CostSummaryRecord {
+    pub since: DateTime<Utc>,
+    pub credits: f64,
+    pub usd: Option<f64>,
+    pub runs: i64,
+    /// Runs whose cost is still pending or partial, which a later build re-reads.
+    pub incomplete_runs: i64,
+    pub by_job: Vec<CostGroup>,
+    pub by_warehouse_size: Vec<CostGroup>,
+    /// Every node that ran, keyed `<resource_type>:<resource_name>` like catalog node keys.
+    pub by_node: Vec<CostGroup>,
+}
+
+/// One build's estimated query cost of one node, across every warehouse it used.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct NodeCostRecord {
+    pub run_id: String,
+    pub orchestration_run_id: Option<String>,
+    pub run_started_at: DateTime<Utc>,
+    /// The collection status of the whole build.
+    pub status: String,
+    pub credits: f64,
+    pub usd: Option<f64>,
+    pub seconds: f64,
+    pub query_count: i64,
+}

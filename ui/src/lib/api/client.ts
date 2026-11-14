@@ -28,6 +28,9 @@ import type {
 	RunRowPage,
 	RunRowQuery,
 	RunStatement,
+	RunCostRow,
+	CostSummary,
+	NodeBuildCost,
 	Snapshot,
 	RunTabCounts,
 	Scope,
@@ -95,6 +98,12 @@ export interface ApiClient extends PlatformApi {
 	/** Recall events and scheduler facts in storage order, paged by `after`. */
 	listRunEvents(scope: Scope, runId: string, query?: { after?: number; limit?: number }): Promise<RunEventPage>;
 	listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]>;
+	/** The latest estimated query cost observations of one run; empty until a collection synced. */
+	listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]>;
+	/** Estimated query cost of the runs that started in the last `days` days, by job, warehouse size and node. */
+	getCostSummary(scope: Scope, days: number): Promise<CostSummary>;
+	/** One node's estimated query cost per build over the last `days` days, newest first. */
+	listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]>;
 	/** One statement's SQL, fetched when its row is expanded. `view.sql` */
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql>;
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]>;

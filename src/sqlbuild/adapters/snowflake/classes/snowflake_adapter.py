@@ -42,6 +42,7 @@ from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import 
 )
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.observations import ObservationsMixin
+from sqlbuild.adapter.contract.classes.resource_costs import ResourceCostsMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.classes.unkeyed_diff import UnkeyedDiffMixin
@@ -203,6 +204,7 @@ class SnowflakeAdapter(
     MicrobatchMixin,
     ConsumptionMixin,
     ObservationsMixin,
+    ResourceCostsMixin,
     AuditResultsMixin,
     UnkeyedDiffMixin,
     BaseAdapter,
@@ -672,6 +674,15 @@ class SnowflakeAdapter(
     def render_create_observations_table_sql(self, *, database: str | None, schema: str) -> str:
         return self._with_state_table_retention(
             create_sql=super().render_create_observations_table_sql(
+                database=database, schema=schema
+            ),
+            database=database,
+            schema=schema,
+        )
+
+    def render_create_resource_costs_table_sql(self, *, database: str | None, schema: str) -> str:
+        return self._with_state_table_retention(
+            create_sql=super().render_create_resource_costs_table_sql(
                 database=database, schema=schema
             ),
             database=database,

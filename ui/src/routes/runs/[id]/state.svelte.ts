@@ -6,7 +6,7 @@ import { rerunHref } from '$lib/run/command';
 import { createResource } from '$lib/state/resource.svelte';
 import { isActiveRun } from '$lib/status';
 import type { BottomTab } from './types';
-import { bannersFor, primaryChoice, progressOf, rerunChoices } from './utils';
+import { bannersFor, primaryChoice, progressOf, rerunChoices, runCostOf } from './utils';
 
 function message(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
@@ -32,6 +32,7 @@ export function createRunDetailState(runId: string) {
 		topics
 	);
 	const statementsRes = createResource((client, scope) => (client.supports('listRunStatements') ? eachRun((id) => client.listRunStatements(scope, id)) : Promise.resolve([])), topics);
+	const costRes = createResource((client, scope) => (client.supports('listRunCost') ? eachRun((id) => client.listRunCost(scope, id)) : Promise.resolve([])), topics);
 
 	const detail = $derived(detailRes.data ?? null);
 	const run = $derived(detail?.run ?? null);
@@ -41,6 +42,7 @@ export function createRunDetailState(runId: string) {
 	const cause = $derived(outputRes.data?.find((l) => l.error)?.text ?? null);
 	const banners = $derived(detail ? bannersFor(detail, app.now, cause) : []);
 	const statements = $derived(statementsRes.data ?? []);
+	const cost = $derived(costRes.data ? runCostOf(costRes.data) : null);
 	// Progress reported by a run with no signal is stale, so the live card only shows while it's running.
 	const runningStatements = $derived(run?.status === 'running' ? statements.filter((s) => s.status === 'running') : []);
 	let showDetails = $state(false);
@@ -101,6 +103,10 @@ export function createRunDetailState(runId: string) {
 		eventsRes,
 		outputRes,
 		statementsRes,
+		costRes,
+		get cost() {
+			return cost;
+		},
 		get detail() {
 			return detail;
 		},

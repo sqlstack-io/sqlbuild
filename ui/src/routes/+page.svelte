@@ -23,6 +23,7 @@
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
 	import { pagesBeyondTarget } from '$lib/nav';
+	import OverviewCost from './overview-cost.svelte';
 
 	const overview = createResource((client, scope) => client.overview(scope), ['runs', 'checks', 'node_status', 'snapshot', 'platform_events', 'triggers']);
 	const data = $derived(overview.data ?? null);
@@ -220,6 +221,8 @@
 					<RunTimeline scroll={false} stickyTop={0} />
 				</section>
 			{/if}
+
+			<OverviewCost />
 
 			<div class="lower-grid" class:single={!showGroups}>
 				{#if showGroups}<section class="surface-panel">

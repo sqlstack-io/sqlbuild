@@ -76,6 +76,10 @@ pub(crate) fn finalize_build_cost<'py>(
             "target_database",
             native_field(&project, "effective_target_database")?,
         ),
+        (
+            "target_schema",
+            native_field(&project, "effective_target_schema")?,
+        ),
         ("run_id", native_field(&project, "run_id")?),
         ("build_status", text(py, cost.status)),
         ("started_at", cost.started_at),
@@ -90,6 +94,12 @@ pub(crate) fn finalize_build_cost<'py>(
         ("output_stream", context.stream.clone()),
         ("use_color", boolean(py, context.use_color)),
     ];
+    if let Some(worker) = &context.worker {
+        fields.push((
+            "orchestration_run_id",
+            text(py, &worker.run_id().to_string()),
+        ));
+    }
     fields.extend(cost.overrides);
     let finalization: Bound<'py, PyAny> =
         new_record_with(py, RecordId::BuildCostFinalization, &fields)?;

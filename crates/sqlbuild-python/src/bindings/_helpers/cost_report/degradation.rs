@@ -14,6 +14,7 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::cost_report::attribution::report_cost_status;
+use crate::bindings::_helpers::cost_report::publication::publish_resource_costs;
 use crate::bindings::_helpers::cost_report::records::cost_run;
 use crate::bindings::_helpers::cost_report::store;
 use crate::bindings::_helpers::cost_telemetry::values::cost_aware;
@@ -198,6 +199,38 @@ fn persist<'py>(
     )
 }
 
+/// Record the run's cost in the warehouse state schema; any failure is logged and warned.
+fn publish<'py>(
+    finalization: &Bound<'py, PyAny>,
+    record: &Bound<'py, PyAny>,
+    (config, rate_source): (&Bound<'py, PyAny>, &str),
+) -> PyResult<()> {
+    let py: Python<'py> = finalization.py();
+    let rate_source: Bound<'py, PyAny> = PyString::new(py, rate_source).into_any();
+    let published: PyResult<()> = cost_run(record).and_then(|run| {
+        publish_resource_costs(
+            finalization,
+            &run,
+            (&native_field(config, "usd_per_credit")?, &rate_source),
+        )
+    });
+    let Err(error) = published else {
+        return Ok(());
+    };
+    log_failure(
+        py,
+        "automatic run-cost warehouse publication failed",
+        &error,
+    )?;
+    warn(
+        &native_field(finalization, "output_stream")?,
+        &format!(
+            "Cost telemetry failed during warehouse publication ({}); build result unchanged.",
+            error_type(py, &error)?
+        ),
+    )
+}
+
 /// `_persist_collection_failure`: log, warn and persist a failed-collection record.
 fn collection_failure<'py>(
     finalization: &Bound<'py, PyAny>,
@@ -231,6 +264,7 @@ fn collection_failure<'py>(
         summary(py, status, (config, rate_source), message)?,
     )?;
     persist(finalization, &record, "failure artifact persistence")?;
+    publish(finalization, &record, (config, rate_source))?;
     Ok(record)
 }
 
@@ -312,6 +346,9 @@ pub(crate) fn finalize_build_cost<'py>(
     report_cost_status(&native_field(&cost, "status")?)?;
     let record: Bound<'py, PyAny> = cost_record(finalization, cost)?;
     persist(finalization, &record, "artifact persistence")?;
+    if native_field(finalization, "collect")?.is_truthy()? {
+        publish(finalization, &record, rate)?;
+    }
     if !native_field(finalization, "render")?.is_truthy()? {
         return Ok(record);
     }

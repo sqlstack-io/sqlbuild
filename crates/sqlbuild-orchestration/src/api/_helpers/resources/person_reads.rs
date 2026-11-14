@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::api::errors::ApiError;
 use crate::api::models::{
-    PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery,
+    CostQuery, PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery,
 };
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::declarations::main::list_person_jobs::list_person_jobs;
@@ -36,14 +36,21 @@ use crate::sensors::models::PersonSensorState;
 use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;
 use crate::store::models::ControlStore;
+use crate::warehouse_history::main::read_person_cost_summary::read_person_cost_summary;
+use crate::warehouse_history::main::read_person_node_costs::read_person_node_costs;
 use crate::warehouse_history::main::read_person_node_runs::read_person_node_runs;
+use crate::warehouse_history::main::read_person_run_cost::read_person_run_cost;
 use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
 use crate::warehouse_history::main::read_person_run_node_error::read_person_run_node_error;
 use crate::warehouse_history::main::read_person_run_output::read_person_run_output;
 use crate::warehouse_history::main::read_person_run_statement_sql::read_person_run_statement_sql;
 use crate::warehouse_history::main::read_person_run_statements::read_person_run_statements;
+use crate::warehouse_history::models::{CostSummaryRecord, NodeCostRecord};
 use crate::warehouse_metadata::main::person_reads::list_person_catalog_nodes::list_person_catalog_nodes;
-use crate::warehouse_metadata::models::CatalogNodeRecord;
+use crate::warehouse_metadata::models::{CatalogNodeRecord, WarehouseResourceCostRecord};
+
+/// Default and largest cost window, in days.
+const COST_DAYS: (u32, u32) = (7, 90);
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes", operation_id = "listPersonRunNodes",
     params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path)),
@@ -175,6 +182,87 @@ pub(crate) async fn run_statements(
     .await?
     .map(Json)
     .ok_or_else(|| not_found("run not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/cost", operation_id = "readPersonRunCost",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path)),
+    responses((status = 200, body = Vec<WarehouseResourceCostRecord>, description = "The latest estimated query cost observation of the run and of each resource and warehouse it used; empty when none was synced"),
+        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 404, description = "Run not found for a person who may view the whole target")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn run_cost(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    Path((location_id, target, run_id)): Path<(Uuid, String, Uuid)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<WarehouseResourceCostRecord>>, ApiError> {
+    read_person_run_cost(
+        &store,
+        (&context, principal),
+        (location_id, &target, run_id),
+        default_role,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("run not found"))
+}
+
+fn cost_days(query: &CostQuery) -> u32 {
+    query.days.unwrap_or(COST_DAYS.0).clamp(1, COST_DAYS.1)
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/cost", operation_id = "readPersonCostSummary",
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("days" = Option<u32>, Query, description = "Runs that started in the last this many days; defaults to 7, capped at 90")),
+    responses((status = 200, body = CostSummaryRecord, description = "Estimated query cost by job, warehouse size and node, most expensive first"),
+        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn cost_summary(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<CostQuery>),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<CostSummaryRecord>, ApiError> {
+    Ok(Json(
+        read_person_cost_summary(
+            &store,
+            (&context, principal),
+            (location_id, &target),
+            (cost_days(&options), default_role),
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/cost", operation_id = "listPersonNodeCosts",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("node_key" = String, Path),
+        ("days" = Option<u32>, Query, description = "Builds that started in the last this many days; defaults to 7, capped at 90"),
+        ("limit" = Option<u32>, Query, description = "Maximum builds; defaults to 100, capped at 1000")),
+    responses((status = 200, body = Vec<NodeCostRecord>, description = "The node's estimated query cost in each build, newest first"),
+        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn node_costs(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, node_key)), Query(options)): (
+        Path<(Uuid, String, String)>,
+        Query<CostQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<NodeCostRecord>>, ApiError> {
+    Ok(Json(
+        read_person_node_costs(
+            &store,
+            (&context, principal),
+            (location_id, &target, &node_key),
+            (
+                cost_days(&options),
+                options.limit.unwrap_or(100).min(1000),
+                default_role,
+            ),
+        )
+        .await?,
+    ))
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements/sql", operation_id = "readPersonRunStatementSql",

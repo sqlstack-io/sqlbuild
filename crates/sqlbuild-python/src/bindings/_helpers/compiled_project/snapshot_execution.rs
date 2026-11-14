@@ -59,6 +59,11 @@ impl WorkerBuild {
         self.execution.claim.request.command
     }
 
+    /// The server run this build executes.
+    pub(crate) fn run_id(&self) -> uuid::Uuid {
+        self.execution.claim.request.run_id
+    }
+
     /// Test and audit runs execute only attached checks, so their nodes take the checks' outcome.
     fn checks_only(&self) -> bool {
         matches!(self.command(), RunCommand::Test | RunCommand::Audit)
