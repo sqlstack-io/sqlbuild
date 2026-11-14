@@ -11,7 +11,7 @@ use crate::scheduler::types::RunLauncher;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
-/// Durable database state drives work; a transient store failure retries the next cycle.
+/// Durable database state drives work; a transient failure or a lost lease retries the next cycle.
 pub async fn run_scheduler(
     store: &ControlStore,
     mut state: SchedulerState,
@@ -36,7 +36,7 @@ pub async fn run_scheduler(
             let retry = Instant::now() + Duration::from_secs(1);
             let due = match polled {
                 Ok(due) => due.min(retry),
-                Err(error) if error.transient() => {
+                Err(error) if error.transient() || matches!(error, ControlError::Fenced) => {
                     launcher.retrying(&error);
                     retry
                 }
