@@ -1,13 +1,12 @@
 //! Resolve which loaders and sources `sqb load` runs, as `SourceEntry` objects.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_core::load_command::errors::UnknownLoadSelector;
 use sqlbuild_core::load_command::main::load_reference_loaders::load_reference_loaders;
 use sqlbuild_core::load_command::main::select_load_entries::select_load_entries as select_entries;
@@ -22,7 +21,7 @@ use crate::bindings::_helpers::compile_attachment::target::{
     connection_is_default_target, project_location,
 };
 use crate::bindings::_helpers::compile_driver::targets::{
-    managed_write_schema, preserved_loader_schema,
+    managed_write_schema, preserved_loader_schemas,
 };
 use crate::bindings::_helpers::contracts::spec_resolution::loader_destination_parts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
@@ -319,19 +318,16 @@ pub(crate) fn loader_write_schemas<'py>(
     (selected_target, cli_vars): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     entries: &[Bound<'py, PyAny>],
 ) -> PyResult<()> {
+    let mut intermediate_loaders: HashSet<String> = HashSet::new();
     for entry in entries {
-        if native_field(entry, "loader")?.is_none() {
-            continue;
-        }
-        let schema: Option<String> = native_field(entry, "schema")?.extract()?;
-        if schema.is_some_and(|schema| schema.trim() == PRESERVE_TARGET_VALUE) {
-            preserved_loader_schema(
-                entry.py(),
-                &native_field(entry, "name")?.str()?.to_string(),
-                &native_field(entry, "table")?.str()?.to_string(),
-            )?;
+        if native_field(entry, "meta")?
+            .call_method1("get", (LOADER_NODE_KEY,))?
+            .is_truthy()?
+        {
+            intermediate_loaders.insert(native_field(entry, "name")?.extract()?);
         }
     }
+    preserved_loader_schemas(discovered, selected_target, &intermediate_loaders)?;
     if connection_is_default_target(discovered)? {
         return Ok(());
     }
