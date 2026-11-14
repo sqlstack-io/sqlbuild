@@ -101,3 +101,12 @@ pub const GENERATED_SOURCE_CONFLICT: &str = "source file is marked as generated"
 pub const SOURCE_BLOCK_CONFLICT: &str = "source declaration has no unambiguous YAML block";
 /// The `ValueError` prefix of a `name_pattern` the native matcher rejects.
 pub const INVALID_NAME_PATTERN_PREFIX: &str = "invalid name_pattern: ";
+/// Where job files live; their `select` and `exclude` follow renamed and moved models.
+pub const JOB_FILES_DIRECTORY: &str = "orchestration/jobs";
+pub const TOML_SUFFIX: &str = ".toml";
+/// The folder path selectors start from.
+pub const MODEL_ROOT: &str = "models";
+pub const UNREADABLE_JOB_REASON: &str = "this job file cannot be read as UTF-8, so its selectors cannot be updated; fix or remove it first";
+pub const PARTIAL_FOLDER_MOVE_REASON: &str = "this job selects folder '{folder}', and {models} moved out of it; check the job still selects what it should";
+pub const UNWRITABLE_SELECTOR_REASON: &str =
+    "this selector is a multi-line string; change it to '{selector}' by hand";

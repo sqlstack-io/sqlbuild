@@ -257,3 +257,13 @@ pub(super) struct StagedCommitOrderTestCase {
     pub(super) changes: &'static [(&'static str, &'static str)],
     pub(super) expected_files: &'static [(&'static str, &'static str)],
 }
+
+/// Models as `(name, path, new name, new path)`, a job's selector lines and what they become.
+pub(super) struct JobSelectorTestCase {
+    pub(super) description: &'static str,
+    pub(super) models: &'static [(&'static str, &'static str, &'static str, &'static str)],
+    pub(super) job: &'static str,
+    pub(super) expected_job: &'static str,
+    /// `line:column reason` of each selector a person must edit or check.
+    pub(super) expected_manual: &'static [&'static str],
+}

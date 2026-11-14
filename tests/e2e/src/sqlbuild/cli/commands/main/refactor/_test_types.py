@@ -299,3 +299,14 @@ class PythonNamedMoveE2ETestCase:
     destination: str
     expected_exit_code: int
     expected_model_path: str
+
+
+@dataclass(frozen=True)
+class JobSelectorRefactorE2ETestCase:
+    """A rename or move, the job file before and after it, and the job built afterwards."""
+
+    description: str
+    command: tuple[str, ...]
+    job: str
+    expected_job: str
+    expected_output: tuple[str, ...] = ()

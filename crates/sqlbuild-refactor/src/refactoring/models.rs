@@ -24,6 +24,8 @@ pub enum EditKind {
     Migration,
     /// A Python import of a moved module.
     Import,
+    /// A job's `select` or `exclude` naming a renamed or moved model.
+    Selector,
 }
 
 impl EditKind {
@@ -36,6 +38,7 @@ impl EditKind {
             Self::Column => "column",
             Self::Migration => "migration",
             Self::Import => "import",
+            Self::Selector => "selector",
         }
     }
 }

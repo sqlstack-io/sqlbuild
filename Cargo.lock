@@ -4457,6 +4457,7 @@ dependencies = [
  "sqlbuild-pysource",
  "sqlbuild-sqltext",
  "tempfile",
+ "toml",
 ]
 
 [[package]]

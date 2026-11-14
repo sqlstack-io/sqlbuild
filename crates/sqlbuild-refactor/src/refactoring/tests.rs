@@ -8,6 +8,8 @@ mod declaration_edits;
 mod header_edits;
 #[path = "tests/helpers.rs"]
 mod helpers;
+#[path = "tests/test_job_selectors.rs"]
+mod job_selectors;
 #[path = "tests/test_planning.rs"]
 mod planning;
 #[path = "tests/test_sql_sites.rs"]
