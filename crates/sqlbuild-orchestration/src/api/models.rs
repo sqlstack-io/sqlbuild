@@ -521,6 +521,7 @@ pub struct ServerFacts {
     pub audit: crate::credentials::models::AuditRetention,
     pub statistics: crate::warehouse_metadata::models::StatisticsRetention,
     pub snapshots: crate::snapshots::models::SnapshotRetention,
+    pub run_logs: crate::runs::models::RunLogRetention,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.
@@ -541,6 +542,10 @@ pub struct ServerRetention {
     pub statistics_days: i64,
     /// Publications kept per location target.
     pub snapshots_kept: i64,
+    /// Days a finished run keeps its log of events, statements and output.
+    pub run_log_days: i64,
+    /// Finished runs per location target that keep their logs.
+    pub run_logs_kept: i64,
     pub platform_alert_days: i64,
     pub heartbeat_days: i64,
     pub location_health_days: i64,

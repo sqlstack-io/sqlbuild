@@ -195,6 +195,7 @@ pub(crate) async fn run_statements_in(
     Ok((transaction, records))
 }
 
+/// One artifact reference names each digest per invocation, so a statement finds its SQL by digest.
 pub(crate) async fn statement_sql_in(
     transaction: ControlTransaction,
     scope: &RunRecallScope,
@@ -205,16 +206,25 @@ pub(crate) async fn statement_sql_in(
     parameters.push(Parameter::Text(statement_id.into()));
     let (transaction, statements) = query(
         transaction,
-        &format!("SELECT statement_id FROM statements WHERE {filter} AND statement_id=${next}"),
+        &format!("SELECT sql_digest FROM statements WHERE {filter} AND statement_id=${next}"),
         parameters.clone(),
     )
     .await?;
-    if statements.is_empty() {
+    let Some(statement) = statements.first() else {
         return Ok((transaction, None));
-    }
-    let (transaction, rows) = query(transaction,
-        &format!("SELECT text FROM artifacts WHERE {filter} AND statement_id=${next} AND kind='sql' LIMIT 1"),
-        parameters).await?;
+    };
+    parameters[next - 1] = Parameter::Text(format!(
+        "sha256:{}",
+        statement["sql_digest"].as_str().unwrap_or_default()
+    ));
+    let (transaction, rows) = query(
+        transaction,
+        &format!(
+            "SELECT text FROM artifacts WHERE {filter} AND digest=${next} AND kind='sql' LIMIT 1"
+        ),
+        parameters,
+    )
+    .await?;
     let sql = rows
         .first()
         .map(|row| display_text(&row["text"]))

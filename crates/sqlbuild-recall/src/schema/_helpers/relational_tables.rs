@@ -3,7 +3,7 @@
 use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
 
 use crate::schema::_helpers::rendering::{all_columns, sqlite_type};
-use crate::schema::constants::EVENTS_TABLE;
+use crate::schema::constants::{BYTE_ORDERED_COLUMN, EVENTS_TABLE};
 use crate::schema::models::{ColumnType, TableSpec};
 
 pub(crate) fn relational_table(spec: &TableSpec, postgres: bool, control: bool) -> Vec<String> {
@@ -18,7 +18,15 @@ pub(crate) fn relational_table(spec: &TableSpec, postgres: bool, control: bool) 
             } else {
                 sqlite_type(column.column_type)
             };
-            format!("    {} {kind}{not_null}", sqlite_identifier(column.name))
+            let collation = if postgres && column.name == BYTE_ORDERED_COLUMN {
+                " COLLATE \"C\""
+            } else {
+                ""
+            };
+            format!(
+                "    {} {kind}{collation}{not_null}",
+                sqlite_identifier(column.name)
+            )
         })
         .collect();
     if control && spec.name == EVENTS_TABLE.name {

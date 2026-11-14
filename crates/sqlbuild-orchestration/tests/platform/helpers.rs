@@ -109,9 +109,14 @@ pub(crate) async fn wait_for_scans(
                 .collect();
             cursor = batch.last().map_or(cursor, |row| row.storage_id);
             scanned.extend(batch.iter().filter_map(|row| {
-                let PlatformEvent::Heartbeat { replica_id } = row.payload.platform else {
+                let PlatformEvent::Heartbeat {
+                    replica_id,
+                    store_bytes,
+                } = row.payload.platform
+                else {
                     return None;
                 };
+                assert!(store_bytes > 0, "a heartbeat reports the store's size");
                 Some(replica_id)
             }));
             observations.extend(batch);

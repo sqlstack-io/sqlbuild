@@ -23,7 +23,7 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
     )
     .await?;
     let digest = schema_digest(store);
-    verify_schema(&rows, &digest)?;
+    verify_schema(store, &rows, &digest)?;
     if rows.is_empty() {
         for statement in recall_schema(store) {
             (transaction, _) = query(transaction, &statement, vec![]).await?;

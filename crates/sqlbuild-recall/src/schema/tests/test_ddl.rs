@@ -154,8 +154,8 @@ fn given_clickhouse_statement_sets_when_rendered_then_every_statement_has_the_sh
                 .collect(),
             required_fragments: &[
                 "INSERT INTO `observability`.`recall_meta`",
-                "SELECT 'schema', 'schema_version', '5'",
-                "5, '9.8.7', now64(6)",
+                "SELECT 'schema', 'schema_version', '6'",
+                "6, '9.8.7', now64(6)",
             ],
             expected_count: 1,
         },

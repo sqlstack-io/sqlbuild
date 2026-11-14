@@ -13,7 +13,9 @@ use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{
+    Connection, ControlStore, ControlTransaction, Parameter, TransactionMode,
+};
 
 pub(crate) async fn scan_health(
     store: &ControlStore,
@@ -61,11 +63,18 @@ pub(crate) async fn scan_health(
         return Ok(());
     }
     let transaction = begin(store, TransactionMode::Write).await?;
+    let (transaction, store_bytes) = store_bytes(transaction).await?;
     commit(
         observe(
             transaction,
             health.installation_id,
-            (PlatformEvent::Heartbeat { replica_id }, None),
+            (
+                PlatformEvent::Heartbeat {
+                    replica_id,
+                    store_bytes,
+                },
+                None,
+            ),
         )
         .await?,
     )
@@ -133,4 +142,21 @@ async fn scan_trigger_page(
     }
     commit(transaction).await?;
     Ok(next)
+}
+
+/// SQLite's main file without its write-ahead log, or the whole PostgreSQL database.
+pub(crate) async fn store_bytes(
+    transaction: ControlTransaction,
+) -> Result<(ControlTransaction, i64), ControlError> {
+    let sql = if matches!(transaction.connection, Some(Connection::Postgres(_))) {
+        "SELECT pg_database_size(current_database()) AS bytes"
+    } else {
+        "SELECT page_count * page_size AS bytes FROM pragma_page_count(), pragma_page_size()"
+    };
+    let (transaction, rows) = query(transaction, sql, Vec::new()).await?;
+    let bytes = rows
+        .first()
+        .and_then(|row| row["bytes"].as_i64())
+        .ok_or_else(|| ControlError::Invalid("control store size is unavailable".into()))?;
+    Ok((transaction, bytes))
 }

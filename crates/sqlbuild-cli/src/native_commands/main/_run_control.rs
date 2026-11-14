@@ -1,6 +1,7 @@
 //! Supervise native API/scheduler roles together; a failed role stops its siblings.
 
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
+use sqlbuild_orchestration::platform::models::RetentionPolicies;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -56,7 +57,12 @@ pub(crate) async fn run_control(
         start_platform_roles(
             &mut tasks,
             (&store, &shutdown),
-            (facts.audit, facts.statistics, facts.snapshots),
+            RetentionPolicies {
+                audit: facts.audit,
+                statistics: facts.statistics,
+                snapshots: facts.snapshots,
+                run_logs: facts.run_logs,
+            },
         )?;
     }
     if facts.scheduler {

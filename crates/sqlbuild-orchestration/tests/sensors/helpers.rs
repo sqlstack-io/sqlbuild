@@ -60,6 +60,7 @@ pub(crate) async fn append_events(
         },
         PlatformEvent::Heartbeat {
             replica_id: Uuid::from_u128(8),
+            store_bytes: 0,
         },
         PlatformEvent::LocationBroken {
             location_id: Uuid::from_u128(9),
@@ -68,6 +69,7 @@ pub(crate) async fn append_events(
         },
         PlatformEvent::Heartbeat {
             replica_id: Uuid::from_u128(10),
+            store_bytes: 0,
         },
         PlatformEvent::LaunchFailed {
             run_id: Uuid::from_u128(11),
@@ -76,6 +78,7 @@ pub(crate) async fn append_events(
         },
         PlatformEvent::Heartbeat {
             replica_id: Uuid::from_u128(13),
+            store_bytes: 0,
         },
     ];
     for index in indices {

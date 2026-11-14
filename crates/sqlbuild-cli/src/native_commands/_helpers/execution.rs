@@ -21,19 +21,17 @@ use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
-use sqlbuild_orchestration::credentials::models::AuditRetention;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::{
-    LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
+    LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
-use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
@@ -41,9 +39,8 @@ use sqlbuild_orchestration::store::main::set_release_version::set_release_versio
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, StatisticsRetention,
-    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead,
-    WarehouseWatermarkRead,
+    MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind,
+    WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead, WarehouseWatermarkRead,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::webhooks::main::{
@@ -891,7 +888,7 @@ pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command 
 pub(crate) fn start_platform_roles(
     tasks: &mut JoinSet<Result<(), ControlError>>,
     (store, shutdown): (&ControlStore, &watch::Receiver<bool>),
-    retention: (AuditRetention, StatisticsRetention, SnapshotRetention),
+    retention: RetentionPolicies,
 ) -> Result<(), ControlError> {
     let mut sinks: Vec<(Webhook, &str)> = Vec::new();
     for (variable, source, label) in [

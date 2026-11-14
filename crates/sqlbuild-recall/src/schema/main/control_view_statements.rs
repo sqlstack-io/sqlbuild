@@ -3,34 +3,17 @@
 use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
 
 use crate::schema::_helpers::relational_views::relational_view_bodies;
-use crate::schema::main::view_statements::view_statements;
-use crate::schema::models::{DdlOptions, Dialect};
 
-/// PostgreSQL validates each view at migration time; SQLite retains its existing view contract.
+/// PostgreSQL validates each view at migration time; SQLite creates each missing view.
 #[must_use]
 pub fn control_view_statements(postgres: bool) -> Vec<String> {
-    if postgres {
-        relational_view_bodies(true)
-            .into_iter()
-            .map(|(name, body)| {
-                format!(
-                    "CREATE OR REPLACE VIEW {} AS\n{body}",
-                    sqlite_identifier(name)
-                )
-            })
-            .collect()
+    let create = if postgres {
+        "CREATE OR REPLACE VIEW"
     } else {
-        view_statements(
-            Dialect::Sqlite,
-            &DdlOptions {
-                database: None,
-                retention_days: 30,
-                cluster: None,
-                producer_version: String::new(),
-            },
-        )
+        "CREATE VIEW IF NOT EXISTS"
+    };
+    relational_view_bodies(postgres, true)
         .into_iter()
-        .map(|(_, statement)| statement)
+        .map(|(name, body)| format!("{create} {} AS\n{body}", sqlite_identifier(name)))
         .collect()
-    }
 }

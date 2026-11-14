@@ -7,6 +7,7 @@
 	import Panel from '$lib/components/platform/panel.svelte';
 	import type { AuthMode } from '$lib/api';
 	import { PERMISSIONS_BY_RISK, RISK_LABEL } from '$lib/platform/permission-catalog';
+	import { formatBytes } from '$lib/build-area/labels';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -36,7 +37,7 @@
 					<KeyValues
 						rows={[
 							{ label: 'Version', value: s.serverVersion },
-							{ label: 'Storage', value: s.storage === 'postgresql' ? 'PostgreSQL' : 'SQLite' },
+							{ label: 'Storage', value: `${s.storage === 'postgresql' ? 'PostgreSQL' : 'SQLite'} · ${formatBytes(s.storeBytes)}`, title: `${s.storeBytes.toLocaleString('en-US')} bytes on disk` },
 							{ label: 'Installed', value: formatAgo(s.installedAt, app.now), title: formatStamp(s.installedAt) },
 							{ label: 'Schema', value: `${s.schemaChecksum.slice(0, 12)} · set up ${formatAgo(s.schemaAppliedAt, app.now)}`, title: `${s.schemaChecksum}\n${formatStamp(s.schemaAppliedAt)}`, mono: true },
 							{ label: 'Authentication', value: authLabel[s.authMode] },

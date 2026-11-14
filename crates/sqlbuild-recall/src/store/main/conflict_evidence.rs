@@ -8,7 +8,7 @@ use crate::store::models::ConflictEvidence;
 #[must_use]
 pub fn conflict_evidence(row: &RecallRow, existing: &str) -> Option<ConflictEvidence> {
     let rejected = row.content_hash().unwrap_or_default();
-    (existing != rejected).then(|| ConflictEvidence {
+    (!row.same_content(existing)).then(|| ConflictEvidence {
         table: row.table,
         record_key: table_spec(row.table)
             .key

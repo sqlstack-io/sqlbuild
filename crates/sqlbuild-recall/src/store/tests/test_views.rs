@@ -7,7 +7,7 @@ use crate::records::models::{ArtifactInput, InvocationContext, OutputStream, Rec
 use crate::store::tests::helpers::{
     NOW, artifact, chunk, chunks, delivered, envelope, event, integer, projected, text, wall_clock,
 };
-use crate::store::tests::test_types::ProjectionTestCase;
+use crate::store::tests::test_types::{PayloadTestCase, ProjectionTestCase};
 
 const BINARY_PIECES: [(OutputStream, &[u8]); 4] = [
     (OutputStream::Stdout, b"line one\n\x00\xff"),
@@ -138,6 +138,18 @@ fn given_duplicates_and_conflicts_when_written_then_first_row_is_kept_and_confli
         vec![original.clone()],
         vec![conflicting.clone()],
     ];
+    // An earlier version stored the full 64-digit digest, of which today's is the prefix.
+    let mut legacy = original.clone();
+    let full_hash = RecallValue::Text(format!(
+        "{}{}",
+        original.content_hash().expect("content hash"),
+        "0".repeat(32)
+    ));
+    legacy
+        .values
+        .iter_mut()
+        .filter(|(name, _)| *name == "content_hash")
+        .for_each(|(_, value)| *value = full_hash.clone());
     let test_cases = [
         ProjectionTestCase {
             description: "the first row wins",
@@ -153,9 +165,19 @@ fn given_duplicates_and_conflicts_when_written_then_first_row_is_kept_and_confli
         },
         ProjectionTestCase {
             description: "identical rewrites are not conflicts",
-            batches: vec![vec![original.clone()], vec![original]],
+            batches: vec![vec![original.clone()], vec![original.clone()]],
             sql: "SELECT COUNT(*) FROM conflicts",
             expected_rows: vec![vec![integer(0)]],
+        },
+        ProjectionTestCase {
+            description: "a row stored with a full-length digest matches its rewrite, not different content",
+            batches: vec![
+                vec![legacy.clone()],
+                vec![original.clone()],
+                vec![conflicting],
+            ],
+            sql: "SELECT record_key FROM conflicts",
+            expected_rows: vec![vec![text("dup:0")]],
         },
     ];
 
@@ -458,6 +480,39 @@ fn given_the_same_sql_in_two_invocations_when_written_then_artifacts_are_shared_
         assert_eq!(
             projected(&test_case.batches, test_case.sql),
             test_case.expected_rows,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_lifecycle_payloads_when_stored_then_promoted_fields_are_kept_once_and_read_back_whole() {
+    let written = r#"{"intent":"execute","statement_kind":"SELECT","duration_ms":12.5,"affected_rows":3,"query_id":null,"attempt_number":2}"#;
+    let test_cases = [
+        PayloadTestCase {
+            description: "the table keeps real fields and fields without a column of their own",
+            sql: "SELECT payload FROM recall_events",
+            expected_payload: r#"{"duration_ms":12.5,"query_id":null,"attempt_number":2}"#,
+        },
+        PayloadTestCase {
+            description: "the events view returns the payload as written, explicit nulls included",
+            sql: "SELECT payload FROM events",
+            expected_payload: written,
+        },
+    ];
+    let env = envelope("strip", NOW);
+    let batches = [vec![event(
+        &env,
+        ("e0", "statement_completed", 0),
+        r#","statement_id":"s1""#,
+        written,
+    )]];
+    for test_case in test_cases {
+        let rows = projected(&batches, test_case.sql);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&rows[0][0].key_text()).expect("JSON"),
+            serde_json::from_str::<serde_json::Value>(test_case.expected_payload).expect("JSON"),
             "{}",
             test_case.description
         );

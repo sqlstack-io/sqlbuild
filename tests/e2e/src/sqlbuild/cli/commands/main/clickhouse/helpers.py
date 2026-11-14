@@ -748,7 +748,8 @@ folded AS (
         argMin(statement_kind, {order}) AS first_statement_kind,
         argMin(purpose, {order}) AS first_purpose,
         argMin(sql_digest, {order}) AS first_sql_digest,
-        minIf(occurred_at, event_type = 'statement_started') AS started_at,
+        coalesce(min(started_at), minIf(occurred_at, event_type = 'statement_started'))
+            AS statement_started_at,
         minIf(occurred_at, event_type = 'statement_submitted') AS submitted_at,
         max(query_id) AS any_query_id,
         countIf({terminal}) AS terminal_count,
@@ -784,7 +785,7 @@ SELECT
     folded.first_purpose AS purpose,
     if(folded.terminal_count > 0, coalesce(folded.last_query_id, folded.any_query_id),
         folded.any_query_id) AS query_id,
-    folded.started_at AS started_at,
+    folded.statement_started_at AS started_at,
     folded.submitted_at AS submitted_at,
     if(folded.terminal_count > 0, folded.last_ended_at, NULL) AS ended_at,
     multiIf(

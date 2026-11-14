@@ -15,6 +15,7 @@ use crate::store::errors::StoreError;
 use crate::store::main::conflict_evidence::conflict_evidence;
 use crate::store::main::relational_insert::relational_insert;
 use crate::store::main::relational_lookup::relational_lookup;
+use crate::store::main::relational_row::relational_row;
 use crate::store::models::{ConflictEvidence, InsertOutcome};
 
 fn text_of(row: &RecallRow, column: &str) -> String {
@@ -29,7 +30,8 @@ fn write_row(
     ingested_at: &str,
 ) -> Result<Option<ConflictEvidence>, StoreError> {
     let ingested: RecallValue = RecallValue::Text(ingested_at.to_owned());
-    let insert = relational_insert((row, columns), &ingested, false);
+    let stored = relational_row(row);
+    let insert = relational_insert((&stored, columns), &ingested, false);
     let parameters: Vec<SqlValue<'_>> = insert
         .values
         .iter()

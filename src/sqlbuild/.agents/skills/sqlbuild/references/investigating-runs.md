@@ -36,11 +36,12 @@ what they printed. `sqb recall query` runs one read-only `SELECT` over a set of 
   and `output_invocations.complete = 0` with a `gap_reason` when output is incomplete. A command
   stopped by SIGTERM or Ctrl-C is `cancelled`, with `signal_number` 15 or 2 and its real end time.
 - **SQL is stored once by digest.** `statements.sql_digest` joins `artifacts` on
-  `(invocation_id, statement_id)` for the SQL text (`artifacts.text`), also for failed and
-  cancelled statements. `statements.sql_available = 0` means the text is missing, and
+  `invocation_id` and `artifacts.digest = 'sha256:' || statements.sql_digest` for the SQL text
+  (`artifacts.text`), also for failed and cancelled statements. `statements.sql_available = 0` means the text is missing, and
   `sql_unavailable_reason` says why.
 - **Audit evidence is an artifact.** A warning or failing audit's flagged rows (up to
-  `evidence_limit`) are in `artifacts` with `ref_id = audit_results.event_id`; `sample_digest` is
+  `evidence_limit`) are in `artifacts` with `digest = 'sha256:' || audit_results.sample_digest`
+  in the same invocation; `sample_digest` is
   `NULL` when `[recall] audit_evidence` kept none. Evidence holds warehouse data values.
 - **Output is a byte-for-byte copy** of stdout and stderr, up to `max_output_bytes` per stream (the
   local store keeps the first and last MiB). Use `sqb recall output` rather than querying
@@ -137,7 +138,8 @@ What did a model actually execute, with its SQL? Find the run, then its statemen
 sqb recall query "SELECT invocation_id, invocation_started_at, status FROM invocations
   WHERE command = 'build' ORDER BY invocation_started_at DESC LIMIT 1"
 sqb recall query "SELECT s.statement_kind, s.outcome, s.duration_ms, a.text
-  FROM statements s JOIN artifacts a USING (invocation_id, statement_id)
+  FROM statements s JOIN artifacts a
+    ON a.invocation_id = s.invocation_id AND a.digest = 'sha256:' || s.sql_digest
   WHERE s.invocation_id = '<invocation_id>' AND s.resource_name = 'orders'
   ORDER BY s.started_at"
 ```
@@ -301,7 +303,8 @@ events (view): every lifecycle fact
   outcome TEXT
   row_count INTEGER
   affected_rows INTEGER
-  payload TEXT
+  payload ANY
+  started_at TEXT
   invocation_id TEXT  join key
   invocation_started_at TEXT
   schema_version INTEGER

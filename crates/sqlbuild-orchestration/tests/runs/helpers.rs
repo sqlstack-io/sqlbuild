@@ -20,8 +20,23 @@ use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use chrono::TimeDelta;
 use serde_json::{Value, json};
+use sqlbuild_recall::records::main::artifact_rows::artifact_rows;
+use sqlbuild_recall::records::main::event_object_row::event_object_row;
+use sqlbuild_recall::records::main::output_row::output_row;
+use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
+use sqlbuild_recall::records::models::{
+    ArtifactInput, OutputChunk, OutputStream, RecallRow, RowEnvelope,
+};
 use uuid::Uuid;
+
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::models::RunClaim;
+use crate::runs::tests::claim_helpers::succeed;
+use crate::scheduler::models::SchedulerLease;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::store::main::append_recall::append_recall;
 
 pub(crate) async fn request_run(
     store: &ControlStore,
@@ -286,4 +301,134 @@ pub(crate) fn check_projection(check: &AdhocCheck) -> Value {
 /// Whether a launch applied, or the HTTP status its refusal reaches people with.
 pub(crate) fn launch_outcome(result: Result<bool, ControlError>) -> Result<bool, u16> {
     result.map_err(|error| ApiError::from(error).status.as_u16())
+}
+
+/// One SQL text every logged run shares.
+const SHARED_LOG_SQL: &str = "select order_id from orders";
+
+fn log_envelope(invocation_id: String) -> RowEnvelope {
+    RowEnvelope {
+        invocation_id,
+        invocation_started_at: "2026-01-02T03:04:05Z".into(),
+        producer_version: "test".into(),
+    }
+}
+
+fn log_sql_rows(envelope: &RowEnvelope, sql: &str) -> [RecallRow; 2] {
+    artifact_rows(
+        envelope,
+        &ArtifactInput {
+            digest: format!("sha256:{}", sha256_hex(sql.as_bytes())),
+            kind: "sql".into(),
+            media_type: "text/x-sql".into(),
+            content: sql.as_bytes().to_vec(),
+            seen_at: "2026-01-02T03:04:05Z".into(),
+            ref_id: "statement".into(),
+            role: "executed_sql".into(),
+            statement_id: Some("statement".into()),
+            resource_id: None,
+        },
+    )
+}
+
+/// The claim's output, and a nested session's event and SQL: one text shared by every run, one its own.
+fn worker_log(claim: Uuid, index: u128) -> Vec<RecallRow> {
+    let worker = log_envelope(format!("worker/{claim}"));
+    let session = log_envelope(format!("worker/{claim}/session"));
+    let mut rows = vec![output_row(
+        &worker,
+        &OutputChunk {
+            sequence: 0,
+            stream: OutputStream::Stdout,
+            occurred_at: "2026-01-02T03:04:05Z".into(),
+            data: b"building orders\n".to_vec(),
+            byte_offset: 0,
+            dropped_before: 0,
+            omitted: None,
+        },
+    )];
+    rows.push(
+        event_object_row(
+            &session,
+            json!({"event_id": "completed", "event_type": "statement_completed", "schema_version": 1,
+                "occurred_at": "2026-01-02T03:04:05Z", "producer": "sqlbuild", "invocation_sequence": 1,
+                "statement_id": "statement", "payload": {"duration_ms": 1.5}})
+            .as_object()
+            .expect("event object"),
+        )
+        .expect("statement event"),
+    );
+    rows.extend(log_sql_rows(&session, SHARED_LOG_SQL));
+    rows.extend(log_sql_rows(
+        &session,
+        &format!("select {index} as order_id"),
+    ));
+    rows
+}
+
+/// The worker invocation of run `index`, which its claim names.
+pub(crate) fn logged_worker(index: u128) -> String {
+    format!(
+        "worker/{}",
+        Uuid::new_v5(&Uuid::from_u128(index), b"run_claimed")
+    )
+}
+
+/// Claims ad-hoc run `index` through the scheduler and stores its worker log.
+async fn claim_logged_run(
+    store: &ControlStore,
+    (location, snapshot_id): (Uuid, Uuid),
+    lease: &SchedulerLease,
+    index: u128,
+) -> RunClaim {
+    let run_request = request((location, snapshot_id), index, 0, &["orders"]);
+    assert!(request_run(store, &run_request).await.expect("request"));
+    let claim = claim_next_run(
+        store,
+        lease,
+        &BTreeMap::new(),
+        Some((location, "development")),
+    )
+    .await
+    .expect("claim")
+    .expect("queued run");
+    let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    for row in worker_log(claim.claim_id, index) {
+        (transaction, _) = append_recall(transaction, &row).await.expect("append");
+    }
+    commit(transaction).await.expect("commit");
+    claim
+}
+
+/// Ad-hoc runs 1, 2, ... of `location`, each claimed through the scheduler with a worker log. Runs with hours finish through the worker lifecycle, one at a time because each writes `orders`, and are then dated that many hours ago; the null entries, which come last, keep running.
+pub(crate) async fn seed_logged_runs(
+    store: &ControlStore,
+    scope: (Uuid, Uuid),
+    ended_hours_ago: &[Value],
+) {
+    let lease = acquire_lease(store, Uuid::now_v7())
+        .await
+        .expect("elect")
+        .expect("leader");
+    let finished: Vec<i64> = ended_hours_ago.iter().filter_map(Value::as_i64).collect();
+    for (position, hours) in finished.iter().enumerate() {
+        let claim = claim_logged_run(store, scope, &lease, position as u128 + 1).await;
+        succeed(store, &claim).await;
+        let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+        let ended_at = transaction.now - TimeDelta::hours(*hours);
+        let (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_runs SET ended_at=$1 WHERE run_id=$2",
+            vec![
+                Parameter::Time(ended_at),
+                Parameter::Id(claim.request.run_id),
+            ],
+        )
+        .await
+        .expect("date run");
+        commit(transaction).await.expect("commit");
+    }
+    for position in finished.len()..ended_hours_ago.len() {
+        claim_logged_run(store, scope, &lease, position as u128 + 1).await;
+    }
 }

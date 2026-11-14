@@ -275,3 +275,10 @@ pub(crate) struct RetryChainTestCase {
     /// The wait a one-hour retry delay shows while the retry is queued.
     pub(crate) expected_delayed_attempt: u8,
 }
+
+pub(crate) struct RunLogRetentionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_artifacts: i64,
+    pub(crate) expected_runs: i64,
+}

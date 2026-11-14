@@ -68,10 +68,13 @@ export function toServerSettings(wire: Wire['ServerSettings']): ServerSettings {
 		installedAt: wire.installation.installed_at,
 		schemaChecksum: wire.installation.schema_checksum,
 		schemaAppliedAt: wire.installation.schema_applied_at,
+		storeBytes: wire.installation.store_bytes,
 		authMode: wire.login_mode,
 		schedulerEnabled: wire.scheduler,
 		retention: [
 			{ name: 'Security audit log', value: days(r.audit_days), description: 'Who did what, and every refusal.' },
+			{ name: 'Run logs', value: days(r.run_log_days), description: 'What finished runs logged. The runs themselves are kept.' },
+			{ name: 'Logged runs', value: String(r.run_logs_kept), description: 'Newest finished runs per location target that keep their logs.' },
 			{ name: 'Published versions', value: String(r.snapshots_kept), description: 'Kept for each location target; older versions are removed.' },
 			{ name: 'Warehouse row counts', value: days(r.statistics_days), description: 'Row counts and sizes sampled from the warehouse.' },
 			{ name: 'Platform problems', value: days(r.platform_alert_days), description: 'Late schedules, failed launches and locations that stopped checking in.' },

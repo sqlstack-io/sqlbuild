@@ -102,6 +102,16 @@ def test_given_expired_audit_rows_when_server_runs_then_only_delivered_rows_are_
             ("--snapshot-retention-count", "0"),
             "--snapshot-retention-count must be between 1 and 65535",
         ),
+        RetentionRejectionTestCase(
+            "Zero run log days",
+            ("--run-log-retention-days", "0"),
+            "--run-log-retention-days must be between 1 and 65535",
+        ),
+        RetentionRejectionTestCase(
+            "Run log count beyond the supported range",
+            ("--run-log-retention-count", "65536"),
+            "--run-log-retention-count must be between 1 and 65535",
+        ),
     ],
     ids=lambda case: case.description,
 )

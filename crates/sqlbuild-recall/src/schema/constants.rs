@@ -3,7 +3,7 @@
 use crate::schema::models::{ColumnSpec, ColumnType, Table, TableSpec};
 
 /// The Recall schema version this build writes. Raise it when a column or view is added.
-pub const RECALL_SCHEMA_VERSION: i64 = 5;
+pub const RECALL_SCHEMA_VERSION: i64 = 6;
 /// Text that only older schema versions wrote into ClickHouse view definitions, with the last version that wrote it. Version 3 changed only view bodies, so view columns cannot tell version 2 views, which set `join_use_nulls`, from current ones.
 pub const SUPERSEDED_CLICKHOUSE_VIEW_MARKERS: [(&str, i64); 1] = [("join_use_nulls", 2)];
 /// The oldest SQLite library the store's views run on (ordered `group_concat`).
@@ -31,6 +31,12 @@ pub const COMMON_COLUMNS: [ColumnSpec; 6] = [
 ];
 /// The artifact columns its content digest covers: what it is, not who saw it when.
 pub const ARTIFACT_CONTENT_COLUMNS: [&str; 5] = ["digest", "kind", "media_type", "size", "content"];
+/// PostgreSQL control stores order this column by bytes, so a `worker/<claim>/` prefix range finds a claim's nested invocations through the index under any database collation.
+pub const BYTE_ORDERED_COLUMN: &str = "invocation_id";
+
+/// The event column holding the lifecycle payload.
+pub const PAYLOAD_COLUMN: &str = "payload";
+
 /// Common columns left out of a row's content digest.
 pub const UNHASHED_COLUMNS: [&str; 2] = ["ingested_at", "content_hash"];
 
@@ -83,7 +89,8 @@ const OUTPUT_COLUMNS: [ColumnSpec; 11] = [
     ColumnSpec::optional("omitted_sequences", ColumnType::Integer),
 ];
 
-const EVENT_COLUMNS: [ColumnSpec; 29] = [
+/// `started_at` holds the start time of a statement end whose start was written with it, instead of a start row.
+const EVENT_COLUMNS: [ColumnSpec; 30] = [
     ColumnSpec::required("event_id", ColumnType::Text),
     ColumnSpec::optional("invocation_sequence", ColumnType::Integer),
     ColumnSpec::required("occurred_at", ColumnType::Timestamp),
@@ -113,6 +120,7 @@ const EVENT_COLUMNS: [ColumnSpec; 29] = [
     ColumnSpec::optional("row_count", ColumnType::Integer),
     ColumnSpec::optional("affected_rows", ColumnType::Integer),
     ColumnSpec::required("payload", ColumnType::Json),
+    ColumnSpec::optional("started_at", ColumnType::Timestamp),
 ];
 
 const DIAGNOSTIC_COLUMNS: [ColumnSpec; 14] = [

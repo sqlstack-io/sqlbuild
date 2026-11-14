@@ -811,3 +811,44 @@ pub enum PersonRunRequest<'a> {
         (Uuid, &'a str, &'a crate::platform::models::PlanRequest),
     ),
 }
+
+/// Installation configuration: how long a finished run keeps its worker log, by age and by the number of newer finished runs in its location target, whichever comes first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RunLogRetention {
+    days: u16,
+    count: u16,
+}
+
+impl RunLogRetention {
+    pub fn new(days: u16, count: u16) -> Result<Self, crate::store::errors::ControlError> {
+        if days == 0 || count == 0 {
+            return Err(crate::store::errors::ControlError::Invalid(
+                "run log retention must keep at least one day and one run".into(),
+            ));
+        }
+        Ok(Self { days, count })
+    }
+
+    pub(crate) fn cutoff(self, now: DateTime<Utc>) -> DateTime<Utc> {
+        now - chrono::TimeDelta::days(i64::from(self.days))
+    }
+
+    #[must_use]
+    pub const fn days(self) -> u16 {
+        self.days
+    }
+
+    #[must_use]
+    pub const fn count(self) -> u16 {
+        self.count
+    }
+}
+
+impl Default for RunLogRetention {
+    fn default() -> Self {
+        Self {
+            days: crate::runs::constants::DEFAULT_RUN_LOG_RETENTION_DAYS,
+            count: crate::runs::constants::DEFAULT_RUN_LOG_RETENTION_COUNT,
+        }
+    }
+}

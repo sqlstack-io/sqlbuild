@@ -632,6 +632,63 @@ fn audit_event(index: usize, outcome: &str) -> serde_json::Map<String, serde_jso
     serde_json::from_value(event).expect("the audit event is an object")
 }
 
+fn statement_event(
+    (statement_id, event_type): (&str, &str),
+    (sequence, occurred_at): (usize, &str),
+) -> serde_json::Map<String, serde_json::Value> {
+    let event: serde_json::Value = serde_json::json!({
+        "event_id": format!("{statement_id}-{event_type}"),
+        "event_type": event_type,
+        "schema_version": 2,
+        "producer": "sqlbuild",
+        "producer_version": "1",
+        "occurred_at": occurred_at,
+        "invocation_id": "fold",
+        "invocation_sequence": sequence,
+        "statement_id": statement_id,
+        "payload": {"intent": "execute", "statement_kind": "SELECT", "duration_ms": 2.5},
+    });
+    serde_json::from_value(event).expect("the statement event is an object")
+}
+
+/// Per statement: its stored event types, the start time its rows keep, and the `statements` view's start, end and outcome, after one batch where `done` started and completed and `running` only started.
+pub(crate) fn folded_statements() -> Vec<Vec<RecallValue>> {
+    let directory = tempfile::tempdir().expect("a temporary directory can be created");
+    let path = directory.path().join("recall.sqlite3");
+    let session = start_recall_session(config(path.clone(), "fold"));
+    // The first batch leaves at once with the first heartbeat; the statements share the next one.
+    std::thread::sleep(Duration::from_millis(100));
+    for event in [
+        statement_event(
+            ("done", "statement_started"),
+            (0, "2026-10-19T00:00:01.000000Z"),
+        ),
+        statement_event(
+            ("running", "statement_started"),
+            (1, "2026-10-19T00:00:02.000000Z"),
+        ),
+        statement_event(
+            ("done", "statement_completed"),
+            (2, "2026-10-19T00:00:03.000000Z"),
+        ),
+    ] {
+        session.publish_event_object(event);
+    }
+    drop(session.close());
+    let store = open_sqlite_store(&path, OpenMode::ReadOnly).expect("the store opens");
+    query_store(
+        &store,
+        "SELECT s.statement_id, \
+         (SELECT group_concat(event_type, ',' ORDER BY event_type) FROM recall_events AS e \
+          WHERE e.statement_id = s.statement_id), \
+         (SELECT MAX(started_at) FROM recall_events AS e WHERE e.statement_id = s.statement_id), \
+         s.started_at, s.ended_at, s.outcome FROM statements AS s ORDER BY s.statement_id",
+        None,
+    )
+    .expect("the query is valid")
+    .rows
+}
+
 /// Per audit outcome: whether the stored event still holds its evidence, its `sample_digest`, and the artifact text that digest names, after a session keeping `audit_evidence`.
 pub(crate) fn stored_evidence(audit_evidence: AuditEvidence) -> Vec<Vec<RecallValue>> {
     let directory = tempfile::tempdir().expect("a temporary directory can be created");

@@ -7,13 +7,14 @@ use sqlbuild_recall::records::models::{RecallRow, RecallValue, RowEnvelope};
 use sqlbuild_recall::schema::models::Table;
 use sqlbuild_recall::store::models::InsertOutcome;
 
+use crate::runs::constants::NAMESPACED_ID_HEX;
 use crate::runs::models::RecallRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::append_recall::append_recall;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Recall statement projections join correlations globally, not only by invocation.
+/// Recall statement projections join correlations globally, not only by invocation, so each ID is namespaced by its invocation. A 128-bit digest of the pair keeps it unique without storing the invocation in every ID column.
 pub(crate) fn claim_record(
     envelope: &RowEnvelope,
     record: &RecallRecord,
@@ -28,7 +29,8 @@ pub(crate) fn claim_record(
         "statement_id",
     ] {
         if let Some(RecallValue::Text(id)) = values.get_mut(name) {
-            *id = serde_json::json!([envelope.invocation_id, id]).to_string();
+            let namespaced: String = serde_json::json!([envelope.invocation_id, id]).to_string();
+            *id = sha256_hex(namespaced.as_bytes())[..NAMESPACED_ID_HEX].to_owned();
         }
     }
     match record.table {

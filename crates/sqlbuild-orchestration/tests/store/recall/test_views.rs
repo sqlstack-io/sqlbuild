@@ -13,7 +13,7 @@ use sqlbuild_recall::records::models::{
     ArtifactInput, DeliveryCounts, InvocationContext, OutputChunk, OutputStream, RowEnvelope,
 };
 
-use crate::store::tests::helpers::publish_recall;
+use crate::store::tests::helpers::{publish_recall, read_recall_events};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::store::tests::test_types::RecallViewTestCase;
@@ -110,6 +110,9 @@ fn given_native_context_output_and_audits_when_reading_views_then_both_databases
             ] {
                 rows.push(event_object_row(&envelope, json!({"event_id": event_id, "event_type": event_type, "schema_version": 1, "occurred_at": "2026-01-02T00:00:03Z", "producer": "worker", "invocation_sequence": 1, "payload": payload}).as_object().expect("event object")).expect("lifecycle fact"));
             }
+            // SQLBuild's own events are stored without the fields their columns hold; the view puts them back.
+            let written = json!({"intent": "execute", "statement_kind": "SELECT", "affected_rows": 3, "duration_ms": 1.5, "query_id": null, "adapter": "duckdb"});
+            rows.push(event_object_row(&envelope, json!({"event_id": "orders-statement", "event_type": "statement_completed", "schema_version": 1, "occurred_at": "2026-01-02T00:00:03Z", "producer": "sqlbuild", "invocation_sequence": 2, "statement_id": "orders-statement", "payload": written}).as_object().expect("event object")).expect("statement fact"));
             rows.extend(artifact_rows(
                 &envelope,
                 &ArtifactInput {
@@ -158,6 +161,35 @@ fn given_native_context_output_and_audits_when_reading_views_then_both_databases
                 .expect("invocation projection");
             assert_eq!(invocation[0]["status"], "completed");
             assert_eq!(invocation[0]["duration_ms"], json!(12.75));
+            let payload = |value: &serde_json::Value| {
+                value.as_str().map_or(value.clone(), |text| {
+                    serde_json::from_str(text).expect("JSON payload")
+                })
+            };
+            let events = read_recall_view(store, ("events", &envelope.invocation_id), 100)
+                .await
+                .expect("events view");
+            let statement = events
+                .iter()
+                .find(|event| event["event_type"] == "statement_completed")
+                .expect("statement event");
+            assert_eq!(
+                payload(&statement["payload"]),
+                written,
+                "the events view returns the payload as written"
+            );
+            let stored = read_recall_events(store, 0, 100)
+                .await
+                .expect("stored rows");
+            let stored = stored
+                .iter()
+                .find(|row| row["event_type"] == "statement_completed")
+                .expect("stored statement");
+            assert_eq!(
+                payload(&stored["payload"]),
+                json!({"duration_ms": 1.5, "query_id": null, "adapter": "duckdb"}),
+                "the table keeps real fields and fields without a column"
+            );
             assert_eq!(invocation[0]["integration_retry"], json!(2));
             let audit = read_recall_view(store, ("audit_results", &envelope.invocation_id), 100)
                 .await

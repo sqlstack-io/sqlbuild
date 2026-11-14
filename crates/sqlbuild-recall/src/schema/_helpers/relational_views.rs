@@ -1,11 +1,53 @@
 //! Shared relational views emit dialect differences at each expression's definition.
 
-use crate::schema::_helpers::rendering::{json_field, relational_cast};
-use crate::schema::constants::OUTPUT_TAIL_RECORDS;
+use sqlbuild_core::lifecycle_events::constants::DEFAULT_PRODUCER;
 
-const EVENTS: &str = "SELECT * FROM recall_events";
+use crate::records::constants::{PROMOTED_INTEGER_FIELDS, PROMOTED_TEXT_FIELDS};
+use crate::schema::_helpers::rendering::{all_columns, json_field, relational_cast};
+use crate::schema::constants::{EVENTS_TABLE, OUTPUT_TAIL_RECORDS, PAYLOAD_COLUMN};
+
 const DIAGNOSTICS: &str = "SELECT * FROM recall_diagnostics";
 const CONFLICTS: &str = "SELECT * FROM recall_conflicts";
+
+/// Relational stores leave promoted fields out of lifecycle payloads; the view merges them back from their columns. A null column adds nothing, so a field the event wrote as null stays null; on SQLite, `json_remove` drops each null column's key, and a present column removes an absent key instead. Control stores also expose their `storage_id` cursor.
+fn events(postgres: bool, control: bool) -> String {
+    let promoted: Vec<&str> = PROMOTED_TEXT_FIELDS
+        .iter()
+        .chain(&PROMOTED_INTEGER_FIELDS)
+        .copied()
+        .collect();
+    let pairs: String = promoted
+        .iter()
+        .map(|field| format!("'{field}', {field}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let merged: String = if postgres {
+        format!("payload || jsonb_strip_nulls(jsonb_build_object({pairs}))")
+    } else {
+        let absent: String = promoted
+            .iter()
+            .map(|field| {
+                format!(", CASE WHEN {field} IS NULL THEN '$.{field}' ELSE '$.payload' END")
+            })
+            .collect();
+        format!("json_patch(payload, json_remove(json_object({pairs}){absent}))")
+    };
+    let mut columns: Vec<String> = all_columns(&EVENTS_TABLE)
+        .iter()
+        .map(|column| {
+            if column.name == PAYLOAD_COLUMN {
+                format!("CASE WHEN producer = '{DEFAULT_PRODUCER}' THEN {merged} ELSE payload END AS payload")
+            } else {
+                column.name.to_owned()
+            }
+        })
+        .collect();
+    if control {
+        columns.push("storage_id".to_owned());
+    }
+    let columns: String = columns.join(",\n    ");
+    format!("SELECT\n    {columns}\nFROM recall_events")
+}
 
 fn statements(postgres: bool) -> String {
     let available = relational_cast(postgres, ("artifact.digest IS NOT NULL", "INTEGER"));
@@ -23,8 +65,13 @@ firsts AS (
     FROM facts
 ),
 started AS (
-    SELECT statement_id, MIN(occurred_at) AS started_at
-    FROM facts WHERE event_type = 'statement_started' GROUP BY statement_id
+    SELECT statement_id, MIN(started_at) AS started_at
+    FROM (
+        SELECT statement_id, occurred_at AS started_at FROM facts WHERE event_type = 'statement_started'
+        UNION ALL
+        SELECT statement_id, started_at FROM facts WHERE started_at IS NOT NULL
+    ) AS starts
+    GROUP BY statement_id
 ),
 submitted AS (
     SELECT statement_id, MIN(occurred_at) AS submitted_at
@@ -511,7 +558,7 @@ WHERE position <= {OUTPUT_TAIL_RECORDS}"
 }
 
 /// Each supported view's name and relational body, in creation order.
-pub(crate) fn relational_view_bodies(postgres: bool) -> Vec<(&'static str, String)> {
+pub(crate) fn relational_view_bodies(postgres: bool, control: bool) -> Vec<(&'static str, String)> {
     vec![
         ("invocations", invocations(postgres)),
         ("statements", statements(postgres)),
@@ -519,7 +566,7 @@ pub(crate) fn relational_view_bodies(postgres: bool) -> Vec<(&'static str, Strin
         ("output_invocations", output_invocations(postgres)),
         ("output_tail", output_tail(postgres)),
         ("output_transcripts", output_transcripts(postgres)),
-        ("events", EVENTS.to_owned()),
+        ("events", events(postgres, control)),
         ("diagnostics", DIAGNOSTICS.to_owned()),
         ("artifacts", artifacts(postgres)),
         ("conflicts", CONFLICTS.to_owned()),

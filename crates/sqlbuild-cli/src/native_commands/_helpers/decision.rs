@@ -9,6 +9,7 @@ use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin, ServerF
 use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
+use sqlbuild_orchestration::runs::models::RunLogRetention;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
 use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -280,6 +281,11 @@ pub(crate) fn control_api_settings(
         Some(count) => SnapshotRetention::count(count)?,
         None => SnapshotRetention::default(),
     };
+    let defaults = RunLogRetention::default();
+    let run_logs = RunLogRetention::new(
+        retention_setting(namespace, "run-log-retention-days")?.unwrap_or(defaults.days()),
+        retention_setting(namespace, "run-log-retention-count")?.unwrap_or(defaults.count()),
+    )?;
     Ok((
         control_authentication(namespace)?,
         ServerFacts {
@@ -288,6 +294,7 @@ pub(crate) fn control_api_settings(
             audit,
             statistics,
             snapshots,
+            run_logs,
         },
     ))
 }

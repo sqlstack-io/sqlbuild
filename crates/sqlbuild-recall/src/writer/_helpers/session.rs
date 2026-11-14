@@ -146,7 +146,7 @@ impl RecallSession {
         Ok(())
     }
 
-    /// Queue the SQL a statement executed: its text once per digest per invocation, and a reference per statement.
+    /// Queue the SQL a statement executed: its text and one reference once per digest per invocation; statements find it by `sql_digest`.
     pub fn publish_sql(&self, sql: &str, statement_id: Option<&str>, resource_id: Option<&str>) {
         self.queue_sql(sql, (statement_id, resource_id), Priority::Artifact);
     }

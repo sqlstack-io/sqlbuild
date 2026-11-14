@@ -5,10 +5,23 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::models::ControlClient;
+use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
-use crate::runs::models::{RunKind, RunNodeFailure, RunOutcome};
+use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
-use crate::warehouse_metadata::models::{WarehouseHistoryKind, WarehouseStateLocation};
+use crate::snapshots::models::SnapshotRetention;
+use crate::warehouse_metadata::models::{
+    StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
+};
+
+/// Every retention horizon one server's maintenance role enforces.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RetentionPolicies {
+    pub audit: AuditRetention,
+    pub statistics: StatisticsRetention,
+    pub snapshots: SnapshotRetention,
+    pub run_logs: RunLogRetention,
+}
 
 /// One pooled outbound connection; the location never receives a store handle.
 #[derive(Clone, Debug)]
@@ -197,6 +210,8 @@ pub enum PlatformEventKind {
 pub enum PlatformEvent {
     Heartbeat {
         replica_id: Uuid,
+        /// The control store's database size on disk when the replica checked in.
+        store_bytes: i64,
     },
     SchedulerNoLeader,
     TickOverdue {
@@ -420,6 +435,8 @@ pub struct InstallationRecord {
     /// Digest of the schema; a server starts only on the exact schema it creates.
     pub schema_checksum: String,
     pub schema_applied_at: DateTime<Utc>,
+    /// The database's size on disk now: SQLite's main file, or the whole PostgreSQL database.
+    pub store_bytes: i64,
 }
 
 /// The stored installation and schema rows.

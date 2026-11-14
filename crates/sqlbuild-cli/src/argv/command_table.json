@@ -1126,6 +1126,28 @@
        },
        {
         "kind": "store",
+        "options": [
+         "--run-log-retention-days"
+        ],
+        "dest": "control_run_log_retention_days",
+        "default": 14,
+        "type": "int",
+        "help": "days a finished run keeps its log of events, statements, SQL and output; the run, its node results and history stay (default: 14)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--run-log-retention-count"
+        ],
+        "dest": "control_run_log_retention_count",
+        "default": 200,
+        "type": "int",
+        "help": "finished runs per location and target that keep their logs; older runs lose theirs, whichever limit comes first (default: 200)",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": ["--trusted-proxy-config"],
         "dest": "control_trusted_proxy_config",
         "help": "JSON origin, trusted_peers and explicit subject-to-person identities; proxy must replace X-SQB-User and terminate HTTPS; no provisioning or grants",

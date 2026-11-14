@@ -130,7 +130,7 @@ impl Planner {
             self.held.insert(key, Held::fresh(hash));
             return Some(true);
         };
-        if !known.hashes.iter().any(|stored| stored == hash) {
+        if !known.hashes.iter().any(|stored| row.same_content(stored)) {
             let (evidence, recorded) = conflict(row, (key.1.clone(), known), &self.detected_at);
             self.inserts
                 .entry(Table::Conflicts)

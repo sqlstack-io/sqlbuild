@@ -113,6 +113,8 @@ pub(crate) async fn server(
             audit_days: i64::from(facts.audit.kept_days()),
             statistics_days: i64::from(facts.statistics.kept_days()),
             snapshots_kept: i64::from(facts.snapshots.kept_count()),
+            run_log_days: i64::from(facts.run_logs.days()),
+            run_logs_kept: i64::from(facts.run_logs.count()),
             platform_alert_days: PLATFORM_ALERT_RETENTION_DAYS,
             heartbeat_days: HEARTBEAT_RETENTION_DAYS,
             location_health_days: LOCATION_RETENTION_DAYS,

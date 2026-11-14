@@ -1726,6 +1726,11 @@ export interface components {
             /** @description Digest of the schema; a server starts only on the exact schema it creates. */
             schema_checksum: string;
             storage: components["schemas"]["StorageKind"];
+            /**
+             * Format: int64
+             * @description The database's size on disk now: SQLite's main file, or the whole PostgreSQL database.
+             */
+            store_bytes: number;
         };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
@@ -2330,6 +2335,11 @@ export interface components {
             kind: "heartbeat";
             /** Format: uuid */
             replica_id: string;
+            /**
+             * Format: int64
+             * @description The control store's database size on disk when the replica checked in.
+             */
+            store_bytes: number;
         } | {
             /** @enum {string} */
             kind: "scheduler_no_leader";
@@ -3041,6 +3051,16 @@ export interface components {
             location_health_days: number;
             /** Format: int64 */
             platform_alert_days: number;
+            /**
+             * Format: int64
+             * @description Days a finished run keeps its log of events, statements and output.
+             */
+            run_log_days: number;
+            /**
+             * Format: int64
+             * @description Finished runs per location target that keep their logs.
+             */
+            run_logs_kept: number;
             /** Format: int64 */
             sensor_evaluation_days: number;
             /**
