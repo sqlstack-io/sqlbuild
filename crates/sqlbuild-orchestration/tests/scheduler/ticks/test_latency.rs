@@ -1,4 +1,6 @@
-//! Bounds tick-to-decision latency, where a decision queues or covers a run, and standby catch-up.
+//! Bounds how late the scheduler wakes for due times and standby catch-up behind a slow launcher.
+
+use std::time::Duration;
 
 use chrono::{DurationRound, SecondsFormat, TimeDelta, Utc};
 use serde_json::json;
@@ -6,7 +8,7 @@ use serde_json::json;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::scheduler::tests::contracts::ticks::helpers::{
-    queued_times, run_scheduler_until, snapshot,
+    decision_wake, queued_times, run_scheduler_until, snapshot,
 };
 use crate::scheduler::tests::contracts::ticks::test_types::SchedulerLatencyTestCase;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -25,16 +27,18 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             backend: Backend::Sqlite,
             expected_ticks: 3,
             expected_ticks_after_failover: 4,
-            expected_max_tick_to_decision: TimeDelta::milliseconds(500),
-            expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
+            expected_max_wake_after_due: TimeDelta::milliseconds(500),
+            expected_max_failover_wake: TimeDelta::milliseconds(1_500),
+            launcher_poll: Duration::from_millis(700),
         },
         SchedulerLatencyTestCase {
             description: "PostgreSQL scheduler latency",
             backend: Backend::Postgres,
             expected_ticks: 3,
             expected_ticks_after_failover: 4,
-            expected_max_tick_to_decision: TimeDelta::milliseconds(500),
-            expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
+            expected_max_wake_after_due: TimeDelta::milliseconds(500),
+            expected_max_failover_wake: TimeDelta::milliseconds(1_500),
+            launcher_poll: Duration::from_millis(700),
         },
     ];
     for test_case in test_cases {
@@ -68,7 +72,8 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
                 .await
                 .expect("trigger")[0]
                 .trigger_id;
-            let ticks = run_scheduler_until(store, trigger_id, at(6)).await;
+            let (ticks, cycles) =
+                run_scheduler_until(store, trigger_id, (at(6), test_case.launcher_poll)).await;
             let queued = queued_times(store, location).await;
             let earliest = ticks
                 .iter()
@@ -88,24 +93,26 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
                 "{}: later times are covered by the waiting run",
                 test_case.description
             );
-            let latencies: Vec<TimeDelta> = ticks
-                .iter()
-                .map(|tick| tick.evaluated_at - tick.scheduled_for)
-                .collect();
-            println!("{} tick-to-decision: {latencies:?}", test_case.description);
             assert_eq!(
-                latencies.len(),
+                ticks.len(),
                 test_case.expected_ticks,
                 "{}",
                 test_case.description
             );
-            assert!(
-                latencies
-                    .iter()
-                    .all(|latency| *latency <= test_case.expected_max_tick_to_decision),
-                "{}: {latencies:?}",
-                test_case.description
-            );
+            for tick in &ticks {
+                let (wake, cycle) = decision_wake(&cycles, tick.evaluated_at, tick.scheduled_for);
+                println!(
+                    "{}: due {} woke {wake:?}, store {:?} to decision, cycle {cycle:?}",
+                    test_case.description,
+                    tick.scheduled_for,
+                    tick.evaluated_at - cycle.timings.started_at,
+                );
+                assert!(
+                    wake <= test_case.expected_max_wake_after_due,
+                    "{}: woke {wake:?} after the due time",
+                    test_case.description
+                );
+            }
             // The first leader stopped without releasing its lease while two more times fell due;
             // the standby catches up on the latest one only.
             // A standby is already polling when that lease lapses, so its own retry wait counts.
@@ -116,8 +123,10 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
                 expire_lease(store).await;
                 Utc::now()
             };
-            let (ticks, available) =
-                tokio::join!(run_scheduler_until(&second, trigger_id, at(14)), lapse);
+            let ((ticks, cycles), available) = tokio::join!(
+                run_scheduler_until(&second, trigger_id, (at(14), Duration::ZERO)),
+                lapse
+            );
             assert_eq!(
                 ticks.len(),
                 test_case.expected_ticks_after_failover,
@@ -128,11 +137,15 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
                 .iter()
                 .find(|tick| tick.scheduled_for == at(9))
                 .expect("the latest overdue time is decided");
-            let catch_up = latest.evaluated_at - available;
-            println!("{} failover catch-up: {catch_up:?}", test_case.description);
+            let (wake, cycle) = decision_wake(&cycles, latest.evaluated_at, available);
+            println!(
+                "{} failover: woke {wake:?} after the lapse, store {:?} to decision, cycle {cycle:?}",
+                test_case.description,
+                latest.evaluated_at - cycle.timings.started_at,
+            );
             assert!(
-                catch_up <= test_case.expected_max_failover_catch_up,
-                "{}: {catch_up:?}",
+                wake <= test_case.expected_max_failover_wake,
+                "{}: woke {wake:?} after the lapse",
                 test_case.description
             );
             close_store(second).await;

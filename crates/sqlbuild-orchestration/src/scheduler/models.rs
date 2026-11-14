@@ -40,6 +40,26 @@ pub struct SchedulerCycle {
     pub ticks: usize,
     pub unresponsive: usize,
     pub wait_for: std::time::Duration,
+    /// When `wait_for` was read, so the loop wakes on time however long the store takes afterwards.
+    pub wait_from: std::time::Instant,
+    pub timings: CycleTimings,
+}
+
+/// Wall time per cycle phase, which separates a late wake from slow store writes.
+#[derive(Clone, Debug)]
+pub struct CycleTimings {
+    pub started_at: DateTime<Utc>,
+    pub lease: std::time::Duration,
+    pub triggers: std::time::Duration,
+    pub monitor: std::time::Duration,
+    pub prune: std::time::Duration,
+    pub next_due: std::time::Duration,
+}
+
+impl CycleTimings {
+    pub fn total(&self) -> std::time::Duration {
+        self.lease + self.triggers + self.monitor + self.prune + self.next_due
+    }
 }
 
 /// Validated at the native boundary and evaluated as wall-clock times with SQLBuild's DST policy.
