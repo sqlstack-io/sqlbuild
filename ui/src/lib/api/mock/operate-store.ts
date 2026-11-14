@@ -1120,7 +1120,7 @@ export class MockOperate {
 		const writable = selection.filter((n) => !isSource(n));
 		const writeSet =
 			parts.verb === 'build'
-				? writable.filter((n) => !(parts.flags['--no-load'] && snapshotNode(n)?.kind === 'loader'))
+				? [...new Set([...writable, ...selection.flatMap((n) => snapshotNode(n)?.upstream ?? []).filter(isManaged)])].filter((n) => !(parts.flags['--no-load'] && isManaged(n)))
 				: parts.verb === 'seed'
 					? writable.filter((n) => snapshotNode(n)?.kind === 'seed')
 					: parts.verb === 'load'
