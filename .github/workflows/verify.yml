@@ -33,6 +33,9 @@ jobs:
     # A label other than `full-verify` changes nothing this workflow verifies.
     if: ${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       full: ${{ steps.depth.outputs.full }}
       partial: ${{ steps.depth.outputs.partial }}
@@ -324,16 +327,23 @@ jobs:
       # every group before it merges, so a passing fast core reports as Verify and each pull
       # request runs the heavy suites once, in the queue. Unsetting the variable restores the old
       # behaviour.
+      # The label and draft state come from the pull request as it is now, not the event payload:
+      # `gh pr create --label` can deliver `labeled` before `opened`, and the later run cancels the
+      # earlier one, so the surviving run must still see the label.
       - name: Choose the fast core or the full matrix
         id: depth
         env:
-          FULL: >-
-            ${{ github.event_name != 'pull_request'
-            || (contains(github.event.pull_request.labels.*.name, 'full-verify')
-            && !github.event.pull_request.draft) }}
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAVY_SELECTED: >-
             ${{ steps.scope.outputs.duckdb == 'true' || steps.scope.outputs.postgres == 'true' || steps.scope.outputs.clickhouse == 'true' || steps.scope.outputs.performance == 'true' || steps.scope.outputs.format_performance == 'true' || steps.scope.outputs.rules_performance == 'true' || steps.scope.outputs.wheels == 'true' || steps.scope.outputs.compiler_differential == 'true' || steps.scope.outputs.recovery == 'true' }}
         run: |
+          FULL=true
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            FULL="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+              --jq 'any(.labels[]; .name == "full-verify") and (.draft | not)')"
+          fi
           partial=false
           if [[ "${FULL}" != "true" && "${HEAVY_SELECTED}" == "true" ]]; then
             partial=true
@@ -1407,6 +1417,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       issues: write
+      pull-requests: write
     steps:
       - name: Open or update the nightly Verify issue
         env:
@@ -1432,4 +1443,11 @@ jobs:
           else
             gh issue create --title "Nightly Verify failed on main" \
               --label "${LABEL}" --body-file report.md
+          fi
+          # The open issue holds releases (release-please.yml); stop a release pull request that
+          # already passed its checks from merging before Release Please runs again.
+          release_pr="$(gh pr list --state open --label "autorelease: pending" \
+            --json number --jq '.[0].number // empty')"
+          if [[ -n "${release_pr}" ]]; then
+            gh pr merge "${release_pr}" --disable-auto 2>/dev/null || true
           fi
