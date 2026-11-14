@@ -1236,6 +1236,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
+name = "dunce"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1348,7 +1354,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1399,6 +1405,38 @@ name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
+
+[[package]]
+name = "fensu-facts"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cebbb33fa7353b9e6d12ad9c62481d9d672da2fd5e9d50429a968b4279d448b2"
+dependencies = [
+ "dunce",
+ "get-size2",
+ "globset",
+ "hex",
+ "rayon",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
+ "sha2 0.10.9",
+ "walkdir",
+]
+
+[[package]]
+name = "fensu-native"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "385879149037e2b959b21e677c1cd8b302926f3d252b46c014d17cf88a9300cc"
+dependencies = [
+ "fensu-facts",
+ "globset",
+ "rayon",
+ "ruff_python_ast",
+ "serde_json",
+ "unicode-ident",
+]
 
 [[package]]
 name = "fensu-policy"
@@ -2203,7 +2241,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde48f36530cbd91b65f050101e6c056d6eb743cea2a8f0f19beef69c6742ff8"
 dependencies = [
  "scopeguard",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3228,7 +3266,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3666,7 +3704,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4471,6 +4509,8 @@ name = "sqlbuild-rules"
 version = "0.0.0"
 dependencies = [
  "blake3",
+ "fensu-facts",
+ "fensu-native",
  "fensu-policy",
  "globset",
  "rayon",
@@ -5578,7 +5618,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -839,6 +839,8 @@ pub enum RuleScope {
     Project,
     ModelAndProject,
     SqlLint,
+    /// Project Python files, evaluated per file outside the model phases.
+    Python,
 }
 
 impl RuleScope {
@@ -848,6 +850,10 @@ impl RuleScope {
 
     pub(crate) fn evaluates_project(self) -> bool {
         matches!(self, Self::Project | Self::ModelAndProject)
+    }
+
+    pub(crate) fn evaluates_python(self) -> bool {
+        matches!(self, Self::Python)
     }
 }
 

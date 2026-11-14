@@ -1,6 +1,7 @@
-use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY, SQL_RULE_PREFIX};
+use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY, PYTHON_RULE_PREFIX, SQL_RULE_PREFIX};
 use crate::models::RulesCodeGrammar;
 use crate::models::{CustomRule, ResolveRulesRequest, RuleGuidance, RuleMetadata, RuleScope};
+use crate::python_rules::main::python_catalogue::python_catalogue;
 use fensu_policy::policy::errors::PolicyError;
 use fensu_policy::policy::main::resolve_policy::resolve_policy;
 use fensu_policy::policy::models::PolicySelectors;
@@ -391,6 +392,7 @@ pub(crate) fn catalogue() -> Vec<RuleMetadata> {
                 scope: RuleScope::SqlLint,
             }),
     );
+    rules.extend(python_catalogue());
     rules.sort_by(|a, b| a.code.cmp(&b.code));
     rules
 }
@@ -480,9 +482,27 @@ pub(crate) fn select<'a>(
         warn: Vec::new(),
         ignore: ignored.to_vec(),
     };
-    resolve_policy(&references, &(), &effective, &grammar)
-        .map(|ruleset| ruleset.blocking)
-        .map_err(rules_error)
+    let blocking: Vec<&RuleMetadata> = resolve_policy(&references, &(), &effective, &grammar)
+        .map_err(rules_error)?
+        .blocking;
+    Ok(without_unnamed_python(blocking, selected_or_none))
+}
+
+/// Drop the Python rules unless a selector names their family or one of their codes; `SQBR` alone does not.
+fn without_unnamed_python<'a>(
+    rules: Vec<&'a RuleMetadata>,
+    selectors: &[String],
+) -> Vec<&'a RuleMetadata> {
+    if selectors
+        .iter()
+        .any(|selector| selector.starts_with(PYTHON_RULE_PREFIX))
+    {
+        return rules;
+    }
+    rules
+        .into_iter()
+        .filter(|rule| !rule.scope.evaluates_python())
+        .collect()
 }
 
 /// SQLClean's selection: its default Rules without a selection, and every Rule a selector names, whatever its default.
