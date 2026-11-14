@@ -1,0 +1,83 @@
+<!-- generated-by: sqlbuild skills -->
+
+# Orchestration Rules
+
+> Keep job and sensor selections from listing nodes one by one.
+
+Online: https://sqlbuild.com/docs/concepts/rules/orchestration-rules/
+
+`SQBRORCHESTRATION101` reports a job or sensor whose `select` names more than three nodes one by one.
+Select a pipeline by its folder or a tag instead, so nodes added to it later are built too.
+
+```toml
+# orchestration/jobs/nightly_orders_job.toml
+name = "nightly_orders_job"
+description = "Orders and their daily totals"
+select = "stg_orders stg_payments int_orders order_totals"
+```
+
+```text
+error[SQBRORCHESTRATION101]: job 'nightly_orders_job' names 4 nodes in its selection (limit 3)
+  --> orchestration/jobs/nightly_orders_job.toml:3:10
+  = help: If these nodes are one pipeline, select its folder or a tag. If the job deliberately targets exactly these nodes, add an exact rule exception for this file with a reason.
+```
+
+```toml
+select = "models/orders"
+```
+
+The Rule is selected with `SQBR` or `SQBRORCHESTRATION`, and with its exact code.
+
+## What counts as a named node
+
+The Rule reads the `select` of every [job](../orchestration.md#declare-a-job) and the
+`select` of each `node_event`, `source_new_data` and `source_stale` condition of a
+[sensor](../orchestration.md#start-a-job-from-a-sensor). It counts the distinct
+[selector](../selectors.md) atoms that each name one node.
+
+| Atom | Counts |
+| --- | --- |
+| A bare name, such as `order_totals` | Yes |
+| A typed name, such as `source:raw_orders` or `task:refund_review` | Yes |
+| Each name in an intersection, such as `order_totals,tag:finance` | The name only |
+| `tag:`, a folder path, `job:`, a job or job group name | No |
+| A name with `+` before or after it | No |
+| A glob, such as `fct_*` | No |
+
+A name written twice counts once. A job's `exclude` is not checked.
+
+## Change the limit
+
+Set `max_named_selectors` to the most nodes one selection may name. The default is 3, and 0 rejects
+every named node.
+
+```toml
+[rules.rule_options.SQBRORCHESTRATION101]
+max_named_selectors = 5
+```
+
+## Keep a deliberate list
+
+A repair job that targets exactly a few nodes is a deliberate exception. Record it for the job's
+file with a reason:
+
+```toml
+[[rules.rule_exceptions]]
+rule = "SQBRORCHESTRATION101"
+path = "orchestration/jobs/repair_orders_job.toml"
+reason = "Rebuilds the four order models after a late payments load."
+```
+
+See [Findings and exceptions](findings-and-exceptions.md#exact-exceptions).
+
+## Sensor selections that are not a literal
+
+The Rule counts only a `select` written as a quoted string. A sensor condition whose `select` is a
+variable or an expression is reported, because its nodes cannot be counted:
+
+```text
+error[SQBRORCHESTRATION101]: sensor 'on_new_orders_sensor' has a condition select that is not a string literal, so the nodes it names cannot be counted
+```
+
+Write the selection as a quoted string. If it must be computed, add an exact rule exception for the
+sensor's file with a reason.

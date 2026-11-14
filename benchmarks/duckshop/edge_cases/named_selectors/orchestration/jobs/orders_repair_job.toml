@@ -1,0 +1,4 @@
+# A deliberate list, kept by an exact rule exception in the test's [rules] table.
+name = "orders_repair_job"
+description = "Rebuilds the four orders models after a late payments load."
+select = "stg_orders stg_payments int_orders order_totals"

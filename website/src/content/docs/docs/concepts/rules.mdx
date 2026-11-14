@@ -150,7 +150,9 @@ SQLBuild maintains native built-in Rules for reusable requirements. SQL Rule cod
 `SQLCLEAN`, for example `SQLCLEAN004`. Rules that read the project, such as `SQBRGRAPH101`, begin
 with `SQBR`. The `SQBRPYTHON` Rules check the project's Python: annotations, imports, function
 shape and the layout of `python/`. They run only when `select` names `SQBRPYTHON` or one of its
-codes; see [Python Rules](/docs/concepts/rules/python-rules).
+codes; see [Python Rules](/docs/concepts/rules/python-rules). `SQBRORCHESTRATION101` keeps job and
+sensor selections from listing nodes one by one; see
+[Orchestration Rules](/docs/concepts/rules/orchestration-rules).
 
 Projects can define custom Python Rules under `rules/**/*.py`. Their codes begin with `XSQBR`, for
 example `XSQBRARCH001`. Custom Rules use the same selection, findings, exceptions, execution order,

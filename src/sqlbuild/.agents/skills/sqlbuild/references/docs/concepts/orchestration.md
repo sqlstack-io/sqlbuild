@@ -94,6 +94,10 @@ cpus = 2
 A job's `[settings]` cannot set `select` or `exclude`: the job's own selection is the run's
 selection.
 
+Select a pipeline by its folder or a tag rather than listing its nodes. Rule `SQBRORCHESTRATION101`
+reports a job or sensor `select` that names more than three nodes one by one; see
+[Orchestration Rules](rules/orchestration-rules.md).
+
 ## Group jobs
 
 A job group runs its jobs as one run. A job waits for another job in the group when it reads a node

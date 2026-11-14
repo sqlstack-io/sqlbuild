@@ -1357,6 +1357,19 @@ def _default_interrupt_handling() -> None:
 
 
 PYTHON_RULES_FIXTURES: Path = Path("benchmarks/duckshop/edge_cases/python_rules")
+NAMED_SELECTOR_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/named_selectors")
+
+
+def write_named_selector_project(*, project_dir: Path, rules_toml: str) -> None:
+    """Copy the DuckShop named-selector fixture under the given `[rules]` table."""
+
+    shutil.copytree(NAMED_SELECTOR_FIXTURE, project_dir, dirs_exist_ok=True)
+    write_project_files(
+        project_dir=project_dir,
+        files={
+            "sqlbuild_project.toml": f'name = "orders"\nadapter = "duckdb"\n\n[rules]\n{rules_toml}'
+        },
+    )
 
 
 def write_python_rules_project(*, project_dir: Path, fixture: str, rules_toml: str) -> None:
