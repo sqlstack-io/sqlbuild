@@ -639,6 +639,15 @@ def build_check_outcomes(stdout: str) -> dict[tuple[object, object], tuple[objec
     }
 
 
+def integration_attempt_outcomes(records_path: Path) -> dict[object, tuple[object, object]]:
+    """Map each resource ID to its attempt's event type and error code from integration records."""
+
+    return {
+        record["resource_id"]: (record["event_type"], record.get("error_code"))
+        for record in map(json.loads, records_path.read_text(encoding="utf-8").splitlines())
+    }
+
+
 def build_asset_names(stdout: str) -> tuple[str, ...]:
     """Return the asset names reported by build JSON output."""
 

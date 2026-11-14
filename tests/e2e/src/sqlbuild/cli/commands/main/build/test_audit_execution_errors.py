@@ -61,7 +61,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
             severity="error",
             concurrency=1,
             expected_attachment_kind="seed",
-            expected_asset_statuses={"order_codes": "success", "coded_orders": "skipped"},
+            expected_asset_statuses={"order_codes": "failed", "coded_orders": "skipped"},
         ),
         AuditExecutionErrorE2ETestCase(
             description="seed audit with error severity at concurrency 4",
@@ -69,7 +69,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
             severity="error",
             concurrency=4,
             expected_attachment_kind="seed",
-            expected_asset_statuses={"order_codes": "success", "coded_orders": "skipped"},
+            expected_asset_statuses={"order_codes": "failed", "coded_orders": "skipped"},
         ),
         AuditExecutionErrorE2ETestCase(
             description="end audit with error severity at concurrency 1",
@@ -133,13 +133,14 @@ def test_given_audit_query_raises_when_building_then_it_reports_a_failed_audit(
             ),
         ),
         AuditExecutionErrorTerminalE2ETestCase(
-            description="seed audit error is listed and counted as a failure",
+            description="seed audit error is listed and fails its seed",
             audit_kind="seed",
             expected_fragments=(
                 "Failures:",
                 "broken_check on order_codes  (audit)",
+                "order_codes  (seed)",
                 "missing_lookup",
-                "PASS=1  WARN=0  FAIL=1  INSUFFICIENT=0  SKIP=1  TOTAL=3",
+                "PASS=0  WARN=0  FAIL=2  INSUFFICIENT=0  SKIP=1  TOTAL=3",
             ),
         ),
         AuditExecutionErrorTerminalE2ETestCase(

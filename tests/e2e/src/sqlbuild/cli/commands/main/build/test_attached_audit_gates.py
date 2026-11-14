@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
+    AttachedAuditGateAttemptE2ETestCase,
     AttachedAuditGateBuildE2ETestCase,
     AttachedAuditGateCycleE2ETestCase,
     AttachedAuditGateNoAuditsE2ETestCase,
@@ -20,6 +21,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     ATTACHED_AUDIT_GATE_DATABASE,
     build_asset_names,
     build_check_outcomes,
+    integration_attempt_outcomes,
     prepare_attached_audit_gate_project,
     prepare_audit_read_plan_project,
     prepare_nested_source_gate_project,
@@ -182,11 +184,11 @@ def test_given_attached_audit_reading_another_resource_when_building_then_it_gat
             expected_summary="PASS=1  WARN=0  FAIL=1  INSUFFICIENT=0  SKIP=1  TOTAL=3",
         ),
         AttachedAuditGateSummaryE2ETestCase(
-            description="failing seed audit counts as a failure",
+            description="failing seed audit fails its seed",
             target_kind="seed",
             order_code="Z",
             expected_exit_code=1,
-            expected_summary="PASS=2  WARN=0  FAIL=1  INSUFFICIENT=0  SKIP=1  TOTAL=4",
+            expected_summary="PASS=1  WARN=0  FAIL=2  INSUFFICIENT=0  SKIP=1  TOTAL=4",
         ),
     ],
     ids=lambda case: case.description,
@@ -206,6 +208,48 @@ def test_given_attached_audit_outcome_when_building_in_terminal_then_summary_cou
     output: str = result.stdout + result.stderr
     assert result.returncode == test_case.expected_exit_code, output
     assert test_case.expected_summary in output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AttachedAuditGateAttemptE2ETestCase(
+            description="passing seed audit completes the seed's attempt",
+            target_kind="seed",
+            order_code="A",
+            expected_target_event=("resource_attempt_completed", None),
+        ),
+        AttachedAuditGateAttemptE2ETestCase(
+            description="failing seed audit fails the seed's attempt",
+            target_kind="seed",
+            order_code="Z",
+            expected_target_event=("resource_attempt_failed", "R006"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_attached_audit_outcome_when_building_then_the_target_attempt_records_it(
+    test_case: AttachedAuditGateAttemptE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_attached_audit_gate_project(
+        tmp_path=tmp_path, target_kind=test_case.target_kind, order_code=test_case.order_code
+    )
+    records_path: Path = tmp_path / "integration_results.jsonl"
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build"),
+        project_dir=project_dir,
+        env={"SQLBUILD_INTEGRATION_RESULT_PATH": str(records_path)},
+    )
+
+    assert (
+        integration_attempt_outcomes(records_path).get("seed:order_codes")
+        == test_case.expected_target_event
+    ), (
+        test_case.description,
+        result.stdout + result.stderr,
+    )
 
 
 @pytest.mark.parametrize(

@@ -1043,6 +1043,14 @@ class AttachedAuditGateSummaryE2ETestCase:
 
 
 @dataclass(frozen=True)
+class AttachedAuditGateAttemptE2ETestCase:
+    description: str
+    target_kind: str
+    order_code: str
+    expected_target_event: tuple[str, str | None]
+
+
+@dataclass(frozen=True)
 class AttachedAuditGateCycleE2ETestCase:
     description: str
     target_kind: str
