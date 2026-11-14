@@ -40,7 +40,7 @@ use crate::bindings::_helpers::scopes::scope_command::run_scope_command;
 use crate::bindings::_helpers::seed_command::command::run_seed_command;
 use crate::bindings::_helpers::sql_test_command::test_command::run_test_command;
 use crate::bindings::_helpers::workspace_commands::commands::{
-    run_playground_command, run_skills_command,
+    run_migrate_command, run_playground_command, run_skills_command,
 };
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyAttributeError, PyOSError, PyTypeError, PyUnicodeError};
@@ -412,6 +412,7 @@ fn run_implementation<'py>(
         )?,
         "run_janitor_command" => run_janitor_command(py, &request()?)?,
         "run_lineage_command" => run_lineage_command(py, &request()?)?,
+        "run_migrate_command" => run_migrate_command(py, options())?,
         "run_load_command" => run_load_command(py, &request()?)?,
         "run_location_command" => run_location(py, options(), Some(recall))?,
         "run_plan_command" => run_plan_command(&request()?)?,

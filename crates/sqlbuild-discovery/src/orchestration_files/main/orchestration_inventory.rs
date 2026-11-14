@@ -9,7 +9,7 @@ use crate::orchestration_files::_helpers::python_modules::module_declaration;
 use crate::orchestration_files::_helpers::references::{check_references, check_renames};
 use crate::orchestration_files::constants::{
     BYTECODE_DIRECTORY, CALENDARS_DIRECTORY, GROUPS_DIRECTORY, HIDDEN_PREFIX, JOBS_DIRECTORY,
-    RENAMES_FILE, SENSORS_DIRECTORY, TOML_FILE_SUFFIX,
+    MIGRATE_HELP, RENAMES_FILE, SENSORS_DIRECTORY, TOML_FILE_SUFFIX,
 };
 use crate::orchestration_files::main::read_group_file::read_group_file;
 use crate::orchestration_files::main::read_job_file::read_job_file;
@@ -84,10 +84,13 @@ fn role_files(
             continue;
         }
         if !path.ends_with(suffix) {
+            let python_job: bool = path.ends_with(PYTHON_FILE_SUFFIX)
+                && matches!(role, JOBS_DIRECTORY | GROUPS_DIRECTORY);
             return Err(layout(
                 &path,
                 format!("orchestration/{role}/ holds only {suffix} files"),
                 Some(match role {
+                    _ if python_job => MIGRATE_HELP.to_owned(),
                     JOBS_DIRECTORY | GROUPS_DIRECTORY => {
                         "jobs and job groups are TOML; calendars and sensors are Python in orchestration/calendars/ and orchestration/sensors/".to_owned()
                     }
@@ -123,17 +126,29 @@ pub fn orchestration_inventory(
             return Err(layout(
                 &path,
                 format!("files cannot sit directly in orchestration/, except {RENAMES_FILE}"),
-                Some(format!(
-                    "move it into one of orchestration/{}/",
-                    ROLE_DIRECTORIES.join("/, orchestration/")
-                )),
+                Some(if entry.name.ends_with(PYTHON_FILE_SUFFIX) {
+                    MIGRATE_HELP.to_owned()
+                } else {
+                    format!(
+                        "move it into one of orchestration/{}/",
+                        ROLE_DIRECTORIES.join("/, orchestration/")
+                    )
+                }),
             ));
         }
         if !ROLE_DIRECTORIES.contains(&entry.name.as_str()) {
+            let holds_python: bool = !rglob(tree, &path, |found| {
+                found.name.ends_with(PYTHON_FILE_SUFFIX)
+            })?
+            .is_empty();
             return Err(layout(
                 &path,
                 format!("unknown orchestration folder '{}'", entry.name),
-                Some(format!("use one of: {}", ROLE_DIRECTORIES.join(", "))),
+                Some(if holds_python {
+                    MIGRATE_HELP.to_owned()
+                } else {
+                    format!("use one of: {}", ROLE_DIRECTORIES.join(", "))
+                }),
             ));
         }
     }

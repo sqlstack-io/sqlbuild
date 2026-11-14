@@ -31,6 +31,10 @@ use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 
 const SKILLS_DIRECTORY: &str = ".agents/skills/sqlbuild";
 const TEMPLATES_DIRECTORY: &str = "playground_templates";
+/// The one module `sqb migrate orchestration` runs; nothing else imports it or the removed records.
+const MIGRATE_ORCHESTRATION_MODULE: &str =
+    "sqlbuild.orchestration_declarations.main.migrate_orchestration";
+const MIGRATE_OPTIONS: (&[&str], &[&str]) = (&["project_dir", "subject"], &["dry_run"]);
 const SKILLS_OPTIONS: (&[&str], &[&str]) =
     (&["project_dir"], &["global_install", "targets", "force"]);
 const UPDATE_OPTIONS: (&[&str], &[&str]) = (
@@ -146,6 +150,30 @@ fn load_packaged_skill_files(py: Python<'_>) -> PyResult<BTreeMap<String, String
         .map_err(|error| raised(py, error))
 }
 
+/// `sqb migrate orchestration`: move Python jobs, job groups and schedules into TOML, once.
+#[pyfunction]
+#[pyo3(signature = (**options))]
+pub(crate) fn run_migrate_command(
+    py: Python<'_>,
+    options: Option<Bound<'_, PyDict>>,
+) -> PyResult<i32> {
+    let arguments: KeywordArguments<'_> =
+        KeywordArguments::read(py, "run_migrate_command", options, MIGRATE_OPTIONS)?;
+    let project_dir: Bound<'_, PyAny> = arguments.value("project_dir")?;
+    let project_dir: PathBuf = if project_dir.is_none() {
+        current_dir(py)?
+    } else {
+        project_dir.extract()?
+    };
+    let migrate = py
+        .import(MIGRATE_ORCHESTRATION_MODULE)?
+        .getattr("migrate_orchestration")?;
+    let options = PyDict::new(py);
+    options.set_item("project_dir", project_dir)?;
+    options.set_item("dry_run", arguments.value_or_false("dry_run")?.is_truthy()?)?;
+    migrate.call((), Some(&options))?.extract()
+}
+
 /// `sqb skills`: install or update SQLBuild skill files.
 #[pyfunction]
 #[pyo3(signature = (**options))]
@@ -217,5 +245,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(maintain_sqlbuild_skills, module)?)?;
     module.add_function(wrap_pyfunction!(load_packaged_skill_files, module)?)?;
     module.add_function(wrap_pyfunction!(run_skills_command, module)?)?;
+    module.add_function(wrap_pyfunction!(run_migrate_command, module)?)?;
     module.add_function(wrap_pyfunction!(run_playground_command, module)?)
 }

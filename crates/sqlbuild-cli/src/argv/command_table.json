@@ -7783,6 +7783,21 @@
      }
     },
     {
+     "name": "migrate",
+     "parser": {
+      "prog": "sqb migrate",
+      "groups": [{"title": "positional arguments"}, {"title": "options"}],
+      "actions": [
+       {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+       {"kind": "store", "dest": "migrate_subject", "choices": ["orchestration"], "metavar": "SUBJECT", "help": "what to migrate: orchestration moves Python jobs, job groups and schedules into TOML", "group": 0},
+       {"kind": "store_true", "options": ["--dry-run"], "dest": "dry_run", "nargs": 0, "const": true, "default": false, "help": "print the renames, files and edits without writing anything", "group": 1},
+       {"kind": "store", "options": ["--project-dir", "--sqb-project-dir"], "dest": "project_dir", "default": {"suppress": true}, "help": "SQLBuild project directory (default: the current directory)", "group": 1},
+       {"kind": "store_true", "options": ["--no-color"], "dest": "no_color", "nargs": 0, "const": true, "default": {"suppress": true}, "help": "disable colored output", "group": 1},
+       {"kind": "store_true", "options": ["--debug"], "dest": "debug", "nargs": 0, "const": true, "default": {"suppress": true}, "help": "enable verbose output and mirror internal diagnostics to stderr", "group": 1}
+      ]
+     }
+    },
+    {
      "name": "skills",
      "parser": {
       "prog": "sqb skills",
@@ -8861,6 +8876,11 @@
      "dest": "review",
      "metavar": "review",
      "help": "build what a branch changed in a temporary schema, test it, compare it with a target and report"
+    },
+    {
+     "dest": "migrate",
+     "metavar": "migrate",
+     "help": "move Python jobs, job groups and schedules into TOML"
     }
    ]
   }

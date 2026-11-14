@@ -117,7 +117,19 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
         description: "loose file",
         files: with("orchestration/jobs.py", "x = 1\n"),
         expected_message: "orchestration/jobs.py:1:1: files cannot sit directly in orchestration/, except renames.toml",
+        expected_help: Some("run `sqb migrate orchestration` to move Python jobs, job groups and schedules into TOML"),
+    });
+    cases.push(InventoryErrorCase {
+        description: "loose non-Python file",
+        files: with("orchestration/nightly.toml", EXPORT_JOB),
+        expected_message: "orchestration/nightly.toml:1:1: files cannot sit directly in orchestration/, except renames.toml",
         expected_help: Some("move it into one of orchestration/jobs/, orchestration/job_groups/, orchestration/calendars/, orchestration/sensors/"),
+    });
+    cases.push(InventoryErrorCase {
+        description: "unknown folder of Python modules",
+        files: with("orchestration/pipelines/daily/orders.py", "x = 1\n"),
+        expected_message: "orchestration/pipelines:1:1: unknown orchestration folder 'pipelines'",
+        expected_help: Some("run `sqb migrate orchestration` to move Python jobs, job groups and schedules into TOML"),
     });
     cases.push(InventoryErrorCase {
         description: "unknown folder",
@@ -129,6 +141,12 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
         description: "python job",
         files: with("orchestration/jobs/orders/legacy.py", "x = 1\n"),
         expected_message: "orchestration/jobs/orders/legacy.py:1:1: orchestration/jobs/ holds only .toml files",
+        expected_help: Some("run `sqb migrate orchestration` to move Python jobs, job groups and schedules into TOML"),
+    });
+    cases.push(InventoryErrorCase {
+        description: "non-TOML job file",
+        files: with("orchestration/jobs/orders/export.yaml", "name: orders_export_job\n"),
+        expected_message: "orchestration/jobs/orders/export.yaml:1:1: orchestration/jobs/ holds only .toml files",
         expected_help: Some("jobs and job groups are TOML; calendars and sensors are Python in orchestration/calendars/ and orchestration/sensors/"),
     });
     cases.push(InventoryErrorCase {

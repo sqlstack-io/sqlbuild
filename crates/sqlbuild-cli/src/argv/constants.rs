@@ -73,7 +73,7 @@ pub(crate) const INT_CONVERTER: &str = "int";
 pub(crate) const PATH_CONVERTER: &str = "Path";
 
 /// Every `CliNamespace` attribute with a default, in declaration order.
-pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 187] = [
+pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 188] = [
     ("command", NamespaceDefault::None),
     ("project_dir", NamespaceDefault::None),
     ("dbt_project_dir", NamespaceDefault::None),
@@ -219,6 +219,7 @@ pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 187] = [
     ("scenario_max_snapshot_total_rows", NamespaceDefault::None),
     ("scenario_max_snapshot_bytes", NamespaceDefault::None),
     ("scenario_max_snapshot_total_bytes", NamespaceDefault::None),
+    ("migrate_subject", NamespaceDefault::None),
     ("skills_global", NamespaceDefault::Bool(false)),
     ("skills_target", NamespaceDefault::EmptyList),
     ("skills_force", NamespaceDefault::Bool(false)),
