@@ -156,7 +156,11 @@ fn python_compiled_project<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let discovered: &Bound<'py, PyAny> = request.discovered_inputs.bind(py);
     let adapter: &Bound<'py, PyAny> = request.adapter.bind(py);
-    named_target_schema_strategy(discovered, adapter, request.selected_target.bind(py))?;
+    named_target_schema_strategy(
+        discovered,
+        adapter,
+        (request.selected_target.bind(py), request.cli_vars.bind(py)),
+    )?;
     managed_loader_target_isolation(discovered, adapter, request.resolved_connection.bind(py))?;
     let selection: &Bound<'py, PyAny> = request.analysis_selection.bind(py);
     let no_cache: bool =

@@ -56,6 +56,25 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             expected_example_count=1,
         ),
         MissingTargetDatabaseTestCase(
+            description="the ignored connection schema is shown with command-line vars applied",
+            project_toml=(
+                'name = "orders"\nadapter = "snowflake"\ndefault_target = "dev"\n\n'
+                '[vars]\norders_schema = "ORDERS"\n\n'
+                '[connections.warehouse]\naccount = "example"\nschema = "${orders_schema}"\n\n'
+                '[targets.dev]\ndatabase = "ANALYTICS"\n'
+            ),
+            expected_error=(
+                "The connection's schema 'ORDERS_CI' is not used because the project defines "
+                "named connections or targets.\n"
+                "  = help: to build this target into that schema, set this in "
+                "sqlbuild_project.toml:\n"
+                "            [targets.dev]\n"
+                '            schema = "ORDERS_CI"\n'
+            ),
+            expected_example_count=0,
+            command=("--no-color", "compile", "--vars", '{"orders_schema": "ORDERS_CI"}'),
+        ),
+        MissingTargetDatabaseTestCase(
             description="a named connection's schema is named as unused",
             project_toml=(
                 'name = "orders"\nadapter = "snowflake"\ndefault_target = "dev"\n\n'
