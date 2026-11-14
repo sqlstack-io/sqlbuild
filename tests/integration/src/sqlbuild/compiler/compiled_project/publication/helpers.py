@@ -816,19 +816,7 @@ def scheduled_worker(
                 "    assert 'SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL' not in os.environ\n"
             ),
         }
-        | (
-            {}
-            if any(path.startswith("orchestration/jobs/") for path in test_case.files)
-            else {
-                "orchestration/jobs/annual_orders_job.toml": (
-                    'name = "annual_orders_job"\n'
-                    'description = "Build orders."\n'
-                    'select = "orders"\n'
-                    'schedule = { cron = "0 0 * * *", timezone = "UTC", '
-                    'starts_at = "2000-01-01T00:00:00Z" }\n'
-                ),
-            }
-        )
+        | test_case.default_job_files
         | test_case.files,
     )
     test_case.warehouse_setup(project / "warehouse.duckdb")

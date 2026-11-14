@@ -16,7 +16,7 @@ use crate::orchestration_modules::constants::{
     SENSOR_CALL, TARGETS_KEYWORD,
 };
 use crate::orchestration_modules::models::{
-    LiteralArgument, ModuleDeclarations, PythonDeclaration, PythonDeclarationKind,
+    LiteralArgument, ModuleDeclarations, PythonDeclaration, PythonDeclarationKind, SourcePosition,
 };
 
 /// Every `calendar(...)` and `sensor(...)` call with its name and job references, in source order; `None` when unparsable.
@@ -32,7 +32,7 @@ pub fn orchestration_module_declarations(
         .map(|(local, name, _)| (local.as_str(), name.as_str()))
         .collect();
     let modules: BTreeSet<String> = module_names(&parsed.module.body);
-    let removed_imports = imports
+    let removed_imports: Vec<(String, SourcePosition)> = imports
         .iter()
         .filter(|(_, name, _)| REMOVED_NAMES.contains(&name.as_str()))
         .map(|(_, name, start)| (name.clone(), position(&parsed.lines, *start)))

@@ -38,6 +38,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     'select = "orders customers"\n'
                 ),
             },
+            default_job_files={},
         )
     ],
     ids=lambda case: case.description,

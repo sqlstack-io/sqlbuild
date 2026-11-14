@@ -67,8 +67,10 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         TYPE_PROOF_FILES
         | {
             path.relative_to(duckshop).as_posix(): path.read_text()
-            for path in (duckshop / "orchestration").rglob("*")
-            if path.is_file()
+            for path in [
+                *(duckshop / "orchestration").rglob("*.py"),
+                *(duckshop / "orchestration").rglob("*.toml"),
+            ]
         }
         | {
             "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(

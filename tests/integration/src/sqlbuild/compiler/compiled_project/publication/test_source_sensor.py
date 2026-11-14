@@ -47,6 +47,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
+            default_job_files={},
         ),
         WorkerExecutionTestCase(
             "stale external timestamp versions",
@@ -67,6 +68,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     "benchmarks/duckshop/edge_cases/orchestration/source_stale_journey.json"
                 ).read_text(),
             },
+            default_job_files={},
         ),
         WorkerExecutionTestCase(
             "a changed: True job still rebuilds on new source data",
@@ -81,6 +83,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
+            default_job_files={},
             warehouse_setup=create_raw_orders,
         ),
     ],

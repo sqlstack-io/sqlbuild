@@ -54,3 +54,10 @@ pub(crate) const BYTECODE_DIRECTORY: &str = "__pycache__";
 /// The prefix of hidden files and folders, and of private support modules.
 pub(crate) const HIDDEN_PREFIX: char = '.';
 pub(crate) const PRIVATE_PREFIX: char = '_';
+/// Every folder `orchestration/` may hold.
+pub const ROLE_DIRECTORIES: [&str; 4] = [
+    JOBS_DIRECTORY,
+    GROUPS_DIRECTORY,
+    CALENDARS_DIRECTORY,
+    SENSORS_DIRECTORY,
+];

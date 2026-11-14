@@ -313,6 +313,7 @@ def test_given_a_published_calendar_when_a_real_worker_compiles_then_it_does_not
                 "    marker.write_text('evaluated')\n    return []\n"
             ),
         },
+        default_job_files={},
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         assert evaluated.read_text() == "evaluated"

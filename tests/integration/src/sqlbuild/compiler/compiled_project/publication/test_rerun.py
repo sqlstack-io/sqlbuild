@@ -77,6 +77,7 @@ def test_given_a_partial_group_when_retrying_from_failure_then_successful_nodes_
                 'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
             ),
         },
+        default_job_files={},
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         source: dict[str, Any] = wait_for_run(

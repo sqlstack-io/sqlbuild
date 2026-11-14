@@ -88,6 +88,7 @@ def test_given_explicit_backfill_bounds_when_running_and_rerunning_a_group_then_
                 'jobs = ["windowed_orders_job"]\n'
             ),
         },
+        default_job_files={},
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         with duckdb.connect(str(worker.project / "warehouse.duckdb")) as warehouse:

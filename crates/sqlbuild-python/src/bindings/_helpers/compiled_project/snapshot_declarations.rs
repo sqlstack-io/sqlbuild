@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use serde_json::Value;
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
@@ -21,9 +21,8 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
-use crate::bindings::_helpers::native_host::constants::{AUTHORING_MODULE, SENSOR_CLASS};
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    AuthoredSensor, module_declarations, run_controls, run_resources,
+    ImportedDeclarations, imported_declarations, module_declarations, run_controls, run_resources,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     CalendarRequest, compile_calendars, compile_sensors,
@@ -64,14 +63,12 @@ fn declared_for(targets: &[String], target: &str) -> bool {
     targets.is_empty() || targets.iter().any(|name| name == target)
 }
 
-/// A run's cron trigger, or the calendar it asks for, keyed by the run's name.
+/// A run's cron trigger, or the calendar it asks for; neither when it has no schedule.
 fn run_schedule(
     (path, run): (&str, &RunFile),
-    triggers: &mut BTreeMap<String, TriggerDefinition>,
-    calendars: &mut Vec<CalendarRequest>,
-) -> PyResult<()> {
+) -> PyResult<(Option<TriggerDefinition>, Option<CalendarRequest>)> {
     let Some(schedule) = &run.schedule else {
-        return Ok(());
+        return Ok((None, None));
     };
     let name: &str = &run.name.value;
     let starts_at = schedule
@@ -95,26 +92,26 @@ fn run_schedule(
         targets: run.targets.iter().cloned().collect(),
         declared_at: file_site(path, run.name.position),
     };
-    match &schedule.source {
-        ScheduleSource::Cron(expression) => {
-            triggers.insert(
-                name.to_owned(),
-                TriggerDefinition {
-                    schedule: Schedule::Cron {
-                        expression: expression.value.clone(),
-                        timezone: schedule.timezone.value.clone(),
-                    },
-                    ..trigger
+    Ok(match &schedule.source {
+        ScheduleSource::Cron(expression) => (
+            Some(TriggerDefinition {
+                schedule: Schedule::Cron {
+                    expression: expression.value.clone(),
+                    timezone: schedule.timezone.value.clone(),
                 },
-            );
-        }
-        ScheduleSource::Calendar(calendar) => calendars.push(CalendarRequest {
-            calendar: calendar.value.clone(),
-            timezone: schedule.timezone.value.clone(),
-            trigger,
-        }),
-    }
-    Ok(())
+                ..trigger
+            }),
+            None,
+        ),
+        ScheduleSource::Calendar(calendar) => (
+            None,
+            Some(CalendarRequest {
+                calendar: calendar.value.clone(),
+                timezone: schedule.timezone.value.clone(),
+                trigger,
+            }),
+        ),
+    })
 }
 
 /// Refuse a calendar or sensor that compile declared but import did not define, or the reverse.
@@ -160,24 +157,11 @@ pub(crate) fn compile_declarations(
             "authored declarations cannot overwrite snapshot job or trigger documents",
         ));
     }
-    let sensor_class = py.import(AUTHORING_MODULE)?.getattr(SENSOR_CLASS)?;
-    let mut authored_calendars: BTreeMap<String, Bound<'_, PyAny>> = BTreeMap::new();
-    let mut authored_sensors: Vec<AuthoredSensor> = Vec::new();
-    for declaration in declarations {
-        if declaration.is_instance(&sensor_class)? {
-            authored_sensors.push(declaration.extract()?);
-        } else {
-            let name: String = declaration.getattr("name")?.extract()?;
-            if authored_calendars
-                .insert(name.clone(), declaration)
-                .is_some()
-            {
-                return Err(PyValueError::new_err(format!(
-                    "calendar '{name}' is declared twice"
-                )));
-            }
-        }
-    }
+    let ImportedDeclarations {
+        calendars: authored_calendars,
+        calendar_descriptions,
+        sensors: authored_sensors,
+    } = imported_declarations(py, declarations)?;
     matching_imports(
         ("calendar", &inventory.calendars),
         authored_calendars.keys().map(String::as_str).collect(),
@@ -205,13 +189,11 @@ pub(crate) fn compile_declarations(
             .iter()
             .map(|sensor| ("sensor", sensor.name.clone(), sensor.description.clone())),
     );
-    for (name, calendar) in &authored_calendars {
-        described.push((
-            "calendar",
-            name.clone(),
-            calendar.getattr("description")?.extract()?,
-        ));
-    }
+    described.extend(
+        calendar_descriptions
+            .into_iter()
+            .map(|(name, description)| ("calendar", name, description)),
+    );
     for (kind, name, description) in described {
         let limit: i64 = format.max_description_lines;
         let lines: usize = description_line_count(&description, format.line_width);
@@ -256,7 +238,9 @@ pub(crate) fn compile_declarations(
             .as_ref()
             .map(|resources| run_resources(name, &resources.value))
             .transpose()?;
-        run_schedule((path, run), &mut triggers, &mut calendar_requests)?;
+        let (trigger, calendar) = run_schedule((path, run))?;
+        triggers.extend(trigger.map(|trigger| (name.to_owned(), trigger)));
+        calendar_requests.extend(calendar);
         let controls = run_controls(run);
         jobs.insert(
             name.to_owned(),
@@ -295,7 +279,9 @@ pub(crate) fn compile_declarations(
             .iter()
             .flat_map(|member| jobs[member].selection.iter().cloned())
             .collect();
-        run_schedule((path, run), &mut triggers, &mut calendar_requests)?;
+        let (trigger, calendar) = run_schedule((path, run))?;
+        triggers.extend(trigger.map(|trigger| (name.to_owned(), trigger)));
+        calendar_requests.extend(calendar);
         let controls = run_controls(run);
         groups.insert(
             name.to_owned(),

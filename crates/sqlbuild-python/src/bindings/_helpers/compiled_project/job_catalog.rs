@@ -202,7 +202,6 @@ fn inventory_catalog(inventory: &OrchestrationInventory, target: Option<&str>) -
         );
     }
     for sensor in &inventory.sensors {
-        // A sensor whose targets are not literals counts for every target.
         if sensor.targets.as_deref().is_none_or(declared_for) {
             triggered.extend(
                 sensor

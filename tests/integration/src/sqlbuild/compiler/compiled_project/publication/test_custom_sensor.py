@@ -70,6 +70,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
                     "        return [RunRequest(run_key='orders-1'), RunRequest(run_key='orders-1')]\n"
                 ),
             },
+            default_job_files={},
         )
     ],
     ids=lambda case: case.description,

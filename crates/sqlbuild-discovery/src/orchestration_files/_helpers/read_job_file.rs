@@ -2,29 +2,25 @@
 
 use std::collections::BTreeMap;
 
+use toml::Spanned;
+
 use crate::orchestration_files::_helpers::raw::{RawJob, RawRun};
 use crate::orchestration_files::_helpers::reading::{
-    check_keys, nonblank, position, positioned, run_file, toml_error,
+    check_keys, error_at, nonblank, position, positioned, run_file, toml_error,
 };
 use crate::orchestration_files::constants::JOB_KEYS;
-use crate::orchestration_files::models::{FileError, FilePosition, JobFile, Positioned};
+use crate::orchestration_files::errors::FileError;
+use crate::orchestration_files::models::{FilePosition, JobFile, Positioned};
 
 /// The job `text` declares, or the first problem with it and where it is.
-pub fn read_job_file(text: &str) -> Result<JobFile, FileError> {
+pub(crate) fn read_job_file(text: &str) -> Result<JobFile, FileError> {
     check_keys(text, &JOB_KEYS, "job")?;
     let run: RawRun = toml::from_str(text).map_err(|error| toml_error(text, &error))?;
     let raw: RawJob = toml::from_str(text).map_err(|error| toml_error(text, &error))?;
-    let resources = raw.resources.map(|resources| {
-        let start: usize = resources.span().start;
-        let table = serde_json::to_value(resources.into_inner())
-            .ok()
-            .and_then(|value| value.as_object().cloned())
-            .unwrap_or_default();
-        Positioned {
-            value: table,
-            position: position(text, start),
-        }
-    });
+    let resources: Option<Positioned<serde_json::Map<String, serde_json::Value>>> = raw
+        .resources
+        .map(|resources| json_table(text, resources))
+        .transpose()?;
     let mut settings: BTreeMap<String, serde_json::Value> = BTreeMap::new();
     let mut setting_positions: BTreeMap<String, FilePosition> = BTreeMap::new();
     for (key, value) in raw.settings {
@@ -46,4 +42,23 @@ pub fn read_job_file(text: &str) -> Result<JobFile, FileError> {
         settings,
         setting_positions,
     })
+}
+
+/// A TOML table as JSON, positioned where it is written.
+fn json_table(
+    text: &str,
+    table: Spanned<toml::Table>,
+) -> Result<Positioned<serde_json::Map<String, serde_json::Value>>, FileError> {
+    let start: usize = table.span().start;
+    match serde_json::to_value(table.into_inner()) {
+        Ok(serde_json::Value::Object(value)) => Ok(Positioned {
+            value,
+            position: position(text, start),
+        }),
+        Ok(_) | Err(_) => Err(error_at(
+            text,
+            start,
+            "resources must be a table of plain values".to_owned(),
+        )),
+    }
 }

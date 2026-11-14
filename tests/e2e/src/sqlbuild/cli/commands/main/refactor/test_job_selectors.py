@@ -10,7 +10,11 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.refactor._test_types import (
     JobSelectorRefactorE2ETestCase,
 )
-from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import sqb, write_orders_project
+from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
+    refresh_job,
+    sqb,
+    write_orders_project,
+)
 
 _JOB: str = "orchestration/jobs/orders/refresh.toml"
 _UNRELATED: str = "orchestration/jobs/orders/totals.toml"
@@ -20,12 +24,6 @@ _SELECTOR_REWRITE: str = Path(
 _UNRELATED_JOB: str = (
     'name = "orders_totals_job"\ndescription = "Rebuild totals."\nselect = "customer_totals"\n'
 )
-
-
-def _job(select: str, exclude: str = "") -> str:
-    return f'name = "orders_refresh_job"\ndescription = "Refresh orders."\nselect = {select}\n' + (
-        f"exclude = {exclude}\n" if exclude else ""
-    )
 
 
 @pytest.mark.parametrize(
@@ -44,15 +42,15 @@ def _job(select: str, exclude: str = "") -> str:
         JobSelectorRefactorE2ETestCase(
             description="moving every model out of a folder moves its folder selectors",
             command=("mv", "stg_orders", "models/core/"),
-            job=_job('"models/staging +path:models/staging/ stg_orders"'),
-            expected_job=_job('"models/core +path:models/core/ stg_orders"'),
+            job=refresh_job('"models/staging +path:models/staging/ stg_orders"'),
+            expected_job=refresh_job('"models/core +path:models/core/ stg_orders"'),
             expected_output=("selector", _JOB),
         ),
         JobSelectorRefactorE2ETestCase(
             description="moving some models out of a folder leaves it and asks for a check",
             command=("mv", "fact_orders", "models/finance/"),
-            job=_job('"+models/marts"'),
-            expected_job=_job('"+models/marts"'),
+            job=refresh_job('"+models/marts"'),
+            expected_job=refresh_job('"+models/marts"'),
             expected_output=(
                 "Notes",
                 f"{_JOB}:3:10",

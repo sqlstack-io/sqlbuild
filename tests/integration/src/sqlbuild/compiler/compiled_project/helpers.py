@@ -431,11 +431,17 @@ WAFFLE_SHOP_NATIVE_MODELS: int = 13
 def duckshop_orchestration(fixture: str) -> dict[str, str]:
     """A DuckShop orchestration fixture tree as project files below `orchestration/`."""
     root: Path = Path("benchmarks/duckshop/edge_cases/orchestration") / fixture
+    paths: list[Path] = sorted([*root.rglob("*.py"), *root.rglob("*.toml")])
     return {
-        f"orchestration/{path.relative_to(root).as_posix()}": path.read_text()
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
+        f"orchestration/{path.relative_to(root).as_posix()}": path.read_text() for path in paths
     }
+
+
+def edited_duckshop_orchestration(fixture: str, path: str, old: str, new: str) -> dict[str, str]:
+    """A DuckShop orchestration fixture with `old` replaced by `new` in the file at `path`."""
+    files: dict[str, str] = duckshop_orchestration(fixture)
+    assert old in files[path], f"{old!r} is not in {path}"
+    return files | {path: files[path].replace(old, new)}
 
 
 def copy_project(*, fixtures: tuple[str, ...], files: dict[str, str], project_dir: Path) -> Path:

@@ -67,6 +67,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             [(41,)],
             launcher="docker",
             files={**duckshop_orchestration("container_resources_orders")},
+            default_job_files={},
             launcher_settings={
                 "run": {"memory": "768m", "cpus": 2, "pids": 256, "max_memory": "1g"}
             },
@@ -80,6 +81,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             [(43,)],
             launcher="docker",
             files={**duckshop_orchestration("container_resources_orders")},
+            default_job_files={},
             expected_host_config={"Memory": 768 << 20, "NanoCpus": 500_000_000},
         ),
         WorkerExecutionTestCase(

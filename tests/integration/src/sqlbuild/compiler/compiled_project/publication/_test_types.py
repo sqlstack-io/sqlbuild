@@ -117,6 +117,18 @@ class WorkerExecutionTestCase:
     expected_node_counts: dict[str, int] | None = None
     expected_origin: Literal["schedule", "sensor"] = "schedule"
     files: dict[str, str] = field(default_factory=dict)
+    # The scheduled job written before `files`; cases that declare their own jobs set it to {}.
+    default_job_files: dict[str, str] = field(
+        default_factory=lambda: {
+            "orchestration/jobs/annual_orders_job.toml": (
+                'name = "annual_orders_job"\n'
+                'description = "Build orders."\n'
+                'select = "orders"\n'
+                'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                'starts_at = "2000-01-01T00:00:00Z" }\n'
+            ),
+        }
+    )
     files_after_publication: dict[str, str] = field(default_factory=dict)
     store_setup: str = ""
     store_edit: Callable[[sqlite3.Connection], None] = lambda _: None

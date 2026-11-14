@@ -8,7 +8,8 @@ use sqlbuild_pysource::orchestration_modules::models::{
 use crate::orchestration_files::constants::{
     CALENDAR_KIND, PRIVATE_PREFIX, SENSOR_KIND, TOML_JOBS_HELP,
 };
-use crate::orchestration_files::models::{FileError, FilePosition, NamedModule, Positioned};
+use crate::orchestration_files::errors::FileError;
+use crate::orchestration_files::models::{FilePosition, NamedModule, Positioned};
 
 fn file_position(position: SourcePosition) -> FilePosition {
     FilePosition {

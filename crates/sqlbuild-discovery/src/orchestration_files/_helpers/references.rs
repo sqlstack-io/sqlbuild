@@ -5,8 +5,9 @@ use std::collections::BTreeSet;
 use crate::orchestration_files::constants::{
     CALENDAR_KIND, CALENDARS_DIRECTORY, GROUP_KIND, JOB_KIND, JOBS_DIRECTORY, SENSOR_KIND,
 };
+use crate::orchestration_files::errors::FileError;
 use crate::orchestration_files::models::{
-    FileError, FilePosition, OrchestrationInventory, Positioned, RunFile, ScheduleSource,
+    FilePosition, OrchestrationInventory, Positioned, RunFile, ScheduleSource,
 };
 
 /// The first problem with a name or reference, and the file it is in.

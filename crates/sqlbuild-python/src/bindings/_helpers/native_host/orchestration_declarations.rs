@@ -1,6 +1,6 @@
 //! The public authoring records enter native compilation here, never scheduler execution.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Component, Path};
 
 use pyo3::exceptions::PyValueError;
@@ -148,6 +148,45 @@ pub(crate) fn run_resources(
         return Err(invalid("pids must be a positive whole number".into()));
     }
     Ok(resources)
+}
+
+/// The calendars, by name with their descriptions, and the sensors that importing the modules defines.
+pub(crate) struct ImportedDeclarations<'py> {
+    pub(crate) calendars: BTreeMap<String, Bound<'py, PyAny>>,
+    pub(crate) calendar_descriptions: BTreeMap<String, String>,
+    pub(crate) sensors: Vec<AuthoredSensor>,
+}
+
+/// Sort imported declarations into calendars and sensors, refusing a calendar name defined twice.
+pub(crate) fn imported_declarations<'py>(
+    py: Python<'py>,
+    declarations: Vec<Bound<'py, PyAny>>,
+) -> PyResult<ImportedDeclarations<'py>> {
+    let sensor_class = py.import(AUTHORING_MODULE)?.getattr(SENSOR_CLASS)?;
+    let mut imported = ImportedDeclarations {
+        calendars: BTreeMap::new(),
+        calendar_descriptions: BTreeMap::new(),
+        sensors: Vec::new(),
+    };
+    for declaration in declarations {
+        if declaration.is_instance(&sensor_class)? {
+            imported.sensors.push(declaration.extract()?);
+            continue;
+        }
+        let name: String = declaration.getattr("name")?.extract()?;
+        let description: String = declaration.getattr("description")?.extract()?;
+        if imported
+            .calendars
+            .insert(name.clone(), declaration)
+            .is_some()
+        {
+            return Err(PyValueError::new_err(format!(
+                "calendar '{name}' is declared twice"
+            )));
+        }
+        imported.calendar_descriptions.insert(name, description);
+    }
+    Ok(imported)
 }
 
 /// The calendars and sensors one module defines; only module execution crosses into Python.

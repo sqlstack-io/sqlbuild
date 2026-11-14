@@ -46,6 +46,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     PARITY_FILES,
     TYPE_PROOF_FILES,
     duckshop_orchestration,
+    edited_duckshop_orchestration,
     published_texts,
     python_pipeline_snapshot,
 )
@@ -67,13 +68,6 @@ _DAILY_BUILD: dict[str, str] = {
     "select": '"orders"',
     "schedule": '{ cron = "0 2 * * *", timezone = "UTC" }',
 }
-
-
-def _edited(fixture: str, old: str, new: str) -> dict[str, str]:
-    """A DuckShop orchestration fixture with one edit to the file that holds `old`."""
-    files: dict[str, str] = duckshop_orchestration(fixture)
-    (path,) = [path for path, text in files.items() if old in text]
-    return files | {path: files[path].replace(old, new)}
 
 
 _PROVIDER_PROJECT: dict[str, str] = {
@@ -1310,8 +1304,9 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
         SnapshotDiscoveryTestCase(
             description="failure and recovery selectors preserve their individual transition kinds",
             files={
-                **_edited(
+                **edited_duckshop_orchestration(
                     "node_orders",
+                    "orchestration/sensors/on_orders_sensor.py",
                     "NodeEventKind.SUCCESS",
                     "NodeEventKind.FAILED, NodeEventKind.RECOVERED",
                 )
@@ -1617,8 +1612,11 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="a zero sensor interval cannot publish",
             files={
-                **_edited(
-                    "platform_orders", "minimum_interval_seconds=7", "minimum_interval_seconds=0"
+                **edited_duckshop_orchestration(
+                    "platform_orders",
+                    "orchestration/sensors/overdue_orders_sensor.py",
+                    "minimum_interval_seconds=7",
+                    "minimum_interval_seconds=0",
                 )
             },
             expected_error=ValueError,
@@ -1627,7 +1625,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="empty platform conditions cannot publish",
             files={
-                **_edited("platform_orders", "kinds=[PlatformEventKind.TICK_OVERDUE]", "kinds=[]")
+                **edited_duckshop_orchestration(
+                    "platform_orders",
+                    "orchestration/sensors/overdue_orders_sensor.py",
+                    "kinds=[PlatformEventKind.TICK_OVERDUE]",
+                    "kinds=[]",
+                )
             },
             expected_error=ValueError,
             expected_message="nonempty event kinds",
@@ -1635,8 +1638,9 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="platform kinds are a closed vocabulary",
             files={
-                **_edited(
+                **edited_duckshop_orchestration(
                     "platform_orders",
+                    "orchestration/sensors/overdue_orders_sensor.py",
                     "kinds=[PlatformEventKind.TICK_OVERDUE]",
                     "kinds=['unknown_event']",
                 )
@@ -1646,14 +1650,26 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="empty node selectors cannot broaden matching to all nodes",
-            files={**_edited("node_orders", 'select="orders orders*"', 'select=" "')},
+            files={
+                **edited_duckshop_orchestration(
+                    "node_orders",
+                    "orchestration/sensors/on_orders_sensor.py",
+                    'select="orders orders*"',
+                    'select=" "',
+                )
+            },
             expected_error=ValueError,
             expected_message="node_event needs nonempty selectors",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="unknown node event kinds cannot publish",
             files={
-                **_edited("node_orders", "kinds=[NodeEventKind.SUCCESS]", "kinds=['unknown_event']")
+                **edited_duckshop_orchestration(
+                    "node_orders",
+                    "orchestration/sensors/on_orders_sensor.py",
+                    "kinds=[NodeEventKind.SUCCESS]",
+                    "kinds=['unknown_event']",
+                )
             },
             expected_error=ValueError,
             expected_message="unknown variant",
@@ -1661,7 +1677,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_new_data rejects model selections",
             files={
-                **_edited("source_orders", 'select="source:raw_orders"', 'select="orders"'),
+                **edited_duckshop_orchestration(
+                    "source_orders",
+                    "orchestration/sensors/on_source_orders_sensor.py",
+                    'select="source:raw_orders"',
+                    'select="orders"',
+                ),
             },
             expected_error=ValueError,
             expected_message="source_new_data must select only source nodes",
@@ -1669,7 +1690,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_new_data rejects blank selections",
             files={
-                **_edited("source_orders", 'select="source:raw_orders"', 'select=" "'),
+                **edited_duckshop_orchestration(
+                    "source_orders",
+                    "orchestration/sensors/on_source_orders_sensor.py",
+                    'select="source:raw_orders"',
+                    'select=" "',
+                ),
             },
             expected_error=ValueError,
             expected_message="source_new_data needs nonempty selectors",
@@ -1677,7 +1703,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_stale rejects a zero threshold",
             files={
-                **_edited("stale_orders", "after_seconds=60", "after_seconds=0"),
+                **edited_duckshop_orchestration(
+                    "stale_orders",
+                    "orchestration/sensors/on_stale_orders_sensor.py",
+                    "after_seconds=60",
+                    "after_seconds=0",
+                ),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
@@ -1688,7 +1719,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_stale rejects a boolean threshold",
             files={
-                **_edited("stale_orders", "after_seconds=60", "after_seconds=True"),
+                **edited_duckshop_orchestration(
+                    "stale_orders",
+                    "orchestration/sensors/on_stale_orders_sensor.py",
+                    "after_seconds=60",
+                    "after_seconds=True",
+                ),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
@@ -1699,7 +1735,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_stale rejects an overflowing threshold",
             files={
-                **_edited("stale_orders", "after_seconds=60", "after_seconds=2**32"),
+                **edited_duckshop_orchestration(
+                    "stale_orders",
+                    "orchestration/sensors/on_stale_orders_sensor.py",
+                    "after_seconds=60",
+                    "after_seconds=2**32",
+                ),
                 "sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
@@ -1710,51 +1751,100 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="source_stale rejects model selections",
             files={
-                **_edited("stale_orders", 'select="source:raw_orders"', 'select="orders"'),
+                **edited_duckshop_orchestration(
+                    "stale_orders",
+                    "orchestration/sensors/on_stale_orders_sensor.py",
+                    'select="source:raw_orders"',
+                    'select="orders"',
+                ),
             },
             expected_error=ValueError,
             expected_message="source_stale must select only source nodes",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="explicit empty execution selectors cannot broaden matching",
-            files={**_edited("run_orders", '("orders",)', "()")},
+            files={
+                **edited_duckshop_orchestration(
+                    "run_orders", "orchestration/sensors/on_orders_sensor.py", '("orders",)', "()"
+                )
+            },
             expected_error=ValueError,
             expected_message="executed_successfully needs nonempty selectors",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="blank execution selectors cannot broaden matching",
-            files={**_edited("run_orders", '("orders",)', '(" ",)')},
+            files={
+                **edited_duckshop_orchestration(
+                    "run_orders",
+                    "orchestration/sensors/on_orders_sensor.py",
+                    '("orders",)',
+                    '(" ",)',
+                )
+            },
             expected_error=ValueError,
             expected_message="executed_successfully needs nonempty selectors",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="unresolved execution selectors fail closed",
-            files={**_edited("run_orders", '("orders",)', '("unknown_orders",)')},
+            files={
+                **edited_duckshop_orchestration(
+                    "run_orders",
+                    "orchestration/sensors/on_orders_sensor.py",
+                    '("orders",)',
+                    '("unknown_orders",)',
+                )
+            },
             expected_error=ValueError,
             expected_message="unknown selector name 'unknown_orders'",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="unmatched execution patterns cannot become an omitted filter",
-            files={**_edited("run_orders", '("orders",)', '("unknown_*",)')},
+            files={
+                **edited_duckshop_orchestration(
+                    "run_orders",
+                    "orchestration/sensors/on_orders_sensor.py",
+                    '("orders",)',
+                    '("unknown_*",)',
+                )
+            },
             expected_error=ValueError,
             expected_message="executed_successfully: unknown selector name 'unknown_\\*'",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="invalid execution selector syntax fails closed",
-            files={**_edited("run_orders", '("orders",)', '("tag:",)')},
+            files={
+                **edited_duckshop_orchestration(
+                    "run_orders",
+                    "orchestration/sensors/on_orders_sensor.py",
+                    '("orders",)',
+                    '("tag:",)',
+                )
+            },
             expected_error=ValueError,
             expected_message="has empty value after ':'",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="execution selectors outside the source job fail closed",
-            files={**_edited("run_orders", '("orders",)', '("stg_orders",)')},
+            files={
+                **edited_duckshop_orchestration(
+                    "run_orders",
+                    "orchestration/sensors/on_orders_sensor.py",
+                    '("orders",)',
+                    '("stg_orders",)',
+                )
+            },
             expected_error=ValueError,
             expected_message="executed_successfully must select nonempty source job/group nodes",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="sensor code defaults use running or paused",
             files={
-                **_edited("platform_orders", 'default_status="paused"', 'default_status="stopped"')
+                **edited_duckshop_orchestration(
+                    "platform_orders",
+                    "orchestration/sensors/overdue_orders_sensor.py",
+                    'default_status="paused"',
+                    'default_status="stopped"',
+                )
             },
             expected_error=ValueError,
             expected_message="unknown variant",

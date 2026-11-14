@@ -116,6 +116,7 @@ def test_given_a_running_local_worker_when_scheduler_dies_then_restart_adopts_an
             files={
                 **duckshop_orchestration("local_recovery_orders"),
             },
+            default_job_files={},
             store_setup=Path(
                 "benchmarks/duckshop/edge_cases/orchestration/local_recovery_publication_fault.sql"
             ).read_text(),

@@ -80,7 +80,9 @@ EXPECTED_CHANGED_RUNS: tuple[tuple[str, frozenset[str], dict[str, int]], ...] = 
 def test_given_a_changed_job_when_inputs_change_between_runs_then_only_their_consumers_run(
     test_case: ChangedJobTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    test_case = replace(test_case, files=changed_job_files(test_case.project_toml))
+    test_case = replace(
+        test_case, files=changed_job_files(test_case.project_toml), default_job_files={}
+    )
     observed: list[tuple[str, frozenset[str], dict[str, int]]] = []
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         warehouse: Path = worker.project / test_case.warehouse_file

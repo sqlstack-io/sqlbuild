@@ -46,14 +46,6 @@ pub struct Positioned<T> {
     pub position: FilePosition,
 }
 
-/// Why a declaration file cannot be read, at the position it points to.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FileError {
-    pub message: String,
-    pub position: FilePosition,
-    pub help: Option<String>,
-}
-
 /// What starts a job or group on its own: a cron expression or a named calendar.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScheduleSource {
@@ -115,6 +107,14 @@ pub struct NamedModule {
     pub job_references: Vec<(&'static str, Positioned<String>)>,
     /// A sensor's targets: empty for every target, `None` when they are not written as literals.
     pub targets: Option<Vec<String>>,
+}
+
+/// The calendars, sensors and every module below their folders.
+#[derive(Debug, Default)]
+pub(crate) struct PythonModules {
+    pub(crate) calendars: Vec<NamedModule>,
+    pub(crate) sensors: Vec<NamedModule>,
+    pub(crate) modules: Vec<String>,
 }
 
 /// Every orchestration declaration in a project, checked for layout, names and references.

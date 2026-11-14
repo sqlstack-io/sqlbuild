@@ -162,6 +162,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             ),
         }
         | test_case.files,
+        default_job_files={},
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         parent: dict[str, Any] = wait_for_run(
@@ -623,6 +624,7 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
                     'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
+            default_job_files={},
             store_setup=(
                 "CREATE TABLE test_slot_claims (run_id TEXT, group_key TEXT, occupied INTEGER);\n"
                 "CREATE TRIGGER test_observe_slots AFTER INSERT ON sqb_concurrency_slots BEGIN "
@@ -864,6 +866,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                 ).read_text(),
                 **duckshop_orchestration("upstream_source_orders"),
             },
+            default_job_files={},
             warehouse_setup=lambda path: (
                 duckdb.connect(str(path))
                 .execute("CREATE TABLE raw_orders AS SELECT CAST(23 AS BIGINT) AS order_id")
@@ -884,6 +887,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                 ).read_text(),
                 **duckshop_orchestration("upstream_source_orders"),
             },
+            default_job_files={},
             warehouse_setup=lambda path: (
                 duckdb.connect(str(path))
                 .execute("CREATE TABLE raw_orders AS SELECT CAST(23 AS BIGINT) AS order_id")
@@ -968,6 +972,7 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
             "success",
             [(9,)],
             files=INTERMEDIATE_LOADER_FILES | {**duckshop_orchestration("upstream_loaded_orders")},
+            default_job_files={},
             expected_node_count=3,
             expected_write_set=frozenset(
                 {"model:orders", "source:raw_shipments", "source:stage_shipments"}
@@ -1478,6 +1483,7 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
                     'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
                 ),
             },
+            default_job_files={},
         ),
     ],
     ids=lambda case: case.description,

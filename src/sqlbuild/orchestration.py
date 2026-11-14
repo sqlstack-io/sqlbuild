@@ -1,8 +1,4 @@
-"""Public authoring and snapshot compilation API for orchestration declarations.
-
-Jobs, job groups and their schedules are TOML files under `orchestration/jobs/` and
-`orchestration/job_groups/`; calendars and sensors are declared here.
-"""
+"""Calendar and sensor authoring and snapshot compilation; jobs and job groups are TOML files."""
 
 from sqlbuild.orchestration_declarations.main.compile_snapshot import compile_snapshot
 from sqlbuild.orchestration_declarations.models.authoring import Calendar as calendar

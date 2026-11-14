@@ -21,10 +21,7 @@ class CalendarWindow:
 
 @dataclass(frozen=True, kw_only=True, eq=False)
 class Calendar:
-    """Decorate a location callback returning upcoming timezone-aware datetimes.
-
-    Jobs and job groups name the calendar in their TOML `schedule`, which also sets the timezone.
-    """
+    """Decorate a location callback returning upcoming timezone-aware datetimes for schedules."""
 
     name: str
     description: str
@@ -49,10 +46,7 @@ class PlatformEventCondition:
 
 @dataclass(frozen=True, kw_only=True)
 class RunEventCondition:
-    """Match scoped terminal outcomes of the named job or job group.
-
-    `executed_successfully` optionally requires nodes that genuinely executed and succeeded.
-    """
+    """Match a job's or group's terminal outcomes; listed nodes must have run and succeeded."""
 
     job: str
     kinds: Sequence[RunEventKind]

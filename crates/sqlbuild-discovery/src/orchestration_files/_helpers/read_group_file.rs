@@ -7,10 +7,11 @@ use crate::orchestration_files::_helpers::reading::{
     check_keys, error_at, nonblank, run_file, toml_error,
 };
 use crate::orchestration_files::constants::GROUP_KEYS;
-use crate::orchestration_files::models::{FileError, GroupFile, Positioned};
+use crate::orchestration_files::errors::FileError;
+use crate::orchestration_files::models::{GroupFile, Positioned};
 
 /// The job group `text` declares, or the first problem with it and where it is.
-pub fn read_group_file(text: &str) -> Result<GroupFile, FileError> {
+pub(crate) fn read_group_file(text: &str) -> Result<GroupFile, FileError> {
     check_keys(text, &GROUP_KEYS, "job group")?;
     let run: RawRun = toml::from_str(text).map_err(|error| toml_error(text, &error))?;
     let raw: RawGroup = toml::from_str(text).map_err(|error| toml_error(text, &error))?;

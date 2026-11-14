@@ -1,3 +1,5 @@
+#[path = "tests/helpers.rs"]
+mod helpers;
 #[path = "tests/test_orchestration_inventory.rs"]
 mod orchestration_inventory;
 #[path = "tests/test_read_files.rs"]

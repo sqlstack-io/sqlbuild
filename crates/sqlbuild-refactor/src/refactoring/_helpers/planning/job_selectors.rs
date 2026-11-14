@@ -44,10 +44,7 @@ struct Changes {
     partial: BTreeMap<String, Vec<String>>,
 }
 
-/// Rewrite exact model names and wholly moved folders in every job's `select` and `exclude`.
-///
-/// `renamed` holds each target model and its new name and path. Tags, globs, `job:` and
-/// other kinds are left alone; a folder only some of its models leave becomes a note.
+/// Rewrite renamed models and wholly moved folders in job selectors; a partly moved folder becomes a note.
 pub(crate) fn job_selector_parts(
     project_dir: &Path,
     models: &[ModelFacts],
@@ -70,7 +67,6 @@ pub(crate) fn job_selector_parts(
                 continue;
             }
         };
-        // A job file that does not parse fails compile with its own error.
         let Ok(job) = toml::from_str::<JobSelectors>(&contents) else {
             continue;
         };
@@ -131,8 +127,8 @@ fn changes(models: &[ModelFacts], renamed: &[(&ModelFacts, &str, &str)]) -> Chan
         .iter()
         .map(|(model, _, destination)| (model.path.as_str(), parent(destination)))
         .collect();
-    let mut folders = BTreeMap::new();
-    let mut partial = BTreeMap::new();
+    let mut folders: BTreeMap<String, String> = BTreeMap::new();
+    let mut partial: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let moved_from = renamed
         .iter()
         .map(|(model, _, destination)| (parent(&model.path), parent(destination)))
@@ -152,23 +148,12 @@ fn changes(models: &[ModelFacts], renamed: &[(&ModelFacts, &str, &str)]) -> Chan
             to.strip_suffix(rest).map(str::to_owned)
         };
         let targets: Vec<Option<String>> = below.iter().map(|model| moved_to(model)).collect();
-        // A destination that keeps or receives other models would widen the selector to them.
-        let shared = |to: &String| {
-            models.iter().any(|model| {
-                let lands: String = destinations
-                    .get(model.path.as_str())
-                    .cloned()
-                    .unwrap_or_else(|| parent(&model.path));
-                within(&lands, to) && !within(&parent(&model.path), &folder)
-            })
-        };
-        let whole = targets
-            .first()
-            .cloned()
-            .flatten()
-            .filter(|to| *to != folder && !within(to, &folder))
-            .filter(|to| targets.iter().all(|target| target.as_ref() == Some(to)))
-            .filter(|to| !shared(to));
+        let whole: Option<String> = targets.first().cloned().flatten().filter(|to| {
+            *to != folder
+                && !within(to, &folder)
+                && all_move_to(&targets, to)
+                && !receives_other_models(models, &destinations, &folder, to)
+        });
         match whole {
             Some(to) => {
                 folders.insert(folder, to);
@@ -196,6 +181,27 @@ fn changes(models: &[ModelFacts], renamed: &[(&ModelFacts, &str, &str)]) -> Chan
     }
 }
 
+/// Whether every model below a folder moves to `to`.
+fn all_move_to(targets: &[Option<String>], to: &str) -> bool {
+    targets.iter().all(|target| target.as_deref() == Some(to))
+}
+
+/// Whether a model from outside `folder` keeps or gets a place in `to`, so selecting `to` would widen to it.
+fn receives_other_models(
+    models: &[ModelFacts],
+    destinations: &BTreeMap<&str, String>,
+    folder: &str,
+    to: &str,
+) -> bool {
+    models.iter().any(|model| {
+        let lands: String = destinations
+            .get(model.path.as_str())
+            .cloned()
+            .unwrap_or_else(|| parent(&model.path));
+        within(&lands, to) && !within(&parent(&model.path), folder)
+    })
+}
+
 /// `folder` and each folder above it, up to the model root.
 fn ancestors(folder: &str) -> Vec<String> {
     let parts: Vec<&str> = folder.split('/').collect();
@@ -213,7 +219,13 @@ fn selected_folders(selector: &str) -> impl Iterator<Item = String> + '_ {
     selector
         .split_whitespace()
         .flat_map(|token| token.split(','))
-        .filter_map(|part| folder_of(part.trim_matches('+')).map(|(_, folder)| folder))
+        .filter_map(selected_folder)
+}
+
+/// The normalized folder one selector part names, ignoring its graph operators.
+fn selected_folder(part: &str) -> Option<String> {
+    let (_, folder) = folder_of(part.trim_matches('+'))?;
+    Some(folder)
 }
 
 /// The `path:` prefix (if any) and normalized folder of a folder selector part.

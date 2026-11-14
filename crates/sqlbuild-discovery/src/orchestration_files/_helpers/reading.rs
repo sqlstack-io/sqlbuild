@@ -10,8 +10,9 @@ use crate::orchestration_files::_helpers::raw::{RawOnFailure, RawRun, RawSchedul
 use crate::orchestration_files::constants::{
     CONCURRENCY_KEY, RETRIES_RANGE, RETRY_DELAY_RANGE, SUGGESTION_CUTOFF,
 };
+use crate::orchestration_files::errors::FileError;
 use crate::orchestration_files::models::{
-    FileError, FilePosition, OnFailure, Positioned, RunFile, ScheduleFile, ScheduleSource,
+    FilePosition, OnFailure, Positioned, RunFile, ScheduleFile, ScheduleSource,
 };
 
 /// The 1-based line and character column of byte `offset` in `text`.
@@ -130,27 +131,20 @@ fn on_failure(text: &str, raw: Spanned<RawOnFailure>) -> Result<OnFailure, FileE
             format!("on_failure {field} must be a whole number from {low} to {high}"),
         )
     };
-    let retries: u8 = u8::try_from(raw.retries)
-        .ok()
-        .filter(|value| (RETRIES_RANGE.0..=RETRIES_RANGE.1).contains(value))
-        .ok_or_else(|| {
-            invalid(
-                "retries",
-                (i64::from(RETRIES_RANGE.0), i64::from(RETRIES_RANGE.1)),
-            )
-        })?;
+    let retries_range: (i64, i64) = (i64::from(RETRIES_RANGE.0), i64::from(RETRIES_RANGE.1));
+    if !(retries_range.0..=retries_range.1).contains(&raw.retries) {
+        return Err(invalid("retries", retries_range));
+    }
+    let delay_range: (i64, i64) = (
+        i64::from(RETRY_DELAY_RANGE.0),
+        i64::from(RETRY_DELAY_RANGE.1),
+    );
+    if !(delay_range.0..=delay_range.1).contains(&raw.retry_delay_seconds) {
+        return Err(invalid("retry_delay_seconds", delay_range));
+    }
+    let retries: u8 = u8::try_from(raw.retries).map_err(|_| invalid("retries", retries_range))?;
     let retry_delay_seconds: u32 = u32::try_from(raw.retry_delay_seconds)
-        .ok()
-        .filter(|value| (RETRY_DELAY_RANGE.0..=RETRY_DELAY_RANGE.1).contains(value))
-        .ok_or_else(|| {
-            invalid(
-                "retry_delay_seconds",
-                (
-                    i64::from(RETRY_DELAY_RANGE.0),
-                    i64::from(RETRY_DELAY_RANGE.1),
-                ),
-            )
-        })?;
+        .map_err(|_| invalid("retry_delay_seconds", delay_range))?;
     Ok(OnFailure {
         retries,
         retry_delay_seconds,
@@ -159,9 +153,9 @@ fn on_failure(text: &str, raw: Spanned<RawOnFailure>) -> Result<OnFailure, FileE
 
 /// The fields jobs and groups share, checked.
 pub(crate) fn run_file(text: &str, raw: RawRun) -> Result<RunFile, FileError> {
-    let owner: Option<String> = raw
+    let owner: Option<Positioned<String>> = raw
         .owner
-        .map(|owner| nonblank(text, owner, "owner").map(|owner| owner.value))
+        .map(|owner| nonblank(text, owner, "owner"))
         .transpose()?;
     let mut groups: BTreeSet<&str> = BTreeSet::new();
     if let Some(repeated) = raw
@@ -179,7 +173,7 @@ pub(crate) fn run_file(text: &str, raw: RawRun) -> Result<RunFile, FileError> {
         name: nonblank(text, raw.name, "name")?,
         description: nonblank(text, raw.description, "description")?.value,
         targets: raw.targets,
-        owner,
+        owner: owner.map(|owner| owner.value),
         overlap: raw.overlap,
         concurrency_groups: raw.concurrency_groups,
         schedule: raw
