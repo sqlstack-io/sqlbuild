@@ -26,9 +26,11 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
     WarehouseInputs, configured_warehouses,
 };
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
+use crate::bindings::_helpers::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::{NodeKeys, WorkerBuild};
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
+use crate::bindings::_helpers::compiled_views::project_reads::sql_tests;
 use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::constants::{
@@ -71,6 +73,38 @@ fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
         attached.insert(key.clone(), nodes);
     }
     attached
+}
+
+/// Each compiled SQL test with the models a failure of it blocks in a build: its expected, assertion and reference targets, as the scheduler's `scope_deps` names them.
+pub(super) fn blocked_nodes(project: &Bound<'_, PyAny>) -> PyResult<NodeKeys> {
+    let mut blocked: NodeKeys = BTreeMap::new();
+    for test in sql_tests(project)?.try_iter()? {
+        let test = test?;
+        let name: String = field(&field(&test, "key")?, "name")?.extract()?;
+        let models: Vec<String> = field(&test, "target_model_names")?.extract()?;
+        blocked.insert(
+            format!("{SQL_TEST_KEY_PREFIX}{name}"),
+            models
+                .into_iter()
+                .map(|model| format!("model:{model}"))
+                .collect(),
+        );
+    }
+    Ok(blocked)
+}
+
+/// Each snapshot node's direct upstream node keys.
+fn upstream_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Vec<String>> {
+    snapshot
+        .input
+        .nodes
+        .iter()
+        .map(|(key, node)| {
+            let deps = node.definition.get("deps").and_then(Value::as_array);
+            let deps = deps.into_iter().flatten().filter_map(Value::as_str);
+            (key.clone(), deps.map(str::to_owned).collect())
+        })
+        .collect()
 }
 
 /// A job run's `--changed` settings: its whole selection, and source data counted unless configured.
@@ -257,7 +291,7 @@ fn run_cancellable<'py>(
 
 pub(super) fn execute_worker<'py>(
     py: Python<'py>,
-    (snapshot, discovered): (&NativeOrchestrationSnapshot, Bound<'py, PyAny>),
+    (snapshot, discovered, blocked): (&NativeOrchestrationSnapshot, Bound<'py, PyAny>, NodeKeys),
     arguments: &KeywordArguments<'py>,
     (bearer, identity, recall): (&str, (String, String), Option<&InvocationRecall>),
 ) -> PyResult<i32> {
@@ -272,7 +306,10 @@ pub(super) fn execute_worker<'py>(
         )
         .map_err(|error| PyValueError::new_err(error.to_string()))?,
     )?;
-    let worker = WorkerBuild::new(&owner, attached_nodes(snapshot))?;
+    let worker = WorkerBuild::new(
+        &owner,
+        (attached_nodes(snapshot), blocked, upstream_nodes(snapshot)),
+    )?;
     if let Some(recall) = recall {
         *recall
             .worker

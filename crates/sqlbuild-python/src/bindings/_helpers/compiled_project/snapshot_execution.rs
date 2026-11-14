@@ -1,6 +1,6 @@
 //! Frozen selection, executor callbacks and completion belong to one verified worker build.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -9,13 +9,20 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyStringMethods;
 use sqlbuild_core::models::ResourceKind;
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
+use sqlbuild_host::models::SqlTestOutcome;
+use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::{
     NodeOutcome, RunChange, RunCommand, RunExecution, RunOutcome,
 };
 
-use crate::bindings::_helpers::compiled_project::constants::{NO_CHANGE_REASON, SKIP_ACTION};
+use crate::bindings::_helpers::compiled_project::constants::{
+    NO_CHANGE_REASON, SKIP_ACTION, SQL_TEST_KEY_PREFIX,
+};
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::records::fields::field;
+
+/// Node keys by snapshot node key, such as the models each test checks.
+pub(crate) type NodeKeys = BTreeMap<String, Vec<String>>;
 
 /// This transient owner records only acknowledged outcomes; durable lifecycle remains on the API.
 #[derive(Debug)]
@@ -26,6 +33,12 @@ pub(crate) struct WorkerBuild {
     checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
     /// The snapshot's audits and SQL tests, each with the node keys it checks.
     attached: BTreeMap<String, Vec<String>>,
+    /// Each SQL test with every model a failure of it blocks in a build: its expected, assertion and reference targets.
+    blocked: BTreeMap<String, Vec<String>>,
+    /// Each snapshot node's direct upstream node keys, for naming what a skipped node waited on.
+    upstream: BTreeMap<String, Vec<String>>,
+    /// The failed node each finished node traces back to: itself when it failed, its cause when skipped.
+    causes: Mutex<BTreeMap<String, String>>,
     /// The worst attached outcome of each node, for commands that only run tests or audits.
     checked: Mutex<BTreeMap<String, NodeOutcome>>,
     /// Whether the command returned, having run every check it planned, rather than being refused or raising.
@@ -37,7 +50,7 @@ pub(crate) struct WorkerBuild {
 impl WorkerBuild {
     pub(crate) fn new(
         worker: &Bound<'_, NativeOrchestrationWorker>,
-        attached: BTreeMap<String, Vec<String>>,
+        (attached, blocked, upstream): (NodeKeys, NodeKeys, NodeKeys),
     ) -> PyResult<Arc<Self>> {
         let state = Arc::new(Self {
             execution: worker.get().execution(worker.py())?,
@@ -45,6 +58,9 @@ impl WorkerBuild {
             completed: Mutex::default(),
             checks: Mutex::default(),
             attached,
+            blocked,
+            upstream,
+            causes: Mutex::default(),
             checked: Mutex::default(),
             returned: AtomicBool::new(false),
             refusal: Mutex::default(),
@@ -179,6 +195,7 @@ impl WorkerBuild {
         Ok(())
     }
 
+    /// A skip in a build names the failed node upstream of it; a test or audit run that raised skips what it never checked, with no cause.
     fn complete(
         &self,
         py: Python<'_>,
@@ -200,6 +217,14 @@ impl WorkerBuild {
         {
             return Ok(());
         }
+        let skipped_because_of = match outcome {
+            NodeOutcome::Skipped => match self.execution.skipped_nodes.get(key) {
+                Some(cause) => Some(cause.clone()),
+                None if !self.checks_only() => self.failed_upstream(key)?,
+                None => None,
+            },
+            _ => None,
+        };
         self.worker.bind(py).get().change(
             py,
             &format!("node-finished/{key}"),
@@ -208,10 +233,20 @@ impl WorkerBuild {
                 outcome,
                 rows_affected,
                 error_code,
-                skipped_because_of: self.execution.skipped_nodes.get(key).cloned(),
+                skipped_because_of: skipped_because_of.clone(),
                 error_message: error_message.as_deref().map(redact_error_text),
             },
         )?;
+        let cause = match outcome {
+            NodeOutcome::Failed => Some(key.to_owned()),
+            _ => skipped_because_of,
+        };
+        if let Some(cause) = cause {
+            self.causes
+                .lock()
+                .map_err(|_| poisoned())?
+                .insert(key.into(), cause);
+        }
         self.completed
             .lock()
             .map_err(|_| poisoned())?
@@ -336,8 +371,58 @@ impl WorkerBuild {
         Ok(())
     }
 
+    /// The failed node nearest upstream of `key` in this run, or the cause a skipped one carries.
+    fn failed_upstream(&self, key: &str) -> PyResult<Option<String>> {
+        let causes = self.causes.lock().map_err(|_| poisoned())?;
+        let mut seen: BTreeSet<&str> = BTreeSet::from([key]);
+        let mut pending: VecDeque<&str> = VecDeque::from([key]);
+        while let Some(node) = pending.pop_front() {
+            for upstream in self.upstream.get(node).into_iter().flatten() {
+                if let Some(cause) = causes.get(upstream) {
+                    return Ok(Some(cause.clone()));
+                }
+                if seen.insert(upstream) {
+                    pending.push_back(upstream);
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// A failing SQL test, found by its compiled name such as `parent [case]`, fails the models it blocks with its error.
+    fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
+        let py = result.py();
+        let outcome: String = field(result, "outcome")?.str()?.extract()?;
+        if SqlTestOutcome::from_value(&outcome) == Some(SqlTestOutcome::Pass)
+            || self.worker.bind(py).get().refresh_cancellation(py)?
+        {
+            return Ok(());
+        }
+        let name: String = field(result, "test_name")?.extract()?;
+        let key = format!("{SQL_TEST_KEY_PREFIX}{name}");
+        let error: Option<String> = match result.getattr_opt("error_code")? {
+            Some(value) => value.extract()?,
+            None => None,
+        };
+        let message: Option<String> = match result.getattr_opt("error_message")? {
+            Some(value) => value.extract()?,
+            None => None,
+        };
+        for model in self.blocked.get(&key).into_iter().flatten() {
+            self.complete(
+                py,
+                model,
+                (NodeOutcome::Failed, None, (error.clone(), message.clone())),
+            )?;
+        }
+        Ok(())
+    }
+
     /// Existing native progress callbacks publish selected-node evidence without Python relays.
     pub(crate) fn completed(&self, result: &Bound<'_, PyAny>, key: &str) -> PyResult<()> {
+        if key.starts_with(SQL_TEST_KEY_PREFIX) {
+            return self.finished_test(result);
+        }
         if self.execution.claim.request.selection.contains(key) {
             let status: String = field(result, "status")?.str()?.extract()?;
             let outcome = match status.as_str() {

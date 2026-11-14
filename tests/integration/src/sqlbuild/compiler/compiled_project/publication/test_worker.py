@@ -202,6 +202,166 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
     "test_case",
     [
         WorkerExecutionTestCase(
+            "a failing unit test fails its model, and what reads it is skipped because of it",
+            "SELECT 3 AS amount",
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
+            "partial",
+            [(0,)],
+            files={
+                "models/raw_orders.sql": (
+                    "MODEL (description 'Raw orders.', materialized table);\n"
+                    "SELECT 1 AS order_id, 10 AS amount\n"
+                ),
+                "models/stg_orders.sql": (
+                    "MODEL (description 'Staged orders.', materialized table);\n"
+                    'SELECT order_id, amount * 2 AS amount FROM __ref("raw_orders")\n'
+                ),
+                "models/order_totals.sql": (
+                    "MODEL (description 'Order totals.', materialized table);\n"
+                    'SELECT SUM(amount) AS total FROM __ref("stg_orders")\n'
+                ),
+                "tests/unit/test_stg_orders.sql": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/worker_failed_unit_test.sql"
+                ).read_text(),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, schedule\n"
+                    'annual_orders = job("annual_orders", '
+                    'select="orders raw_orders stg_orders order_totals", '
+                    'description="Build orders.", '
+                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
+                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                ),
+            },
+            expected_run_nodes=[
+                ("model:order_totals", "skipped", None, "model:stg_orders", None),
+                ("model:orders", "success", None, None, None),
+                ("model:raw_orders", "success", None, None, None),
+                (
+                    "model:stg_orders",
+                    "failed",
+                    "T003",
+                    None,
+                    "test 'stg_orders__doubles_amounts' failed for models: stg_orders",
+                ),
+            ],
+        ),
+        WorkerExecutionTestCase(
+            "a failing case of a parameterised test fails its model",
+            "SELECT 3 AS amount",
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
+            "partial",
+            [(0,)],
+            files={
+                "models/raw_orders.sql": (
+                    "MODEL (description 'Raw orders.', materialized table);\n"
+                    "SELECT 1 AS order_id, 10 AS amount\n"
+                ),
+                "models/stg_orders.sql": (
+                    "MODEL (description 'Staged orders.', materialized table);\n"
+                    'SELECT order_id, amount * 2 AS amount FROM __ref("raw_orders")\n'
+                ),
+                "models/order_totals.sql": (
+                    "MODEL (description 'Order totals.', materialized table);\n"
+                    'SELECT SUM(amount) AS total FROM __ref("stg_orders")\n'
+                ),
+                "tests/unit/test_stg_orders.sql": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/worker_failed_unit_test_cases.sql"
+                ).read_text(),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, schedule\n"
+                    'annual_orders = job("annual_orders", '
+                    'select="orders raw_orders stg_orders order_totals", '
+                    'description="Build orders.", '
+                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
+                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                ),
+            },
+            expected_run_nodes=[
+                ("model:order_totals", "skipped", None, "model:stg_orders", None),
+                ("model:orders", "success", None, None, None),
+                ("model:raw_orders", "success", None, None, None),
+                (
+                    "model:stg_orders",
+                    "failed",
+                    "T003",
+                    None,
+                    "test 'stg_orders__doubles_case_amounts [ten]' failed for models: stg_orders",
+                ),
+            ],
+        ),
+        WorkerExecutionTestCase(
+            "a failing assertion fails the model it reads, with no expected output",
+            "SELECT 3 AS amount",
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('stg_orders', 'order_totals')",
+            "partial",
+            [(0,)],
+            files={
+                "models/raw_orders.sql": (
+                    "MODEL (description 'Raw orders.', materialized table);\n"
+                    "SELECT 1 AS order_id, 10 AS amount\n"
+                ),
+                "models/stg_orders.sql": (
+                    "MODEL (description 'Staged orders.', materialized table);\n"
+                    'SELECT order_id, amount * 2 AS amount FROM __ref("raw_orders")\n'
+                ),
+                "models/order_totals.sql": (
+                    "MODEL (description 'Order totals.', materialized table);\n"
+                    'SELECT SUM(amount) AS total FROM __ref("stg_orders")\n'
+                ),
+                "tests/unit/test_stg_orders.sql": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/worker_failed_unit_test_assert.sql"
+                ).read_text(),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, schedule\n"
+                    'annual_orders = job("annual_orders", '
+                    'select="orders raw_orders stg_orders order_totals", '
+                    'description="Build orders.", '
+                    'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
+                    'starts_at="2000-01-01T00:00:00Z"))\n'
+                ),
+            },
+            expected_run_nodes=[
+                ("model:order_totals", "skipped", None, "model:stg_orders", None),
+                ("model:orders", "success", None, None, None),
+                ("model:raw_orders", "success", None, None, None),
+                (
+                    "model:stg_orders",
+                    "failed",
+                    "T003",
+                    None,
+                    "test 'stg_orders__amounts_stay_small' failed for models: assertion amounts_stay_small",
+                ),
+            ],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_failing_unit_test_when_a_worker_builds_then_its_model_fails_and_downstream_names_it(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, str | None, str | None, str | None]] = control.execute(
+                "SELECT n.node_key, n.status, n.error_code, n.skipped_because_of, "
+                "json_extract(e.payload, '$.change.change.error_message') "
+                "FROM sqb_run_nodes n LEFT JOIN recall_events e "
+                "ON e.storage_id=n.finished_storage_id "
+                "WHERE n.run_id=? AND n.kind='node' ORDER BY n.node_key",
+                (run["run_id"],),
+            ).fetchall()
+        assert nodes == test_case.expected_run_nodes, worker.log.read_text()
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
             "a stale source blocks only its own branch",
             "SELECT 11 AS amount",
             "SELECT amount FROM orders UNION ALL SELECT return_id FROM returns ORDER BY 1",
