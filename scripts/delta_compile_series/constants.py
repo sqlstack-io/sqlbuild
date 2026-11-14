@@ -20,7 +20,6 @@ FALLBACK_WEIGHT: int = 1
 STALE_PROBLEMS: str = "reports problems in files the edit leaves alone"
 AFTER_FAILED_RULES: str = "the previous compile failed its Rules"
 PROJECT_CONFIG: str = "sqlbuild_project.toml"
-# Delta series author minimal Python modules, so they leave the by-name Python rules unselected.
 DELTA_RULE_SELECT: str = 'select = ["SQBR", "SQLCLEAN", "XSQBR"]'
 RANDOM_VALUE_LIMIT: int = 10**6
 FULL_COPY_SUFFIX: str = "_full_copy"
