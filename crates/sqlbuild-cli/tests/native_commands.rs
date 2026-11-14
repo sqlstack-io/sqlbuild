@@ -6,6 +6,8 @@ mod helpers;
 mod test_admin;
 #[path = "native_commands/test_control.rs"]
 mod test_control;
+#[path = "native_commands/test_location_health.rs"]
+mod test_location_health;
 #[path = "native_commands/admin/test_passwords.rs"]
 mod test_passwords;
 #[path = "native_commands/test_proxy.rs"]

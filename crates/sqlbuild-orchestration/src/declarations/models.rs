@@ -52,6 +52,61 @@ pub struct JobDefinition {
     pub overlap: Overlap,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_failure: Option<OnFailure>,
+    /// The worker container's limits for this job; the launcher's `max_memory` caps memory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resources: Option<RunResources>,
+}
+
+/// Container limits a job asks for; each unset limit falls back to the launcher's.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunResources {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory: Option<MemorySize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpus: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pids: Option<u64>,
+}
+
+/// Bytes, written as an integer or with a `k`, `m` or `g` suffix (powers of 1024), as Docker's `--memory` reads it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(transparent)]
+pub struct MemorySize(pub u64);
+
+impl MemorySize {
+    /// `"512m"`, `"2g"` or `"1073741824"`; the size must be at least one byte.
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let text = text.trim().to_ascii_lowercase();
+        let (digits, scale) = match text.strip_suffix('b').unwrap_or(&text) {
+            value if value.ends_with('k') => (&value[..value.len() - 1], 1u64 << 10),
+            value if value.ends_with('m') => (&value[..value.len() - 1], 1u64 << 20),
+            value if value.ends_with('g') => (&value[..value.len() - 1], 1u64 << 30),
+            value => (value, 1),
+        };
+        match digits.parse::<u64>().map(|count| count.checked_mul(scale)) {
+            Ok(Some(bytes)) if bytes > 0 => Ok(Self(bytes)),
+            _ => Err(format!(
+                "memory must be a positive size such as \"512m\" or \"2g\", not {text:?}"
+            )),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for MemorySize {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Written {
+            Bytes(u64),
+            Text(String),
+        }
+        match Written::deserialize(deserializer)? {
+            Written::Bytes(0) => Err(serde::de::Error::custom("memory must be at least one byte")),
+            Written::Bytes(bytes) => Ok(Self(bytes)),
+            Written::Text(text) => Self::parse(&text).map_err(serde::de::Error::custom),
+        }
+    }
 }
 
 /// What a schedule tick or sensor request does while a run of the same job is active; people's requests always queue.

@@ -39,6 +39,7 @@ sqlbuild-process-ownership.workspace = true
 sqlbuild-recall.workspace = true
 sqlbuild-rules.workspace = true
 tokio.workspace = true
+toml.workspace = true
 uuid.workspace = true
 
 [target.'cfg(unix)'.dependencies]
