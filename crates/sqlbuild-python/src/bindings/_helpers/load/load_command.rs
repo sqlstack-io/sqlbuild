@@ -33,7 +33,7 @@ use crate::bindings::_helpers::load::load_progress::{
     LoadCallbackRelay, LoadProgressReporter, load_result_text,
 };
 use crate::bindings::_helpers::load::load_selection::{
-    LoadProject, LoaderDefaults, loader_defaults, loader_write_schemas,
+    LoadProject, LoaderDefaults, expanded_target_config, loader_defaults, loader_write_schemas,
 };
 use crate::bindings::_helpers::native_host::connections::connection_failure;
 use crate::bindings::_helpers::native_host::host;
@@ -110,7 +110,16 @@ fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Inv
             &native_field(request, "cli_vars")?,
         ),
     )?;
-    let project: LoadProject<'py> = LoadProject::new(&discovered, &target_config)?;
+    let expanded_target: Bound<'py, PyAny> = expanded_target_config(
+        &discovered,
+        (
+            &selected_target,
+            &target_config,
+            &native_field(request, "cli_vars")?,
+        ),
+    )?;
+    let project: LoadProject<'py> =
+        LoadProject::new(&discovered, (&target_config, &expanded_target))?;
     let selected: Vec<Bound<'py, PyAny>> = project.selected_entries(
         (
             &select.extract::<Vec<String>>()?,
