@@ -7,6 +7,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_core::load_command::errors::UnknownLoadSelector;
 use sqlbuild_core::load_command::main::load_reference_loaders::load_reference_loaders;
 use sqlbuild_core::load_command::main::select_load_entries::select_load_entries as select_entries;
@@ -20,7 +21,9 @@ use crate::bindings::_helpers::compile_attachment::effective_config::{
 use crate::bindings::_helpers::compile_attachment::target::{
     connection_is_default_target, project_location,
 };
-use crate::bindings::_helpers::compile_driver::targets::managed_write_schema;
+use crate::bindings::_helpers::compile_driver::targets::{
+    managed_write_schema, preserved_loader_schema,
+};
 use crate::bindings::_helpers::contracts::spec_resolution::loader_destination_parts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::model_config::template_data::early_model_templates;
@@ -310,12 +313,25 @@ pub(crate) fn loader_defaults<'py>(
     })
 }
 
-/// Raise when a selected loader has no schema because the connection's schema is not used.
+/// Raise when a selected loader would write to `preserve` or lost its schema to an ignored connection.
 pub(crate) fn loader_write_schemas<'py>(
     discovered: &Bound<'py, PyAny>,
     (selected_target, cli_vars): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     entries: &[Bound<'py, PyAny>],
 ) -> PyResult<()> {
+    for entry in entries {
+        if native_field(entry, "loader")?.is_none() {
+            continue;
+        }
+        let schema: Option<String> = native_field(entry, "schema")?.extract()?;
+        if schema.is_some_and(|schema| schema.trim() == PRESERVE_TARGET_VALUE) {
+            preserved_loader_schema(
+                entry.py(),
+                &native_field(entry, "name")?.str()?.to_string(),
+                &native_field(entry, "table")?.str()?.to_string(),
+            )?;
+        }
+    }
     if connection_is_default_target(discovered)? {
         return Ok(());
     }

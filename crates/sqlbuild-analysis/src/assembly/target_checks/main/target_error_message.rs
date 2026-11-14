@@ -42,5 +42,10 @@ pub fn target_error_message(error: &TargetError) -> String {
              '{PRESERVE_TARGET_VALUE}'. Resource schemas, defaults, and connection schemas do \
              not select a named target schema strategy."
         ),
+        TargetError::PreservedLoaderSchema(loader) => format!(
+            "Intermediate loader '{loader}' would write to a schema named \
+             '{PRESERVE_TARGET_VALUE}'. The target's schema '{PRESERVE_TARGET_VALUE}' keeps each \
+             model's own schema, and a loader has none, so its destination must name a schema."
+        ),
     }
 }

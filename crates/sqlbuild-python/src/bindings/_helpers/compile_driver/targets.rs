@@ -10,7 +10,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_analysis::assembly::target_checks::constants::{
     LOADER_COLLISION_CODE, MANAGED_WRITE_SCHEMA_CODE, MISSING_TARGET_PARTS_CODE,
-    NAMED_TARGET_SCHEMA_CODE,
+    NAMED_TARGET_SCHEMA_CODE, PRESERVE_TARGET_VALUE,
 };
 use sqlbuild_analysis::assembly::target_checks::errors::TargetError;
 use sqlbuild_analysis::assembly::target_checks::main::explicit_write_schema::explicit_write_schema;
@@ -554,6 +554,28 @@ pub(crate) fn managed_write_schemas(
     adapter: &Bound<'_, PyAny>,
     project: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
+    let target_schema: Option<String> =
+        text_or_none(&native_field(project, "effective_target_schema")?)?;
+    for loader in native_field(project, "loader_functions")?.try_iter()? {
+        let loader: Bound<'_, PyAny> = loader?;
+        let name: String = native_field(&loader, "name")?.str()?.to_cow()?.into_owned();
+        let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
+        if loader_schema(destination.as_deref(), target_schema.as_deref())
+            .is_some_and(|schema| python_strip(schema) == PRESERVE_TARGET_VALUE)
+        {
+            let table: String = destination.as_deref().map_or_else(
+                || format!("__loader__{name}"),
+                |destination| {
+                    destination
+                        .rsplit('.')
+                        .next()
+                        .unwrap_or(destination)
+                        .to_owned()
+                },
+            );
+            preserved_loader_schema(loader.py(), &name, &table)?;
+        }
+    }
     let ignored: Option<String> = ignored_connection_value(project, "schema")?;
     if ignored.is_none()
         && native_field(adapter, "allows_implicit_managed_write_schema")?.is_truthy()?
@@ -625,6 +647,30 @@ pub(crate) fn managed_write_schemas(
         )?;
     }
     Ok(())
+}
+
+/// Raise when loader `name` would write into a schema literally named `preserve`.
+pub(crate) fn preserved_loader_schema(py: Python<'_>, name: &str, table: &str) -> PyResult<()> {
+    Err(planner_error(
+        py,
+        target_error_message(&TargetError::PreservedLoaderSchema(name.to_owned())),
+        MANAGED_WRITE_SCHEMA_CODE,
+        Some(format!(
+            "to choose where it writes, set its destination in its @loader decorator:\n            \
+             @loader(destination=\"my_schema.{table}\")"
+        )),
+    ))
+}
+
+/// The schema a loader destination names, or `target_schema` when it names none.
+fn loader_schema<'a>(
+    destination: Option<&'a str>,
+    target_schema: Option<&'a str>,
+) -> Option<&'a str> {
+    match destination.map(|destination| destination.rsplit('.').collect::<Vec<&str>>()) {
+        Some(parts) if parts.len() > 1 => Some(parts[1]),
+        _ => target_schema,
+    }
 }
 
 /// Raise when neither the resource nor the project names a physical write schema.
