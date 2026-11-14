@@ -11,5 +11,3 @@ pub(crate) const JOB_SELECTOR_KINDS: [&str; 2] = ["job", "name"];
 pub(crate) const SELECTOR_INTERSECTION: char = ',';
 /// The key prefix of a SQL unit test's result, as the snapshot names it.
 pub(crate) const SQL_TEST_KEY_PREFIX: &str = "sql_test:";
-/// The outcome of a SQL unit test that passed.
-pub(crate) const SQL_TEST_PASS: &str = "pass";

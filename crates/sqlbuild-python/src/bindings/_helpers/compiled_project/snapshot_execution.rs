@@ -9,15 +9,20 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyStringMethods;
 use sqlbuild_core::models::ResourceKind;
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
+use sqlbuild_host::models::SqlTestOutcome;
+use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::{
     NodeOutcome, RunChange, RunCommand, RunExecution, RunOutcome,
 };
 
 use crate::bindings::_helpers::compiled_project::constants::{
-    NO_CHANGE_REASON, SKIP_ACTION, SQL_TEST_KEY_PREFIX, SQL_TEST_PASS,
+    NO_CHANGE_REASON, SKIP_ACTION, SQL_TEST_KEY_PREFIX,
 };
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::records::fields::field;
+
+/// Node keys by snapshot node key, such as the models each test checks.
+pub(crate) type NodeKeys = BTreeMap<String, Vec<String>>;
 
 /// This transient owner records only acknowledged outcomes; durable lifecycle remains on the API.
 #[derive(Debug)]
@@ -28,6 +33,8 @@ pub(crate) struct WorkerBuild {
     checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
     /// The snapshot's audits and SQL tests, each with the node keys it checks.
     attached: BTreeMap<String, Vec<String>>,
+    /// Each SQL test with every model a failure of it blocks in a build: its expected, assertion and reference targets.
+    blocked: BTreeMap<String, Vec<String>>,
     /// Each snapshot node's direct upstream node keys, for naming what a skipped node waited on.
     upstream: BTreeMap<String, Vec<String>>,
     /// The failed node each finished node traces back to: itself when it failed, its cause when skipped.
@@ -43,7 +50,7 @@ pub(crate) struct WorkerBuild {
 impl WorkerBuild {
     pub(crate) fn new(
         worker: &Bound<'_, NativeOrchestrationWorker>,
-        (attached, upstream): (BTreeMap<String, Vec<String>>, BTreeMap<String, Vec<String>>),
+        (attached, blocked, upstream): (NodeKeys, NodeKeys, NodeKeys),
     ) -> PyResult<Arc<Self>> {
         let state = Arc::new(Self {
             execution: worker.get().execution(worker.py())?,
@@ -51,6 +58,7 @@ impl WorkerBuild {
             completed: Mutex::default(),
             checks: Mutex::default(),
             attached,
+            blocked,
             upstream,
             causes: Mutex::default(),
             checked: Mutex::default(),
@@ -203,10 +211,12 @@ impl WorkerBuild {
         {
             return Ok(());
         }
+        // A test or audit run that raised skips what it never checked, not what a failed check reads.
         let skipped_because_of = match outcome {
             NodeOutcome::Skipped => match self.execution.skipped_nodes.get(key) {
                 Some(cause) => Some(cause.clone()),
-                None => self.failed_upstream(key)?,
+                None if !self.checks_only() => self.failed_upstream(key)?,
+                None => None,
             },
             _ => None,
         };
@@ -375,12 +385,17 @@ impl WorkerBuild {
     }
 
     /// A failing SQL test blocks the models it covers, so they finish failed with its error rather than as bare skips.
-    fn finished_test(&self, result: &Bound<'_, PyAny>, key: &str) -> PyResult<()> {
+    fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
         let py = result.py();
-        let outcome: String = field(result, "outcome")?.str()?.extract()?;
-        if outcome == SQL_TEST_PASS || self.worker.bind(py).get().refresh_cancellation(py)? {
+        let outcome: String = field(result, "outcome")?.getattr("value")?.extract()?;
+        if SqlTestOutcome::from_value(&outcome) == Some(SqlTestOutcome::Pass)
+            || self.worker.bind(py).get().refresh_cancellation(py)?
+        {
             return Ok(());
         }
+        // The snapshot keys a parameterised case by its compiled name, not by the file and block the result reports.
+        let name: String = field(result, "test_name")?.extract()?;
+        let key = format!("{SQL_TEST_KEY_PREFIX}{name}");
         let error: Option<String> = match result.getattr_opt("error_code")? {
             Some(value) => value.extract()?,
             None => None,
@@ -389,7 +404,7 @@ impl WorkerBuild {
             Some(value) => value.extract()?,
             None => None,
         };
-        for model in self.attached.get(key).into_iter().flatten() {
+        for model in self.blocked.get(&key).into_iter().flatten() {
             self.complete(
                 py,
                 model,
@@ -402,7 +417,7 @@ impl WorkerBuild {
     /// Existing native progress callbacks publish selected-node evidence without Python relays.
     pub(crate) fn completed(&self, result: &Bound<'_, PyAny>, key: &str) -> PyResult<()> {
         if key.starts_with(SQL_TEST_KEY_PREFIX) {
-            return self.finished_test(result, key);
+            return self.finished_test(result);
         }
         if self.execution.claim.request.selection.contains(key) {
             let status: String = field(result, "status")?.str()?.extract()?;

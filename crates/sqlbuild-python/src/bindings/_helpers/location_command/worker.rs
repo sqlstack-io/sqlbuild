@@ -26,13 +26,16 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
     WarehouseInputs, configured_warehouses,
 };
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
+use crate::bindings::_helpers::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::{NodeKeys, WorkerBuild};
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
+use crate::bindings::_helpers::compiled_views::project_reads::sql_tests;
 use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::constants::{
-    CHANGED_SETTING, COMMAND_IMPLEMENTATIONS, JOB_RUN_COUNTS, JOB_RUN_REACH, REACH_SETTING,
+    BLOCKED_TEST_TARGETS, CHANGED_SETTING, COMMAND_IMPLEMENTATIONS, JOB_RUN_COUNTS, JOB_RUN_REACH,
+    REACH_SETTING,
 };
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::recall::console::write_stderr;
@@ -71,6 +74,29 @@ fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
         attached.insert(key.clone(), nodes);
     }
     attached
+}
+
+/// Each compiled SQL test with the models a failure of it blocks in a build, as the scheduler's `scope_deps` names them.
+pub(super) fn blocked_nodes(project: &Bound<'_, PyAny>) -> PyResult<NodeKeys> {
+    let mut blocked: NodeKeys = BTreeMap::new();
+    for test in sql_tests(project)?.try_iter()? {
+        let test = test?;
+        let name: String = field(&field(&test, "key")?, "name")?.extract()?;
+        let mut models: Vec<String> = Vec::new();
+        for list in BLOCKED_TEST_TARGETS {
+            let Some(names) = test.getattr_opt(list)? else {
+                continue;
+            };
+            for name in names.extract::<Vec<String>>()? {
+                let model = format!("model:{name}");
+                if !models.contains(&model) {
+                    models.push(model);
+                }
+            }
+        }
+        blocked.insert(format!("{SQL_TEST_KEY_PREFIX}{name}"), models);
+    }
+    Ok(blocked)
 }
 
 /// Each snapshot node's direct upstream node keys.
@@ -271,7 +297,7 @@ fn run_cancellable<'py>(
 
 pub(super) fn execute_worker<'py>(
     py: Python<'py>,
-    (snapshot, discovered): (&NativeOrchestrationSnapshot, Bound<'py, PyAny>),
+    (snapshot, discovered, blocked): (&NativeOrchestrationSnapshot, Bound<'py, PyAny>, NodeKeys),
     arguments: &KeywordArguments<'py>,
     (bearer, identity, recall): (&str, (String, String), Option<&InvocationRecall>),
 ) -> PyResult<i32> {
@@ -286,7 +312,10 @@ pub(super) fn execute_worker<'py>(
         )
         .map_err(|error| PyValueError::new_err(error.to_string()))?,
     )?;
-    let worker = WorkerBuild::new(&owner, (attached_nodes(snapshot), upstream_nodes(snapshot)))?;
+    let worker = WorkerBuild::new(
+        &owner,
+        (attached_nodes(snapshot), blocked, upstream_nodes(snapshot)),
+    )?;
     if let Some(recall) = recall {
         *recall
             .worker

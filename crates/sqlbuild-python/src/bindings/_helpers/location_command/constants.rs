@@ -33,3 +33,9 @@ pub(crate) const REACH_SETTING: &str = "reach";
 pub(crate) const JOB_RUN_REACH: &str = "all";
 /// What a job run with `changed: True` counts when `[changes] counts` is not set: every change.
 pub(crate) const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];
+/// The model lists of a compiled SQL test that a failure of it blocks in a build.
+pub(crate) const BLOCKED_TEST_TARGETS: [&str; 3] = [
+    "expected_model_names",
+    "assertion_target_model_names",
+    "reference_target_model_names",
+];
