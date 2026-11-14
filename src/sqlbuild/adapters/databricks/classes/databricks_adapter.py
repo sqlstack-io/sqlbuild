@@ -1866,7 +1866,7 @@ class DatabricksAdapter(
         columns: tuple[str, ...],
         window: str | None = None,
     ) -> str:
-        """One MERGE deleting the window and the delta's keys, once each, then inserting every row."""
+        """One MERGE deleting the window and delta keys, once each, then inserting every row."""
 
         quoted: tuple[str, ...] = tuple(self.render_identifier(column) for column in columns)
         keys: frozenset[str] = frozenset(key.lower() for key in unique_key)
