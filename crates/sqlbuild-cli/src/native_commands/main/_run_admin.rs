@@ -25,15 +25,13 @@ use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
-use crate::native_commands::_helpers::decision::{control_admin, control_database_variable};
+use crate::native_commands::_helpers::decision::control_admin;
 use crate::native_commands::_helpers::execution::open_control_store;
 use crate::native_commands::models::ControlAdmin;
-use crate::server_config::models::ServerSection;
 
 pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlError> {
     let action = control_admin(namespace)?;
-    let variable = control_database_variable(namespace, &ServerSection::default());
-    let store = open_control_store(namespace, &variable).await?;
+    let store = open_control_store(namespace, None).await?;
     let context = AuditContext {
         actor: "local-control-store-owner".into(),
         granting_role: "control-store-owner".into(),

@@ -85,6 +85,8 @@ def docker_deployment(directory: Path, executable: str) -> Iterator[WorkerDeploy
         "ALL",
         "--security-opt",
         "no-new-privileges",
+        "--memory",
+        "768m",
         "--user",
         f"{os.getuid()}:{os.getgid()}",
         "--workdir",

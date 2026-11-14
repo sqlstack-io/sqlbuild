@@ -116,9 +116,14 @@ pub(in crate::workers) fn validate_configuration(
             return Err(ControlError::Invalid("Docker launchers require an absolute socket path, location container and executable".into()));
         }
         let run = &location.run;
-        if run.cpus.is_some_and(|cpus| !cpus.is_finite() || cpus <= 0.0)
-            || run.pids.is_some_and(|pids| pids <= 0)
-            || run.cgroup_parent.as_deref().is_some_and(|path| path.trim().is_empty())
+        if run
+            .cpus
+            .is_some_and(|cpus| !cpus.is_normal() || cpus.is_sign_negative())
+            || run.pids == Some(0)
+            || run
+                .cgroup_parent
+                .as_deref()
+                .is_some_and(|path| path.trim().is_empty())
         {
             return Err(ControlError::Invalid(format!(
                 "launcher location '{}' run settings require positive cpus and pids and a non-blank cgroup_parent",

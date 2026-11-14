@@ -6,8 +6,8 @@ use crate::api::errors::ClientError;
 use crate::api::main::client_response::client_response;
 use crate::api::models::MutationResponse;
 use crate::platform::models::{
-    LocationHealthReport, LocationWorkClaim, LocationWorkClient, LocationWorkPoll,
-    LocationWorkResult,
+    LocationHealthObservation, LocationHealthReport, LocationWorkClaim, LocationWorkClient,
+    LocationWorkPoll, LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
     MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
@@ -34,6 +34,21 @@ impl LocationWorkClient {
         let response: MutationResponse =
             client_response(self.connection.client.post(endpoint).json(report)).await?;
         Ok(response.applied)
+    }
+
+    /// The newest health observations of one target of this location, newest first.
+    pub async fn recent_health(
+        &self,
+        target: &str,
+    ) -> Result<Vec<LocationHealthObservation>, ClientError> {
+        let mut endpoint = self.connection.endpoint(&[
+            "api",
+            "locations",
+            &self.location_id.to_string(),
+            "health",
+        ])?;
+        endpoint.query_pairs_mut().append_pair("target", target);
+        client_response(self.connection.client.get(endpoint)).await
     }
 
     pub async fn metadata_watermark(

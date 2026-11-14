@@ -293,6 +293,8 @@
 				"label": "Server",
 				"items": [
 					"docs/cli/server",
+					"docs/cli/location",
+					"docs/cli/dev",
 					"docs/cli/login"
 				]
 			}

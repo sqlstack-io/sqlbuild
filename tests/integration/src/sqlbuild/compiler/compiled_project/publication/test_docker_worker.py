@@ -77,8 +77,24 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     "benchmarks/duckshop/edge_cases/orchestration/container_resources_orders.py"
                 ).read_text()
             },
-            launcher_run={"memory": "768m", "cpus": 2, "pids": 256, "max_memory": "1g"},
+            launcher_settings={
+                "run": {"memory": "768m", "cpus": 2, "pids": 256, "max_memory": "1g"}
+            },
             expected_host_config={"Memory": 1 << 30, "NanoCpus": 500_000_000, "PidsLimit": 256},
+        ),
+        WorkerExecutionTestCase(
+            "without max_memory a job cannot raise memory above its location container's",
+            "SELECT 43 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(43,)],
+            launcher="docker",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/container_resources_orders.py"
+                ).read_text()
+            },
+            expected_host_config={"Memory": 768 << 20, "NanoCpus": 500_000_000},
         ),
         WorkerExecutionTestCase(
             "container warehouse error retains failed node evidence",
@@ -109,7 +125,9 @@ def test_given_a_scheduled_docker_job_when_published_then_a_pinned_worker_execut
         assert state["ExitCode"] == {"success": 0, "failed": 1}[test_case.expected_status]
         name: str = f"sqlbuild-{worker.api.location_id}-{run['run_id']}"
         host: dict[str, Any] = json.loads(
-            docker_command(worker.docker.socket, "inspect", "--format", "{{json .HostConfig}}", name)
+            docker_command(
+                worker.docker.socket, "inspect", "--format", "{{json .HostConfig}}", name
+            )
         )
         location: dict[str, Any] = json.loads(
             docker_command(

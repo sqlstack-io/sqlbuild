@@ -60,6 +60,8 @@ executable = "/usr/local/bin/sqb"
 - Each launcher names a location by the name you gave `sqb admin create-location`. Create the
   location before you start the server; an unknown name stops it.
 - `sqb scheduler --config server.toml` reads the same file for its control database and launchers.
+- `sqb admin` doesn't read the file. When `database_env` names another variable, pass the same
+  name to `sqb admin --database-env` so it changes the server's store.
 - An unknown section or key stops the server with the line it is on.
 
 Use `sqb server --help` for the remaining options.
@@ -438,6 +440,8 @@ nightly_orders = job(
 - A job's `resources` win over the launcher's `run` table, which wins over the location
   container's limits.
 - A worker never gets more than `max_memory`: a job that asks for more gets `max_memory`.
+  Without `max_memory`, a job's `resources` can't go above the location container's memory, CPU
+  or process limits; set `max_memory` to let jobs ask for more memory than the location has.
 - Workers keep the location container's dropped capabilities and security options, such as
   `no-new-privileges`.
 - A job in a group uses its own `resources`. Local launchers ignore `resources`.

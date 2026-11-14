@@ -2,8 +2,7 @@
 
 use sqlbuild_orchestration::store::errors::ControlError;
 
-use crate::argv::models::Namespace;
-use crate::native_commands::_helpers::decision::text;
+use crate::argv::models::{Namespace, Value};
 use crate::server_config::constants::REPLACED_SERVER_FLAGS;
 use crate::server_config::models::ServerConfig;
 
@@ -31,4 +30,11 @@ pub(crate) fn read_server_config(namespace: &Namespace) -> Result<ServerConfig, 
             error.message().trim_end()
         ))
     })
+}
+
+fn text(namespace: &Namespace, name: &str) -> Option<String> {
+    match namespace.get(name) {
+        Some(Value::Str(text) | Value::Path(text)) => Some(text.clone()),
+        _ => None,
+    }
 }

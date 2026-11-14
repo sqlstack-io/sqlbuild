@@ -2,7 +2,7 @@ name: ${COMPOSE_PROJECT_NAME:-sqlbuild}
 
 services:
   postgres:
-    image: postgres:17.6-alpine3.22
+    image: docker.io/library/postgres:17.6-alpine3.22
     environment:
       POSTGRES_USER: sqlbuild
       POSTGRES_DB: sqlbuild

@@ -26,11 +26,11 @@ use crate::native_commands::constants::{
     SKILLS_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
-use crate::server_config::models::{ServerConfig, ServerSection};
 use crate::native_commands::models::{
     ControlAdmin, CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions,
     SkillsOptions,
 };
+use crate::server_config::models::{ServerConfig, ServerSection};
 use sqlbuild_core::cost_command::constants::DESCENDING_ORDER;
 
 /// Whether `sqb review --json` failed to parse, which Python reports as a JSON document.
@@ -362,8 +362,8 @@ fn control_authentication(
     namespace: &Namespace,
     config: &ServerConfig,
 ) -> Result<ApiAuthentication, ControlError> {
-    let password =
-        text(namespace, "control_password_origin").or_else(|| config.server.password_origin.clone());
+    let password = text(namespace, "control_password_origin")
+        .or_else(|| config.server.password_origin.clone());
     let login = match (password, config.trusted_proxy.clone(), config.oidc.clone()) {
         (None, None, None) => HumanLogin::None,
         (Some(origin), None, None) => HumanLogin::Password(origin),
@@ -383,9 +383,11 @@ fn control_authentication(
     };
     Ok(ApiAuthentication {
         login,
-        default_role: serde_json::from_value(json!(text(namespace, "control_default_role")
-            .or_else(|| config.server.default_role.clone())
-            .unwrap_or_else(|| "none".into())))
+        default_role: serde_json::from_value(json!(
+            text(namespace, "control_default_role")
+                .or_else(|| config.server.default_role.clone())
+                .unwrap_or_else(|| "none".into())
+        ))
         .map_err(|_| ControlError::Invalid("default role must be none or viewer".into()))?,
     })
 }
@@ -397,7 +399,10 @@ pub(crate) fn control_database_variable(namespace: &Namespace, server: &ServerSe
         .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into())
 }
 
-pub(crate) fn control_database(namespace: &Namespace, variable: &str) -> Result<String, ControlError> {
+pub(crate) fn control_database(
+    namespace: &Namespace,
+    variable: &str,
+) -> Result<String, ControlError> {
     match std::env::var(variable) {
         Ok(value) => Ok(value),
         Err(std::env::VarError::NotPresent) => Ok(PathBuf::from(

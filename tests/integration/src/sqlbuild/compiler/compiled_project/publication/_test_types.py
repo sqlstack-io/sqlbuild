@@ -123,7 +123,7 @@ class WorkerExecutionTestCase:
     concurrency_limits: dict[str, int] = field(default_factory=dict)
     launcher: Literal["native", "uncooperative", "docker"] = "native"
     # A Docker launcher's [launchers.docker.run] settings and the worker HostConfig they produce.
-    launcher_run: dict[str, Any] = field(default_factory=dict)
+    launcher_settings: dict[str, Any] = field(default_factory=dict)
     expected_host_config: dict[str, Any] = field(default_factory=dict)
     warehouse_setup: Callable[[Path], None] = lambda _: None
     # Each run node as (key, status, error code, skipped because of, error message).

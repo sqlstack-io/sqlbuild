@@ -1,4 +1,4 @@
-"""A job asks for more memory than its launcher's max_memory and fewer CPUs than the launcher default."""
+"""A job asks for more memory than its worker may have and fewer CPUs than the launcher default."""
 
 from sqlbuild.orchestration import job, resources, schedule
 

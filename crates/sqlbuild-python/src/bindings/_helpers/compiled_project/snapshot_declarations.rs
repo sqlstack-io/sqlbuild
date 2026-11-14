@@ -21,8 +21,8 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, declared_at, module_jobs,
-    job_resources, run_controls,
+    AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, declared_at, job_resources,
+    module_jobs, run_controls,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     compile_calendars, compile_cron, compile_sensors,

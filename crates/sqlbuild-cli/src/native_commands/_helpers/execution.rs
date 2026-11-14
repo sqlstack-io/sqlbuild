@@ -61,7 +61,9 @@ use crate::compute_logs::main::finish_capture::finish_capture;
 use crate::compute_logs::main::open_log_root::open_log_root;
 use crate::compute_logs::main::start_capture::start_capture;
 use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
-use crate::native_commands::_helpers::decision::{control_database, text};
+use crate::native_commands::_helpers::decision::{
+    control_database, control_database_variable, text,
+};
 use crate::native_commands::_helpers::init::run_init;
 use crate::native_commands::_helpers::package::installed_package;
 use crate::native_commands::_helpers::paths::{location_database_files, project_location};
@@ -87,6 +89,7 @@ use crate::native_commands::models::{
     MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
 };
 use crate::native_commands::types::LocationPublication;
+use crate::server_config::models::ServerSection;
 use crate::workers::main::docker_image_sources::docker_image_sources;
 use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
@@ -970,9 +973,12 @@ pub(crate) async fn run_control_action(
 /// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.
 pub(crate) async fn open_control_store(
     namespace: &Namespace,
-    variable: &str,
+    server: Option<&ServerSection>,
 ) -> Result<ControlStore, ControlError> {
-    let url = control_database(namespace, variable)?;
+    let url = control_database(
+        namespace,
+        &control_database_variable(namespace, server.unwrap_or(&ServerSection::default())),
+    )?;
     set_release_version(env!("CARGO_PKG_VERSION"));
     drop(write_output(&[(
         Stream::Stderr,
@@ -986,10 +992,11 @@ pub(crate) async fn open_control_store(
 
 /// Hand the configured launchers to the workers domain, which resolves their locations in the store.
 pub(crate) async fn open_control_workers(
-    store: &ControlStore,
-    launchers: Launchers,
-    (variable, scheduler_enabled): (String, bool),
+    (store, namespace): (&ControlStore, &Namespace),
+    (server, launchers): (&ServerSection, Launchers),
+    scheduler_enabled: bool,
 ) -> Result<(Workers, RunHandoff), ControlError> {
+    let variable = control_database_variable(namespace, server);
     let workers = open_workers(store, launchers, (variable, scheduler_enabled)).await?;
     let images = docker_image_sources(&workers);
     Ok((workers, (images, adhoc_planner())))
