@@ -34,6 +34,8 @@ from sqlbuild.orchestration import (
 )
 from sqlbuild.orchestration_declarations.models.authoring import Job, JobGroup
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
+    PythonCheckJobRejectionTestCase,
+    PythonCheckJobTestCase,
     PythonJobGroupCycleTestCase,
     PythonJobGroupTestCase,
     PythonJobSelectionTestCase,
@@ -1997,3 +1999,50 @@ def test_given_a_python_dependency_cycle_across_jobs_when_publishing_a_group_the
 
     with pytest.raises(ValueError, match=re.escape(test_case.expected_message)):
         python_pipeline_snapshot(tmp_path, [*jobs, group])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonCheckJobTestCase(
+            description="a job matching a check and the model it checks publishes the model",
+            select="tag:order_checks orders",
+            expected_selection=["model:orders"],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_job_matching_a_check_and_its_node_when_publishing_then_the_check_runs_with_it(
+    tmp_path: Path, test_case: PythonCheckJobTestCase
+) -> None:
+    nightly: Job = job("nightly_orders", description="Orders.", select=test_case.select)
+
+    snapshot: dict[str, Any] = json.loads(python_pipeline_snapshot(tmp_path, [nightly]).to_json())
+
+    assert snapshot["documents"]["jobs"]["nightly_orders"]["selection"] == (
+        test_case.expected_selection
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonCheckJobRejectionTestCase(
+            description="a job matching a check without the model it checks names both",
+            select="tag:order_checks",
+            expected_message=(
+                "job nightly_orders: Python check 'orders_present' checks model:orders, which "
+                "the selection does not include; select it too, or narrow the selector so it no "
+                "longer matches the check."
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_job_matching_a_check_without_its_node_when_publishing_then_it_is_rejected(
+    tmp_path: Path, test_case: PythonCheckJobRejectionTestCase
+) -> None:
+    nightly: Job = job("nightly_orders", description="Orders.", select=test_case.select)
+
+    with pytest.raises(ValueError, match=re.escape(test_case.expected_message)):
+        python_pipeline_snapshot(tmp_path, [nightly])

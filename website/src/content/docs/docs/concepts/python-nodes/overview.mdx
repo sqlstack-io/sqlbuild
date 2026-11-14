@@ -141,7 +141,7 @@ Python nodes are selected like SQL resources, by bare name or typed selector:
 sqb build --select export_orders          # bare name
 sqb build --select task:export_orders      # typed
 sqb build --select asset:orders_export
-sqb build --select check:check_orders
+sqb build --select export_orders check:check_orders_exported  # a check with the node it checks
 sqb build --select tag:exports             # by tag
 sqb build --select +orders_export           # with upstreams
 ```

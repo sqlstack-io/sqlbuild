@@ -18,3 +18,4 @@ class RunE2ETestCase:
     expected_query_results: tuple[tuple[str, tuple[tuple[object, ...], ...]], ...] = field(
         default_factory=tuple
     )
+    select: tuple[str, ...] = field(default_factory=tuple)

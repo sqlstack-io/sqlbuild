@@ -89,14 +89,10 @@ pub(crate) fn run_selection(
             Atom::Sql(_) => None,
         })
         .collect();
-    if !select.is_empty() && !checks.is_empty() {
-        return Err(error(
-            PLANNER_DEFAULT_CODE,
-            format!(
-                "Python checks are not selectable here: {}. Use sqb check instead.",
-                checks.join(", ")
-            ),
-        ));
+    if !select.is_empty()
+        && let Some(message) = unselected_checked_nodes(context, &selected, &checks)
+    {
+        return Err(error(PLANNER_DEFAULT_CODE, message));
     }
     let runnable: Atoms = selected
         .into_iter()
@@ -104,6 +100,38 @@ pub(crate) fn run_selection(
         .collect();
     validate_selected_dependencies(context, &runnable)?;
     Ok(selection(context, sql_keys(&runnable), &runnable))
+}
+
+/// A matched check runs with the nodes it checks, so each of them must be selected too.
+fn unselected_checked_nodes(
+    context: &SelectionContext<'_>,
+    selected: &Atoms,
+    checks: &[&str],
+) -> Option<String> {
+    checks.iter().find_map(|check| {
+        let python = context
+            .nodes
+            .edges(check, EdgeDirection::Upstream)
+            .iter()
+            .filter(|name| !selected.contains(&Atom::Python((*name).clone())))
+            .filter_map(|name| Some(format!("{}:{name}", context.nodes.node(name)?.kind)));
+        let sql = context
+            .nodes
+            .node(check)
+            .map_or(&[][..], |node| &node.sql_deps);
+        let sql = sql
+            .iter()
+            .filter(|key| !selected.contains(&Atom::Sql((*key).clone())))
+            .map(|(kind, name)| format!("{kind}:{name}"));
+        let missing: Vec<String> = python.chain(sql).collect();
+        (!missing.is_empty()).then(|| {
+            format!(
+                "Python check '{check}' checks {}, which the selection does not include; \
+                 select it too, or narrow the selector so it no longer matches the check.",
+                missing.join(", ")
+            )
+        })
+    })
 }
 
 /// The SQL keys, with the source each selected intermediate loader writes, and the selected Python node names.

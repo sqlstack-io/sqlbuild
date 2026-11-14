@@ -27,6 +27,9 @@ pub(crate) const CHANGED_COUNTS_DEST: &str = "changed_counts";
 /// The job setting `--changed` becomes.
 pub(crate) const CHANGED_DEST: &str = "changed";
 
+/// The destination `--no-python` clears; only a build with Python nodes resolves them.
+pub(crate) const INCLUDE_PYTHON_DEST: &str = "include_python";
+
 /// The destination `--load` and `--no-load` share; only `--no-load` is accepted.
 pub(crate) const LOAD_SOURCES_DEST: &str = "load_sources";
 

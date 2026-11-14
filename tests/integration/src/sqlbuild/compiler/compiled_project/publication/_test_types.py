@@ -406,6 +406,8 @@ class AdhocVerbTestCase:
     # Files the worker's checkout gains after it verified the final run, which must not run.
     rewrites: dict[str, str] = field(default_factory=dict)
     expected_status: str = "success"
+    # Files that replace the published project's own before publication.
+    files: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

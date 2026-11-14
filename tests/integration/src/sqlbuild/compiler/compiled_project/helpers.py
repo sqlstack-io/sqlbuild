@@ -84,6 +84,9 @@ PYTHON_PIPELINE_FILES: dict[str, str] = {
     "python/fulfillment/carrier_sync/node.py": Path(
         "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_carrier_sync.py"
     ).read_text(),
+    "python/checks/orders_present.py": Path(
+        "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_orders_check.py"
+    ).read_text(),
 }
 
 TYPE_PROOF_FILES: dict[str, str] = {

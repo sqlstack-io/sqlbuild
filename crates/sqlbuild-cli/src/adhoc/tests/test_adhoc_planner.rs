@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
+use sqlbuild_orchestration::runs::models::PlannerResource;
 use sqlbuild_orchestration::runs::types::PublishedJobs;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
@@ -348,6 +349,23 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             &["orders"],
             Some("python/fulfillment/carrier_sync"),
         ),
+        PlannerResource {
+            loader: Some("raw_shipments".to_owned()),
+            ..resource("source:raw_shipments", &[], &[], None)
+        },
+        resource(
+            "model:shipments",
+            &["source:raw_shipments"],
+            &[],
+            Some("models/marts"),
+        ),
+        resource(
+            "loader:raw_shipments",
+            &["loader:stage_shipments"],
+            &[],
+            Some("python/loaders"),
+        ),
+        resource("loader:stage_shipments", &[], &[], Some("python/loaders")),
     ];
     let jobs: PublishedJobs = BTreeMap::from([(
         "carrier_sync".to_owned(),
@@ -435,6 +453,46 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
                 ],
                 json!({}),
             )),
+        },
+        AdhocPlanTestCase {
+            description: "upstream of a model runs its source's loader chain as the sources they write",
+            command: &["build", "--select", "+shipments"],
+            expected_plan: Ok((
+                &[
+                    "model:shipments",
+                    "source:raw_shipments",
+                    "source:stage_shipments",
+                ],
+                json!({}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "an intermediate loader runs as the source it writes",
+            command: &["build", "--select", "loader:stage_shipments"],
+            expected_plan: Ok((&["source:stage_shipments"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "test selects only the SQL nodes a tag shared with Python nodes matches",
+            command: &["test", "--select", "tag:orders"],
+            expected_plan: Ok((&["model:orders", "model:stg_orders"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "test downstream of a model stops at the Python nodes that read it",
+            command: &["test", "--select", "orders+", "--exclude", "stg_orders"],
+            expected_plan: Ok((&["model:orders"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a build without Python nodes selects only the SQL nodes a shared tag matches",
+            command: &["build", "--no-python", "--select", "tag:orders"],
+            expected_plan: Ok((
+                &["model:orders", "model:stg_orders"],
+                json!({"include_python": false}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "test of a job with only Python nodes has nothing to test",
+            command: &["test", "--select", "job:carrier_sync"],
+            expected_plan: Err("the selectors match no nodes in the current publication"),
         },
     ];
     let planner = adhoc_planner();

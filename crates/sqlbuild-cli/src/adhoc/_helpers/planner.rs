@@ -11,6 +11,7 @@ use sqlbuild_analysis::graph::models::{GraphResource, JobSelection};
 use sqlbuild_analysis::planner_selection::main::split_unit_test_selectors::split_unit_test_selectors;
 use sqlbuild_analysis::planner_selection::models::{SelectorGroups, UnitTestSelectorNames};
 use sqlbuild_analysis::python_selection::main::published_python_graph::published_python_graph;
+use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
 use sqlbuild_analysis::python_selection::models::{PublishedPythonNode, SqlSelectionGraph};
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
@@ -19,8 +20,9 @@ use sqlbuild_orchestration::runs::types::{CommandPlanner, PublishedJobs};
 
 use crate::adhoc::constants::{
     ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, CHANGED_COUNTS_DEST, CHANGED_DEST, COMMAND_DEST,
-    FRESHNESS_VERB, INTEGER_CONVERTERS, LOAD_SOURCES_DEST, POSITIVE_INTEGER_CONVERTER,
-    REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS, SQL_TEST_KIND, UNIT_TEST_VERBS,
+    FRESHNESS_VERB, INCLUDE_PYTHON_DEST, INTEGER_CONVERTERS, LOAD_SOURCES_DEST,
+    POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS, SQL_TEST_KIND,
+    UNIT_TEST_VERBS,
 };
 use crate::argv::main::command_settings_arguments::command_settings_arguments;
 use crate::argv::main::job_settings_arguments::job_settings_arguments;
@@ -86,7 +88,11 @@ impl CommandPlanner for CliPlanner {
                 seeds
             }
             FRESHNESS_VERB => freshness_sources(publication, &select, &exclude)?,
-            _ => resolve_with_tests(verb, publication, &select, &exclude)?,
+            _ => {
+                let python = verb == BUILD_VERB
+                    && settings.get(INCLUDE_PYTHON_DEST) != Some(&Json::Bool(false));
+                resolve_with_tests((verb, python), publication, &select, &exclude)?
+            }
         };
         Ok(CommandPlan {
             verb: verb.clone(),
@@ -196,7 +202,7 @@ fn resolve(
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let selected: BTreeSet<String> = resolved(publication, select, exclude)?;
+    let selected: BTreeSet<String> = resolved(publication, select, exclude, false)?;
     if selected.is_empty() {
         return Err("the selectors match no nodes in the current publication".into());
     }
@@ -205,7 +211,7 @@ fn resolve(
 
 /// [`resolve`] with `test:` and unit-test names selecting `sql_test:` keys, as `sqb test` does.
 fn resolve_with_tests(
-    verb: &str,
+    (verb, python): (&str, bool),
     (resources, jobs): (&[PlannerResource], &PublishedJobs),
     select: &[String],
     exclude: &[String],
@@ -235,7 +241,7 @@ fn resolve_with_tests(
         );
     }
     let mut keys: BTreeSet<String> = if split.models_selected {
-        resolved((resources, jobs), &split.select, &split.exclude)?
+        resolved((resources, jobs), &split.select, &split.exclude, python)?
     } else {
         BTreeSet::new()
     };
@@ -255,15 +261,20 @@ fn is_sql_test(resource: &PlannerResource) -> bool {
     resource.key.split_once(':').map(|(kind, _)| kind) == Some(SQL_TEST_KIND)
 }
 
+/// The published keys the selectors match; Python nodes only when the command runs them.
 fn resolved(
     (resources, jobs): (&[PlannerResource], &PublishedJobs),
     select: &[String],
     exclude: &[String],
+    include_python: bool,
 ) -> Result<BTreeSet<String>, String> {
-    let (python, sql): (Vec<&PlannerResource>, Vec<&PlannerResource>) = resources
+    let (mut python, sql): (Vec<&PlannerResource>, Vec<&PlannerResource>) = resources
         .iter()
         .filter(|resource| !is_sql_test(resource))
         .partition(|resource| python_kind(&resource.key).is_some());
+    if !include_python {
+        python.clear();
+    }
     let graph_resources: Vec<GraphResource> = sql
         .iter()
         .filter_map(|resource| graph_resource(resource))
@@ -275,7 +286,7 @@ fn resolved(
         .map(|resource| name_of(&resource.key))
         .collect();
     if selectors_need_jobs(&graph, &selectors, &node_names) {
-        graph = attach_jobs(graph, published_jobs(jobs));
+        graph = attach_jobs(graph, published_jobs(jobs, include_python));
     }
     let sources: Vec<(String, Option<String>)> = sql
         .iter()
@@ -306,10 +317,9 @@ fn resolved(
         .into_iter()
         .map(|(kind, name)| format!("{kind}:{name}"))
         .chain(
-            selection
-                .python_node_names
-                .iter()
-                .filter_map(|name| Some(format!("{}:{name}", kinds.get(name.as_str())?))),
+            selection.python_node_names.iter().filter_map(|name| {
+                Some(python_run_key(&sources, (kinds.get(name.as_str())?, name)))
+            }),
         )
         .collect())
 }
@@ -339,10 +349,14 @@ fn name_of(key: &str) -> &str {
 }
 
 /// Published jobs as already-resolved graph selections.
-fn published_jobs(jobs: &PublishedJobs) -> BTreeMap<String, JobSelection> {
+fn published_jobs(jobs: &PublishedJobs, include_python: bool) -> BTreeMap<String, JobSelection> {
     let mut selections: BTreeMap<String, JobSelection> = BTreeMap::new();
     for (name, keys) in jobs {
-        let keys: Vec<(String, String)> = keys.iter().filter_map(|key| object_key(key)).collect();
+        let keys: Vec<(String, String)> = keys
+            .iter()
+            .filter(|key| include_python || python_kind(key).is_none())
+            .filter_map(|key| object_key(key))
+            .collect();
         selections.insert(name.clone(), JobSelection::Resolved { keys });
     }
     selections
@@ -355,11 +369,11 @@ fn freshness_sources(
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
     let selected: BTreeSet<String> =
-        upstream_sources(publication.0, &resolved(publication, select, &[])?);
+        upstream_sources(publication.0, &resolved(publication, select, &[], false)?);
     let excluded: BTreeSet<String> = if exclude.is_empty() {
         BTreeSet::new()
     } else {
-        upstream_sources(publication.0, &resolved(publication, exclude, &[])?)
+        upstream_sources(publication.0, &resolved(publication, exclude, &[], false)?)
     };
     let sources: BTreeSet<String> = selected.difference(&excluded).cloned().collect();
     if sources.is_empty() {

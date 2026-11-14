@@ -284,6 +284,20 @@ class PythonJobGroupCycleTestCase:
 
 
 @dataclass(frozen=True)
+class PythonCheckJobTestCase:
+    description: str
+    select: str
+    expected_selection: list[str]
+
+
+@dataclass(frozen=True)
+class PythonCheckJobRejectionTestCase:
+    description: str
+    select: str
+    expected_message: str
+
+
+@dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
     schedule: Schedule

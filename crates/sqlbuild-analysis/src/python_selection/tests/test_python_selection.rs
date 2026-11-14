@@ -139,13 +139,20 @@ fn given_run_selectors_when_resolving_then_selection_matches_python() {
             expected_selection: Ok((&[("model", "orders")], &["export_orders", "prepare_orders"])),
         },
         RunSelectionTestCase {
-            description: "checks are rejected",
+            description: "a check whose checked node is selected runs with it",
+            select: &["tag:exports"],
+            exclude: &[],
+            expected_selection: Ok((&[], &["export_orders"])),
+        },
+        RunSelectionTestCase {
+            description: "a check whose checked node is unselected names both",
             select: &["check:check_orders_export"],
             exclude: &[],
             expected_selection: Err((
                 "S000",
-                "Python checks are not selectable here: check_orders_export. \
-                 Use sqb check instead.",
+                "Python check 'check_orders_export' checks asset:export_orders, which the \
+                 selection does not include; select it too, or narrow the selector so it no \
+                 longer matches the check.",
             )),
         },
         RunSelectionTestCase {

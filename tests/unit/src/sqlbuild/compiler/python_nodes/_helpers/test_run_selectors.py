@@ -43,6 +43,13 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
             expected_python_node_names=frozenset({"export_orders"}),
         ),
         PythonSqlSelectorTestCase(
+            description="accepts a check whose checked node the selection also matches",
+            select=("tag:exports",),
+            exclude=(),
+            expected_sql_names=frozenset(),
+            expected_python_node_names=frozenset({"export_orders"}),
+        ),
+        PythonSqlSelectorTestCase(
             description="selects expanded source terminal loader requirement for run",
             select=("+source:raw_orders",),
             exclude=(),
@@ -73,18 +80,14 @@ def test_given_run_selectors_when_resolving_then_excludes_python_checks(
     "test_case",
     [
         PythonSqlSelectorErrorTestCase(
-            description="rejects explicit check selector for run",
+            description="rejects a check whose checked node the selection leaves out",
             select=("check:check_orders_export",),
             exclude=(),
             expected_error_type=ValueError,
-            expected_error_fragment=("Python checks are not selectable here: check_orders_export"),
-        ),
-        PythonSqlSelectorErrorTestCase(
-            description="rejects tag selector that includes a check for run",
-            select=("tag:exports",),
-            exclude=(),
-            expected_error_type=ValueError,
-            expected_error_fragment=("Python checks are not selectable here: check_orders_export"),
+            expected_error_fragment=(
+                "Python check 'check_orders_export' checks asset:export_orders, which the "
+                "selection does not include"
+            ),
         ),
     ],
     ids=lambda case: case.description,

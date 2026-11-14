@@ -851,6 +851,23 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
                 {"model:orders", "source:raw_shipments", "source:stage_shipments"}
             ),
         ),
+        ClaimedLoadTestCase(
+            "a job reaching a managed source through + runs the source's loader",
+            "",
+            "SELECT amount FROM orders",
+            "success",
+            [(9,)],
+            files=INTERMEDIATE_LOADER_FILES
+            | {
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/upstream_loaded_orders.py"
+                ).read_text()
+            },
+            expected_node_count=3,
+            expected_write_set=frozenset(
+                {"model:orders", "source:raw_shipments", "source:stage_shipments"}
+            ),
+        ),
     ],
     ids=lambda case: case.description,
 )

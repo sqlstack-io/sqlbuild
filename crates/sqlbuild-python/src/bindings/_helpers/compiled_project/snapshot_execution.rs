@@ -357,9 +357,10 @@ impl WorkerBuild {
             outcome
         };
         if self.execution.claim.request.selection.contains(key) {
-            return self.complete(py, key, (outcome, None, (None, None)));
+            self.complete(py, key, (outcome, None, (None, None)))?;
+        } else {
+            self.finish_check(py, key, outcome)?;
         }
-        self.finish_check(py, key, outcome)?;
         if outcome == NodeOutcome::Skipped {
             return Ok(());
         }
@@ -395,15 +396,12 @@ impl WorkerBuild {
         Ok(None)
     }
 
-    /// A failing SQL test, found by its compiled name such as `parent [case]`, fails the models it blocks with its error.
+    /// A finished SQL test completes itself when selected; a failing one fails the models it blocks.
     fn finished_test(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
         let py = result.py();
         let outcome: String = field(result, "outcome")?.str()?.extract()?;
-        if SqlTestOutcome::from_value(&outcome) == Some(SqlTestOutcome::Pass)
-            || self.worker.bind(py).get().refresh_cancellation(py)?
-        {
-            return Ok(());
-        }
+        let passed = SqlTestOutcome::from_value(&outcome) == Some(SqlTestOutcome::Pass);
+        let cancelled = !passed && self.worker.bind(py).get().refresh_cancellation(py)?;
         let name: String = field(result, "test_name")?.extract()?;
         let key = format!("{SQL_TEST_KEY_PREFIX}{name}");
         let error: Option<String> = match result.getattr_opt("error_code")? {
@@ -414,6 +412,15 @@ impl WorkerBuild {
             Some(value) => value.extract()?,
             None => None,
         };
+        let node = match (passed, cancelled) {
+            (true, _) => NodeOutcome::Success,
+            (false, true) => NodeOutcome::Cancelled,
+            (false, false) => NodeOutcome::Failed,
+        };
+        self.complete(py, &key, (node, None, (error.clone(), message.clone())))?;
+        if passed || cancelled {
+            return Ok(());
+        }
         for model in self.blocked.get(&key).into_iter().flatten() {
             self.complete(
                 py,

@@ -13,6 +13,7 @@ use sqlbuild_analysis::graph::errors::SelectorError;
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_analysis::python_selection::main::attach_python_jobs::attach_python_jobs;
 use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python_node_graph_indexes as graph_indexes;
+use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
 use sqlbuild_analysis::python_selection::main::resolve_python_node_excludes::resolve_python_node_excludes;
 use sqlbuild_analysis::python_selection::main::resolve_python_node_selectors::resolve_python_node_selectors;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_nodes::resolve_python_sql_nodes;
@@ -187,6 +188,17 @@ impl ProjectSelection {
             .map(|node| format!("{}:{name}", node.kind))
     }
 
+    /// The key a selected Python node's run reports under; a loader reports as the source it writes.
+    fn run_key(&self, name: &str) -> Option<String> {
+        let node = self
+            .nodes
+            .nodes
+            .iter()
+            .rev()
+            .find(|node| node.name == name)?;
+        Some(python_run_key(&self.sources, (&node.kind, name)))
+    }
+
     /// Whether a loader writes no declared source and so runs only as part of another loader's chain.
     pub(crate) fn intermediate_loader(&self, name: &str) -> bool {
         !self
@@ -213,7 +225,7 @@ impl ProjectSelection {
             .map(|(kind, name)| format!("{kind}:{name}"))
             .collect();
         for name in &selection.python_node_names {
-            keys.extend(self.node_key(name));
+            keys.extend(self.run_key(name));
         }
         Ok(keys)
     }
