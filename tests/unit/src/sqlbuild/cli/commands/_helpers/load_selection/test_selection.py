@@ -148,9 +148,16 @@ def test_given_intermediate_loader_when_selecting_then_parses_destination_with_e
             expected_defaults=("defaults_db", "defaults_schema"),
         ),
         LoaderDefaultResolutionTestCase(
-            description="explicit-target adapters never take the connection namespace",
+            description="an inline connection is the default target on explicit-target adapters",
             adapter="snowflake",
             connection={"database": "CONNECTION_DB", "schema": "CONNECTION_SCHEMA"},
+            expected_defaults=("CONNECTION_DB", "CONNECTION_SCHEMA"),
+        ),
+        LoaderDefaultResolutionTestCase(
+            description="a named connection's location is never used",
+            adapter="snowflake",
+            connection={},
+            connections={"warehouse": {"database": "NAMED_DB", "schema": "NAMED_SCHEMA"}},
             expected_defaults=(None, None),
         ),
         LoaderDefaultResolutionTestCase(
@@ -171,6 +178,7 @@ def test_given_connection_namespace_when_resolving_load_defaults_then_matches_co
             name="demo",
             adapter=test_case.adapter,
             connection=test_case.connection,
+            connections=test_case.connections,
             defaults=DefaultsConfig(
                 database=test_case.project_defaults[0], schema=test_case.project_defaults[1]
             ),

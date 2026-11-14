@@ -7,6 +7,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_core::load_command::errors::UnknownLoadSelector;
 use sqlbuild_core::load_command::main::load_reference_loaders::load_reference_loaders;
 use sqlbuild_core::load_command::main::select_load_entries::select_load_entries as select_entries;
@@ -15,8 +16,9 @@ use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
-use crate::bindings::_helpers::compile_attachment::target::project_location;
-use crate::bindings::_helpers::compile_driver::targets::requires_explicit_targets;
+use crate::bindings::_helpers::compile_attachment::target::{
+    connection_is_default_target, project_location,
+};
 use crate::bindings::_helpers::contracts::spec_resolution::loader_destination_parts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::native_host::host;
@@ -271,17 +273,21 @@ pub(crate) fn loader_defaults<'py>(
     } else {
         non_empty_text(connection.get_item("database")?)?
     };
-    let explicit: bool = requires_explicit_targets(&adapter_name)?;
+    let inline: bool = connection_is_default_target(discovered)?;
     let defaults: Bound<'py, PyAny> =
         native_field(&native_field(discovered, "project_config")?, "defaults")?;
-    let location = |field: &str, fallback: Option<Bound<'py, PyAny>>| {
+    let location = |field: &str, connection_value: Option<Bound<'py, PyAny>>| {
+        let target: Bound<'py, PyAny> = target_value(target_config, field)?;
         project_location(
             (
-                target_value(target_config, field)?,
+                if target.eq(PRESERVE_TARGET_VALUE)? {
+                    py.None().into_bound(py)
+                } else {
+                    target
+                },
                 native_field(&defaults, field)?,
             ),
-            fallback.into_iter().collect(),
-            explicit,
+            connection_value.into_iter().filter(|_| inline).collect(),
         )
     };
     Ok(LoaderDefaults {

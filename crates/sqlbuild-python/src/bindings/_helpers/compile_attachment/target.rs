@@ -3,15 +3,12 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
-use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
 use crate::bindings::_helpers::compile_attachment::effective_config::project_vars;
 use crate::bindings::_helpers::compile_command::constants::{
     COMPILE_CACHE_DISABLE_ENV_VAR, COMPILE_CACHE_DISABLE_VALUE, RETIRED_CACHE_DIRECTORY_NAMES,
 };
-use crate::bindings::_helpers::compile_driver::targets::requires_explicit_targets;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
@@ -124,27 +121,31 @@ fn optional_string<'py>(
     })
 }
 
-/// A project-level location as models resolve it: target, then `[defaults]`, then any fallback.
+/// A project-level location: the target's value, then `[defaults]`, then the first set fallback.
 pub(crate) fn project_location<'py>(
     (target, default): (Bound<'py, PyAny>, Bound<'py, PyAny>),
     fallbacks: Vec<Bound<'py, PyAny>>,
-    explicit: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = target.py();
-    if target.is_truthy()? && !target.eq(PRESERVE_TARGET_VALUE)? {
-        return Ok(target);
-    }
-    if default.is_truthy()? {
-        return Ok(default);
-    }
-    if !explicit {
-        for fallback in fallbacks {
-            if fallback.is_truthy()? {
-                return Ok(fallback);
-            }
+    for value in [target, default].into_iter().chain(fallbacks) {
+        if value.is_truthy()? {
+            return Ok(value);
         }
     }
     Ok(py.None().into_bound(py))
+}
+
+/// Whether the top-level `[connection]` is the implicit default target: no named connections or targets.
+pub(crate) fn connection_is_default_target(discovered: &Bound<'_, PyAny>) -> PyResult<bool> {
+    for config in ["project_config", "local_config"] {
+        let config: Bound<'_, PyAny> = native_field(discovered, config)?;
+        for field in ["connections", "targets"] {
+            if native_field(&config, field)?.is_truthy()? {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
 }
 
 /// Resolve the target and its effective database/schema without compiling resources.
@@ -186,10 +187,7 @@ pub(crate) fn build_effective_target_namespace<'py>(
     };
     let project_config: Bound<'py, PyAny> = native_field(discovered_inputs, "project_config")?;
     let defaults: Bound<'py, PyAny> = native_field(&project_config, "defaults")?;
-    let explicit: bool = requires_explicit_targets(&resolve_effective_adapter_name(
-        &project_config,
-        &native_field(discovered_inputs, "local_config")?,
-    )?)?;
+    let inline: bool = connection_is_default_target(discovered_inputs)?;
     let values: Bound<'py, PyDict> = PyDict::new(py);
     values.set_item(
         DATABASE_KEY,
@@ -198,8 +196,11 @@ pub(crate) fn build_effective_target_namespace<'py>(
                 target_value(DATABASE_KEY)?,
                 native_field(&defaults, DATABASE_KEY)?,
             ),
-            vec![connection_database, default_database],
-            explicit,
+            [connection_database]
+                .into_iter()
+                .filter(|_| inline)
+                .chain([default_database])
+                .collect(),
         )?,
     )?;
     values.set_item(
@@ -209,8 +210,11 @@ pub(crate) fn build_effective_target_namespace<'py>(
                 target_value(SCHEMA_KEY)?,
                 native_field(&defaults, SCHEMA_KEY)?,
             ),
-            vec![connection_schema, default_schema],
-            explicit,
+            [connection_schema]
+                .into_iter()
+                .filter(|_| inline)
+                .chain([default_schema])
+                .collect(),
         )?,
     )?;
     let run_id: Bound<'py, PyAny> = run_id(&py.None().into_bound(py))?;

@@ -1422,3 +1422,12 @@ class PythonMacroArgumentErrorTestCase:
     description: str
     call_sql: str
     expected_message: str
+
+
+@dataclass(frozen=True)
+class InlineConnectionLocationTestCase:
+    """A project whose only location is its inline connection, and where its models build."""
+
+    description: str
+    project_toml: str
+    expected_qualified_name: str

@@ -140,13 +140,32 @@ explicitly:
 database = ":memory:"
 ```
 
-A `database` or `schema` on a connection, named or a top-level `[connection]`, doesn't decide where
-models are built; set them on the target or in `[defaults]`. Intermediate loaders and the janitor
-use the same location as models: the target's `database` and `schema`, then `[defaults]`. On
-Snowflake, BigQuery and Databricks they never use the connection's values. On the other adapters,
-the connection's values fill in when neither the target nor `[defaults]` sets one. Managed sources
-load into their own `database` and `schema`, then the target's, as described in
-[Targets](#targets).
+Where models build depends on how the project names its connection:
+
+| Project shape | Models, intermediate loaders and the janitor use |
+|---------------|--------------------------------------------------|
+| One top-level `[connection]`, no `[connections.*]` and no `[targets]` | `[defaults]`, then the connection's `database` and `schema` |
+| Named `[connections.*]` or any `[targets]` | The target's `database` and `schema`, then `[defaults]`; never the connection's |
+
+A project with a single top-level `[connection]` treats it as its default target, so this is
+enough on every adapter:
+
+```toml
+name = "orders"
+adapter = "snowflake"
+
+[connection]
+account = "my_org-my_account"
+user = "${ENV:SNOWFLAKE_USER}"
+password = "${ENV:SNOWFLAKE_PASSWORD}"
+database = "ANALYTICS"
+schema = "ORDERS"
+```
+
+Once the project names connections or targets, a `database` or `schema` on a connection is
+ignored, and the `S101`, `S103` or `S104` error for a missing location names the ignored value and
+the setting to add. Managed sources load into their own `database` and `schema`, then the
+target's, as described in [Targets](#targets).
 
 A target that names an unknown connection fails when the configuration loads, before anything
 connects.

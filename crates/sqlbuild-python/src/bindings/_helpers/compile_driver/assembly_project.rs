@@ -10,7 +10,9 @@ use sqlbuild_analysis::assembly::project::main::configured_namespace::configured
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::compile_attachment::target::project_location;
+use crate::bindings::_helpers::compile_attachment::target::{
+    connection_is_default_target, project_location,
+};
 use crate::bindings::_helpers::compile_driver::assembly::{AssemblyRequest, AssemblyStage};
 use crate::bindings::_helpers::compile_driver::assembly_analysis::{
     AnalysisContext, analysis_context, and_not,
@@ -24,7 +26,6 @@ use crate::bindings::_helpers::compile_driver::assembly_models::{
 };
 use crate::bindings::_helpers::compile_driver::assembly_sql_tests::assembled_sql_tests;
 use crate::bindings::_helpers::compile_driver::stage_work::{SEMANTIC_COMPLETION, count_stage};
-use crate::bindings::_helpers::compile_driver::targets::requires_explicit_targets;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::contracts::spec_resolution::{
     resolve_effective_adapter_name, resolve_effective_scenario_config,
@@ -179,22 +180,23 @@ fn effective_target_values<'py>(inputs: &Bound<'py, PyAny>) -> PyResult<Bound<'p
     let connection: Bound<'py, PyAny> = native_field(inputs, "effective_connection")?;
     let defaults: Bound<'py, PyAny> =
         native_field(&native_field(inputs, "project_config")?, "defaults")?;
-    let explicit: bool = requires_explicit_targets(&effective_adapter_name(inputs)?)?;
+    let inline: bool = connection_is_default_target(&native_field(inputs, "discovered_inputs")?)?;
+    let connection_value = |value: Bound<'py, PyAny>| -> Vec<Bound<'py, PyAny>> {
+        [value].into_iter().filter(|_| inline).collect()
+    };
     let database: Bound<'py, PyAny> = project_location(
         (
             target_field(inputs, "database")?,
             native_field(&defaults, "database")?,
         ),
-        vec![connection_database_fallback(inputs, &connection)?],
-        explicit,
+        connection_value(connection_database_fallback(inputs, &connection)?),
     )?;
     let schema: Bound<'py, PyAny> = project_location(
         (
             target_field(inputs, "schema")?,
             native_field(&defaults, "schema")?,
         ),
-        vec![str_or_none(&mapping_get(&connection, "schema")?)?],
-        explicit,
+        connection_value(str_or_none(&mapping_get(&connection, "schema")?)?),
     )?;
     early_model_templates(
         keywords(py, &[("database", database), ("schema", schema)])?.as_any(),

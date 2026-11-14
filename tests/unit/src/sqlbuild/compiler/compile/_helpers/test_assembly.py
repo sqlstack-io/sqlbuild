@@ -14,6 +14,7 @@ from sqlbuild._native import (
     assemble_project,
     build_compile_inputs,
     discover_project_inputs,
+    resolve_loader_defaults,
 )
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
 from sqlbuild.compiler.compile.types import (
@@ -734,7 +735,7 @@ seeds:
     "test_case",
     (
         AssembleCompiledProjectEffectiveTargetTestCase(
-            description="falls back effective target location to connection location",
+            description="a target never takes its connection's location on duckdb",
             project_toml="""
 name = "demo"
 adapter = "duckdb"
@@ -746,10 +747,10 @@ schema = "connection_schema"
 """.strip()
             + "\n",
             expected_effective_target_database=None,
-            expected_effective_target_schema="connection_schema",
+            expected_effective_target_schema=None,
         ),
         AssembleCompiledProjectEffectiveTargetTestCase(
-            description="falls back non duckdb target database to connection database",
+            description="a target never takes its connection's location on postgres",
             project_toml="""
 name = "demo"
 adapter = "postgres"
@@ -760,8 +761,8 @@ database = "connection_db"
 schema = "connection_schema"
 """.strip()
             + "\n",
-            expected_effective_target_database="connection_db",
-            expected_effective_target_schema="connection_schema",
+            expected_effective_target_database=None,
+            expected_effective_target_schema=None,
         ),
         AssembleCompiledProjectEffectiveTargetTestCase(
             description="prefers target location over connection fallback",
@@ -816,10 +817,59 @@ schema = "connection_schema"
             expected_effective_target_database=None,
             expected_effective_target_schema=None,
         ),
+        AssembleCompiledProjectEffectiveTargetTestCase(
+            description="an inline connection is the implicit default target on snowflake",
+            project_toml="""
+name = "demo"
+adapter = "snowflake"
+
+[connection]
+database = "CONN_DB"
+schema = "CONN_SCHEMA"
+""".strip()
+            + "\n",
+            expected_effective_target_database="CONN_DB",
+            expected_effective_target_schema="CONN_SCHEMA",
+        ),
+        AssembleCompiledProjectEffectiveTargetTestCase(
+            description="an inline connection schema fills in beside a defaults database",
+            project_toml="""
+name = "demo"
+adapter = "bigquery"
+
+[connection]
+project = "example-project"
+schema = "orders"
+
+[defaults]
+database = "example-project"
+""".strip()
+            + "\n",
+            expected_effective_target_database="example-project",
+            expected_effective_target_schema="orders",
+        ),
+        AssembleCompiledProjectEffectiveTargetTestCase(
+            description="a top-level connection beside named targets is not used",
+            project_toml="""
+name = "demo"
+adapter = "snowflake"
+default_target = "dev"
+
+[connection]
+database = "CONN_DB"
+schema = "CONN_SCHEMA"
+
+[targets.dev]
+database = "TARGET_DB"
+""".strip()
+            + "\n",
+            expected_effective_target_database="TARGET_DB",
+            expected_effective_target_schema=None,
+        ),
     ),
     ids=lambda case: case.description,
 )
-def test_given_connection_location_when_assembling_project_then_sets_effective_target_location(
+def test_given_connection_location_when_assembling_project_then_models_and_loaders_agree(
     test_case: AssembleCompiledProjectEffectiveTargetTestCase,
     tmp_path: Path,
     write_repo_files: Callable[[Path, dict[str, str]], None],
@@ -836,9 +886,21 @@ def test_given_connection_location_when_assembling_project_then_sets_effective_t
     )
 
     compiled: CompiledProjectView = assemble_project(inputs=compile_inputs)
+    loader_location: tuple[str | None, str | None] = resolve_loader_defaults(
+        discovered_inputs=discovered,
+        selected_target=compiled.effective_target_name,
+        target_config=compile_inputs.effective_target,
+    )
 
-    assert compiled.effective_target_database == test_case.expected_effective_target_database
-    assert compiled.effective_target_schema == test_case.expected_effective_target_schema
+    expected_location: tuple[str | None, str | None] = (
+        test_case.expected_effective_target_database,
+        test_case.expected_effective_target_schema,
+    )
+    assert (
+        compiled.effective_target_database,
+        compiled.effective_target_schema,
+    ) == expected_location, test_case.description
+    assert loader_location == expected_location, f"{test_case.description}: loaders"
 
 
 @pytest.mark.parametrize(
