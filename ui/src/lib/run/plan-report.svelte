@@ -2,10 +2,10 @@
 	// A plan in the order and words of `sqb plan`: what runs first, each change with its detail and diff,
 	// then the routine models.
 	import { to } from '$lib/paths';
-	import type { PlanDocument, PlanWarning } from '$lib/api';
+	import type { PlanDocument } from '$lib/api';
 	import { formatAgo } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
-	import { changedRule, changedSections, looseWarnings, planSections, unknownWords, type PlanEntry } from './plan-text';
+	import { REPROCESS_OPTIONS, changedRule, changedSections, looseWarnings, planSections, unknownWords, warningView, type PlanEntry } from './plan-text';
 
 	/** `refresh` words what refreshes the nodes a `--changed` plan holds back for a job. */
 	let { plan, refresh = (job: string) => `job ${job}` }: { plan: PlanDocument; refresh?: (job: string) => string } = $props();
@@ -15,11 +15,6 @@
 	const limit = 50;
 	let expanded = $state<Record<string, boolean>>({});
 	const loose = $derived(looseWarnings(plan, sections));
-	/** A warning shown under its model, without the model name the CLI opens it with. */
-	const warningText = (w: PlanWarning) => {
-		const text = w.model_name ? w.message : w.message.slice(w.message.indexOf(':') + 1).trim();
-		return text.charAt(0).toUpperCase() + text.slice(1);
-	};
 
 	const href = (e: PlanEntry, title: string) => (/^\d+$/.test(e.name) || title.includes('unction') || title.startsWith('Sources') || title.startsWith('Loaders') ? null : to(`/catalog/model:${e.name}`));
 	const diffClass = (line: string) => (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@') ? 'hunk' : line.startsWith('+') ? 'add' : line.startsWith('-') ? 'del' : '');
@@ -59,7 +54,18 @@
 						<span class="value" class:accent={s.changed}>{e.value}</span>
 					</div>
 					{#each e.detail as d, i (i)}<div class="detail">{d}</div>{/each}
-					{#each e.warnings ?? [] as w, i (i)}<p class="entry-warning" class:err={w.severity === 'error'}>{warningText(w)}</p>{/each}
+					{#each e.warnings ?? [] as w, i (i)}
+						{@const view = warningView(w)}
+						<div class="entry-warning" class:err={w.severity === 'error'}>
+							<p>{view.text}</p>
+							{#if view.reprocess}
+								<details>
+									<summary>How to reprocess</summary>
+									<ul>{#each REPROCESS_OPTIONS as option (option)}<li>{option}</li>{/each}</ul>
+								</details>
+							{/if}
+						</div>
+					{/each}
 					{#if hasDiff}
 						{#if e.schema?.length}
 							<div class="detail">schema diff:</div>
@@ -135,6 +141,21 @@
 	}
 	.entry-warning.err {
 		border-left-color: var(--sb-error);
+	}
+	.entry-warning p {
+		margin: 0;
+	}
+	.entry-warning summary {
+		margin-top: 2px;
+		color: var(--primary);
+		font-size: 11.5px;
+		cursor: pointer;
+	}
+	.entry-warning ul {
+		margin: 4px 0 2px;
+		padding-left: 16px;
+		list-style: disc;
+		color: var(--muted-foreground);
 	}
 	h4 {
 		display: flex;

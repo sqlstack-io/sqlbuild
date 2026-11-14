@@ -61,6 +61,7 @@
 		}
 	}
 	const stale = $derived(data?.attention.find((i) => i.kind === 'stale_models'));
+	const staleListed = $derived(issues.some(({ item }) => item.kind === 'stale_models'));
 	const staleSelection = $derived(stale && stale.kind === 'stale_models' ? [...new Set([...stale.changed, ...stale.behind])] : []);
 	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
 	const loaded = $derived(data !== null);
@@ -114,13 +115,14 @@
 							<span>{overview.error ? 'Couldn’t check its health' : 'Checking…'}</span>
 						{:else}
 							<strong>{issues.length ? `${app.location?.name} needs attention` : `${app.location?.name} is healthy`}</strong>
-							<span>{issues.length ? `${issues.length} ${issues.length === 1 ? 'item' : 'items'} · ${latestText}` : latestText}</span>
+							<span>{issues.length > 1 ? `${issues.length} items · ${latestText}` : latestText}</span>
 						{/if}
 					</div>
 					{#if m}
 						<div class="health-facts">
-							{#if m.stale?.changed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
-							{#if m.stale?.behind}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
+							<!-- The out-of-date alert below already counts these. -->
+							{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
+							{#if m.stale?.behind && !staleListed}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
 							{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
 						</div>
 					{/if}

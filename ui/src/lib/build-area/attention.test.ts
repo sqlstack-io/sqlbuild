@@ -59,8 +59,12 @@ describe('overview alerts', () => {
 	});
 
 	it('states how many nodes are out of date, counting a node both changed and behind once', () => {
-		const [{ view }] = attentionViews([{ kind: 'stale_models', changed: ['model:a', 'model:b'], behind: ['model:b', 'model:c'] }], now);
-		expect(view.title).toBe('3 nodes out of date');
-		expect(view.detail).toBe('2 changed since their last build and 2 behind an upstream rebuild (1 is both): a, b, c');
+		const detail = (changed: string[], behind: string[]) => attentionViews([{ kind: 'stale_models', changed, behind }], now)[0].view;
+		expect(detail(['model:a', 'model:b'], ['model:b']).title).toBe('2 nodes out of date');
+		expect(detail(['model:a', 'model:b'], ['model:b']).detail).toBe('2 changed since their last build, 1 of them also behind an upstream rebuild: a, b');
+		expect(detail(['model:a', 'model:b'], ['model:b', 'model:c']).detail).toBe('2 changed since their last build, 1 of them also behind an upstream rebuild, and 1 more behind an upstream rebuild: a, b, c');
+		expect(detail(['model:a'], ['model:c']).detail).toBe('1 changed since its last build and 1 behind an upstream rebuild: a, c');
+		expect(detail(['model:a'], ['model:a']).detail).toBe('1 changed since its last build, also behind an upstream rebuild: a');
+		expect(detail([], ['model:c', 'model:d']).detail).toBe('2 behind an upstream rebuild: c, d');
 	});
 });

@@ -67,15 +67,17 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 			const changed = new Set(item.changed);
 			const both = item.behind.filter((key) => changed.has(key)).length;
 			const all = [...new Set([...item.changed, ...item.behind])];
-			const counts = [
-				item.changed.length && `${item.changed.length} changed since ${item.changed.length === 1 ? 'its' : 'their'} last build`,
-				item.behind.length && `${item.behind.length} behind an upstream rebuild`
-			].filter(Boolean);
+			const only = item.behind.length - both;
+			const alsoBehind = both ? `, ${item.changed.length === 1 ? 'also' : `${both} of them also`} behind an upstream rebuild` : '';
+			const onlyBehind = only ? `${both ? `, and ${only} more` : ` and ${only}`} behind an upstream rebuild` : '';
+			const counts = item.changed.length
+				? `${item.changed.length} changed since ${item.changed.length === 1 ? 'its' : 'their'} last build${alsoBehind}${onlyBehind}`
+				: `${only} behind an upstream rebuild`;
 			return {
 				key: 'stale',
 				tone: 'stale',
 				title: `${plural(all.length, 'node')} out of date`,
-				detail: `${counts.join(' and ')}${both ? ` (${both} ${both === 1 ? 'is' : 'are'} both)` : ''}: ${all.slice(0, 4).map(shortName).join(', ')}${all.length > 4 ? ` and ${all.length - 4} more` : ''}`,
+				detail: `${counts}: ${all.slice(0, 4).map(shortName).join(', ')}${all.length > 4 ? ` and ${all.length - 4} more` : ''}`,
 				since: '',
 				href: '/catalog?stale=1',
 				action: 'View in catalog',
