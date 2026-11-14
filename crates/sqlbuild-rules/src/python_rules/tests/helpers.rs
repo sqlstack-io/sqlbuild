@@ -3,7 +3,8 @@ use std::collections::BTreeSet;
 use fensu_facts::extension::models::ProgramHandle;
 use fensu_native::{NativeProjectPlane, NativeRuleContext, evaluate_core_rules};
 
-use crate::models::{RuleMetadata, RuleScope};
+use crate::engine::_helpers::memo::prepare;
+use crate::models::{EvaluateRequest, RowsRequest, RuleMetadata, RuleScope, RulesConfig};
 use crate::rules::_helpers::catalogue::{catalogue, select};
 
 /// How many distinct `SQBRPYTHON` codes the catalogue holds.
@@ -52,4 +53,36 @@ pub(super) fn core_rule_faults(source: &str, fensu_code: &str) -> Vec<(String, u
     .into_iter()
     .map(|fault| (fault.code, fault.line))
     .collect()
+}
+
+/// The speculation keys of a request selecting `select`, before and after its one Python module changes from `original` to `edited`.
+pub(super) fn source_keys(select: &[&str], original: &str, edited: &str) -> (String, String) {
+    let directory = tempfile::tempdir().expect("temporary project");
+    let module = directory.path().join("python/orders/main.py");
+    std::fs::create_dir_all(module.parent().expect("parent")).expect("folders");
+    std::fs::write(&module, original).expect("module");
+    let before: String = request_key(directory.path(), select);
+    std::fs::write(&module, edited).expect("module");
+    (before, request_key(directory.path(), select))
+}
+
+fn request_key(project_dir: &std::path::Path, select: &[&str]) -> String {
+    let config: RulesConfig =
+        serde_json::from_value(serde_json::json!({ "select": select })).expect("rules config");
+    let request = EvaluateRequest {
+        project_dir: project_dir.to_string_lossy().into_owned(),
+        config,
+        ..EvaluateRequest::default()
+    };
+    prepare(
+        RowsRequest {
+            request,
+            memo: None,
+            retain: false,
+        },
+        true,
+    )
+    .expect("request prepares")
+    .key
+    .expect("keyed")
 }

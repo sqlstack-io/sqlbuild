@@ -26,3 +26,10 @@ pub(super) struct OptionsTestCase {
     pub(super) code: &'static str,
     pub(super) expected_options: Vec<(&'static str, BuiltinOptionKind)>,
 }
+
+pub(super) struct SourceKeyTestCase {
+    pub(super) description: &'static str,
+    pub(super) select: &'static [&'static str],
+    pub(super) edited_source: &'static str,
+    pub(super) expected_same_key: bool,
+}

@@ -1,10 +1,10 @@
 use fensu_native::rules::constants as fensu;
 
 use crate::python_rules::tests::helpers::{
-    core_rule_faults, distinct_python_codes, is_selected, project_wide_python_rules,
+    core_rule_faults, distinct_python_codes, is_selected, project_wide_python_rules, source_keys,
 };
 use crate::python_rules::tests::test_types::{
-    CatalogueTestCase, CoreRuleTestCase, OptionsTestCase, SelectionTestCase,
+    CatalogueTestCase, CoreRuleTestCase, OptionsTestCase, SelectionTestCase, SourceKeyTestCase,
 };
 use crate::rules::_helpers::catalogue::catalogue;
 use crate::rules::main::builtin_options::builtin_options;
@@ -163,6 +163,43 @@ fn given_python_rules_when_reading_their_options_then_fensu_thresholds_are_whole
             .collect();
         assert_eq!(
             declared, test_case.expected_options,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_python_edit_when_preparing_rules_then_only_python_selections_see_it() {
+    const ORIGINAL: &str = "def total(amount: int) -> int:\n    return amount\n";
+    let test_cases = [
+        SourceKeyTestCase {
+            description: "an edit changes the key when the Python family is selected",
+            select: &["SQBRPYTHON"],
+            edited_source: "def total(amount):\n    return amount\n",
+            expected_same_key: false,
+        },
+        SourceKeyTestCase {
+            description: "unchanged Python keeps the key",
+            select: &["SQBRPYTHON"],
+            edited_source: ORIGINAL,
+            expected_same_key: true,
+        },
+        SourceKeyTestCase {
+            description: "an edit is not read when only SQL rules run",
+            select: &["SQBR"],
+            edited_source: "def total(amount):\n    return amount\n",
+            expected_same_key: true,
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            {
+                let (before, after) =
+                    source_keys(test_case.select, ORIGINAL, test_case.edited_source);
+                before == after
+            },
+            test_case.expected_same_key,
             "{}",
             test_case.description
         );

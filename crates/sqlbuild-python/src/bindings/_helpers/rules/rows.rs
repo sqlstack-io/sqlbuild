@@ -202,6 +202,8 @@ fn request_header(
         header["scope_index"] =
             metadata_projection_value(&project_attribute(project, "scope_index")?)?;
     }
+    let version = py.version_info();
+    header["python_version"] = json!([version.major, version.minor]);
     header["defer_suppressions"] = Value::Bool(true);
     header["custom_rules"] = plain_value(custom_payloads)?;
     header["rules_cache_path"] = Value::String(path_text(

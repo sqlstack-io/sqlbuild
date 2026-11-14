@@ -762,6 +762,21 @@ pub struct EvaluateRequest {
     pub defer_suppressions: bool,
     pub custom_rules: Vec<CustomRule>,
     pub rules_cache_path: String,
+    /// The interpreter's major and minor version, which decides how project Python parses.
+    pub python_version: (u8, u8),
+    /// The supported project Python files, filled from disk only when a Python rule is selected.
+    pub python_sources: Vec<PythonSource>,
+}
+
+/// One project Python file, keyed in the request by the digest of its bytes.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PythonSource {
+    pub relative_path: String,
+    pub digest: String,
+    /// The text that was digested; it never enters the request JSON or the memo.
+    #[serde(skip)]
+    pub text: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -799,6 +814,8 @@ impl Default for EvaluateRequest {
             defer_suppressions: false,
             custom_rules: vec![],
             rules_cache_path: String::new(),
+            python_version: (3, 12),
+            python_sources: vec![],
         }
     }
 }
