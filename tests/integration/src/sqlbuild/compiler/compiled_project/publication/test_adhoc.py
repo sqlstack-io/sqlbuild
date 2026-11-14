@@ -475,7 +475,7 @@ def test_given_ad_hoc_loads_and_variables_when_launched_then_only_permitted_peop
         server_arguments=("--password-origin", "https://control.example.com"),
     ) as worker:
         scheduled: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, job_key="annual_orders"
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
         )
         assert scheduled["status"] == "success", worker.log.read_text()
         admin: dict[str, Any] = provision_person(
