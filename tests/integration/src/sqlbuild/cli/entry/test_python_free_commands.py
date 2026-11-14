@@ -393,9 +393,9 @@ def test_given_python_free_command_when_interrupted_then_sqb_dies_by_sigint_with
             expected_stderr_end=TRACEBACK_LAST_LINE,
         ),
         BrokenPipeTestCase(
-            description="a report the failed flush drops",
-            args=("rules", "list"),
-            prepare=prepare_project,
+            description="output the failed flush drops",
+            args=("build", "--help"),
+            prepare=prepare_nothing,
             expected_exit_code=0,
             expected_stderr_end=b"",
         ),
