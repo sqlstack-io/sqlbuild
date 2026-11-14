@@ -4523,6 +4523,7 @@ dependencies = [
  "sqlbuild-attachments",
  "sqlbuild-cache",
  "sqlbuild-core",
+ "sqlbuild-discovery",
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlclean",
