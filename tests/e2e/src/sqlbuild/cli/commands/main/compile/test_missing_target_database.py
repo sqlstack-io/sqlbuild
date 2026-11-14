@@ -351,6 +351,28 @@ def test_given_connection_location_when_compiling_then_models_build_there(
             expected_rows=((1,),),
         ),
         ManagedSourceLoaderLocationTestCase(
+            description="load expands a templated target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[vars]\nraw_schema = "raw"\n\n[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "${raw_schema}"\n'
+            ),
+            source_schema="",
+            command=("--no-color", "load", "--select", "raw_orders"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="build expands a templated target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[vars]\nraw_schema = "raw"\n\n[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "${raw_schema}"\n'
+            ),
+            source_schema="",
+            command=("--no-color", "build"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
             description="build under a preserved target loads the source into its own schema",
             project_toml=_PRESERVED_TARGET_PROJECT,
             source_schema="    schema: raw\n",
