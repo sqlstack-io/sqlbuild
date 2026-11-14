@@ -74,6 +74,17 @@ pub(super) struct PythonScalingTestCase {
     pub(super) expected_max_duration: std::time::Duration,
 }
 
+pub(super) struct PythonGrowthTestCase {
+    pub(super) description: &'static str,
+    pub(super) units: usize,
+    pub(super) noisy_files: usize,
+    pub(super) functions: usize,
+    pub(super) config: serde_json::Value,
+    pub(super) growth: usize,
+    pub(super) pairs: usize,
+    pub(super) expected_max_ratio: f64,
+}
+
 pub(super) struct RelativeQueryTestCase {
     pub(super) description: &'static str,
     pub(super) project_dir: &'static str,

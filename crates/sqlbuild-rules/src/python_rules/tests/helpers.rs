@@ -213,6 +213,38 @@ pub(super) fn timed_python_codes(
     Ok((codes, elapsed))
 }
 
+/// Hold while timing, so the scaling tests never measure each other's work.
+pub(super) fn serial_timing() -> std::sync::MutexGuard<'static, ()> {
+    static TIMING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    TIMING
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// The median over interleaved `pairs` of the large project's time divided by the small one's.
+pub(super) fn median_growth(
+    small: &[(String, String)],
+    large: &[(String, String)],
+    config: &serde_json::Value,
+    pairs: usize,
+) -> f64 {
+    let mut ratios: Vec<f64> = (0..pairs)
+        .map(|_| pair_growth(small, large, config))
+        .collect();
+    ratios.sort_by(f64::total_cmp);
+    ratios[ratios.len() / 2]
+}
+
+fn pair_growth(
+    small: &[(String, String)],
+    large: &[(String, String)],
+    config: &serde_json::Value,
+) -> f64 {
+    let (_, small_elapsed) = timed_python_codes(small, config.clone()).expect("rules run");
+    let (_, large_elapsed) = timed_python_codes(large, config.clone()).expect("rules run");
+    large_elapsed.as_secs_f64() / small_elapsed.as_secs_f64()
+}
+
 fn cached_run(
     project_dir: &std::path::Path,
     config: serde_json::Value,

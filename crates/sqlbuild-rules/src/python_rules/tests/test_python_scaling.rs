@@ -2,32 +2,24 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use crate::python_rules::tests::helpers::{scaling_project, timed_python_codes};
-use crate::python_rules::tests::test_types::PythonScalingTestCase;
+use crate::python_rules::tests::helpers::{
+    median_growth, scaling_project, serial_timing, timed_python_codes,
+};
+use crate::python_rules::tests::test_types::{PythonGrowthTestCase, PythonScalingTestCase};
 
 #[test]
 fn given_many_modules_and_dense_findings_when_evaluating_python_rules_then_finishes_within_budget()
 {
-    let test_cases = [
-        PythonScalingTestCase {
-            description: "default rules over 4000 modules and 40 hooks of 300 findings each",
-            units: 4000,
-            noisy_files: 40,
-            functions: 150,
-            config: json!({ "select": ["SQBRPYTHON"] }),
-            expected_annotation_faults: 12000,
-            expected_max_duration: Duration::from_secs(5),
-        },
-        PythonScalingTestCase {
-            description: "the same project with unreachable definitions walking every import",
-            units: 4000,
-            noisy_files: 40,
-            functions: 150,
-            config: json!({ "select": ["SQBRPYTHON", "SQBRPYTHON306"] }),
-            expected_annotation_faults: 12000,
-            expected_max_duration: Duration::from_secs(5),
-        },
-    ];
+    let _serial = serial_timing();
+    let test_cases = [PythonScalingTestCase {
+        description: "default rules over 4000 modules and 40 hooks of 300 findings each",
+        units: 4000,
+        noisy_files: 40,
+        functions: 150,
+        config: json!({ "select": ["SQBRPYTHON"] }),
+        expected_annotation_faults: 12000,
+        expected_max_duration: Duration::from_secs(5),
+    }];
     for test_case in test_cases {
         let files = scaling_project(test_case.units, test_case.noisy_files, test_case.functions);
         let (codes, elapsed) = timed_python_codes(&files, test_case.config).expect("rules run");
@@ -42,10 +34,36 @@ fn given_many_modules_and_dense_findings_when_evaluating_python_rules_then_finis
             "{}: took {elapsed:?}",
             test_case.description
         );
-        eprintln!(
-            "{}: {elapsed:?}, {} faults",
+    }
+}
+
+#[test]
+fn given_four_times_the_modules_when_finding_unreachable_definitions_then_time_grows_near_linearly()
+{
+    let _serial = serial_timing();
+    let test_cases = [PythonGrowthTestCase {
+        description: "unreachable definitions walking every import, 500 against 2000 modules",
+        units: 500,
+        noisy_files: 5,
+        functions: 150,
+        config: json!({ "select": ["SQBRPYTHON", "SQBRPYTHON306"] }),
+        growth: 4,
+        pairs: 5,
+        expected_max_ratio: 6.5,
+    }];
+    for test_case in test_cases {
+        let small = scaling_project(test_case.units, test_case.noisy_files, test_case.functions);
+        let large = scaling_project(
+            test_case.growth * test_case.units,
+            test_case.growth * test_case.noisy_files,
+            test_case.functions,
+        );
+        let ratio: f64 = median_growth(&small, &large, &test_case.config, test_case.pairs);
+        assert!(
+            ratio < test_case.expected_max_ratio,
+            "{}: growing the project {}x multiplied the time by {ratio:.2}",
             test_case.description,
-            codes.len()
+            test_case.growth
         );
     }
 }
