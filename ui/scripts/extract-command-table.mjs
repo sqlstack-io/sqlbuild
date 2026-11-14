@@ -38,6 +38,9 @@ const DESCRIPTIONS = {
 	'--no-audits': 'Skip audits during the build',
 	'--max-microbatches': 'Process at most this many microbatches per incremental model',
 	'--no-load': 'Skip loaders',
+	'--load': 'Load managed sources before building',
+	'--reload': 'Reload managed sources (loaders get is_reload=True)',
+	'--vars': 'Project variables as a JSON object, e.g. {"day": "7"}',
 	'--fail-fast': 'Stop at the first failed node',
 	'--full-refresh': 'Rebuild incremental models and snapshots from scratch',
 	'--allow-snapshot-full-refresh': 'Allow a full refresh of snapshot models',
@@ -107,7 +110,7 @@ function extract(table) {
 				choices: action.choices ?? null,
 				repeatable: action.kind === 'extend' || action.kind === 'append',
 				requires: FLAG_REQUIRES.get(flag) ?? REQUIRES.get(action.dest) ?? null,
-				description: help ?? DESCRIPTIONS[flag] ?? ''
+				description: help || DESCRIPTIONS[flag] || ''
 			});
 		}
 		return { name, description, flags };
