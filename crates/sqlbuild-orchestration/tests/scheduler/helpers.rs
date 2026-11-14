@@ -26,9 +26,17 @@ pub(crate) fn hold_lease(
         let store = store.clone();
         async move {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            let started = std::time::Instant::now();
             renew_lease(&store, &lease)
                 .await
                 .map(|renewed| Some(((), renewed)))
+                .inspect_err(|error| {
+                    println!(
+                        "lease holder stopped: renewal failed after {:?} with {error}; the lease was due to expire at {}",
+                        started.elapsed(),
+                        lease.expires_at
+                    );
+                })
         }
     });
     tokio::spawn(renewals.for_each(|_| async {}))

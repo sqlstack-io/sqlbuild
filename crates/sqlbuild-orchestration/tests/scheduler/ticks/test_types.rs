@@ -82,6 +82,45 @@ impl crate::scheduler::types::RunLauncher for CycleRecorder<'_> {
     }
 }
 
+/// Expires its lease and renews it on the first leader poll, so a real fence reaches the loop.
+pub(crate) struct FencingLauncher<'a> {
+    pub(crate) epochs: &'a mut Vec<i64>,
+}
+
+impl crate::scheduler::types::RunLauncher for FencingLauncher<'_> {
+    async fn poll(
+        &mut self,
+        store: &crate::store::models::ControlStore,
+        lease: Option<&crate::scheduler::models::SchedulerLease>,
+    ) -> Result<(), crate::store::errors::ControlError> {
+        let Some(lease) = lease else {
+            return Ok(());
+        };
+        self.epochs.push(lease.epoch);
+        if self.epochs.len() > 1 {
+            return Ok(());
+        }
+        crate::store::tests::lease_helpers::expire_lease(store).await;
+        crate::scheduler::main::renew_lease::renew_lease(store, lease)
+            .await
+            .map(drop)
+    }
+
+    async fn shutdown(
+        &mut self,
+        _store: &crate::store::models::ControlStore,
+        _lease: Option<&crate::scheduler::models::SchedulerLease>,
+    ) -> Result<(), crate::store::errors::ControlError> {
+        Ok(())
+    }
+}
+
+pub(crate) struct FencedLoopTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_rejoined: bool,
+}
+
 pub(crate) struct TickRetentionTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

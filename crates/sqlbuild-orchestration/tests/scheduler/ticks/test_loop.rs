@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::scheduler::tests::contracts::ticks::helpers::snapshot;
 use crate::scheduler::tests::contracts::ticks::test_types::{
-    IdleLauncher, TickTransactionTestCase,
+    FencedLoopTestCase, FencingLauncher, IdleLauncher, TickTransactionTestCase,
 };
 use crate::store::tests::lease_helpers::expire_lease;
 use crate::store::tests::replica_helpers::second_store;
@@ -95,6 +95,58 @@ fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drain
                 .expect("idle shutdown does not wait for the five-second timer")
                 .expect("scheduler exits cleanly");
             close_store(second).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_leader_fenced_mid_cycle_when_the_loop_continues_then_it_rejoins_the_election_instead_of_stopping()
+ {
+    let test_cases = [
+        FencedLoopTestCase {
+            description: "SQLite scheduler loop",
+            backend: Backend::Sqlite,
+            expected_rejoined: true,
+        },
+        FencedLoopTestCase {
+            description: "PostgreSQL scheduler loop",
+            backend: Backend::Postgres,
+            expected_rejoined: true,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate loop store");
+            let mut epochs = Vec::new();
+            let (stop, shutdown) = tokio::sync::watch::channel(false);
+
+            let (finished, ()) = tokio::join!(
+                run_scheduler(
+                    store,
+                    SchedulerState::new(Uuid::now_v7()),
+                    shutdown,
+                    FencingLauncher {
+                        epochs: &mut epochs
+                    }
+                ),
+                async {
+                    tokio::time::sleep(Duration::from_millis(2_500)).await;
+                    stop.send_replace(true);
+                }
+            );
+
+            finished.expect("a fenced leader keeps the scheduler running");
+            assert_eq!(
+                epochs.windows(2).any(|pair| pair[1] > pair[0]),
+                test_case.expected_rejoined,
+                "{}: leads again under a newer epoch, polled with {epochs:?}",
+                test_case.description
+            );
             close_test_store(fixture).await;
         });
     }
