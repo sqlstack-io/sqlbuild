@@ -239,10 +239,15 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
                 .collect();
         }
         plan.selection.retain(|key| !excluded.contains(key));
-        // As the CLI's planner: a load is a build of its sources with loading on.
-        if plan.verb == "load" && !plan.settings.contains_key("reload") {
-            plan.settings
-                .insert("load_sources".into(), serde_json::json!(true));
+        // As the CLI's planner: a load is a build of its sources with loading on and no tests or audits.
+        if plan.verb == "load" {
+            for name in ["run_tests", "run_audits"] {
+                plan.settings.insert(name.into(), serde_json::json!(false));
+            }
+            if !plan.settings.contains_key("reload") {
+                plan.settings
+                    .insert("load_sources".into(), serde_json::json!(true));
+            }
         }
         Ok(plan)
     }

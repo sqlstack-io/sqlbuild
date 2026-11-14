@@ -1106,13 +1106,14 @@ export class MockOperate {
 		if (resolution.unknown.length) return refused(`no nodes match selector '${resolution.unknown[0]}'`);
 		if (!resolution.nodes.length) return refused('the selection resolves to no nodes');
 		const isSource = (n: string) => snapshotNode(n)?.kind === 'source';
+		const isManaged = (n: string) => snapshotNode(n)?.kind === 'loader';
 		const selection =
 			parts.verb === 'seed'
 				? resolution.nodes.filter((n) => snapshotNode(n)?.kind === 'seed')
 				: parts.verb === 'freshness'
 					? [...new Set(resolution.nodes.flatMap((n) => [n, ...ancestors(n)]).filter(isSource))]
 					: parts.verb === 'load'
-						? resolution.nodes.filter(isSource)
+						? resolution.nodes.filter(isManaged)
 						: resolution.nodes;
 		const empty = { seed: 'the selectors match no seeds in the current publication', load: 'the selectors match no managed sources in the current publication' } as Partial<Record<LaunchVerb, string>>;
 		if (!selection.length) return refused(empty[parts.verb] ?? 'no sources are selected or upstream of the selection');
@@ -1129,8 +1130,17 @@ export class MockOperate {
 		const granted = scopeTerms === null ? null : new Set(writeSetOf(scopeTerms.length ? scopeTerms : ['__none__'], []));
 		const covered = this.#ctx.can('run.adhoc') && (granted === null || selection.every((n) => granted.has(n)));
 		const decide = (action: Capability, allowed: boolean): AdhocPermission => ({ action, allowed, reason: allowed ? null : `missing ${action} permission for this target` });
-		const verbGate: Capability[] = parts.verb === 'load' ? ['run.load'] : [];
-		const gates = [...new Set([...Object.keys(parts.flags).flatMap((f) => flagSpec(parts.verb, f)?.requires ?? []), ...verbGate])];
+		const settings: Record<string, string | boolean> = Object.fromEntries(Object.entries(parts.flags).map(([f, v]) => [f.replace(/^--/, '').replaceAll('-', '_'), v]));
+		if ('load' in settings) settings.load_sources = true;
+		if ('no_load' in settings) settings.load_sources = false;
+		delete settings.load;
+		delete settings.no_load;
+		if (typeof settings.vars === 'string' && /^\{\s*\}$/.test(settings.vars)) delete settings.vars;
+		if (parts.verb === 'load') Object.assign(settings, settings.reload ? {} : { load_sources: true }, { run_tests: false, run_audits: false });
+		// As on the server: run.vars for variables, and run.load over the managed sources an explicit load writes.
+		const loads = settings.load_sources === true || settings.reload === true ? writeSet.filter(isManaged) : [];
+		const flagGates = Object.keys(parts.flags).flatMap((f) => flagSpec(parts.verb, f)?.requires ?? []).filter((a) => a !== 'run.vars' && a !== 'run.load');
+		const gates = [...new Set([...flagGates, ...('vars' in settings ? ['run.vars' as const] : []), ...(loads.length ? ['run.load' as const] : [])])];
 		const permissions = [
 			decide('run.adhoc', covered),
 			...gates.map((action) => decide(action, this.#ctx.can(action))),
@@ -1140,7 +1150,7 @@ export class MockOperate {
 			verb: parts.verb,
 			selection,
 			writeSet,
-			settings: Object.fromEntries(Object.entries(parts.flags).map(([f, v]) => [f.replace(/^--/, '').replaceAll('-', '_'), v])),
+			settings,
 			permissions,
 			error: null,
 			launchable: permissions.every((p) => p.allowed)

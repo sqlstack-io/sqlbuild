@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::job::frozen_group_children;
+use crate::runs::constants::VARS_SETTING;
 use crate::runs::models::{RunKind, RunRequest};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
@@ -84,7 +85,7 @@ pub(crate) fn execution_scopes(
     if launches && adhoc && request.settings.contains_key("warehouse") {
         actions.push(Action::RunWarehouse);
     }
-    if launches && adhoc && request.settings.contains_key("vars") {
+    if launches && adhoc && request.settings.contains_key(VARS_SETTING) {
         actions.push(Action::RunVars);
     }
     if launches && request.priority > 0 {

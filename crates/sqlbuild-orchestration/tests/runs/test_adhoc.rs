@@ -122,7 +122,7 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
         AdhocCommandTestCase {
             description: "Developer lacks run.load for the load verb",
             person: AdhocPerson::Developer,
-            command: &["load", "source:shop.customers"],
+            command: &["load", "--select", "source:shop.customers"],
             priority: 0,
             reason: "Load customers",
             expected_check: json!({"selection": ["source:shop.customers"], "write_set": ["source:shop.customers"],
@@ -154,6 +154,7 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             person: AdhocPerson::Admin,
             command: &[
                 "load",
+                "--select",
                 "source:shop.customers",
                 "--reload",
                 "--vars",
@@ -381,7 +382,7 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                     json!(["build", {}, "Reload customers"]),
                     json!(["build", {"load_sources": false}, "Refresh customers only"]),
                     json!(["build", {"load_sources": true}, "Refresh orders"]),
-                    json!(["load", {"reload": true, "vars": {"day": 1}}, "Reload customers for one day"]),
+                    json!(["load", {"reload": true, "run_audits": false, "run_tests": false, "vars": {"day": 1}}, "Reload customers for one day"]),
                     json!(["build", {"full_refresh": true, "warehouse": "BUILD_XS"}, "Rebuild orders now"]),
                     json!(["test", {}, "Check orders"]),
                 ],

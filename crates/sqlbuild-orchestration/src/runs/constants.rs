@@ -43,3 +43,6 @@ pub(crate) const DERIVED_RUN_ID_VERSION: usize = 5;
 
 /// A load runs as a build of its managed sources, so the worker's verified build path enforces its write set.
 pub(crate) const LOAD_VERB: &str = "load";
+
+/// The ad-hoc setting that carries `--vars`.
+pub(crate) const VARS_SETTING: &str = "vars";

@@ -90,7 +90,7 @@ pub(crate) async fn frozen_adhoc_request(
         .and_then(|row| row["image_id"].as_str())
         .map(str::to_owned);
     let write_set: BTreeSet<String> = match plan.verb.as_str() {
-        "build" | "load" => writers,
+        "build" | LOAD_VERB => writers,
         "seed" => writers
             .into_iter()
             .filter(|key| key.starts_with("seed:"))
