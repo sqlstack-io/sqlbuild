@@ -1854,7 +1854,7 @@ export interface components {
         };
         JobMember: {
             job_key: string;
-            /** @description Members this one waits for, from lineage and from the group's `after`. */
+            /** @description Members this one waits for, from the lineage between their nodes. */
             waits_for: string[];
         };
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
