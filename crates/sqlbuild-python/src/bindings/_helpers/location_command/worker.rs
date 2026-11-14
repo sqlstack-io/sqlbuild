@@ -73,6 +73,20 @@ fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
     attached
 }
 
+/// Each snapshot node's direct upstream node keys.
+fn upstream_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Vec<String>> {
+    snapshot
+        .input
+        .nodes
+        .iter()
+        .map(|(key, node)| {
+            let deps = node.definition.get("deps").and_then(Value::as_array);
+            let deps = deps.into_iter().flatten().filter_map(Value::as_str);
+            (key.clone(), deps.map(str::to_owned).collect())
+        })
+        .collect()
+}
+
 /// A job run's `--changed` settings: its whole selection, and source data counted unless configured.
 fn job_run_settings(
     project_dir: &Bound<'_, PyAny>,
@@ -272,7 +286,7 @@ pub(super) fn execute_worker<'py>(
         )
         .map_err(|error| PyValueError::new_err(error.to_string()))?,
     )?;
-    let worker = WorkerBuild::new(&owner, attached_nodes(snapshot))?;
+    let worker = WorkerBuild::new(&owner, (attached_nodes(snapshot), upstream_nodes(snapshot)))?;
     if let Some(recall) = recall {
         *recall
             .worker
