@@ -24,6 +24,8 @@ services:
       target: server
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+        SQLBUILD_SOURCE: ${SQLBUILD_SOURCE:-wheels}
+        SQLBUILD_VERSION: ${SQLBUILD_VERSION:-}
     environment:
       - SQLBUILD_CONTROL_DATABASE_URL=${SQLBUILD_CONTROL_DATABASE_URL:?Set SQLBUILD_CONTROL_DATABASE_URL}
       - SQLBUILD_PLATFORM_WEBHOOK_URL
@@ -54,6 +56,8 @@ services:
       target: location
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+        SQLBUILD_SOURCE: ${SQLBUILD_SOURCE:-wheels}
+        SQLBUILD_VERSION: ${SQLBUILD_VERSION:-}
         SQLBUILD_GIT_REVISION: ${SQLBUILD_GIT_REVISION:?Set SQLBUILD_GIT_REVISION}
     command: [location, serve, --server, "http://server:8000", --location-id, "${SQLBUILD_LOCATION_ID:?Set SQLBUILD_LOCATION_ID}", --target, development]
     environment:

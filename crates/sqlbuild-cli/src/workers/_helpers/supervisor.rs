@@ -282,7 +282,7 @@ impl Workers {
                         if let (Launcher::Docker(location), Some(WorkerChild::Docker(child))) =
                             (location, &worker.child)
                             && let Err(error) = child
-                                .launch(location, claim, &credential.bearer, &self.control_variable)
+                                .launch((store, location), claim, &credential.bearer, &self.control_variable)
                                 .await
                         {
                             worker.launch_failure = Some("docker_launch_failed");

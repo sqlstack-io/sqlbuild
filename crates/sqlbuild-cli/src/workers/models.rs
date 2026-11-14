@@ -5,6 +5,7 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use std::path::PathBuf;
 use std::time::Instant;
 
+use sqlbuild_orchestration::declarations::models::MemorySize;
 use sqlbuild_orchestration::runs::models::RunClaim;
 use tokio::process::Child;
 use uuid::Uuid;
@@ -79,6 +80,19 @@ pub(super) struct DockerLauncher {
     pub(super) socket: PathBuf,
     pub(super) location_container: String,
     pub(super) executable: String,
+    #[serde(default)]
+    pub(super) run: RunDefaults,
+}
+
+/// Worker container limits for every run of a launcher; a job's `resources` override them up to `max_memory`.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RunDefaults {
+    pub(super) memory: Option<MemorySize>,
+    pub(super) cpus: Option<f64>,
+    pub(super) pids: Option<i64>,
+    pub(super) cgroup_parent: Option<String>,
+    pub(super) max_memory: Option<MemorySize>,
 }
 
 #[derive(Clone, Copy, Debug)]
