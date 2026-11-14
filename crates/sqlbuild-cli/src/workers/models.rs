@@ -30,9 +30,10 @@ pub(super) enum WorkerExit {
     Absent,
 }
 
-#[derive(Debug, serde::Deserialize)]
+/// The `[launchers]` section of `server.toml`.
+#[derive(Debug, Default, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Launchers {
+pub(crate) struct Launchers {
     #[serde(default)]
     pub(super) local: Vec<LocalLauncher>,
     #[serde(default)]
@@ -53,6 +54,9 @@ pub(super) struct LauncherScope<'a> {
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct LocalLauncher {
+    /// The location's name; start-up resolves it to `location_id`.
+    pub(super) location: String,
+    #[serde(skip)]
     pub(super) location_id: Uuid,
     pub(super) target: String,
     pub(super) server_url: String,
@@ -65,6 +69,9 @@ pub(super) struct LocalLauncher {
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DockerLauncher {
+    /// The location's name; start-up resolves it to `location_id`.
+    pub(super) location: String,
+    #[serde(skip)]
     pub(super) location_id: Uuid,
     pub(super) target: String,
     pub(super) server_url: String,

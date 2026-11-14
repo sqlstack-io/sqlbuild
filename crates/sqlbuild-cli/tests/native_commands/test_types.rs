@@ -52,9 +52,8 @@ pub(crate) struct ProxyCliTestCase {
     pub(crate) expected_statuses: [reqwest::StatusCode; 3],
 }
 
-pub(crate) struct AuthenticationConfigurationTestCase {
+pub(crate) struct ServerConfigurationTestCase {
     pub(crate) description: &'static str,
-    pub(crate) option: &'static str,
     pub(crate) configuration: &'static str,
     pub(crate) arguments: &'static [&'static str],
     pub(crate) expected_error: &'static str,

@@ -1043,15 +1043,22 @@
          "--database-env"
         ],
         "dest": "control_database_env",
-        "default": "SQLBUILD_CONTROL_DATABASE_URL",
         "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--config"],
+        "dest": "control_config",
+        "metavar": "PATH",
+        "help": "server.toml: [server], [retention], [oidc], [trusted_proxy] and [[launchers.docker]] or [[launchers.local]]; read at start-up, so a change needs a restart. A flag overrides the file",
         "group": 1
        },
        {
         "kind": "store",
         "options": ["--launchers"],
         "dest": "control_launchers",
-        "help": "installation-owned JSON file of local location/target launchers and concurrency limits",
+        "help": {"suppress": true},
         "group": 1
        },
        {
@@ -1060,7 +1067,6 @@
          "--host"
         ],
         "dest": "control_host",
-        "default": "127.0.0.1",
         "help": "IP address to listen on (default: 127.0.0.1)",
         "group": 1
        },
@@ -1070,7 +1076,6 @@
          "--port"
         ],
         "dest": "control_port",
-        "default": 8000,
         "type": "int",
         "help": "TCP port, or 0 to choose a free port (default: 8000)",
         "group": 1
@@ -1087,7 +1092,6 @@
         "options": ["--default-role"],
         "dest": "control_default_role",
         "choices": ["none", "viewer"],
-        "default": "none",
         "help": "ambient metadata access for authenticated people: none (default) or installation-wide viewer; never grants SQL, evidence, execution or administration",
         "group": 1
        },
@@ -1097,7 +1101,6 @@
          "--statistics-retention-days"
         ],
         "dest": "control_statistics_retention_days",
-        "default": 90,
         "type": "int",
         "help": "days of hourly warehouse statistics to keep; older samples are hidden and then deleted (default: 90)",
         "group": 1
@@ -1108,7 +1111,6 @@
          "--audit-retention-days"
         ],
         "dest": "control_audit_retention_days",
-        "default": 400,
         "type": "int",
         "help": "days of security audit records to keep; older records are deleted once every configured audit webhook has received them and no retained run's retry needs them (default: 400)",
         "group": 1
@@ -1119,7 +1121,6 @@
          "--snapshot-retention-count"
         ],
         "dest": "control_snapshot_retention_count",
-        "default": 10,
         "type": "int",
         "help": "published snapshots to keep per location and target; older snapshots are deleted unless a run, trigger, job or other retained record still references them (default: 10)",
         "group": 1
@@ -1130,7 +1131,6 @@
          "--run-log-retention-days"
         ],
         "dest": "control_run_log_retention_days",
-        "default": 14,
         "type": "int",
         "help": "days a finished run keeps its log of events, statements, SQL and output; the run, its node results and history stay (default: 14)",
         "group": 1
@@ -1141,7 +1141,6 @@
          "--run-log-retention-count"
         ],
         "dest": "control_run_log_retention_count",
-        "default": 200,
         "type": "int",
         "help": "finished runs per location and target that keep their logs; older runs lose theirs, whichever limit comes first (default: 200)",
         "group": 1
@@ -1150,14 +1149,14 @@
         "kind": "store",
         "options": ["--trusted-proxy-config"],
         "dest": "control_trusted_proxy_config",
-        "help": "JSON origin, trusted_peers and explicit subject-to-person identities; proxy must replace X-SQB-User and terminate HTTPS; no provisioning or grants",
+        "help": {"suppress": true},
         "group": 1
        },
        {
         "kind": "store",
         "options": ["--oidc-config"],
         "dest": "control_oidc_config",
-        "help": "JSON HTTPS origin/issuer, client_id and explicit subject-to-person identities; native code flow with PKCE; no provisioning. Beta: groups_claim names an ID-token claim and group_roles maps a group to a non-admin role, optionally in one location and target",
+        "help": {"suppress": true},
         "group": 1
        },
        {
@@ -1221,15 +1220,22 @@
          "--database-env"
         ],
         "dest": "control_database_env",
-        "default": "SQLBUILD_CONTROL_DATABASE_URL",
         "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--config"],
+        "dest": "control_config",
+        "metavar": "PATH",
+        "help": "server.toml: [server], [retention], [oidc], [trusted_proxy] and [[launchers.docker]] or [[launchers.local]]; read at start-up, so a change needs a restart. A flag overrides the file",
         "group": 1
        },
        {
         "kind": "store",
         "options": ["--launchers"],
         "dest": "control_launchers",
-        "help": "installation-owned JSON file of local location/target launchers and concurrency limits",
+        "help": {"suppress": true},
         "group": 1
        }
       ]

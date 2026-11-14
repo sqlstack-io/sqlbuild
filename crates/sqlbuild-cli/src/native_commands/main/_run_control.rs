@@ -9,11 +9,14 @@ use tokio::sync::watch;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::{control_address, control_api_settings};
+use crate::native_commands::_helpers::decision::{
+    control_address, control_api_settings, control_database_variable,
+};
 use crate::native_commands::_helpers::execution::{
     open_control_store, open_control_workers, start_platform_roles, supervise_control_roles,
 };
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::server_config::main::read_server_config::read_server_config;
 
 async fn stopped(mut shutdown: watch::Receiver<bool>) {
     while !*shutdown.borrow_and_update() {
@@ -27,10 +30,13 @@ pub(crate) async fn run_control(
     namespace: &Namespace,
     standalone: bool,
 ) -> Result<(), ControlError> {
-    let address = control_address(namespace, standalone)?;
-    let (authentication, facts) = control_api_settings(namespace, standalone)?;
-    let store = open_control_store(namespace).await?;
-    let (workers, handoff) = open_control_workers(namespace)?;
+    let config = read_server_config(namespace)?;
+    let address = control_address(namespace, standalone, &config.server)?;
+    let (authentication, facts) = control_api_settings(namespace, standalone, &config)?;
+    let variable = control_database_variable(namespace, &config.server);
+    let store = open_control_store(namespace, &variable).await?;
+    let (workers, handoff) =
+        open_control_workers(&store, config.launchers, (variable, facts.scheduler)).await?;
     let (stop, shutdown) = watch::channel(false);
     let mut tasks = tokio::task::JoinSet::new();
     if let Some(address) = address {

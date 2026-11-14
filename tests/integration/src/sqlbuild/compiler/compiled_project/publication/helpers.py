@@ -721,6 +721,21 @@ def current_snapshot(api: SnapshotApi, target: str) -> dict[str, Any]:
     return result
 
 
+def toml_value(value: Any) -> str:
+    """One-line TOML for JSON-shaped settings; every key is quoted so any name survives."""
+    if isinstance(value, dict):
+        pairs: str = ", ".join(f"{json.dumps(str(key))} = {toml_value(item)}" for key, item in value.items())
+        return "{" + pairs + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(toml_value(item) for item in value) + "]"
+    return json.dumps(value)
+
+
+def write_server_config(path: Path, sections: dict[str, Any]) -> None:
+    """Write `server.toml` with each section as an inline table."""
+    _ = path.write_text("".join(f"{name} = {toml_value(value)}\n" for name, value in sections.items()))
+
+
 def native_launcher(directory: Path, executable: str) -> AbstractContextManager[WorkerDeployment]:
     """Use the installed native launcher without a synthetic child."""
     return nullcontext(
@@ -821,20 +836,21 @@ def scheduled_worker(
         )
         assert published.returncode == 0, published.stderr
         write_files(project_dir=project, files=test_case.files_after_publication)
-        configuration: Path = directory / "launchers.json"
+        configuration: Path = directory / "server.toml"
         launcher: dict[str, Any] = {
-            "location_id": api.location_id,
+            "location": "orders",
             "target": "development",
             "server_url": api.url,
             "max_workers": 1,
         } | deployment.configuration
-        _ = configuration.write_text(
-            json.dumps(
-                {
+        write_server_config(
+            configuration,
+            {
+                "launchers": {
                     deployment.kind: [launcher],
                     "concurrency_limits": test_case.concurrency_limits,
                 }
-            )
+            },
         )
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:
@@ -856,7 +872,7 @@ def scheduled_worker(
                 "scheduler",
                 "--database-env",
                 "SQLBUILD_SCHEDULER_TEST_STORE",
-                "--launchers",
+                "--config",
                 str(configuration),
             ],
             log,

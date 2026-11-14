@@ -2,7 +2,9 @@
 
 use std::collections::BTreeSet;
 
+use sqlbuild_orchestration::credentials::main::locations::location_named::location_named;
 use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::workers::models::{Launcher, LauncherScope, Launchers};
@@ -44,25 +46,41 @@ impl Launchers {
     }
 }
 
-pub(in crate::workers) fn read_configuration(
-    path: Option<&str>,
+/// Each launcher names one existing location; the server reads them once, so a new location needs a restart.
+pub(in crate::workers) async fn resolve_locations(
+    store: &ControlStore,
+    configuration: &mut Launchers,
+) -> Result<(), ControlError> {
+    let names = configuration
+        .local
+        .iter_mut()
+        .map(|launcher| (&launcher.location, &mut launcher.location_id))
+        .chain(
+            configuration
+                .docker
+                .iter_mut()
+                .map(|launcher| (&launcher.location, &mut launcher.location_id)),
+        );
+    for (name, location_id) in names {
+        *location_id = location_named(store, name).await?.ok_or_else(|| {
+            ControlError::Invalid(format!(
+                "launcher location '{name}' does not exist; create it with \
+                 `sqb admin create-location {name}`, then restart the server"
+            ))
+        })?;
+    }
+    Ok(())
+}
+
+pub(in crate::workers) fn validate_configuration(
+    configuration: &Launchers,
     scheduler_enabled: bool,
-) -> Result<Launchers, ControlError> {
-    let configuration: Launchers = match path {
-        Some(path) => serde_json::from_slice(&std::fs::read(path)?)
-            .map_err(|error| ControlError::Invalid(format!("launcher configuration: {error}")))?,
-        None => Launchers {
-            local: Vec::new(),
-            docker: Vec::new(),
-            concurrency_limits: Default::default(),
-        },
-    };
+) -> Result<(), ControlError> {
     if !scheduler_enabled && configuration.locations().next().is_some() {
         return Err(ControlError::Invalid(
             "launchers require the embedded scheduler".into(),
         ));
     }
-    let mut scopes: BTreeSet<(Uuid, &str)> = BTreeSet::new();
     for location in &configuration.local {
         if !location.project_dir.is_absolute()
             || !location.project_dir.is_dir()
@@ -72,20 +90,31 @@ pub(in crate::workers) fn read_configuration(
             return Err(ControlError::Invalid("local launchers require unique location/target scopes and existing absolute project/executable paths".into()));
         }
     }
-    for location in configuration.locations() {
-        let scope = location.scope();
-        if scope.target.trim().is_empty() || !scopes.insert((scope.location_id, scope.target)) {
+    let mut scopes: BTreeSet<(&str, &str)> = BTreeSet::new();
+    let named = configuration
+        .local
+        .iter()
+        .map(|launcher| (launcher.location.as_str(), launcher.target.as_str()))
+        .chain(
+            configuration
+                .docker
+                .iter()
+                .map(|launcher| (launcher.location.as_str(), launcher.target.as_str())),
+        );
+    for (name, target) in named {
+        if name.trim().is_empty() || target.trim().is_empty() || !scopes.insert((name, target)) {
             return Err(ControlError::Invalid(
-                "launchers require unique location/target scopes".into(),
+                "launchers require a location name and unique location/target scopes".into(),
             ));
         }
-        if let Launcher::Docker(location) = location
-            && (!location.socket.is_absolute()
-                || location.location_container.trim().is_empty()
-                || location.executable.trim().is_empty())
+    }
+    for location in &configuration.docker {
+        if !location.socket.is_absolute()
+            || location.location_container.trim().is_empty()
+            || location.executable.trim().is_empty()
         {
             return Err(ControlError::Invalid("Docker launchers require an absolute socket path, location container and executable".into()));
         }
     }
-    Ok(configuration)
+    Ok(())
 }
