@@ -35,12 +35,18 @@ pub fn target_error_message(error: &TargetError) -> String {
         ),
         TargetError::ManagedWriteSchema(label) => format!(
             "{label} has no explicitly resolved physical write schema. Set schema on the \
-             resource or its defaults, selected target, loader_schema, or connection."
+             resource or its defaults, the selected target or its loader_schema, or the \
+             project's only top-level [connection]."
         ),
         TargetError::NamedTargetSchema(target) => format!(
             "Named target '{target}' must explicitly set schema to a nonblank literal or \
              '{PRESERVE_TARGET_VALUE}'. Resource schemas, defaults, and connection schemas do \
              not select a named target schema strategy."
+        ),
+        TargetError::PreservedLoaderSchema(loader) => format!(
+            "Intermediate loader '{loader}' would write to a schema named \
+             '{PRESERVE_TARGET_VALUE}'. The target's schema '{PRESERVE_TARGET_VALUE}' keeps each \
+             model's own schema, and a loader has none, so its destination must name a schema."
         ),
     }
 }

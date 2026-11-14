@@ -46,12 +46,17 @@ fn given_target_error_when_formatting_then_matches_python_message() {
         MessageTestCase {
             description: "a managed write without a schema",
             error: TargetError::ManagedWriteSchema("Model 'orders'".to_owned()),
-            expected_message: "Model 'orders' has no explicitly resolved physical write schema. Set schema on the resource or its defaults, selected target, loader_schema, or connection.",
+            expected_message: "Model 'orders' has no explicitly resolved physical write schema. Set schema on the resource or its defaults, the selected target or its loader_schema, or the project's only top-level [connection].",
         },
         MessageTestCase {
             description: "a named target without a schema",
             error: TargetError::NamedTargetSchema("ci".to_owned()),
             expected_message: "Named target 'ci' must explicitly set schema to a nonblank literal or 'preserve'. Resource schemas, defaults, and connection schemas do not select a named target schema strategy.",
+        },
+        MessageTestCase {
+            description: "an intermediate loader under a preserved target schema",
+            error: TargetError::PreservedLoaderSchema("raw_orders".to_owned()),
+            expected_message: "Intermediate loader 'raw_orders' would write to a schema named 'preserve'. The target's schema 'preserve' keeps each model's own schema, and a loader has none, so its destination must name a schema.",
         },
     ];
 

@@ -17,6 +17,12 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
+_PRESERVED_TARGET_PROJECT: str = (
+    'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+    '[connection]\ndatabase = "dev.duckdb"\n\n'
+    '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -54,6 +60,25 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 '            database = "ANALYTICS"\n'
             ),
             expected_example_count=1,
+        ),
+        MissingTargetDatabaseTestCase(
+            description="the ignored connection schema is shown with command-line vars applied",
+            project_toml=(
+                'name = "orders"\nadapter = "snowflake"\ndefault_target = "dev"\n\n'
+                '[vars]\norders_schema = "ORDERS"\n\n'
+                '[connections.warehouse]\naccount = "example"\nschema = "${orders_schema}"\n\n'
+                '[targets.dev]\ndatabase = "ANALYTICS"\n'
+            ),
+            expected_error=(
+                "The connection's schema 'ORDERS_CI' is not used because the project defines "
+                "named connections or targets.\n"
+                "  = help: to build this target into that schema, set this in "
+                "sqlbuild_project.toml:\n"
+                "            [targets.dev]\n"
+                '            schema = "ORDERS_CI"\n'
+            ),
+            expected_example_count=0,
+            command=("--no-color", "compile", "--vars", '{"orders_schema": "ORDERS_CI"}'),
         ),
         MissingTargetDatabaseTestCase(
             description="a named connection's schema is named as unused",
@@ -94,9 +119,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_error=(
                 "error[S103]: Intermediate loader 'raw_orders' has no explicitly resolved "
-                "physical write schema. Set schema on the resource or its defaults, selected "
-                "target, loader_schema, or connection. The connection's schema 'raw' is not used "
-                "because the project defines named connections or targets.\n"
+                "physical write schema. Set schema on the resource or its defaults, the selected "
+                "target or its loader_schema, or the project's only top-level [connection]. The "
+                "connection's schema 'raw' is not used because the project defines named "
+                "connections or targets.\n"
                 "  = help: to set project-wide defaults, set this in sqlbuild_project.toml:\n"
                 "            [defaults]\n"
                 '            schema = "raw"\n'
@@ -123,14 +149,115 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_error=(
                 "error[S103]: Intermediate loader 'raw_orders' has no explicitly resolved "
-                "physical write schema. Set schema on the resource or its defaults, selected "
-                "target, loader_schema, or connection. The connection's schema 'raw' is not used "
-                "because the project defines named connections or targets.\n"
+                "physical write schema. Set schema on the resource or its defaults, the selected "
+                "target or its loader_schema, or the project's only top-level [connection]. The "
+                "connection's schema 'raw' is not used because the project defines named "
+                "connections or targets.\n"
                 "  = help: to set project-wide defaults, set this in sqlbuild_project.toml:\n"
                 "            [defaults]\n"
                 '            schema = "raw"\n'
             ),
             expected_example_count=1,
+            command=("--no-color", "load", "--select", "raw_orders"),
+        ),
+        MissingTargetDatabaseTestCase(
+            description="a loader under a preserved target schema stops compile",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
+            ),
+            extra_files={
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error=(
+                "error[S103]: Intermediate loader 'raw_orders' would write to a schema named "
+                "'preserve'. The target's schema 'preserve' keeps each model's own schema, and a "
+                "loader has none, so its destination must name a schema.\n"
+                "  = help: to choose where it writes, set its destination in its @loader "
+                "decorator:\n"
+                '            @loader(destination="my_schema.__loader__raw_orders")\n'
+            ),
+            expected_example_count=0,
+        ),
+        MissingTargetDatabaseTestCase(
+            description="sqb load stops a loader under a preserved target schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
+            ),
+            extra_files={
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error=(
+                "error[S103]: Intermediate loader 'raw_orders' would write to a schema named "
+                "'preserve'. The target's schema 'preserve' keeps each model's own schema, and a "
+                "loader has none, so its destination must name a schema.\n"
+                "  = help: to choose where it writes, set its destination in its @loader "
+                "decorator:\n"
+                '            @loader(destination="my_schema.__loader__raw_orders")\n'
+            ),
+            expected_example_count=0,
+            command=("--no-color", "load", "--select", "raw_orders"),
+        ),
+        MissingTargetDatabaseTestCase(
+            description="sqb load stops a managed source under a preserved loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "preserve"\n'
+            ),
+            extra_files={
+                "sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+                    "    managed: true\n    write_strategy: table\n"
+                    "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                ),
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error=(
+                "error[P001]: Managed source 'raw_orders' has no logical schema, but the "
+                "selected target sets schema to 'preserve'\n"
+                "  = help: Set schema on the resource or its defaults, or configure a literal "
+                "target schema.\n"
+            ),
+            expected_example_count=0,
+            command=("--no-color", "load", "--select", "raw_orders"),
+        ),
+        MissingTargetDatabaseTestCase(
+            description="sqb load refuses a run context template in the target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "raw_${CTX:run.id}"\n'
+            ),
+            extra_files={
+                "sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+                    "    managed: true\n    write_strategy: table\n"
+                    "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                ),
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error="managed loader target namespace does not allow CTX templates",
+            expected_example_count=0,
             command=("--no-color", "load", "--select", "raw_orders"),
         ),
     ),
@@ -224,32 +351,93 @@ def test_given_connection_location_when_compiling_then_models_build_there(
     (
         ManagedSourceLoaderLocationTestCase(
             description="build loads the managed source into the target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n[connection]\n'
+                'database = "dev.duckdb"\nschema = "landing"\n\n'
+                '[connections.archive]\ndatabase = "archive.duckdb"\n\n'
+                '[targets.dev]\nloader_schema = "raw"\n'
+            ),
+            source_schema="",
             command=("--no-color", "build"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="load loads the managed source into the target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n[connection]\n'
+                'database = "dev.duckdb"\nschema = "landing"\n\n'
+                '[connections.archive]\ndatabase = "archive.duckdb"\n\n'
+                '[targets.dev]\nloader_schema = "raw"\n'
+            ),
+            source_schema="",
+            command=("--no-color", "load", "--select", "raw_orders"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="load expands a templated target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[vars]\nraw_schema = "raw"\n\n[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "${raw_schema}"\n'
+            ),
+            source_schema="",
+            command=("--no-color", "load", "--select", "raw_orders"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="build expands a templated target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[vars]\nraw_schema = "raw"\n\n[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "${raw_schema}"\n'
+            ),
+            source_schema="",
+            command=("--no-color", "build"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="load ignores a target loader schema template no source uses",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "${missing_var}"\n'
+            ),
+            source_schema="    schema: raw\n",
+            command=("--no-color", "load", "--select", "raw_orders"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="build under a preserved target loads the source into its own schema",
+            project_toml=_PRESERVED_TARGET_PROJECT,
+            source_schema="    schema: raw\n",
+            command=("--no-color", "build"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="load under a preserved target loads the source into its own schema",
+            project_toml=_PRESERVED_TARGET_PROJECT,
+            source_schema="    schema: raw\n",
+            command=("--no-color", "load", "--select", "raw_orders"),
             expected_rows=((1,),),
         ),
     ),
     ids=lambda case: case.description,
 )
-def test_given_ignored_connection_schema_when_building_managed_source_then_loader_schema_is_used(
+def test_given_managed_source_when_loading_then_source_lands_in_its_resolved_schema(
     test_case: ManagedSourceLoaderLocationTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="orders",
         repo_files={
-            "sqlbuild_project.toml": (
-                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n[connection]\n'
-                'database = "dev.duckdb"\nschema = "landing"\n\n'
-                '[connections.archive]\ndatabase = "archive.duckdb"\n\n'
-                '[targets.dev]\nloader_schema = "raw"\n'
-            ),
+            "sqlbuild_project.toml": test_case.project_toml,
             "models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized view, "
                 'schema staging);\n\nSELECT order_id FROM __source("raw_orders")\n'
             ),
             "sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
-                "    managed: true\n    write_strategy: table\n"
+                f"    managed: true\n{test_case.source_schema}    write_strategy: table\n"
                 "    columns:\n      - name: order_id\n        type: INTEGER\n"
             ),
             "python/loaders/orders.py": (

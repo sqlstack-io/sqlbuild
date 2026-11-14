@@ -16,7 +16,7 @@ use sqlbuild_orchestration::runs::models::{
 };
 use sqlbuild_orchestration::scheduler::constants::RENEW_INTERVAL_SECONDS;
 use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;
-use sqlbuild_orchestration::scheduler::models::SchedulerLease;
+use sqlbuild_orchestration::scheduler::models::{SchedulerCycle, SchedulerLease};
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_process_ownership::ownership::main::{
@@ -26,6 +26,7 @@ use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::workers::_helpers::invocation::{arguments, environment, excluded};
+use crate::workers::constants::SLOW_SCHEDULER_CYCLE;
 use crate::workers::models::{
     ClaimedWorker, DockerWorker, Launcher, LocalLauncher, LocalSpawn, WorkerChild, WorkerExit,
     Workers,
@@ -147,6 +148,22 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
         lease: Option<&SchedulerLease>,
     ) -> Result<(), ControlError> {
         self.shutdown_workers(store, lease).await
+    }
+
+    fn cycled(&mut self, cycle: &SchedulerCycle) {
+        let timings = &cycle.timings;
+        if timings.total() >= SLOW_SCHEDULER_CYCLE {
+            drop(writeln!(
+                std::io::stderr().lock(),
+                "Slow scheduler cycle: {} ms (lease {} ms, triggers {} ms, run monitor {} ms, tick cleanup {} ms, next due {} ms)",
+                timings.total().as_millis(),
+                timings.lease.as_millis(),
+                timings.triggers.as_millis(),
+                timings.monitor.as_millis(),
+                timings.prune.as_millis(),
+                timings.next_due.as_millis(),
+            ));
+        }
     }
 
     /// A claim whose commit outcome is unknown is adopted by the next recovery pass.

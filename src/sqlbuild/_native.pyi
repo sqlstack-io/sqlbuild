@@ -3663,7 +3663,11 @@ def build_discovered_project_inputs(
     extract_output_column_locations: bool = True,
 ) -> DiscoveredProjectInputs: ...
 def validate_named_target_schema_strategy(
-    *, discovered_inputs: DiscoveredProjectInputs, adapter: BaseAdapter, selected_target: str | None
+    *,
+    discovered_inputs: DiscoveredProjectInputs,
+    adapter: BaseAdapter,
+    selected_target: str | None,
+    cli_vars: dict[str, object] | None = None,
 ) -> None: ...
 def validate_managed_loader_target_isolation(
     *,

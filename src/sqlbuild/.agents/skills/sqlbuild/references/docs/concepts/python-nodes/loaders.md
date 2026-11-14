@@ -329,6 +329,11 @@ def raw_accounts(ctx: LoaderContext):
     ...
 ```
 
+An intermediate loader without a schema in its `destination` writes to the target's schema. When
+the target's schema is `preserve`, which keeps each model's own schema, the loader has no schema to
+keep, so `compile`, `build` and `load` stop with `S103` until its `destination` names one, such as
+`destination="staging.__loader__raw_accounts"`.
+
 ## Decorator parameters
 
 The `@loader` decorator accepts optional parameters that can also be set in the source YAML. When both are specified, the YAML takes precedence.
