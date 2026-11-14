@@ -2,11 +2,15 @@
 
 use std::collections::{HashMap, HashSet};
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::assembly::project::errors::AssemblyError;
+use sqlbuild_analysis::assembly::project::main::preserved_logical_namespace::preserved_logical_namespace;
+use sqlbuild_analysis::assembly::project::models::TargetNamespace;
 use sqlbuild_core::load_command::errors::UnknownLoadSelector;
 use sqlbuild_core::load_command::main::load_reference_loaders::load_reference_loaders;
 use sqlbuild_core::load_command::main::select_load_entries::select_load_entries as select_entries;
@@ -28,12 +32,13 @@ use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_ada
 use crate::bindings::_helpers::model_config::template_data::early_model_templates;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
+use crate::bindings::_helpers::records::construct::{new_helped_error, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::replaced_keywords;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 
 const LOADER_NODE_KEY: &str = "sqlbuild_loader_node";
+const COMPILE_INPUT_CODE: &str = "P001";
 const LOADER_TABLE_PREFIX: &str = "__loader__";
 const UNKNOWN_SELECTOR_CODE: &str = "C901";
 const UNKNOWN_SELECTOR_HELP: &str = "Use exact managed source names or loader function names.";
@@ -63,6 +68,9 @@ pub(crate) fn environment_sources<'py>(
             let source: Bound<'py, PyAny> = source?;
             let changes: Bound<'py, PyDict> = PyDict::new(py);
             let managed: bool = native_field(&source, "managed")?.is_truthy()?;
+            if managed && !target_config.is_none() {
+                preserved_source_namespace(&source, target_config)?;
+            }
             for (field, loader_first) in [("database", false), ("schema", managed)] {
                 let value: Bound<'py, PyAny> = native_field(&source, field)?;
                 let effective: Bound<'py, PyAny> = if !value.is_none() || target_config.is_none() {
@@ -84,6 +92,44 @@ pub(crate) fn environment_sources<'py>(
         }
     }
     Ok(sources)
+}
+
+/// Raise build's error when a managed source has no schema of its own and its target value is `preserve`.
+fn preserved_source_namespace(
+    source: &Bound<'_, PyAny>,
+    target_config: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let text = |record: &Bound<'_, PyAny>, field: &str| -> PyResult<Option<String>> {
+        native_field(record, field)?.extract()
+    };
+    let loader_schema: Option<String> =
+        text(target_config, "loader_schema")?.filter(|value| !value.is_empty());
+    let target: TargetNamespace = TargetNamespace {
+        database: text(target_config, "database")?,
+        schema: loader_schema.clone().or(text(target_config, "schema")?),
+        loader_schema,
+    };
+    let label: String = format!(
+        "Managed source '{}'",
+        text(source, "name")?.unwrap_or_default()
+    );
+    match preserved_logical_namespace(
+        &label,
+        Some(&target),
+        (
+            text(source, "database")?.as_ref(),
+            text(source, "schema")?.as_ref(),
+        ),
+    ) {
+        Ok(()) => Ok(()),
+        Err(AssemblyError::CompileInput { message, help }) => Err(new_helped_error(
+            source.py(),
+            ErrorId::CompileInput,
+            (message, COMPILE_INPUT_CODE),
+            help.as_deref(),
+        )),
+        Err(other) => Err(PyValueError::new_err(format!("{other:?}"))),
+    }
 }
 
 impl<'py> LoadProject<'py> {
