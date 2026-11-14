@@ -30,7 +30,7 @@ _REPO_ROOT: Path = Path(__file__).resolve().parents[6]
 def test_given_discovery_error_codes_when_reading_the_failure_corpus_then_each_has_a_case(
     test_case: DiscoveryCodesTestCase,
 ) -> None:
-    declared: set[str] = {project.expected.error_code for project in refactor_cases()}
+    declared: set[str | None] = {project.expected.error_code for project in refactor_cases()}
     for case in failure_cases():
         declared.add(case.expected_code)
         declared.update(case.expected_codes or ())
