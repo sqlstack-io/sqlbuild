@@ -112,7 +112,7 @@ def analysis_error_codes(compiler_root: Path) -> frozenset[str]:
         path: Path = compiler_root / root
         for module in sorted(path.rglob("*.py")) if path.is_dir() else (path,):
             found.update(_module_codes(module))
-    repo_root: Path = compiler_root.parents[2]
+    repo_root: Path = Path(__file__).resolve().parents[4]
     for native_module in ANALYSIS_NATIVE_CODE_SCAN_ROOTS:
         text: str = (repo_root / native_module).read_text(encoding="utf-8")
         found.update(NATIVE_CODE_CONSTANT_PATTERN.findall(text))
@@ -131,7 +131,7 @@ def inline_compile_codes(compile_root: Path) -> dict[str, tuple[str, ...]]:
             code: str | None = _code_literal(node)
             if code is not None:
                 found.setdefault(code, []).append(f"{relative}:{getattr(node, 'lineno', 0)}")
-    repo_root: Path = compile_root.parents[3]
+    repo_root: Path = Path(__file__).resolve().parents[4]
     for directory in RENDER_NATIVE_CODE_SCAN_ROOTS:
         for path in sorted((repo_root / directory).rglob("*.rs")):
             if NATIVE_CODE_TEST_DIRECTORY in path.parts:
