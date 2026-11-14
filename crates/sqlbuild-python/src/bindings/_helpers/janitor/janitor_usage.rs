@@ -4,19 +4,26 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use pyo3::IntoPyObject;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyString};
+use sqlbuild_cli::diff_report::errors::DiffUserError;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_model_config::model_validation::main::fixed_duration_seconds::fixed_duration_seconds;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::build_progress::transient_status::TransientStatusReporter;
+use crate::bindings::_helpers::diff_report::support::cli_error;
 use crate::bindings::_helpers::janitor::janitor_keys::{Folded, Key, record, tuple};
 use crate::bindings::_helpers::janitor::janitor_planning::completed;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::records::ids::ErrorId;
 
 const START_MESSAGE: &str = "Checking relation usage...";
+const INCOMPLETE_USAGE_CODE: &str = "C503";
+const INCOMPLETE_USAGE_HELP: &str = "grant the role read access to the warehouse's query history \
+     (see `sqb janitor`, \"Usage comes from the warehouse's query history\"), or run without \
+     keep_in_use to archive relations whether or not they are read";
 
 /// The usage window and whether in-use candidates are kept.
 pub(crate) struct UsageSettings {
@@ -96,6 +103,27 @@ fn completion_message(
     format!("Checked relation usage: {in_use} of {total} in use. ({elapsed_seconds:.2}s)")
 }
 
+/// Why `keep_in_use` cannot run: usage was not checked, or the check left something out.
+fn incomplete_usage_error(py: Python<'_>, reason: Option<String>, notices: &[String]) -> PyErr {
+    let missing: String = match reason {
+        Some(reason) if notices.is_empty() => format!("usage was not checked: {reason}"),
+        None if notices.is_empty() => "usage was not checked".to_owned(),
+        _ => format!("usage was only partly checked: {}", notices.join("; ")),
+    };
+    cli_error(
+        py,
+        ErrorId::CliUser,
+        &DiffUserError {
+            message: format!(
+                "keep_in_use needs the usage of every relation to archive, but {missing}; \
+                 nothing was archived"
+            ),
+            code: INCOMPLETE_USAGE_CODE.to_owned(),
+            help: Some(INCOMPLETE_USAGE_HELP.to_owned()),
+        },
+    )
+}
+
 /// The plan with each candidate's reads, the usage check, and in-use candidates kept when asked.
 pub(crate) fn check_janitor_usage<'py>(
     (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -127,8 +155,20 @@ pub(crate) fn check_janitor_usage<'py>(
             }
         };
     let checked: bool = native_field(&report, "checked")?.is_truthy()?;
+    let reason: Bound<'py, PyAny> = native_field(&report, "reason")?;
+    let notices: Vec<String> = native_field(&report, "notices")?.extract()?;
+    if settings.keep_in_use && (!checked || !notices.is_empty()) {
+        TransientStatusReporter::error(
+            status,
+            &format!(
+                "Relation usage check incomplete. ({:.2}s)",
+                started.elapsed().as_secs_f64()
+            ),
+        )?;
+        return Err(incomplete_usage_error(py, reason.extract()?, &notices));
+    }
     let usages: HashMap<Folded, Bound<'py, PyAny>> = usages_by_relation(&report)?;
-    let keep: bool = checked && settings.keep_in_use;
+    let keep: bool = settings.keep_in_use;
     let mut archived: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut kept: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut kept_keys: HashSet<Folded> = HashSet::new();
@@ -159,7 +199,6 @@ pub(crate) fn check_janitor_usage<'py>(
             deletions.push(deletion);
         }
     }
-    let reason: Bound<'py, PyAny> = native_field(&report, "reason")?;
     TransientStatusReporter::complete(
         status,
         &completion_message(

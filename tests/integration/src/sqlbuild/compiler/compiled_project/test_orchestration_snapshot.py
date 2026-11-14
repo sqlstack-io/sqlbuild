@@ -44,6 +44,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
     METADATA,
     PARITY_FILES,
+    PYTHON_PIPELINE_FILES,
     TYPE_PROOF_FILES,
     duckshop_orchestration,
     published_texts,

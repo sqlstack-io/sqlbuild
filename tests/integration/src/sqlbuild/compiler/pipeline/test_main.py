@@ -541,17 +541,16 @@ def test_given_progress_callback_when_building_project_graph_then_reports_compil
     "test_case",
     [
         SnowflakeTargetValidationIntegrationTestCase(
-            description="snowflake compile requires explicit target database and schema",
+            description="snowflake compile without a database anywhere fails early",
             project_files={
                 "sqlbuild_project.toml": (
-                    'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
+                    'name = "demo"\nadapter = "duckdb"\n\n[connection]\npath = "demo.duckdb"\n'
                 ),
                 "sqlbuild_local.toml": (
                     'adapter = "snowflake"\n\n'
                     "[connection]\n"
                     'account = "${ENV:TEST_ACCOUNT}"\n'
                     'warehouse = "TEST_WH"\n'
-                    'database = "TEST_DB"\n'
                     'schema = "TEST_SCHEMA"\n'
                 ),
                 "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
@@ -600,7 +599,24 @@ def test_given_snowflake_local_override_without_target_namespace_when_compiling_
             },
             expected_database="LOCAL_DB",
             expected_schema="LOCAL_SCHEMA",
-        )
+        ),
+        SnowflakeTargetValidationIntegrationTestCase(
+            description="snowflake defaults namespace resolves the project target like models",
+            project_files={
+                "sqlbuild_project.toml": (
+                    'name = "demo"\nadapter = "snowflake"\n\n'
+                    "[connection]\n"
+                    'database = "CONN_DB"\n'
+                    'schema = "CONN_SCHEMA"\n\n'
+                    "[defaults]\n"
+                    'database = "DEFAULTS_DB"\n'
+                    'schema = "DEFAULTS_SCHEMA"\n'
+                ),
+                "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
+            },
+            expected_database="DEFAULTS_DB",
+            expected_schema="DEFAULTS_SCHEMA",
+        ),
     ],
     ids=lambda case: case.description,
 )

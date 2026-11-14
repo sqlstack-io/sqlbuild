@@ -202,13 +202,12 @@ def test_given_cloned_target_when_diffing_then_sqlite_reports_changed_rows(
             absent_tables=("analytics___sqlbuild_microbatches", "_sqlbuild_microbatches"),
         ),
         SqliteProjectE2ETestCase(
-            description="cursor delete_insert replaces only the cursor window",
+            description="keyed cursor delete_insert replaces the window and changed keys",
             files=STRATEGY_PROJECT_FILES,
             changed_files={"seeds/order_events.csv": CHANGED_EVENTS_CSV},
             query="SELECT * FROM analytics__orders_window ORDER BY 1, 3",
             expected_rows=(
                 (1, 100, "2026-01-01 10:00:00"),
-                (2, 200, "2026-01-01 11:00:00"),
                 (2, 250, "2026-01-02 12:00:00"),
                 (3, 300, "2026-01-02 09:00:00"),
                 (4, 400, "2026-01-03 08:00:00"),

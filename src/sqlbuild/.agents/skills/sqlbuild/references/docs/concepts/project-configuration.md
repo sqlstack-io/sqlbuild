@@ -140,9 +140,35 @@ explicitly:
 database = ":memory:"
 ```
 
-A `database` or `schema` on a connection doesn't decide where models are built; set them on the
-target. A target that names an unknown connection fails when the configuration loads, before
-anything connects.
+Where models build depends on how the project names its connection:
+
+| Project shape | Models, intermediate loaders and the janitor use |
+|---------------|--------------------------------------------------|
+| One top-level `[connection]`, no `[connections.*]` and no `[targets]` | `[defaults]`, then the connection's `database` and `schema` |
+| Named `[connections.*]` or any `[targets]` | The target's `database` and `schema`, then `[defaults]`; never the connection's |
+
+A project with a single top-level `[connection]` treats it as its default target, so this is
+enough on every adapter:
+
+```toml
+name = "orders"
+adapter = "snowflake"
+
+[connection]
+account = "my_org-my_account"
+user = "${ENV:SNOWFLAKE_USER}"
+password = "${ENV:SNOWFLAKE_PASSWORD}"
+database = "ANALYTICS"
+schema = "ORDERS"
+```
+
+Once the project names connections or targets, a `database` or `schema` on a connection is
+ignored, and the `S101`, `S103` or `S104` error for a missing location names the ignored value and
+the setting to add. Managed sources load into their own `database` and `schema`, then the
+target's, as described in [Targets](#targets).
+
+A target that names an unknown connection fails when the configuration loads, before anything
+connects.
 
 ## Targets
 
@@ -614,7 +640,7 @@ keep_in_use = false
 | `exclude_patterns` | `[]` | Glob patterns for relations to skip |
 | `direct_state_history_versions` | `20` | How many state-history rows to keep per identity in `_sqlbuild_fingerprints` and `_sqlbuild_source_freshness`, and how many builds of each model and seed to keep in `_sqlbuild_consumption` |
 | `in_use_window` | `"7d"` | How far back the janitor looks for reads of each relation it would archive. A fixed duration such as `"7d"` or `"36h"`. See [Relations in use](../cli/janitor.md#relations-in-use) |
-| `keep_in_use` | `false` | Keep relations read within `in_use_window` instead of archiving them. `--keep-in-use` turns it on for one run |
+| `keep_in_use` | `false` | Keep relations read within `in_use_window` instead of archiving them. `--keep-in-use` turns it on for one run. Stops with `C503` when usage can't be read in full |
 
 See [janitor](../cli/janitor.md) for the archive and delete lifecycle.
 

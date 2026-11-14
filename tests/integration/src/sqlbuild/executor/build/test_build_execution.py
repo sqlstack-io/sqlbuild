@@ -100,6 +100,47 @@ _FAILING_TEST_SQL: str = (
     "test_case",
     [
         BuildExecutionTestCase(
+            description="cursor delete_insert with a unique_key replaces a row whose cursor moved",
+            project_files={
+                "sqlbuild_project.toml": _PROJECT_YML,
+                "models/orders.sql": (
+                    "MODEL (description 'Latest version of each order.',\n"
+                    "  materialized incremental,\n"
+                    "  incremental_strategy delete_insert,\n"
+                    "  unique_key [id],\n"
+                    "  cursor updated_at,\n"
+                    "  cursor_type timestamp,\n"
+                    "  cursor_grain second,\n"
+                    ");\n\n"
+                    'SELECT id, updated_at FROM __source("raw_orders")'
+                ),
+                "sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
+                    "    schema: main\n    table: raw_orders\n"
+                ),
+            },
+            setup_sql=(
+                "CREATE TABLE main.orders AS SELECT * FROM (VALUES "
+                "(1, TIMESTAMP '2024-01-01'), (2, TIMESTAMP '2024-01-02')) AS t(id, updated_at)",
+                "CREATE TABLE raw_orders AS SELECT * FROM (VALUES "
+                "(1, TIMESTAMP '2024-01-05'), (2, TIMESTAMP '2024-01-02'), "
+                "(3, TIMESTAMP '2024-01-05')) AS t(id, updated_at)",
+            ),
+            expected_status=BuildStatus.SUCCESS,
+            expected_success_count=1,
+            expected_model_statuses=(("orders", ExecutionStatus.SUCCESS),),
+            expected_query_results=(
+                (
+                    "SELECT id, CAST(updated_at AS VARCHAR) FROM main.orders ORDER BY id",
+                    (
+                        (1, "2024-01-05 00:00:00"),
+                        (2, "2024-01-02 00:00:00"),
+                        (3, "2024-01-05 00:00:00"),
+                    ),
+                ),
+            ),
+        ),
+        BuildExecutionTestCase(
             description="sql udf builds before dependent model",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,

@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
@@ -19,6 +20,7 @@ from tests.integration.src.sqlbuild.adapters.sqlite._test_types import (
     SqliteAtomicityTestCase,
     SqliteCastTestCase,
     SqliteConnectErrorTestCase,
+    SqliteCursorRowCountTestCase,
     SqliteDiffTestCase,
     SqliteNamespaceListingTestCase,
     SqlitePragmaTestCase,
@@ -383,6 +385,16 @@ def test_given_contract_type_when_casting_then_sqlite_renders_storage_form(
             ),
             expected_rows=((1, "placed"), (3, "placed"), (9, "placed")),
         ),
+        SqliteStrategyTestCase(
+            description="keyed cursor delete_insert also replaces a key whose cursor moved",
+            strategy="keyed_cursor",
+            select_columns="order_id, status",
+            source_sql=(
+                "SELECT 1 AS order_id, 10 AS customer_id, 13 AS amount, "
+                "'2026-01-02 15:00:00' AS ordered_at, 'shipped' AS status"
+            ),
+            expected_rows=((1, "shipped"), (3, "placed")),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -419,6 +431,11 @@ def test_given_strategy_when_writing_incrementally_then_sqlite_produces_expected
         SqliteAtomicityTestCase(
             description="a failing cursor window leaves the target unchanged",
             strategy="cursor",
+            expected_rows=((1,), (2,), (3,)),
+        ),
+        SqliteAtomicityTestCase(
+            description="a failing keyed cursor window leaves the target unchanged",
+            strategy="keyed_cursor",
             expected_rows=((1,), (2,), (3,)),
         ),
         SqliteAtomicityTestCase(
@@ -815,3 +832,42 @@ def test_given_sqlite_rows_when_sampling_metadata_then_unknown_without_scanning(
 
     assert interactive.row_count == test_case.expected_interactive_row_count
     assert interactive.detail is None
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqliteCursorRowCountTestCase(
+            description="a keyed window reports the insert's rows, not its staging drop",
+            unique_key=("order_id",),
+            expected_inserted=1,
+        ),
+        SqliteCursorRowCountTestCase(
+            description="an unkeyed window reports the insert's rows",
+            unique_key=(),
+            expected_inserted=1,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_cursor_window_when_writing_then_sqlite_reports_inserted_rows(
+    test_case: SqliteCursorRowCountTestCase, adapter: SqliteAdapter, connection: Any
+) -> None:
+    create_orders(adapter=adapter, connection=connection, relation="orders")
+
+    inserted: int | None = adapter.delete_insert_cursor(
+        connection=connection,
+        destination="orders",
+        sql=(
+            "SELECT 1 AS order_id, 10 AS customer_id, 13 AS amount, "
+            "'2026-01-02 15:00:00' AS ordered_at, 'shipped' AS status"
+        ),
+        cursor_column="ordered_at",
+        cursor_start="2026-01-02 00:00:00",
+        cursor_end="2026-01-03 00:00:00",
+        cursor_type="timestamp",
+        statement_recorder=StatementRecorder(),
+        unique_key=test_case.unique_key,
+    )
+
+    assert inserted == test_case.expected_inserted

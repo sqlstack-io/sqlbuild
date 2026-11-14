@@ -35,7 +35,10 @@ class ConservativeCustomAdapter(BaseAdapter):
 
 
 def build_project(
-    *, target: CompiledRelationLocation, effective_connection: dict[str, object]
+    *,
+    target: CompiledRelationLocation,
+    effective_connection: dict[str, object],
+    effective_target_schema: str | None = None,
 ) -> CompiledProjectView:
     """Build a minimal compiled project for target validation tests."""
 
@@ -43,6 +46,7 @@ def build_project(
         run_id="run_123",
         effective_target_name=None,
         effective_connection=effective_connection,
+        effective_target_schema=effective_target_schema,
         effective_vars={},
         models=(
             CompiledModel(

@@ -103,6 +103,7 @@ class LoaderLogicalType(StrEnum):
     BOOLEAN = "boolean"
     INTEGER = "integer"
     FLOAT = "float"
+    DECIMAL = "decimal"
     STRING = "string"
     TIMESTAMP = "timestamp"
     DATE = "date"

@@ -150,6 +150,10 @@ sqb diff prod:dev --full --select order_lines \
 For a model without a stable row key, opt in to exact full-row multiset comparison with
 `--unkeyed`. Duplicate rows retain their multiplicity; SQLBuild never guesses a key.
 
+An append model, or a microbatch `delete_insert` model, uses its `unique_key` only to match rows
+here and in review. Neither replaces earlier rows by key, so the same key can appear more than once
+in the table. See [incremental strategies](incremental.md#strategies).
+
 ```bash
 sqb diff prod:dev --full --select daily_order_totals --unkeyed
 ```

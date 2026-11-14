@@ -217,10 +217,11 @@ def test_given_warehouse_managed_write_without_schema_when_validating_then_error
             expected_error_fragment=None,
         ),
         ValidateManagedWriteSchemaTestCase(
-            description="connection schema satisfies write policy",
+            description="an inline connection's schema, as the project schema, satisfies write policy",
             adapter=PostgresAdapter(),
             target_schema=None,
             effective_connection={"schema": "analytics"},
+            effective_target_schema="analytics",
             expected_error_fragment=None,
         ),
         ValidateManagedWriteSchemaTestCase(
@@ -244,6 +245,7 @@ def test_given_explicit_or_permitted_schema_when_validating_managed_write_then_i
             qualified_name=None,
         ),
         effective_connection=test_case.effective_connection,
+        effective_target_schema=test_case.effective_target_schema,
     )
 
     validate_managed_write_schemas(adapter=test_case.adapter, project=project)

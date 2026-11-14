@@ -231,7 +231,7 @@ Table promotion mode is a project setting rather than a `MODEL()` field. Staged 
 | `cursor_future_max_distance` | Largest distance a discovered cursor watermark may sit in the future, or `disabled` |
 | `cursor_future_action` | `cap` or `error` when a watermark exceeds `cursor_future_max_distance` |
 | `cursor_inputs` | Upstream names mapped to cursor columns |
-| `unique_key` | Merge or delete/insert matching columns |
+| `unique_key` | Row identity. `merge` and `delete_insert` replace rows with a matching key; `append` and microbatch `delete_insert` use it only to match rows in diff and review |
 | `incremental_mode` | Set to `microbatch` for batched execution |
 | `microbatch_strategy` | Required in microbatch mode: `watermark` or `rolling_window` |
 | `cursor_watermark_mode` | Watermark strategy policy: `all` or `any` |

@@ -1059,7 +1059,7 @@ seeds:
             expected_error_fragment=(
                 "Project resource name 'orders' is declared as both model in "
                 "models/marts/orders.sql and unit test in tests/unit/orders.sql; .*unit test, "
-                "scenario, job, job group, sensor, and calendar schedule names must be globally unique"
+                "scenario, job, job group, sensor, and calendar names must be globally unique"
             ),
         ),
         DiscoverProjectInputsErrorTestCase(

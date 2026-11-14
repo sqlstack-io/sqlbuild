@@ -1,7 +1,8 @@
 SHELL := /bin/bash
 
 .PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-dupes-new check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client \
-	check-e2e-shards test-e2e-duckdb test-e2e-duckdb-build-core \
+	check-e2e-shards check-test-shards test-shard-core test-shard-publication test-shard-history \
+	test-e2e-duckdb test-e2e-duckdb-build-core \
 	test-e2e-duckdb-build-incremental \
 	test-e2e-duckdb-cli-data test-e2e-duckdb-cli test-e2e-duckdb-inspection \
 	test-e2e-duckdb-integrations test-e2e-performance \
@@ -69,14 +70,46 @@ rust-lint:
 	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 
-test:
+UNIT_INTEGRATION_MARKERS := not real_warehouse and not dbt
+PUBLICATION_TESTS := tests/integration/src/sqlbuild/compiler/compiled_project/publication
+
+# CI runs the unit and integration tests in these shards; check-test-shards proves that together
+# they run every test once. Each shard lists the pytest path arguments it runs.
+TEST_SHARD_CORE_PATHS := tests/unit tests/integration --ignore=$(PUBLICATION_TESTS)
+TEST_SHARD_HISTORY_PATHS := $(PUBLICATION_TESTS)/test_warehouse_metadata.py
+TEST_SHARD_PUBLICATION_PATHS := $(PUBLICATION_TESTS) --ignore=$(TEST_SHARD_HISTORY_PATHS)
+
+# $(1) target, $(2) pytest path arguments, $(3) xdist distribution.
+define run_unit_integration
 	@mkdir -p /tmp/opencode
-	@log="/tmp/opencode/test-$$(date +%Y%m%d-%H%M%S).log"; \
+	@log="/tmp/opencode/$(1)-$$(date +%Y%m%d-%H%M%S).log"; \
 	echo "Logging to $$log"; \
-	env PYTHONUNBUFFERED=1 SQLBUILD_CONCURRENCY=$(SQLBUILD_CONCURRENCY) uv run pytest tests/unit tests/integration -m "not real_warehouse and not dbt" -vv --color=yes -n auto --dist loadfile --max-worker-restart=0 2>&1 | tee "$$log"; \
+	env PYTHONUNBUFFERED=1 SQLBUILD_CONCURRENCY=$(SQLBUILD_CONCURRENCY) uv run pytest $(2) -m "$(UNIT_INTEGRATION_MARKERS)" -vv --color=yes -n auto --dist $(3) --max-worker-restart=0 2>&1 | tee "$$log"; \
 	status=$${PIPESTATUS[0]}; \
 	echo "TEST_EXIT=$$status (log: $$log)" | tee -a "$$log"; \
 	exit $$status
+endef
+
+test:
+	$(call run_unit_integration,$@,tests/unit tests/integration,loadfile)
+
+test-shard-core:
+	$(call run_unit_integration,$@,$(TEST_SHARD_CORE_PATHS),loadfile)
+
+test-shard-publication:
+	$(call run_unit_integration,$@,$(TEST_SHARD_PUBLICATION_PATHS),loadfile)
+
+# Its location-backed cases wait on reconcile loops, and no test there shares module state, so
+# they spread test by test instead of running as one file on one worker.
+test-shard-history:
+	$(call run_unit_integration,$@,$(TEST_SHARD_HISTORY_PATHS),load)
+
+check-test-shards:
+	bash scripts/check_test_shards.sh --root tests/unit --root tests/integration \
+		--markers "$(UNIT_INTEGRATION_MARKERS)" \
+		--shard core $(TEST_SHARD_CORE_PATHS) \
+		--shard publication $(TEST_SHARD_PUBLICATION_PATHS) \
+		--shard history $(TEST_SHARD_HISTORY_PATHS)
 
 
 test-all:
@@ -291,7 +324,7 @@ test-e2e-duckdb-integrations:
 	$(call run_e2e_duckdb,$@,$(E2E_DUCKDB_INTEGRATIONS_PATHS))
 
 check-e2e-shards:
-	bash scripts/check_e2e_shards.sh \
+	bash scripts/check_test_shards.sh --root tests/e2e --markers "$(E2E_DUCKDB_MARKERS)" \
 		--shard build-core $(E2E_DUCKDB_BUILD_CORE_PATHS) \
 		--shard build-incremental $(E2E_DUCKDB_BUILD_INCREMENTAL_PATHS) \
 		--shard cli-data $(E2E_DUCKDB_CLI_DATA_PATHS) \
@@ -707,7 +740,7 @@ verify-quick:
 	exit $$status
 
 
-check-ci: check-dupes-new check-e2e-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client rust-lint
+check-ci: check-dupes-new check-e2e-shards check-test-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill check-control-client rust-lint
 	uv run ruff format --check .
 	uv run ruff check .
 	uv run ty check src tests
