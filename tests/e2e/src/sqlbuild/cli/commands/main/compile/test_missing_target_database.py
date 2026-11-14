@@ -237,6 +237,29 @@ _PRESERVED_TARGET_PROJECT: str = (
             expected_example_count=0,
             command=("--no-color", "load", "--select", "raw_orders"),
         ),
+        MissingTargetDatabaseTestCase(
+            description="sqb load refuses a run context template in the target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "raw_${CTX:run.id}"\n'
+            ),
+            extra_files={
+                "sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+                    "    managed: true\n    write_strategy: table\n"
+                    "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                ),
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error="managed loader target namespace does not allow CTX templates",
+            expected_example_count=0,
+            command=("--no-color", "load", "--select", "raw_orders"),
+        ),
     ),
     ids=lambda case: case.description,
 )
@@ -370,6 +393,17 @@ def test_given_connection_location_when_compiling_then_models_build_there(
             ),
             source_schema="",
             command=("--no-color", "build"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="load ignores a target loader schema template no source uses",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "${missing_var}"\n'
+            ),
+            source_schema="    schema: raw\n",
+            command=("--no-color", "load", "--select", "raw_orders"),
             expected_rows=((1,),),
         ),
         ManagedSourceLoaderLocationTestCase(
