@@ -267,7 +267,7 @@ class BasePythonNodeContext:
             if default is not MISSING_DEFAULT:
                 return default
             raise ExecutorInputError("No Python node result store is available")
-        node_type, node_name = self._result_dependency_identity(node_function)
+        node_type, node_name = self.result_dependency_identity(node_function)
         return self.result_store.result_of(
             node_type=node_type,
             node_name=node_name,
@@ -285,14 +285,16 @@ class BasePythonNodeContext:
 
         if self.result_store is None:
             return ()
-        node_type, node_name = self._result_dependency_identity(node_function)
+        node_type, node_name = self.result_dependency_identity(node_function)
         return self.result_store.results_of(
             node_type=node_type,
             node_name=node_name,
             limit=limit,
         )
 
-    def _result_dependency_identity(self, node_function: Callable[..., object]) -> tuple[str, str]:
+    def result_dependency_identity(self, node_function: Callable[..., object]) -> tuple[str, str]:
+        """Return the `(kind, name)` a dependency's results are stored under."""
+
         task_definition: object = getattr(node_function, "__sqlbuild_task__", None)
         if task_definition is not None:
             return PythonNodeKind.TASK.value, self._definition_name(task_definition)

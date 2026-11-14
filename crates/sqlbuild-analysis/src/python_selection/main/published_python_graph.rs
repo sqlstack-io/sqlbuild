@@ -1,26 +1,26 @@
-use crate::definition_changes::constants::PYTHON_NODE_KINDS;
-use crate::python_selection::_helpers::inventory::indexes;
+use crate::python_selection::_helpers::inventory::{indexes, split_published_deps};
 use crate::python_selection::models::{
     InventoryIndexes, InventoryNode, PublishedPythonNode, PythonSelectionGraph, PythonSelectionNode,
 };
 
 /// The selection graph of Python nodes rebuilt from a published snapshot, so the server selects them as the CLI does.
 pub fn published_python_graph(nodes: &[PublishedPythonNode]) -> PythonSelectionGraph {
-    let is_python = |kind: &str| PYTHON_NODE_KINDS.contains(&kind);
-    let inventory: Vec<InventoryNode> = nodes
-        .iter()
-        .map(|node| InventoryNode {
+    let mut inventory: Vec<InventoryNode> = Vec::with_capacity(nodes.len());
+    let mut selection_nodes: Vec<PythonSelectionNode> = Vec::with_capacity(nodes.len());
+    for node in nodes {
+        let (upstream, sql_deps) = split_published_deps(&node.deps);
+        inventory.push(InventoryNode {
             name: node.name.clone(),
             tags: node.tags.clone(),
             relative_path: String::new(),
-            upstream: node
-                .deps
-                .iter()
-                .filter(|(kind, _)| is_python(kind))
-                .map(|(_, name)| name.clone())
-                .collect(),
-        })
-        .collect();
+            upstream,
+        });
+        selection_nodes.push(PythonSelectionNode {
+            name: node.name.clone(),
+            kind: node.kind.clone(),
+            sql_deps,
+        });
+    }
     let InventoryIndexes {
         upstream,
         downstream,
@@ -28,19 +28,7 @@ pub fn published_python_graph(nodes: &[PublishedPythonNode]) -> PythonSelectionG
         ..
     } = indexes(&inventory);
     PythonSelectionGraph {
-        nodes: nodes
-            .iter()
-            .map(|node| PythonSelectionNode {
-                name: node.name.clone(),
-                kind: node.kind.clone(),
-                sql_deps: node
-                    .deps
-                    .iter()
-                    .filter(|(kind, _)| !is_python(kind))
-                    .cloned()
-                    .collect(),
-            })
-            .collect(),
+        nodes: selection_nodes,
         upstream,
         downstream,
         tags,

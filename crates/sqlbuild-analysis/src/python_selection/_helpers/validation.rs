@@ -157,7 +157,7 @@ fn validate_loader_upstreams(context: &SelectionContext<'_>) -> Result<(), Selec
     Ok(())
 }
 
-/// Python's `_validate_selected_dependencies`: selected sources and nodes have their loaders.
+/// Selected managed sources have their loaders selected; a Python node may run without its Python upstream, whose latest persisted result it reads.
 pub(crate) fn validate_selected_dependencies(
     context: &SelectionContext<'_>,
     atoms: &BTreeSet<Atom>,
@@ -187,19 +187,6 @@ pub(crate) fn validate_selected_dependencies(
             "Source '{source}' requires loader '{loader}', but that loader was not selected; \
              select it directly or use upstream expansion"
         )));
-    }
-    for atom in atoms {
-        let Atom::Python(name) = atom else {
-            continue;
-        };
-        for upstream in context.nodes.edges(name, EdgeDirection::Upstream) {
-            if !selected.contains(upstream.as_str()) {
-                return Err(failure(format!(
-                    "Python node '{name}' depends on unselected Python node '{upstream}'; \
-                     select it directly or use upstream expansion"
-                )));
-            }
-        }
     }
     Ok(())
 }

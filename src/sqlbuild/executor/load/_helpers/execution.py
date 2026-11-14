@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 
-from sqlbuild._native import DiscoveredLoaderFunction, SourceEntry
+from sqlbuild._native import DiscoveredLoaderFunction, SourceEntry, SourceWriteStrategy
 from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.executor.load.models import LoadExecutionIndexes, LoadExecutionResult
 from sqlbuild.executor.scheduling.types import ExecutionStatus
@@ -191,3 +192,14 @@ def is_untargeted_self_managed_intermediate(
         and source_entry.write_strategy is None
         and loader_function.destination is None
     )
+
+
+def row_write_entry(source_entry: SourceEntry) -> SourceEntry:
+    """Return the entry rows are written with: an intermediate loader defaults to `table`."""
+
+    if (
+        source_entry.meta.get("sqlbuild_loader_node") is True
+        and source_entry.write_strategy is None
+    ):
+        return replace(source_entry, write_strategy=SourceWriteStrategy.TABLE)
+    return source_entry

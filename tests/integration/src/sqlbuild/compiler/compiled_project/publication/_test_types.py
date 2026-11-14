@@ -126,6 +126,12 @@ class WorkerExecutionTestCase:
 
 
 @dataclass(frozen=True)
+class ClaimedLoadTestCase(WorkerExecutionTestCase):
+    description: str
+    expected_write_set: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
 class UnclaimedLoadTestCase:
     description: str
     files: dict[str, str]

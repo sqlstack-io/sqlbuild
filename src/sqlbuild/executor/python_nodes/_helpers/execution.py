@@ -189,6 +189,18 @@ def _execute_ready_node_in_cost_scope(
         result_store=result_store,
         warnings=warnings,
     )
+    missing: str | None = _missing_upstream_result(
+        node=node, node_kind=node_kind, context=context, upstream_results=upstream_results
+    )
+    if missing is not None:
+        result = PythonNodeExecutionResult(
+            node_name=node.name,
+            kind=node_kind,
+            status=PythonNodeStatus.FAILED,
+            error_message=missing,
+        )
+        _persist_python_node_result(result_store=result_store, result=result, run_id=run_id)
+        return result, None
     try:
         result: PythonNodeExecutionResult = _call_node_with_retry(
             node=node,
@@ -342,6 +354,37 @@ def _call_node_with_retry(
             raise ExecutorInputError("Python retry attempt ended without a retry decision")
         sleep(delay_seconds)
         attempt += 1
+
+
+def _missing_upstream_result(
+    *,
+    node: ExecutablePythonNode,
+    node_kind: PythonNodeKind,
+    context: TaskContext | AssetContext,
+    upstream_results: tuple[PythonNodeExecutionResult, ...],
+) -> str | None:
+    """Why the node cannot run: a Python upstream outside this run that has never succeeded."""
+
+    python_dependencies: tuple[Callable[..., object], ...] = tuple(
+        dependency for dependency in node.depends_on if not isinstance(dependency, SqlResourceRef)
+    )
+    if len(upstream_results) == len(python_dependencies):
+        return None
+    in_run: frozenset[str] = frozenset(result.node_name for result in upstream_results)
+    for dependency in python_dependencies:
+        kind, name = context.result_dependency_identity(dependency)
+        if name in in_run or context.result_of(node_function=dependency, default=None) is not None:
+            continue
+        both: str = f"'sqb build --select +{node_kind.value}:{node.name}'"
+        if kind == PythonNodeKind.LOADER.value:
+            return (
+                f"Upstream loader '{name}' has no successful result to read. Build it with {both}."
+            )
+        return (
+            f"Upstream {kind} '{name}' has no successful result to read. Build it first with "
+            f"'sqb build --select {kind}:{name}', or build both with {both}."
+        )
+    return None
 
 
 def _build_context(

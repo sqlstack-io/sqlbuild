@@ -1,5 +1,6 @@
 use crate::python_selection::tests::helpers::{
-    excluded_names, expected_names, expected_run, indexed_folder, node_names, run,
+    excluded_names, expected_names, expected_run, indexed_folder, node_names, orders_python_graph,
+    published_orders_graph, run, run_over,
 };
 use crate::python_selection::tests::test_types::{
     InventoryTestCase, NodeSelectorTestCase, RunSelectionTestCase,
@@ -148,14 +149,10 @@ fn given_run_selectors_when_resolving_then_selection_matches_python() {
             )),
         },
         RunSelectionTestCase {
-            description: "unselected upstream node",
+            description: "a node runs without its unselected Python upstream",
             select: &["load_events"],
             exclude: &[],
-            expected_selection: Err((
-                "S000",
-                "Python node 'load_events' depends on unselected Python node 'prepare_orders'; \
-                 select it directly or use upstream expansion",
-            )),
+            expected_selection: Ok((&[("source", "load_events")], &["load_events"])),
         },
         RunSelectionTestCase {
             description: "managed source loader selected as a loader",
@@ -179,12 +176,20 @@ fn given_run_selectors_when_resolving_then_selection_matches_python() {
     ];
 
     for test_case in test_cases {
-        let selection = run(test_case.select, test_case.exclude);
-
         assert_eq!(
-            selection,
+            run(test_case.select, test_case.exclude),
             expected_run(test_case.expected_selection),
             "{}",
+            test_case.description
+        );
+        assert_eq!(
+            run_over(
+                &published_orders_graph(),
+                test_case.select,
+                test_case.exclude
+            ),
+            expected_run(test_case.expected_selection),
+            "{} (published snapshot nodes)",
             test_case.description
         );
     }

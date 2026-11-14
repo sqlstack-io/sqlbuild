@@ -26,6 +26,7 @@ from sqlbuild._native import (
     LocalConfig,
     MeasurementThresholdBound,
     MeasurementThresholds,
+    NativeOrchestrationSnapshot,
     ProjectConfig,
     SourceColumnEntry,
     SqlLexicalSyntax,
@@ -44,6 +45,8 @@ from sqlbuild.compiler.compile.types import (
     CompiledModelView,
     CompiledProjectView,
 )
+from sqlbuild.orchestration import compile_snapshot
+from sqlbuild.orchestration_declarations.models.authoring import Job, JobGroup
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 if TYPE_CHECKING:
@@ -750,3 +753,23 @@ def published_texts(test_case: SnapshotExpressionRangeTestCase, tmp_path: Path) 
         column: compiled[slice(*metadata["expression_range"])].decode()
         for column, metadata in columns.items()
     }
+
+
+def python_pipeline_snapshot(
+    tmp_path: Path, declarations: list[Job | JobGroup]
+) -> NativeOrchestrationSnapshot:
+    """Publish the Python pipeline project with the given job declarations."""
+    write_files(project_dir=tmp_path, files=PYTHON_PIPELINE_FILES)
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discovered,
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+    return compile_snapshot(
+        project=project,
+        metadata_json=json.dumps(METADATA),
+        project_dir=tmp_path,
+        declarations=declarations,
+        discovered_inputs=discovered,
+    )

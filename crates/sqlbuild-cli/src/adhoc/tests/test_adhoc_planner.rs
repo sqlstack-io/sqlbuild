@@ -333,9 +333,9 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             )),
         },
         AdhocPlanTestCase {
-            description: "a task without the Python node it depends on is refused, as on the command line",
+            description: "a task runs without the Python node it depends on, as on the command line",
             command: &["build", "--select", "task:request_carrier_collection"],
-            expected_plan: Err("depends on unselected Python node 'partner_orders_file'"),
+            expected_plan: Ok((&["task:request_carrier_collection"], json!({}))),
         },
         AdhocPlanTestCase {
             description: "a python folder selects the nodes under it",

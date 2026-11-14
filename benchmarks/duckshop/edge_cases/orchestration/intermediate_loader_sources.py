@@ -1,9 +1,12 @@
-"""A source loader that depends on an intermediate loader no source declares."""
+"""A source loader that depends on an intermediate loader no source declares.
+
+A job that selects the model must claim the intermediate loader's relation as well as the source.
+"""
 
 from sqlbuild.loaders import loader
 
 
-@loader
+@loader(write_strategy="table")
 def stage_shipments(ctx):
     """Stage synthetic shipments in the intermediate loader's own relation."""
     return [{"order_id": 9}]

@@ -10,6 +10,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     PythonNodeSelectionE2ETestCase,
+    PythonUpstreamResultE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     PYTHON_NODE_SELECTION_DATABASE,
@@ -174,3 +175,51 @@ def test_given_python_node_selection_when_building_then_it_gates_only_on_schedul
         table_exists(db_path=database, table_name=table)
         for table in test_case.expected_missing_tables
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonUpstreamResultE2ETestCase(
+            description="a task reads its unselected upstream task's latest result",
+            select="task:report_order_count",
+            upstream_select="task:count_orders",
+            expected_error=(
+                "Upstream task 'count_orders' has no successful result to read. Build it first "
+                "with 'sqb build --select task:count_orders', or build both with "
+                "'sqb build --select +task:report_order_count'."
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_task_selected_without_its_python_upstream_when_building_then_it_reads_the_persisted_result(
+    test_case: PythonUpstreamResultE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="order_nodes",
+        repo_files=python_node_selection_project_files(
+            orders_sql=PythonNodeSelectionE2ETestCase.orders_sql
+        ),
+    )
+    database: Path = project_dir / PYTHON_NODE_SELECTION_DATABASE
+    execute_duckdb(db_path=database, sql=_EXISTING_ROWS + _EXISTING_ORDERS)
+    report: tuple[str, ...] = ("--no-color", "build", "--select", test_case.select)
+
+    never_built: subprocess.CompletedProcess[str] = run_sqb(command=report, project_dir=project_dir)
+    upstream: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", "--select", test_case.upstream_select),
+        project_dir=project_dir,
+    )
+    rebuilt: subprocess.CompletedProcess[str] = run_sqb(command=report, project_dir=project_dir)
+
+    output: str = never_built.stdout + never_built.stderr
+    assert never_built.returncode == 1, test_case.description + output
+    assert test_case.expected_error in output, test_case.description
+    assert upstream.returncode == 0, upstream.stdout + upstream.stderr
+    assert rebuilt.returncode == 0, rebuilt.stdout + rebuilt.stderr
+    node: str = test_case.select.split(":", 1)[1]
+    assert query_duckdb(db_path=database, sql=f"SELECT status FROM main.{node}_result") == [
+        ("success",)
+    ]

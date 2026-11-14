@@ -36,6 +36,13 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
             expected_python_node_names=frozenset({"prepare_orders", "export_orders"}),
         ),
         PythonSqlSelectorTestCase(
+            description="selects a Python asset without its unselected Python dependency",
+            select=("path:python/assets",),
+            exclude=(),
+            expected_sql_names=frozenset(),
+            expected_python_node_names=frozenset({"export_orders"}),
+        ),
+        PythonSqlSelectorTestCase(
             description="selects expanded source terminal loader requirement for run",
             select=("+source:raw_orders",),
             exclude=(),
@@ -78,15 +85,6 @@ def test_given_run_selectors_when_resolving_then_excludes_python_checks(
             exclude=(),
             expected_error_type=ValueError,
             expected_error_fragment=("Python checks are not selectable here: check_orders_export"),
-        ),
-        PythonSqlSelectorErrorTestCase(
-            description="rejects direct asset path with unselected Python dependency for run",
-            select=("path:python/assets",),
-            exclude=(),
-            expected_error_type=ValueError,
-            expected_error_fragment=(
-                "Python node 'export_orders' depends on unselected Python node 'prepare_orders'"
-            ),
         ),
     ],
     ids=lambda case: case.description,

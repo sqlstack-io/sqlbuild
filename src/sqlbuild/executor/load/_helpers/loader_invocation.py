@@ -18,6 +18,7 @@ from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecord
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.load._helpers.execution import (
     is_untargeted_self_managed_intermediate,
+    row_write_entry,
 )
 from sqlbuild.executor.load._helpers.relation_refs import (
     build_loader_relation_refs,
@@ -238,7 +239,7 @@ def interpret_loader_return(
             duration_ms=int((time.monotonic() - start) * 1000),
             lifecycle_events=statement_recorder.snapshot(),
         )
-    if source_entry.write_strategy is None:
+    if row_write_entry(source_entry).write_strategy is None:
         raise ExecutorInputError(
             f"Source '{source_entry.name}' loader '{loader_function.name}' returned rows "
             "but source has no write_strategy"

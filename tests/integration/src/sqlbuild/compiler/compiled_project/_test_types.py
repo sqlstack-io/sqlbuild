@@ -270,6 +270,20 @@ class PythonJobSelectionTestCase:
 
 
 @dataclass(frozen=True)
+class PythonJobGroupTestCase:
+    description: str
+    jobs: tuple[tuple[str, str], ...]
+    expected_groups: dict[str, dict[str, list[str]]]
+
+
+@dataclass(frozen=True)
+class PythonJobGroupCycleTestCase:
+    description: str
+    jobs: tuple[tuple[str, str], ...]
+    expected_message: str
+
+
+@dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
     schedule: Schedule

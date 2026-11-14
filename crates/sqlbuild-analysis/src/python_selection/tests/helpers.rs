@@ -2,13 +2,14 @@ use crate::assembly::project::types::ObjectKey;
 use crate::graph::errors::SelectorError;
 use crate::graph::main::build_project_graph::build_project_graph;
 use crate::graph::models::{GraphResource, ProjectGraph};
+use crate::python_selection::main::published_python_graph::published_python_graph;
 use crate::python_selection::main::python_node_graph_indexes::python_node_graph_indexes;
 use crate::python_selection::main::resolve_python_node_excludes::resolve_python_node_excludes;
 use crate::python_selection::main::resolve_python_node_selectors::resolve_python_node_selectors;
 use crate::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
 use crate::python_selection::models::{
-    InventoryIndexes, InventoryNode, PythonSelectionGraph, PythonSelectionNode, RunSelection,
-    SqlSelectionGraph,
+    InventoryIndexes, InventoryNode, PublishedPythonNode, PythonSelectionGraph,
+    PythonSelectionNode, RunSelection, SqlSelectionGraph,
 };
 use crate::python_selection::tests::test_types::{ExpectedRun, SelectorFailure};
 
@@ -130,6 +131,36 @@ fn orders_sql_graph() -> ProjectGraph {
     ])
 }
 
+/// The orders Python node graph as the server rebuilds it from published snapshot nodes.
+pub(super) fn published_orders_graph() -> PythonSelectionGraph {
+    let nodes: Vec<PublishedPythonNode> = ORDERS_NODES
+        .iter()
+        .map(
+            |(name, kind, path, tags, upstream, sql_deps)| PublishedPythonNode {
+                name: (*name).to_owned(),
+                kind: (*kind).to_owned(),
+                tags: owned(tags),
+                folder: path
+                    .rsplit_once('/')
+                    .map_or(".", |(folder, _)| folder)
+                    .to_owned(),
+                deps: upstream
+                    .iter()
+                    .map(|upstream| {
+                        let kind: &str = ORDERS_NODES
+                            .iter()
+                            .find(|node| node.0 == *upstream)
+                            .map_or("task", |node| node.1);
+                        key(&(kind, upstream))
+                    })
+                    .chain(sql_deps.iter().map(key))
+                    .collect(),
+            },
+        )
+        .collect();
+    published_python_graph(&nodes)
+}
+
 /// The Python node names the selectors resolve to over the orders graph.
 pub(super) fn node_names(select: &[&str], exclude: &[&str]) -> Result<Vec<String>, OwnedFailure> {
     resolve_python_node_selectors(&orders_python_graph(), &owned(select), &owned(exclude))
@@ -138,6 +169,15 @@ pub(super) fn node_names(select: &[&str], exclude: &[&str]) -> Result<Vec<String
 
 /// The run selection over the orders SQL and Python graphs.
 pub(super) fn run(select: &[&str], exclude: &[&str]) -> Result<OwnedRun, OwnedFailure> {
+    run_over(&orders_python_graph(), select, exclude)
+}
+
+/// The run selection over the orders SQL graph and the given Python graph.
+pub(super) fn run_over(
+    python: &PythonSelectionGraph,
+    select: &[&str],
+    exclude: &[&str],
+) -> Result<OwnedRun, OwnedFailure> {
     let graph: ProjectGraph = orders_sql_graph();
     let sources: Vec<(String, Option<String>)> =
         vec![("raw_orders".to_owned(), Some("raw_orders".to_owned()))];
@@ -146,7 +186,7 @@ pub(super) fn run(select: &[&str], exclude: &[&str]) -> Result<OwnedRun, OwnedFa
             graph: &graph,
             sources: &sources,
         },
-        &orders_python_graph(),
+        python,
         &owned(select),
         &owned(exclude),
     )

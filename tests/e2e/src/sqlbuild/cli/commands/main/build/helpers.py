@@ -895,6 +895,15 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             'MODEL (description "Test model order_summary.", '
             'materialized table);\nSELECT count(*) AS order_count FROM __ref("orders")\n'
         ),
+        "python/tasks/reports.py": (
+            "from python.tasks.counts import count_orders\nfrom sqlbuild.tasks import task\n\n\n"
+            "@task(depends_on=count_orders)\n"
+            "def report_order_count(ctx):\n"
+            "    '''Test task report_order_count.'''\n"
+            "    upstream = ctx.result_of(node_function=count_orders)\n"
+            '    ctx.execute_sql(f"CREATE OR REPLACE TABLE main.report_order_count_result AS "\n'
+            "                    f\"SELECT '{upstream.status}' AS status\")\n"
+        ),
     }
 
 

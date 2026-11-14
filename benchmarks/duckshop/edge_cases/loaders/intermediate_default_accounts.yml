@@ -1,0 +1,5 @@
+sources:
+  - name: raw_account_metrics
+    description: Account metrics read from the intermediate raw_accounts loader.
+    managed: true
+    write_strategy: table

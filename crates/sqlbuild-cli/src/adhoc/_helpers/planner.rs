@@ -217,7 +217,7 @@ fn resolved(
     let selectors: Vec<String> = select.iter().chain(exclude).cloned().collect();
     let node_names: Vec<&str> = python
         .iter()
-        .filter_map(|resource| object_key(&resource.key).map(|_| name_of(&resource.key)))
+        .map(|resource| name_of(&resource.key))
         .collect();
     if selectors_need_jobs(&graph, &selectors, &node_names) {
         graph = attach_jobs(graph, published_jobs(jobs));
@@ -229,19 +229,7 @@ fn resolved(
         .collect();
     let nodes: Vec<PublishedPythonNode> = python
         .iter()
-        .filter_map(|resource| {
-            Some(PublishedPythonNode {
-                name: name_of(&resource.key).to_owned(),
-                kind: python_kind(&resource.key)?.to_owned(),
-                tags: resource.tags.clone(),
-                folder: resource.folder.clone().unwrap_or_else(|| ".".to_owned()),
-                deps: resource
-                    .deps
-                    .iter()
-                    .filter_map(|dep| object_key(dep))
-                    .collect(),
-            })
-        })
+        .filter_map(|resource| published_python_node(resource))
         .collect();
     let python_graph = published_python_graph(&nodes);
     let selection = resolve_python_sql_run_selection(
@@ -275,6 +263,20 @@ fn resolved(
 fn python_kind(key: &str) -> Option<&'static str> {
     let (kind, _) = key.split_once(':')?;
     PYTHON_NODE_KINDS.into_iter().find(|python| *python == kind)
+}
+
+fn published_python_node(resource: &PlannerResource) -> Option<PublishedPythonNode> {
+    Some(PublishedPythonNode {
+        name: name_of(&resource.key).to_owned(),
+        kind: python_kind(&resource.key)?.to_owned(),
+        tags: resource.tags.clone(),
+        folder: resource.folder.clone().unwrap_or_else(|| ".".to_owned()),
+        deps: resource
+            .deps
+            .iter()
+            .filter_map(|dep| object_key(dep))
+            .collect(),
+    })
 }
 
 fn name_of(key: &str) -> &str {
