@@ -1272,7 +1272,9 @@ jobs:
       - name: Start the Podman API socket with group access for the runner
         run: |
           sudo systemctl start podman.socket
+          sudo chmod 0711 /run/podman
           sudo chgrp "$(id -g)" /run/podman/podman.sock
+          sudo chmod 0660 /run/podman/podman.sock
           podman --version
           docker version --format 'Podman API {{.Server.Version}}'
           docker compose version
