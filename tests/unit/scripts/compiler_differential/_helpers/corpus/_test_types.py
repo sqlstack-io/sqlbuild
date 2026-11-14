@@ -52,3 +52,12 @@ class DiscoveryCodesTestCase:
 
     description: str
     expected_undeclared_codes: frozenset[str]
+
+
+@dataclass(frozen=True)
+class FailureGoldensTestCase:
+    """The golden directory and the failure cases with no golden there, which must be none."""
+
+    description: str
+    golden_dir: Path
+    expected_missing: frozenset[str]
