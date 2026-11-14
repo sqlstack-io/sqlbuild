@@ -35,7 +35,8 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			column_migrations: list(document.column_migrations),
 			table_type_conversions: list(document.table_type_conversions),
 			retention: list(document.retention),
-			synced_copy: document.synced_copy ?? null
+			synced_copy: document.synced_copy ?? null,
+			changed: document.changed ?? null
 		},
 		error: null
 	};

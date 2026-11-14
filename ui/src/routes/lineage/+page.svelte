@@ -27,7 +27,7 @@
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
-	import { planHref } from '$lib/run/command';
+	import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
 	import { scaleGraph } from '$lib/mock/scale-graph';
 	import { layoutDag } from '$lib/lineage/graph-layout';
@@ -333,6 +333,8 @@
 		return true;
 	}
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
+	/** Stale nodes with a change of their own or upstream, counted as the Overview counts them. */
+	const changedCount = $derived(catalogNodes.filter((c) => matchesFilterStatus(c, 'changed')).length);
 	const kindOptions = $derived(NODE_KINDS.filter((k) => catalogNodes.some((n) => n.kind === k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: catalogNodes.filter((n) => n.kind === k).length })));
 	const groupOptions = $derived([...new Set(catalogNodes.flatMap((n) => (n.group === null ? [] : [n.group])))].map((g) => ({ value: g, label: g, count: catalogNodes.filter((n) => n.group === g).length })));
 	const statusOptions = [
@@ -549,7 +551,10 @@
 
 <AppTopbar title="Lineage">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
-	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>{/if}
+	{#if app.client.supports('launchAdhocRun')}
+		{#if changedCount}<GatedButton requires="run.adhoc" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build <span class="changed-count">{changedCount} changed</span></GatedButton>{/if}
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
+	{/if}
 </AppTopbar>
 
 
@@ -1011,6 +1016,10 @@
 	.toolbar-action:hover {
 		background: var(--sb-hover);
 		color: var(--foreground);
+	}
+	.changed-count {
+		color: var(--sb-stale);
+		font-weight: 500;
 	}
 	.status-summary {
 		display: flex;

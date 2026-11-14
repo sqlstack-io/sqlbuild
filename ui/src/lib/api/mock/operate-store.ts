@@ -10,6 +10,7 @@ import type {
 	Acknowledgement,
 	AdhocPermission,
 	AdhocRunCheck,
+	PlanChanged,
 	PlanResult,
 	AdhocRunRequest,
 	BuiltInRole,
@@ -65,7 +66,7 @@ import {
 	type TriggerDef
 } from './operate';
 import { SCHEDULER } from './principals';
-import { ancestors, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
+import { ancestors, isWritable, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
 import {
 	commandOf,
 	computeNodes,
@@ -529,13 +530,14 @@ export class MockOperate {
 		return this.#ctx.reply(this.#view(rec, scope));
 	}
 
-	/** Every selected model is planned as unchanged unless the command asks for a full refresh. */
-	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+	/** Every selected model is planned as unchanged unless the command asks for a full refresh; `changed` names the models `--changed` starts from. */
+	async planBuild(scope: Scope, command: string[], changed: Map<string, string> | null = null): Promise<PlanResult> {
 		const check = this.#check(scope, { command, priority: 0 });
 		await new Promise((resolve) => setTimeout(resolve, 1200));
 		if (check.error) return this.#ctx.reply({ plan: null, error: check.error });
 		if (check.verb !== 'build') return this.#ctx.reply({ plan: null, error: `sqb plan previews builds; sqb ${check.verb} cannot be planned` });
 		const reason = command.includes('--full-refresh') ? 'full_refresh' : 'no_change';
+		const decision = changed ? changedDecision(check.selection, changed) : null;
 		const modelKinds = new Set(['view', 'table', 'incremental']);
 		const models = check.selection.filter((key) => modelKinds.has(snapshotNode(key)?.kind ?? '')).map((key) => {
 			const incremental = snapshotNode(key)?.kind === 'incremental';
@@ -543,7 +545,7 @@ export class MockOperate {
 				name: key,
 				materialization_type: incremental ? 'incremental' : 'table',
 				action: incremental ? 'incremental_append' : 'create_table',
-				reason: incremental && reason === 'no_change' ? 'normal_incremental' : reason,
+				reason: changed?.get(key) === 'definition changed' && reason === 'no_change' ? 'query_changed' : incremental && reason === 'no_change' ? 'normal_incremental' : reason,
 				backfill: { action: reason === 'full_refresh' ? 'full' : 'forward', duration: null },
 				qualified_name: `main.${key}`,
 				...(incremental ? { incremental_strategy: 'append', cursor_column: 'updated_at', cursor_type: 'timestamp' } : {})
@@ -557,7 +559,7 @@ export class MockOperate {
 			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas']
 		};
 		return this.#ctx.reply({
-			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy },
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision },
 			error: null
 		});
 	}
@@ -1216,4 +1218,48 @@ export class MockOperate {
 			stateHistory: structuredClone(rt.history)
 		};
 	}
+}
+
+/** A node as `sqb plan --changed` names it, such as `model:orders`. */
+function changedKey(key: string): string {
+	const kind = snapshotNode(key)?.kind ?? 'table';
+	return `${['view', 'table', 'incremental'].includes(kind) ? 'model' : kind}:${key}`;
+}
+
+/**
+ * The location's `--changed` decision for the mock project, with its default reach: a change runs what reads
+ * it, except nodes a triggered job without the change refreshes on its own, and what reads those.
+ */
+function changedDecision(selection: string[], changed: Map<string, string>): PlanChanged {
+	const selected = new Set(selection.filter(isWritable));
+	// A node belongs to jobs, not groups; a job counts as triggered when it or a group it is in has a trigger.
+	const triggered = new Set(TRIGGER_DEFS.flatMap((t) => (t.jobKey ? [t.jobKey] : [])));
+	const jobs = JOB_DEFS.filter((j) => j.kind === 'job' && (triggered.has(j.key) || JOB_DEFS.some((g) => g.kind === 'group' && triggered.has(g.key) && g.members.includes(j.key)))).map((j) => ({
+		key: j.key,
+		nodes: new Set(jobNodes(j.key))
+	}));
+	/** Each running node's changed root. */
+	const root = new Map<string, string>([...changed.keys()].filter((k) => selected.has(k)).map((k) => [k, k]));
+	const held = new Set<string>();
+	const decision: PlanChanged = { counts: ['definition'], reach: 'job', runs: [...root.keys()].map((k) => ({ node: changedKey(k), reason: changed.get(k)!, downstream_of: null })), held_back: [], unchanged: [] };
+	for (const node of SNAPSHOT_NODES) {
+		if (!selected.has(node.key) || root.has(node.key)) continue;
+		const heldUpstream = node.upstream.find((u) => held.has(u));
+		const runningUpstream = node.upstream.find((u) => root.has(u));
+		if (heldUpstream) {
+			held.add(node.key);
+			decision.held_back.push({ node: changedKey(node.key), reads: changedKey(heldUpstream) });
+		} else if (runningUpstream) {
+			const origin = root.get(runningUpstream)!;
+			const owners = jobs.filter((j) => j.nodes.has(node.key));
+			if (owners.length && !owners.some((j) => j.nodes.has(origin))) {
+				held.add(node.key);
+				decision.held_back.push({ node: changedKey(node.key), refreshed_by: owners.map((j) => j.key) });
+			} else {
+				root.set(node.key, origin);
+				decision.runs.push({ node: changedKey(node.key), reason: `upstream model ${origin} runs`, downstream_of: changedKey(origin) });
+			}
+		} else decision.unchanged.push(changedKey(node.key));
+	}
+	return decision;
 }

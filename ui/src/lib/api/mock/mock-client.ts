@@ -275,7 +275,11 @@ export class MockApiClient implements ApiClient {
 
 	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
 		this.#location(scope);
-		return this.#operate.planBuild(scope, command);
+		// `--changed` starts from the nodes whose own definition changed, as the catalog marks them.
+		const changed = command.some((t) => t === '--changed' || t.startsWith('--changed='))
+			? new Map((await this.#build.listCatalogNodes(scope)).filter((n) => n.stale?.some((r) => r.reason === 'changed')).map((n) => [n.key, 'definition changed']))
+			: null;
+		return this.#operate.planBuild(scope, command, changed);
 	}
 
 	async listJobs(scope: Scope): Promise<Job[]> {

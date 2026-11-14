@@ -530,6 +530,20 @@ export type PlanDocument = {
 	retention: { model: string; action?: string }[];
 	/** What a location's preview planned from instead of the warehouse; `null` for a live plan. */
 	synced_copy: PlanSyncedCopy | null;
+	/** What `--changed` runs, holds back and skips; `null` without `--changed`. */
+	changed: PlanChanged | null;
+};
+
+/** `sqb plan --changed`'s decision. Nodes are keys such as `model:orders`. */
+export type PlanChanged = {
+	counts: ('definition' | 'source_data')[];
+	reach: 'job' | 'all';
+	/** Each node that runs, with why; `downstream_of` names the changed upstream it runs for. */
+	runs: { node: string; reason: string; downstream_of: string | null }[];
+	/** Nodes left for a job's own run (`refreshed_by`), or that read such a node (`reads`). */
+	held_back: ({ node: string; refreshed_by: string[] } | { node: string; reads: string })[];
+	/** Selected nodes that run only when something they read changed; nothing did. */
+	unchanged: string[];
 };
 
 /** The server's synced copy of warehouse metadata a location's plan preview planned from. */

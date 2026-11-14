@@ -97,10 +97,13 @@ export function tokenAt(text: string, caret: number): TokenContext {
 }
 
 /** The plan page for a command, opened by every Run button before anything runs; with `job`, a run of that job narrowed by the command. */
-export function planHref(selection: string[] = [], verb: LaunchVerb = 'build', narrowing: { job?: string; exclude?: string[] } = {}): string {
-	const command = buildCommand({ verb, select: selection.map(selectorOf), exclude: (narrowing.exclude ?? []).map(selectorOf), flags: {} });
+export function planHref(selection: string[] = [], verb: LaunchVerb = 'build', narrowing: { job?: string; exclude?: string[]; flags?: CommandParts['flags'] } = {}): string {
+	const command = buildCommand({ verb, select: selection.map(selectorOf), exclude: (narrowing.exclude ?? []).map(selectorOf), flags: narrowing.flags ?? {} });
 	return `/plan?cmd=${encodeURIComponent(command)}${narrowing.job ? `&job=${encodeURIComponent(narrowing.job)}` : ''}`;
 }
+
+/** The plan of `sqb build --changed`: what changed, what runs downstream of it, and what waits for its job. */
+export const CHANGED_PLAN_HREF = planHref([], 'build', { flags: { '--changed': true } });
 
 /** The review page for rerunning runs, opened before anything reruns; `nodes` only for one run's selected nodes. */
 export function rerunHref(runIds: string[], mode: RerunMode, nodes: string[] = []): string {

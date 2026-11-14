@@ -5,11 +5,12 @@
 	import type { PlanDocument } from '$lib/api';
 	import { formatAgo } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
-	import { planSections, type PlanEntry } from './plan-text';
+	import { changedPolicyLine, changedSections, planSections, type PlanEntry } from './plan-text';
 
-	let { plan }: { plan: PlanDocument } = $props();
+	/** `refresh` words what refreshes the nodes a `--changed` plan holds back for a job. */
+	let { plan, refresh = (job: string) => `job ${job}` }: { plan: PlanDocument; refresh?: (job: string) => string } = $props();
 
-	const sections = $derived(planSections(plan));
+	const sections = $derived([...planSections(plan), ...(plan.changed ? changedSections(plan.changed, refresh) : [])]);
 	/** Rows a section shows before "Show all", as the CLI truncates long sections. */
 	const limit = 50;
 	let expanded = $state<Record<string, boolean>>({});
@@ -34,6 +35,7 @@
 			{/if}
 		</section>
 	{/if}
+	{#if plan.changed}<p class="policy" data-testid="changed-policy">{changedPolicyLine(plan.changed)}</p>{/if}
 	{#each sections as s (s.title)}
 		{@const shown = expanded[s.title] ? s.entries : s.entries.slice(0, limit)}
 		<section>
@@ -87,6 +89,12 @@
 		flex-direction: column;
 		gap: 18px;
 		font-size: 12.5px;
+	}
+	.policy {
+		margin: 0;
+		color: var(--muted-foreground);
+		font-family: var(--font-mono);
+		font-size: 12px;
 	}
 	h4 {
 		display: flex;
