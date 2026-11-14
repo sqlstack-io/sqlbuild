@@ -7,6 +7,13 @@ use uuid::Uuid;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, TransactionMode};
 
+/// Records a scan page carries, and the size of the control namespace scanned beside the retained one.
+const SCAN_PAGE: usize = 100;
+/// The median retained page may cost at most this many times the control page sent right after it.
+const MAX_RETAINED_SCAN_RATIO: f64 = 1.8;
+/// Only a hang trips this; per-commit disk syncs make wall time vary widely between runners.
+const SCAN_HANG_BOUND: std::time::Duration = std::time::Duration::from_secs(60);
+
 pub(crate) async fn reconcile_history(
     store: &ControlStore,
     (client, url, bearer): (&Client, &str, &str),
@@ -145,21 +152,25 @@ async fn retained_history(
     (session_id, fixture, record, (kind, timestamp)): (Uuid, &Value, &Value, (&str, &str)),
 ) {
     let count = fixture["retained_count"].as_u64().expect("retained count");
-    let records: Vec<_> = (0..count)
-        .map(|index| {
-            let mut record = record.clone();
-            record["event_id"] = json!(format!("retained-{index}"));
-            record["state_database"] = json!("analytics");
-            record["state_schema"] = json!("reconcile_retained");
-            record[timestamp] = json!(format!(
-                "2026-01-01T10:{:02}:{:02}Z",
-                index / 120,
-                (index / 2) % 60
-            ));
-            record
-        })
-        .collect();
-    for records in records.chunks(100) {
+    let namespace_records = |schema: &str, count: u64| -> Vec<Value> {
+        (0..count)
+            .map(|index| {
+                let mut record = record.clone();
+                record["event_id"] = json!(format!("{schema}-{index}"));
+                record["state_database"] = json!("analytics");
+                record["state_schema"] = json!(schema);
+                record[timestamp] = json!(format!(
+                    "2026-01-01T10:{:02}:{:02}Z",
+                    index / 120,
+                    (index / 2) % 60
+                ));
+                record
+            })
+            .collect()
+    };
+    let records = namespace_records("reconcile_retained", count);
+    let control = namespace_records("reconcile_control", SCAN_PAGE as u64);
+    for records in records.chunks(SCAN_PAGE).chain([control.as_slice()]) {
         post(
             (client, url, bearer),
             &json!({"kind":kind,"session_id":session_id,"generation":1,"records":records}),
@@ -167,22 +178,47 @@ async fn retained_history(
         )
         .await;
     }
-    let mut page = json!({"kind":kind,"session_id":session_id,"generation":1,"records":[],"scan":{
-        "scan_id":Uuid::now_v7(),"location":{"database":"analytics","schema":"reconcile_retained"},"complete":false}});
-    let pages = records.len().div_ceil(100);
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
-        for (index, records) in records.chunks(100).enumerate() {
-            page["records"] = json!(records);
-            page["scan"]["complete"] = json!(index + 1 == pages);
-            let reply = post((client, url, bearer), &page, StatusCode::OK).await;
+    let scan_page = |schema: &str| {
+        json!({"kind":kind,"session_id":session_id,"generation":1,"records":[],"scan":{
+            "scan_id":Uuid::now_v7(),"location":{"database":"analytics","schema":schema},"complete":false}})
+    };
+    let (mut retained_page, mut control_page) = (
+        scan_page("reconcile_retained"),
+        scan_page("reconcile_control"),
+    );
+    control_page["records"] = json!(control);
+    let pages = records.len().div_ceil(SCAN_PAGE);
+    let mut ratios: Vec<f64> = tokio::time::timeout(SCAN_HANG_BOUND, async {
+        let mut ratios = Vec::with_capacity(pages);
+        for (index, records) in records.chunks(SCAN_PAGE).enumerate() {
+            retained_page["records"] = json!(records);
+            for page in [&mut retained_page, &mut control_page] {
+                page["scan"]["complete"] = json!(index + 1 == pages);
+            }
+            control_page["scan"]["scan_id"] = json!(Uuid::now_v7());
+            let started = std::time::Instant::now();
+            let retained = post((client, url, bearer), &retained_page, StatusCode::OK).await;
+            let retained_time = started.elapsed();
+            let started = std::time::Instant::now();
+            let unchanged = post((client, url, bearer), &control_page, StatusCode::OK).await;
+            ratios.push(retained_time.as_secs_f64() / started.elapsed().as_secs_f64());
             assert_eq!(
-                reply["applied"], false,
+                [&retained["applied"], &unchanged["applied"]],
+                [false, false],
                 "retained observations never change"
             );
         }
+        ratios
     })
     .await
-    .expect("a retained-heavy scan has a strict total deadline");
+    .expect("a retained-heavy scan finishes");
+    ratios.sort_by(f64::total_cmp);
+    let median = (ratios[(pages - 1) / 2] + ratios[pages / 2]) / 2.0;
+    assert!(
+        median < MAX_RETAINED_SCAN_RATIO,
+        "a scan page's cost must not grow with the namespace's history: over {count} retained \
+         rows a page took {median:.2} times a page over {SCAN_PAGE}"
+    );
     let (transaction, rows) = query(
         begin(store, TransactionMode::Read).await.expect("read retained"),
         &format!("SELECT record_json ->> 'event_id' AS source_event_id FROM {table} WHERE state_database='analytics' AND state_schema='reconcile_retained' ORDER BY source_event_id"),
@@ -190,7 +226,7 @@ async fn retained_history(
     ).await.expect("retained identities");
     commit(transaction).await.expect("close retained read");
     let mut expected: Vec<_> = (0..count)
-        .map(|index| format!("retained-{index}"))
+        .map(|index| format!("reconcile_retained-{index}"))
         .collect();
     expected.sort();
     assert_eq!(

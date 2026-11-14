@@ -564,10 +564,10 @@ export class MockOperate {
 		if (job?.kind === 'group') {
 			const members = this.#children(source).filter((c) => mode === 'all' || affected(c).length);
 			if (!members.length) throw new ApiError('Nothing to rerun: no node failed or was skipped', 409);
-			const parent = this.#create({ id, origin: 'rerun', jobKey: job.key, rerunOf: runId, by: user, select: [], exclude: [], flags: {}, nodes: [], priority: job.priority });
+			const parent = this.#create(scope, { id, origin: 'rerun', jobKey: job.key, rerunOf: runId, by: user, select: [], exclude: [], flags: {}, nodes: [], priority: job.priority });
 			members.forEach((c, i) => {
 				const nodes = mode === 'all' ? c.script.nodes : affected(c);
-				this.#create({ id: `${id}-${i + 1}`, origin: 'rerun', jobKey: c.run.jobKey, parent: id, rerunOf: c.run.id, by: user, select: mode === 'all' ? c.script.select : nodes, exclude: mode === 'all' ? c.script.exclude : [], flags: c.script.flags, nodes, priority: job.priority });
+				this.#create(scope, { id: `${id}-${i + 1}`, origin: 'rerun', jobKey: c.run.jobKey, parent: id, rerunOf: c.run.id, by: user, select: mode === 'all' ? c.script.select : nodes, exclude: mode === 'all' ? c.script.exclude : [], flags: c.script.flags, nodes, priority: job.priority });
 			});
 			parent.run.childRunCount = members.length;
 			this.#ctx.changes.emit('runs');
@@ -575,7 +575,7 @@ export class MockOperate {
 		}
 		const nodes = mode === 'all' ? source.script.nodes : affected(source);
 		if (!nodes.length) throw new ApiError('Nothing to rerun: no node failed or was skipped', 409);
-		const rec = this.#create({
+		const rec = this.#create(scope, {
 			id,
 			origin: 'rerun',
 			jobKey: source.run.jobKey,
@@ -609,10 +609,10 @@ export class MockOperate {
 		const id = this.#newId();
 		if (job.kind === 'group') {
 			if (options.select?.length || options.exclude?.length) throw new ApiError('invalid control-plane data: a job group cannot be narrowed; narrow one of its jobs', 400);
-			const parent = this.#create({ id, origin: 'manual', jobKey: key, by: user, select: [], exclude: [], flags, nodes: [], priority: job.priority });
+			const parent = this.#create(scope, { id, origin: 'manual', jobKey: key, by: user, select: [], exclude: [], flags, nodes: [], priority: job.priority });
 			job.members.forEach((m, i) => {
 				const member = jobDef(m)!;
-				this.#create({ id: `${id}-${i + 1}`, origin: 'manual', jobKey: m, parent: id, by: user, select: selectorTerms(member), exclude: member.exclude, flags: { ...flags, ...Object.fromEntries(Object.entries(member.settings).map(([k, v]) => [k, v === true ? true : String(v)])) }, nodes: jobNodes(m), priority: job.priority });
+				this.#create(scope, { id: `${id}-${i + 1}`, origin: 'manual', jobKey: m, parent: id, by: user, select: selectorTerms(member), exclude: member.exclude, flags: { ...flags, ...Object.fromEntries(Object.entries(member.settings).map(([k, v]) => [k, v === true ? true : String(v)])) }, nodes: jobNodes(m), priority: job.priority });
 			});
 			parent.run.childRunCount = job.members.length;
 			this.#ctx.changes.emit('runs');
@@ -624,7 +624,7 @@ export class MockOperate {
 		const nodes = jobNodes(key).filter((n) => (!options.select?.length || named(options.select, n)) && !named(options.exclude, n));
 		if (narrowed && !nodes.length) throw new ApiError("invalid control-plane data: the selectors leave none of the job's nodes", 400);
 		const narrowing = narrowed ? { select: options.select ?? [], exclude: options.exclude ?? [] } : null;
-		const rec = this.#create({ id, origin: 'manual', jobKey: key, narrowing, by: user, select: selectorTerms(job), exclude: job.exclude, flags, nodes, priority: job.priority });
+		const rec = this.#create(scope, { id, origin: 'manual', jobKey: key, narrowing, by: user, select: selectorTerms(job), exclude: job.exclude, flags, nodes, priority: job.priority });
 		this.#ctx.changes.emit('runs');
 		return this.#ctx.reply(this.#view(rec, scope));
 	}
@@ -639,7 +639,7 @@ export class MockOperate {
 		const denied = check.permissions.find((p) => !p.allowed);
 		if (denied) throw new ApiError(denied.reason ?? `missing ${denied.action} permission for this target`, 403);
 		const parts = parseCommand(request.command.join(' '));
-		const rec = this.#create({
+		const rec = this.#create(scope, {
 			id: this.#newId(),
 			origin: 'manual',
 			jobKey: null,
@@ -1016,7 +1016,7 @@ export class MockOperate {
 		return id;
 	}
 
-	#create(spec: {
+	#create(scope: Scope, spec: {
 		id: string;
 		origin: Run['origin'];
 		jobKey: string | null;
@@ -1055,8 +1055,8 @@ export class MockOperate {
 				requestedBy: spec.by,
 				priority: spec.priority,
 				rewriteHistory: Object.keys(spec.flags).some((f) => flagSpec(spec.verb ?? 'build', f)?.requires === 'run.rewrite_history'),
-				locationId: '',
-				target: '',
+				locationId: scope.locationId,
+				target: this.#ctx.target(scope),
 				snapshotId: 'snap-7d2e41a',
 				gitRevision: '7d2e41a',
 				queuedAt: now,
