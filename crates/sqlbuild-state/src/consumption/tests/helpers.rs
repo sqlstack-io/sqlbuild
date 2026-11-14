@@ -9,6 +9,7 @@ use crate::consumption::main::changed_run_set::changed_run_set;
 use crate::consumption::main::consumed_inputs::consumed_inputs;
 use crate::consumption::main::consumption_history::consumption_history;
 use crate::consumption::main::read_back_history::read_back_history;
+use crate::consumption::main::recent_executions::recent_executions;
 use crate::consumption::main::started_append::started_append;
 use crate::consumption::main::succeeded_appends::succeeded_appends;
 use crate::consumption::models::TriggeredJob;
@@ -171,35 +172,7 @@ impl World {
 
     /// The reader's SQL: rows of the newest executions per relation by earliest row time.
     fn read_rows(&self) -> Vec<ConsumptionRow> {
-        let mut started: BTreeMap<(RelationKey, String), i64> = BTreeMap::new();
-        for row in &self.rows {
-            let entry = started
-                .entry((row.row.relation.clone(), row.row.execution_id.clone()))
-                .or_insert(row.recorded_at);
-            *entry = (*entry).min(row.recorded_at);
-        }
-        let mut by_relation: BTreeMap<RelationKey, Vec<(i64, String)>> = BTreeMap::new();
-        for ((relation, execution), time) in started {
-            by_relation
-                .entry(relation)
-                .or_default()
-                .push((time, execution));
-        }
-        let mut kept: BTreeSet<String> = BTreeSet::new();
-        for executions in by_relation.values_mut() {
-            executions.sort_by(|left, right| right.cmp(left));
-            kept.extend(
-                executions
-                    .iter()
-                    .take(RECENT_EXECUTIONS)
-                    .map(|(_, execution)| execution.clone()),
-            );
-        }
-        self.rows
-            .iter()
-            .filter(|row| kept.contains(&row.row.execution_id))
-            .cloned()
-            .collect()
+        recent_executions(&self.rows, RECENT_EXECUTIONS)
     }
 
     /// The janitor's SQL: keep the newest `retain` executions per relation.

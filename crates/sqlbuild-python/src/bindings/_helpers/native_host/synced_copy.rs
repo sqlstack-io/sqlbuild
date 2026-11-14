@@ -254,7 +254,7 @@ impl SyncedCopyAdapter {
         None
     }
 
-    /// The copied consumption rows of the table in `location`, each relation's newest executions.
+    /// Every copied consumption row of the table in `location`.
     pub(crate) fn consumption(&self, location: &Location) -> Vec<ConsumptionRow> {
         let mut rows: Vec<ConsumptionRow> = Vec::new();
         for record in &self.copy.consumption {

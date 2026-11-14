@@ -435,6 +435,9 @@ pub struct WarehouseSyncDue {
 pub struct PreviewCopyRead {
     pub session_id: Uuid,
     pub generation: i64,
+    /// Whether the copy carries consumption history, which only `--changed` plans read.
+    #[serde(default)]
+    pub consumption: bool,
 }
 
 /// The newest successful build of a node, which a `cursor_max` observation must come from.
@@ -466,8 +469,9 @@ pub struct PreviewCopy {
     pub fingerprints: Vec<WarehouseFingerprintRecord>,
     pub latest_runs: Vec<PreviewLatestRun>,
     pub observations: Vec<WarehouseObservationRecord>,
-    /// Rows of each relation's newest executions, which `--changed` decides from.
-    #[serde(default)]
+    /// Every mirrored consumption row when the read asked for them; locations that never ask
+    /// never receive the field.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub consumption: Vec<WarehouseConsumptionRecord>,
 }
 

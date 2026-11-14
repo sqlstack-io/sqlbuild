@@ -5,7 +5,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use sqlbuild_state::consumption::constants::RECENT_EXECUTIONS;
 use uuid::Uuid;
 
 use crate::authorization::models::CurrentSnapshotId;
@@ -37,15 +36,9 @@ const LATEST_RUNS_SQL: &str = "SELECT record_json FROM (SELECT record_json, ROW_
     WHERE location_id=$1 AND target=$2 AND record_json ->> 'phase'='succeeded' \
     AND record_json ->> 'run_id' IS NOT NULL) runs WHERE newest=1 \
     ORDER BY record_json ->> 'node_type', record_json ->> 'node_name'";
-/// Every row of each relation's newest executions, timing each execution by its earliest row.
-const CONSUMPTION_SQL: &str = "SELECT record_json FROM (SELECT record_json, observed_at, DENSE_RANK() OVER \
-    (PARTITION BY state_database, state_schema, record_json ->> 'target_database', \
-    record_json ->> 'target_schema', record_json ->> 'target_name' \
-    ORDER BY started_at DESC, record_json ->> 'execution_id' DESC) AS execution_rank \
-    FROM (SELECT record_json, observed_at, state_database, state_schema, MIN(observed_at) OVER \
-    (PARTITION BY state_database, state_schema, record_json ->> 'execution_id') AS started_at \
-    FROM sqb_warehouse_consumption WHERE location_id=$1 AND target=$2) executions) ranked \
-    WHERE execution_rank <= $3 ORDER BY observed_at, record_json ->> 'execution_id'";
+/// Every consumption row the warehouse still keeps, which complete scans bound.
+const CONSUMPTION_SQL: &str = "SELECT record_json FROM sqb_warehouse_consumption \
+    WHERE location_id=$1 AND target=$2 ORDER BY observed_at, event_id";
 const OBSERVATIONS_SQL: &str = "SELECT record_json FROM (SELECT record_json, kind, node, ROW_NUMBER() OVER \
     (PARTITION BY state_database, state_schema, kind, node ORDER BY observed_at DESC, event_id DESC) AS newest \
     FROM sqb_warehouse_observations WHERE location_id=$1 AND target=$2) observations WHERE newest=1 \
@@ -157,19 +150,12 @@ pub(crate) async fn preview_latest_runs(
     Ok((transaction, runs))
 }
 
-/// The rows of each relation's newest executions, as many as a build reads from the warehouse.
+/// Every mirrored consumption row: a build reads the newest executions and any older one by ID.
 pub(crate) async fn preview_consumption(
     transaction: ControlTransaction,
     scope: (Uuid, &str),
 ) -> Result<(ControlTransaction, Vec<WarehouseConsumptionRecord>), ControlError> {
-    let mut parameters: Vec<Parameter> = scope_parameters(scope);
-    parameters.push(Parameter::Integer(RECENT_EXECUTIONS as i64));
-    let (transaction, rows) = query(transaction, CONSUMPTION_SQL, parameters).await?;
-    let mut records: Vec<WarehouseConsumptionRecord> = Vec::with_capacity(rows.len());
-    for row in rows {
-        records.push(decoded(row)?);
-    }
-    Ok((transaction, records))
+    mirrored(transaction, CONSUMPTION_SQL, scope).await
 }
 
 /// Each node's newest observation of each kind.

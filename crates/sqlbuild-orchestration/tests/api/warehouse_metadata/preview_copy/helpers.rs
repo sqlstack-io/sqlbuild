@@ -8,7 +8,7 @@ use crate::platform::models::{LocationHealthReport, LocationWorkClient};
 use crate::warehouse_metadata::models::{PreviewCopy, PreviewCopyRead};
 
 const NODE: &str = "preview_copy_orders";
-/// A relation with more executions than a build reads; only its newest eight are copied.
+/// A relation with more executions than a build reads recently; read-back can still need them all.
 const BUSY_NODE: &str = "preview_copy_customers";
 
 async fn post(client: &Client, (url, bearer): (&str, &str), body: Value) {
@@ -110,8 +110,7 @@ pub(crate) async fn preview_copy_scope(
     .await;
     let mut busy: Vec<Value> = Vec::new();
     for execution in 1..=10 {
-        let finished: u32 = if execution == 1 { 20 } else { execution };
-        for (phase, hour, minute) in [("started", execution, 0), ("succeeded", finished, 30)] {
+        for (phase, hour, minute) in [("started", execution, 0), ("succeeded", execution, 30)] {
             let mut row = consumption(
                 &format!("busy-execution-{execution:02}"),
                 (phase, &format!("busy-run-{execution:02}")),
@@ -159,6 +158,7 @@ pub(crate) async fn preview_copy_scope(
     let read = PreviewCopyRead {
         session_id: preview_session,
         generation: 1,
+        consumption: false,
     };
     let copy = || async {
         outbound
@@ -191,29 +191,45 @@ pub(crate) async fn preview_copy_scope(
         )
     };
     let unsynced = copy().await;
-    let mut busy_executions: Vec<String> = unsynced
+    let older_location: Value = client
+        .post(format!("{metadata}/preview-copy"))
+        .bearer_auth(bearer)
+        .json(&json!({"session_id": preview_session, "generation": 1}))
+        .send()
+        .await
+        .expect("copy for an older location")
+        .json()
+        .await
+        .expect("copy body");
+    assert!(
+        unsynced.consumption.is_empty() && older_location.get("consumption").is_none(),
+        "a read that does not ask for consumption never carries the field, which older locations reject"
+    );
+    let with_consumption = outbound
+        .preview_copy(
+            "preview",
+            &PreviewCopyRead {
+                consumption: true,
+                ..read.clone()
+            },
+        )
+        .await
+        .expect("preview copy with consumption");
+    let busy: Vec<(String, String)> = with_consumption
         .consumption
         .iter()
         .filter(|row| row.target_name.as_deref() == Some(BUSY_NODE))
-        .filter_map(|row| row.execution_id.clone())
+        .map(|row| {
+            (
+                row.execution_id.clone().unwrap_or_default(),
+                row.phase.clone().unwrap_or_default(),
+            )
+        })
         .collect();
-    busy_executions.dedup();
     assert_eq!(
-        busy_executions,
-        (3..=10)
-            .map(|execution| format!("busy-execution-{execution:02}"))
-            .collect::<Vec<_>>(),
-        "each relation's newest eight executions by start, every row of each, oldest first; \
-         the first execution finished last but started first"
-    );
-    assert_eq!(
-        unsynced
-            .consumption
-            .iter()
-            .filter(|row| row.target_name.as_deref() == Some(BUSY_NODE))
-            .count(),
-        16,
-        "both rows of each copied execution"
+        busy.len(),
+        20,
+        "every mirrored row, beyond the newest eight executions, so read-back finds older ones: {busy:?}"
     );
     assert_eq!(unsynced.synced_at, None, "nothing synced cleanly yet");
     assert_eq!(
@@ -308,6 +324,7 @@ pub(crate) async fn preview_copy_scope(
             &PreviewCopyRead {
                 session_id,
                 generation: 1,
+                consumption: false,
             },
         )
         .await

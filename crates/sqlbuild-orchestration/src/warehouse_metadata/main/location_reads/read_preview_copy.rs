@@ -23,7 +23,11 @@ pub async fn read_preview_copy(
     let (transaction, fingerprints) = preview_fingerprints(transaction, scope).await?;
     let (transaction, latest_runs) = preview_latest_runs(transaction, scope).await?;
     let (transaction, observations) = preview_observations(transaction, scope).await?;
-    let (transaction, consumption) = preview_consumption(transaction, scope).await?;
+    let (transaction, consumption) = if request.consumption {
+        preview_consumption(transaction, scope).await?
+    } else {
+        (transaction, Vec::new())
+    };
     let (transaction, synced_at) = preview_synced_at(transaction, scope).await?;
     commit(transaction).await?;
     Ok(PreviewCopy {

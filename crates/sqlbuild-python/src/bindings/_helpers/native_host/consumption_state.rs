@@ -13,6 +13,7 @@ use sqlbuild_state::consumption::constants::{
 };
 use sqlbuild_state::consumption::main::executions_by_id_sql::executions_by_id_sql;
 use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
+use sqlbuild_state::consumption::main::recent_executions::recent_executions;
 use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_sql;
 use sqlbuild_state::consumption::models::{
     ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
@@ -454,7 +455,10 @@ impl ConsumptionConnection {
         location: &Location,
     ) -> PyResult<Vec<ConsumptionRow>> {
         if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
-            return Ok(copy.get().consumption(location));
+            return Ok(recent_executions(
+                &copy.get().consumption(location),
+                RECENT_EXECUTIONS,
+            ));
         }
         read_recent(self.adapter.bind(py), &self.connected(py)?, location)
     }
