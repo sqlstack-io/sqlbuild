@@ -91,7 +91,13 @@ pub(crate) fn environment_sources<'py>(
                     if managed && fallback && !vars.is_none() && !effective.is_none() {
                         let location: Bound<'py, PyDict> = PyDict::new(py);
                         location.set_item(field, effective)?;
-                        expanded_loader_namespace(location.as_any(), vars)?.get_item(field)?
+                        let expanded: Bound<'py, PyAny> =
+                            expanded_loader_namespace(location.as_any(), vars)?.get_item(field)?;
+                        if expanded.is_none() {
+                            expanded
+                        } else {
+                            expanded.str()?.into_any()
+                        }
                     } else {
                         effective
                     };
