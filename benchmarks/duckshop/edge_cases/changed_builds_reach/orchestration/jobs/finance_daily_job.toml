@@ -1,0 +1,4 @@
+name = "finance_daily_job"
+description = "Build revenue reports."
+select = "int_orders fct_revenue rpt_pnl"
+schedule = { cron = "0 2 * * *", timezone = "UTC" }

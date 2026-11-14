@@ -1,0 +1,5 @@
+# Two scheduled jobs each own one staging model; customer_orders reads both, in crm_daily_job.
+name = "crm_daily_job"
+description = "Refresh customers."
+select = "stg_customers customer_orders"
+schedule = { cron = "0 2 * * *", timezone = "UTC" }

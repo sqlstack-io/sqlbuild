@@ -114,25 +114,39 @@ fn compile_location<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
     input: &SnapshotInput,
-) -> PyResult<(NativeOrchestrationSnapshot, Bound<'py, PyAny>, NodeKeys)> {
+) -> PyResult<(NativeOrchestrationSnapshot, ProjectAdapter<'py>, NodeKeys)> {
     status(py, "Discovering location project...")?;
-    let ProjectAdapter {
-        project_dir,
-        discovered,
-        adapter,
-    } = project_adapter(
+    let project = project_adapter(
         py,
         Some(arguments.value("project_dir")?),
         ProjectInputs::Discovered,
     )?;
     status(py, "Location project discovered. Compiling snapshot...")?;
-    let options = new_record_with(
-        py,
-        RecordId::CompilePipelineOptions,
-        &[("selected_target", arguments.value("selected_target")?)],
-    )?;
+    let (snapshot, blocked) = compile_snapshot(py, arguments, (input, &project), None)?;
+    status(py, "Location snapshot compiled.")?;
+    Ok((snapshot, project, blocked))
+}
+
+/// Compile the discovered project into a snapshot, with a run's variables when it carries them.
+pub(super) fn compile_snapshot<'py>(
+    py: Python<'py>,
+    arguments: &KeywordArguments<'py>,
+    (input, project): (&SnapshotInput, &ProjectAdapter<'py>),
+    vars: Option<&Bound<'py, PyAny>>,
+) -> PyResult<(NativeOrchestrationSnapshot, NodeKeys)> {
+    let ProjectAdapter {
+        project_dir,
+        discovered,
+        adapter,
+    } = project;
+    let mut options: Vec<(&str, Bound<'py, PyAny>)> =
+        vec![("selected_target", arguments.value("selected_target")?)];
+    if let Some(vars) = vars {
+        options.push(("cli_vars", vars.clone()));
+    }
+    let options = new_record_with(py, RecordId::CompilePipelineOptions, &options)?;
     let compiled = compiled_phase(
-        (&discovered, &adapter),
+        (discovered, adapter),
         &options,
         &py.None().into_bound(py),
         None,
@@ -145,15 +159,13 @@ fn compile_location<'py>(
         project_dir.extract()?,
         (
             discovered.clone(),
-            arguments
+            !arguments
                 .value("action")?
                 .extract::<Option<String>>()?
-                .is_some_and(|action| action == EXECUTE_ACTION)
-                .then(Vec::new),
+                .is_some_and(|action| action == EXECUTE_ACTION),
         ),
     )?;
-    status(py, "Location snapshot compiled.")?;
-    Ok((snapshot, discovered, blocked_nodes(&project)?))
+    Ok((snapshot, blocked_nodes(&project)?))
 }
 
 pub(super) fn location_arguments<'py>(
@@ -288,11 +300,11 @@ pub(crate) fn run_location<'py>(
             arguments.value("run_id")?.extract::<String>()?,
             arguments.value("claim_id")?.extract::<String>()?,
         );
-        let (snapshot, discovered, blocked) = compile_location(py, &arguments, &input)?;
+        let (snapshot, project, blocked) = compile_location(py, &arguments, &input)?;
         return execute_worker(
             py,
-            (&snapshot, discovered, blocked),
-            &arguments,
+            (&snapshot, project, blocked),
+            (&arguments, &input),
             (&bearer, identity, recall),
         );
     }

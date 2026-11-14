@@ -163,6 +163,10 @@ pub enum Action {
     RunPrioritise,
     #[serde(rename = "run.warehouse")]
     RunWarehouse,
+    #[serde(rename = "run.vars")]
+    RunVars,
+    #[serde(rename = "run.load")]
+    RunLoad,
     #[serde(rename = "trigger.toggle")]
     TriggerToggle,
     #[serde(rename = "sensor.reset_cursor")]

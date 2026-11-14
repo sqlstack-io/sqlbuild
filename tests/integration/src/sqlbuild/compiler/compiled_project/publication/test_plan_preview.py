@@ -43,7 +43,6 @@ _PROJECT_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n[connections.local]\ndatabase = "warehouse.db"\n'
         '[targets.development]\nschema = "main"\n'
     ),
-    "orchestration/orders.py": "",
     "seeds/raw_orders.csv": "id,ordered_at\n1,2026-01-01 00:00:00\n2,2026-01-01 01:00:00\n",
     "seeds/raw_orders.yml": dedent(
         """

@@ -13,6 +13,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     PythonProjectLayoutCompileTestCase,
     UnrelatedPythonPackageBuildTestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import orders_job_project
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
 
@@ -30,6 +31,110 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 "error[D016]",
                 "Unsupported project Python path(s): audit_helpers/measurements.py",
                 "Move pipeline Python nodes and the helper modules they import under python/",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="Python jobs left in orchestration/ point to the TOML layout",
+            repo_files={
+                "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job\n"
+                    "nightly = job('nightly', description='Orders.', select='orders')\n"
+                ),
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/jobs.py",
+                "files cannot sit directly in orchestration/",
+                "jobs, job groups and schedules are TOML files in orchestration/jobs/",
+                "https://sqlbuild.com/docs/concepts/orchestration/",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="a sensor importing the removed job API points to the TOML layout",
+            repo_files={
+                "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
+                "orchestration/sensors/orders_sensor.py": (
+                    "from sqlbuild.orchestration import job, sensor\n"
+                    "orders = sensor('orders_sensor', description='Orders.', "
+                    "run=job('nightly', description='Orders.', select='orders'))\n"
+                ),
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/sensors/orders_sensor.py:1:",
+                "`job` was removed from sqlbuild.orchestration",
+                "https://sqlbuild.com/docs/concepts/orchestration/",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="an invalid cron is reported at its value",
+            repo_files=orders_job_project(
+                'select = "orders"\nschedule = { cron = "not a cron", timezone = "UTC" }\n'
+            ),
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/jobs/orders_job.toml:4:21:",
+                "schedule cron: invalid cron expression",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="an unknown time zone is reported at its value",
+            repo_files=orders_job_project(
+                'select = "orders"\nschedule = { cron = "0 2 * * *", timezone = "Mars/Olympus" }\n'
+            ),
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/jobs/orders_job.toml:4:45:",
+                "schedule timezone is not an IANA time zone",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="a starts_at that is not RFC 3339 is reported at its value",
+            repo_files=orders_job_project(
+                'select = "orders"\nschedule = { cron = "0 2 * * *", timezone = "UTC", starts_at = "yesterday" }\n'
+            ),
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/jobs/orders_job.toml:4:64:",
+                "schedule starts_at must be an RFC 3339 timestamp",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="an invalid build setting is reported at its value",
+            repo_files=orders_job_project(
+                'select = "orders"\n\n[settings]\nconcurrency = "lots"\n'
+            ),
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/jobs/orders_job.toml:6:15:",
+                "concurrency",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="an unknown selector type is reported at the selector",
+            repo_files=orders_job_project('select = "orders tagg:finance"\n'),
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/jobs/orders_job.toml:3:10:",
+                "unknown selector type 'tagg' in 'tagg:finance'",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="an empty intersection part is reported at the selector",
+            repo_files=orders_job_project('select = "tag:finance,"\n'),
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D017]",
+                "orchestration/jobs/orders_job.toml:3:10:",
+                "empty selector",
             ),
         ),
         PythonProjectLayoutCompileTestCase(

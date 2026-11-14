@@ -1,0 +1,5 @@
+# A small scheduled project baked into the reference location image.
+name = "refresh_orders_job"
+description = "Refresh orders every minute."
+select = "orders"
+schedule = { cron = "* * * * *", timezone = "UTC" }

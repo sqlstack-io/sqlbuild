@@ -1,0 +1,4 @@
+name = "edge_snapshot_products_job"
+description = "Exercise the opposing parent and child acquisition order."
+select = "tag:edge_case"
+concurrency_groups = ["edge_inventory_limit"]

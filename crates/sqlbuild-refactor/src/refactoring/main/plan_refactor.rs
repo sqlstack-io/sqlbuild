@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::refactoring::_helpers::edits::text_edits::build_plan;
 use crate::refactoring::_helpers::planning::batch_planning::batch_parts;
+use crate::refactoring::_helpers::planning::job_selectors::job_selector_parts;
 use crate::refactoring::_helpers::planning::model_planning::{ModelTarget, model_target};
 use crate::refactoring::_helpers::planning::python_imports::python_import_parts;
 use crate::refactoring::_helpers::planning::single_planning::plan_single;
@@ -38,6 +39,23 @@ pub fn plan_refactor(
     let imports = python_import_parts(Path::new(&facts.project_dir), &moves)?;
     parts.edits.extend(imports.edits);
     parts.blocking.extend(imports.blocking);
+    let destinations: Vec<String> = targets.iter().map(ModelTarget::destination).collect();
+    let renamed: Vec<(&_, &str, &str)> = targets
+        .iter()
+        .zip(&destinations)
+        .map(|(target, destination)| {
+            (
+                target.model,
+                target.request.new_name.as_str(),
+                destination.as_str(),
+            )
+        })
+        .collect();
+    let selectors = job_selector_parts(Path::new(&facts.project_dir), &facts.models, &renamed)?;
+    parts.edits.extend(selectors.edits);
+    parts.manual.extend(selectors.manual);
+    parts.notes.extend(selectors.notes);
+    parts.blocking.extend(selectors.blocking);
     let batch: Vec<RefactorRequest> = targets.into_iter().map(|target| target.request).collect();
     let mut plan = build_plan(
         batch[0].clone(),

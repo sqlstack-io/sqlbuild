@@ -1,0 +1,3 @@
+name = "order_counts_job"
+description = "Count orders."
+select = "+task:count_orders"

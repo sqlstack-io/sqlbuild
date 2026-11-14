@@ -142,7 +142,7 @@ fn name_conflict(first: &DeclaredName<'_>, second: &DeclaredName<'_>) -> Validat
     };
     conflict(format!(
         "Project resource name '{}' is declared as both {} in {} and {} in {}; model, source, seed, function, loader, task, asset, check, provider, \
-         hook, unit test, scenario, job, job group, sensor, and calendar schedule names must be \
+         hook, unit test, scenario, job, job group, sensor, and calendar names must be \
          globally unique; rename one of them{advice}",
         first.name, first.kind, first.path, second.kind, second.path
     ))

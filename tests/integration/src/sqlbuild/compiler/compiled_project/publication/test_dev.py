@@ -17,7 +17,10 @@ from uuid import uuid4
 import duckdb
 import pytest
 
-from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import TYPE_PROOF_FILES
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
+    TYPE_PROOF_FILES,
+    duckshop_orchestration,
+)
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentTestCase,
     SnapshotApi,
@@ -68,11 +71,12 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
 ) -> None:
     project: Path = tmp_path / "project"
     pidfile: Path = tmp_path / "interpreter.pid"
-    declaration: str = (
-        "import os\nfrom pathlib import Path\n"
+    probe: str = (
+        "import os\nfrom pathlib import Path\nfrom sqlbuild.orchestration import calendar\n"
         "assert 'SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL' not in os.environ\n"
         f"Path({str(pidfile)!r}).write_text(str(os.getpid()))\n"
-        + Path("benchmarks/duckshop/edge_cases/orchestration/development_orders.py").read_text()
+        "@calendar(name='interpreter_probe_calendar', description='Probe.', horizon='1d')\n"
+        "def interpreter_probe(window):\n    return []\n"
     )
     write_files(
         project_dir=project,
@@ -86,7 +90,8 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
             "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
                 "SELECT order_id, amount", "SELECT order_id, CAST(amount AS BIGINT) AS amount"
             ),
-            "orchestration/orders.py": declaration,
+            **duckshop_orchestration("development_orders"),
+            "orchestration/calendars/interpreter_probe_calendar.py": probe,
         },
     )
     executable: str = str(Path(sys.executable).with_name("sqb"))
@@ -137,7 +142,7 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
                 "admin",
                 "request-run",
                 identity,
-                "annual_orders",
+                "annual_orders_job",
                 "--target",
                 test_case.target,
                 "--run-id",
@@ -182,9 +187,12 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
         with urlopen(f"{scope}/changes", timeout=5) as stream:
             assert stream.readline() == b"event: changed\n"
             assert json.loads(stream.readline().removeprefix(b"data: ")) == {"topic": "all"}
-            _ = (project / "orchestration/orders.py").write_text(
-                declaration
-                + '\nadditional_orders = job("additional_orders", description="Additional orders.", select="orders", schedule=annual)\n'
+            _ = (project / "orchestration/jobs/additional_orders_job.toml").write_text(
+                'name = "additional_orders_job"\n'
+                'description = "Additional orders."\n'
+                'select = "orders"\n'
+                'schedule = { cron = "0 0 1 1 *", timezone = "UTC", '
+                'starts_at = "2099-01-01T00:00:00Z" }\n'
             )
             assert f"snapshot:{identity}" in islice(
                 (
@@ -198,7 +206,7 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
             statuses: dict[str, str] = {
                 entry["job_key"]: entry["status"] for entry in json.load(response)
             }
-        assert statuses == {"annual_orders": "paused", "additional_orders": "running"}
+        assert statuses == {"annual_orders_job": "paused", "additional_orders_job": "running"}
         stop_location(restarted, int(pidfile.read_text()), log)
     with sqlite3.connect(control) as connection:
         assert connection.execute("SELECT count(*) FROM sqb_development_locations").fetchone() == (

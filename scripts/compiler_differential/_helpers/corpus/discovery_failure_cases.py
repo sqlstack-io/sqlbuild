@@ -390,6 +390,17 @@ def _python_cases() -> tuple[FailureCase, ...]:
             },
         ),
         failure_case(
+            name="orchestration-python-job-module",
+            expected_code="D017",
+            files={
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job\n"
+                    "nightly = job('nightly', description='Orders.', select='stg_orders')\n"
+                )
+            },
+            expected_message="files cannot sit directly in orchestration/",
+        ),
+        failure_case(
             name="legacy-event-exporters-directory",
             expected_code="D015",
             files={"event_exporters/publish.py": "VALUE = 1\n"},

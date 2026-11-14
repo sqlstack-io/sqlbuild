@@ -565,6 +565,10 @@ pub enum RunChange {
         node_key: String,
         outcome: NodeOutcome,
     },
+    /// A run with variables compiles them on the worker; this records each run node's resulting hash.
+    Compiled {
+        node_hashes: BTreeMap<String, String>,
+    },
     Unresponsive,
     Recovered,
     CancelRequested {
@@ -589,6 +593,7 @@ impl RunChange {
             Self::NodeFinished { .. } => "run_node_finished",
             Self::CheckStarted { .. } => "run_check_started",
             Self::CheckFinished { .. } => "run_check_finished",
+            Self::Compiled { .. } => "run_compiled",
             Self::Unresponsive => "run_unresponsive",
             Self::Recovered => "run_recovered",
             Self::CancelRequested { .. } => "run_cancel_requested",

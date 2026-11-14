@@ -1,0 +1,7 @@
+# A sensor on new source data starts a job that builds only what changed, source data included.
+name = "orders_refresh_job"
+description = "Refresh orders when the source has new data."
+select = "orders"
+
+[settings]
+changed = true

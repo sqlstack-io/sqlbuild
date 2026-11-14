@@ -106,7 +106,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="a job selecting only Python nodes builds them",
-            select=("job:customer_counts",),
+            select=("job:customer_counts_job",),
             expected_exit_code=0,
             expected_output_patterns=(r"count_customers\s+OK", r"customers_extract\s+OK"),
             expected_row_counts={"raw_customers": 3},
@@ -114,7 +114,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="a job named without job: builds its Python nodes",
-            select=("customer_counts",),
+            select=("customer_counts_job",),
             expected_exit_code=0,
             expected_output_patterns=(r"count_customers\s+OK", r"customers_extract\s+OK"),
             expected_row_counts={"raw_customers": 3},
@@ -122,7 +122,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="a job selecting a task with its upstream model builds both",
-            select=("job:order_counts",),
+            select=("job:order_counts_job",),
             expected_exit_code=0,
             expected_output_patterns=(r"count_orders\s+OK",),
             expected_row_counts={"orders": 2},

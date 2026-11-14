@@ -1,0 +1,5 @@
+# Schedule a job whose selection reaches an upstream source that a build never executes.
+name = "annual_orders_job"
+description = "Build orders together with the source it reads."
+select = "+orders"
+schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }

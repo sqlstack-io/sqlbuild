@@ -6,6 +6,7 @@ use crate::refactoring::_helpers::edits::text_edits::build_plan;
 use crate::refactoring::_helpers::planning::column_planning::{
     column_rename_context, column_rename_parts,
 };
+use crate::refactoring::_helpers::planning::job_selectors::job_selector_parts;
 use crate::refactoring::_helpers::planning::model_planning::{model_parts, model_target};
 use crate::refactoring::_helpers::planning::python_imports::python_import_parts;
 use crate::refactoring::_helpers::scanning::scan_context::ScanContext;
@@ -43,11 +44,20 @@ pub(crate) fn plan_single(
     let mut moves = parts.moves.clone();
     let destination = target.destination();
     if destination != target.source_path {
-        moves.push((target.source_path.clone(), destination));
+        moves.push((target.source_path.clone(), destination.clone()));
     }
     let imports = python_import_parts(Path::new(&facts.project_dir), &moves)?;
     parts.edits.extend(imports.edits);
     parts.blocking.extend(imports.blocking);
+    let selectors = job_selector_parts(
+        Path::new(&facts.project_dir),
+        &facts.models,
+        &[(target.model, &target.request.new_name, &destination)],
+    )?;
+    parts.edits.extend(selectors.edits);
+    parts.manual.extend(selectors.manual);
+    parts.notes.extend(selectors.notes);
+    parts.blocking.extend(selectors.blocking);
     Ok(build_plan(
         target.request,
         parts,

@@ -1,0 +1,4 @@
+name = "annual_orders_job"
+description = "Build the marts layer and the sources it loads."
+select = "tag:marts"
+schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }

@@ -3,6 +3,7 @@ pub(crate) mod batch_planning;
 pub(crate) mod column_planning;
 pub(crate) mod column_references;
 pub(crate) mod declaration_moves;
+pub(crate) mod job_selectors;
 pub(crate) mod model_planning;
 pub(crate) mod model_references;
 pub(crate) mod python_imports;

@@ -26,6 +26,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
 
 
 def run_replay_command(
@@ -916,9 +917,7 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             'MODEL (description "Test model order_summary.", '
             'materialized table);\nSELECT count(*) AS order_count FROM __ref("orders")\n'
         ),
-        "orchestration/jobs.py": Path(
-            "benchmarks/duckshop/edge_cases/orchestration/python_node_jobs.py"
-        ).read_text(),
+        **duckshop_orchestration("python_node_jobs"),
         "python/tasks/reports.py": (
             "from python.tasks.counts import count_orders\nfrom sqlbuild.tasks import task\n\n\n"
             "@task(depends_on=count_orders)\n"
@@ -1377,7 +1376,7 @@ def prepare_changed_project(*, tmp_path: Path, warehouse: ChangedWarehouse) -> P
 def add_changed_overlay(project_dir: Path, fixture: Path) -> None:
     """Overlay one of the DuckShop changed-builds cases on the base case."""
 
-    for path in (*fixture.rglob("*.sql"), *fixture.rglob("*.py")):
+    for path in (*fixture.rglob("*.sql"), *fixture.rglob("*.py"), *fixture.rglob("*.toml")):
         destination: Path = project_dir / path.relative_to(fixture)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")

@@ -11,3 +11,6 @@ pub(crate) const JOB_SELECTOR_KINDS: [&str; 2] = ["job", "name"];
 pub(crate) const SELECTOR_INTERSECTION: char = ',';
 /// The key prefix of a SQL unit test's result, as the snapshot names it.
 pub(crate) const SQL_TEST_KEY_PREFIX: &str = "sql_test:";
+
+/// The sensor argument naming the job it starts, as the orchestration inventory labels it.
+pub(crate) const SENSOR_RUN_ARGUMENT: &str = "run";

@@ -90,7 +90,7 @@ error[P010]: model 'orders_summary' has no description
 A description may take at most `[format] max_description_lines` lines (default `10`) once wrapped
 at the line width, the same limit `sqb format --check` applies to headers. A longer Python
 description, from a decorator or a docstring, is a `P027` compile error at its declaration. A job,
-job group, sensor or calendar schedule with a longer description cannot publish.
+job group, sensor or calendar with a longer description cannot publish.
 
 SQL tests, audits, macros, enums, constants, materializations and event or output sinks do not need a
 description. Descriptions do not change fingerprints, so adding or editing one does not rebuild a

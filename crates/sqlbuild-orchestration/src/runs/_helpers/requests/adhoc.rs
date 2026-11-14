@@ -15,7 +15,7 @@ use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
 use crate::runs::_helpers::requests::run_id::refuse_derived_run_id;
-use crate::runs::constants::ADHOC_AUDIT_TAG;
+use crate::runs::constants::{ADHOC_AUDIT_TAG, LOAD_VERB};
 use crate::runs::models::{
     AdhocCheckRequest, AdhocPermission, AdhocRunRequest, CommandPlan, PlannerResource, RunCommand,
     RunKind, RunOrigin, RunRequest,
@@ -64,7 +64,12 @@ pub(crate) async fn frozen_adhoc_request(
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
-    let Some(command) = RunCommand::of_verb(&plan.verb) else {
+    let command = if plan.verb == LOAD_VERB {
+        Some(RunCommand::Build)
+    } else {
+        RunCommand::of_verb(&plan.verb)
+    };
+    let Some(command) = command else {
         let refusal = format!("workers do not run sqb {}", plan.verb);
         return Ok((transaction, Err(refusal)));
     };
@@ -85,7 +90,7 @@ pub(crate) async fn frozen_adhoc_request(
         .and_then(|row| row["image_id"].as_str())
         .map(str::to_owned);
     let write_set: BTreeSet<String> = match plan.verb.as_str() {
-        "build" => writers,
+        "build" | LOAD_VERB => writers,
         "seed" => writers
             .into_iter()
             .filter(|key| key.starts_with("seed:"))

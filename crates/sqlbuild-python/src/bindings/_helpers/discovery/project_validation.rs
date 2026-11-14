@@ -8,6 +8,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_discovery::project_validation::main::validate_project_inputs::validate_project_inputs;
 use sqlbuild_discovery::project_validation::models::{ProjectFacts, ValidationFailure};
 
+use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
 use crate::bindings::_helpers::discovery::project_facts::{NodeRow, project_facts};
 use crate::bindings::_helpers::discovery::raised::{failure_error, read_error};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -32,7 +33,11 @@ fn validate_discovered_project_inputs(
     inputs: Bound<'_, PyAny>,
     nodes: Vec<NodeRow>,
 ) -> Result<(), PyErr> {
-    let facts: ProjectFacts = project_facts(py, &inputs, nodes)?;
+    let mut facts: ProjectFacts = project_facts(py, &inputs, nodes)?;
+    let project_dir: Bound<'_, PyAny> = native_field(&inputs, "project_dir")?;
+    if !project_dir.is_none() {
+        facts.orchestration = orchestration_declarations(&project_dir)?.names();
+    }
     validate_project_inputs(&facts).map_err(|failure| validation_error(py, failure))
 }
 

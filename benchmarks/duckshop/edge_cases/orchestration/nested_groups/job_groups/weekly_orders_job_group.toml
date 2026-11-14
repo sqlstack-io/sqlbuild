@@ -1,0 +1,4 @@
+# A group can contain jobs, but cannot contain another group.
+name = "weekly_orders_job_group"
+description = "Unsupported nested membership."
+jobs = ["daily_orders_job_group"]

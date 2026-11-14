@@ -1,0 +1,11 @@
+# Refresh only the synthetic edge-case models, with nested settings and a paused offset-start schedule.
+name = "edge_snapshot_orders_job"
+description = "Refresh only the synthetic edge-case models."
+select = "tag:edge_case"
+schedule = { cron = "15 2 * * *", timezone = "UTC", starts_at = "2026-07-03T01:17:23.456789+05:30", default_status = "paused" }
+
+[settings]
+run_tests = false
+vars = { edge_delivery_batch = "1" }
+reload = true
+concurrency = 2

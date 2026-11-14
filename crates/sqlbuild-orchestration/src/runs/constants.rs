@@ -40,3 +40,9 @@ pub(crate) const RUN_LOG_RETENTION_BATCH: usize = 10;
 pub(crate) const RUN_LOG_DIGEST_CHUNK: usize = 500;
 /// The UUID version of the run IDs the server derives from other IDs, which people may not supply.
 pub(crate) const DERIVED_RUN_ID_VERSION: usize = 5;
+
+/// A load runs as a build of its managed sources, so the worker's verified build path enforces its write set.
+pub(crate) const LOAD_VERB: &str = "load";
+
+/// The ad-hoc setting that carries `--vars`.
+pub(crate) const VARS_SETTING: &str = "vars";

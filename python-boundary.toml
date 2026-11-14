@@ -20,7 +20,7 @@ note = "Public orchestration facade: re-exports only."
 [[stays]]
 path = "orchestration_declarations/models/authoring.py"
 rule = 3
-note = "Public job and schedule authoring records only; selection resolution, validation and scheduling stay native."
+note = "Public calendar and sensor authoring records only; jobs, job groups and schedules are TOML read natively, and selection, validation and scheduling stay native."
 
 [[stays]]
 path = "orchestration_declarations/models/sensor_context.py"
