@@ -44,3 +44,11 @@ class AnalysisCodesTestCase:
     description: str
     compiler_root: Path
     expected_codes: frozenset[str]
+
+
+@dataclass(frozen=True)
+class DiscoveryCodesTestCase:
+    """The discovery codes no failure-corpus case declares, which must be none."""
+
+    description: str
+    expected_undeclared_codes: frozenset[str]
