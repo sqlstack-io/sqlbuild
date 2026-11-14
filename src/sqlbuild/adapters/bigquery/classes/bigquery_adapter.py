@@ -1136,8 +1136,10 @@ class BigQueryAdapter(
             return f"JSON {self._quote_sql_string(json.dumps(value, sort_keys=True))}"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, Decimal):
+        if isinstance(value, Decimal) and logical_type == LoaderLogicalType.DECIMAL:
             return self._quote_sql_string(format(value, "f"))
+        if isinstance(value, Decimal):
+            return format(value, "f")
         if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):

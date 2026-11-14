@@ -23,7 +23,6 @@ from sqlbuild.adapter.contract.models import (
 from sqlbuild.adapter.contract.types import (
     CursorKind,
     FunctionNullabilityRule,
-    LoaderLogicalType,
     TableFreshnessStatus,
 )
 from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
@@ -1214,6 +1213,13 @@ def test_given_listed_relations_when_adding_age_metadata_then_bigquery_reads_eac
             column_type="NUMERIC(4, 2)",
             expected_sql="SELECT CAST('12.50' AS NUMERIC) AS `amount`",
         ),
+        BigQueryLoaderDecimalRowTestCase(
+            description="a decimal in a declared integer column stays a numeric literal",
+            value=Decimal("3.00"),
+            column_type="INT64",
+            inferred_types=(),
+            expected_sql="SELECT CAST(3.00 AS INT64) AS `amount`",
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -1226,7 +1232,7 @@ def test_given_decimal_loader_value_when_rendering_rows_then_bigquery_casts_it_e
         rows=({"amount": test_case.value},),
         column_names=("amount",),
         column_sql_types={"amount": test_case.column_type},
-        inferred_types={"amount": LoaderLogicalType.DECIMAL},
+        inferred_types=dict(test_case.inferred_types),
     )
 
     assert rendered_sql == test_case.expected_sql

@@ -580,8 +580,10 @@ class ClickHouseAdapter(
             return quote_string(json.dumps(value, sort_keys=True))
         if isinstance(value, bool):
             return "true" if value else "false"
-        if isinstance(value, Decimal):
+        if isinstance(value, Decimal) and logical_type == LoaderLogicalType.DECIMAL:
             return quote_string(format(value, "f"))
+        if isinstance(value, Decimal):
+            return format(value, "f")
         if isinstance(value, int | float):
             return str(value)
         if isinstance(value, datetime | date):

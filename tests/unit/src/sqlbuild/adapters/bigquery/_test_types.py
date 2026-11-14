@@ -11,6 +11,7 @@ from sqlbuild.adapter.contract.models import (
     RowDiffSampleRow,
     SchemaDiffResult,
 )
+from sqlbuild.adapter.contract.types import LoaderLogicalType
 from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
 
 
@@ -299,3 +300,6 @@ class BigQueryLoaderDecimalRowTestCase:
     value: Decimal
     column_type: str
     expected_sql: str
+    inferred_types: tuple[tuple[str, LoaderLogicalType], ...] = (
+        ("amount", LoaderLogicalType.DECIMAL),
+    )
