@@ -1,8 +1,7 @@
 """Export shipped orders to the carrier."""
 
-from sqlbuild.tasks import task
-
 from python.fulfillment.shipment_export.main import export_shipments
+from sqlbuild.tasks import task
 
 
 @task
