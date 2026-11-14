@@ -82,7 +82,6 @@ impl crate::scheduler::types::RunLauncher for CycleRecorder<'_> {
     }
 }
 
-/// Expires its lease and renews it on the first leader poll, so a real fence reaches the loop.
 /// Fences the first lease it polls with, and stops the loop once it polls under a newer epoch.
 pub(crate) struct FencingLauncher<'a> {
     pub(crate) epochs: &'a mut Vec<i64>,

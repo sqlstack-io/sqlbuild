@@ -18,10 +18,7 @@ pub enum ControlStore {
     Postgres(sqlx_postgres::PgPool),
 }
 
-/// A SQLite store's file, and an idle connection held while any handle lives.
-///
-/// Without it the next transaction's connection would be the file's first and rebuild the WAL
-/// index, which restarts checkpointing from the start of the WAL, so the WAL would never reset.
+/// A SQLite store's file, and an idle connection that keeps its WAL index between transactions.
 #[derive(Clone, Debug)]
 pub struct SqliteStore {
     pub(crate) path: PathBuf,

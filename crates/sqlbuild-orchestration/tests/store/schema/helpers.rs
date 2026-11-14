@@ -29,13 +29,11 @@ pub(crate) fn write_until_killed_when_spawned() {
     run(async {
         let store = open_store(&path).await.expect("open store");
         migrate_store(&store).await.expect("migrate store");
-        let mut index: u64 = 0;
-        loop {
+        for index in 0..u64::MAX {
             create_location(&store, &format!("orders-{index}"), "test-admin")
                 .await
                 .expect("create location");
             println!("{ACKNOWLEDGED}{index}");
-            index += 1;
         }
     });
 }
