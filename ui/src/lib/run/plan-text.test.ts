@@ -175,6 +175,12 @@ describe('plan under --changed', () => {
 		// A group's schedule says nothing about a job whose own trigger is paused; the plan names the group itself when it matters.
 		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', '2026-01-01T05:00:00Z'), trigger('nightly', 'running', '2026-01-01T02:00:00Z')], now)).toBe('job finance_daily is paused');
 		expect(jobRefreshText('nightly', [trigger('nightly', 'running', '2026-01-01T02:00:00Z'), trigger('nightly', 'running', '2026-01-01T05:00:00Z')], now)).toBe('job nightly · next run in 2h');
+		// While no server runs the scheduler, neither a schedule nor a sensor starts the job, so it shows no countdown.
+		const stopped = true;
+		expect(jobRefreshText('nightly', [trigger('nightly', 'running', '2026-01-01T02:00:00Z')], now, stopped)).toBe('job nightly · can’t start until the scheduler is running again');
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'running', null, 'sensor')], now, stopped)).toBe('job finance_daily · can’t start until the scheduler is running again');
+		// A paused job stays paused whether or not the scheduler runs.
+		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', '2026-01-01T05:00:00Z')], now, stopped)).toBe('job finance_daily is paused');
 		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'paused', null), trigger('finance_daily', 'running', null, 'sensor')], now)).toBe('job finance_daily · when its sensor fires');
 		// A running schedule with no next run, such as a finished calendar, is not a sensor.
 		expect(jobRefreshText('finance_daily', [trigger('finance_daily', 'running', null)], now)).toBe('job finance_daily');

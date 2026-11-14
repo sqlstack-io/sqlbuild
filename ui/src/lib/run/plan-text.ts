@@ -221,11 +221,15 @@ export function changedSections(changed: PlanChanged, refresh: (job: string) => 
 	return sections;
 }
 
-/** What refreshes a node held back for `job` (a job or group the plan names): its next scheduled run, its sensor, or that it is paused. */
-export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | 'type' | 'state' | 'nextDueAt'>[], now: number): string {
+/**
+ * What refreshes a node held back for `job` (a job or group the plan names): its next scheduled run, its sensor, or that it is paused.
+ * While no server runs the scheduler, a schedule or sensor starts nothing, so the text says the job waits for it instead.
+ */
+export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | 'type' | 'state' | 'nextDueAt'>[], now: number, schedulerStopped = false): string {
 	const mine = triggers.filter((t) => t.jobKey === job);
 	const live = mine.filter((t) => t.state === 'running');
 	if (mine.length && !live.length) return `job ${job} is paused`;
+	if (schedulerStopped && live.length) return `job ${job} · can’t start until the scheduler is running again`;
 	const next = live.flatMap((t) => (t.nextDueAt ? [t.nextDueAt] : [])).sort()[0];
 	if (next) return `job ${job} · next run ${formatIn(next, now)}`;
 	return live.some((t) => t.type === 'sensor') ? `job ${job} · when its sensor fires` : `job ${job}`;
