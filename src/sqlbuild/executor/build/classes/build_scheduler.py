@@ -104,6 +104,7 @@ from sqlbuild.executor.migrations.main._complete_old_name_views import complete_
 from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
 from sqlbuild.executor.run.classes.fingerprint_writes import FingerprintWrites
 from sqlbuild.executor.run.classes.runtime_watermark_resolver import RuntimeWatermarkResolver
+from sqlbuild.executor.run.constants import RUN_AUDIT_FAILED_CODE
 from sqlbuild.executor.run.models import (
     BatchWindow,
     BoundViewGuard,
@@ -258,6 +259,7 @@ class BuildScheduler:
         self._load_results: list[LoadExecutionResult] = list(initial_state.initial_load_results)
         self._test_results: list[SqlTestExecutionResult] = []
         self._source_audit_results: list[AuditExecutionResult] = []
+        self._seed_audit_results: dict[CompiledObjectKey, tuple[AuditExecutionResult, ...]] = {}
 
         self._executed_source_audits: set[str] = set()
         self._failed_sources: set[str] = set()
@@ -1004,6 +1006,8 @@ class BuildScheduler:
                 query_change_tracking=self._query_change_tracking,
                 schema_prepared=self._schema_prepared,
             )
+        if result.status == ExecutionStatus.SUCCESS:
+            result = self._with_seed_audits(key=key, result=result, connection=connection)
         duration: int = int((time.monotonic() - start) * 1000)
         completed_result: SeedExecutionResult = dataclasses.replace(result, duration_ms=duration)
         log_debug_event(
@@ -1346,12 +1350,11 @@ class BuildScheduler:
         failed: bool = False
 
         if isinstance(result, SeedExecutionResult):
+            self._source_audit_results.extend(self._seed_audit_results.pop(key, ()))
             self._seed_results.append(result)
             if self._on_node_complete is not None:
                 self._on_node_complete(result)
             failed = result.status == ExecutionStatus.FAILED
-            if result.status == ExecutionStatus.SUCCESS and self._run_seed_audits(key=key):
-                failed = True
 
         elif isinstance(result, SqlTestExecutionResult):
             self._test_results.append(result)
@@ -1404,26 +1407,38 @@ class BuildScheduler:
                 self._stop = True
         self._mark_complete(key)
 
-    def _run_seed_audits(self, *, key: CompiledObjectKey) -> bool:
-        """Run a loaded seed's audits and return whether an error-severity audit failed."""
+    def _with_seed_audits(
+        self, *, key: CompiledObjectKey, result: SeedExecutionResult, connection: Any
+    ) -> SeedExecutionResult:
+        """Run a loaded seed's audits within its attempt; an error-severity failure fails it."""
 
         if not self._run_audits:
-            return False
+            return result
         audits: tuple[AuditPlanEntry, ...] = self._indexes.seed_audits_by_seed.get(key.name, ())
         if not audits:
-            return False
+            return result
         results: tuple[AuditExecutionResult, ...] = run_end_audits(
             end_audits=audits,
             adapter=self._adapter,
-            connection=self._scheduler_connection,
+            connection=connection,
             model_locations=self._plan.model_locations,
             seed_locations=self._plan.seed_locations,
             source_map=self._plan.source_map,
             run_id=self._run_id,
             quality_scope="seed",
         )
-        self._source_audit_results.extend(results)
-        return any(result.outcome == AuditOutcome.ERROR for result in results)
+        self._seed_audit_results[key] = results
+        if not any(audit.outcome == AuditOutcome.ERROR for audit in results):
+            return result
+        return dataclasses.replace(
+            result,
+            status=ExecutionStatus.FAILED,
+            error_code=RUN_AUDIT_FAILED_CODE,
+            error_message=(
+                f"audit for seed '{result.seed_name}' failed after loading "
+                "with severity level: error"
+            ),
+        )
 
     def _mark_complete(self, key: CompiledObjectKey) -> None:
         """Mark a key complete and enqueue any downstream that become ready."""

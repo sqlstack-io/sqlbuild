@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
-	import type { CatalogNodeDetail } from '$lib/api';
+	import type { CatalogNodeDetail, NodeBuildCost } from '$lib/api';
+	import { CREDIT_PRICE_HINT, formatQueryCost } from '$lib/operate/cost';
+	import CostChart from './cost-chart.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -10,11 +12,19 @@
 
 	// Build attempts of this node: scheduler run nodes plus builds outside the
 	// scheduler, which are known only by their fingerprint run and time.
-	let { node }: { node: CatalogNodeDetail } = $props();
+	// Estimated query cost appears only where the adapter collects it.
+	let { node, costs, costDays }: { node: CatalogNodeDetail; costs: NodeBuildCost[]; costDays: number } = $props();
+	const costOf = (r: NonNullable<CatalogNodeDetail['runs']>[number]) => costs.find((c) => (r.runId !== null && c.runId === r.runId) || c.buildRunId === r.fingerprintRunId);
+	const costText = (c: NodeBuildCost | undefined) => (!c ? '—' : c.status === 'pending' ? 'pending' : c.status === 'collection_failed' || c.status === 'unavailable' ? 'unavailable' : formatQueryCost(c));
 </script>
 
+{#if costs.length}
+	<CostChart {costs} days={costDays} />
+	{#if costs.some((c) => c.usd === null)}<p class="hint">{CREDIT_PRICE_HINT}</p>{/if}
+{/if}
+
 <table class="sb-list">
-	<thead><tr><th>Outcome</th><th>Run</th><th>Job</th><th class="num">Rows</th><th class="num">Duration</th><th>Started</th></tr></thead>
+	<thead><tr><th>Outcome</th><th>Run</th><th>Job</th><th class="num">Rows</th><th class="num">Duration</th>{#if costs.length}<th class="num" title="Estimated query cost of this node in the build">Est. cost</th>{/if}<th>Started</th></tr></thead>
 	<tbody>
 		{#each node.runs ?? [] as r, i (`${r.runId ?? r.fingerprintRunId}-${i}`)}
 			<tr>
@@ -29,10 +39,11 @@
 				<td>{#if r.jobKey}<a class="link" href={to(`/jobs/${r.jobKey}`)}>{r.jobKey}</a>{:else}<span class="muted">{r.runId ? 'started by hand' : '—'}</span>{/if}</td>
 				<td class="num muted">{formatNumber(r.rows)}</td>
 				<td class="num muted">{formatMs(r.durationMs)}</td>
+				{#if costs.length}{@const c = costOf(r)}<td class="num muted" title={c?.status === 'partial' ? 'Partial: the warehouse has not reported every statement of this build' : undefined}>{costText(c)}{c?.status === 'partial' ? '*' : ''}</td>{/if}
 				<td><RelativeTime value={formatAgo(r.startedAt, app.now)} exact={formatStamp(r.startedAt)} /></td>
 			</tr>
 		{:else}
-			<tr><td colspan="6" class="empty">No builds recorded in this location.</td></tr>
+			<tr><td colspan={costs.length ? 7 : 6} class="empty">No builds recorded in this location.</td></tr>
 		{/each}
 	</tbody>
 </table>
@@ -47,6 +58,11 @@
 	}
 	.muted {
 		color: var(--muted-foreground);
+	}
+	.hint {
+		margin: 0 0 10px;
+		color: var(--sb-text-faint);
+		font-size: 12px;
 	}
 	.detail {
 		margin-top: 3px;

@@ -10,6 +10,7 @@ import type {
 	Acknowledgement,
 	AdhocPermission,
 	AdhocRunCheck,
+	PlanChanged,
 	PlanResult,
 	AdhocRunRequest,
 	BuiltInRole,
@@ -33,6 +34,9 @@ import type {
 	RunRowPage,
 	RunRowQuery,
 	RunStatement,
+	RunCostRow,
+	CostSummary,
+	NodeBuildCost,
 	RunTabCounts,
 	Scope,
 	SnapshotNode,
@@ -65,7 +69,7 @@ import {
 	type TriggerDef
 } from './operate';
 import { SCHEDULER } from './principals';
-import { ancestors, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
+import { ancestors, isWritable, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
 import {
 	commandOf,
 	computeNodes,
@@ -314,6 +318,128 @@ export class MockOperate {
 		return this.#ctx.reply(execution(rec, this.#nodesOf(rec, now), now).statements);
 	}
 
+	listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]> {
+		return this.#ctx.reply(this.#costRows(scope, this.#require(runId), Date.now()));
+	}
+
+	/** The latest cost of the builds that started in the window, grouped as the server groups them. */
+	getCostSummary(scope: Scope, days: number): Promise<CostSummary> {
+		const now = Date.now();
+		const since = now - days * 86_400_000;
+		const totals = () => ({ credits: 0, usd: 0 as number | null, seconds: 0, runs: new Set<string>() });
+		type Totals = ReturnType<typeof totals>;
+		const add = (groups: Map<string | null, Totals>, key: string | null, row: RunCostRow) => {
+			const g = groups.get(key) ?? totals();
+			g.credits += row.credits;
+			g.usd = g.usd === null || row.usd === null ? null : g.usd + row.usd;
+			g.seconds += row.seconds;
+			g.runs.add(row.buildRunId);
+			groups.set(key, g);
+		};
+		const all = new Map<string | null, Totals>();
+		const byJob = new Map<string | null, Totals>();
+		const bySize = new Map<string | null, Totals>();
+		const byNode = new Map<string | null, Totals>();
+		let incompleteRuns = 0;
+		for (const rec of this.#records) {
+			if (!rec.run.startedAt || Date.parse(rec.run.startedAt) < since) continue;
+			for (const row of this.#costRows(scope, rec, now)) {
+				if (row.resourceType === '_total') {
+					add(all, null, row);
+					add(byJob, rec.run.jobKey, row);
+					if (row.status === 'pending' || row.status === 'partial') incompleteRuns += 1;
+				} else {
+					add(bySize, row.warehouseSize || null, row);
+					add(byNode, row.nodeKey, row);
+				}
+			}
+		}
+		const total = all.get(null) ?? totals();
+		const ranked = (groups: Map<string | null, Totals>) =>
+			[...groups].map(([key, g]) => ({ key, credits: g.credits, usd: g.usd, seconds: g.seconds, runs: g.runs.size })).sort((a, b) => b.credits - a.credits);
+		return this.#ctx.reply({
+			since: new Date(since).toISOString(),
+			credits: total.credits,
+			usd: total.runs.size ? total.usd : null,
+			runs: total.runs.size,
+			incompleteRuns,
+			byJob: ranked(byJob),
+			byWarehouseSize: ranked(bySize),
+			byNode: ranked(byNode)
+		});
+	}
+
+	/** One node's cost in each build of the window, newest first. */
+	listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]> {
+		const now = Date.now();
+		const since = now - days * 86_400_000;
+		const costs: NodeBuildCost[] = [];
+		for (const rec of this.#records) {
+			if (!rec.run.startedAt || Date.parse(rec.run.startedAt) < since) continue;
+			const rows = this.#costRows(scope, rec, now);
+			const mine = rows.filter((r) => r.nodeKey === nodeKey);
+			const run = rows.find((r) => r.resourceType === '_total');
+			if (!run || !mine.length) continue;
+			costs.push({
+				buildRunId: run.buildRunId,
+				runId: rec.run.id,
+				startedAt: rec.run.startedAt,
+				status: run.status,
+				credits: mine.reduce((t, r) => t + r.credits, 0),
+				usd: mine.some((r) => r.usd === null) ? null : mine.reduce((t, r) => t + (r.usd ?? 0), 0),
+				seconds: mine.reduce((t, r) => t + r.seconds, 0),
+				queryCount: mine.reduce((t, r) => t + r.queryCount, 0)
+			});
+		}
+		return this.#ctx.reply(costs.sort((a, b) => b.startedAt.localeCompare(a.startedAt)));
+	}
+
+	/**
+	 * Cost follows the mock statements at 1 credit an hour on X-Small, 2 on Small, and $3 a credit
+	 * where the target prices credits.
+	 * Only Snowflake estimates query cost, and a run that built nothing (a group run) has none.
+	 */
+	#costRows(scope: Scope, rec: RunRecord, now: number): RunCostRow[] {
+		if (this.#ctx.adapter(scope) !== 'snowflake' || !rec.run.startedAt || !rec.script.nodes.length) return [];
+		const statements = execution(rec, this.#nodesOf(rec, now), now).statements.filter((st) => st.nodeKey);
+		const buildRunId = `build-${rec.run.id}`;
+		// Staging sets no credit price, so it shows credits and the hint to set one.
+		const priced = this.#ctx.target(scope) !== 'staging';
+		const status: RunCostRow['status'] = isActive(rec.run.status) ? 'pending' : 'complete';
+		// Mock node keys are bare names, so each resource row carries its name as its node key.
+		const row = (resourceType: string, resourceName: string, seconds: number, queryCount: number, warehouse: [string, string], credits: number): RunCostRow => ({
+			buildRunId,
+			resourceType,
+			resourceName,
+			nodeKey: resourceType === '_total' ? null : resourceName,
+			warehouseName: warehouse[0],
+			warehouseSize: warehouse[1],
+			queryCount,
+			seconds,
+			bytesScanned: queryCount * 52_428_800,
+			credits,
+			usd: priced ? credits * 3 : null,
+			status,
+			statementsExpected: statements.length,
+			statementsObserved: status === 'pending' ? 0 : statements.length
+		});
+		if (status === 'pending') return [row('_total', buildRunId, 0, 0, ['', ''], 0)];
+		const byNode = new Map<string, { seconds: number; queries: number }>();
+		for (const st of statements) {
+			const seconds = st.endedAt ? Math.max(0, (Date.parse(st.endedAt) - Date.parse(st.startedAt)) / 1000) : 0;
+			const node = byNode.get(st.nodeKey) ?? { seconds: 0, queries: 0 };
+			node.seconds += seconds;
+			node.queries += 1;
+			byNode.set(st.nodeKey, node);
+		}
+		const parts = [...byNode].map(([key, node]) => {
+			const small = /revenue|rollup|segments|status/.test(key);
+			return row('model', key, node.seconds, node.queries, small ? ['TRANSFORM_WH', 'Small'] : ['LOAD_WH', 'X-Small'], (node.seconds / 3600) * (small ? 2 : 1));
+		});
+		const sum = (pick: (p: RunCostRow) => number) => parts.reduce((total, p) => total + pick(p), 0);
+		return [row('_total', buildRunId, sum((p) => p.seconds), statements.length, ['', ''], sum((p) => p.credits)), ...parts];
+	}
+
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql> {
 		this.#need('view.sql');
 		const rec = this.#require(runId);
@@ -529,13 +655,14 @@ export class MockOperate {
 		return this.#ctx.reply(this.#view(rec, scope));
 	}
 
-	/** Every selected model is planned as unchanged unless the command asks for a full refresh. */
-	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+	/** Every selected model is planned as unchanged unless the command asks for a full refresh; `changed` names the models `--changed` starts from. */
+	async planBuild(scope: Scope, command: string[], changed: Map<string, string> | null = null): Promise<PlanResult> {
 		const check = this.#check(scope, { command, priority: 0 });
 		await new Promise((resolve) => setTimeout(resolve, 1200));
 		if (check.error) return this.#ctx.reply({ plan: null, error: check.error });
 		if (check.verb !== 'build') return this.#ctx.reply({ plan: null, error: `sqb plan previews builds; sqb ${check.verb} cannot be planned` });
 		const reason = command.includes('--full-refresh') ? 'full_refresh' : 'no_change';
+		const decision = changed ? changedDecision(check.selection, changed) : null;
 		const modelKinds = new Set(['view', 'table', 'incremental']);
 		const models = check.selection.filter((key) => modelKinds.has(snapshotNode(key)?.kind ?? '')).map((key) => {
 			const incremental = snapshotNode(key)?.kind === 'incremental';
@@ -543,7 +670,7 @@ export class MockOperate {
 				name: key,
 				materialization_type: incremental ? 'incremental' : 'table',
 				action: incremental ? 'incremental_append' : 'create_table',
-				reason: incremental && reason === 'no_change' ? 'normal_incremental' : reason,
+				reason: changed?.get(key) === 'definition changed' && reason === 'no_change' ? 'query_changed' : incremental && reason === 'no_change' ? 'normal_incremental' : reason,
 				backfill: { action: reason === 'full_refresh' ? 'full' : 'forward', duration: null },
 				qualified_name: `main.${key}`,
 				...(incremental ? { incremental_strategy: 'append', cursor_column: 'updated_at', cursor_type: 'timestamp' } : {})
@@ -557,7 +684,7 @@ export class MockOperate {
 			unknown_until_run: ['source freshness', 'retention', 'column rename support', 'sources outside mirrored schemas']
 		};
 		return this.#ctx.reply({
-			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy },
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [], synced_copy, changed: decision },
 			error: null
 		});
 	}
@@ -1216,4 +1343,53 @@ export class MockOperate {
 			stateHistory: structuredClone(rt.history)
 		};
 	}
+}
+
+/** A node as `sqb plan --changed` names it, such as `model:orders`. */
+function changedKey(key: string): string {
+	const kind = snapshotNode(key)?.kind ?? 'table';
+	return `${['view', 'table', 'incremental'].includes(kind) ? 'model' : kind}:${key}`;
+}
+
+/**
+ * The location's `--changed` decision for the mock project, with its default reach: a change runs what reads
+ * it, except nodes a triggered job without the change refreshes on its own, and what reads those.
+ */
+function changedDecision(selection: string[], changed: Map<string, string>): PlanChanged {
+	// The decision covers only models and seeds, as the CLI's does.
+	const selected = new Set(selection.filter((k) => isWritable(k) && ['view', 'table', 'incremental', 'seed'].includes(snapshotNode(k)?.kind ?? '')));
+	// A node belongs to jobs, not groups; a job counts as triggered when it or a group it is in has a trigger.
+	const triggered = new Set(TRIGGER_DEFS.flatMap((t) => (t.jobKey ? [t.jobKey] : [])));
+	const jobs = JOB_DEFS.filter((j) => j.kind === 'job' && (triggered.has(j.key) || JOB_DEFS.some((g) => g.kind === 'group' && triggered.has(g.key) && g.members.includes(j.key)))).map((j) => ({
+		key: j.key,
+		nodes: new Set(jobNodes(j.key))
+	}));
+	/** Each running node's changed root. */
+	const root = new Map<string, string>([...changed.keys()].filter((k) => selected.has(k)).map((k) => [k, k]));
+	/** Each held-back node's changed root, which a node reading it is held from too. */
+	const held = new Map<string, string>();
+	const decision: PlanChanged = { counts: ['definition'], reach: 'job', runs: [...root.keys()].map((k) => ({ node: changedKey(k), reason: changed.get(k)!, downstream_of: null })), held_back: [], unchanged: [] };
+	for (const node of SNAPSHOT_NODES) {
+		if (!selected.has(node.key) || root.has(node.key)) continue;
+		const heldUpstream = node.upstream.find((u) => held.has(u));
+		const runningUpstream = node.upstream.find((u) => root.has(u));
+		const origin = heldUpstream ? held.get(heldUpstream) : runningUpstream ? root.get(runningUpstream) : undefined;
+		if (!origin) {
+			decision.unchanged.push(changedKey(node.key));
+			continue;
+		}
+		// As in the CLI, a triggered job without the change refreshes the node itself before it counts as reading a held node.
+		const owners = jobs.filter((j) => j.nodes.has(node.key));
+		if (owners.length && !owners.some((j) => j.nodes.has(origin))) {
+			held.set(node.key, origin);
+			decision.held_back.push({ node: changedKey(node.key), refreshed_by: owners.map((j) => j.key) });
+		} else if (heldUpstream) {
+			held.set(node.key, origin);
+			decision.held_back.push({ node: changedKey(node.key), reads: changedKey(heldUpstream) });
+		} else {
+			root.set(node.key, origin);
+			decision.runs.push({ node: changedKey(node.key), reason: `upstream model ${origin} runs`, downstream_of: changedKey(origin) });
+		}
+	}
+	return decision;
 }

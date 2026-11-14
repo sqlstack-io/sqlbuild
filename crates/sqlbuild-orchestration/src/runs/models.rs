@@ -188,6 +188,7 @@ impl RunRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct JobRunRequest {
+    /// A new random (UUID v4) or time-ordered (UUID v7) ID; name-based (v5) IDs are refused as the server derives those.
     pub run_id: Uuid,
     pub location_id: Uuid,
     pub target: String,
@@ -211,6 +212,7 @@ pub struct JobRunRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RerunRequest {
+    /// A new random (UUID v4) or time-ordered (UUID v7) ID; name-based (v5) IDs are refused as the server derives those.
     pub run_id: Uuid,
     pub source_run_id: Uuid,
     pub from_failure: bool,
@@ -742,6 +744,7 @@ pub struct RunObservation {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AdhocRunRequest {
+    /// A new random (UUID v4) or time-ordered (UUID v7) ID; name-based (v5) IDs are refused as the server derives those.
     pub run_id: Uuid,
     pub location_id: Uuid,
     pub target: String,

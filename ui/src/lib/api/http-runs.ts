@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanDocument, PlanResult, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanDocument, PlanResult, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -35,7 +35,8 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			column_migrations: list(document.column_migrations),
 			table_type_conversions: list(document.table_type_conversions),
 			retention: list(document.retention),
-			synced_copy: document.synced_copy ?? null
+			synced_copy: document.synced_copy ?? null,
+			changed: document.changed ?? null
 		},
 		error: null
 	};
@@ -408,3 +409,55 @@ export function toRunOutput(wire: Wire['RunOutput']): RunOutputLine[] {
 	return [...lines, ...errors].sort((a, b) => a.at.localeCompare(b.at));
 }
 
+const COST_STATUSES: RunCostRow['status'][] = ['complete', 'partial', 'pending', 'collection_failed', 'unavailable'];
+
+const costStatus = (status: string): RunCostRow['status'] => COST_STATUSES.find((s) => s === status) ?? 'unavailable';
+
+const toCostGroup = (g: Wire['CostGroup']): CostGroup => ({ key: g.key ?? null, credits: g.credits, usd: g.usd ?? null, seconds: g.seconds, runs: g.runs });
+
+export function toCostSummary(wire: Wire['CostSummaryRecord']): CostSummary {
+	return {
+		since: wire.since,
+		credits: wire.credits,
+		usd: wire.usd ?? null,
+		runs: wire.runs,
+		incompleteRuns: wire.incomplete_runs,
+		byJob: wire.by_job.map(toCostGroup),
+		byWarehouseSize: wire.by_warehouse_size.map(toCostGroup),
+		byNode: wire.by_node.map(toCostGroup)
+	};
+}
+
+export function toNodeBuildCosts(wire: Wire['NodeCostRecord'][]): NodeBuildCost[] {
+	return wire.map((c) => ({
+		buildRunId: c.run_id,
+		runId: c.orchestration_run_id ?? null,
+		startedAt: c.run_started_at,
+		status: costStatus(c.status),
+		credits: c.credits,
+		usd: c.usd ?? null,
+		seconds: c.seconds,
+		queryCount: c.query_count
+	}));
+}
+
+/** Latest cost observations as numbers; a status the UI does not know reads as unavailable. */
+export function toRunCostRows(wire: Wire['WarehouseResourceCostRecord'][]): RunCostRow[] {
+	return wire.map((r) => ({
+		buildRunId: r.run_id,
+		resourceType: r.resource_type,
+		resourceName: r.resource_name,
+		// Catalog node keys are `kind:name`, and a resource's type is its node kind.
+		nodeKey: r.resource_type === '_total' ? null : `${r.resource_type}:${r.resource_name}`,
+		warehouseName: r.warehouse_name,
+		warehouseSize: r.warehouse_size,
+		queryCount: r.query_count,
+		seconds: Number(r.attributed_seconds),
+		bytesScanned: r.bytes_scanned,
+		credits: Number(r.estimated_credits),
+		usd: r.estimated_usd == null ? null : Number(r.estimated_usd),
+		status: costStatus(r.status),
+		statementsExpected: r.statements_expected,
+		statementsObserved: r.statements_observed
+	}));
+}

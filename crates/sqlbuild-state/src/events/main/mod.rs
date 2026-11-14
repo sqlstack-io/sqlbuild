@@ -16,3 +16,4 @@ pub mod old_name_histories;
 pub mod old_name_view_event_id;
 pub mod readable_columns;
 pub mod recorded_renames;
+pub mod resource_cost_observation_id;

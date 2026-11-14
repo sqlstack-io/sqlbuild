@@ -14,6 +14,7 @@ use crate::runs::_helpers::requests::permissions::{authorize_execution, executio
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
+use crate::runs::_helpers::requests::run_id::refuse_derived_run_id;
 use crate::runs::constants::ADHOC_AUDIT_TAG;
 use crate::runs::models::{
     AdhocCheckRequest, AdhocPermission, AdhocRunRequest, CommandPlan, PlannerResource, RunCommand,
@@ -257,6 +258,7 @@ pub(in crate::runs) async fn request_adhoc_run_in(
     (context, principal_id): (&AuditContext, Uuid),
     (planner, request): (&dyn CommandPlanner, &AdhocRunRequest),
 ) -> Result<(ControlTransaction, bool), ControlError> {
+    refuse_derived_run_id(request.run_id)?;
     let (transaction, context) = authorize_listing(
         transaction,
         (context, principal_id),

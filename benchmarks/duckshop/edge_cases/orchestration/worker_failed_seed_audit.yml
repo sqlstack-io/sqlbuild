@@ -1,0 +1,9 @@
+seeds:
+  - name: order_codes
+    description: Order codes, one of which the audit does not accept.
+    columns:
+      - name: code
+        type: VARCHAR
+        audits:
+          - accepted_values:
+              values: [A, B]

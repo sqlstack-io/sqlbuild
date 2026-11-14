@@ -49,7 +49,7 @@ export function createFixtures(now: number) {
 			health: 'healthy',
 			lastSeenAt: ago(0.2),
 			target: { name: 'prod', adapter: 'snowflake', connectionSummary: 'WAFFLE_SHOP on example-account' },
-			snapshot: snapshot(42, '7d2e41a', 190, 'Alex Rivera'),
+			snapshot: snapshot(43, 'c41e9b2', 6, 'Alex Rivera'),
 			warehouseSync: idleSync(4)
 		},
 		{

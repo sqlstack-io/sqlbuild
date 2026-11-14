@@ -1665,6 +1665,7 @@ allowed_paths = [
     "crates/sqlbuild-cli/src/native_commands/main/_location_plan.rs=A location's requested plan names the synced copy for its sqb plan child.",
     "crates/sqlbuild-core/src/plan_display/constants.rs=Names the synced-copy environment variable.",
     "crates/sqlbuild-python/src/bindings/_helpers/freshness/planning.rs=Preview branch: a refused freshness observation leaves the source unknown.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs=Preview branch: --changed reads consumption history from the copy instead of the warehouse table.",
     "crates/sqlbuild-python/src/bindings/_helpers/native_host/registration.rs=Registers the synced copy's refusal error with Python.",
     "crates/sqlbuild-python/src/bindings/_helpers/native_host/synced_copy.rs=Defines the synced-copy adapter.",
     "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=Only sqb plan activates the synced copy and reports what it could not know.",
@@ -1853,7 +1854,7 @@ paths = ["src/sqlbuild/adapter/contract/classes/*", "src/sqlbuild/adapters/*/cla
 reason = "tests/unit/src/sqlbuild/adapter/contract/classes/strict_adapter/test_strict_adapter.py requires every first-class adapter to define each StrictAdapter method itself instead of inheriting it from BaseAdapter."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python/src/bindings/_helpers/native_host/audit_results_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/observations_state.rs"]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/native_host/audit_results_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/observations_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/resource_costs_state.rs"]
 reason = "Each state table has its own Python-facing create and prune bindings. The DDL and table naming live in the shared fixed_state_table_sql and state_table_name; each prune keeps its own retention rule."
 
 [[dupes.allowlist]]
@@ -2885,6 +2886,7 @@ module_layers = [
     "native_host/observations_state=front",
     "native_host/orchestration_sensors=commands",
     "native_host/orchestration_triggers=project",
+    "native_host/resource_costs_state=front",
     "native_host/warehouse_metadata=commands",
     "native_threads=infra",
     "observations=plan",

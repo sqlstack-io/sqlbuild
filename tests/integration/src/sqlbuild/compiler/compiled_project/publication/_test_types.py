@@ -123,6 +123,10 @@ class WorkerExecutionTestCase:
     concurrency_limits: dict[str, int] = field(default_factory=dict)
     launcher: Literal["native", "uncooperative", "docker"] = "native"
     warehouse_setup: Callable[[Path], None] = lambda _: None
+    # Each run node as (key, status, error code, skipped because of, error message).
+    expected_run_nodes: list[tuple[str, str, str | None, str | None, str | None]] = field(
+        default_factory=list
+    )
 
 
 @dataclass(frozen=True)
@@ -419,6 +423,14 @@ class AdhocRunTestCase:
     job_settings: str = ""
     expected_scheduled_status: str = "success"
     expected_worker_log: str = ""
+
+
+@dataclass(frozen=True)
+class ChangedPlanPreviewTestCase:
+    description: str
+    edited_model: str
+    edit: tuple[str, str]
+    expected_changed: dict[str, Any]
 
 
 @dataclass(frozen=True)

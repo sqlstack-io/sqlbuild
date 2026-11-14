@@ -8,7 +8,7 @@ use sqlbuild_core::constants::{
     AUDIT_RESULTS_TABLE_NAME, COLUMN_MIGRATION_TABLE_NAME, CONSUMPTION_TABLE_NAME,
     FINGERPRINT_TABLE_NAME, JANITOR_EVENTS_TABLE_NAME, MICROBATCH_TABLE_NAME, MIGRATION_TABLE_NAME,
     NODE_RESULTS_TABLE_NAME, OBSERVATIONS_TABLE_NAME, OLD_NAME_VIEW_TABLE_NAME,
-    SOURCE_FRESHNESS_TABLE_NAME,
+    RESOURCE_COSTS_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
 };
 
 use crate::store::errors::ControlError;
@@ -286,6 +286,37 @@ pub struct WarehouseObservationRecord {
     pub observed_at: DateTime<Utc>,
 }
 
+/// One estimated query cost observation of a run, resource and warehouse; refreshes append.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseResourceCostRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub observation_id: String,
+    pub run_id: String,
+    pub orchestration_run_id: Option<String>,
+    pub attempt: i64,
+    pub resource_type: String,
+    pub resource_name: String,
+    pub warehouse_name: String,
+    pub warehouse_size: String,
+    pub warehouse_type: Option<String>,
+    pub cluster_number: Option<i64>,
+    pub query_count: i64,
+    pub attributed_seconds: String,
+    pub bytes_scanned: i64,
+    pub estimated_credits: String,
+    pub estimated_usd: Option<String>,
+    pub status: String,
+    pub statements_expected: i64,
+    pub statements_observed: i64,
+    pub limitations: String,
+    pub target_name: Option<String>,
+    pub run_started_at: DateTime<Utc>,
+    pub run_completed_at: DateTime<Utc>,
+    pub observed_at: DateTime<Utc>,
+}
+
 /// Catalog observations require full scans; only immutable history supports a watermark.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -301,13 +332,14 @@ pub enum WarehouseHistoryKind {
     NodeResults,
     Consumption,
     Observations,
+    ResourceCosts,
     Catalog,
     Statistics,
 }
 
 impl WarehouseHistoryKind {
     /// Catalog and statistics stay last: a failed statistics read rewinds one kind, to catalog.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
@@ -319,6 +351,7 @@ impl WarehouseHistoryKind {
         Self::NodeResults,
         Self::Consumption,
         Self::Observations,
+        Self::ResourceCosts,
         Self::Catalog,
         Self::Statistics,
     ];
@@ -381,6 +414,11 @@ impl WarehouseHistoryKind {
                 "sqb_warehouse_observations",
                 Some(OBSERVATIONS_TABLE_NAME),
             ),
+            Self::ResourceCosts => (
+                "resource_costs",
+                "sqb_warehouse_resource_costs",
+                Some(RESOURCE_COSTS_TABLE_NAME),
+            ),
             Self::Catalog => ("catalog", "sqb_warehouse_catalog", None),
             Self::Statistics => ("statistics", "sqb_warehouse_statistics", None),
         }
@@ -435,6 +473,9 @@ pub struct WarehouseSyncDue {
 pub struct PreviewCopyRead {
     pub session_id: Uuid,
     pub generation: i64,
+    /// Whether the copy carries consumption history; sent only when set, as older servers reject it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub consumption: bool,
 }
 
 /// The newest successful build of a node, which a `cursor_max` observation must come from.
@@ -466,6 +507,9 @@ pub struct PreviewCopy {
     pub fingerprints: Vec<WarehouseFingerprintRecord>,
     pub latest_runs: Vec<PreviewLatestRun>,
     pub observations: Vec<WarehouseObservationRecord>,
+    /// Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub consumption: Vec<WarehouseConsumptionRecord>,
 }
 
 /// Private interpreter input; cursor values are data and receive adapter literal rendering.
@@ -603,6 +647,7 @@ pub enum WarehouseHistoryRead {
     NodeResults(NodeResultsRead),
     Consumption(ConsumptionRead),
     Observations(StateEventsRead),
+    ResourceCosts(StateEventsRead),
     Catalog(CatalogRead),
     Statistics(StatisticsRead),
 }
@@ -621,6 +666,7 @@ pub enum WarehouseHistoryRecord {
     NodeResult(Box<WarehouseNodeResultRecord>),
     Consumption(Box<WarehouseConsumptionRecord>),
     Observation(Box<WarehouseObservationRecord>),
+    ResourceCost(Box<WarehouseResourceCostRecord>),
     Catalog(WarehouseCatalogRecord),
     Statistics(WarehouseStatisticsRecord),
 }

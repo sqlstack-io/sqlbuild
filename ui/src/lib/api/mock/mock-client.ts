@@ -23,6 +23,9 @@ import type {
 	RunNodeError,
 	RunOutputLine,
 	RunStatement,
+	RunCostRow,
+	CostSummary,
+	NodeBuildCost,
 	Scope,
 	Snapshot,
 	SnapshotNode,
@@ -212,6 +215,21 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.listRunStatements(scope, runId);
 	}
 
+	async listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]> {
+		this.#location(scope);
+		return this.#operate.listRunCost(scope, runId);
+	}
+
+	async getCostSummary(scope: Scope, days: number): Promise<CostSummary> {
+		this.#location(scope);
+		return this.#operate.getCostSummary(scope, days);
+	}
+
+	async listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]> {
+		this.#location(scope);
+		return this.#operate.listNodeCosts(scope, nodeKey, days);
+	}
+
 	async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
 		this.#location(scope);
 		return this.#operate.listRunOutput(scope, runId);
@@ -275,7 +293,11 @@ export class MockApiClient implements ApiClient {
 
 	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
 		this.#location(scope);
-		return this.#operate.planBuild(scope, command);
+		// `--changed` starts from the nodes whose own definition changed, as the catalog marks them.
+		const changed = command.some((t) => t === '--changed' || t.startsWith('--changed='))
+			? new Map((await this.#build.listCatalogNodes(scope)).filter((n) => n.stale?.some((r) => r.reason === 'changed')).map((n) => [n.key, 'definition changed']))
+			: null;
+		return this.#operate.planBuild(scope, command, changed);
 	}
 
 	async listJobs(scope: Scope): Promise<Job[]> {

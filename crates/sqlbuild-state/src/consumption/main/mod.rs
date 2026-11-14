@@ -4,6 +4,7 @@ pub mod consumption_history;
 pub mod executions_by_id_sql;
 pub mod prune_executions_sql;
 pub mod read_back_history;
+pub mod recent_executions;
 pub mod recent_executions_sql;
 pub mod started_append;
 pub mod succeeded_appends;

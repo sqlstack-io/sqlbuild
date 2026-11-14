@@ -68,6 +68,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     WorkerDeployment,
     WorkerExecutionTestCase,
 )
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
+    request_plan,
+)
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.docker.helpers import (
     docker_deployment,
 )
@@ -1534,12 +1537,14 @@ def run_sqb(project: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def live_plan(project: Path, selection: list[str]) -> subprocess.CompletedProcess[str]:
-    """Run `sqb plan --json` against the warehouse for node keys such as `model:orders`."""
+def live_plan(project: Path, selection: list[str], *flags: str) -> subprocess.CompletedProcess[str]:
+    """Run `sqb plan --json` with `flags` on the warehouse for node keys such as `model:orders`."""
     selected: list[str] = []
     for key in selection:
         selected.extend(("--select", key.split(":")[1]))
-    return run_sqb(project, "plan", "--target", "development", "--json", "--no-color", *selected)
+    return run_sqb(
+        project, "plan", "--target", "development", "--json", "--no-color", *flags, *selected
+    )
 
 
 def hold_write_lock(database: Path) -> duckdb.DuckDBPyConnection:
@@ -1615,3 +1620,54 @@ def create_raw_orders(warehouse: Path) -> None:
         _ = connection.execute(
             "CREATE TABLE main.raw_orders AS SELECT CAST(1 AS BIGINT) AS order_id"
         )
+
+
+def plan_from_copy(
+    tmp_path: Path, project: Path, selection: list[str], settings: dict[str, object]
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+    """Sync `project` to a location, lock its warehouse, then plan `selection` from the copy.
+
+    Returns the refused live plan run while the lock was held and the location's plan document.
+    """
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+    started: datetime = datetime.now(UTC)
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "development", 1, location, log)
+        _ = wait_for_warehouse_sync_health(
+            api,
+            {"failure": None, "tables": ["catalog", "consumption", "fingerprints", "observations"]},
+            location,
+            log,
+            after=started,
+        )
+        lock: duckdb.DuckDBPyConnection = hold_write_lock(project / "warehouse.db")
+        try:
+            refused: subprocess.CompletedProcess[str] = live_plan(project, selection)
+            request_id: str = request_plan(control, selection, settings)
+            result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
+        finally:
+            lock.close()
+    outcome: dict[str, Any] = result["result_json"]["outcome"]
+    assert outcome["kind"] == "plan", outcome
+    return refused, outcome["document"]

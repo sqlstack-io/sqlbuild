@@ -38,3 +38,5 @@ pub(crate) const DEFAULT_RUN_LOG_RETENTION_COUNT: u16 = 200;
 pub(crate) const RUN_LOG_RETENTION_BATCH: usize = 10;
 /// Artifact digests checked for remaining references per statement.
 pub(crate) const RUN_LOG_DIGEST_CHUNK: usize = 500;
+/// The UUID version of the run IDs the server derives from other IDs, which people may not supply.
+pub(crate) const DERIVED_RUN_ID_VERSION: usize = 5;

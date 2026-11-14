@@ -4,6 +4,7 @@
 	import LogTab from './log-tab.svelte';
 	import type { RunDetailState } from './state.svelte';
 	import StatementsTab from './statements-tab.svelte';
+	import CostTab from './cost-tab.svelte';
 	import type { BottomTab } from './types';
 	import { bottomTabs, logEntries } from './utils';
 
@@ -20,17 +21,17 @@
 	let printed = $state(false);
 	const logCount = $derived(shownEntries.filter((e) => printed || e.category !== 'output' || e.pinned).length);
 
-	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c)));
+	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c), !!view.cost && view.cost.status !== 'none'));
 	$effect(() => {
 		if (TABS.length && !TABS.some((t) => t.value === view.tab)) view.tab = TABS[0].value;
 	});
-	const count = (t: BottomTab) => (t === 'statements' ? statements.length : logCount);
+	const count = (t: BottomTab) => (t === 'statements' ? statements.length : t === 'cost' ? (view.cost?.resources.length ?? 0) : logCount);
 	const chipText = $derived(view.selected.length === 1 ? view.selected[0] : `${view.selected.length} nodes`);
 </script>
 
 <div class="bar">
 	{#each TABS as t (t.value)}
-		<button class:on={view.tab === t.value} onclick={() => (view.tab = t.value)} title={t.value === 'statements' ? 'SQL statements the run sent to the warehouse' : undefined}>
+		<button class:on={view.tab === t.value} onclick={() => (view.tab = t.value)} title={t.value === 'statements' ? 'SQL statements the run sent to the warehouse' : t.value === 'cost' ? 'Estimated query cost of this run, by node and warehouse' : undefined}>
 			{t.label} <span>{count(t.value)}</span>
 		</button>
 	{/each}
@@ -45,12 +46,23 @@
 <div class="body sb-scroll">
 	{#if view.tab === 'statements'}
 		<StatementsTab {statements} total={view.statements.length} {grouped} />
+	{:else if view.tab === 'cost'}
+		{#if view.cost}
+			<CostTab cost={view.cost} filteredBy={view.selected} onnode={(key) => view.focusNode(key, 'cost')} />
+		{:else if view.costRes.error}
+			<p class="err">Couldn't load this run's cost: {view.costRes.error}</p>
+		{/if}
 	{:else}
 		<LogTab entries={shownEntries} {grouped} bind:printed runId={view.run?.id ?? ''} filteredBy={view.selected} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </div>
 
 <style>
+	.err {
+		padding: 12px 16px;
+		color: var(--destructive);
+		font-size: 12.5px;
+	}
 	.bar {
 		display: flex;
 		flex: 0 0 auto;

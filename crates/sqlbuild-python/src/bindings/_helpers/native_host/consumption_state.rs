@@ -13,6 +13,7 @@ use sqlbuild_state::consumption::constants::{
 };
 use sqlbuild_state::consumption::main::executions_by_id_sql::executions_by_id_sql;
 use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
+use sqlbuild_state::consumption::main::recent_executions::recent_executions;
 use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_sql;
 use sqlbuild_state::consumption::models::{
     ConsumedInput, ConsumptionAppend, ConsumptionRow, NodeKey, RelationKey,
@@ -22,6 +23,7 @@ use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
+use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
 
@@ -351,10 +353,30 @@ fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
     })
 }
 
+/// A nullable state value as a SQL literal of `declared_type`.
+fn state_literal(
+    py: Python<'_>,
+    value: Option<Bound<'_, PyAny>>,
+    declared_type: &str,
+) -> PyResult<String> {
+    let value: Bound<'_, PyAny> = value.unwrap_or_else(|| py.None().into_bound(py));
+    render_state_sql_literal(py, &value, declared_type, None)
+}
+
 pub(crate) fn literal(py: Python<'_>, value: Option<&str>) -> PyResult<String> {
-    let value: Bound<'_, PyAny> =
-        value.map_or_else(|| py.None().into_bound(py), |value| text(py, value));
-    render_state_sql_literal(py, &value, STRING_STATE_VALUE_TYPE, None)
+    state_literal(
+        py,
+        value.map(|value| text(py, value)),
+        STRING_STATE_VALUE_TYPE,
+    )
+}
+
+pub(crate) fn integer_literal(py: Python<'_>, value: Option<i64>) -> PyResult<String> {
+    state_literal(
+        py,
+        value.map(|value| PyInt::new(py, value).into_any()),
+        INTEGER_STATE_VALUE_TYPE,
+    )
 }
 
 fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyResult<Vec<String>> {
@@ -369,12 +391,7 @@ fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyRe
         literal(py, Some(&row.relation.schema))?,
         literal(py, Some(&row.relation.name))?,
         literal(py, Some(&row.version_hash))?,
-        render_state_sql_literal(
-            py,
-            &PyInt::new(py, row.input_count).into_any(),
-            INTEGER_STATE_VALUE_TYPE,
-            None,
-        )?,
+        integer_literal(py, Some(row.input_count))?,
         literal(py, input.map(|input| input.kind.as_str()))?,
         literal(py, input.map(|input| input.name.as_str()))?,
         literal(py, input.map(|input| input.version.as_str()))?,
@@ -452,6 +469,14 @@ impl ConsumptionConnection {
         py: Python<'_>,
         location: &Location,
     ) -> PyResult<Vec<ConsumptionRow>> {
+        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
+            return Ok(recent_executions(
+                &copy
+                    .get()
+                    .consumption((location.database.as_deref(), &location.schema)),
+                RECENT_EXECUTIONS,
+            ));
+        }
         read_recent(self.adapter.bind(py), &self.connected(py)?, location)
     }
 
@@ -461,6 +486,13 @@ impl ConsumptionConnection {
         location: &Location,
         execution_ids: &[&str],
     ) -> PyResult<Vec<ConsumptionRow>> {
+        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
+            let mut rows: Vec<ConsumptionRow> = copy
+                .get()
+                .consumption((location.database.as_deref(), &location.schema));
+            rows.retain(|row| execution_ids.contains(&row.row.execution_id.as_str()));
+            return Ok(rows);
+        }
         read_executions(
             self.adapter.bind(py),
             &self.connected(py)?,

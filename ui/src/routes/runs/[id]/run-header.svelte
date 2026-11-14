@@ -7,6 +7,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { runKindLabel, runOriginLabel, runStatusTone } from '$lib/status';
 	import RerunButton from './rerun-button.svelte';
+	import { costSummary } from './utils';
 	import type { RunDetailState } from './state.svelte';
 
 	let { view, runId }: { view: RunDetailState; runId: string } = $props();
@@ -53,6 +54,11 @@
 					<span title={formatStamp(run.startedAt)}>Started {formatStamp(run.startedAt)} <span class="faint">({formatAgo(run.startedAt, app.now)})</span></span>
 					<span>·</span>
 					<span class:live={view.active}>{view.active ? 'running for ' : 'took '}{formatDuration(run.startedAt, run.endedAt, app.now)}</span>
+					{#if view.cost && view.cost.status !== 'none'}
+						{@const summary = costSummary(view.cost)}
+						<span>·</span>
+						<button class="cost-link" onclick={() => (view.tab = 'cost')} title="Estimated query cost{summary.note ? `. ${summary.note}` : ''}" data-testid="run-cost-chip">{summary.text.startsWith('Cost') ? summary.text.toLowerCase() : `est. ${summary.text}`}</button>
+					{/if}
 				{:else}
 					<span title={formatStamp(run.queuedAt)}>Queued {formatAgo(run.queuedAt, app.now)}</span>
 				{/if}
@@ -104,6 +110,11 @@
 {#if view.actionError}<div class="action-error" role="alert">{view.actionError}</div>{/if}
 
 <style>
+	.cost-link {
+		color: inherit;
+		text-decoration: underline dotted;
+		text-underline-offset: 2px;
+	}
 	.command {
 		display: flex;
 		align-items: center;

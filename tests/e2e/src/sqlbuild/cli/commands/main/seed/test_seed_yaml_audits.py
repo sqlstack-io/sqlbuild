@@ -49,7 +49,11 @@ _RELATION_AUDIT_SQL: str = "AUDIT ();\n\nSELECT *\nFROM @relation\nWHERE NOT (@e
             audit_sql=_RELATION_AUDIT_SQL,
             seed_csv="waffle_type_id,price_cents\n1,450\n2,-1\n",
             expected_exit_code=1,
-            expected_output_fragments=("expression_is_true (waffle_types)", "FAIL=1"),
+            expected_output_fragments=(
+                "expression_is_true (waffle_types)",
+                "waffle_types  (seed)",
+                "FAIL=2",
+            ),
         ),
         SeedYamlAuditE2ETestCase(
             description="model-only audit on a seed points at @relation",
