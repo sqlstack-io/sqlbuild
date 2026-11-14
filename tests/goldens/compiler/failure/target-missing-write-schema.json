@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "S103",
-     "message": "Model 'customer_totals' has no explicitly resolved physical write schema. Set schema on the resource or its defaults, selected target, loader_schema, or connection."
+     "message": "Model 'customer_totals' has no explicitly resolved physical write schema. Set schema on the resource or its defaults, the selected target or its loader_schema, or the project's only top-level [connection]."
     }
    ]
   }

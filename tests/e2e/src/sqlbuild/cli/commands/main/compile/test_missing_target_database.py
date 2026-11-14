@@ -92,9 +92,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_error=(
                 "error[S103]: Intermediate loader 'raw_orders' has no explicitly resolved "
-                "physical write schema. Set schema on the resource or its defaults, selected "
-                "target, loader_schema, or connection. The connection's schema 'raw' is not used "
-                "because the project defines named connections or targets.\n"
+                "physical write schema. Set schema on the resource or its defaults, the selected "
+                "target or its loader_schema, or the project's only top-level [connection]. The "
+                "connection's schema 'raw' is not used because the project defines named "
+                "connections or targets.\n"
                 "  = help: to set project-wide defaults, set this in sqlbuild_project.toml:\n"
                 "            [defaults]\n"
                 '            schema = "raw"\n'
@@ -121,9 +122,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_error=(
                 "error[S103]: Intermediate loader 'raw_orders' has no explicitly resolved "
-                "physical write schema. Set schema on the resource or its defaults, selected "
-                "target, loader_schema, or connection. The connection's schema 'raw' is not used "
-                "because the project defines named connections or targets.\n"
+                "physical write schema. Set schema on the resource or its defaults, the selected "
+                "target or its loader_schema, or the project's only top-level [connection]. The "
+                "connection's schema 'raw' is not used because the project defines named "
+                "connections or targets.\n"
                 "  = help: to set project-wide defaults, set this in sqlbuild_project.toml:\n"
                 "            [defaults]\n"
                 '            schema = "raw"\n'
