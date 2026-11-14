@@ -2,12 +2,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::cpython_tree::main::parse_cpython_module::parse_cpython_module;
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
-use crate::cpython_tree::models::{CpythonNode, ParsedSource};
+use crate::cpython_tree::models::{CpythonNode, ParsedSource, SourceLines};
 use crate::orchestration_modules::_helpers::calls::{
     authoring_call, imported_names, literal, literal_strings, module_names, position,
 };
@@ -51,48 +51,15 @@ pub fn orchestration_module_declarations(
             .arguments
             .find_argument_value(NAME_KEYWORD, 0)
             .map(|value| literal(value, &parsed.lines));
-        let mut job_references: Vec<(&'static str, LiteralArgument)> = Vec::new();
-        let mut selections: Vec<LiteralArgument> = Vec::new();
         let targets: Option<Vec<String>> = match call.arguments.find_keyword(TARGETS_KEYWORD) {
             Some(targets) => literal_strings(&targets.value),
             None => Some(Vec::new()),
         };
-        if kind == PythonDeclarationKind::Sensor {
-            if let Some(run) = call.arguments.find_keyword(RUN_KEYWORD) {
-                job_references.push((RUN_KEYWORD, literal(&run.value, &parsed.lines)));
-            }
-            let conditions: Vec<CpythonNode<'_>> = call
-                .arguments
-                .keywords
-                .iter()
-                .filter(|keyword| {
-                    keyword
-                        .arg
-                        .as_ref()
-                        .is_some_and(|arg| arg.as_str() != RUN_KEYWORD)
-                })
-                .map(|keyword| CpythonNode::Expr(&keyword.value))
-                .collect();
-            for inner in walk_breadth_first(conditions) {
-                let CpythonNode::Expr(Expr::Call(inner)) = inner else {
-                    continue;
-                };
-                match authoring_call(inner, (&imported, &modules)) {
-                    Some(RUN_EVENT_CALL) => {
-                        if let Some(job) = inner.arguments.find_keyword(JOB_KEYWORD) {
-                            job_references
-                                .push((RUN_EVENT_CALL, literal(&job.value, &parsed.lines)));
-                        }
-                    }
-                    Some(call) if SELECTING_CONDITION_CALLS.contains(&call) => {
-                        if let Some(select) = inner.arguments.find_keyword(SELECT_KEYWORD) {
-                            selections.push(literal(&select.value, &parsed.lines));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let (job_references, selections) = if kind == PythonDeclarationKind::Sensor {
+            sensor_references(call, (&imported, &modules), &parsed.lines)
+        } else {
+            (Vec::new(), Vec::new())
+        };
         declarations.push(PythonDeclaration {
             kind,
             name,
@@ -108,4 +75,48 @@ pub fn orchestration_module_declarations(
         declarations,
         removed_imports,
     })
+}
+
+/// The sensor's `run` job, the jobs its run events name, and the `select` of each condition that selects nodes.
+fn sensor_references(
+    call: &ExprCall,
+    scope: (&BTreeMap<&str, &str>, &BTreeSet<String>),
+    lines: &SourceLines,
+) -> (Vec<(&'static str, LiteralArgument)>, Vec<LiteralArgument>) {
+    let mut job_references: Vec<(&'static str, LiteralArgument)> = Vec::new();
+    let mut selections: Vec<LiteralArgument> = Vec::new();
+    if let Some(run) = call.arguments.find_keyword(RUN_KEYWORD) {
+        job_references.push((RUN_KEYWORD, literal(&run.value, lines)));
+    }
+    let conditions: Vec<CpythonNode<'_>> = call
+        .arguments
+        .keywords
+        .iter()
+        .filter(|keyword| {
+            keyword
+                .arg
+                .as_ref()
+                .is_some_and(|arg| arg.as_str() != RUN_KEYWORD)
+        })
+        .map(|keyword| CpythonNode::Expr(&keyword.value))
+        .collect();
+    for inner in walk_breadth_first(conditions) {
+        let CpythonNode::Expr(Expr::Call(inner)) = inner else {
+            continue;
+        };
+        match authoring_call(inner, scope) {
+            Some(RUN_EVENT_CALL) => {
+                if let Some(job) = inner.arguments.find_keyword(JOB_KEYWORD) {
+                    job_references.push((RUN_EVENT_CALL, literal(&job.value, lines)));
+                }
+            }
+            Some(name) if SELECTING_CONDITION_CALLS.contains(&name) => {
+                if let Some(select) = inner.arguments.find_keyword(SELECT_KEYWORD) {
+                    selections.push(literal(&select.value, lines));
+                }
+            }
+            _ => {}
+        }
+    }
+    (job_references, selections)
 }
