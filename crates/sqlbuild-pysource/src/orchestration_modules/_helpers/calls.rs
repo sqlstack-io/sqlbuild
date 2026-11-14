@@ -8,12 +8,19 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::cpython_tree::main::source_position::source_position;
 use crate::cpython_tree::models::SourceLines;
 use crate::orchestration_modules::constants::{
-    CALENDAR_CALL, ORCHESTRATION_MODULE, RUN_EVENT_CALL, SENSOR_CALL,
+    CALENDAR_CALL, ORCHESTRATION_MODULE, RUN_EVENT_CALL, SELECTING_CONDITION_CALLS, SENSOR_CALL,
 };
 use crate::orchestration_modules::models::{LiteralArgument, SourcePosition};
 
-/// The calls a module's `calendar`, `sensor` and `run_event` names can make.
-const AUTHORING_CALLS: [&str; 3] = [CALENDAR_CALL, SENSOR_CALL, RUN_EVENT_CALL];
+/// The calls a module's `calendar`, `sensor`, `run_event` and selecting condition names can make.
+const AUTHORING_CALLS: [&str; 6] = [
+    CALENDAR_CALL,
+    SENSOR_CALL,
+    RUN_EVENT_CALL,
+    SELECTING_CONDITION_CALLS[0],
+    SELECTING_CONDITION_CALLS[1],
+    SELECTING_CONDITION_CALLS[2],
+];
 
 /// The 1-based line and column of `offset`.
 pub(crate) fn position(lines: &SourceLines, offset: TextSize) -> SourcePosition {

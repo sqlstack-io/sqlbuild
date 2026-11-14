@@ -107,6 +107,8 @@ pub struct NamedModule {
     pub job_references: Vec<(&'static str, Positioned<String>)>,
     /// A sensor's targets: empty for every target, `None` when they are not written as literals.
     pub targets: Option<Vec<String>>,
+    /// Each condition's `select`, with `None` for one not written as a string literal.
+    pub selections: Vec<Positioned<Option<String>>>,
 }
 
 /// The calendars, sensors and every module below their folders.

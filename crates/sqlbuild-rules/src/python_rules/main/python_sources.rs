@@ -5,18 +5,11 @@ use std::path::Path;
 use sqlbuild_discovery::python_paths::main::supported_python_paths::supported_python_paths;
 
 use crate::models::{EvaluateRequest, PythonSource};
-use crate::rules::main::assemble_catalogue::assemble_catalogue;
-use crate::rules::main::select::select;
+use crate::rules::main::request_selects::request_selects;
 
 /// Every supported project Python file when the request selects a Python rule, otherwise none.
 pub(crate) fn python_sources(request: &EvaluateRequest) -> Result<Vec<PythonSource>, String> {
-    let catalogue = assemble_catalogue(&request.custom_rules)?;
-    let selected = select(
-        &catalogue,
-        request.config.select.as_deref(),
-        &request.config.ignore,
-    )?;
-    if !selected.iter().any(|rule| rule.scope.evaluates_python()) {
+    if !request_selects(request, |rule| rule.scope.evaluates_python())? {
         return Ok(Vec::new());
     }
     let project_dir: &Path = Path::new(&request.project_dir);

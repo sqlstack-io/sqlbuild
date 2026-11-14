@@ -32,6 +32,8 @@ pub struct PythonDeclaration {
     pub job_references: Vec<(&'static str, LiteralArgument)>,
     /// A sensor's `targets`: empty when omitted, `None` when not a literal tuple or list of strings.
     pub targets: Option<Vec<String>>,
+    /// The `select=` of each `node_event`, `source_new_data` and `source_stale` condition of a sensor.
+    pub selections: Vec<LiteralArgument>,
 }
 
 /// The orchestration facts of one module.

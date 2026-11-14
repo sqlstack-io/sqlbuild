@@ -1,5 +1,7 @@
 use crate::orchestration_modules::main::orchestration_module_declarations::orchestration_module_declarations;
-use crate::orchestration_modules::models::{ModuleDeclarations, PythonDeclarationKind};
+use crate::orchestration_modules::models::{
+    ModuleDeclarations, PythonDeclaration, PythonDeclarationKind,
+};
 use crate::orchestration_modules::tests::helpers::{at, declaration, non_literal, text};
 use crate::orchestration_modules::tests::test_types::ScanTestCase;
 
@@ -32,6 +34,33 @@ fn given_orchestration_modules_when_scanning_then_reads_declarations_and_removed
                         ("run_event", text("orders_job", 6, 22)),
                     ],
                 )],
+                removed_imports: Vec::new(),
+            }),
+        },
+        ScanTestCase {
+            description: "each selecting condition keeps its selection, literal or not, under any import name",
+            contents: "from sqlbuild.orchestration import node_event, sensor, source_new_data as fresh\nSELECTION = \"source:raw_orders\"\na = sensor(\"a_sensor\", description=\"d\", when=node_event(select=\"fct_orders fct_refunds\", kinds=[]), run=\"a_job\")\nb = sensor(\"b_sensor\", description=\"d\", when=fresh(select=SELECTION), run=\"b_job\")\n",
+            expected_module: Some(ModuleDeclarations {
+                declarations: vec![
+                    PythonDeclaration {
+                        selections: vec![text("fct_orders fct_refunds", 3, 64)],
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("a_sensor", 3, 12),
+                            at(3, 5),
+                            vec![("run", text("a_job", 3, 105))],
+                        )
+                    },
+                    PythonDeclaration {
+                        selections: vec![non_literal(4, 59)],
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("b_sensor", 4, 12),
+                            at(4, 5),
+                            vec![("run", text("b_job", 4, 75))],
+                        )
+                    },
+                ],
                 removed_imports: Vec::new(),
             }),
         },

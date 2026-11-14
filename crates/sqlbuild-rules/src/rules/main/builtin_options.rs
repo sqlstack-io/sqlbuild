@@ -67,6 +67,14 @@ pub fn builtin_options(code: &str) -> Vec<BuiltinOption> {
                               whose file path matches a glob.",
             },
         ],
+        "SQBRORCHESTRATION101" => vec![BuiltinOption {
+            kind: BuiltinOptionKind::Integer {
+                default: 3,
+                minimum: 0,
+            },
+            name: "max_named_selectors",
+            description: "Most nodes one job or sensor-condition selection may name one by one.",
+        }],
         "SQBRTEST203" => vec![BuiltinOption {
             kind: BuiltinOptionKind::StringList(&[]),
             name: "allowed_tests",

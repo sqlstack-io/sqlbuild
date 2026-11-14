@@ -6,6 +6,11 @@ pub(crate) const CALENDAR_CALL: &str = "calendar";
 pub(crate) const SENSOR_CALL: &str = "sensor";
 /// The sensor condition that names the job whose runs it watches.
 pub(crate) const RUN_EVENT_CALL: &str = "run_event";
+/// Sensor conditions that select the nodes or sources they watch.
+pub(crate) const SELECTING_CONDITION_CALLS: [&str; 3] =
+    ["node_event", "source_new_data", "source_stale"];
+/// The keyword a selecting condition takes its selection in.
+pub(crate) const SELECT_KEYWORD: &str = "select";
 /// The keyword naming a declaration.
 pub(crate) const NAME_KEYWORD: &str = "name";
 /// The sensor keyword naming the job it starts.

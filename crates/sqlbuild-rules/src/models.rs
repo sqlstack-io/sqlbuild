@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlbuild_analysis::sql_macros::models::TypedCall;
 
 use crate::errors::RowsError;
+use crate::orchestration_rules::models::OrchestrationFacts;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -772,6 +773,8 @@ pub struct EvaluateRequest {
     pub python_version: (u8, u8),
     /// The supported project Python files, filled from disk only when a Python rule is selected.
     pub python_sources: Vec<PythonSource>,
+    /// The job and sensor selections, filled from disk only when an orchestration rule is selected.
+    pub orchestration: OrchestrationFacts,
 }
 
 /// One project Python file, keyed in the request by the digest of its bytes.
@@ -822,6 +825,7 @@ impl Default for EvaluateRequest {
             rules_cache_path: String::new(),
             python_version: (3, 12),
             python_sources: vec![],
+            orchestration: OrchestrationFacts::default(),
         }
     }
 }

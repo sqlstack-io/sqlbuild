@@ -148,5 +148,13 @@ pub(crate) fn module_declaration(
         position: name.position,
         job_references,
         targets: declaration.targets,
+        selections: declaration
+            .selections
+            .into_iter()
+            .map(|selection| Positioned {
+                value: selection.value,
+                position: file_position(selection.position),
+            })
+            .collect(),
     }))
 }

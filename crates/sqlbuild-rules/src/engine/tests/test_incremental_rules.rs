@@ -35,6 +35,7 @@ const REVIEWED_SCOPES: &[(&str, RuleScope)] = &[
     ("SQBRMODEL102", RuleScope::Model),
     ("SQBRMODEL103", RuleScope::Model),
     ("SQBRMODEL104", RuleScope::Model),
+    ("SQBRORCHESTRATION101", RuleScope::Project),
     ("SQBRPROJECT101", RuleScope::Model),
     ("SQBRPROJECT102", RuleScope::Model),
     ("SQBRPROJECT103", RuleScope::Model),

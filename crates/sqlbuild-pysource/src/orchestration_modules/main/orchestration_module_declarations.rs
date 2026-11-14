@@ -13,7 +13,7 @@ use crate::orchestration_modules::_helpers::calls::{
 };
 use crate::orchestration_modules::constants::{
     CALENDAR_CALL, JOB_KEYWORD, NAME_KEYWORD, REMOVED_NAMES, RUN_EVENT_CALL, RUN_KEYWORD,
-    SENSOR_CALL, TARGETS_KEYWORD,
+    SELECT_KEYWORD, SELECTING_CONDITION_CALLS, SENSOR_CALL, TARGETS_KEYWORD,
 };
 use crate::orchestration_modules::models::{
     LiteralArgument, ModuleDeclarations, PythonDeclaration, PythonDeclarationKind, SourcePosition,
@@ -52,6 +52,7 @@ pub fn orchestration_module_declarations(
             .find_argument_value(NAME_KEYWORD, 0)
             .map(|value| literal(value, &parsed.lines));
         let mut job_references: Vec<(&'static str, LiteralArgument)> = Vec::new();
+        let mut selections: Vec<LiteralArgument> = Vec::new();
         let targets: Option<Vec<String>> = match call.arguments.find_keyword(TARGETS_KEYWORD) {
             Some(targets) => literal_strings(&targets.value),
             None => Some(Vec::new()),
@@ -76,11 +77,19 @@ pub fn orchestration_module_declarations(
                 let CpythonNode::Expr(Expr::Call(inner)) = inner else {
                     continue;
                 };
-                if authoring_call(inner, (&imported, &modules)) != Some(RUN_EVENT_CALL) {
-                    continue;
-                }
-                if let Some(job) = inner.arguments.find_keyword(JOB_KEYWORD) {
-                    job_references.push((RUN_EVENT_CALL, literal(&job.value, &parsed.lines)));
+                match authoring_call(inner, (&imported, &modules)) {
+                    Some(RUN_EVENT_CALL) => {
+                        if let Some(job) = inner.arguments.find_keyword(JOB_KEYWORD) {
+                            job_references
+                                .push((RUN_EVENT_CALL, literal(&job.value, &parsed.lines)));
+                        }
+                    }
+                    Some(call) if SELECTING_CONDITION_CALLS.contains(&call) => {
+                        if let Some(select) = inner.arguments.find_keyword(SELECT_KEYWORD) {
+                            selections.push(literal(&select.value, &parsed.lines));
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -90,6 +99,7 @@ pub fn orchestration_module_declarations(
             position: position(&parsed.lines, call.range().start()),
             job_references,
             targets,
+            selections,
         });
     }
     declarations

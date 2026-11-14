@@ -7,6 +7,7 @@ pub mod edge_keys;
 pub mod graph_from_indexes;
 pub mod match_selector;
 pub mod model_layer_count;
+pub mod named_selector_atoms;
 pub mod parse_selector;
 pub mod reachable_graph_keys;
 pub mod reachable_keys;
