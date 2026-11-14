@@ -157,12 +157,18 @@ fn validate_named_target_schema_strategy<'py>(
         py,
         "validate_named_target_schema_strategy",
         options,
-        (&["discovered_inputs", "adapter", "selected_target"], &[]),
+        (
+            &["discovered_inputs", "adapter", "selected_target"],
+            &["cli_vars"],
+        ),
     )?;
     named_target_schema_strategy(
         &arguments.value("discovered_inputs")?,
         &arguments.value("adapter")?,
-        &arguments.value("selected_target")?,
+        (
+            &arguments.value("selected_target")?,
+            &arguments.value("cli_vars")?,
+        ),
     )
 }
 
@@ -170,7 +176,7 @@ fn validate_named_target_schema_strategy<'py>(
 pub(crate) fn named_target_schema_strategy(
     discovered: &Bound<'_, PyAny>,
     adapter: &Bound<'_, PyAny>,
-    selected_target: &Bound<'_, PyAny>,
+    (selected_target, cli_vars): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
 ) -> PyResult<()> {
     let py: Python<'_> = discovered.py();
     if native_field(adapter, "allows_implicit_managed_write_schema")?.is_truthy()? {
@@ -197,8 +203,12 @@ pub(crate) fn named_target_schema_strategy(
     }
     let name: String = target_name.str()?.to_cow()?.into_owned();
     let mut message: String = target_error_message(&TargetError::NamedTargetSchema(name.clone()));
-    let connection: Bound<'_, PyAny> =
-        build_effective_connection_config(discovered, Some(target_name), None, false)?;
+    let connection: Bound<'_, PyAny> = build_effective_connection_config(
+        discovered,
+        Some(target_name),
+        Some(cli_vars.clone()).filter(|value| !value.is_none()),
+        false,
+    )?;
     let help: Option<String> = match text_or_none(&mapping_get(&connection, "schema")?)? {
         Some(value) => {
             message.push_str(&ignored_connection_note("schema", &value));
