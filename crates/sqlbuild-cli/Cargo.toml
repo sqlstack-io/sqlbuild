@@ -1,6 +1,6 @@
 [package]
 name = "sqlbuild-cli"
-version = "0.225.0"
+version = "0.226.0"
 description = "The native `sqb` executable: reused compiles and Python-free commands served without Python, every other command handed to the Python CLI."
 edition.workspace = true
 license-file = "LICENSE"

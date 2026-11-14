@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.226.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.225.0...v0.226.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* order job groups by lineage only, limit Python descriptions, skip checks under --no-audits ([#1476](https://github.com/sqlstack-io/sqlbuild/issues/1476))
+* atomic keyed writes, indexed control store and matching loader locations ([#1478](https://github.com/sqlstack-io/sqlbuild/issues/1478))
+
+### Features
+
+* order job groups by lineage only, limit Python descriptions, skip checks under --no-audits ([#1476](https://github.com/sqlstack-io/sqlbuild/issues/1476)) ([4e32d70](https://github.com/sqlstack-io/sqlbuild/commit/4e32d704a58bb75634e3a86dab1295693947131f))
+
+
+### Bug Fixes
+
+* atomic keyed writes, indexed control store and matching loader locations ([#1478](https://github.com/sqlstack-io/sqlbuild/issues/1478)) ([53d8395](https://github.com/sqlstack-io/sqlbuild/commit/53d8395d1ceb5854c34528541f144b0dde18a5d1))
+
 ## [0.225.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.224.0...v0.225.0) (2026-11-14)
 
 
