@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.223.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.222.0...v0.223.0) (2026-11-14)
+
+
+### Features
+
+* **server:** estimated Snowflake query cost per run, node and warehouse ([#1461](https://github.com/sqlstack-io/sqlbuild/issues/1461)) ([16e22dc](https://github.com/sqlstack-io/sqlbuild/commit/16e22dce3ac653bf176257103231b569382f0d78))
+* **ui:** build what changed from Overview and Lineage, and show held-back nodes in the plan ([#1464](https://github.com/sqlstack-io/sqlbuild/issues/1464)) ([1ff49a0](https://github.com/sqlstack-io/sqlbuild/commit/1ff49a07f459905c4e68c58ba00479409e833e1c))
+
+
+### Bug Fixes
+
+* refuse name-based run IDs and fail seeds whose audits fail ([#1469](https://github.com/sqlstack-io/sqlbuild/issues/1469)) ([f83b16c](https://github.com/sqlstack-io/sqlbuild/commit/f83b16c9b858cba856cdcc82c8b82fb45d809554))
+* **server:** preview plan --changed from the synced consumption copy ([#1467](https://github.com/sqlstack-io/sqlbuild/issues/1467)) ([d9c6858](https://github.com/sqlstack-io/sqlbuild/commit/d9c6858559420239cdf4ea37498908532b83c119))
+* **worker:** record a model blocked by a failing unit test as failed, and name the failed node on downstream skips ([#1466](https://github.com/sqlstack-io/sqlbuild/issues/1466)) ([d17daef](https://github.com/sqlstack-io/sqlbuild/commit/d17daef8af39d0fb10f56124271515a2bd6b301c))
+
 ## [0.222.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.221.0...v0.222.0) (2026-11-13)
 
 
