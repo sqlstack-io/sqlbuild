@@ -1,4 +1,4 @@
-//! Freeze job boundaries from snapshot lineage plus explicit waits, rejecting cycles.
+//! Freeze job boundaries from snapshot lineage, rejecting cycles.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,19 +10,12 @@ use crate::store::errors::ControlError;
 pub fn group_dependencies(
     (group, input): (&str, &SnapshotInput),
     jobs: &BTreeMap<String, JobDefinition>,
-    (members, after): (&BTreeSet<String>, &BTreeMap<String, BTreeSet<String>>),
+    members: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, BTreeSet<String>>, ControlError> {
-    if members.is_empty()
-        || members.iter().any(|name| !jobs.contains_key(name))
-        || after
-            .iter()
-            .any(|(name, dependencies)| !members.contains(name) || !dependencies.is_subset(members))
-    {
-        return Err(ControlError::Invalid(
-            "group needs known jobs and dependencies within its membership".into(),
-        ));
+    if members.is_empty() || members.iter().any(|name| !jobs.contains_key(name)) {
+        return Err(ControlError::Invalid("group needs known jobs".into()));
     }
-    let waits = lineage_dependencies(input, jobs, (members, after));
+    let waits = lineage_dependencies(input, jobs, members);
     ensure_acyclic(group, &waits.edges, &waits.reasons)?;
     Ok(waits.edges)
 }
@@ -31,7 +24,7 @@ pub fn group_dependencies(
 fn lineage_dependencies(
     input: &SnapshotInput,
     jobs: &BTreeMap<String, JobDefinition>,
-    (members, after): (&BTreeSet<String>, &BTreeMap<String, BTreeSet<String>>),
+    members: &BTreeSet<String>,
 ) -> GroupWaits {
     let mut owners: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for name in members {
@@ -42,12 +35,7 @@ fn lineage_dependencies(
     let mut edges: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut reasons: BTreeMap<(String, String), String> = BTreeMap::new();
     for name in members {
-        let mut dependencies = after.get(name).cloned().unwrap_or_default();
-        for dependency in &dependencies {
-            reasons = record_wait(reasons, (name, dependency), || {
-                "declared in after".to_owned()
-            });
-        }
+        let mut dependencies: BTreeSet<String> = BTreeSet::new();
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         let mut pending: Vec<&str> = jobs[name].selection.iter().map(String::as_str).collect();
         while let Some(key) = pending.pop() {

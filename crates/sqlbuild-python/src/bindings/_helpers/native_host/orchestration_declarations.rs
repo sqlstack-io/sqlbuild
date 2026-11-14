@@ -49,7 +49,6 @@ pub(crate) struct AuthoredGroup {
     pub(crate) name: String,
     pub(crate) description: String,
     pub(crate) jobs: Vec<AuthoredJobReference>,
-    pub(crate) after: BTreeMap<AuthoredJobReference, Vec<AuthoredJobReference>>,
     pub(crate) concurrency_groups: Vec<String>,
     pub(crate) schedule: Option<Py<PyAny>>,
     pub(crate) targets: Vec<String>,
@@ -327,20 +326,6 @@ pub(crate) fn collect_declarations<'py>(
                     return Err(PyTypeError::new_err("group members must be Job objects"));
                 }
                 pending.push(member);
-            }
-            for (member, dependencies) in declaration.getattr("after")?.cast::<PyDict>()?.iter() {
-                if !member.is_instance(&job)? {
-                    return Err(PyTypeError::new_err(
-                        "group dependencies must be Job objects",
-                    ));
-                }
-                for dependency in dependencies.try_iter()? {
-                    if !dependency?.is_instance(&job)? {
-                        return Err(PyTypeError::new_err(
-                            "group dependencies must be Job objects",
-                        ));
-                    }
-                }
             }
             AuthoredDeclaration::Group(declaration.extract()?)
         } else if !declaration.is_instance(&job)? {

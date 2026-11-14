@@ -201,7 +201,7 @@ pub struct JobDetailRecord {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct JobMember {
     pub job_key: String,
-    /// Members this one waits for, from lineage and from the group's `after`.
+    /// Members this one waits for, from the lineage between their nodes.
     pub waits_for: BTreeSet<String>,
 }
 
@@ -288,7 +288,7 @@ pub(crate) struct PreviousTriggerState {
     pub(crate) status_override: Option<TriggerStatus>,
 }
 
-/// Each member job's waits, and why it waits: an explicit `after`, or the first lineage edge found.
+/// Each member job's waits, and why it waits: the first lineage edge found.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct GroupWaits {
     pub(crate) edges: BTreeMap<String, BTreeSet<String>>,

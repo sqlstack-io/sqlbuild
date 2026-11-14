@@ -668,7 +668,10 @@ pub(crate) fn run_post_build_python_checks<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = context.py();
     let result = &outcome.result;
-    if result.status != BuildStatus::Success {
+    // `--no-audits` skips Python checks alongside audits.
+    if result.status != BuildStatus::Success
+        || !native_field(&context.request, "run_audits")?.extract::<bool>()?
+    {
         return tuple(py, &[]);
     }
     let discovered: Bound<'py, PyAny> = context.get("discovered_inputs")?;

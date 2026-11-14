@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import InitVar, dataclass, field, replace
 from datetime import datetime
 from typing import Literal
 
@@ -53,12 +53,12 @@ class Job:
 
 @dataclass(frozen=True, eq=False)
 class JobGroup:
-    """Jobs ordered by compiled lineage and optional explicit dependencies."""
+    """Jobs ordered by the lineage between the nodes they build."""
 
     name: str
     description: str = field(kw_only=True)
     jobs: Sequence[Job] = field(kw_only=True)
-    after: dict[Job, Sequence[Job]] = field(default_factory=dict, kw_only=True)
+    after: InitVar[object] = field(default=None, kw_only=True)
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
@@ -67,7 +67,13 @@ class JobGroup:
     on_failure: OnFailure | None = field(default=None, kw_only=True)
     _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, after: object) -> None:
+        if after is not None:
+            raise ValueError(
+                f"job group '{self.name}' declares after, which is no longer supported: groups "
+                "order jobs only by lineage. Declare the dependency on the nodes instead, for "
+                "example depends_on on the task that must wait."
+            )
         object.__setattr__(self, "_declared_at", declaration_site())
 
 

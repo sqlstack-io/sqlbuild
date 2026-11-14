@@ -6,7 +6,7 @@ import { boxId, jobGraph, layoutJobGraph } from './job-graph';
 const node = (key: string, upstream: string[] = []) => ({ key, kind: 'table', upstream, tags: [], stale: null, checks: null }) as unknown as CatalogNode;
 const measured = (nodes: Node[]) => nodes.map((n) => (n.type === 'job' ? n : { ...n, measured: { width: 236, height: 61 } }));
 
-// staging builds raw → stg; orders reads stg; reports waits for orders only through `after`.
+// staging builds raw → stg; orders reads stg; reports waits for orders through lineage outside the graph.
 const catalog = [node('model:raw'), node('model:stg', ['model:raw']), node('model:orders', ['model:stg']), node('model:report')];
 const all = catalog.map((n) => n.key);
 const boxes = [
@@ -17,11 +17,11 @@ const boxes = [
 const members = [
 	{ jobKey: 'staging', upstream: [], stage: 0 },
 	{ jobKey: 'orders', upstream: [{ jobKey: 'staging', source: 'lineage' as const }], stage: 1 },
-	{ jobKey: 'reports', upstream: [{ jobKey: 'orders', source: 'after' as const }, { jobKey: 'staging', source: 'lineage' as const }], stage: 2 }
+	{ jobKey: 'reports', upstream: [{ jobKey: 'orders', source: null }, { jobKey: 'staging', source: 'lineage' as const }], stage: 2 }
 ];
 
 describe('job graph', () => {
-	it('puts each node in the first box that builds it and draws `after` only where no lineage links two boxes', () => {
+	it('puts each node in the first box that builds it and draws a wait edge only where no drawn lineage links two boxes', () => {
 		const { nodes, edges } = jobGraph(all, catalog, boxes, members);
 		const parent = Object.fromEntries(nodes.filter((n) => n.type === 'asset').map((n) => [n.id, n.parentId]));
 		expect(parent).toEqual({ 'model:raw': boxId('staging'), 'model:stg': boxId('staging'), 'model:orders': boxId('orders'), 'model:report': boxId('reports') });
@@ -64,7 +64,7 @@ describe('job graph', () => {
 		expect(nodes.filter((n) => n.type === 'asset').map((n) => n.id).sort()).toEqual(['model:orders', 'model:report']);
 		expect(nodes.find((n) => n.id === boxId('staging'))!.data.collapsed).toBe(true);
 		// raw → stg sits inside the box and disappears; stg → orders now leaves the box. Staging and
-		// reports still have no lineage between them, so their `after` edge stays.
+		// reports still have no lineage between them, so their wait edge stays.
 		expect(edges.map((e) => `${e.source}>${e.target}`).sort()).toEqual(
 			[`${boxId('staging')}>model:orders`, `${boxId('orders')}>${boxId('reports')}`, `${boxId('staging')}>${boxId('reports')}`].sort()
 		);
@@ -106,8 +106,8 @@ describe('job graph', () => {
 			{ jobKey: 'b', nodes: wide.slice(30).map((n) => n.key) },
 			{ jobKey: 'empty', nodes: [] }
 		];
-		const after = (jobKey: string) => ({ jobKey, upstream: [{ jobKey: 'a', source: 'after' as const }], stage: 1 });
-		const { nodes, edges } = jobGraph(wide.map((n) => n.key), wide, groupBoxes, [{ jobKey: 'a', upstream: [], stage: 0 }, after('b'), after('empty')]);
+		const waiting = (jobKey: string) => ({ jobKey, upstream: [{ jobKey: 'a', source: null }], stage: 1 });
+		const { nodes, edges } = jobGraph(wide.map((n) => n.key), wide, groupBoxes, [{ jobKey: 'a', upstream: [], stage: 0 }, waiting('b'), waiting('empty')]);
 		const laid = layoutJobGraph(measured(nodes), edges);
 		const box = (k: string) => laid.find((n) => n.id === boxId(k))!;
 		expect(box('a').height).toBeLessThan(15 * (61 + 24) + 60);

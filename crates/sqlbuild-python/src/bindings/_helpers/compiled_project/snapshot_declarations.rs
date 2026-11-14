@@ -162,17 +162,7 @@ pub(crate) fn compile_declarations(
         if members.len() != group.jobs.len() {
             return Err(PyValueError::new_err("group members must be distinct"));
         }
-        let mut after: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        for (job, dependencies) in group.after {
-            after.insert(
-                job.name,
-                dependencies
-                    .into_iter()
-                    .map(|dependency| dependency.name)
-                    .collect(),
-            );
-        }
-        let dependencies = group_dependencies((&group.name, &input), &jobs, (&members, &after))
+        let dependencies = group_dependencies((&group.name, &input), &jobs, &members)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         let selection: BTreeSet<String> = members
             .iter()

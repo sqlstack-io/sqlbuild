@@ -318,6 +318,18 @@ def prepare_build_test_audit_flag_project(*, tmp_path: Path, project_name: str) 
                 """
             ).strip()
             + "\n",
+            "python/checks/orders.py": dedent(
+                """
+                from sqlbuild.checks import check
+                from sqlbuild.refs import model
+
+
+                @check(depends_on=model("orders"))
+                def check_orders_exist(ctx):
+                    '''Test check check_orders_exist.'''
+                    return ctx.pass_()
+                """
+            ).lstrip(),
         },
     )
 
