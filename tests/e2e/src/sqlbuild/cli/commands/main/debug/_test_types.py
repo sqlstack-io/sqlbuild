@@ -9,6 +9,7 @@ class DebugCliTestCase:
     command: tuple[str, ...]
     expected_stdout_fragment: str
     expected_returncode: int = 0
+    project_toml: str = ""
 
 
 @dataclass(frozen=True)
