@@ -2,7 +2,9 @@
 
 use uuid::Uuid;
 
-use crate::store::_helpers::migration::{SCHEMA, render, schema_digest, verify_schema};
+use crate::store::_helpers::migration::{
+    INDEXES, SCHEMA, render, schema_digest, statements, verify_schema,
+};
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -10,7 +12,7 @@ use crate::store::main::commit::commit;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
-/// Create the schema once, or reject a schema this server did not create.
+/// Create or verify the schema, then add any missing additive indexes.
 pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
     let mut transaction = begin(store, TransactionMode::Write).await?;
     (transaction, _) = query(transaction, &render(store,
@@ -28,11 +30,7 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
         for statement in recall_schema(store) {
             (transaction, _) = query(transaction, &statement, vec![]).await?;
         }
-        for statement in SCHEMA
-            .split(';')
-            .map(str::trim)
-            .filter(|statement| !statement.is_empty())
-        {
+        for statement in statements(SCHEMA) {
             (transaction, _) = query(transaction, &render(store, statement), vec![]).await?;
         }
         let now = transaction.now;
@@ -45,6 +43,9 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
             vec![Parameter::Text(digest), Parameter::Time(now)],
         )
         .await?;
+    }
+    for statement in statements(INDEXES) {
+        (transaction, _) = query(transaction, statement, vec![]).await?;
     }
     commit(transaction).await
 }

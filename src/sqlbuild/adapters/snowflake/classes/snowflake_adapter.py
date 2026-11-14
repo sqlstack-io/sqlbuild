@@ -1565,8 +1565,7 @@ class SnowflakeAdapter(
             destination=destination, sql=sql, unique_key=keys, columns=columns
         )
         statement_recorder.record_many(statements)
-        with self.transaction(connection):
-            return self._inserted_rows(connection=connection, statements=statements)
+        return self._replace_staged(connection=connection, statements=statements)
 
     def delete_insert_cursor(
         self,
@@ -1582,8 +1581,6 @@ class SnowflakeAdapter(
         cursor_type: str | None = None,
         unique_key: tuple[str, ...] = (),
     ) -> int | None:
-        """Replace a cursor window; staging DDL runs outside the transaction, which DDL commits."""
-
         statements: tuple[str, ...] = self.render_delete_insert_cursor(
             destination=destination,
             sql=sql,
@@ -1595,6 +1592,11 @@ class SnowflakeAdapter(
             unique_key=unique_key,
         )
         statement_recorder.record_many(statements)
+        return self._replace_staged(connection=connection, statements=statements)
+
+    def _replace_staged(self, *, connection: Any, statements: tuple[str, ...]) -> int | None:
+        """Run deletes and inserts in one transaction; staging DDL, which commits, runs outside."""
+
         staged: tuple[str, ...] = tuple(s for s in statements if s.startswith("CREATE "))
         dropped: tuple[str, ...] = tuple(s for s in statements if s.startswith("DROP "))
         for statement in staged:

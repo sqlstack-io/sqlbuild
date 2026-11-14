@@ -134,6 +134,7 @@ from sqlbuild.adapters.databricks.constants import (
     DELTA_RELATION_FORMAT,
     DESCRIBE_DETAIL_ROW_WIDTH,
     DETAILED_TABLE_INFORMATION_MARKER,
+    MERGE_OPERATION_COLUMN,
     NON_ROW_RESULT_COLUMN_NAMES,
     RELATION_NOT_FOUND_ERROR_CLASSES,
     SERVER_OPERATION_ERROR_CLASS_NAME,
@@ -1775,6 +1776,12 @@ class DatabricksAdapter(
         unique_key: tuple[str, ...],
         columns: tuple[str, ...] | None = None,
     ) -> tuple[str, ...]:
+        if columns is not None:
+            return (
+                self._render_keyed_replace_merge(
+                    destination=destination, sql=sql, unique_key=unique_key, columns=columns
+                ),
+            )
         key_condition: str = " AND ".join(
             f"{destination}.{self.render_identifier(key)} = __source.{self.render_identifier(key)}"
             for key in unique_key
@@ -1825,6 +1832,20 @@ class DatabricksAdapter(
         replace_where: str = (
             f"{quoted_cursor_column} >= {start_bound} AND {quoted_cursor_column} < {end_bound}"
         )
+        if unique_key and columns is not None:
+            window: str = (
+                f"__target.{quoted_cursor_column} >= {start_bound} "
+                f"AND __target.{quoted_cursor_column} < {end_bound}"
+            )
+            return (
+                self._render_keyed_replace_merge(
+                    destination=destination,
+                    sql=sql,
+                    unique_key=unique_key,
+                    columns=columns,
+                    window=window,
+                ),
+            )
         if unique_key:
             key_delete, *insert_statements = self.render_delete_insert(
                 destination=destination, sql=sql, unique_key=unique_key, columns=columns
@@ -1835,6 +1856,44 @@ class DatabricksAdapter(
                 *insert_statements,
             )
         return (f"INSERT INTO {destination}{column_list} REPLACE WHERE {replace_where} {sql}",)
+
+    def _render_keyed_replace_merge(
+        self,
+        *,
+        destination: str,
+        sql: str,
+        unique_key: tuple[str, ...],
+        columns: tuple[str, ...],
+        window: str | None = None,
+    ) -> str:
+        """One MERGE deleting the window and the delta's keys, once each, then inserting every row."""
+
+        quoted: tuple[str, ...] = tuple(self.render_identifier(column) for column in columns)
+        keys: frozenset[str] = frozenset(key.lower() for key in unique_key)
+        key_values: str = ", ".join(
+            self.render_identifier(column) if column.lower() in keys else "NULL"
+            for column in columns
+        )
+        key_condition: str = " AND ".join(
+            f"__target.{self.render_identifier(key)} = __source.{self.render_identifier(key)}"
+            for key in unique_key
+        )
+        window_clause: str = (
+            "" if window is None else f" WHEN NOT MATCHED BY SOURCE AND {window} THEN DELETE"
+        )
+        return (
+            f"MERGE INTO {destination} AS __target USING ("
+            f"SELECT {', '.join(quoted)}, 'insert' AS {MERGE_OPERATION_COLUMN} "
+            f"FROM ({sql}) AS __delta UNION ALL "
+            f"SELECT DISTINCT {key_values}, 'delete' AS {MERGE_OPERATION_COLUMN} "
+            f"FROM ({sql}) AS __delta) AS __source "
+            f"ON __source.{MERGE_OPERATION_COLUMN} = 'delete' AND {key_condition} "
+            "WHEN MATCHED THEN DELETE "
+            f"WHEN NOT MATCHED AND __source.{MERGE_OPERATION_COLUMN} = 'insert' THEN INSERT "
+            f"({', '.join(quoted)}) VALUES "
+            f"({', '.join(f'__source.{column}' for column in quoted)})"
+            f"{window_clause}"
+        )
 
     def render_rename(self, *, origin: str, destination: str) -> tuple[str, ...]:
         return (f"ALTER TABLE {origin} RENAME TO {destination}",)

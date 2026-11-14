@@ -14,13 +14,16 @@ use sqlbuild_core::load_command::models::{LoadEntry, LoadGraph};
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
+use crate::bindings::_helpers::compile_attachment::effective_config::{
+    build_effective_connection_config, build_effective_runtime_config,
+};
 use crate::bindings::_helpers::compile_attachment::target::{
     connection_is_default_target, project_location,
 };
 use crate::bindings::_helpers::compile_driver::targets::managed_write_schema;
 use crate::bindings::_helpers::contracts::spec_resolution::loader_destination_parts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use crate::bindings::_helpers::model_config::template_data::early_model_templates;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record_with;
@@ -285,9 +288,25 @@ pub(crate) fn loader_defaults<'py>(
             connection_value.into_iter().filter(|_| inline).collect(),
         )
     };
+    let values: Bound<'py, PyDict> = PyDict::new(py);
+    values.set_item("database", location("database", connection_database)?)?;
+    values.set_item(
+        "schema",
+        location("schema", non_empty_text(connection.get_item("schema")?)?)?,
+    )?;
+    let runtime: Bound<'py, PyTuple> = build_effective_runtime_config(
+        discovered,
+        Some(selected_target.clone()).filter(|value| !value.is_none()),
+        Some(cli_vars.clone()).filter(|value| !value.is_none()),
+    )?;
+    let resolved: Bound<'py, PyAny> = early_model_templates(
+        values.as_any(),
+        &runtime.get_item(1)?,
+        (&runtime.get_item(0)?, &runtime.get_item(2)?),
+    )?;
     Ok(LoaderDefaults {
-        database: location("database", connection_database)?,
-        schema: location("schema", non_empty_text(connection.get_item("schema")?)?)?,
+        database: resolved.get_item("database")?,
+        schema: resolved.get_item("schema")?,
     })
 }
 

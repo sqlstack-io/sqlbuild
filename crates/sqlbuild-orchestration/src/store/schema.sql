@@ -92,7 +92,6 @@ CREATE TABLE sqb_jobs (
     definition_json {json} NOT NULL,
     PRIMARY KEY (location_id, target, job_key)
 );
-CREATE INDEX sqb_jobs_snapshot ON sqb_jobs(snapshot_id);
 CREATE TABLE sqb_triggers (
     trigger_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -105,8 +104,6 @@ CREATE TABLE sqb_triggers (
     removed_in_snapshot_id {uuid} REFERENCES sqb_snapshots(snapshot_id),
     UNIQUE (location_id, target, kind, name)
 );
-CREATE INDEX sqb_triggers_snapshot ON sqb_triggers(snapshot_id);
-CREATE INDEX sqb_triggers_removed ON sqb_triggers(removed_in_snapshot_id) WHERE removed_in_snapshot_id IS NOT NULL;
 CREATE TABLE sqb_trigger_state (
     trigger_id {uuid} PRIMARY KEY REFERENCES sqb_triggers(trigger_id),
     status TEXT NOT NULL CHECK (status IN ('running', 'paused')),
@@ -165,8 +162,6 @@ CREATE TABLE sqb_runs (
     claimed_at {time},
     last_heartbeat_at {time}
 );
-CREATE INDEX sqb_runs_trigger ON sqb_runs(trigger_id) WHERE trigger_id IS NOT NULL;
-CREATE INDEX sqb_runs_rerun_of ON sqb_runs(rerun_of_run_id) WHERE rerun_of_run_id IS NOT NULL;
 CREATE INDEX sqb_runs_location_time ON sqb_runs(location_id, target, queued_at);
 CREATE INDEX sqb_runs_location_ended ON sqb_runs(location_id, target, ended_at);
 CREATE INDEX sqb_runs_queue ON sqb_runs(priority DESC, queued_at) WHERE status = 'queued';
@@ -267,8 +262,6 @@ CREATE TABLE sqb_location_work (
     result_json {json},
     completed_at {time}
 );
-CREATE INDEX sqb_location_work_session ON sqb_location_work(session_id) WHERE session_id IS NOT NULL;
-CREATE INDEX sqb_location_work_snapshot ON sqb_location_work(snapshot_id);
 CREATE INDEX sqb_location_work_pending ON sqb_location_work(location_id, target, requested_at);
 CREATE TABLE sqb_platform_sink_deliveries (
     sink_id TEXT NOT NULL,
@@ -295,7 +288,6 @@ CREATE TABLE sqb_run_requests (
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
     PRIMARY KEY (trigger_id, run_key)
 );
-CREATE INDEX sqb_run_requests_run ON sqb_run_requests(run_id);
 CREATE INDEX sqb_runs_terminal_cursor ON sqb_runs(location_id, target, job_key, last_event_storage_id)
 WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled');
 CREATE INDEX sqb_runs_parent ON sqb_runs(parent_run_id) WHERE parent_run_id IS NOT NULL;
@@ -329,7 +321,6 @@ CREATE TABLE sqb_warehouse_fingerprints (
     target_name TEXT,
     scan_id {uuid}
 );
-CREATE INDEX sqb_warehouse_fingerprints_text ON sqb_warehouse_fingerprints(definition_text_hash);
 CREATE INDEX sqb_warehouse_fingerprints_scope ON sqb_warehouse_fingerprints (location_id, target, observed_at, event_id);
 CREATE TABLE sqb_development_locations (
     project_path TEXT NOT NULL,
@@ -381,7 +372,6 @@ CREATE TABLE sqb_role_assignments (
     target TEXT,
     active_key TEXT NOT NULL UNIQUE
 );
-CREATE INDEX sqb_role_assignments_location ON sqb_role_assignments(location_id);
 CREATE INDEX sqb_role_assignments_principal ON sqb_role_assignments(principal_id);
 CREATE TABLE sqb_person_groups (
     principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),

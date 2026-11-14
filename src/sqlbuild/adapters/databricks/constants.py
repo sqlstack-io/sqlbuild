@@ -15,6 +15,7 @@ RELATION_NOT_FOUND_ERROR_CLASSES: tuple[str, ...] = (
 )
 UNDEFINED_TABLE_SQLSTATE: str = "42P01"
 SERVER_OPERATION_ERROR_CLASS_NAME: str = "ServerOperationError"
+MERGE_OPERATION_COLUMN: str = "__sqlbuild_op"
 DETAILED_TABLE_INFORMATION_MARKER: str = "# detailed table information"
 DESCRIBE_DETAIL_ROW_WIDTH: int = 2
 TEMPORARY_FUNCTION_PREFIX: str = "__sqb_test__"
