@@ -17,6 +17,12 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
+_PRESERVED_TARGET_PROJECT: str = (
+    'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+    '[connection]\ndatabase = "dev.duckdb"\n\n'
+    '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -294,32 +300,48 @@ def test_given_connection_location_when_compiling_then_models_build_there(
     (
         ManagedSourceLoaderLocationTestCase(
             description="build loads the managed source into the target loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n[connection]\n'
+                'database = "dev.duckdb"\nschema = "landing"\n\n'
+                '[connections.archive]\ndatabase = "archive.duckdb"\n\n'
+                '[targets.dev]\nloader_schema = "raw"\n'
+            ),
+            source_schema="",
             command=("--no-color", "build"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="build under a preserved target loads the source into its own schema",
+            project_toml=_PRESERVED_TARGET_PROJECT,
+            source_schema="    schema: raw\n",
+            command=("--no-color", "build"),
+            expected_rows=((1,),),
+        ),
+        ManagedSourceLoaderLocationTestCase(
+            description="load under a preserved target loads the source into its own schema",
+            project_toml=_PRESERVED_TARGET_PROJECT,
+            source_schema="    schema: raw\n",
+            command=("--no-color", "load", "--select", "raw_orders"),
             expected_rows=((1,),),
         ),
     ),
     ids=lambda case: case.description,
 )
-def test_given_ignored_connection_schema_when_building_managed_source_then_loader_schema_is_used(
+def test_given_managed_source_when_loading_then_source_lands_in_its_resolved_schema(
     test_case: ManagedSourceLoaderLocationTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="orders",
         repo_files={
-            "sqlbuild_project.toml": (
-                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n[connection]\n'
-                'database = "dev.duckdb"\nschema = "landing"\n\n'
-                '[connections.archive]\ndatabase = "archive.duckdb"\n\n'
-                '[targets.dev]\nloader_schema = "raw"\n'
-            ),
+            "sqlbuild_project.toml": test_case.project_toml,
             "models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized view, "
                 'schema staging);\n\nSELECT order_id FROM __source("raw_orders")\n'
             ),
             "sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
-                "    managed: true\n    write_strategy: table\n"
+                f"    managed: true\n{test_case.source_schema}    write_strategy: table\n"
                 "    columns:\n      - name: order_id\n        type: INTEGER\n"
             ),
             "python/loaders/orders.py": (

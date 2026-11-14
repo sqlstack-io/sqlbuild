@@ -182,21 +182,10 @@ pub(crate) fn named_target_schema_strategy(
     if native_field(adapter, "allows_implicit_managed_write_schema")?.is_truthy()? {
         return Ok(());
     }
-    let project_config: Bound<'_, PyAny> = native_field(discovered, "project_config")?;
-    let local_config: Bound<'_, PyAny> = native_field(discovered, "local_config")?;
-    let target_name: Bound<'_, PyAny> = resolve_target_name(
-        py,
-        &project_config.clone(),
-        &local_config.clone(),
-        &selected_target.clone(),
-    )
-    .and_then(|value| value.into_bound_py_any(py))?;
-    if target_name.is_none() {
+    let Some((target_name, target_config)) = selected_target_config(discovered, selected_target)?
+    else {
         return Ok(());
-    }
-    let target_config: Bound<'_, PyAny> =
-        resolve_target_config(py, &project_config, &local_config, &target_name.clone())
-            .and_then(|value| value.into_bound_py_any(py))?;
+    };
     let schema: Option<String> = text_or_none(&native_field(&target_config, "schema")?)?;
     if schema.is_some_and(|schema| !python_strip(&schema).is_empty()) {
         return Ok(());
@@ -564,28 +553,6 @@ pub(crate) fn managed_write_schemas(
     adapter: &Bound<'_, PyAny>,
     project: &Bound<'_, PyAny>,
 ) -> PyResult<()> {
-    let target_schema: Option<String> =
-        text_or_none(&native_field(project, "effective_target_schema")?)?;
-    for loader in native_field(project, "loader_functions")?.try_iter()? {
-        let loader: Bound<'_, PyAny> = loader?;
-        let name: String = native_field(&loader, "name")?.str()?.to_cow()?.into_owned();
-        let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
-        if loader_schema(destination.as_deref(), target_schema.as_deref())
-            .is_some_and(|schema| python_strip(schema) == PRESERVE_TARGET_VALUE)
-        {
-            let table: String = destination.as_deref().map_or_else(
-                || format!("__loader__{name}"),
-                |destination| {
-                    destination
-                        .rsplit('.')
-                        .next()
-                        .unwrap_or(destination)
-                        .to_owned()
-                },
-            );
-            preserved_loader_schema(loader.py(), &name, &table)?;
-        }
-    }
     let ignored: Option<String> = ignored_connection_value(project, "schema")?;
     if ignored.is_none()
         && native_field(adapter, "allows_implicit_managed_write_schema")?.is_truthy()?
@@ -630,15 +597,7 @@ pub(crate) fn managed_write_schemas(
     if ignored.is_none() {
         return Ok(());
     }
-    let mut source_loaders: HashSet<String> = HashSet::new();
-    for source in native_field(project, "sources")?.try_iter()? {
-        if let Some(loader) = text_or_none(&native_field(
-            &native_field(&source?, "source_entry")?,
-            "loader",
-        )?)? {
-            source_loaders.insert(loader);
-        }
-    }
+    let source_loaders: HashSet<String> = managed_source_loaders(project)?;
     for loader in native_field(project, "loader_functions")?.try_iter()? {
         let loader: Bound<'_, PyAny> = loader?;
         let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
@@ -659,28 +618,78 @@ pub(crate) fn managed_write_schemas(
     Ok(())
 }
 
-/// Raise when loader `name` would write into a schema literally named `preserve`.
-pub(crate) fn preserved_loader_schema(py: Python<'_>, name: &str, table: &str) -> PyResult<()> {
-    Err(planner_error(
-        py,
-        target_error_message(&TargetError::PreservedLoaderSchema(name.to_owned())),
-        MANAGED_WRITE_SCHEMA_CODE,
-        Some(format!(
-            "to choose where it writes, set its destination in its @loader decorator:\n            \
-             @loader(destination=\"my_schema.{table}\")"
-        )),
-    ))
+/// The loader names that load managed sources, which write to the source's own location.
+pub(crate) fn managed_source_loaders(project: &Bound<'_, PyAny>) -> PyResult<HashSet<String>> {
+    let mut loaders: HashSet<String> = HashSet::new();
+    for source in native_field(project, "sources")?.try_iter()? {
+        if let Some(loader) = text_or_none(&native_field(
+            &native_field(&source?, "source_entry")?,
+            "loader",
+        )?)? {
+            loaders.insert(loader);
+        }
+    }
+    Ok(loaders)
 }
 
-/// The schema a loader destination names, or `target_schema` when it names none.
-fn loader_schema<'a>(
-    destination: Option<&'a str>,
-    target_schema: Option<&'a str>,
-) -> Option<&'a str> {
-    match destination.map(|destination| destination.rsplit('.').collect::<Vec<&str>>()) {
-        Some(parts) if parts.len() > 1 => Some(parts[1]),
-        _ => target_schema,
+/// Raise when the selected target's schema is `preserve` and one of `loaders` names no schema.
+pub(crate) fn preserved_loader_schemas(
+    discovered: &Bound<'_, PyAny>,
+    selected_target: &Bound<'_, PyAny>,
+    loaders: &HashSet<String>,
+) -> PyResult<()> {
+    let py: Python<'_> = discovered.py();
+    let Some((_, target_config)) = selected_target_config(discovered, selected_target)? else {
+        return Ok(());
+    };
+    if !text_or_none(&native_field(&target_config, "schema")?)?
+        .is_some_and(|schema| python_strip(&schema) == PRESERVE_TARGET_VALUE)
+    {
+        return Ok(());
     }
+    for loader in native_field(discovered, "loader_functions")?.try_iter()? {
+        let loader: Bound<'_, PyAny> = loader?;
+        let name: String = native_field(&loader, "name")?.extract()?;
+        let destination: Option<String> = text_or_none(&native_field(&loader, "destination")?)?;
+        if !loaders.contains(&name) || destination.as_deref().is_some_and(|d| d.contains('.')) {
+            continue;
+        }
+        let table: String = destination.unwrap_or_else(|| format!("__loader__{name}"));
+        return Err(planner_error(
+            py,
+            target_error_message(&TargetError::PreservedLoaderSchema(name)),
+            MANAGED_WRITE_SCHEMA_CODE,
+            Some(format!(
+                "to choose where it writes, set its destination in its @loader decorator:\n            \
+                 @loader(destination=\"my_schema.{table}\")"
+            )),
+        ));
+    }
+    Ok(())
+}
+
+/// The selected target's name and configuration, or `None` when no named target is selected.
+fn selected_target_config<'py>(
+    discovered: &Bound<'py, PyAny>,
+    selected_target: &Bound<'py, PyAny>,
+) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
+    let py: Python<'py> = discovered.py();
+    let project_config: Bound<'py, PyAny> = native_field(discovered, "project_config")?;
+    let local_config: Bound<'py, PyAny> = native_field(discovered, "local_config")?;
+    let target_name: Bound<'py, PyAny> = resolve_target_name(
+        py,
+        &project_config.clone(),
+        &local_config.clone(),
+        &selected_target.clone(),
+    )
+    .and_then(|value| value.into_bound_py_any(py))?;
+    if target_name.is_none() {
+        return Ok(None);
+    }
+    let target_config: Bound<'py, PyAny> =
+        resolve_target_config(py, &project_config, &local_config, &target_name.clone())
+            .and_then(|value| value.into_bound_py_any(py))?;
+    Ok(Some((target_name, target_config)))
 }
 
 /// Raise when neither the resource nor the project names a physical write schema.

@@ -1,5 +1,7 @@
 //! Compiled project and project graph construction: frontier stages, target defaults and checks.
 
+use std::collections::HashSet;
+
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyCFunction, PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -14,8 +16,9 @@ use crate::bindings::_helpers::compile_driver::target_defaults::{
     TargetDefaults, apply_target_defaults,
 };
 use crate::bindings::_helpers::compile_driver::targets::{
-    managed_loader_target_isolation, managed_write_schemas, named_target_schema_strategy,
-    project_targets, requires_explicit_targets,
+    managed_loader_target_isolation, managed_source_loaders, managed_write_schemas,
+    named_target_schema_strategy, preserved_loader_schemas, project_targets,
+    requires_explicit_targets,
 };
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
@@ -213,6 +216,19 @@ fn targeted_project<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let discovered: &Bound<'py, PyAny> = request.discovered_inputs.bind(py);
     let adapter: &Bound<'py, PyAny> = request.adapter.bind(py);
+    let source_loaders: HashSet<String> = managed_source_loaders(project)?;
+    let mut intermediate_loaders: HashSet<String> = HashSet::new();
+    for loader in native_field(discovered, "loader_functions")?.try_iter()? {
+        let name: String = native_field(&loader?, "name")?.extract()?;
+        if !source_loaders.contains(&name) {
+            intermediate_loaders.insert(name);
+        }
+    }
+    preserved_loader_schemas(
+        discovered,
+        request.selected_target.bind(py),
+        &intermediate_loaders,
+    )?;
     managed_write_schemas(adapter, project)?;
     let effective_schema: Bound<'py, PyAny> = native_field(project, "effective_target_schema")?;
     let default_schema: Bound<'py, PyAny> = if effective_schema.is_truthy()? {
