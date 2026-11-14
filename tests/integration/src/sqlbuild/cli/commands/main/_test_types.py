@@ -1164,6 +1164,29 @@ class SqlRuleCacheSequenceTestCase:
 
 
 @dataclass(frozen=True)
+class PythonRulesIntegrationTestCase:
+    """One compile of a DuckShop Python-rules fixture under a `[rules]` table."""
+
+    description: str
+    fixture: str
+    rules_toml: str
+    expected_exit_code: int
+    expected_findings: tuple[tuple[str, str | None, int | None, int | None], ...]
+    expected_text: str = ""
+
+
+@dataclass(frozen=True)
+class PythonRuleCacheSequenceTestCase:
+    """Compiles after each `(project toml, alert hook source)` step, with each step's cache counts
+    and whether a Python rules cache exists afterwards."""
+
+    description: str
+    steps: tuple[tuple[str, str], ...]
+    expected_hits_and_misses: tuple[tuple[int, int], ...]
+    expected_python_cache: tuple[bool, ...]
+
+
+@dataclass(frozen=True)
 class CustomRuleCacheSequenceTestCase:
     """Compiles after each `(rule source, model SQL)` step and the cache counts each reports."""
 

@@ -36,6 +36,8 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     ImplicitAliasRuleIntegrationTestCase,
     NumericRangeDecisionIntegrationTestCase,
     ProjectRuleScratchStateTestCase,
+    PythonRuleCacheSequenceTestCase,
+    PythonRulesIntegrationTestCase,
     RulePassIntegrationTestCase,
     RulesIntegrationTestCase,
     SetOperationStarRuleTestCase,
@@ -44,6 +46,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
 )
 from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     EARLY_LINT_PROJECT_FILES,
+    PYTHON_RULES_FIXTURES,
     child_processes,
     compile_finding_keys,
     compile_findings,
@@ -52,6 +55,7 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     write_custom_host_project,
     write_project_files,
     write_project_scratch_rules,
+    write_python_rules_project,
 )
 
 _CACHE_RULES_TOML: str = (
@@ -77,6 +81,18 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     return [] if "final" in model.path.parts else [ctx.finding(subject=model)]
 """
 _CUSTOM_CACHE_EDITED_RULE: str = _CUSTOM_CACHE_RULE.replace('"final" in', '"staging" in')
+_PYTHON_RULES_EXPECTED: dict[str, Any] = json.loads(
+    (PYTHON_RULES_FIXTURES / "expected_findings.json").read_text(encoding="utf-8")
+)
+_PYTHON_RULES_SELECT: str = f"select = {json.dumps(_PYTHON_RULES_EXPECTED['select'])}\n"
+_PYTHON_ALERT_PATH: str = "hooks/python/alert.py"
+_PYTHON_ALERT: str = (PYTHON_RULES_FIXTURES / "violations" / _PYTHON_ALERT_PATH).read_text(
+    encoding="utf-8"
+)
+_PYTHON_ANNOTATED_ALERT: str = _PYTHON_ALERT.replace("def alert(ctx,", "def alert(ctx: object,")
+_PYTHON_CACHE_TOML: str = (
+    'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRPYTHON101"]\n'
+)
 _CUSTOM_CACHE_MODEL_SQL: str = 'MODEL (description "Orders");\nSELECT 1 AS order_id\n'
 _CUSTOM_CACHE_EDITED_SQL: str = _CUSTOM_CACHE_MODEL_SQL.replace("SELECT 1", "SELECT 2")
 
@@ -3345,3 +3361,177 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
     assert exit_code == 1
     assert tuple(item["code"] for item in diagnostics) == test_case.expected_codes
     assert len({item["line"] for item in diagnostics}) == test_case.expected_distinct_lines
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonRulesIntegrationTestCase(
+            description="every DuckShop violation is reported where it is",
+            fixture="violations",
+            rules_toml=_PYTHON_RULES_SELECT,
+            expected_exit_code=1,
+            expected_findings=tuple(
+                (code, path, line, column)
+                for code, path, line, column in _PYTHON_RULES_EXPECTED["findings"]
+            ),
+        ),
+        PythonRulesIntegrationTestCase(
+            description="the conforming DuckShop layout passes every Python rule",
+            fixture="conforming",
+            rules_toml=_PYTHON_RULES_SELECT,
+            expected_exit_code=0,
+            expected_findings=(),
+        ),
+        PythonRulesIntegrationTestCase(
+            description="the built-in namespace leaves the Python family out",
+            fixture="violations",
+            rules_toml=(
+                'select = ["SQBR"]\n\n[[rules.rule_ignores]]\nrules = ["SQBR"]\n'
+                'paths = ["models/orders.sql"]\nreason = "Only Python findings matter here."\n'
+            ),
+            expected_exit_code=0,
+            expected_findings=(),
+        ),
+        PythonRulesIntegrationTestCase(
+            description="a rule exception suppresses a Python finding",
+            fixture="violations",
+            rules_toml=(
+                'select = ["SQBRPYTHON101"]\n\n[[rules.rule_exceptions]]\n'
+                'rule = "SQBRPYTHON101"\npath = "hooks/python/alert.py"\n'
+                'reason = "The alert hook keeps its documented signature."\n'
+            ),
+            expected_exit_code=0,
+            expected_findings=(),
+        ),
+        PythonRulesIntegrationTestCase(
+            description="a rule exception that suppresses nothing fails as stale",
+            fixture="violations",
+            rules_toml=(
+                'select = ["SQBRPYTHON101"]\n\n[[rules.rule_exceptions]]\n'
+                'rule = "SQBRPYTHON101"\npath = "python/report.py"\nreason = "Legacy."\n'
+            ),
+            expected_exit_code=1,
+            expected_findings=(("C000", None, None, None),),
+            expected_text=(
+                "stale rule exception suppresses no finding: SQBRPYTHON101 at python/report.py"
+            ),
+        ),
+        PythonRulesIntegrationTestCase(
+            description="a rule option tightens a Python threshold",
+            fixture="violations",
+            rules_toml=(
+                'select = ["SQBRPYTHON504"]\n\n'
+                "[rules.rule_options.SQBRPYTHON504]\nmax_arguments = 1\n"
+            ),
+            expected_exit_code=1,
+            expected_findings=(("SQBRPYTHON504", "hooks/python/alert.py", 4, 1),),
+            expected_text="function has 2 parameters",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_project_python_when_compiling_with_python_rules_then_findings_follow_configuration(
+    test_case: PythonRulesIntegrationTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_python_rules_project(
+        project_dir=tmp_path, fixture=test_case.fixture, rules_toml=test_case.rules_toml
+    )
+
+    exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
+    python_diagnostics: list[dict[str, Any]] = json.loads(capsys.readouterr().out)["diagnostics"]
+
+    assert exit_code == test_case.expected_exit_code
+    assert (
+        tuple(
+            (item["code"], item.get("path"), item.get("line"), item.get("column"))
+            for item in python_diagnostics
+        )
+        == test_case.expected_findings
+    )
+    assert test_case.expected_text in json.dumps(python_diagnostics)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [RulesIntegrationTestCase("rules run reports what compile reports", 1, "SQBRPYTHON")],
+    ids=lambda case: case.description,
+)
+def test_given_project_python_when_running_python_rules_then_findings_match_compile(
+    test_case: RulesIntegrationTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_python_rules_project(
+        project_dir=tmp_path,
+        fixture="violations",
+        rules_toml=f'select = ["{test_case.expected_code}"]\n',
+    )
+
+    run_exit: int = main(
+        ["--project-dir", str(tmp_path), "rules", "--json", "run", test_case.expected_code]
+    )
+    run_findings: list[dict[str, Any]] = json.loads(capsys.readouterr().out)["findings"]
+    compiled: tuple[tuple[str, str | None, int | None, int | None], ...] = compile_findings(
+        project_dir=tmp_path, capsys=capsys
+    )
+
+    assert run_exit == test_case.expected_exit_code
+    assert run_findings
+    assert (
+        tuple((item["code"], item["path"], item["line"], item["column"]) for item in run_findings)
+        == compiled
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonRuleCacheSequenceTestCase(
+            description=(
+                "no Python cache without a Python rule; a cold run misses every file, an edit "
+                "misses only the edited file, and a new selection misses every file again"
+            ),
+            steps=(
+                (_PYTHON_CACHE_TOML.replace("SQBRPYTHON101", "SQLCLEAN004"), _PYTHON_ALERT),
+                (_PYTHON_CACHE_TOML, _PYTHON_ALERT),
+                (_PYTHON_CACHE_TOML, _PYTHON_ANNOTATED_ALERT),
+                (
+                    _PYTHON_CACHE_TOML.replace(
+                        '"SQBRPYTHON101"', '"SQBRPYTHON101", "SQBRPYTHON504"'
+                    ),
+                    _PYTHON_ANNOTATED_ALERT,
+                ),
+            ),
+            expected_hits_and_misses=((0, 1), (0, 9), (8, 1), (0, 9)),
+            expected_python_cache=(False, True, True, True),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_rerun(
+    test_case: PythonRuleCacheSequenceTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_python_rules_project(project_dir=tmp_path, fixture="violations", rules_toml="")
+    observed: list[tuple[int, int]] = []
+    cached: list[bool] = []
+    for project_toml, alert_source in test_case.steps:
+        write_project_files(
+            project_dir=tmp_path,
+            files={"sqlbuild_project.toml": project_toml, _PYTHON_ALERT_PATH: alert_source},
+        )
+        _ = main(["--project-dir", str(tmp_path), "compile", "--json"])
+        timings: dict[str, int] = cast(
+            dict[str, int], json.loads(capsys.readouterr().out)["compile_timings"]
+        )
+        observed.append((timings["rule_cache_hits"], timings["rule_cache_misses"]))
+        cached.append(
+            rules_bulk_cache_path(project_dir=tmp_path, file_name="python.json").is_file()
+        )
+
+    assert tuple(observed) == test_case.expected_hits_and_misses
+    assert tuple(cached) == test_case.expected_python_cache

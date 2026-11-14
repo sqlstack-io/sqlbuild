@@ -1354,3 +1354,21 @@ def _default_interrupt_handling() -> None:
     """Give the spawned command default Ctrl-C handling even when its parent ignores SIGINT."""
 
     _ = signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+
+PYTHON_RULES_FIXTURES: Path = Path("benchmarks/duckshop/edge_cases/python_rules")
+
+
+def write_python_rules_project(*, project_dir: Path, fixture: str, rules_toml: str) -> None:
+    """Copy one DuckShop Python-rules fixture with one model under the given `[rules]` table."""
+
+    shutil.copytree(PYTHON_RULES_FIXTURES / fixture, project_dir, dirs_exist_ok=True)
+    write_project_files(
+        project_dir=project_dir,
+        files={
+            "sqlbuild_project.toml": (
+                f'name = "orders"\nadapter = "duckdb"\n\n[rules]\n{rules_toml}'
+            ),
+            "models/orders.sql": 'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
+        },
+    )
