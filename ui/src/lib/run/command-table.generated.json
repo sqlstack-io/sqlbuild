@@ -111,7 +111,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.load",
-					"description": ""
+					"description": "Load managed sources before building"
 				},
 				{
 					"flag": "--no-load",
@@ -129,7 +129,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.load",
-					"description": ""
+					"description": "Reload managed sources (loaders get is_reload=True)"
 				},
 				{
 					"flag": "--fail-fast",
@@ -262,7 +262,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.vars",
-					"description": ""
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
 				},
 				{
 					"flag": "--warehouse",
@@ -342,7 +342,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.vars",
-					"description": ""
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
 				},
 				{
 					"flag": "--warehouse",
@@ -395,7 +395,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.vars",
-					"description": ""
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
 				},
 				{
 					"flag": "--warehouse",
@@ -448,7 +448,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.vars",
-					"description": ""
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
 				},
 				{
 					"flag": "--warehouse",
@@ -519,7 +519,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.vars",
-					"description": ""
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
 				},
 				{
 					"flag": "--warehouse",
@@ -543,7 +543,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.load",
-					"description": ""
+					"description": "Reload managed sources (loaders get is_reload=True)"
 				},
 				{
 					"flag": "--concurrency",
@@ -635,7 +635,7 @@
 					"choices": null,
 					"repeatable": false,
 					"requires": "run.vars",
-					"description": ""
+					"description": "Project variables as a JSON object, e.g. {\"day\": \"7\"}"
 				},
 				{
 					"flag": "--warehouse",
