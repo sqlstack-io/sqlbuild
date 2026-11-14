@@ -10,6 +10,7 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_attachments::audits::constants::BUILTIN_AUDITS;
 use sqlbuild_host::compile_context::main::record_compile_timing::record_compile_timing;
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost, UserCodeHost};
+use sqlbuild_rules::lint_text::constants::{DEFAULT_LINE_WIDTH, DEFAULT_MAX_DESCRIPTION_LINES};
 use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
 use sqlbuild_rules::lint_text::models::FormatSettings;
 
@@ -585,8 +586,15 @@ fn diagnostic_settings<'py>(
 /// The project's `max_description_lines` and `line_width`, as `sqb format` resolves them.
 fn description_limit(discovered: &Bound<'_, PyAny>) -> PyResult<(usize, i64)> {
     let directory: Option<PathBuf> = native_field(discovered, "project_dir")?.extract()?;
+    // Without a project directory there is no configuration to read, not the current directory's.
+    let Some(directory) = directory else {
+        return Ok((
+            usize::try_from(DEFAULT_MAX_DESCRIPTION_LINES).unwrap_or(0),
+            DEFAULT_LINE_WIDTH,
+        ));
+    };
     let settings: FormatSettings =
-        resolve_format_settings(&directory.unwrap_or_default()).map_err(PyValueError::new_err)?;
+        resolve_format_settings(&directory).map_err(PyValueError::new_err)?;
     Ok((
         usize::try_from(settings.max_description_lines).unwrap_or(0),
         settings.line_width,

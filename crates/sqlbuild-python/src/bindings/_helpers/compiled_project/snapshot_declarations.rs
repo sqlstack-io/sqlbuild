@@ -110,12 +110,14 @@ pub(crate) fn compile_declarations(
     );
     for calendar in &authored_calendars {
         let calendar: &Bound<'_, PyAny> = calendar.bind(py);
+        // A calendar that never decorated a function has no name; `compile_calendars` handles it per target.
+        let function: Bound<'_, PyAny> = calendar.getattr("function")?;
+        if function.is_none() {
+            continue;
+        }
         described.push((
             "calendar schedule",
-            calendar
-                .getattr("function")?
-                .getattr("__name__")?
-                .extract()?,
+            function.getattr("__name__")?.extract()?,
             calendar.getattr("description")?.extract()?,
         ));
     }

@@ -68,6 +68,17 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 .get_mut("orders")
                 .expect("orders model")
                 .definition = json!({"materialization": "table", "deps": ["source:raw_orders"]});
+            // Lineage orders the group: products reads orders, and inventory reads products.
+            input
+                .nodes
+                .get_mut("products")
+                .expect("products model")
+                .definition["deps"] = json!(["orders"]);
+            input
+                .nodes
+                .get_mut("inventory")
+                .expect("inventory model")
+                .definition["deps"] = json!(["products"]);
             input.documents.insert("jobs".into(), json!({
                 "staging": {"description": "Stage orders", "selection": ["orders", "customers"], "concurrency_groups": ["warehouse"], "settings": {"vars": {"batch": 23}}},
                 "marts": {"description": "Build inventory", "selection": ["inventory"], "concurrency_groups": ["inventory_limit"]},
@@ -75,7 +86,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             }));
             input.documents.insert("groups".into(), json!({"daily_orders": {
                 "description": "Build daily orders", "selection": ["customers", "orders", "inventory", "products"],
-                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["completed"], "completed": ["staging"]}
+                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["completed", "staging"], "completed": ["staging"]}
             }}));
             let published = publish_snapshot(store, &input).await.expect("publish");
             let source_id = Uuid::now_v7();

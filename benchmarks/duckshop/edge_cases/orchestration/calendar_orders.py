@@ -13,3 +13,13 @@ orders = job("order_reporting", description="Build order reporting.", select="or
 )
 def fulfillment_calendar(window, fulfillment):
     return fulfillment.upcoming(window)
+
+
+# Declared for another target without decorating a function: development publication skips it.
+production_calendar = calendar_schedule(
+    job=orders,
+    description="Production fulfillment times, not yet attached to a provider.",
+    horizon="8s",
+    timezone="UTC",
+    targets=("production",),
+)

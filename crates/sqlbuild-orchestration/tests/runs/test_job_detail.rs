@@ -87,8 +87,7 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 .nodes
                 .get_mut("customers")
                 .expect("customers node")
-                .definition =
-                json!({"materialization": "table", "config": {"cursor_type": "timestamp"}});
+                .definition = json!({"materialization": "table", "deps": ["orders"], "config": {"cursor_type": "timestamp"}});
             publish_snapshot(store, &input).await.expect("publish jobs");
             let administrator = (&roles.context, credentials(&roles.administrator));
             let location = roles.location_id;
