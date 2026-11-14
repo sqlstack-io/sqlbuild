@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.227.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.226.1...v0.227.0) (2026-11-14)
+
+
+### Features
+
+* **server:** ad-hoc --vars, --load, --reload and load runs gated by run.vars and run.load ([#1484](https://github.com/sqlstack-io/sqlbuild/issues/1484)) ([b286141](https://github.com/sqlstack-io/sqlbuild/commit/b28614100ab8aa223566ff34db92587cd3db049a))
+
 ## [0.226.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.226.0...v0.226.1) (2026-11-14)
 
 
