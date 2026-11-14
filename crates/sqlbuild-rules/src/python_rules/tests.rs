@@ -2,6 +2,8 @@
 mod evaluate_python_rules;
 #[path = "tests/helpers.rs"]
 mod helpers;
+#[path = "tests/test_python_cache.rs"]
+mod python_cache;
 #[path = "tests/test_python_catalogue.rs"]
 mod python_catalogue;
 #[path = "tests/test_types.rs"]

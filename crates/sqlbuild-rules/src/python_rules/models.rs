@@ -44,10 +44,9 @@ pub(crate) struct PythonTarget {
     pub is_entry_module: bool,
 }
 
-/// One `evaluate_core_rules` call: a file, the Fensu codes it runs, and the context they read.
+/// One `evaluate_core_rules` call on a file: the Fensu codes it runs and the context they read.
 #[derive(Debug)]
-pub(crate) struct RuleCall<'a> {
-    pub target: &'a PythonTarget,
+pub(crate) struct RuleCall {
     pub codes: Vec<String>,
     pub context: fensu_native::NativeRuleContext,
     pub queries: Vec<fensu_native::NativeProjectQuery>,
@@ -59,4 +58,46 @@ pub(crate) struct CallInputs<'a> {
     pub request: &'a crate::models::EvaluateRequest,
     pub settings: crate::python_rules::_helpers::contexts::ContextSettings,
     pub programs: &'a crate::python_rules::_helpers::programs::Programs<'a>,
+    /// Cached findings by file from the last run with the same ruleset.
+    pub cached: &'a std::collections::BTreeMap<String, PythonCacheEntry>,
+    /// The digest of the ruleset and interpreter version the cached findings must match.
+    pub fingerprint: &'a str,
+    /// The digest of every Python source, for rules that read the whole project.
+    pub project_digest: String,
+}
+
+/// One file's cached Python findings and the project answers they were computed from.
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct PythonCacheEntry {
+    /// The digest of the file, its rules and thresholds, and the ruleset.
+    pub identity: String,
+    /// The project questions the file's rules asked, as kind, path and argument.
+    pub queries: Vec<(String, String, String)>,
+    /// The digest of their answers; a changed answer makes the entry stale.
+    pub answers: String,
+    pub faults: Vec<crate::models::Fault>,
+}
+
+/// The Python rules' findings, with the cache entries of every file that ran Fensu's rules.
+#[derive(Debug, Default)]
+pub(crate) struct PythonEvaluation {
+    pub faults: Vec<crate::models::Fault>,
+    pub entries: std::collections::BTreeMap<String, PythonCacheEntry>,
+    pub hits: usize,
+    pub misses: usize,
+}
+
+/// One file's planned calls before it is parsed: Fensu codes and thresholds per call.
+#[derive(Debug)]
+pub(crate) struct FilePlan<'a> {
+    pub target: &'a PythonTarget,
+    pub calls: Vec<(Vec<String>, std::collections::HashMap<String, u32>)>,
+    pub identity: String,
+}
+
+/// Planned files split into cached entries that still hold and files to evaluate again.
+#[derive(Debug, Default)]
+pub(crate) struct CacheSplit<'a> {
+    pub fresh: Vec<(String, PythonCacheEntry)>,
+    pub stale: Vec<FilePlan<'a>>,
 }

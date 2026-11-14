@@ -1,12 +1,13 @@
 use crate::configuration::main::validate as config;
 use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY, RELATION_EXCEPTION_RULES};
-use crate::engine::_helpers::cache::{Cache, PendingBucketWrite, RuleCacheEntry};
+use crate::engine::_helpers::cache::{Cache, PendingBucketWrite, RuleCacheBucket, RuleCacheEntry};
 use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
 use crate::models::{
     EvaluateRequest, EvaluateResponse, Fault, Model, RuleException, RuleMetadata, RuleScope,
     RulesCodeGrammar, RulesConfig,
 };
 use crate::python_rules::main::evaluate_python_rules::evaluate_python_rules;
+use crate::python_rules::models::PythonEvaluation;
 use crate::rules::main::{
     assemble_catalogue, evaluate as rules, evaluate_project, fingerprint,
     resolve_threshold_overrides, select, sql_test_coverage,
@@ -186,7 +187,7 @@ fn evaluate_native_models(
             None => cache.put_native_rules_bucket(model_rules_fingerprint, &bucket)?,
             Some(deferred) => {
                 *deferred.borrow_mut() =
-                    Some(cache.pending_native_rules_bucket(model_rules_fingerprint, bucket));
+                    Some(cache.pending_native_rules_bucket(model_rules_fingerprint, bucket)?);
             }
         }
     }
@@ -278,6 +279,52 @@ fn parse_model_payloads(
         })
     };
     results.into_iter().collect()
+}
+
+/// The Python rules' findings, reusing and then replacing their per-file cache when it is enabled.
+fn evaluate_python_phase(
+    request: &EvaluateRequest,
+    selected: &[&RuleMetadata],
+    cache: Option<&Cache>,
+    control: &EvaluationControl<'_>,
+) -> Result<PythonEvaluation, String> {
+    let python_rules: Vec<&RuleMetadata> = selected
+        .iter()
+        .copied()
+        .filter(|rule| rule.scope.evaluates_python())
+        .collect();
+    let fingerprint: String = format!(
+        "{}\0{}.{}",
+        model_rules_fingerprint(&python_rules, &request.config, &request.dialect)?,
+        request.python_version.0,
+        request.python_version.1
+    );
+    let previous = cache
+        .map(|store| store.python_rules_bucket(&fingerprint))
+        .transpose()?
+        .unwrap_or_default();
+    let evaluation = native_rule_pool(request.python_sources.len().max(1))?
+        .install(|| evaluate_python_rules(request, selected, &previous.entries, &fingerprint))?;
+    let unchanged: bool =
+        evaluation.misses == 0 && evaluation.entries.len() == previous.entries.len();
+    if let Some(store) = cache.filter(|_| !unchanged) {
+        let bucket = RuleCacheBucket {
+            fingerprint: fingerprint.clone(),
+            entries: evaluation.entries.clone(),
+        };
+        let write: PendingBucketWrite = store.pending_python_rules_bucket(&fingerprint, &bucket)?;
+        match control.deferred_bucket {
+            None => write.publish()?,
+            Some(deferred) => {
+                let earlier: Option<PendingBucketWrite> = deferred.borrow_mut().take();
+                *deferred.borrow_mut() = Some(match earlier {
+                    Some(earlier) => earlier.then(write),
+                    None => write,
+                });
+            }
+        }
+    }
+    Ok(evaluation)
 }
 
 /// Built-in rules other than SQLClean and the Python rules, which read neither models nor the model cache.
@@ -448,17 +495,18 @@ fn evaluated_request(
         },
         control,
     )?;
-    let cache_hits = native.hits;
-    let cache_misses = native.misses;
+    let mut cache_hits = native.hits;
+    let mut cache_misses = native.misses;
     raw_faults.extend(native.faults);
     if selected.iter().any(|rule| rule.scope.evaluates_python()) {
-        let python_faults: Vec<Fault> = native_rule_pool(request.python_sources.len().max(1))?
-            .install(|| evaluate_python_rules(&request, &selected))?;
+        let python = evaluate_python_phase(&request, &selected, cache.as_ref(), control)?;
         raw_faults.extend(scoped_faults(
             &selected_by_code,
-            python_faults,
+            python.faults,
             RuleScope::evaluates_python,
         )?);
+        cache_hits += python.hits;
+        cache_misses += python.misses;
         if control.cancelled() {
             return Err(CANCELLED.to_owned());
         }

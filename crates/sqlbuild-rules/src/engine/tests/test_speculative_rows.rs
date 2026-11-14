@@ -9,8 +9,9 @@ use crate::engine::main::answer_speculative_rows::answer_speculative_rows;
 use crate::engine::main::evaluate_rows::evaluate_rows;
 use crate::engine::main::start_speculative_rows::start_speculative_rows;
 use crate::engine::tests::helpers::{
-    SPECULATIVE_CACHE_FILE, answer_after_stop, changed_orders_models, discard_after_running,
-    drop_at_once, evaluation_summary, orders_models, speculative_rows_request, written_rules_files,
+    SPECULATIVE_CACHE_FILE, SPECULATIVE_PYTHON_CACHE_FILE, answer_after_stop,
+    changed_orders_models, discard_after_running, drop_at_once, evaluation_summary, orders_models,
+    speculative_rows_request, written_rules_files,
 };
 use crate::engine::tests::test_types::{
     SpeculativeOutcomeTestCase, SpeculativeRowsTestCase, SpeculativeStopTestCase,
@@ -68,7 +69,10 @@ fn given_speculative_rows_when_answering_then_result_and_writes_match_ordinary_e
             return Err(format!("{}: answer stopped", test_case.description));
         };
         let evaluation = evaluation.map_err(|_| "speculative answer failed".to_owned())?;
-        let cache = |dir: &Path| std::fs::read(dir.join(SPECULATIVE_CACHE_FILE)).ok();
+        let cache = |dir: &Path| {
+            [SPECULATIVE_CACHE_FILE, SPECULATIVE_PYTHON_CACHE_FILE]
+                .map(|file| std::fs::read(dir.join(file)).ok())
+        };
         assert_eq!(used, test_case.expected_used, "{}", test_case.description);
         assert_eq!(
             evaluation_summary(&evaluation),

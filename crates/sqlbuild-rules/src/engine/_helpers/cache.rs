@@ -1,12 +1,24 @@
 use crate::models::Fault;
+use crate::python_rules::models::PythonCacheEntry;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct RuleCacheBucket {
+/// Cached findings by path, valid for one ruleset fingerprint.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct RuleCacheBucket<E = RuleCacheEntry> {
     pub fingerprint: String,
-    pub entries: BTreeMap<String, RuleCacheEntry>,
+    pub entries: BTreeMap<String, E>,
+}
+
+impl<E> Default for RuleCacheBucket<E> {
+    fn default() -> Self {
+        Self {
+            fingerprint: String::new(),
+            entries: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -16,6 +28,7 @@ pub(crate) struct RuleCacheEntry {
 }
 
 const FIXTURE_SUMMARIES_FILE: &str = "sql-test-fixtures.json";
+const PYTHON_RULES_FILE: &str = "python.json";
 
 /// Where the SQL-test fixture summaries sit, beside the bulk native rules cache.
 pub(crate) fn fixture_summaries_path(project_dir: &Path, rules_cache_path: &str) -> PathBuf {
@@ -61,31 +74,67 @@ impl Cache {
         &self,
         ruleset_identity: &str,
         bucket: RuleCacheBucket,
-    ) -> PendingBucketWrite {
-        PendingBucketWrite {
-            path: self.native_rules_path.clone(),
-            fingerprint: ruleset_identity.to_owned(),
-            bucket,
-        }
+    ) -> Result<PendingBucketWrite, String> {
+        PendingBucketWrite::new(&self.native_rules_path, ruleset_identity, &bucket)
+    }
+
+    /// The Python rules' findings by file, kept beside the bulk native rules cache.
+    pub(crate) fn python_rules_bucket(
+        &self,
+        ruleset_identity: &str,
+    ) -> Result<RuleCacheBucket<PythonCacheEntry>, String> {
+        read_bucket(&self.python_rules_path(), ruleset_identity)
+    }
+
+    /// The write of the Python rules' findings, held until it is published.
+    pub(crate) fn pending_python_rules_bucket(
+        &self,
+        ruleset_identity: &str,
+        bucket: &RuleCacheBucket<PythonCacheEntry>,
+    ) -> Result<PendingBucketWrite, String> {
+        PendingBucketWrite::new(&self.python_rules_path(), ruleset_identity, bucket)
+    }
+
+    fn python_rules_path(&self) -> PathBuf {
+        self.native_rules_path.with_file_name(PYTHON_RULES_FILE)
     }
 }
 
-/// One bulk rules cache write that has not been made yet.
+/// Rules cache writes that have not been made yet, made in order when published.
 #[derive(Debug)]
 pub(crate) struct PendingBucketWrite {
-    path: PathBuf,
-    fingerprint: String,
-    bucket: RuleCacheBucket,
+    writes: Vec<(PathBuf, Vec<u8>)>,
 }
 
 impl PendingBucketWrite {
-    /// Make the write exactly as `Cache::put_native_rules_bucket` makes it.
+    fn new<E: Clone + Serialize>(
+        path: &Path,
+        fingerprint: &str,
+        bucket: &RuleCacheBucket<E>,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            writes: vec![(path.to_path_buf(), encoded_bucket(fingerprint, bucket)?)],
+        })
+    }
+
+    /// These writes followed by `later`'s.
+    pub(crate) fn then(mut self, later: Self) -> Self {
+        self.writes.extend(later.writes);
+        self
+    }
+
+    /// Make the writes exactly as the immediate `put` methods make them.
     pub(crate) fn publish(&self) -> Result<(), String> {
-        write_bucket(&self.path, &self.fingerprint, &self.bucket)
+        self.writes
+            .iter()
+            .try_for_each(|(path, bytes)| write_bytes(path, bytes))
     }
 }
 
-fn read_bucket(path: &Path, fingerprint: &str) -> Result<RuleCacheBucket, String> {
+fn read_bucket<E: DeserializeOwned>(
+    path: &Path,
+    fingerprint: &str,
+) -> Result<RuleCacheBucket<E>, String> {
     let bytes = match std::fs::read(path) {
         Ok(value) => value,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -96,7 +145,7 @@ fn read_bucket(path: &Path, fingerprint: &str) -> Result<RuleCacheBucket, String
         }
         Err(error) => return Err(format!("could not read bulk rules cache: {error}")),
     };
-    let bucket: RuleCacheBucket = match serde_json::from_slice(&bytes) {
+    let bucket: RuleCacheBucket<E> = match serde_json::from_slice(&bytes) {
         Ok(value) => value,
         Err(error) if error.is_syntax() || error.is_eof() || error.is_data() => {
             RuleCacheBucket::default()
@@ -114,16 +163,26 @@ fn read_bucket(path: &Path, fingerprint: &str) -> Result<RuleCacheBucket, String
 }
 
 fn write_bucket(path: &Path, fingerprint: &str, bucket: &RuleCacheBucket) -> Result<(), String> {
+    write_bytes(path, &encoded_bucket(fingerprint, bucket)?)
+}
+
+fn encoded_bucket<E: Clone + Serialize>(
+    fingerprint: &str,
+    bucket: &RuleCacheBucket<E>,
+) -> Result<Vec<u8>, String> {
     let mut output = bucket.clone();
     output.fingerprint = fingerprint.to_owned();
+    serde_json::to_vec(&output)
+        .map_err(|error| format!("could not encode bulk rules cache: {error}"))
+}
+
+fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| "bulk rules cache path has no parent".to_owned())?;
     std::fs::create_dir_all(parent)
         .map_err(|error| format!("could not create bulk rules cache: {error}"))?;
     let temporary = path.with_extension(format!("tmp-{}", std::process::id()));
-    let bytes = serde_json::to_vec(&output)
-        .map_err(|error| format!("could not encode bulk rules cache: {error}"))?;
     std::fs::write(&temporary, bytes)
         .map_err(|error| format!("could not write bulk rules cache: {error}"))?;
     std::fs::rename(&temporary, path)

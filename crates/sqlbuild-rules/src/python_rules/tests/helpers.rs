@@ -5,6 +5,7 @@ use fensu_native::{NativeProjectPlane, NativeRuleContext, evaluate_core_rules};
 
 use crate::engine::_helpers::memo::{evaluate_rows, prepare};
 use crate::models::{EvaluateRequest, RowsRequest, RuleMetadata, RuleScope, RulesConfig};
+use crate::python_rules::tests::test_types::CachedRuns;
 use crate::rules::_helpers::catalogue::{catalogue, select};
 
 /// How many distinct `SQBRPYTHON` codes the catalogue holds.
@@ -125,5 +126,69 @@ pub(super) fn owned_faults(faults: &[(&str, &str, u64, u64)]) -> Vec<(String, St
     faults
         .iter()
         .map(|(code, path, line, column)| ((*code).to_owned(), (*path).to_owned(), *line, *column))
+        .collect()
+}
+
+/// Python faults of two cached runs, `files` then `changes` under `changed_config`, and the second's cache use.
+pub(super) fn cached_runs(
+    files: &[(&str, &str)],
+    config: serde_json::Value,
+    changes: &[(&str, &str)],
+    changed_config: serde_json::Value,
+) -> Result<CachedRuns, String> {
+    let directory = tempfile::tempdir().map_err(|error| error.to_string())?;
+    write_files(directory.path(), files)?;
+    let first = cached_run(directory.path(), config)?;
+    write_files(directory.path(), changes)?;
+    let second = cached_run(directory.path(), changed_config)?;
+    Ok(CachedRuns {
+        first_faults: python_codes(&first),
+        second_faults: python_codes(&second),
+        second_hits: second.cache_hits,
+        second_misses: second.cache_misses,
+    })
+}
+
+fn write_files(root: &std::path::Path, files: &[(&str, &str)]) -> Result<(), String> {
+    for (path, contents) in files {
+        let file = root.join(path);
+        std::fs::create_dir_all(file.parent().expect("parent"))
+            .map_err(|error| error.to_string())?;
+        std::fs::write(&file, contents).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn cached_run(
+    project_dir: &std::path::Path,
+    config: serde_json::Value,
+) -> Result<crate::models::RowsEvaluation, String> {
+    let request = EvaluateRequest {
+        project_dir: project_dir.to_string_lossy().into_owned(),
+        config: serde_json::from_value(config).map_err(|error| error.to_string())?,
+        ..EvaluateRequest::default()
+    };
+    evaluate_rows(RowsRequest {
+        request,
+        memo: None,
+        retain: false,
+    })
+    .map_err(|error| format!("{error:?}"))
+}
+
+fn python_codes(evaluation: &crate::models::RowsEvaluation) -> Vec<(String, String)> {
+    evaluation
+        .faults
+        .iter()
+        .filter(|fault| fault.code.starts_with("SQBRPYTHON"))
+        .map(|fault| (fault.code.clone(), fault.path.clone()))
+        .collect()
+}
+
+/// Expected faults as owned code and path pairs.
+pub(super) fn named_faults(items: &[(&str, &str)]) -> Vec<(String, String)> {
+    items
+        .iter()
+        .map(|(code, path)| ((*code).to_owned(), (*path).to_owned()))
         .collect()
 }

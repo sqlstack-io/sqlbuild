@@ -46,3 +46,20 @@ pub(super) struct PythonParseFailureTestCase {
     pub(super) files: &'static [(&'static str, &'static str)],
     pub(super) expected_error: &'static str,
 }
+
+#[derive(Debug, PartialEq)]
+pub(super) struct CachedRuns {
+    pub(super) first_faults: Vec<(String, String)>,
+    pub(super) second_faults: Vec<(String, String)>,
+    pub(super) second_hits: u64,
+    pub(super) second_misses: u64,
+}
+
+pub(super) struct PythonCacheTestCase {
+    pub(super) description: &'static str,
+    pub(super) files: &'static [(&'static str, &'static str)],
+    pub(super) config: serde_json::Value,
+    pub(super) changes: &'static [(&'static str, &'static str)],
+    pub(super) changed_config: serde_json::Value,
+    pub(super) expected_runs: CachedRuns,
+}

@@ -1,25 +1,24 @@
-//! Which file runs which rules, and the faults each `evaluate_core_rules` call reports.
+//! Which file runs which rules, and each file's findings, from the cache when its answers still hold.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use fensu_facts::snapshot::models::RepositoryObservationIndex;
-
 use fensu_native::{
     NativeExecutionRule, NativeExecutionTarget, NativeProjectPlane, NativeProjectQuery,
     NativeRuleContext, evaluate_core_rules, plan_core_rule_queries, plan_execution_owners,
 };
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::models::{Fault, RuleMetadata};
 use crate::python_rules::_helpers::contexts::{rule_context, threshold_calls};
 use crate::python_rules::_helpers::faults::python_fault;
+use crate::python_rules::_helpers::file_cache::{answers_digest, file_identity};
 use crate::python_rules::_helpers::observations::{observations, repository_index};
 use crate::python_rules::constants::{PACKAGE_ROOT, PYTHON_RULES, ROOT_SCOPE};
 use crate::python_rules::models::{
-    CallInputs, PythonFiles, PythonRuleSpec, PythonTarget, RuleCall,
+    CacheSplit, CallInputs, FilePlan, PythonCacheEntry, PythonEvaluation, PythonFiles,
+    PythonRuleSpec, PythonTarget, RuleCall,
 };
 
 /// The selected rules that Fensu evaluates.
@@ -31,56 +30,201 @@ pub(crate) fn selected_rules(selected: &[&RuleMetadata]) -> Vec<&'static PythonR
         .collect()
 }
 
-/// Every call of the run, with the project questions each one asks.
-pub(crate) fn rule_calls<'a>(
+/// Each file's calls and cache identity, worked out before any file is parsed.
+pub(crate) fn file_plans<'a>(
     targets: &'a [PythonTarget],
     rules: &[&PythonRuleSpec],
     inputs: &CallInputs<'_>,
-) -> Result<Vec<RuleCall<'a>>, String> {
+) -> Result<Vec<FilePlan<'a>>, String> {
     Ok(targets
-        .par_iter()
-        .zip(file_rules(targets, rules)?.into_par_iter())
-        .map(|(target, rules)| planned_calls(target, &rules, inputs))
-        .collect::<Result<Vec<_>, String>>()?
-        .into_iter()
-        .flatten()
+        .iter()
+        .zip(file_rules(targets, rules)?)
+        .filter(|(_, rules)| !rules.is_empty())
+        .map(|(target, rules)| {
+            let calls = threshold_calls(&rules, &inputs.request.config, target.is_main_module);
+            FilePlan {
+                target,
+                identity: file_identity(target, &calls, inputs),
+                calls,
+            }
+        })
         .collect())
 }
 
-/// The faults of `calls`, answering their project questions from one walk of the project.
-pub(crate) fn call_faults(
-    calls: Vec<RuleCall<'_>>,
+/// Every planned file's findings: cached ones whose project answers still hold, the rest evaluated.
+pub(crate) fn evaluated_files(
+    plans: Vec<FilePlan<'_>>,
     inputs: &CallInputs<'_>,
     plane: &NativeProjectPlane,
-) -> Result<Vec<Fault>, String> {
-    let queries: Vec<&NativeProjectQuery> =
-        calls.iter().flat_map(|call| call.queries.iter()).collect();
-    let index = repository_index(Path::new(&inputs.request.project_dir), &queries)?;
-    Ok(calls
-        .into_par_iter()
-        .map(|call| call_rows(call, inputs, &index, plane))
-        .collect::<Result<Vec<Vec<Fault>>, String>>()?
-        .into_iter()
-        .flatten()
-        .collect())
+) -> Result<PythonEvaluation, String> {
+    let split: CacheSplit<'_> = cached_files(plans, inputs)?;
+    let hits: usize = split.fresh.len();
+    let misses: usize = split.stale.len();
+    let mut entries: BTreeMap<String, PythonCacheEntry> = split.fresh.into_iter().collect();
+    entries.extend(evaluate_files(split.stale, inputs, plane)?);
+    Ok(PythonEvaluation {
+        faults: entries
+            .values()
+            .flat_map(|entry| entry.faults.iter().cloned())
+            .collect(),
+        entries,
+        hits,
+        misses,
+    })
 }
 
-fn call_rows(
-    call: RuleCall<'_>,
+/// Split `plans` into cached entries that still hold and files to evaluate again.
+fn cached_files<'a>(
+    plans: Vec<FilePlan<'a>>,
+    inputs: &CallInputs<'_>,
+) -> Result<CacheSplit<'a>, String> {
+    let cached = |plan: &FilePlan<'_>| {
+        inputs
+            .cached
+            .get(&plan.target.repository_path)
+            .filter(|entry| entry.identity == plan.identity)
+    };
+    let queries: Vec<NativeProjectQuery> = plans
+        .iter()
+        .filter_map(cached)
+        .flat_map(|entry| entry.queries.iter().map(project_query))
+        .collect();
+    let index: Option<RepositoryObservationIndex> = (!queries.is_empty())
+        .then(|| {
+            let borrowed: Vec<&NativeProjectQuery> = queries.iter().collect();
+            repository_index(Path::new(&inputs.request.project_dir), &borrowed)
+        })
+        .transpose()?;
+    let mut split: CacheSplit<'a> = CacheSplit::default();
+    for plan in plans {
+        match cached(&plan) {
+            Some(entry) if still_holds(entry, inputs, index.as_ref())? => {
+                split
+                    .fresh
+                    .push((plan.target.repository_path.clone(), entry.clone()));
+            }
+            _ => split.stale.push(plan),
+        }
+    }
+    Ok(split)
+}
+
+/// Whether `entry`'s recorded project questions still have the answers it was computed from.
+fn still_holds(
+    entry: &PythonCacheEntry,
+    inputs: &CallInputs<'_>,
+    index: Option<&RepositoryObservationIndex>,
+) -> Result<bool, String> {
+    let queries: Vec<NativeProjectQuery> = entry.queries.iter().map(project_query).collect();
+    let answers: BTreeMap<String, Vec<String>> = match index {
+        Some(index) => observations(&queries, inputs.programs, index)?
+            .into_iter()
+            .collect(),
+        None => BTreeMap::new(),
+    };
+    Ok(answers_digest(&answers) == entry.answers)
+}
+
+/// Parse and evaluate `plans`, answering every file's project questions from one walk.
+fn evaluate_files(
+    plans: Vec<FilePlan<'_>>,
+    inputs: &CallInputs<'_>,
+    plane: &NativeProjectPlane,
+) -> Result<Vec<(String, PythonCacheEntry)>, String> {
+    if plans.is_empty() {
+        return Ok(Vec::new());
+    }
+    let files: Vec<(FilePlan<'_>, Vec<RuleCall>)> = plans
+        .into_par_iter()
+        .map(|plan| {
+            let calls = file_calls(&plan, inputs)?;
+            Ok((plan, calls))
+        })
+        .collect::<Result<_, String>>()?;
+    let mut queries: Vec<&NativeProjectQuery> = Vec::new();
+    for call in files.iter().flat_map(|(_, calls)| calls) {
+        queries.extend(call.queries.iter());
+    }
+    let index = repository_index(Path::new(&inputs.request.project_dir), &queries)?;
+    files
+        .into_par_iter()
+        .map(|file| file_entry(file, inputs, &index, plane))
+        .collect()
+}
+
+/// One file's findings and the cache entry that records what they were computed from.
+fn file_entry(
+    (plan, calls): (FilePlan<'_>, Vec<RuleCall>),
     inputs: &CallInputs<'_>,
     index: &RepositoryObservationIndex,
     plane: &NativeProjectPlane,
-) -> Result<Vec<Fault>, String> {
-    let context = NativeRuleContext {
-        observations: observations(&call.queries, inputs.programs, index)?,
-        ..call.context
-    };
-    let program = inputs.programs.program(call.target.source)?;
+) -> Result<(String, PythonCacheEntry), String> {
+    let mut answers: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut queries: Vec<(String, String, String)> = Vec::new();
     let mut faults: Vec<Fault> = Vec::new();
-    for row in evaluate_core_rules(program, &call.codes, &context, plane)? {
-        faults.extend(python_fault(row, call.target, inputs.programs)?);
+    for call in calls {
+        let observed = observations(&call.queries, inputs.programs, index)?;
+        answers.extend(
+            observed
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone())),
+        );
+        queries.extend(call.queries.iter().map(|query| {
+            (
+                query.kind.clone(),
+                query.path.clone(),
+                query.argument.clone(),
+            )
+        }));
+        let context = NativeRuleContext {
+            observations: observed,
+            ..call.context
+        };
+        let program = inputs.programs.program(plan.target.source)?;
+        for row in evaluate_core_rules(program, &call.codes, &context, plane)? {
+            faults.extend(python_fault(row, plan.target, inputs.programs)?);
+        }
     }
-    Ok(faults)
+    queries.sort();
+    queries.dedup();
+    Ok((
+        plan.target.repository_path.clone(),
+        PythonCacheEntry {
+            identity: plan.identity,
+            queries,
+            answers: answers_digest(&answers),
+            faults,
+        },
+    ))
+}
+
+/// The file's calls with their contexts and project questions; parses the file.
+fn file_calls<'a>(plan: &FilePlan<'a>, inputs: &CallInputs<'_>) -> Result<Vec<RuleCall>, String> {
+    let program = inputs.programs.program(plan.target.source)?;
+    let base: NativeRuleContext = rule_context(plan.target, &inputs.settings);
+    Ok(plan
+        .calls
+        .iter()
+        .map(|(codes, thresholds)| {
+            let context = NativeRuleContext {
+                thresholds: thresholds.clone(),
+                ..base.clone()
+            };
+            RuleCall {
+                queries: plan_core_rule_queries(program, codes, &context),
+                codes: codes.clone(),
+                context,
+            }
+        })
+        .collect())
+}
+
+fn project_query((kind, path, argument): &(String, String, String)) -> NativeProjectQuery {
+    NativeProjectQuery {
+        kind: kind.clone(),
+        path: path.clone(),
+        argument: argument.clone(),
+    }
 }
 
 /// Each file's rules; project-, scope- and package-wide rules run once, on the file Fensu picks.
@@ -135,33 +279,4 @@ fn execution_target(target: &PythonTarget) -> NativeExecutionTarget {
         ownership_root: target.package.then(|| PACKAGE_ROOT.to_owned()),
         ownership_offset: target.package.then_some(0),
     }
-}
-
-fn planned_calls<'a>(
-    target: &'a PythonTarget,
-    rules: &[&PythonRuleSpec],
-    inputs: &CallInputs<'_>,
-) -> Result<Vec<RuleCall<'a>>, String> {
-    if rules.is_empty() {
-        return Ok(Vec::new());
-    }
-    let program = inputs.programs.program(target.source)?;
-    let base: NativeRuleContext = rule_context(target, &inputs.settings);
-    Ok(
-        threshold_calls(rules, &inputs.request.config, target.is_main_module)
-            .into_iter()
-            .map(|(codes, thresholds)| {
-                let context = NativeRuleContext {
-                    thresholds,
-                    ..base.clone()
-                };
-                RuleCall {
-                    target,
-                    queries: plan_core_rule_queries(program, &codes, &context),
-                    codes,
-                    context,
-                }
-            })
-            .collect(),
-    )
 }
