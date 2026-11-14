@@ -10,12 +10,8 @@ pub(crate) const SOURCE_STALE_CONDITION: &str = "source_stale";
 pub(crate) const SENSOR_CONTEXT_PARAMETER: &str = "ctx";
 
 pub(crate) const AUTHORING_MODULE: &str = "sqlbuild.orchestration_declarations.models.authoring";
-/// The removed records `sqb migrate orchestration` rebuilds while it imports a project.
-pub(crate) const LEGACY_AUTHORING_MODULE: &str =
-    "sqlbuild.orchestration_declarations.models.legacy_authoring";
 /// Frames of these modules construct declarations on the author's behalf.
-pub(crate) const CONSTRUCTING_MODULES: [&str; 3] =
-    [AUTHORING_MODULE, LEGACY_AUTHORING_MODULE, "dataclasses"];
+pub(crate) const CONSTRUCTING_MODULES: [&str; 2] = [AUTHORING_MODULE, "dataclasses"];
 
 /// The authoring classes publication imports calendar and sensor modules for.
 pub(crate) const CALENDAR_CLASS: &str = "Calendar";

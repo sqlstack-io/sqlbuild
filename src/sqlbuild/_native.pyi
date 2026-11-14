@@ -2332,7 +2332,6 @@ def update_sqlbuild_skills(
 def maintain_sqlbuild_skills(*, project_dir: Path) -> SkillMaintenanceResult: ...
 def load_packaged_skill_files() -> dict[str, str]: ...
 def run_playground_command(request: PlaygroundCommandRequest) -> int: ...
-def run_migrate_command(**options: object) -> int: ...
 def describe_connection_warehouse(
     *,
     discovered_inputs: DiscoveredProjectInputs,
@@ -7434,7 +7433,6 @@ class CliEntrypointHandlers(NativeRecord):
     run_recall: Callable[..., int] | None
     run_review: Callable[..., int] | None
     run_location: Callable[..., int] | None
-    run_migrate: Callable[..., int] | None
     def __init__(
         self,
         run_compile: Callable[[CompileCommandRequest], int],
@@ -7472,7 +7470,6 @@ class CliEntrypointHandlers(NativeRecord):
         run_recall: Callable[..., int] | None = None,
         run_review: Callable[..., int] | None = None,
         run_location: Callable[..., int] | None = None,
-        run_migrate: Callable[..., int] | None = None,
     ) -> None: ...
 
 class CommandWarehouseScope(NativeRecord):
@@ -8210,7 +8207,6 @@ class CliCommand(StrEnum):
     RENAME = "rename"
     MV = "mv"
     RECALL = "recall"
-    MIGRATE = "migrate"
 
 class ScopeCommandHandler(Protocol):
     def __call__(self, *, request: ScopeCommandRequest) -> int: ...

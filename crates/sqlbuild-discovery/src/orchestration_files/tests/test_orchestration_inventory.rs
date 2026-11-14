@@ -116,20 +116,20 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
     cases.push(InventoryErrorCase {
         description: "loose file",
         files: with("orchestration/jobs.py", "x = 1\n"),
-        expected_message: "orchestration/jobs.py:1:1: files cannot sit directly in orchestration/, except renames.toml",
-        expected_help: Some("run `sqb migrate orchestration` to move Python jobs, job groups and schedules into TOML"),
+        expected_message: "orchestration/jobs.py:1:1: files cannot sit directly in orchestration/",
+        expected_help: Some("jobs, job groups and schedules are TOML files in orchestration/jobs/ and orchestration/job_groups/; see https://sqlbuild.com/docs/concepts/orchestration/"),
     });
     cases.push(InventoryErrorCase {
         description: "loose non-Python file",
         files: with("orchestration/nightly.toml", EXPORT_JOB),
-        expected_message: "orchestration/nightly.toml:1:1: files cannot sit directly in orchestration/, except renames.toml",
+        expected_message: "orchestration/nightly.toml:1:1: files cannot sit directly in orchestration/",
         expected_help: Some("move it into one of orchestration/jobs/, orchestration/job_groups/, orchestration/calendars/, orchestration/sensors/"),
     });
     cases.push(InventoryErrorCase {
         description: "unknown folder of Python modules",
         files: with("orchestration/pipelines/daily/orders.py", "x = 1\n"),
         expected_message: "orchestration/pipelines:1:1: unknown orchestration folder 'pipelines'",
-        expected_help: Some("run `sqb migrate orchestration` to move Python jobs, job groups and schedules into TOML"),
+        expected_help: Some("jobs, job groups and schedules are TOML files in orchestration/jobs/ and orchestration/job_groups/; see https://sqlbuild.com/docs/concepts/orchestration/"),
     });
     cases.push(InventoryErrorCase {
         description: "unknown folder",
@@ -141,7 +141,7 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
         description: "python job",
         files: with("orchestration/jobs/orders/legacy.py", "x = 1\n"),
         expected_message: "orchestration/jobs/orders/legacy.py:1:1: orchestration/jobs/ holds only .toml files",
-        expected_help: Some("run `sqb migrate orchestration` to move Python jobs, job groups and schedules into TOML"),
+        expected_help: Some("jobs, job groups and schedules are TOML files in orchestration/jobs/ and orchestration/job_groups/; see https://sqlbuild.com/docs/concepts/orchestration/"),
     });
     cases.push(InventoryErrorCase {
         description: "non-TOML job file",
@@ -204,48 +204,7 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
             "from sqlbuild.orchestration import job, sensor\nstale = sensor(name=\"stock_stale_sensor\", description=\"d\", run=\"orders_export_job\")\n",
         ),
         expected_message: "orchestration/sensors/inventory/stock.py:1:36: `job` was removed from sqlbuild.orchestration; jobs, job groups and schedules are declared in TOML",
-        expected_help: Some("run `sqb migrate orchestration` to move Python jobs, job groups and schedules into TOML"),
-    });
-    let renamed = |text: &'static str| {
-        let mut files = valid();
-        files.push(("orchestration/renames.toml", text));
-        files
-    };
-    cases.push(InventoryErrorCase {
-        description: "rename to an undeclared job",
-        files: renamed("[jobs]\norders_export = \"orders_exports_job\"\n"),
-        expected_message: "orchestration/renames.toml:2:17: [jobs] renames 'orders_export' to 'orders_exports_job', which is not a declared job or job group",
-        expected_help: None,
-    });
-    cases.push(InventoryErrorCase {
-        description: "old name still declared",
-        files: renamed("[jobs]\norders_export_job = \"orders_nightly_job_group\"\n"),
-        expected_message: "orchestration/renames.toml:2:1: [jobs] renames 'orders_export_job', which is still declared",
-        expected_help: Some("remove the pair, or finish the rename in the declaration"),
-    });
-    cases.push(InventoryErrorCase {
-        description: "chained renames",
-        files: renamed("[sensors]\nstock = \"stock_stale\"\nstock_stale = \"stock_stale_sensor\"\n"),
-        expected_message: "orchestration/renames.toml:3:1: 'stock_stale' is both a new name and an old name; renames cannot chain",
-        expected_help: Some("map each old name straight to its final name"),
-    });
-    cases.push(InventoryErrorCase {
-        description: "two names onto one",
-        files: renamed("[jobs]\norders = \"orders_export_job\"\nexport = \"orders_export_job\"\n"),
-        expected_message: "orchestration/renames.toml:3:10: two names are renamed to 'orders_export_job'",
-        expected_help: None,
-    });
-    cases.push(InventoryErrorCase {
-        description: "trigger onto an unscheduled run",
-        files: renamed("[triggers]\ntrading_days = \"orders_nightly_job_group\"\n"),
-        expected_message: "orchestration/renames.toml:2:16: [triggers] renames 'trading_days' to 'orders_nightly_job_group', which is not a job or job group with a schedule",
-        expected_help: None,
-    });
-    cases.push(InventoryErrorCase {
-        description: "unknown renames section",
-        files: renamed("[groups]\nnightly = \"orders_nightly_job_group\"\n"),
-        expected_message: "orchestration/renames.toml:1:2: unknown renames file key 'groups'",
-        expected_help: Some("supported keys: jobs, sensors, triggers"),
+        expected_help: Some("jobs, job groups and schedules are TOML files in orchestration/jobs/ and orchestration/job_groups/; see https://sqlbuild.com/docs/concepts/orchestration/"),
     });
     for case in cases {
         let (actual, actual_help) = message(&case.files);
@@ -257,25 +216,4 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
             case.description
         );
     }
-}
-
-#[test]
-fn given_renames_file_when_inventorying_then_reads_each_section_as_the_server_document() {
-    let mut files = valid();
-    files.push((
-        "orchestration/renames.toml",
-        "[jobs]\norders_export = \"orders_export_job\"\nnightly = \"orders_nightly_job_group\"\n\n[sensors]\nstock = \"stock_stale_sensor\"\n\n[triggers]\ntrading_days = \"orders_export_job\"\n",
-    ));
-    let directory = project(&files);
-    let found = inventory(directory.path()).expect("valid renames");
-    let (path, renames) = found.renames.expect("renames read");
-    assert_eq!(path, "orchestration/renames.toml");
-    assert_eq!(
-        renames.document(),
-        serde_json::json!({
-            "jobs": {"orders_export": "orders_export_job", "nightly": "orders_nightly_job_group"},
-            "sensors": {"stock": "stock_stale_sensor"},
-            "triggers": {"trading_days": "orders_export_job"},
-        })
-    );
 }

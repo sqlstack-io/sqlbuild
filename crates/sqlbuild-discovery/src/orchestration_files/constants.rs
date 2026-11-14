@@ -47,15 +47,10 @@ pub const JOB_KIND: (&str, &str) = ("job", "_job");
 pub const GROUP_KIND: (&str, &str) = ("job group", "_job_group");
 pub const CALENDAR_KIND: (&str, &str) = ("calendar", "_calendar");
 pub const SENSOR_KIND: (&str, &str) = ("sensor", "_sensor");
-/// What to run when a project still declares orchestration the old way.
-pub const MIGRATE_HELP: &str =
-    "run `sqb migrate orchestration` to move Python jobs, job groups and schedules into TOML";
+/// Where jobs, job groups and schedules are declared now, for projects that still use Python.
+pub const TOML_JOBS_HELP: &str = "jobs, job groups and schedules are TOML files in orchestration/jobs/ and orchestration/job_groups/; see https://sqlbuild.com/docs/concepts/orchestration/";
 /// The folder Python writes bytecode to, which declarations never live in.
 pub(crate) const BYTECODE_DIRECTORY: &str = "__pycache__";
 /// The prefix of hidden files and folders, and of private support modules.
 pub(crate) const HIDDEN_PREFIX: char = '.';
 pub(crate) const PRIVATE_PREFIX: char = '_';
-/// The file `sqb migrate orchestration` writes in `orchestration/`, mapping old names to new.
-pub const RENAMES_FILE: &str = "renames.toml";
-/// The sections of the renames file: jobs and groups, sensors, and schedule triggers.
-pub const RENAME_SECTIONS: [&str; 3] = ["jobs", "sensors", "triggers"];

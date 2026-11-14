@@ -23,16 +23,6 @@ rule = 3
 note = "Public calendar and sensor authoring records only; jobs, job groups and schedules are TOML read natively, and selection, validation and scheduling stay native."
 
 [[stays]]
-path = "orchestration_declarations/models/legacy_authoring.py"
-rule = 2
-note = "Approved temporary exception: the removed job, job group and schedule records, rebuilt only while `sqb migrate orchestration` imports a project, because jobs built in loops or from constants exist only once their module runs. Remove in the next minor release after the TOML orchestration release."
-
-[[stays]]
-path = "orchestration_declarations/main/migrate_orchestration.py"
-rule = 2
-note = "Approved temporary exception: `sqb migrate orchestration` imports the project's old orchestration modules once and writes TOML from what they built, because jobs built in loops or from constants exist only at runtime. Remove in the next minor release after the TOML orchestration release."
-
-[[stays]]
 path = "orchestration_declarations/models/sensor_context.py"
 rule = 3
 note = "Only the mutable SensorContext authoring declaration required by ctx.cursor assignment; no Python runtime allowance. Native fenced completion validates and commits proposed progress."

@@ -21,9 +21,6 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
-
-/// The snapshot document carrying the renames file, which the server applies to stored state.
-const RENAMES_DOCUMENT: &str = "renames";
 use crate::bindings::_helpers::native_host::constants::{AUTHORING_MODULE, SENSOR_CLASS};
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     AuthoredSensor, module_declarations, run_controls, run_resources,
@@ -324,11 +321,6 @@ pub(crate) fn compile_declarations(
             key.into(),
             document.map_err(|error| PyValueError::new_err(error.to_string()))?,
         );
-    }
-    if let Some((_, renames)) = &inventory.renames {
-        input
-            .documents
-            .insert(RENAMES_DOCUMENT.into(), renames.document());
     }
     snapshot_definitions(&input).map_err(|error| PyValueError::new_err(error.to_string()))?;
     Ok(input)

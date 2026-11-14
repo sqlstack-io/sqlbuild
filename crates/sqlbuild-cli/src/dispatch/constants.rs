@@ -693,21 +693,6 @@ pub(crate) const SKILLS_ROUTE: Route = routed(
     },
 );
 
-const MIGRATE_ARGUMENTS: [Field; 3] = [
-    PROJECT_DIR,
-    attr("subject", "migrate_subject"),
-    attr("dry_run", "dry_run"),
-];
-pub(crate) const MIGRATE_ROUTE: Route = routed(
-    "run_migrate",
-    "run_migrate_command",
-    &MIGRATE_ARGUMENTS,
-    CallShape {
-        slot_positional: 0,
-        implementation_keywords: true,
-    },
-);
-
 const FORMAT_ARGUMENTS: [Field; 10] = [
     PROJECT_DIR,
     field("select", Source::FormatSelect),

@@ -24,7 +24,7 @@ pub(crate) const SETTING_SNIPPET_INDENT: &str = "            ";
 /// Two quotes around at least one character.
 pub(crate) const MIN_QUOTED_IDENTIFIER_LENGTH: usize = 3;
 /// The warehouse group each CLI command selects a target's default warehouse from.
-pub const COMMAND_WAREHOUSE_GROUPS: [(&str, Option<&str>); 33] = [
+pub const COMMAND_WAREHOUSE_GROUPS: [(&str, Option<&str>); 32] = [
     ("audit", Some("build")),
     ("build", Some("build")),
     ("check", Some("build")),
@@ -51,7 +51,6 @@ pub const COMMAND_WAREHOUSE_GROUPS: [(&str, Option<&str>); 33] = [
     ("init", None),
     ("lineage", None),
     ("location", None),
-    ("migrate", None),
     ("mv", None),
     ("playground", None),
     ("rename", None),

@@ -6,7 +6,7 @@ use sqlbuild_pysource::orchestration_modules::models::{
 };
 
 use crate::orchestration_files::constants::{
-    CALENDAR_KIND, MIGRATE_HELP, PRIVATE_PREFIX, SENSOR_KIND,
+    CALENDAR_KIND, PRIVATE_PREFIX, SENSOR_KIND, TOML_JOBS_HELP,
 };
 use crate::orchestration_files::models::{FileError, FilePosition, NamedModule, Positioned};
 
@@ -82,7 +82,7 @@ pub(crate) fn module_declaration(
             format!(
                 "`{name}` was removed from sqlbuild.orchestration; jobs, job groups and schedules are declared in TOML"
             ),
-            Some(MIGRATE_HELP.to_owned()),
+            Some(TOML_JOBS_HELP.to_owned()),
         ));
     }
     let (noun, suffix) = label(kind);

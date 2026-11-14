@@ -6,14 +6,13 @@ use crate::_helpers::reading::read_authored_text;
 use crate::constants::{ORCHESTRATION_DIRECTORY, PYTHON_FILE_SUFFIX};
 use crate::models::{DiscoveryFailure, FailureKind};
 use crate::orchestration_files::_helpers::python_modules::module_declaration;
-use crate::orchestration_files::_helpers::references::{check_references, check_renames};
+use crate::orchestration_files::_helpers::references::check_references;
 use crate::orchestration_files::constants::{
     BYTECODE_DIRECTORY, CALENDARS_DIRECTORY, GROUPS_DIRECTORY, HIDDEN_PREFIX, JOBS_DIRECTORY,
-    MIGRATE_HELP, RENAMES_FILE, SENSORS_DIRECTORY, TOML_FILE_SUFFIX,
+    SENSORS_DIRECTORY, TOML_FILE_SUFFIX, TOML_JOBS_HELP,
 };
 use crate::orchestration_files::main::read_group_file::read_group_file;
 use crate::orchestration_files::main::read_job_file::read_job_file;
-use crate::orchestration_files::main::read_renames_file::read_renames_file;
 use crate::orchestration_files::models::{
     FileError, FilePosition, OrchestrationFailure, OrchestrationInventory,
 };
@@ -90,7 +89,7 @@ fn role_files(
                 &path,
                 format!("orchestration/{role}/ holds only {suffix} files"),
                 Some(match role {
-                    _ if python_job => MIGRATE_HELP.to_owned(),
+                    _ if python_job => TOML_JOBS_HELP.to_owned(),
                     JOBS_DIRECTORY | GROUPS_DIRECTORY => {
                         "jobs and job groups are TOML; calendars and sensors are Python in orchestration/calendars/ and orchestration/sensors/".to_owned()
                     }
@@ -116,18 +115,12 @@ pub fn orchestration_inventory(
         if ignored(&entry) {
             continue;
         }
-        if !entry.is_dir && entry.name == RENAMES_FILE {
-            let renames =
-                read_renames_file(&read(tree, &path)?).map_err(|error| failure(&path, error))?;
-            inventory.renames = Some((path, renames));
-            continue;
-        }
         if !entry.is_dir {
             return Err(layout(
                 &path,
-                format!("files cannot sit directly in orchestration/, except {RENAMES_FILE}"),
+                "files cannot sit directly in orchestration/".to_owned(),
                 Some(if entry.name.ends_with(PYTHON_FILE_SUFFIX) {
-                    MIGRATE_HELP.to_owned()
+                    TOML_JOBS_HELP.to_owned()
                 } else {
                     format!(
                         "move it into one of orchestration/{}/",
@@ -145,7 +138,7 @@ pub fn orchestration_inventory(
                 &path,
                 format!("unknown orchestration folder '{}'", entry.name),
                 Some(if holds_python {
-                    MIGRATE_HELP.to_owned()
+                    TOML_JOBS_HELP.to_owned()
                 } else {
                     format!("use one of: {}", ROLE_DIRECTORIES.join(", "))
                 }),
@@ -183,6 +176,5 @@ pub fn orchestration_inventory(
         }
     }
     check_references(&inventory).map_err(|(path, error)| failure(&path, error))?;
-    check_renames(&inventory).map_err(|(path, error)| failure(&path, error))?;
     Ok(inventory)
 }
