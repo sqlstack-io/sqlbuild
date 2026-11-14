@@ -1,7 +1,12 @@
 use serde_json::json;
 
+use fensu_native::NativeProjectQuery;
+
+use crate::python_rules::_helpers::observations::relative_query;
 use crate::python_rules::tests::helpers::{cached_runs, named_faults};
-use crate::python_rules::tests::test_types::{CachedRuns, PythonCacheTestCase};
+use crate::python_rules::tests::test_types::{
+    CachedRuns, PythonCacheTestCase, RelativeQueryTestCase,
+};
 
 const UNANNOTATED: &str = "def send(count) -> None:\n    pass\n";
 const ANNOTATED: &str = "def send(count: int) -> None:\n    pass\n";
@@ -114,6 +119,51 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
         assert_eq!(
             runs,
             Ok(test_case.expected_runs),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_planned_project_query_when_caching_it_then_its_path_is_relative_to_the_project() {
+    let test_cases = [
+        RelativeQueryTestCase {
+            description: "a POSIX path below the project",
+            project_dir: "/work/proj",
+            path: "/work/proj/python/inventory",
+            expected_path: "python/inventory",
+        },
+        RelativeQueryTestCase {
+            description: "a Windows project directory against Fensu's forward-slash path",
+            project_dir: "C:\\work\\proj",
+            path: "C:/work/proj/python/inventory",
+            expected_path: "python/inventory",
+        },
+        RelativeQueryTestCase {
+            description: "the project directory itself",
+            project_dir: "/work/proj",
+            path: "/work/proj",
+            expected_path: ".",
+        },
+        RelativeQueryTestCase {
+            description: "a sibling directory sharing the project's name prefix",
+            project_dir: "/work/proj",
+            path: "/work/proj2/python",
+            expected_path: "/work/proj2/python",
+        },
+    ];
+    for test_case in test_cases {
+        let query = NativeProjectQuery {
+            kind: "directory_entries".to_owned(),
+            path: test_case.path.to_owned(),
+            argument: String::new(),
+        };
+
+        let relative = relative_query(query, test_case.project_dir);
+
+        assert_eq!(
+            relative.path, test_case.expected_path,
             "{}",
             test_case.description
         );

@@ -877,6 +877,8 @@ pub(crate) const LOADED_DECORATORS: [&str; 6] = [
 ];
 /// Fensu codes whose own remediation names settings SQLBuild does not have, so the catalogue's is used.
 pub(crate) const CATALOGUE_REMEDIATION_CODES: [&str; 1] = [fensu::DEAD_DEFINITION_CODE];
+/// How Fensu's observation index names the project directory itself.
+pub(crate) const PROJECT_ROOT_QUERY_PATH: &str = ".";
 /// The entry-point kind recorded for modules SQLBuild loads.
 pub(crate) const ENTRYPOINT_KIND: &str = "sqlbuild";
 /// Fensu's family of naming-contract rules, which read the naming contracts.

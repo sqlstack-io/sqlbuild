@@ -10,6 +10,7 @@ use fensu_native::NativeProjectQuery;
 
 use crate::python_rules::_helpers::placement::package_anchor;
 use crate::python_rules::_helpers::programs::Programs;
+use crate::python_rules::constants::PROJECT_ROOT_QUERY_PATH;
 
 const TRUE_TEXT: &str = "true";
 const FALSE_TEXT: &str = "false";
@@ -122,9 +123,16 @@ fn filesystem_query(query: &NativeProjectQuery) -> RepositoryObservationQuery {
 }
 
 /// `query` with its path relative to `project_dir`, so its answer can be read again from the project.
+///
+/// Fensu spells query paths with `/`, while a Windows `project_dir` uses `\`, so both are compared with `/`.
 pub(crate) fn relative_query(query: NativeProjectQuery, project_dir: &str) -> NativeProjectQuery {
-    let path: String = match query.path.strip_prefix(project_dir) {
-        Some("") => String::new(),
+    let project_dir: String = project_dir.replace('\\', "/");
+    let path: String = match query
+        .path
+        .replace('\\', "/")
+        .strip_prefix(project_dir.as_str())
+    {
+        Some("") => PROJECT_ROOT_QUERY_PATH.to_owned(),
         Some(rest) if rest.starts_with('/') => rest.trim_start_matches('/').to_owned(),
         _ => query.path,
     };

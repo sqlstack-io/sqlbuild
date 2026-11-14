@@ -73,3 +73,10 @@ pub(super) struct PythonScalingTestCase {
     pub(super) expected_annotation_faults: usize,
     pub(super) expected_max_duration: std::time::Duration,
 }
+
+pub(super) struct RelativeQueryTestCase {
+    pub(super) description: &'static str,
+    pub(super) project_dir: &'static str,
+    pub(super) path: &'static str,
+    pub(super) expected_path: &'static str,
+}
