@@ -79,6 +79,29 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
                 second_misses: 2,
             },
         },
+        PythonCacheTestCase {
+            description: "an unchanged domain package whose folder gains a subdomain is evaluated again",
+            files: &[
+                ("python/inventory/__init__.py", ""),
+                ("python/inventory/main/__init__.py", ""),
+                (
+                    "python/inventory/main/publish.py",
+                    "def publish() -> None:\n    pass\n",
+                ),
+            ],
+            config: json!({ "select": ["SQBRPYTHON613"] }),
+            changes: &[
+                ("python/inventory/restock/__init__.py", ""),
+                ("python/inventory/restock/main/__init__.py", ""),
+            ],
+            changed_config: json!({ "select": ["SQBRPYTHON613"] }),
+            expected_runs: CachedRuns {
+                first_faults: named_faults(&[]),
+                second_faults: named_faults(&[("SQBRPYTHON613", "python/inventory/__init__.py")]),
+                second_hits: 0,
+                second_misses: 1,
+            },
+        },
     ];
     for test_case in test_cases {
         let runs = cached_runs(

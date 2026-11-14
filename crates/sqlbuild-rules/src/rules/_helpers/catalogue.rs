@@ -485,23 +485,26 @@ pub(crate) fn select<'a>(
     let blocking: Vec<&RuleMetadata> = resolve_policy(&references, &(), &effective, &grammar)
         .map_err(rules_error)?
         .blocking;
-    Ok(without_unnamed_python(blocking, selected_or_none))
+    Ok(without_unnamed_python(blocking, selected_or_none, &grammar))
 }
 
-/// Drop the Python rules unless a selector names their family or one of their codes; `SQBR` alone does not.
+/// Keep a Python rule only when a selector inside its family matches it; `SQBR` alone selects none.
 fn without_unnamed_python<'a>(
     rules: Vec<&'a RuleMetadata>,
     selectors: &[String],
+    grammar: &RulesCodeGrammar,
 ) -> Vec<&'a RuleMetadata> {
-    if selectors
+    let python_selectors: Vec<String> = selectors
         .iter()
-        .any(|selector| selector.starts_with(PYTHON_RULE_PREFIX))
-    {
-        return rules;
-    }
+        .filter(|selector| selector.starts_with(PYTHON_RULE_PREFIX))
+        .cloned()
+        .collect();
     rules
         .into_iter()
-        .filter(|rule| !rule.scope.evaluates_python())
+        .filter(|rule| {
+            !rule.scope.evaluates_python()
+                || matches_any_selector(grammar, &rule.code, &python_selectors)
+        })
         .collect()
 }
 

@@ -3492,7 +3492,8 @@ def test_given_project_python_when_running_python_rules_then_findings_match_comp
         PythonRuleCacheSequenceTestCase(
             description=(
                 "no Python cache without a Python rule; a cold run misses every file, an edit "
-                "misses only the edited file, and a new selection misses every file again"
+                "misses only the edited file, a new Python selection misses every file, and "
+                "restoring the first model rule reuses its entry and every file"
             ),
             steps=(
                 (_PYTHON_CACHE_TOML.replace("SQBRPYTHON101", "SQLCLEAN004"), _PYTHON_ALERT),
@@ -3504,9 +3505,15 @@ def test_given_project_python_when_running_python_rules_then_findings_match_comp
                     ),
                     _PYTHON_ANNOTATED_ALERT,
                 ),
+                (
+                    _PYTHON_CACHE_TOML.replace(
+                        '"SQBRPYTHON101"', '"SQBRPYTHON101", "SQBRPYTHON504", "SQLCLEAN004"'
+                    ),
+                    _PYTHON_ANNOTATED_ALERT,
+                ),
             ),
-            expected_hits_and_misses=((0, 1), (0, 9), (8, 1), (0, 9)),
-            expected_python_cache=(False, True, True, True),
+            expected_hits_and_misses=((0, 1), (0, 9), (8, 1), (0, 9), (10, 0)),
+            expected_python_cache=(False, True, True, True, True),
         )
     ],
     ids=lambda case: case.description,

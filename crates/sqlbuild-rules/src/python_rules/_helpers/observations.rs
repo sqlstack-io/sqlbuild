@@ -121,6 +121,16 @@ fn filesystem_query(query: &NativeProjectQuery) -> RepositoryObservationQuery {
     }
 }
 
+/// `query` with its path relative to `project_dir`, so its answer can be read again from the project.
+pub(crate) fn relative_query(query: NativeProjectQuery, project_dir: &str) -> NativeProjectQuery {
+    let path: String = match query.path.strip_prefix(project_dir) {
+        Some("") => String::new(),
+        Some(rest) if rest.starts_with('/') => rest.trim_start_matches('/').to_owned(),
+        _ => query.path,
+    };
+    NativeProjectQuery { path, ..query }
+}
+
 /// A project-relative path; Fensu spells paths below a top-level root with a leading `/`.
 fn project_path(path: &str) -> &str {
     path.strip_prefix('/').unwrap_or(path)

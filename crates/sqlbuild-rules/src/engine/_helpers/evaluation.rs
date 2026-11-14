@@ -1,5 +1,7 @@
 use crate::configuration::main::validate as config;
-use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY, RELATION_EXCEPTION_RULES};
+use crate::constants::{
+    API_VERSION, NATIVE_BUILD_IDENTITY, PYTHON_RULE_PREFIX, RELATION_EXCEPTION_RULES,
+};
 use crate::engine::_helpers::cache::{Cache, PendingBucketWrite, RuleCacheBucket, RuleCacheEntry};
 use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
 use crate::models::{
@@ -295,7 +297,7 @@ fn evaluate_python_phase(
         .collect();
     let fingerprint: String = format!(
         "{}\0{}.{}",
-        model_rules_fingerprint(&python_rules, &request.config, &request.dialect)?,
+        fingerprint::fingerprint(&python_rules, &python_config(&request.config), "")?,
         request.python_version.0,
         request.python_version.1
     );
@@ -359,13 +361,26 @@ fn scoped_faults(
     Ok(faults)
 }
 
-/// Fingerprint model-rule inputs; suppressions and graph-edge exceptions never reach model rules.
+/// Fingerprint model-rule inputs; suppressions, graph-edge exceptions and Python-rule settings never reach model rules.
 fn model_rules_fingerprint(
     selected: &[&RuleMetadata],
     config: &RulesConfig,
     dialect: &str,
 ) -> Result<String, String> {
     let model_config = RulesConfig {
+        select: config.select.as_ref().map(|selectors| {
+            selectors
+                .iter()
+                .filter(|selector| !selector.starts_with(PYTHON_RULE_PREFIX))
+                .cloned()
+                .collect()
+        }),
+        rule_options: config
+            .rule_options
+            .iter()
+            .filter(|(code, _)| !code.starts_with(PYTHON_RULE_PREFIX))
+            .map(|(code, options)| (code.clone(), options.clone()))
+            .collect(),
         rule_exceptions: Vec::new(),
         rule_ignores: Vec::new(),
         graph_edge_exceptions: Vec::new(),
@@ -373,6 +388,19 @@ fn model_rules_fingerprint(
         ..config.clone()
     };
     fingerprint::fingerprint(selected, &model_config, dialect)
+}
+
+/// The only configuration the Python rules read: their own options.
+fn python_config(config: &RulesConfig) -> RulesConfig {
+    RulesConfig {
+        rule_options: config
+            .rule_options
+            .iter()
+            .filter(|(code, _)| code.starts_with(PYTHON_RULE_PREFIX))
+            .map(|(code, options)| (code.clone(), options.clone()))
+            .collect(),
+        ..RulesConfig::default()
+    }
 }
 
 #[cfg(test)]

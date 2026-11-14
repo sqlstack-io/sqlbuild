@@ -68,6 +68,12 @@ fn given_python_selectors_when_selecting_then_opt_in_rules_need_their_exact_code
             expected_selected: false,
         },
         SelectionTestCase {
+            description: "the built-in namespace with one Python code leaves the other Python rules out",
+            select: vec!["SQBR".to_owned(), "SQBRPYTHON101".to_owned()],
+            code: "SQBRPYTHON613",
+            expected_selected: false,
+        },
+        SelectionTestCase {
             description: "the built-in namespace with the Python family selects both",
             select: vec!["SQBR".to_owned(), "SQBRPYTHON".to_owned()],
             code: "SQBRPYTHON101",
