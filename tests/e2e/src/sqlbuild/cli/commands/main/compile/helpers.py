@@ -3265,6 +3265,13 @@ def hooked_model_file(*, model_name: str, hook: str) -> tuple[str, str]:
     )
 
 
+def description_paragraphs(count: int) -> str:
+    """A docstring of `count` one-line paragraphs, which wrap to 2 * count - 1 lines."""
+
+    body: str = "\n\n    ".join(f"Orders paragraph {index}." for index in range(count))
+    return f'    """{body}"""\n'
+
+
 def python_node_source(
     *,
     module: str,

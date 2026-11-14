@@ -136,8 +136,7 @@ impl<'py> Diagnostics<'_, 'py> {
             .call((), Some(&fields))
     }
 
-    /// P010 for `kind` `name` when its description is missing or blank; for a Python resource,
-    /// P027 when it wraps past the project's `max_description_lines`.
+    /// P010 when `kind` `name` has no description; for Python, P027 when it wraps past the limit.
     fn described(
         &self,
         resource: (&str, &str, Option<&str>),

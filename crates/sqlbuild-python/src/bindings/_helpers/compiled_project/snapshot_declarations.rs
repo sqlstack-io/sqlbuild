@@ -25,7 +25,7 @@ use crate::bindings::_helpers::native_host::orchestration_declarations::{
     module_jobs, run_controls,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
-    compile_calendars, compile_cron, compile_sensors,
+    calendar_descriptions, compile_calendars, compile_cron, compile_sensors,
 };
 use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
 use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
@@ -108,20 +108,11 @@ pub(crate) fn compile_declarations(
             .iter()
             .map(|sensor| ("sensor", sensor.name.clone(), sensor.description.clone())),
     );
-    for calendar in &authored_calendars {
-        let calendar: &Bound<'_, PyAny> = calendar.bind(py);
-        // A calendar that never decorated a function has no name to report; on its own target,
-        // `compile_calendars` still fails publication for it.
-        let function: Bound<'_, PyAny> = calendar.getattr("function")?;
-        if function.is_none() {
-            continue;
-        }
-        described.push((
-            "calendar schedule",
-            function.getattr("__name__")?.extract()?,
-            calendar.getattr("description")?.extract()?,
-        ));
-    }
+    described.extend(
+        calendar_descriptions(py, &authored_calendars)?
+            .into_iter()
+            .map(|(name, description)| ("calendar schedule", name, description)),
+    );
     for (kind, name, description) in described {
         let limit: i64 = format.max_description_lines;
         let lines: usize = description_line_count(&description, format.line_width);

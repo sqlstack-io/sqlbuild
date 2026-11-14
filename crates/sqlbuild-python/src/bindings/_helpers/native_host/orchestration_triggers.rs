@@ -184,6 +184,25 @@ fn calendar_times(
     })
 }
 
+/// The name and description of each calendar that decorates a function.
+pub(crate) fn calendar_descriptions(
+    py: Python<'_>,
+    calendars: &[Py<PyAny>],
+) -> PyResult<Vec<(String, String)>> {
+    let mut described: Vec<(String, String)> = Vec::new();
+    for calendar in calendars {
+        let calendar: &Bound<'_, PyAny> = calendar.bind(py);
+        let function: Bound<'_, PyAny> = calendar.getattr("function")?;
+        if !function.is_none() {
+            described.push((
+                function.getattr("__name__")?.extract()?,
+                calendar.getattr("description")?.extract()?,
+            ));
+        }
+    }
+    Ok(described)
+}
+
 pub(crate) fn compile_calendars(
     py: Python<'_>,
     (project_dir, target): (&Path, &str),

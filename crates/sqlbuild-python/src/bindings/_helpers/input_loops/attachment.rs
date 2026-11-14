@@ -583,10 +583,9 @@ fn diagnostic_settings<'py>(
     Ok(settings)
 }
 
-/// The project's `max_description_lines` and `line_width`, as `sqb format` resolves them.
+/// The project's `max_description_lines` and `line_width` as `sqb format` resolves them, else the defaults.
 fn description_limit(discovered: &Bound<'_, PyAny>) -> PyResult<(usize, i64)> {
     let directory: Option<PathBuf> = native_field(discovered, "project_dir")?.extract()?;
-    // Without a project directory there is no configuration to read, not the current directory's.
     let Some(directory) = directory else {
         return Ok((
             usize::try_from(DEFAULT_MAX_DESCRIPTION_LINES).unwrap_or(0),
