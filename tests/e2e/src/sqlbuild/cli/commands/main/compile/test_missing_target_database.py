@@ -209,6 +209,34 @@ _PRESERVED_TARGET_PROJECT: str = (
             expected_example_count=0,
             command=("--no-color", "load", "--select", "raw_orders"),
         ),
+        MissingTargetDatabaseTestCase(
+            description="sqb load stops a managed source under a preserved loader schema",
+            project_toml=(
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+                '[connection]\ndatabase = "dev.duckdb"\n\n'
+                '[targets.dev]\nschema = "analytics"\nloader_schema = "preserve"\n'
+            ),
+            extra_files={
+                "sources/raw.yml": (
+                    "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+                    "    managed: true\n    write_strategy: table\n"
+                    "    columns:\n      - name: order_id\n        type: INTEGER\n"
+                ),
+                "python/loaders/orders.py": (
+                    "from sqlbuild.loaders import loader\n\n\n@loader\n"
+                    "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
+                    '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
+                ),
+            },
+            expected_error=(
+                "error[P001]: Managed source 'raw_orders' has no logical schema, but the "
+                "selected target sets schema to 'preserve'\n"
+                "  = help: Set schema on the resource or its defaults, or configure a literal "
+                "target schema.\n"
+            ),
+            expected_example_count=0,
+            command=("--no-color", "load", "--select", "raw_orders"),
+        ),
     ),
     ids=lambda case: case.description,
 )
