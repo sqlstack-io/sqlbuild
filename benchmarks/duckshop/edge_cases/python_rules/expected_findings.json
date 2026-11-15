@@ -2,6 +2,9 @@
   "select": ["SQBRPYTHON", "SQBRPYTHON306"],
   "findings": [
     ["SQBRPYTHON101", "hooks/python/alert.py", 4, 11],
+    ["SQBRPYTHON015", "providers/carrier_api/provider.py", 3, 43],
+    ["SQBRPYTHON014", "providers/carrier_api/provider.py", 7, 5],
+    ["SQBRPYTHON013", "providers/stock_feed.py", 1, 1],
     ["SQBRPYTHON613", "python/inventory/__init__.py", 1, 1],
     ["SQBRPYTHON002", "python/inventory/common/__init__.py", 1, 1],
     ["SQBRPYTHON306", "python/inventory/common/stock.py", 4, 1],
@@ -10,7 +13,6 @@
     ["SQBRPYTHON614", "python/inventory/replenishment.py", 1, 1],
     ["SQBRPYTHON012", "python/inventory/replenishment.py", 7, 5],
     ["SQBRPYTHON617", "python/inventory/restock/main.py", 1, 1],
-    ["SQBRPYTHON306", "python/inventory/restock/main.py", 4, 1],
     ["SQBRPYTHON306", "python/inventory/restock/main.py", 9, 1],
     ["SQBRPYTHON003", "python/inventory/stock_count/node.py", 1, 1],
     ["SQBRPYTHON004", "python/inventory/stock_count/node.py", 5, 1],
