@@ -35,6 +35,10 @@ const CROSS_JOIN_FILE: &str = "select o.order_id\nfrom orders as o\n-- sqb: igno
 const NORMALISE_NAME_MACRO: &str = "MACRO (\n  description \"Normalise a name\",\n  arguments (column_name VARCHAR),\n  returns VARCHAR,\n);\n\nREGEXP_REPLACE(\n  TRIM(UPPER(\n  -- Collapse repeated spaces\n  REGEXP_REPLACE(\n    @column_name,\n    '[[:space:]]+',\n    ' '\n  ))),\n  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n";
 const ESCAPED_QUOTE_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(\n  @v,\n  'O\\'Brien\n      kept indent',\n  'tail'\n)\n";
 const ESCAPED_QUOTE_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(@v, 'O\\'Brien\n      kept indent', 'tail')\n";
+const E_STRING_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(\n  @v,\n  E'O\\'Brien\n      kept indent',\n  'tail'\n)\n";
+const E_STRING_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(@v, E'O\\'Brien\n      kept indent', 'tail')\n";
+const NESTED_COMMENT_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* outer /* inner */ it's\n      kept */\n  'x'\n)\n";
+const NESTED_COMMENT_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* outer /* inner */ it's\n      kept */ 'x'\n)\n";
 const BLOCK_COMMENT_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* first\n      second */\n  'x'\n)\n";
 const BLOCK_COMMENT_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* first\n      second */ 'x'\n)\n";
 const NORMALISE_NAME_FORMATTED: &str = "MACRO (\n  description \"Normalise a name\",\n  arguments (column_name VARCHAR),\n  returns VARCHAR,\n);\n\nREGEXP_REPLACE(\n  TRIM(\n    UPPER(\n      -- Collapse repeated spaces\n      REGEXP_REPLACE(@column_name, '[[:space:]]+', ' ')\n    )\n  ),\n  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n";
@@ -1011,21 +1015,33 @@ fn given_expression_macro_bodies_when_formatting_twice_then_every_dialect_lays_t
     let test_cases = [
         ExpressionMacroFormatTestCase {
             description: "a body with a comment between nested calls",
-            dialects: &["duckdb", "snowflake"],
+            dialects: &["duckdb", "snowflake", "databricks"],
             contents: NORMALISE_NAME_MACRO.to_string(),
             expected_formatted: NORMALISE_NAME_FORMATTED.to_string(),
         },
         ExpressionMacroFormatTestCase {
             description: "a body nesting fifteen calls, authored flush left",
-            dialects: &["duckdb", "snowflake"],
+            dialects: &["duckdb", "snowflake", "databricks"],
             contents: nested_macro(15, ""),
             expected_formatted: nested_macro(15, "  "),
         },
         ExpressionMacroFormatTestCase {
             description: "a multi-line string after a backslash-escaped quote",
-            dialects: &["snowflake"],
+            dialects: &["snowflake", "databricks"],
             contents: ESCAPED_QUOTE_MACRO.to_string(),
             expected_formatted: ESCAPED_QUOTE_FORMATTED.to_string(),
+        },
+        ExpressionMacroFormatTestCase {
+            description: "a multi-line E-string after a backslash-escaped quote",
+            dialects: &["duckdb"],
+            contents: E_STRING_MACRO.to_string(),
+            expected_formatted: E_STRING_FORMATTED.to_string(),
+        },
+        ExpressionMacroFormatTestCase {
+            description: "a nested block comment holding an apostrophe",
+            dialects: &["duckdb", "databricks"],
+            contents: NESTED_COMMENT_MACRO.to_string(),
+            expected_formatted: NESTED_COMMENT_FORMATTED.to_string(),
         },
         ExpressionMacroFormatTestCase {
             description: "a block comment with indented lines",
