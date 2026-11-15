@@ -10,7 +10,9 @@ use sqlbuild_pysource::orchestration_modules::main::orchestration_module_declara
 
 use crate::models::{Fault, PythonSource};
 use crate::python_rules::_helpers::engine::faults::catalogue_fault;
-use crate::python_rules::_helpers::units::project::{absolute_module, dotted_names, unit_fault};
+use crate::python_rules::_helpers::units::project::{
+    absolute_module, dotted_names, nearest_unit, unit_fault, unit_folders,
+};
 use crate::python_rules::constants::{
     INIT_FILE, ORCHESTRATION_GENERIC_MODULES, ORCHESTRATION_IMPORT_DIRECTION_CODE,
     ORCHESTRATION_MODULE_PATHS_CODE, ORCHESTRATION_MODULE_SURFACE_CODE,
@@ -46,18 +48,22 @@ pub(crate) fn orchestration_faults(
     let mut faults: Vec<Fault> = sources.iter().filter_map(layout_fault).collect();
     let files: Vec<OrchestrationFile<'_>> = sources
         .par_iter()
-        .filter(|source| source.text.contains(ORCHESTRATION_ROOT))
+        .filter(|source| {
+            source.relative_path.split('/').next() == Some(ORCHESTRATION_ROOT)
+                || source.text.contains(ORCHESTRATION_ROOT)
+        })
         .filter_map(|source| parsed_file(source, python_version))
         .collect();
     let modules: BTreeSet<String> = sources
         .iter()
         .flat_map(|source| dotted_names(&source.relative_path))
         .collect();
+    let units: BTreeSet<String> = unit_folders(sources);
     for file in &files {
         if role_folders(&file.parts).is_some_and(|rest| !is_private(rest)) {
             faults.extend(surface_faults(file));
         }
-        faults.extend(import_faults(file, &modules));
+        faults.extend(import_faults(file, &modules, &units));
     }
     faults.retain(|fault| codes.contains(fault.code.as_str()));
     faults
@@ -214,7 +220,11 @@ fn public_name(names: &[String]) -> Option<String> {
 }
 
 /// Imports of another domain's private support, and imports across the orchestration boundary.
-fn import_faults(file: &OrchestrationFile<'_>, modules: &BTreeSet<String>) -> Vec<Fault> {
+fn import_faults(
+    file: &OrchestrationFile<'_>,
+    modules: &BTreeSet<String>,
+    units: &BTreeSet<String>,
+) -> Vec<Fault> {
     let folder: &[&str] = &file.parts[..file.parts.len() - 1];
     file.module
         .imports
@@ -224,7 +234,7 @@ fn import_faults(file: &OrchestrationFile<'_>, modules: &BTreeSet<String>) -> Ve
             if !modules.contains(&module) {
                 return None;
             }
-            let (code, detail): (&str, String) = boundary_detail(&file.parts, &module)?;
+            let (code, detail): (&str, String) = boundary_detail(&file.parts, &module, units)?;
             unit_fault(
                 code,
                 file.path,
@@ -235,12 +245,19 @@ fn import_faults(file: &OrchestrationFile<'_>, modules: &BTreeSet<String>) -> Ve
         .collect()
 }
 
-/// The rule and reason a file at `parts` may not import project module `module`.
-fn boundary_detail(parts: &[&str], module: &str) -> Option<(&'static str, String)> {
+/// Why a file at `parts` may not import `module`; node units and providers are left to 008 and 015.
+fn boundary_detail(
+    parts: &[&str],
+    module: &str,
+    units: &BTreeSet<String>,
+) -> Option<(&'static str, String)> {
     let imported: Vec<&str> = module.split('.').collect();
     let Some(rest) = role_folders(parts) else {
+        let in_unit: bool =
+            parts.first() == Some(&PACKAGE_ROOT) && nearest_unit(&parts[1..], units).is_some();
         let outside: bool = parts.first() != Some(&ORCHESTRATION_ROOT)
             && parts.first() != Some(&PROVIDERS_ROOT)
+            && !in_unit
             && imported.first() == Some(&ORCHESTRATION_ROOT);
         return outside.then(|| {
             (

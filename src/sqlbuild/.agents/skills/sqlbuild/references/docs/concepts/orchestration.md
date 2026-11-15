@@ -142,7 +142,7 @@ another system. The code location evaluates it when it publishes and again befor
 out.
 
 ```python
-# orchestration/calendars/fulfillment_calendar.py
+# orchestration/calendars/fulfillment/cutoffs.py
 from sqlbuild.orchestration import calendar
 
 @calendar(name="fulfillment_calendar", description="Upcoming fulfillment times", horizon="1d")
@@ -163,7 +163,7 @@ returns timezone-aware datetimes inside it. Other parameters name
 A sensor starts a job or job group when something happens, named by `run`.
 
 ```python
-# orchestration/sensors/on_new_orders_sensor.py
+# orchestration/sensors/orders/new_orders.py
 from sqlbuild.orchestration import sensor, source_new_data
 
 on_new_orders = sensor(

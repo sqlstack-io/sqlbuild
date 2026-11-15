@@ -3520,7 +3520,7 @@ def test_given_project_python_when_running_python_rules_then_findings_match_comp
                     _PYTHON_ANNOTATED_ALERT,
                 ),
             ),
-            expected_hits_and_misses=((0, 1), (0, 16), (15, 1), (0, 16), (17, 0)),
+            expected_hits_and_misses=((0, 1), (0, 18), (17, 1), (0, 18), (19, 0)),
             expected_python_cache=(False, True, True, True, True),
         )
     ],

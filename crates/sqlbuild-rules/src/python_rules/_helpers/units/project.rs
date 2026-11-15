@@ -60,10 +60,7 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
             (root == PACKAGE_ROOT).then(|| (source, rest.split('/').collect()))
         })
         .collect();
-    let units: BTreeSet<String> = package
-        .iter()
-        .filter_map(|(_, parts)| unit_folder(parts))
-        .collect();
+    let units: BTreeSet<String> = unit_folders(sources);
     let files: Vec<UnitFile<'_>> = package
         .par_iter()
         .filter_map(|(source, parts)| {
@@ -98,8 +95,22 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
     }
 }
 
+/// The unit folders under `python/`, each relative to it.
+pub(crate) fn unit_folders(sources: &[PythonSource]) -> BTreeSet<String> {
+    sources
+        .iter()
+        .filter_map(|source| {
+            let (root, rest) = source.relative_path.split_once('/')?;
+            let parts: Vec<&str> = rest.split('/').collect();
+            (root == PACKAGE_ROOT)
+                .then(|| unit_folder(&parts))
+                .flatten()
+        })
+        .collect()
+}
+
 /// The deepest unit folder among the file's folders.
-fn nearest_unit(parts: &[&str], units: &BTreeSet<String>) -> Option<String> {
+pub(crate) fn nearest_unit(parts: &[&str], units: &BTreeSet<String>) -> Option<String> {
     (1..parts.len())
         .rev()
         .map(|depth| parts[..depth].join("/"))

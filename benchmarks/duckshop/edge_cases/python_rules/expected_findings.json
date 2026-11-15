@@ -2,6 +2,8 @@
   "select": ["SQBRPYTHON", "SQBRPYTHON306"],
   "findings": [
     ["SQBRPYTHON101", "hooks/python/alert.py", 4, 11],
+    ["SQBRPYTHON301", "orchestration/sensors/inventory/_helpers/feed_window.py", 3, 1],
+    ["SQBRPYTHON017", "orchestration/sensors/inventory/_helpers/feed_window.py", 3, 43],
     ["SQBRPYTHON017", "orchestration/sensors/inventory/_lib/age.py", 1, 1],
     ["SQBRPYTHON016", "orchestration/sensors/stock_feed.py", 1, 1],
     ["SQBRPYTHON019", "orchestration/sensors/stock_feed.py", 3, 8],
@@ -21,11 +23,12 @@
     ["SQBRPYTHON306", "python/inventory/restock/main.py", 4, 1],
     ["SQBRPYTHON306", "python/inventory/restock/main.py", 9, 1],
     ["SQBRPYTHON003", "python/inventory/stock_count/node.py", 1, 1],
-    ["SQBRPYTHON004", "python/inventory/stock_count/node.py", 5, 1],
-    ["SQBRPYTHON605", "python/inventory/stock_count/node.py", 5, 1],
-    ["SQBRPYTHON005", "python/inventory/stock_count/node.py", 9, 5],
-    ["SQBRPYTHON007", "python/inventory/stock_count/node.py", 9, 5],
-    ["SQBRPYTHON011", "python/inventory/stock_count/node.py", 9, 5],
+    ["SQBRPYTHON008", "python/inventory/stock_count/node.py", 3, 62],
+    ["SQBRPYTHON004", "python/inventory/stock_count/node.py", 7, 1],
+    ["SQBRPYTHON605", "python/inventory/stock_count/node.py", 7, 1],
+    ["SQBRPYTHON005", "python/inventory/stock_count/node.py", 11, 5],
+    ["SQBRPYTHON007", "python/inventory/stock_count/node.py", 11, 5],
+    ["SQBRPYTHON011", "python/inventory/stock_count/node.py", 11, 5],
     ["SQBRPYTHON001", "python/report.py", 1, 1],
     ["SQBRPYTHON614", "python/report.py", 1, 1]
   ]

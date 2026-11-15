@@ -180,7 +180,7 @@ for row in []:
             ],
         },
         PythonRunTestCase {
-            description: "imports: another domain's support, a node unit from a sensor, and orchestration/ from outside it except providers",
+            description: "imports: another domain's support, a node unit from a sensor or its helpers, and orchestration/ from outside it except providers and node units",
             files: &[
                 (
                     "orchestration/sensors/orders/refund_spike.py",
@@ -193,6 +193,15 @@ from ._helpers.window import window
                 ),
                 ("orchestration/sensors/orders/_helpers/window.py", ""),
                 ("orchestration/sensors/inventory/_helpers/feed_age.py", ""),
+                (
+                    "orchestration/sensors/inventory/_helpers/age.py",
+                    "from ...orders._helpers.window import window\nfrom python.orders.daily.main import main\n",
+                ),
+                ("python/orders/weekly/node.py", ""),
+                (
+                    "python/orders/weekly/main.py",
+                    "from orchestration.sensors.orders._helpers.window import window\n",
+                ),
                 (
                     "python/orders/daily/main.py",
                     "from orchestration.sensors.orders._helpers.window import window\n",
@@ -207,9 +216,21 @@ from ._helpers.window import window
                     "import orchestration.sensors.orders.refund_spike\n",
                 ),
             ],
-            config: json!({ "select": ["SQBRPYTHON017", "SQBRPYTHON019"] }),
+            config: json!({ "select": ["SQBRPYTHON008", "SQBRPYTHON017", "SQBRPYTHON019"] }),
             expected_faults: vec![
                 ("SQBRPYTHON019", "hooks/python/notify.py", 1, 8),
+                (
+                    "SQBRPYTHON017",
+                    "orchestration/sensors/inventory/_helpers/age.py",
+                    1,
+                    39,
+                ),
+                (
+                    "SQBRPYTHON019",
+                    "orchestration/sensors/inventory/_helpers/age.py",
+                    2,
+                    38,
+                ),
                 (
                     "SQBRPYTHON017",
                     "orchestration/sensors/orders/refund_spike.py",
@@ -223,6 +244,7 @@ from ._helpers.window import window
                     38,
                 ),
                 ("SQBRPYTHON019", "python/orders/daily/main.py", 1, 58),
+                ("SQBRPYTHON008", "python/orders/weekly/main.py", 1, 58),
             ],
         },
     ];
