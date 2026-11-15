@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.229.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.228.0...v0.229.0) (2026-11-15)
+
+
+### Features
+
+* add SQBRPYTHON node unit rules for Python nodes under python/ ([#1490](https://github.com/sqlstack-io/sqlbuild/issues/1490)) ([b6e4517](https://github.com/sqlstack-io/sqlbuild/commit/b6e4517aaf3d3d0db54ab17f5073f7fa8fbbfabb))
+
 ## [0.228.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.227.0...v0.228.0) (2026-11-15)
 
 
