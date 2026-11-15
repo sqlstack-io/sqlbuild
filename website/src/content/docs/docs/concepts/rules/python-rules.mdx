@@ -170,6 +170,10 @@ A capability folder may also hold `types.py`, `constants.py`, `exceptions.py`, `
 | `SQBRPYTHON014` | `provider.py` holding a function, a public constant, another class or a second provider | Keep one public `Provider` subclass and private constants; move the rest to `_helpers/`, `_classes/` or `constants.py` |
 | `SQBRPYTHON015` | An import of a provider's `_helpers/` or `_classes/` from outside its folder, or a provider importing `python/` outside `utils/` or anything in `orchestration/` | Import the provider through `provider.py` or its role files; share code through `python/utils/` |
 
+`SQBRPYTHON014` follows a class's bases through the project's modules, so a provider may subclass
+`Provider` through an alias or a base class in `_classes/`. A class whose base comes from another
+package is never reported as not being a provider.
+
 ## Main modules and entry modules
 
 Some Rules apply only to a domain's main modules: files under a `main/` folder, and a unit's
