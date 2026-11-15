@@ -174,6 +174,37 @@ A capability folder may also hold `types.py`, `constants.py`, `exceptions.py`, `
 `Provider` through an alias or a base class in `_classes/`. A class whose base comes from another
 package is never reported as not being a provider.
 
+## Laying out sensors and calendars
+
+`SQBRPYTHON016` to `SQBRPYTHON020` keep each sensor and calendar module in a domain folder, named
+for what it checks, with its private support beside it:
+
+```text
+orchestration/
+  sensors/
+    inventory/
+      stock_feed.py      # one sensor
+      _constants.py
+      _helpers/
+        feed_age.py
+  calendars/
+    finance/
+      month_end.py       # one calendar
+```
+
+A domain folder's private support is `_models.py`, `_types.py`, `_constants.py`,
+`_exceptions.py` and `_helpers/`. These are reported:
+
+| Code | Finding | Fix |
+|---|---|---|
+| `SQBRPYTHON016` | A module directly in `sensors/` or `calendars/`, nested below its domain folder, or named `main.py`, `definitions.py`, `sensors.py`, `calendars.py` or `processing.py` | Move it to `<role>/<domain>/<capability>.py` |
+| `SQBRPYTHON017` | Other private files or folders, private support outside a domain folder, or an import of another domain's private support | Use the support files or `_helpers/`; share code through `python/utils/` or a provider |
+| `SQBRPYTHON018` | A sensor or calendar module holding a function, a class, a public constant or another statement besides its declaration | Move it to `_helpers/`, `_models.py` or `_constants.py` |
+| `SQBRPYTHON019` | A sensor or calendar importing `python/` outside `utils/`, or code outside `orchestration/` importing it | Read node results through the sensor's context; share code through `python/utils/` or a provider |
+| `SQBRPYTHON020` | A sensor or calendar function with a docstring | Keep the text in `description=` only |
+
+Providers importing `orchestration/` are reported by `SQBRPYTHON015` instead.
+
 ## Main modules and entry modules
 
 Some Rules apply only to a domain's main modules: files under a `main/` folder, and a unit's
@@ -262,6 +293,16 @@ remediation.
 | `SQBRPYTHON013` | provider-layout | All | yes | `providers/` holds capability folders with `provider.py`, role files, `_helpers/` and `_classes/` only |
 | `SQBRPYTHON014` | provider-module-shape | All | yes | `provider.py` holds imports, private constants and one public `Provider` subclass |
 | `SQBRPYTHON015` | provider-import-boundaries | All | yes | A provider's `_helpers/` and `_classes/` are private to it; providers import only `python/utils/` from `python/` and nothing from `orchestration/` |
+
+### Sensors and calendars
+
+| Code | Name | Files | Default | Checks |
+|---|---|---|---|---|
+| `SQBRPYTHON016` | orchestration-module-paths | All | yes | Sensor and calendar modules sit at `orchestration/<role>/<domain>/<capability>.py` with a specific name |
+| `SQBRPYTHON017` | orchestration-private-support | All | yes | A domain folder's private support is its support files and `_helpers/`, imported only from that folder |
+| `SQBRPYTHON018` | orchestration-module-surface | All | yes | A sensor or calendar module holds imports, private constants and its one declaration |
+| `SQBRPYTHON019` | orchestration-import-direction | All | yes | Sensors and calendars import only providers, `python/utils/` and their own support; nothing outside `orchestration/` imports them |
+| `SQBRPYTHON020` | orchestration-no-docstring | All | yes | Sensor and calendar functions have no docstring |
 
 ### Type annotations
 

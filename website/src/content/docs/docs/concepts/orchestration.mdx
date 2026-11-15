@@ -34,6 +34,8 @@ sqb build nightly_orders_job        # build what the job builds, locally
   `orchestration/calendars/` or `orchestration/sensors/` (such as `sensors/inventory/_helpers/`), is
   private support and declares nothing. Declaring a calendar or sensor there fails compilation.
 - Any other file under `orchestration/`, or a folder not in the table, is a `D017` error.
+- The [Python Rules](/docs/concepts/rules/python-rules#laying-out-sensors-and-calendars) add a
+  domain-folder layout for sensor and calendar modules.
 
 ## Declare a job
 
