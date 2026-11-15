@@ -637,7 +637,7 @@ fn given_valid_shapes_and_hidden_mistakes_when_evaluating_unit_rules_then_report
             expected_faults: vec![],
         },
         PythonRunTestCase {
-            description: "a factory may read specs through a method or a module attribute, and loop again inside",
+            description: "a factory may read specs through a method, a module attribute or a builtin call, and loop again inside",
             files: &[
                 (
                     "python/orders/regions/constants.py",
@@ -667,6 +667,23 @@ def region_exports():
 "#,
                 ),
                 ("python/orders/regions/main.py", TASK_MAIN),
+                ("python/orders/ranked/constants.py", "SPECS: dict = {}\n"),
+                (
+                    "python/orders/ranked/node.py",
+                    r#"from .constants import SPECS
+from .main import main
+
+
+@factory
+def ranked_exports():
+    for rank, region in enumerate(sorted(SPECS)):
+
+        @task(name=f"export_{rank}_{region}", description="E.")
+        def export(ctx: TaskContext) -> None:
+            return main(ctx=ctx, region=region)
+"#,
+                ),
+                ("python/orders/ranked/main.py", TASK_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON010"] }),
             expected_faults: vec![],

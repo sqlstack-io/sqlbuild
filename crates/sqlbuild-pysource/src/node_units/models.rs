@@ -71,8 +71,8 @@ pub struct UnitFunction {
     pub delegation: Option<bool>,
     /// The decorated functions defined anywhere in the body.
     pub inner: Vec<UnitFunction>,
-    /// The name each `for` loop in the body reads its iterable from, such as `SPECS` for `SPECS.items()`; `None` when it reads no name.
-    pub loops: Vec<Option<String>>,
+    /// The names each `for` loop's iterable in the body loads, such as `enumerate` and `SPECS` for `enumerate(SPECS.items())`.
+    pub loops: Vec<Vec<String>>,
 }
 
 /// A decorator by its last name, the keywords it is called with and the names its `depends_on` reads.

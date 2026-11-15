@@ -1,5 +1,6 @@
 //! A function's decorators, signature and body shape, and the decorated functions inside it.
 
+use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{Decorator, Expr, Parameter, Stmt, StmtFunctionDef};
 use ruff_python_parser::{Mode, ParseOptions};
 use ruff_text_size::Ranged;
@@ -55,7 +56,7 @@ pub(crate) fn unit_function(function: &StmtFunctionDef, source: &UnitText<'_>) -
             .iter()
             .filter_map(|node| match node {
                 CpythonNode::Stmt(Stmt::For(loop_statement)) => {
-                    Some(root_name(&loop_statement.iter))
+                    Some(loaded_names(&loop_statement.iter))
                 }
                 _ => None,
             })
@@ -192,13 +193,23 @@ fn string_expression(text: &str) -> Option<Expr> {
     Some(*parsed.try_into_expression()?.into_syntax().body)
 }
 
-/// The name an iterable is read from: `SPECS` for `SPECS`, `SPECS.items()`, `SPECS[1:]` or `SPECS.rows`.
-fn root_name(expression: &Expr) -> Option<String> {
-    match expression {
-        Expr::Name(name) => Some(name.id.to_string()),
-        Expr::Attribute(attribute) => root_name(&attribute.value),
-        Expr::Call(call) => root_name(&call.func),
-        Expr::Subscript(subscript) => root_name(&subscript.value),
-        _ => None,
+/// Every name `expression` loads, in source order: `enumerate` and `SPECS` for `enumerate(SPECS.items())`.
+fn loaded_names(expression: &Expr) -> Vec<String> {
+    let mut names = LoadedNames::default();
+    names.visit_expr(expression);
+    names.names
+}
+
+#[derive(Default)]
+struct LoadedNames {
+    names: Vec<String>,
+}
+
+impl<'a> Visitor<'a> for LoadedNames {
+    fn visit_expr(&mut self, expression: &'a Expr) {
+        if let Expr::Name(name) = expression {
+            self.names.push(name.id.to_string());
+        }
+        walk_expr(self, expression);
     }
 }

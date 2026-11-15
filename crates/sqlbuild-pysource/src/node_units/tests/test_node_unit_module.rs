@@ -131,7 +131,7 @@ fn given_declaration_when_reading_then_signature_body_and_inner_declarations_are
                     inner: vec![],
                     loops: vec![],
                 }],
-                loops: vec![Some("TABLES".to_owned()), Some("specs".to_owned())],
+                loops: vec![names(&["TABLES"]), names(&["specs"])],
             },
         },
         FunctionTestCase {
