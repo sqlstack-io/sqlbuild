@@ -16,6 +16,7 @@ use crate::bindings::_helpers::compiled_project::snapshot_declarations::python_d
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
 use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::native_host::constants::SENSOR_CONTEXT_PARAMETER;
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_environment::{
@@ -70,8 +71,10 @@ pub(crate) fn evaluate_sensor(
         .import("sqlbuild.orchestration")?
         .getattr("SensorContext")?
         .call((), Some(&fields))?;
-    let providers =
-        discover_provider_classes(imported(py, "pathlib", "Path")?.call1((project_dir,))?)?;
+    let providers = discover_provider_classes(
+        imported(py, "pathlib", "Path")?.call1((project_dir,))?,
+        SecretPolicy::Defer.name(),
+    )?;
     let by_name = provider_by_name(&providers)?;
     let session = call_with(
         &entry(py, UserCodeHost::BuildProviderSession)?,

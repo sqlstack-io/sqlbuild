@@ -23,6 +23,7 @@ pub(crate) mod project_config;
 pub(crate) mod project_facts;
 pub(crate) mod project_files;
 pub(crate) mod project_validation;
+pub(crate) mod provider_secrets;
 pub(crate) mod python_function_files;
 pub(crate) mod python_hook_files;
 pub(crate) mod python_module_files;

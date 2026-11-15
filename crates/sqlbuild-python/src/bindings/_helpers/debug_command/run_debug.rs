@@ -42,6 +42,7 @@ use crate::bindings::_helpers::compile_attachment::target::build_effective_targe
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::record_class;
@@ -270,7 +271,13 @@ fn build_report(
         py,
         Some(keywords(
             py,
-            &[("project_dir", project_dir_object.clone())],
+            &[
+                ("project_dir", project_dir_object.clone()),
+                (
+                    "secret_policy",
+                    PyString::new(py, SecretPolicy::Defer.name()).into_any(),
+                ),
+            ],
         )?),
     )?;
     let files: DebugConfigFiles = debug_config_files(project_dir);

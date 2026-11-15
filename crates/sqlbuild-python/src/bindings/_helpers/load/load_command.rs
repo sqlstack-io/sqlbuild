@@ -29,6 +29,7 @@ use crate::bindings::_helpers::compile_attachment::effective_config::build_effec
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::cursor::overrides::{cursor_integer, cursor_timestamp};
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::load::load_progress::{
     LoadCallbackRelay, LoadProgressReporter, load_result_text,
 };
@@ -92,7 +93,16 @@ fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Inv
     };
     let discovered: Bound<'py, PyAny> = discover_project_inputs(
         py,
-        Some(keywords(py, &[("project_dir", project_dir.clone())])?),
+        Some(keywords(
+            py,
+            &[
+                ("project_dir", project_dir.clone()),
+                (
+                    "secret_policy",
+                    PyString::new(py, SecretPolicy::Defer.name()).into_any(),
+                ),
+            ],
+        )?),
     )?;
     let select: Bound<'py, PyAny> = native_field(request, "select")?;
     let exclude: Bound<'py, PyAny> = native_field(request, "exclude")?;
