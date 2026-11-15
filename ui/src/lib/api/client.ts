@@ -31,6 +31,7 @@ import type {
 	RunCostRow,
 	CostSummary,
 	NodeBuildCost,
+	NodeStates,
 	Snapshot,
 	RunTabCounts,
 	Scope,
@@ -66,13 +67,18 @@ export interface ApiClient extends PlatformApi {
 	 * Health, attention items, metrics, build status by group and recent changes; null when the
 	 * person may view only part of the target, because its listings need view on every node.
 	 */
-	overview(scope: Scope): Promise<Overview | null>;
-	/** Every node in the current snapshot with its build state; also the lineage graph. */
+	overview(scope: Scope, listing?: CatalogNode[]): Promise<Overview | null>;
+	/**
+	 * Every node in the current snapshot with its build state; also the lineage graph. Pages read it
+	 * through the shared catalog store (`$lib/state/catalog.svelte`), which reads it once per snapshot.
+	 */
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
+	/** Every node's build state at the current status version, for applying `node_status` changes to a listing. */
+	listNodeStates(scope: Scope): Promise<NodeStates>;
 	/** `listing` is a current `listCatalogNodes` result the caller already holds, so it isn't read again. */
 	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null>;
-	/** The snapshot's column lineage around one node. */
-	getColumnLineage(scope: Scope, key: string): Promise<ColumnLineage | null>;
+	/** The snapshot's column lineage around one node; `listing` as for `getCatalogNode`. */
+	getColumnLineage(scope: Scope, key: string, listing?: CatalogNode[]): Promise<ColumnLineage | null>;
 	/** Every audit and check with its latest result. */
 	listChecks(scope: Scope): Promise<Check[]>;
 	getCheck(scope: Scope, id: string): Promise<CheckDetail | null>;
@@ -151,7 +157,7 @@ export interface ApiClient extends PlatformApi {
 	/** Asks the location to read SQLBuild's state back from the warehouse now. `connection.test` */
 	requestWarehouseSync(scope: Scope): Promise<void>;
 
-	/** Live "changed" signals (SSE in the server client); consumers refetch. */
+	/** Live "changed" signals (SSE in the server client); consumers refetch or apply their payload. */
 	changes: ChangeSubscription;
 }
 

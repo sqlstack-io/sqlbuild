@@ -23,9 +23,10 @@
 	import { builtModels, builtSeeds, changedModelKeys, jobRefreshText } from '$lib/run/plan-text';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 
 	const snapshotNodes = createResource((client, scope) => client.listSnapshotNodes(scope), ['snapshot']);
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs', 'node_status']);
+	const catalog = useCatalogNodes();
 	const checkList = createResource((client, scope) => client.listChecks(scope), ['checks']);
 	// A `--changed` plan names the job whose own run refreshes what it holds back, with that job's schedule.
 	const triggerList = createResource((client, scope) => client.listTriggers(scope), ['triggers']);

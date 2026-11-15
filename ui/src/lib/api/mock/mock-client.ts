@@ -1,6 +1,7 @@
 import type { ApiClient } from '../client';
 import { ApiError } from '../client';
 import { LocalChangeBus, type ConnectionState } from '../signals';
+import { stateOf } from '../node-states';
 import type {
 	AdhocRunCheck,
 	PlanResult,
@@ -26,6 +27,8 @@ import type {
 	RunCostRow,
 	CostSummary,
 	NodeBuildCost,
+	NodeState,
+	NodeStates,
 	Scope,
 	Snapshot,
 	SnapshotNode,
@@ -66,6 +69,9 @@ export class MockApiClient implements ApiClient {
 	readonly #syncs = new Map<string, WarehouseSync>();
 	readonly #platform: MockPlatformApi;
 	readonly #build: MockBuild;
+	/** Node states as last read or announced, by location, so a finished run announces only what changed. */
+	readonly #nodeStates = new Map<string, { version: number; states: Record<string, NodeState> }>();
+	#announcing: Promise<void> = Promise.resolve();
 
 	constructor(options: MockOptions = {}) {
 		this.#options = {
@@ -105,6 +111,26 @@ export class MockApiClient implements ApiClient {
 			platform: this.#platform,
 			platformEvents: () => this.#platformEvents()
 		});
+		// As the server does: when runs or checks change, the node states that changed go out on `node_status`.
+		this.changes.subscribe((signal) => {
+			if (signal.channel === 'runs' || signal.channel === 'checks') this.#announcing = this.#announcing.then(() => this.#announceNodeStates());
+		});
+	}
+
+	async #currentStates(scope: Scope): Promise<Record<string, NodeState>> {
+		const nodes = await this.#build.listCatalogNodes(scope);
+		return Object.fromEntries(nodes.map((n) => [n.key, stateOf(n)]));
+	}
+
+	async #announceNodeStates(): Promise<void> {
+		for (const [locationId, held] of this.#nodeStates) {
+			const current = await this.#currentStates({ locationId });
+			const changed = Object.fromEntries(Object.entries(current).filter(([key, state]) => JSON.stringify(held.states[key]) !== JSON.stringify(state)));
+			if (!Object.keys(changed).length) continue;
+			const previousVersion = held.version;
+			this.#nodeStates.set(locationId, { version: previousVersion + 1, states: current });
+			this.changes.emit(`node_status:${locationId}`, { version: previousVersion + 1, previousVersion, states: changed });
+		}
 	}
 
 	async bootstrap(): Promise<Bootstrap> {
@@ -136,11 +162,21 @@ export class MockApiClient implements ApiClient {
 
 	overview(...args: Parameters<ApiClient['overview']>) {
 		this.#location(args[0]);
-		return this.#build.overview(...args);
+		return this.#build.overview(args[0]);
 	}
 	listCatalogNodes(...args: Parameters<ApiClient['listCatalogNodes']>) {
 		this.#location(args[0]);
 		return this.#build.listCatalogNodes(...args);
+	}
+	/** The first read starts the location's versions; later runs announce changes against it. */
+	async listNodeStates(scope: Scope): Promise<NodeStates> {
+		const location = this.#location(scope);
+		await this.#announcing;
+		const states = await this.#currentStates(scope);
+		const held = this.#nodeStates.get(scope.locationId);
+		const version = held && JSON.stringify(held.states) === JSON.stringify(states) ? held.version : (held?.version ?? 0) + 1;
+		this.#nodeStates.set(scope.locationId, { version, states });
+		return { snapshotId: location.snapshot?.id ?? 'unpublished', version, states };
 	}
 	getCatalogNode(...args: Parameters<ApiClient['getCatalogNode']>) {
 		this.#location(args[0]);
@@ -148,7 +184,7 @@ export class MockApiClient implements ApiClient {
 	}
 	getColumnLineage(...args: Parameters<ApiClient['getColumnLineage']>) {
 		this.#location(args[0]);
-		return this.#build.getColumnLineage(...args);
+		return this.#build.getColumnLineage(args[0], args[1]);
 	}
 	listChecks(...args: Parameters<ApiClient['listChecks']>) {
 		this.#location(args[0]);

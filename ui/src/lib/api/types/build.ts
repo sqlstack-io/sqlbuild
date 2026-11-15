@@ -79,6 +79,26 @@ export type CatalogNode = {
 	checks: CheckCounts | null;
 };
 
+// ---- node states ----
+
+/** A node's build state, the part of a catalog node that changes between publications. */
+export type NodeState = {
+	lastBuild: NodeBuild | null;
+	lastOutcome: NodeOutcome | null;
+	/** The definition differs from the one the last build recorded. */
+	definitionChanged: boolean;
+	checks: CheckCounts | null;
+};
+
+/** Every node's state at one status version of a snapshot. */
+export type NodeStates = { snapshotId: string; version: number; states: Record<string, NodeState> };
+
+/**
+ * A `node_status` change: the states that changed between two versions, or `full` when too many
+ * changed to list, so the whole map is read again.
+ */
+export type NodeStatusDelta = { version: number; previousVersion: number; states: Record<string, NodeState>; full?: false } | { version: number; previousVersion: number; full: true };
+
 // ---- node detail ----
 
 export type ColumnDef = {

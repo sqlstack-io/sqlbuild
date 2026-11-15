@@ -3,6 +3,7 @@
 	import { ApiError, DEMO } from '$lib/api';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { CREDIT_PRICE_HINT, costByFolder, formatQueryCost } from '$lib/operate/cost';
 
 	// Estimated query cost of the target's recent runs. Hidden until any run has cost, so
@@ -18,10 +19,10 @@
 			if (unrecorded(error)) return null;
 			throw error;
 		});
-		if (!cost) return null;
-		return { cost, folders: costByFolder(cost.byNode, await client.listCatalogNodes(scope)) };
+		return cost;
 	}, ['runs', 'warehouse_sync', 'snapshot']);
-	const data = $derived(summary.data ?? null);
+	const catalog = useCatalogNodes();
+	const data = $derived(summary.data && catalog.data ? { cost: summary.data, folders: costByFolder(summary.data.byNode, catalog.data) } : null);
 	const cost = $derived(data?.cost ?? null);
 	type Row = { key: string; label: string; credits: number; usd: number | null; detail: string; href?: string };
 	const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;

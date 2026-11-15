@@ -42,6 +42,7 @@
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
@@ -59,7 +60,7 @@
 	// The graph is the catalog: every node in the current snapshot with its
 	// build state. Later refreshes update card data in place so positions,
 	// selection and focus survive.
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['runs', 'checks', 'snapshot', 'node_status']);
+	const catalog = useCatalogNodes();
 	const catalogByKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const initialFocus = page.url.searchParams.get('select');
 	let nodes = $state.raw<Node[]>([]);

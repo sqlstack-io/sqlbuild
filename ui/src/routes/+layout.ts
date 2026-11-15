@@ -1,6 +1,7 @@
 import type { ApiClient, Scope } from '$lib/api';
 import { app } from '$lib/state/app.svelte';
 import { prefetch } from '$lib/state/prefetch';
+import { catalogNodes } from '$lib/state/catalog.svelte';
 import { appPath } from '$lib/paths';
 import { readParams, toQuery } from './runs/utils';
 import type { LayoutLoad } from './$types';
@@ -15,9 +16,12 @@ type Read = (client: ApiClient, scope: Scope, match: RegExpMatchArray, search: U
 
 const part = (match: RegExpMatchArray) => decodeURIComponent(match[1]);
 
+/** The shared catalog store's listing, which these pages read; the store holds it, so pages never read it themselves. */
+const CATALOG_PAGES = /^\/(?:$|lineage$|catalog(?:\/[^/]+)?$|jobs\/[^/]+$|plan(?:\/rerun)?$)/;
+
 /** Each page's first reads, with the same arguments the page passes, so the page takes them over. */
 const PAGE_READS: [RegExp, Read][] = [
-	[/^\/$/, (c, s) => [c.overview(s)]],
+	[/^\/$/, () => []],
 	[
 		/^\/runs$/,
 		(c, s, _, search) => {
@@ -27,15 +31,15 @@ const PAGE_READS: [RegExp, Read][] = [
 	],
 	[/^\/runs\/([^/]+)$/, (c, s, m) => [c.getRunDetail(s, part(m))]],
 	[/^\/jobs$/, (c, s) => [c.listJobs(s), c.listTriggers(s)]],
-	[/^\/jobs\/([^/]+)$/, (c, s, m) => [c.getJob(s, part(m)), c.listRuns(s, { jobKey: part(m), limit: 50 }), c.listTriggers(s), c.listCatalogNodes(s)]],
+	[/^\/jobs\/([^/]+)$/, (c, s, m) => [c.getJob(s, part(m)), c.listRuns(s, { jobKey: part(m), limit: 50 }), c.listTriggers(s)]],
 	[/^\/triggers$/, (c, s) => [c.listTriggers(s)]],
 	[/^\/triggers\/([^/]+)$/, (c, s, m) => [c.getTrigger(s, part(m))]],
-	[/^\/catalog$/, (c, s) => [c.listCatalogNodes(s)]],
-	[/^\/catalog\/([^/]+)$/, (c, s, m) => [c.getCatalogNode(s, part(m)), c.listCatalogNodes(s), c.getColumnLineage(s, part(m))]],
+	[/^\/catalog$/, () => []],
+	[/^\/catalog\/([^/]+)$/, (c, s, m) => [c.getCatalogNode(s, part(m), catalogNodes.view.nodes), c.getColumnLineage(s, part(m), catalogNodes.view.nodes)]],
 	[/^\/checks$/, (c, s) => [c.listChecks(s)]],
 	[/^\/checks\/([^/]+)$/, (c, s, m) => [c.getCheck(s, part(m))]],
 	[/^\/changes$/, (c, s) => [c.listSnapshotChanges(s)]],
-	[/^\/lineage$/, (c, s) => [c.listCatalogNodes(s)]],
+	[/^\/lineage$/, () => []],
 	[/^\/maintenance$/, (c, s) => [c.maintenanceHistory(s)]],
 	[/^\/locations$/, (c) => [c.listLocations(), c.platformHealth()]],
 	[/^\/locations\/([^/]+)$/, (c, _, m) => [c.getLocation(part(m))]],
@@ -54,6 +58,8 @@ const fontsReady =
 // Reads only the path, so filter changes within a page don't wait on this.
 export const load: LayoutLoad = async ({ url, untrack }) => {
 	const search = untrack(() => url.searchParams);
-	prefetch(app.scope, appPath(url.pathname), search, PAGE_READS);
+	const path = appPath(url.pathname);
+	if (app.scope && CATALOG_PAGES.test(path) && app.client.supports('listCatalogNodes')) catalogNodes.ensure(app.scope);
+	prefetch(app.scope, path, search, PAGE_READS);
 	await fontsReady;
 };

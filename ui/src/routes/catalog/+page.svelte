@@ -16,14 +16,14 @@
 	import { planHref } from '$lib/run/command';
 	import { topFolder } from '$lib/lineage/catalog-graph';
 	import { app } from '$lib/state/app.svelte';
-	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
 	import { NODE_KINDS, kindLine, nodeIcon, nodeIconKey, nodeKindPlural, shortName, shortRunId } from '$lib/build-area/labels';
 
 	type StatusFilter = 'stale' | 'changed' | 'behind' | 'failed' | 'warn';
 
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['runs', 'checks', 'snapshot', 'node_status']);
+	const catalog = useCatalogNodes();
 	const all = $derived(catalog.data ?? []);
 
 	const params = page.url.searchParams;

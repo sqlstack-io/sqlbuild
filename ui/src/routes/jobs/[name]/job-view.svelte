@@ -8,6 +8,7 @@
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine } from '$lib/build-area/labels';
@@ -23,7 +24,7 @@
 	const job = createResource((client, scope) => client.getJob(scope, name), ['jobs', 'runs', 'snapshot']);
 	const jobRuns = createResource((client, scope) => client.listRuns(scope, { jobKey: name, limit: 50 }), ['runs']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs', 'warehouse']);
+	const catalog = useCatalogNodes();
 	// Each member's nodes and last run, so a group's graph can box every member job around what it builds.
 	// Reading `job.data` here reloads it with the job; it stays null until the job has loaded.
 	const members = createResource(async (client, scope) => {

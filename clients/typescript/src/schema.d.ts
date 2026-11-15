@@ -530,6 +530,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/node-states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonNodeStates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/node-status": {
         parameters: {
             query?: never;
@@ -1563,6 +1579,8 @@ export interface components {
         };
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
         ChangeNotice: {
+            /** @description The changed node states of a `node_status` notice; absent on other topics. */
+            data?: unknown;
             topic: string;
         };
         /** @description One result's stored evidence rows; `view.evidence` reads them, audited. */
@@ -2198,6 +2216,24 @@ export interface components {
             raw_sql?: string | null;
             /** Format: uuid */
             snapshot_id: string;
+        };
+        /** @description Every node's build state at one status version of the current snapshot. */
+        NodeStates: {
+            /** Format: uuid */
+            snapshot_id: string;
+            /** @description Node states by node key. */
+            states: {
+                [key: string]: components["schemas"]["NodeState"];
+            };
+            /** Format: int64 */
+            version: number;
+        };
+        /** @description A node's build state, with the same meaning as the matching `CatalogNodeRecord` fields. */
+        NodeState: {
+            checks: components["schemas"]["CatalogNodeChecks"];
+            definition_changed: boolean;
+            last_build?: null | components["schemas"]["CatalogNodeBuild"];
+            last_outcome?: null | components["schemas"]["CatalogNodeOutcome"];
         };
         NodeStatus: {
             build?: null | components["schemas"]["FingerprintObservation"];
@@ -4938,6 +4974,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["MicrobatchCoverage"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonNodeStates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every node's state at the current status version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeStates"];
                 };
             };
             /** @description Session rejected */
