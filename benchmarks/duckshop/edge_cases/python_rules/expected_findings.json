@@ -30,6 +30,17 @@
     ["SQBRPYTHON007", "python/inventory/stock_count/node.py", 11, 5],
     ["SQBRPYTHON011", "python/inventory/stock_count/node.py", 11, 5],
     ["SQBRPYTHON001", "python/report.py", 1, 1],
-    ["SQBRPYTHON614", "python/report.py", 1, 1]
+    ["SQBRPYTHON614", "python/report.py", 1, 1],
+    ["SQBRPYTHON021", "tests/python/inventory/test_restock_window.py", 1, 1],
+    ["SQBRPYTHON710", "tests/python/inventory/test_restock_window.py", 1, 1],
+    ["SQBRPYTHON722", "tests/python/inventory/test_restock_window.py", 6, 35],
+    ["SQBRPYTHON712", "tests/python/inventory/test_restock_window.py", 7, 1],
+    ["SQBRPYTHON714", "tests/python/inventory/test_restock_window.py", 7, 1],
+    ["SQBRPYTHON715", "tests/python/inventory/test_restock_window.py", 7, 1],
+    ["SQBRPYTHON716", "tests/python/inventory/test_restock_window.py", 7, 1],
+    ["SQBRPYTHON718", "tests/python/inventory/test_restock_window.py", 7, 1],
+    ["SQBRPYTHON719", "tests/python/inventory/test_restock_window.py", 7, 1],
+    ["SQBRPYTHON724", "tests/python/inventory/test_restock_window.py", 7, 1],
+    ["SQBRPYTHON704", "tests/python/inventory/test_restock_window.py", 9, 5]
   ]
 }

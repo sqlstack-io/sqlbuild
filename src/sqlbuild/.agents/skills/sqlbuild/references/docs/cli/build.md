@@ -51,7 +51,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | Flag | Description |
 |------|-------------|
 | `--target` | Build against a configured target instead of the active/default target |
-| `--no-tests` | Skip SQL unit tests |
+| `--no-tests` | Skip SQL unit tests; a build never runs [Python tests](test.md#python-tests) |
 | `--no-audits` | Skip audits |
 | `--no-python` | Skip read-side Python tasks and assets (loader-side Python still runs for selected sources) |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |

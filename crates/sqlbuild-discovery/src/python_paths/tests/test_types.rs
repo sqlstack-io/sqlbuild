@@ -11,3 +11,10 @@ pub(super) struct SupportedPathsTestCase {
     pub(super) files: &'static [&'static str],
     pub(super) expected_supported: &'static [&'static str],
 }
+
+/// One project layout and its Python test files.
+pub(super) struct TestPathsTestCase {
+    pub(super) description: &'static str,
+    pub(super) files: &'static [&'static str],
+    pub(super) expected_tests: &'static [&'static str],
+}

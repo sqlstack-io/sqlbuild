@@ -73,7 +73,7 @@ pub(crate) const INT_CONVERTER: &str = "int";
 pub(crate) const PATH_CONVERTER: &str = "Path";
 
 /// Every `CliNamespace` attribute with a default, in declaration order.
-pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 188] = [
+pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 190] = [
     ("command", NamespaceDefault::None),
     ("project_dir", NamespaceDefault::None),
     ("dbt_project_dir", NamespaceDefault::None),
@@ -96,6 +96,8 @@ pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 188] = [
     ("inspect", NamespaceDefault::Bool(false)),
     ("since", NamespaceDefault::None),
     ("explain", NamespaceDefault::Bool(false)),
+    ("sql_only", NamespaceDefault::Bool(false)),
+    ("python_only", NamespaceDefault::Bool(false)),
     ("review_against", NamespaceDefault::None),
     ("review_downstream", NamespaceDefault::None),
     ("review_no_clone", NamespaceDefault::Bool(false)),

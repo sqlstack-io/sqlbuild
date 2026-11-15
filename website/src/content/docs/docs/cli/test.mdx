@@ -1,12 +1,13 @@
 ---
 title: "sqb test"
-description: "Run SQL unit tests and multi-model tests in isolation."
+description: "Run SQL unit tests, multi-model tests and the project's Python tests in isolation."
 sidebar:
   label: "test"
 ---
 
 Runs SQL unit tests, independently reported parameterized cases, and multi-model tests without
-building models. Useful for validating test logic independently.
+building models, then the project's [Python tests](#python-tests) with pytest. Useful for
+validating test logic independently.
 
 ## Usage
 
@@ -28,6 +29,8 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--test-timeout <duration>` | Time limit for each test in this run, such as `30s` or `2m`, or `disabled`; overrides `TEST(timeout ...)`, the target and `[settings] test_timeout` |
 | `--since <ref>` | Run only the tests affected by changes since the merge base of `<ref>` and `HEAD` (see [Run only affected tests](#run-only-affected-tests)); `@base` reads `[git] base_ref` |
 | `--explain` | With `--since`, print why each selected test was selected |
+| `--sql` | Run only SQL tests |
+| `--python` | Run only [Python tests](#python-tests); cannot be combined with `--inspect` or `--since` |
 
 Test names are globally unique, so a bare test name selects exactly that test. `test:<name>` is the
 explicit form and accepts the same glob patterns as names, such as `test:orders_*`. A bare pattern
@@ -51,6 +54,36 @@ counted under `TIMEOUT=` and excluded from `FAIL=` in the summary line
 (`PASS=4  FAIL=0  TIMEOUT=1  TOTAL=5`), and the run continues with the remaining tests. In `--json`
 output, `summary.fail_count` still includes timed-out tests, and `summary.timeout_count` reports how
 many of them timed out. A timeout still fails the run: `sqb test` exits non-zero.
+
+## Python tests
+
+Python tests are pytest modules named `test_*.py` under `tests/python/` and `tests/providers/`. Each
+sits in the folder that mirrors the code it tests, so the tests of
+`python/orders/storefront_import/node.py` live in `tests/python/orders/storefront_import/`.
+
+| Command | SQL unit tests | Python tests |
+|---------|----------------|--------------|
+| `sqb test` | Yes | Yes, when any exist; needs pytest installed |
+| `sqb test --sql` | Yes | No |
+| `sqb test --python` | No | Yes |
+| `sqb test --since <ref>` | The affected tests | No |
+| `sqb build` | Yes | Never |
+
+pytest runs from the project directory with the same Python as SQLBuild and with
+`--import-mode=importlib`, so tests import project code as `python.orders...` or `providers...`.
+Its output appears after the SQL test summary, followed by `Python tests passed` or
+`Python tests failed`. `sqb test` exits non-zero when either kind fails. With `--json`, pytest
+writes to stderr so stdout stays one JSON document.
+
+Selecting a Python node, such as `sqb test storefront_import`, runs the Python tests in that node's
+mirrored folder. Selecting only models or unit tests runs no Python tests. When Python tests exist
+but pytest is not installed, `sqb test` fails before running anything; install it, or run
+`sqb test --sql`.
+
+[Ad-hoc runs](/docs/cli/server#run-ad-hoc-commands) on a server run SQL tests only.
+
+[Python Rules](/docs/concepts/rules/python-rules#testing-python) check where Python tests sit and
+how they are written.
 
 ## Run only affected tests
 

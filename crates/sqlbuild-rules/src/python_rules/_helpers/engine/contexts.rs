@@ -11,7 +11,7 @@ use std::path::Path;
 
 use crate::models::{EvaluateRequest, RulesConfig};
 use crate::python_rules::constants::{
-    NAMING_CONTRACTS, NAMING_FAMILY, PACKAGE_ROOT, PROJECT_CONFIG_FILE, ROOT_SCOPE,
+    NAMING_CONTRACTS, NAMING_FAMILY, PACKAGE_ROOT, PROJECT_CONFIG_FILE,
 };
 use crate::python_rules::models::{PythonRuleSpec, PythonTarget};
 
@@ -68,12 +68,12 @@ pub(crate) fn context_settings(
 /// The context of `target`, without thresholds, observations or the dead-code context.
 pub(crate) fn rule_context(target: &PythonTarget, settings: &ContextSettings) -> NativeRuleContext {
     let shared = NativeRuleContext {
-        scope: ROOT_SCOPE.to_owned(),
+        scope: target.scope.to_owned(),
         repository_path: target.repository_path.clone(),
         relative_parts: target.relative_parts.clone(),
         contracts: settings.contracts.clone(),
         repo_root: settings.repo_root.clone(),
-        scope_roots: vec![(ROOT_SCOPE.to_owned(), target.root.clone())],
+        scope_roots: vec![(target.scope.to_owned(), target.root.clone())],
         ..NativeRuleContext::default()
     };
     if !target.package {

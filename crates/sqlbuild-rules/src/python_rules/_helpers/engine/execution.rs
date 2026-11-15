@@ -19,7 +19,7 @@ use crate::python_rules::_helpers::engine::file_cache::{answers_digest, file_ide
 use crate::python_rules::_helpers::engine::observations::{
     observations, relative_queries, repository_index,
 };
-use crate::python_rules::constants::{PACKAGE_ROOT, PYTHON_RULES, ROOT_SCOPE};
+use crate::python_rules::constants::{PACKAGE_ROOT, PYTHON_RULES};
 use crate::python_rules::models::{
     CacheSplit, CallInputs, FilePlan, PythonCacheEntry, PythonEvaluation, PythonFiles,
     PythonRuleSpec, PythonTarget, RuleCall,
@@ -258,7 +258,7 @@ fn file_rules<'a>(
         let applicable: Vec<&PythonRuleSpec> = rules
             .iter()
             .copied()
-            .filter(|rule| package || rule.applies == PythonFiles::All)
+            .filter(|rule| package || rule.applies != PythonFiles::Package)
             .collect();
         let execution_targets: Vec<NativeExecutionTarget> = indexes
             .iter()
@@ -290,7 +290,7 @@ fn execution_rule(rule: &PythonRuleSpec) -> NativeExecutionRule {
 fn execution_target(target: &PythonTarget) -> NativeExecutionTarget {
     NativeExecutionTarget {
         repository_path: target.repository_path.clone(),
-        scope: ROOT_SCOPE.to_owned(),
+        scope: target.scope.to_owned(),
         root: target.root.clone(),
         relative_parts: target.relative_parts.clone(),
         direct: true,

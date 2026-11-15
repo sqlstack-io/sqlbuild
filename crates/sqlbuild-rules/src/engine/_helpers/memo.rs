@@ -14,6 +14,7 @@ use crate::errors::RowsError;
 use crate::models::{EvaluateRequest, Model, RetainedRows, RowsEvaluation, RowsRequest};
 use crate::orchestration_rules::main::orchestration_facts::orchestration_facts;
 use crate::python_rules::main::python_sources::python_sources;
+use crate::python_rules::main::python_test_sources::python_test_sources;
 
 /// The shared key prefix of fields a request serializes but evaluation derives again.
 const DERIVED_FIELD_PREFIX: &str = ",\"empty_input_only";
@@ -60,6 +61,7 @@ pub(crate) fn prepare(rows: RowsRequest, keyed: bool) -> Result<PreparedRows, Ro
         .map(digested)
         .collect::<Result<_, _>>()?;
     request.python_sources = python_sources(&request).map_err(RowsError::Rules)?;
+    request.python_test_sources = python_test_sources(&request).map_err(RowsError::Rules)?;
     request.orchestration = orchestration_facts(&request).map_err(RowsError::Rules)?;
     let mut request_json: Option<Vec<u8>> = None;
     let memo: Option<(String, PathBuf)> = match memo {

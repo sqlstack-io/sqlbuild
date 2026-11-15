@@ -14,6 +14,7 @@ Online: https://sqlbuild.com/docs/concepts/rules/python-rules/
 - Writing nodes as units
 - Laying out providers
 - Laying out sensors and calendars
+- Testing Python
 - Main modules and entry modules
 - Unreachable definitions
 - Rule options
@@ -63,10 +64,12 @@ sqb rules run SQBRPYTHON
 The Python Rules read every supported project Python file: the runtime package under `python/` and
 the folders that extend SQLBuild, such as `hooks/python/`, `functions/python/`, `providers/`,
 `rules/` and `macros/`. See [Project Python](../project-configuration.md#project-python)
-for the full list. Files under `tests/` are not checked.
+for the full list. Under `tests/`, only the [Python tests](#testing-python) in `tests/python/` and
+`tests/providers/` are checked, and only by the Rules marked `tests/`.
 
 Rules marked `python/` in the [reference](#rule-reference) check only the runtime package, because
-they describe how its packages are organised. The others check every file.
+they describe how its packages are organised. Rules marked `tests/` check only Python tests. The
+others check every file except Python tests.
 
 ## Laying out `python/`
 
@@ -221,6 +224,64 @@ A domain folder's private support is `_models.py`, `_types.py`, `_constants.py`,
 
 Providers importing `orchestration/` are reported by `SQBRPYTHON015` instead.
 
+## Testing Python
+
+`sqb test` runs the pytest modules under `tests/python/` and `tests/providers/`; see
+[Python tests](../../cli/test.md#python-tests). `SQBRPYTHON021` keeps each test beside a mirror of the
+code it tests, and `SQBRPYTHON701` to `SQBRPYTHON724` keep tests table-driven:
+
+```text
+python/
+  orders/
+    storefront_import/
+      node.py
+      _helpers/
+        row_mapping.py
+tests/
+  python/
+    orders/
+      storefront_import/
+        _helpers/
+          _test_types.py      # the test-case dataclasses
+          test_row_mapping.py # tests row_mapping.py
+```
+
+```python
+# tests/python/orders/storefront_import/_helpers/_test_types.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class RowMappingTestCase:
+    description: str
+    status: str
+    expected_label: str
+```
+
+```python
+# tests/python/orders/storefront_import/_helpers/test_row_mapping.py
+import pytest
+
+from python.orders.storefront_import._helpers.row_mapping import status_label
+from tests.python.orders.storefront_import._helpers._test_types import RowMappingTestCase
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RowMappingTestCase(description="shipped orders", status="S", expected_label="shipped"),
+        RowMappingTestCase(description="open orders", status="O", expected_label="open"),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_status_when_mapping_then_returns_its_label(test_case: RowMappingTestCase) -> None:
+    assert status_label(test_case.status) == test_case.expected_label
+```
+
+| Code | Finding | Fix |
+|---|---|---|
+| `SQBRPYTHON021` | A test module whose folder does not mirror one under `python/` or `providers/`, or a `test_<name>.py` with no `<name>.py` or `<name>/` package beside the code it tests | Move the test to the mirrored folder, or rename it for the module it tests |
+| `SQBRPYTHON701` to `SQBRPYTHON711` | A test folder or module whose layout, imports, helpers, conditionals or test-case dataclasses break the pattern above | Follow the pattern above |
+| `SQBRPYTHON712` to `SQBRPYTHON724` | A test function or `pytest.mark.parametrize` that is not named `test_given_<state>_when_<action>_then_<outcome>`, or does not take dataclass cases through `test_case` with ids from each `description` | Follow the pattern above |
+
 ## Main modules and entry modules
 
 Some Rules apply only to a domain's main modules: files under a `main/` folder, and a unit's
@@ -319,6 +380,36 @@ remediation.
 | `SQBRPYTHON018` | orchestration-module-surface | All | yes | A sensor or calendar module holds imports, private constants and its one declaration |
 | `SQBRPYTHON019` | orchestration-import-direction | All | yes | Sensors and calendars import only providers, `python/utils/` and their own support; nothing outside `orchestration/` imports them |
 | `SQBRPYTHON020` | orchestration-no-docstring | All | yes | Sensor and calendar functions have no docstring |
+
+### Python tests
+
+| Code | Name | Files | Default | Checks |
+|---|---|---|---|---|
+| `SQBRPYTHON021` | python-test-placement | `tests/` | yes | Python tests must mirror an existing module under `python/` or `providers/` |
+| `SQBRPYTHON701` | test-init-module-empty | `tests/` | yes | Test package `__init__.py` files must be empty or docstring-only |
+| `SQBRPYTHON702` | test-absolute-imports | `tests/` | yes | Tests must use absolute imports |
+| `SQBRPYTHON703` | test-no-top-level-helpers | `tests/` | yes | Test modules may contain only tests, imports, and declarations |
+| `SQBRPYTHON704` | test-no-conditionals | `tests/` | yes | Tests and local test helpers must not contain conditional control flow |
+| `SQBRPYTHON705` | test-private-constant-order | `tests/` | yes | Private test constants must appear before test functions |
+| `SQBRPYTHON706` | test-no-complex-comprehensions | `tests/` | yes | Nested or multi-generator comprehensions hide control flow and data shapes |
+| `SQBRPYTHON707` | test-case-description | `tests/` | yes | Test-case dataclasses must define a `description` field |
+| `SQBRPYTHON708` | test-case-expected-field | `tests/` | yes | Test-case dataclasses must define at least one `expected_` field |
+| `SQBRPYTHON709` | test-local-types-import | `tests/` | yes | Tests must import test-case types from their local `_test_types.py` |
+| `SQBRPYTHON710` | test-local-types-file | `tests/` | yes | Test directories must provide a local `_test_types.py` |
+| `SQBRPYTHON711` | test-file-name | `tests/` | yes | Test modules must use a `test_` filename |
+| `SQBRPYTHON712` | test-function-name | `tests/` | yes | Test functions must use `test_given_<state>_when_<action>_then_<outcome>` |
+| `SQBRPYTHON713` | test-dataclass-parametrize | `tests/` | yes | Tests must use dataclass-backed pytest parameterization |
+| `SQBRPYTHON714` | test-accepts-test-case | `tests/` | yes | Parametrized tests must accept a `test_case` argument |
+| `SQBRPYTHON715` | test-case-annotation | `tests/` | yes | `test_case` parameters must use a local test-case dataclass annotation |
+| `SQBRPYTHON716` | test-expected-field-assertion | `tests/` | yes | Tests must assert against an `expected_` field from `test_case` |
+| `SQBRPYTHON717` | test-parametrize-arguments | `tests/` | yes | Pytest parametrize decorators must define parameter names and values |
+| `SQBRPYTHON718` | test-parametrize-test-case | `tests/` | yes | Pytest parametrize must expose cases through the `test_case` parameter |
+| `SQBRPYTHON719` | test-parametrize-ids | `tests/` | yes | Pytest parametrize decorators must define readable case ids |
+| `SQBRPYTHON720` | test-inline-parametrize-values | `tests/` | yes | Pytest parametrize values must be a visible list, tuple, or local comprehension |
+| `SQBRPYTHON721` | test-nonempty-parametrize-values | `tests/` | yes | Pytest parametrize case sequences must not be empty |
+| `SQBRPYTHON722` | test-no-dict-cases | `tests/` | yes | Pytest cases must use typed dataclasses instead of dictionaries |
+| `SQBRPYTHON723` | test-local-case-constructors | `tests/` | yes | Pytest cases must construct dataclasses from the local `_test_types.py` |
+| `SQBRPYTHON724` | test-description-ids | `tests/` | yes | Pytest case ids must come from each test case `description` |
 
 ### Type annotations
 

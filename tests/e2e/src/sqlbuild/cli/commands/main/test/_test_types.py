@@ -613,3 +613,15 @@ class PythonUdfConnectionsE2ETestCase:
     database: str
     concurrency: int
     expected_stdout_fragment: str
+
+
+@dataclass(frozen=True)
+class PythonTestsE2ETestCase:
+    """One `sqb test` run over a project with SQL tests and Python tests."""
+
+    description: str
+    command: tuple[str, ...]
+    extra_repo_files: Mapping[str, str]
+    expected_exit_code: int
+    expected_output_fragments: tuple[str, ...]
+    expected_absent_fragments: tuple[str, ...]

@@ -698,6 +698,8 @@ const TEST_COMMAND_REQUEST: RecordSpec = RecordSpec {
         FieldSpec::new("test_timeout", FieldDefault::None),
         FieldSpec::new("since", FieldDefault::None),
         FieldSpec::new("explain", FieldDefault::False),
+        FieldSpec::new("sql_only", FieldDefault::False),
+        FieldSpec::new("python_only", FieldDefault::False),
     ],
 };
 const REFACTOR_COMMAND_REQUEST: RecordSpec = RecordSpec {
