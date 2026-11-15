@@ -40,8 +40,8 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
 };
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::discovery::configuration::discover_configured_providers;
 use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
+use crate::bindings::_helpers::discovery::configuration::discover_configured_providers;
 use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::provider_settings::{
