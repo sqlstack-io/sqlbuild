@@ -1,0 +1,3 @@
+name = "restock_shipments_job"
+description = "Rebuild shipments."
+select = "shipments"

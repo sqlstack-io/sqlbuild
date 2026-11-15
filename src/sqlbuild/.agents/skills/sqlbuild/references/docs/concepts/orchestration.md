@@ -44,8 +44,12 @@ sqb build nightly_orders_job        # build what the job builds, locally
 - Subfolders are allowed, such as `orchestration/jobs/finance/revenue_job.toml`.
 - A name must end with its folder's suffix. Names are unique across the whole project, with models,
   sources and every other resource.
-- A Python module whose file name starts with `_` is a private helper and declares nothing.
+- A Python module whose file name starts with `_`, or that sits in a folder starting with `_` under
+  `orchestration/calendars/` or `orchestration/sensors/` (such as `sensors/inventory/_helpers/`), is
+  private support and declares nothing. Declaring a calendar or sensor there fails compilation.
 - Any other file under `orchestration/`, or a folder not in the table, is a `D017` error.
+- The [Python Rules](rules/python-rules.md#laying-out-sensors-and-calendars) add a
+  domain-folder layout for sensor and calendar modules.
 
 ## Declare a job
 
@@ -138,7 +142,7 @@ another system. The code location evaluates it when it publishes and again befor
 out.
 
 ```python
-# orchestration/calendars/fulfillment_calendar.py
+# orchestration/calendars/fulfillment/cutoffs.py
 from sqlbuild.orchestration import calendar
 
 @calendar(name="fulfillment_calendar", description="Upcoming fulfillment times", horizon="1d")
@@ -159,7 +163,7 @@ returns timezone-aware datetimes inside it. Other parameters name
 A sensor starts a job or job group when something happens, named by `run`.
 
 ```python
-# orchestration/sensors/on_new_orders_sensor.py
+# orchestration/sensors/orders/new_orders.py
 from sqlbuild.orchestration import sensor, source_new_data
 
 on_new_orders = sensor(

@@ -12,6 +12,7 @@ use crate::python_rules::_helpers::engine::layout::layout_faults;
 use crate::python_rules::_helpers::engine::placement::python_targets;
 use crate::python_rules::_helpers::engine::programs::Programs;
 use crate::python_rules::_helpers::engine::project_plane::loaded_project;
+use crate::python_rules::_helpers::units::orchestration::orchestration_faults;
 use crate::python_rules::_helpers::units::project::unit_faults;
 use crate::python_rules::_helpers::units::providers::provider_faults;
 use crate::python_rules::models::{
@@ -51,6 +52,11 @@ pub(crate) fn evaluate_python_rules(
         request.python_version,
     ));
     evaluation.faults.extend(provider_faults(
+        &request.python_sources,
+        &codes,
+        request.python_version,
+    ));
+    evaluation.faults.extend(orchestration_faults(
         &request.python_sources,
         &codes,
         request.python_version,

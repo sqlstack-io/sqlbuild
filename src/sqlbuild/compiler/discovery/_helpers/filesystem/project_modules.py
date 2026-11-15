@@ -362,11 +362,17 @@ def _exec_project_module(
     return module
 
 
+def _deepest_modules_first() -> list[tuple[str, ModuleType]]:
+    """Loaded modules, children first: a namespace package reads its parent's path."""
+
+    return sorted(sys.modules.items(), key=lambda item: item[0].count("."), reverse=True)
+
+
 def _evict_stale_project_package_modules(*, root_module: str, project_dir: Path) -> None:
     root_path: Path = (project_dir / root_module).resolve()
     module_name: str
     module: ModuleType
-    for module_name, module in tuple(sys.modules.items()):
+    for module_name, module in _deepest_modules_first():
         if module_name != root_module and not module_name.startswith(f"{root_module}."):
             continue
         module_file: object = getattr(module, "__file__", None)

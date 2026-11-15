@@ -5,7 +5,7 @@ use fensu_native::rules::constants as fensu;
 use crate::python_rules::models::{PythonFiles, PythonRuleSpec};
 
 /// Every `SQBRPYTHON` rule; numbers are never reused, and new rules append to their band.
-pub(crate) const PYTHON_RULES: [PythonRuleSpec; 77] = [
+pub(crate) const PYTHON_RULES: [PythonRuleSpec; 82] = [
     PythonRuleSpec {
         code: "SQBRPYTHON001",
         fensu_code: None,
@@ -185,6 +185,66 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 77] = [
         options: &[],
         message: "a provider's _helpers/ and _classes/ are private to it, and providers import only python/utils/ from the runtime package and nothing from orchestration/",
         remediation: "Import a provider through provider.py or its role files; move code a provider shares with nodes into python/utils/<capability>/.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON016",
+        fensu_code: None,
+        slug: "orchestration-module-paths",
+        family: "orchestration",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "sensor and calendar modules sit at orchestration/<role>/<domain>/<capability>.py and are named for their capability",
+        remediation: "Move the module into a domain folder directly under orchestration/sensors/ or orchestration/calendars/, and name it for what it checks instead of main.py, definitions.py, sensors.py, calendars.py or processing.py.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON017",
+        fensu_code: None,
+        slug: "orchestration-private-support",
+        family: "orchestration",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "a sensor or calendar domain folder's private support is _models.py, _types.py, _constants.py, _exceptions.py and _helpers/, imported only from that folder",
+        remediation: "Keep support beside its declarations in one of the support files or _helpers/; move code another domain needs into python/utils/<capability>/ or a provider.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON018",
+        fensu_code: None,
+        slug: "orchestration-module-surface",
+        family: "orchestration",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "a sensor or calendar module holds imports, private constants and its one declaration",
+        remediation: "Move functions and classes into the folder's _helpers/ or _models.py, and public constants into _constants.py.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON019",
+        fensu_code: None,
+        slug: "orchestration-import-direction",
+        family: "orchestration",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "sensor and calendar code imports providers, python/utils/ and its own folder's support, and nothing outside orchestration/ imports from it",
+        remediation: "Read node results through the sensor's context instead of importing node units, share code through python/utils/<capability>/ or a provider, and keep other code from importing orchestration/.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON020",
+        fensu_code: None,
+        slug: "orchestration-no-docstring",
+        family: "orchestration",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "sensor and calendar functions have no docstring; their description is the declaration's description=",
+        remediation: "Remove the docstring and keep the text in description=.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON101",
@@ -1097,6 +1157,34 @@ pub(crate) const PROVIDER_PRIVATE_FOLDERS: [&str; 2] = ["_helpers", "_classes"];
 pub(crate) const PROVIDER_BASE: &str = "Provider";
 /// The folder holding orchestration declarations, imported as `orchestration`.
 pub(crate) const ORCHESTRATION_ROOT: &str = "orchestration";
+pub(crate) const ORCHESTRATION_MODULE_PATHS_CODE: &str = "SQBRPYTHON016";
+pub(crate) const ORCHESTRATION_PRIVATE_SUPPORT_CODE: &str = "SQBRPYTHON017";
+pub(crate) const ORCHESTRATION_MODULE_SURFACE_CODE: &str = "SQBRPYTHON018";
+pub(crate) const ORCHESTRATION_IMPORT_DIRECTION_CODE: &str = "SQBRPYTHON019";
+pub(crate) const ORCHESTRATION_NO_DOCSTRING_CODE: &str = "SQBRPYTHON020";
+/// The orchestration rules, which read sensor and calendar modules and their importers.
+pub(crate) const ORCHESTRATION_RULE_CODES: [&str; 5] = [
+    ORCHESTRATION_MODULE_PATHS_CODE,
+    ORCHESTRATION_PRIVATE_SUPPORT_CODE,
+    ORCHESTRATION_MODULE_SURFACE_CODE,
+    ORCHESTRATION_IMPORT_DIRECTION_CODE,
+    ORCHESTRATION_NO_DOCSTRING_CODE,
+];
+/// The orchestration folders that hold Python sensor and calendar modules.
+pub(crate) const ORCHESTRATION_PYTHON_ROLES: [&str; 2] = ["sensors", "calendars"];
+/// Module names too generic to say which capability a sensor or calendar checks.
+pub(crate) const ORCHESTRATION_GENERIC_MODULES: [&str; 5] = [
+    "main.py",
+    "definitions.py",
+    "sensors.py",
+    "calendars.py",
+    "processing.py",
+];
+/// The private support files a sensor or calendar domain folder may hold.
+pub(crate) const ORCHESTRATION_SUPPORT_FILES: [&str; 4] =
+    ["_models.py", "_types.py", "_constants.py", "_exceptions.py"];
+/// The private support folder a sensor or calendar domain folder may hold.
+pub(crate) const ORCHESTRATION_SUPPORT_FOLDER: &str = "_helpers";
 /// The prefix of a private name.
 pub(crate) const PRIVATE_PREFIX: &str = "_";
 /// The name a `from module import *` binds.

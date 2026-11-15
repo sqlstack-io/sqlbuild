@@ -2,36 +2,27 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-
-use sqlbuild_pysource::node_units::main::node_unit_module::node_unit_module;
-use sqlbuild_pysource::node_units::models::{
-    UnitClass, UnitModule, UnitPosition, UnitStatementKind,
-};
+use sqlbuild_pysource::node_units::models::{UnitClass, UnitPosition, UnitStatementKind};
 
 use crate::models::{Fault, PythonSource};
 use crate::python_rules::_helpers::engine::faults::catalogue_fault;
 use crate::python_rules::_helpers::engine::placement::package_anchor;
-use crate::python_rules::_helpers::units::project::{absolute_module, dotted_names, unit_fault};
+use crate::python_rules::_helpers::units::project::{
+    absolute_module, dotted_names, files_naming, project_modules, rejected_import_faults,
+    unit_fault,
+};
 use crate::python_rules::constants::{
     INIT_FILE, ORCHESTRATION_ROOT, PACKAGE_ROOT, PRIVATE_PREFIX, PROVIDER_BASE, PROVIDER_FILE,
     PROVIDER_IMPORT_BOUNDARIES_CODE, PROVIDER_LAYOUT_CODE, PROVIDER_MODULE_SHAPE_CODE,
     PROVIDER_PRIVATE_FOLDERS, PROVIDER_ROLE_FILES, PROVIDER_RULE_CODES, PROVIDERS_ROOT,
     SHARED_UTILITIES_PACKAGE, STAR_IMPORT,
 };
+use crate::python_rules::models::ParsedFile;
 
 const FILE_START: UnitPosition = UnitPosition { line: 1, column: 1 };
 const OTHER_STATEMENT: &str = "a statement that is not an import, a constant or the provider class";
 /// The package Provider is imported from.
 const SQLBUILD_PACKAGE: &str = "sqlbuild";
-
-/// One parsed project file and its path parts.
-#[derive(Debug)]
-struct ParsedFile<'a> {
-    path: &'a str,
-    parts: Vec<&'a str>,
-    module: UnitModule,
-}
 
 /// Faults of the selected provider rules among `codes`.
 pub(crate) fn provider_faults(
@@ -43,24 +34,8 @@ pub(crate) fn provider_faults(
         return Vec::new();
     }
     let mut faults: Vec<Fault> = provider_layout_faults(sources);
-    let files: Vec<ParsedFile<'_>> = sources
-        .par_iter()
-        .filter(|source| {
-            source.relative_path.split('/').next() == Some(PROVIDERS_ROOT)
-                || source.text.contains(PROVIDERS_ROOT)
-        })
-        .filter_map(|source| {
-            Some(ParsedFile {
-                path: source.relative_path.as_str(),
-                parts: source.relative_path.split('/').collect(),
-                module: node_unit_module(&source.text, python_version)?,
-            })
-        })
-        .collect();
-    let modules: BTreeSet<String> = sources
-        .iter()
-        .flat_map(|source| dotted_names(&source.relative_path))
-        .collect();
+    let files: Vec<ParsedFile<'_>> = files_naming(sources, PROVIDERS_ROOT, python_version);
+    let modules: BTreeSet<String> = project_modules(sources);
     let classes: ProviderClasses = provider_classes(&files, &modules);
     for file in &files {
         if matches!(file.parts.as_slice(), [root, _, file_name] if *root == PROVIDERS_ROOT && *file_name == PROVIDER_FILE)
@@ -357,24 +332,9 @@ fn import_faults(file: &ParsedFile<'_>, modules: &BTreeSet<String>) -> Vec<Fault
         [root, capability, _, ..] if *root == PROVIDERS_ROOT => Some(capability),
         _ => None,
     };
-    let folder: &[&str] = &file.parts[..file.parts.len() - 1];
-    file.module
-        .imports
-        .iter()
-        .filter_map(|import| {
-            let module: String = absolute_module(import, folder, modules)?;
-            if !modules.contains(&module) {
-                return None;
-            }
-            let detail: String = boundary_detail(&module, capability)?;
-            unit_fault(
-                PROVIDER_IMPORT_BOUNDARIES_CODE,
-                file.path,
-                import.position,
-                &format!("{} imports {module}, {detail}", file.path),
-            )
-        })
-        .collect()
+    rejected_import_faults(file, modules, |module| {
+        boundary_detail(module, capability).map(|detail| (PROVIDER_IMPORT_BOUNDARIES_CODE, detail))
+    })
 }
 
 /// Why a file in provider `capability` (or outside providers/ when `None`) may not import `module`.
