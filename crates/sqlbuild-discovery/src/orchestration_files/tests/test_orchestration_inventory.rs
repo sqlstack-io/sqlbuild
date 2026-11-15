@@ -40,6 +40,46 @@ fn given_projects_when_inventorying_then_reads_each_kind_and_names_them() {
             expected_empty: false,
         },
         InventoryTestCase {
+            description: "a module inside a private folder is support and declares nothing",
+            files: [
+                valid(),
+                vec![(
+                    "orchestration/sensors/inventory/_helpers/feed_age.py",
+                    "def feed_age() -> int:\n    return 0\n",
+                )],
+            ]
+            .concat(),
+            expected_names: vec![
+                named(
+                    "orders_export_job",
+                    "job",
+                    "orchestration/jobs/orders/export.toml",
+                ),
+                named(
+                    "orders_nightly_job_group",
+                    "job group",
+                    "orchestration/job_groups/orders/nightly.toml",
+                ),
+                named(
+                    "trading_days_calendar",
+                    "calendar",
+                    "orchestration/calendars/trading_days.py",
+                ),
+                named(
+                    "stock_stale_sensor",
+                    "sensor",
+                    "orchestration/sensors/inventory/stock.py",
+                ),
+            ],
+            expected_modules: vec![
+                "orchestration/calendars/_holidays.py",
+                "orchestration/calendars/trading_days.py",
+                "orchestration/sensors/inventory/_helpers/feed_age.py",
+                "orchestration/sensors/inventory/stock.py",
+            ],
+            expected_empty: false,
+        },
+        InventoryTestCase {
             description: "no orchestration folder",
             files: vec![("models/orders.sql", "select 1")],
             expected_names: Vec::new(),
@@ -175,6 +215,14 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
             expected_message: "orchestration/sensors/helpers.py:1:1: declares no sensor",
             expected_help: Some(
                 "declare one sensor, or start the file name with `_` to make it a private support module",
+            ),
+        },
+        InventoryErrorTestCase {
+            description: "a sensor declared inside a private folder",
+            files: with_file("orchestration/sensors/inventory/_helpers/stock.py", SENSOR),
+            expected_message: "orchestration/sensors/inventory/_helpers/stock.py:3:9: declares a sensor inside the private folder _helpers/; declarations can't live in a private folder",
+            expected_help: Some(
+                "move the module out of _helpers/ into its domain folder, or move the sensor into a module there",
             ),
         },
         InventoryErrorTestCase {
