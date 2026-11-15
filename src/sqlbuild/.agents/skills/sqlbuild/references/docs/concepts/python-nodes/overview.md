@@ -57,7 +57,7 @@ python/
   factories/regional.py
 ```
 
-Grouping by domain (`python/orders/`, `python/customers/`) works just as well, and a single file may mix kinds. A project that selects the [Python Rules](../rules/python-rules.md#laying-out-python) commits to grouping by domain: `SQBRPYTHON001` reports node-kind folders such as `python/loaders/` and modules directly under `python/`. Import other project modules through the `python` package, for example `from python.tasks.orders import export_orders` or `from python._helpers import normalize_status`.
+Grouping by domain (`python/orders/`, `python/customers/`) works just as well, and a single file may mix kinds. A project that selects the [Python Rules](../rules/python-rules.md#laying-out-python) commits to grouping by domain, with each node in its own [unit folder](../rules/python-rules.md#writing-nodes-as-units) holding `node.py` and `main.py`: `SQBRPYTHON001` reports node-kind folders such as `python/loaders/` and modules directly under `python/`, and `SQBRPYTHON012` reports nodes declared outside a unit's `node.py`. Import other project modules through the `python` package, for example `from python.tasks.orders import export_orders` or `from python._helpers import normalize_status`.
 
 Code that extends SQLBuild itself keeps its own folder, such as `rules/`, `materializations/`, `adapters/`, `providers/`, `sinks/`, `hooks/python/`, `functions/python/`, and `macros/`. Python outside the supported locations fails compilation with `D016`; see [Project Python](../project-configuration.md#project-python) for the full list.
 

@@ -10,6 +10,7 @@ use crate::python_rules::_helpers::layout::layout_faults;
 use crate::python_rules::_helpers::placement::python_targets;
 use crate::python_rules::_helpers::programs::Programs;
 use crate::python_rules::_helpers::project_plane::loaded_project;
+use crate::python_rules::_helpers::units::project::unit_faults;
 use crate::python_rules::models::{
     CallInputs, PythonCacheEntry, PythonEvaluation, PythonRuleSpec, PythonTarget,
 };
@@ -41,6 +42,11 @@ pub(crate) fn evaluate_python_rules(
     evaluation
         .faults
         .extend(layout_faults(&request.python_sources, &codes));
+    evaluation.faults.extend(unit_faults(
+        &request.python_sources,
+        &codes,
+        request.python_version,
+    ));
     evaluation.faults.sort_by(|left, right| {
         (&left.path, left.line, left.column, &left.code).cmp(&(
             &right.path,

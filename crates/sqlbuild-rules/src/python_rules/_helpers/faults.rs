@@ -77,3 +77,22 @@ fn line_start(text: &str, line: u32) -> Option<usize> {
     }
     Some(index)
 }
+
+/// A fault of the catalogue rule `code` on `path` at `(line, column)`, its message followed by `detail`.
+pub(crate) fn catalogue_fault(
+    code: &str,
+    path: &str,
+    (line, column): (u64, u64),
+    detail: &str,
+) -> Option<Fault> {
+    let rule = PYTHON_RULES.iter().find(|rule| rule.code == code)?;
+    Some(Fault {
+        unevaluated: false,
+        code: code.to_owned(),
+        path: path.to_owned(),
+        line,
+        column,
+        message: format!("{}: {detail}", rule.message),
+        remediation: rule.remediation.to_owned(),
+    })
+}
