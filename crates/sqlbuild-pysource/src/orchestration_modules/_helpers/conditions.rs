@@ -9,7 +9,9 @@ use crate::orchestration_modules::_helpers::calls::{authoring_call, literal, pos
 use crate::orchestration_modules::constants::{
     EXCERPT_LIMIT, SELECT_KEYWORD, SELECTING_CONDITION_CALLS,
 };
-use crate::orchestration_modules::models::{ConditionSource, LiteralArgument, ModuleScope};
+use crate::orchestration_modules::models::{
+    ConditionSource, ImportedName, LiteralArgument, ModuleScope,
+};
 
 /// Each module-level `NAME = value` or `NAME: T = value` with one plain name target, in source order.
 pub(crate) fn module_assignments(body: &[Stmt]) -> BTreeMap<&str, Vec<(TextSize, &Expr)>> {
@@ -26,8 +28,8 @@ pub(crate) fn module_assignments(body: &[Stmt]) -> BTreeMap<&str, Vec<(TextSize,
 }
 
 /// Each name a module-level `from ... import` binds, with its module, relative level and imported name.
-pub(crate) fn module_imports(body: &[Stmt]) -> BTreeMap<&str, (String, u32, &str)> {
-    let mut imports: BTreeMap<&str, (String, u32, &str)> = BTreeMap::new();
+pub(crate) fn module_imports(body: &[Stmt]) -> BTreeMap<&str, ImportedName<'_>> {
+    let mut imports: BTreeMap<&str, ImportedName<'_>> = BTreeMap::new();
     for statement in body {
         let Stmt::ImportFrom(import) = statement else {
             continue;
@@ -39,7 +41,15 @@ pub(crate) fn module_imports(body: &[Stmt]) -> BTreeMap<&str, (String, u32, &str
             .unwrap_or_default();
         for alias in &import.names {
             let local: &str = alias.asname.as_ref().unwrap_or(&alias.name).as_str();
-            imports.insert(local, (module.clone(), import.level, alias.name.as_str()));
+            imports.insert(
+                local,
+                ImportedName {
+                    module: module.clone(),
+                    level: import.level,
+                    name: alias.name.as_str(),
+                    start: statement.range().start(),
+                },
+            );
         }
     }
     imports
@@ -59,28 +69,29 @@ pub(crate) fn condition_source(
             Expr::Call(call) => return call_source(call, scope),
             Expr::Name(name) => {
                 let id: &str = name.id.as_str();
-                let bound = scope.assignments.get(id).and_then(|bindings| {
+                let assigned = scope.assignments.get(id).and_then(|bindings| {
                     bindings
                         .iter()
                         .rev()
                         .find(|(start, _)| *start < at)
                         .copied()
                 });
-                if let Some((start, bound)) = bound {
-                    current = (bound, start);
-                    continue;
-                }
-                return Some(match scope.imports.get(id) {
-                    Some((module, level, imported)) => ConditionSource::Imported {
-                        module: module.clone(),
-                        level: *level,
-                        name: (*imported).to_owned(),
-                        position: position(scope.lines, value.range().start()),
-                    },
-                    None => {
-                        unresolvable(format!("`{id}` is not bound at module level"), value, scope)
+                let imported = scope.imports.get(id).filter(|import| import.start < at);
+                match (assigned, imported) {
+                    (Some((start, bound)), imported)
+                        if imported.is_none_or(|import| import.start < start) =>
+                    {
+                        current = (bound, start);
                     }
-                });
+                    (_, Some(import)) => return Some(imported_source(import, value, scope)),
+                    _ => {
+                        return Some(unresolvable(
+                            format!("`{id}` is not bound at module level"),
+                            value,
+                            scope,
+                        ));
+                    }
+                }
             }
             other => {
                 return Some(unresolvable(
@@ -117,6 +128,20 @@ fn call_source(call: &ExprCall, scope: &ModuleScope<'_>) -> Option<ConditionSour
     }
 }
 
+/// The imported name `import` binds, reported where `at` uses it.
+pub(crate) fn imported_source(
+    import: &ImportedName<'_>,
+    at: &Expr,
+    scope: &ModuleScope<'_>,
+) -> ConditionSource {
+    ConditionSource::Imported {
+        module: import.module.clone(),
+        level: import.level,
+        name: import.name.to_owned(),
+        position: position(scope.lines, at.range().start()),
+    }
+}
+
 fn unresolvable(what: String, at: &Expr, scope: &ModuleScope<'_>) -> ConditionSource {
     ConditionSource::Unresolvable {
         what,
@@ -126,7 +151,10 @@ fn unresolvable(what: String, at: &Expr, scope: &ModuleScope<'_>) -> ConditionSo
 
 /// The first line of `expression`'s source, shortened to a quotable length.
 fn excerpt(expression: &Expr, scope: &ModuleScope<'_>) -> String {
-    let text: &str = scope.contents[expression.range()]
+    let text: &str = scope
+        .contents
+        .get(std::ops::Range::<usize>::from(expression.range()))
+        .unwrap_or_default()
         .lines()
         .next()
         .unwrap_or_default();

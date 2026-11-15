@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 
+use sqlbuild_core::text::main::decode_text::decode_text;
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_pysource::orchestration_modules::main::module_binding_condition::module_binding_condition;
 use sqlbuild_pysource::orchestration_modules::models::{
@@ -48,8 +49,13 @@ pub(crate) fn resolved_condition(
         if !followed.insert((file.clone(), name.clone())) {
             return unresolvable(format!("`{name}` is imported in a cycle through `{file}`"));
         }
-        let Ok(contents) = std::fs::read_to_string(reader.tree.absolute(&file)) else {
-            return unresolvable(format!("`{file}` cannot be read"));
+        let bytes: Vec<u8> = match std::fs::read(reader.tree.absolute(&file)) {
+            Ok(bytes) => bytes,
+            Err(failure) => return unresolvable(format!("`{file}` cannot be read: {failure}")),
+        };
+        let contents: String = match decode_text(&bytes) {
+            Ok(contents) => contents,
+            Err(_undecodable) => return unresolvable(format!("`{file}` is not valid UTF-8")),
         };
         let next: Option<ConditionSource> =
             module_binding_condition(&contents, reader.python_version, &name);

@@ -77,8 +77,17 @@ pub(crate) struct ModuleScope<'a> {
     pub(crate) modules: BTreeSet<String>,
     /// Each module-level name's bindings, in source order.
     pub(crate) assignments: BTreeMap<&'a str, Vec<(TextSize, &'a Expr)>>,
-    /// Each name a module-level `from ... import` binds, with its module, relative level and imported name.
-    pub(crate) imports: BTreeMap<&'a str, (String, u32, &'a str)>,
+    /// Each name a module-level `from ... import` last binds, with its module, relative level, imported name and start.
+    pub(crate) imports: BTreeMap<&'a str, ImportedName<'a>>,
     pub(crate) lines: &'a SourceLines,
     pub(crate) contents: &'a str,
+}
+
+/// A name a module-level `from ... import` binds.
+#[derive(Debug)]
+pub(crate) struct ImportedName<'a> {
+    pub(crate) module: String,
+    pub(crate) level: u32,
+    pub(crate) name: &'a str,
+    pub(crate) start: TextSize,
 }

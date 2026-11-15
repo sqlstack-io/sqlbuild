@@ -80,6 +80,7 @@ call that name holds.
 | A selecting condition whose `select` is a variable or an expression | Reported |
 | A call to any other function, such as a helper that builds the condition | Reported |
 | A name imported from outside the project, or not bound at module level | Reported |
+| Any other expression, such as `module.NAME` | Reported |
 
 A reported condition names what the Rule could not resolve:
 

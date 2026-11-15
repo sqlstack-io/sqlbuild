@@ -163,6 +163,47 @@ fn given_job_and_sensor_selections_when_evaluating_then_more_named_nodes_than_th
             ],
         },
         NamedSelectorLimitTestCase {
+            description: "a CRLF condition module is read like any other, and a later import rebinds an assigned name",
+            files: vec![
+                export_job(),
+                (
+                    "orchestration/sensors/orders/_crlf.py",
+                    "# r\u{e9}sum\u{e9}\r\nfrom sqlbuild.orchestration import node_event\r\nX = m\u{e9}k(\"x\")\r\n".to_owned(),
+                ),
+                (
+                    "orchestration/sensors/orders/_wide.py",
+                    "from sqlbuild.orchestration import node_event\nWIDE = node_event(select=\"a b c d\", kinds=[])\n".to_owned(),
+                ),
+                (
+                    "orchestration/sensors/orders/_rebound.py",
+                    "from sqlbuild.orchestration import node_event\nWIDE = node_event(select=\"a\", kinds=[])\nfrom ._wide import WIDE\n".to_owned(),
+                ),
+                (
+                    "orchestration/sensors/orders/crlf.py",
+                    format!("from ._crlf import X\n{}", sensor("orders_crlf", "X")),
+                ),
+                (
+                    "orchestration/sensors/orders/rebound.py",
+                    format!("from ._rebound import WIDE\n{}", sensor("orders_rebound", "WIDE")),
+                ),
+            ],
+            config: selected.clone(),
+            expected_findings: vec![
+                (
+                    "orchestration/sensors/orders/crlf.py",
+                    5,
+                    71,
+                    "sensor 'orders_crlf_sensor' has a condition the rule cannot resolve: in `orchestration/sensors/orders/_crlf.py`, `m\u{e9}k(...)` is a function call, so the nodes it selects cannot be counted",
+                ),
+                (
+                    "orchestration/sensors/orders/rebound.py",
+                    5,
+                    77,
+                    "sensor 'orders_rebound_sensor' names 4 nodes in its selection (limit 3)",
+                ),
+            ],
+        },
+        NamedSelectorLimitTestCase {
             description: "an exact rule exception for the file removes its finding",
             files: vec![
                 export_job(),

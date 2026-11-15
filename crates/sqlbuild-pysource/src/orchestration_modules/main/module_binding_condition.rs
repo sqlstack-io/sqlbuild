@@ -28,23 +28,24 @@ pub fn module_binding_condition(
     };
     let imports: Vec<(String, String, TextSize)> = imported_names(&parsed.module.body);
     let scope: ModuleScope<'_> = module_scope(&parsed, contents, &imports);
-    if let Some((at, value)) = scope
+    let assigned = scope
         .assignments
         .get(name)
-        .and_then(|bindings| bindings.last())
-    {
-        return condition_source(value, *at, &scope);
-    }
-    Some(match scope.imports.get(name) {
-        Some((module, level, imported)) => ConditionSource::Imported {
-            module: module.clone(),
-            level: *level,
-            name: (*imported).to_owned(),
+        .and_then(|bindings| bindings.last());
+    let imported = scope.imports.get(name);
+    match (assigned, imported) {
+        (Some((at, value)), imported) if imported.is_none_or(|import| import.start < *at) => {
+            condition_source(value, *at, &scope)
+        }
+        (_, Some(import)) => Some(ConditionSource::Imported {
+            module: import.module.clone(),
+            level: import.level,
+            name: import.name.to_owned(),
             position: start,
-        },
-        None => ConditionSource::Unresolvable {
+        }),
+        _ => Some(ConditionSource::Unresolvable {
             what: format!("`{name}` is not bound at module level"),
             position: start,
-        },
-    })
+        }),
+    }
 }
