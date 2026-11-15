@@ -200,6 +200,48 @@ fn given_dialect_lexical_syntax_when_scanning_non_code_then_dialect_decides_boun
             syntax: single_quote_backslashes(),
             expected_first_range: Some((0, 4)),
         },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a Databricks string continues past a backslash-escaped quote",
+            sql: r"'a\'b' x",
+            syntax: dialect_lexical_syntax("databricks"),
+            expected_first_range: Some((0, 6)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "Databricks backslash escapes hold in double-quoted strings",
+            sql: r#""a\"b" x"#,
+            syntax: dialect_lexical_syntax("databricks"),
+            expected_first_range: Some((0, 6)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a Databricks raw string ends at the quote after a backslash",
+            sql: r"r'a\' x",
+            syntax: dialect_lexical_syntax("databricks"),
+            expected_first_range: Some((1, 5)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "Databricks block comments nest",
+            sql: "/* a /* b */ c */ x",
+            syntax: dialect_lexical_syntax("databricks"),
+            expected_first_range: Some((0, 17)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a DuckDB E-string continues past a backslash-escaped quote",
+            sql: r"E'a\'b' x",
+            syntax: dialect_lexical_syntax("duckdb"),
+            expected_first_range: Some((1, 7)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a plain DuckDB string ends at the quote after a backslash",
+            sql: r"'a\' x",
+            syntax: dialect_lexical_syntax("duckdb"),
+            expected_first_range: Some((0, 4)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "DuckDB block comments nest",
+            sql: "/* a /* b */ c */ x",
+            syntax: dialect_lexical_syntax("duckdb"),
+            expected_first_range: Some((0, 17)),
+        },
     ];
     for test_case in test_cases {
         let ranges: Vec<(usize, usize)> = dialect_non_code_ranges(test_case.sql, &test_case.syntax);
