@@ -5,7 +5,7 @@ use fensu_native::rules::constants as fensu;
 use crate::python_rules::models::{PythonFiles, PythonRuleSpec};
 
 /// Every `SQBRPYTHON` rule; numbers are never reused, and new rules append to their band.
-pub(crate) const PYTHON_RULES: [PythonRuleSpec; 74] = [
+pub(crate) const PYTHON_RULES: [PythonRuleSpec; 77] = [
     PythonRuleSpec {
         code: "SQBRPYTHON001",
         fensu_code: None,
@@ -149,6 +149,42 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 74] = [
         options: &[],
         message: "nodes are declared in a unit's node.py, and checks in a unit's checks.py",
         remediation: "Move the declaration into its own unit folder under its domain, with the implementation in that folder's main.py.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON013",
+        fensu_code: None,
+        slug: "provider-layout",
+        family: "providers",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "providers/ holds capability folders, each with provider.py, optional role files, _helpers/ and _classes/ only",
+        remediation: "Move a module directly under providers/ into providers/<capability>/provider.py, add provider.py to each capability folder, and move other modules into _helpers/, _classes/ or a role file: models.py, types.py, constants.py or exceptions.py.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON014",
+        fensu_code: None,
+        slug: "provider-module-shape",
+        family: "providers",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "provider.py holds imports, private constants and exactly one public Provider subclass",
+        remediation: "Keep one public class that subclasses Provider in provider.py; move functions into _helpers/, collaborator classes into _classes/ and public constants into constants.py.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON015",
+        fensu_code: None,
+        slug: "provider-import-boundaries",
+        family: "providers",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "a provider's _helpers/ and _classes/ are private to it, and providers import only python/utils/ from the runtime package and nothing from orchestration/",
+        remediation: "Import a provider through provider.py or its role files; move code a provider shares with nodes into python/utils/<capability>/.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON101",
@@ -1036,6 +1072,33 @@ pub(crate) const NODE_DESCRIPTION_CODE: &str = "SQBRPYTHON011";
 pub(crate) const NODE_DECLARED_IN_UNIT_CODE: &str = "SQBRPYTHON012";
 /// The fewest folders below `python/` a unit sits in: its domain and its own.
 pub(crate) const MIN_UNIT_DEPTH: usize = 2;
+pub(crate) const PROVIDER_LAYOUT_CODE: &str = "SQBRPYTHON013";
+pub(crate) const PROVIDER_MODULE_SHAPE_CODE: &str = "SQBRPYTHON014";
+pub(crate) const PROVIDER_IMPORT_BOUNDARIES_CODE: &str = "SQBRPYTHON015";
+/// The provider rules, which read parsed modules across the project.
+pub(crate) const PROVIDER_RULE_CODES: [&str; 3] = [
+    PROVIDER_LAYOUT_CODE,
+    PROVIDER_MODULE_SHAPE_CODE,
+    PROVIDER_IMPORT_BOUNDARIES_CODE,
+];
+/// The file declaring a provider capability's Provider subclass.
+pub(crate) const PROVIDER_FILE: &str = "provider.py";
+/// The files a provider capability folder may hold beside provider.py.
+pub(crate) const PROVIDER_ROLE_FILES: [&str; 5] = [
+    "models.py",
+    "types.py",
+    "constants.py",
+    "exceptions.py",
+    INIT_FILE,
+];
+/// The private folders a provider capability folder may hold.
+pub(crate) const PROVIDER_PRIVATE_FOLDERS: [&str; 2] = ["_helpers", "_classes"];
+/// The base class a provider subclasses.
+pub(crate) const PROVIDER_BASE: &str = "Provider";
+/// The folder holding orchestration declarations, imported as `orchestration`.
+pub(crate) const ORCHESTRATION_ROOT: &str = "orchestration";
+/// The prefix of a private name.
+pub(crate) const PRIVATE_PREFIX: &str = "_";
 /// The file that declares a unit's node and makes its folder a unit.
 pub(crate) const UNIT_NODE_FILE: &str = "node.py";
 /// The file holding a unit's checks.
