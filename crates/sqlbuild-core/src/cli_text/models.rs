@@ -1,7 +1,7 @@
 //! Plain data of the human compile report, and the semantic styling it is rendered with.
 
 use crate::cli_text::constants::{
-    BLUE, BOLD, DIM, ERROR_STATUS_LABELS, GREEN, ORANGE, RED, RESET, SKIPPED_STATUS_LABELS,
+    BLUE, BOLD, CYAN, DIM, ERROR_STATUS_LABELS, GREEN, ORANGE, RED, RESET, SKIPPED_STATUS_LABELS,
     SUCCESS_STATUS_LABELS, WARNING_STATUS_LABELS, YELLOW,
 };
 
@@ -48,6 +48,12 @@ impl CliStyle {
     #[must_use]
     pub fn value(self, text: &str) -> String {
         self.apply(BLUE, text)
+    }
+
+    /// Cyan: URLs and started runs on the live screens.
+    #[must_use]
+    pub fn link(self, text: &str) -> String {
+        self.apply(CYAN, text)
     }
 
     #[must_use]
