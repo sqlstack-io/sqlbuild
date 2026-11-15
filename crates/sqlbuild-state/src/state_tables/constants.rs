@@ -3,3 +3,6 @@
 pub(crate) const SQLSERVER_ADAPTER: &str = "sqlserver";
 /// Cursor key of a table without event IDs: always NULL, so it never orders or binds a value.
 pub(crate) const MISSING_EVENT_ID_KEY: &str = "NULL";
+/// The trailing cursor key of a table whose projected columns already include `event_id`: aliased,
+/// so `ORDER BY event_id` names one output column (Snowflake rejects a duplicated output name).
+pub(crate) const EVENT_ID_KEY_PROJECTION: &str = ", event_id AS sqb_event_id_key";

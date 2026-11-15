@@ -7,13 +7,18 @@ import hashlib
 import inspect
 import json
 import textwrap
+import weakref
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import asdict
+from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
 
 from sqlbuild._native import PythonIdentityDependency, PythonNodeIdentity
+
+_SOURCE_PATHS: weakref.WeakKeyDictionary[object, Path | None] = weakref.WeakKeyDictionary()
+_NORMALIZED_SOURCES: weakref.WeakKeyDictionary[object, str] = weakref.WeakKeyDictionary()
 
 _IGNORED_PATH_PARTS: frozenset[str] = frozenset(
     {
@@ -196,6 +201,7 @@ def _dependency_for_object(
     )
 
 
+@lru_cache(maxsize=4096)
 def _called_references(source: str) -> tuple[tuple[str, ...], ...]:
     try:
         tree: ast.AST = ast.parse(source)
@@ -238,6 +244,11 @@ def _resolve_reference(*, ref: tuple[str, ...], globals_map: Mapping[str, object
 
 
 def _is_first_party_source(*, source_path: Path, allowed_roots: tuple[Path, ...]) -> bool:
+    return _first_party_source(source_path, allowed_roots)
+
+
+@lru_cache(maxsize=4096)
+def _first_party_source(source_path: Path, allowed_roots: tuple[Path, ...]) -> bool:
     resolved: Path = source_path.resolve()
     if any(part in _IGNORED_PATH_PARTS for part in resolved.parts):
         return False
@@ -245,6 +256,11 @@ def _is_first_party_source(*, source_path: Path, allowed_roots: tuple[Path, ...]
 
 
 def _source_path(obj: object) -> Path | None:
+    """The object's source file, read once per object: nodes share most of their dependencies."""
+    return _object_cached(_SOURCE_PATHS, obj, _uncached_source_path)
+
+
+def _uncached_source_path(obj: object) -> Path | None:
     try:
         raw_path: str | None = inspect.getsourcefile(cast(Any, obj))
     except TypeError:
@@ -255,6 +271,11 @@ def _source_path(obj: object) -> Path | None:
 
 
 def _normalized_source(obj: object) -> str:
+    """The object's dedented source, read once per object: `inspect.getsource` rescans its file."""
+    return _object_cached(_NORMALIZED_SOURCES, obj, _uncached_normalized_source)
+
+
+def _uncached_normalized_source(obj: object) -> str:
     try:
         return textwrap.dedent(inspect.getsource(cast(Any, obj))).strip()
     except (OSError, TypeError):
@@ -284,6 +305,11 @@ def _object_qualname(obj: object) -> str:
 
 
 def _display_path(*, source_path: Path | None, roots: Iterable[Path]) -> str:
+    return _cached_display_path(source_path, tuple(roots))
+
+
+@lru_cache(maxsize=4096)
+def _cached_display_path(source_path: Path | None, roots: tuple[Path, ...]) -> str:
     if source_path is None:
         return ""
     resolved: Path = source_path.resolve()
@@ -306,9 +332,24 @@ def _is_relative_to(*, path: Path, root: Path) -> bool:
     return True
 
 
+@lru_cache(maxsize=8192)
 def _hash_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _stable_json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=repr)
+
+
+def _object_cached[T](
+    cache: weakref.WeakKeyDictionary[object, T], obj: object, compute: Callable[[object], T]
+) -> T:
+    """Memoise per live object; objects that cannot be weakly referenced are computed each time."""
+    try:
+        return cache[obj]
+    except KeyError:
+        value: T = compute(obj)
+        cache[obj] = value
+        return value
+    except TypeError:
+        return compute(obj)
