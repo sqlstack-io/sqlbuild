@@ -157,13 +157,8 @@ pub(crate) fn read_python_modules(
         (SENSORS_DIRECTORY, PythonDeclarationKind::Sensor),
     ] {
         for path in role_files(tree, role, PYTHON_FILE_SUFFIX)? {
-            let stem: &str = path
-                .rsplit('/')
-                .next()
-                .and_then(|name| name.strip_suffix(PYTHON_FILE_SUFFIX))
-                .unwrap_or_default();
             let declared: Option<NamedModule> =
-                module_declaration(&read(tree, &path)?, stem, kind, python_version)
+                module_declaration(&read(tree, &path)?, &path, kind, python_version)
                     .map_err(|error| failure(&path, error))?;
             if let Some(mut module) = declared {
                 module.path = path.clone();

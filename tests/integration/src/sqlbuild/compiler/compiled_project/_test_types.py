@@ -324,6 +324,13 @@ class SnapshotDiscoveryTestCase:
 
 
 @dataclass(frozen=True)
+class SnapshotProcessReuseTestCase:
+    description: str
+    fixtures: tuple[str, ...]
+    expected_sensors: tuple[tuple[str, ...], ...]
+
+
+@dataclass(frozen=True)
 class SnapshotDiscoveryRejectionTestCase:
     description: str
     files: dict[str, str]

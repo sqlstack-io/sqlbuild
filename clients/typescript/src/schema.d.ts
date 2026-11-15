@@ -1931,6 +1931,13 @@ export interface components {
             kind: "connection";
         } | {
             /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "provider_secrets";
+            /** Format: int64 */
+            missing: number;
+        } | {
+            /** Format: int64 */
             elapsed_millis: number;
             failure?: null | components["schemas"]["WarehouseSyncFailure"];
             /** Format: int64 */
@@ -2571,6 +2578,8 @@ export interface components {
             description?: string | null;
             /** @description The environment variable the setting is read from. */
             env: string;
+            /** @description Whether this required secret is unset in the location's environment. */
+            missing?: boolean;
             name: string;
             required: boolean;
             /** @description Whether the annotation is a pydantic secret type. */

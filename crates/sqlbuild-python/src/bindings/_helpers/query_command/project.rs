@@ -8,6 +8,7 @@ use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::discovery::configuration::discover_connection_configuration;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 /// The project directory, defaulting to the working directory, with its inputs and adapter.
@@ -22,6 +23,8 @@ pub(crate) struct ProjectAdapter<'py> {
 pub(crate) enum ProjectInputs {
     /// Every declaration file and the imported project Python.
     Discovered,
+    /// As `Discovered`, leaving missing provider secrets to the runs that use the providers.
+    DiscoveredDeferringSecrets,
     /// Only the project and local configuration, with its connection settings validated.
     Configuration,
 }
@@ -39,6 +42,19 @@ pub(crate) fn project_adapter<'py>(
         ProjectInputs::Discovered => discover_project_inputs(
             py,
             Some(keywords(py, &[("project_dir", project_dir.clone())])?),
+        )?,
+        ProjectInputs::DiscoveredDeferringSecrets => discover_project_inputs(
+            py,
+            Some(keywords(
+                py,
+                &[
+                    ("project_dir", project_dir.clone()),
+                    (
+                        "secret_policy",
+                        pyo3::types::PyString::new(py, SecretPolicy::Defer.name()).into_any(),
+                    ),
+                ],
+            )?),
         )?,
         ProjectInputs::Configuration => discover_connection_configuration(py, &project_dir)?,
     };

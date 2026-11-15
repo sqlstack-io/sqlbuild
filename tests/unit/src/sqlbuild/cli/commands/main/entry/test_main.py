@@ -1289,9 +1289,10 @@ def test_given_debug_command_arguments_when_running_with_dependencies_then_it_di
         no_connection: bool,
         selected_target: str | None,
         json_output: bool,
+        verbose: bool,
     ) -> int:
         del selected_target
-        received_args.append((project_dir, no_color, no_connection, json_output))
+        received_args.append((project_dir, no_color, no_connection, json_output, verbose))
         return test_case.expected_exit_code
 
     exit_code: int = _main_with_dependencies(
@@ -1300,7 +1301,7 @@ def test_given_debug_command_arguments_when_running_with_dependencies_then_it_di
     )
 
     assert exit_code == test_case.expected_exit_code
-    assert received_args == [(None, True, True, True)]
+    assert received_args == [(None, True, True, True, False)]
 
 
 @pytest.mark.parametrize(

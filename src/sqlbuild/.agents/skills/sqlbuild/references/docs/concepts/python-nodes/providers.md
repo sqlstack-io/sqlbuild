@@ -15,6 +15,7 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/providers/
 - Using providers via context
 - Lifecycle
 - Configuration from environment variables
+- Secrets
 - Discovery rules
 - Plan output
 - Providers in the web UI
@@ -150,8 +151,8 @@ Both approaches (parameter injection and `ctx.providers`) are equivalent. Parame
 
 Providers follow a lazy setup, reverse-teardown lifecycle scoped to the command invocation:
 
-1. **Discovery** - on compile, SQLBuild discovers all `Provider` subclasses under `providers/` and validates their settings (from environment variables or field defaults).
-2. **Lazy setup** - `setup(ctx)` is called the first time a provider is accessed during a build, not at startup. Providers that are never used are never set up.
+1. **Discovery** - on compile, SQLBuild discovers all `Provider` subclasses under `providers/` and validates their settings (from environment variables or field defaults). Missing [secrets](#secrets) follow the command's rules.
+2. **Lazy setup** - the first time a provider is accessed during a build, SQLBuild reads its settings and calls `setup(ctx)`. Providers that are never used are never set up.
 3. **Teardown** - after the command completes, `teardown()` is called on all providers that were set up, in reverse setup order. Teardown runs even if the build failed.
 
 ```python
@@ -183,13 +184,61 @@ class SlackNotifier(Provider):
 
 See the [pydantic-settings documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) for advanced configuration like custom env prefixes, `.env` file support, and nested settings.
 
+## Secrets
+
+Declare a secret as a field typed `SecretStr`. Laptops and CI jobs can then compile without production secrets, and builds check only the secrets their selection needs.
+
+```python
+from pydantic import SecretStr
+
+class SlackAlerts(Provider):
+    """Posts alerts to Slack."""
+
+    channel: str = "#data-alerts"
+    slack_webhook_url: SecretStr  # reads SLACK_WEBHOOK_URL
+```
+
+| Commands | When a required secret is unset |
+| --- | --- |
+| `compile`, `rules run`, `format`, `dag`, `lineage`, `scope` | Error `D012`, unless missing secrets are allowed |
+| `build`, `load`, `check`, and runs on `sqb server` workers | Error before anything runs, only when a selected node or a sink uses the provider |
+| `sqb debug` | Lists the missing secrets as warnings |
+| `sqb location health` | Reports `missing_secrets` and exits `1` |
+
+```text
+$ sqb compile
+error[D012]: provider 'slack_alerts' (providers/slack_alerts/provider.py) is missing secret SLACK_WEBHOOK_URL
+  = help: set SLACK_WEBHOOK_URL, or pass --allow-missing-secrets where secrets aren't available
+```
+
+Allow missing secrets for the static commands in any of these ways:
+
+| Where | Setting |
+| --- | --- |
+| Command line | `--allow-missing-secrets` |
+| Environment | `SQLBUILD_ALLOW_MISSING_SECRETS=1` |
+| `sqlbuild_local.toml` | `allow_missing_secrets = true` under `[settings]` |
+
+The command then lists the providers it skipped on stderr, such as
+`1 provider has missing secrets (allowed): slack_alerts`. Settings that aren't secrets are still
+validated. Execution commands accept none of these.
+
+```text
+$ sqb build --select python/orders
+error[D012]: selected nodes need secrets that are missing:
+  slack_alerts  SLACK_WEBHOOK_URL  (partner_export_alert)
+nothing was run
+```
+
+Run [`sqb debug`](../../cli/debug.md) to see which secrets this machine has.
+
 ## Discovery rules
 
 - Provider classes are discovered from `.py` files under `providers/` recursively
 - Files named `__init__.py` or starting with `_` are skipped
 - Each concrete (non-abstract) subclass of `Provider` is registered
 - Provider names must be globally unique across project resources
-- Settings are validated at discovery time. Missing required fields (without environment variables set) raise a discovery error immediately, not at runtime
+- Settings are validated at discovery time. A missing or invalid setting that isn't a secret is a `D012` error; missing secrets follow [Secrets](#secrets)
 
 ## Plan output
 
@@ -210,7 +259,7 @@ provider with its class and docstring. A provider's page shows:
 
 | Tab | Shows |
 | --- | --- |
-| Settings | Each setting's type, environment variable and whether it is required; secret settings are marked |
+| Settings | Each setting's type, environment variable and whether it is required; secret settings are marked, and flagged **missing** when the location's environment doesn't set them |
 | Used by | The loaders, tasks, hooks and other code that take the provider, and the jobs that run that code |
 
 Setting values, defaults included, are never published.

@@ -102,3 +102,18 @@ pub struct UnitParameter {
     pub name: String,
     pub annotation: Option<String>,
 }
+
+/// Source a module's import never runs, from `start` up to `end`, each a 1-based line and 0-based UTF-8 byte column.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DeferredSpan {
+    pub start: (usize, usize),
+    pub end: (usize, usize),
+}
+
+impl DeferredSpan {
+    /// Whether the 1-based `line` and 0-based byte `column` fall inside the span.
+    #[must_use]
+    pub fn contains(&self, line: usize, column: usize) -> bool {
+        self.start <= (line, column) && (line, column) < self.end
+    }
+}
