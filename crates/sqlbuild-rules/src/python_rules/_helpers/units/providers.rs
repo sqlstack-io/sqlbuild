@@ -1,6 +1,6 @@
 //! Provider capability folders: what they hold, what provider.py declares, and who imports their private code.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -21,6 +21,9 @@ use crate::python_rules::constants::{
 };
 
 const FILE_START: UnitPosition = UnitPosition { line: 1, column: 1 };
+const OTHER_STATEMENT: &str = "a statement that is not an import, a constant or the provider class";
+/// The package Provider is imported from.
+const SQLBUILD_PACKAGE: &str = "sqlbuild";
 
 /// One parsed project file and its path parts.
 #[derive(Debug)]
@@ -42,6 +45,10 @@ pub(crate) fn provider_faults(
     let mut faults: Vec<Fault> = provider_layout_faults(sources);
     let files: Vec<ParsedFile<'_>> = sources
         .par_iter()
+        .filter(|source| {
+            source.relative_path.split('/').next() == Some(PROVIDERS_ROOT)
+                || source.text.contains(PROVIDERS_ROOT)
+        })
         .filter_map(|source| {
             Some(ParsedFile {
                 path: source.relative_path.as_str(),
@@ -54,10 +61,11 @@ pub(crate) fn provider_faults(
         .iter()
         .flat_map(|source| dotted_names(&source.relative_path))
         .collect();
+    let classes: ProviderClasses = provider_classes(&files, &modules);
     for file in &files {
         if matches!(file.parts.as_slice(), [root, _, file_name] if *root == PROVIDERS_ROOT && *file_name == PROVIDER_FILE)
         {
-            faults.extend(provider_module_faults(file));
+            faults.extend(provider_module_faults(file, &classes));
         }
         faults.extend(import_faults(file, &modules));
     }
@@ -127,12 +135,16 @@ fn provider_layout_faults(sources: &[PythonSource]) -> Vec<Fault> {
 }
 
 /// provider.py: imports, private constants and exactly one public Provider subclass.
-fn provider_module_faults(file: &ParsedFile<'_>) -> Vec<Fault> {
+fn provider_module_faults(file: &ParsedFile<'_>, classes: &ProviderClasses) -> Vec<Fault> {
+    let module: String = file_module(file.path);
     let mut faults: Vec<Fault> = Vec::new();
     let mut providers: usize = 0;
     for statement in &file.module.statements {
         let (detail, position): (String, UnitPosition) = match &statement.kind {
             UnitStatementKind::Docstring | UnitStatementKind::Import => continue,
+            UnitStatementKind::Assignment(names) if names.is_empty() => {
+                (OTHER_STATEMENT.to_owned(), statement.position)
+            }
             UnitStatementKind::Assignment(names) => {
                 match names.iter().find(|name| !name.starts_with(PRIVATE_PREFIX)) {
                     Some(name) => (
@@ -143,8 +155,10 @@ fn provider_module_faults(file: &ParsedFile<'_>) -> Vec<Fault> {
                 }
             }
             UnitStatementKind::Class(class) => {
-                let detail: Option<String> = class_detail(class, providers);
-                providers += usize::from(is_public_provider(class));
+                let public_provider: bool = !class.name.starts_with(PRIVATE_PREFIX)
+                    && classes.is_provider(&module, &class.name);
+                let detail: Option<String> = class_detail(class, public_provider, providers);
+                providers += usize::from(public_provider);
                 match detail {
                     Some(detail) => (detail, class.position),
                     None => continue,
@@ -154,10 +168,7 @@ fn provider_module_faults(file: &ParsedFile<'_>) -> Vec<Fault> {
                 format!("function '{}' belongs in _helpers/", function.name),
                 function.position,
             ),
-            UnitStatementKind::Other => (
-                "a statement that is not an import, a constant or the provider class".to_owned(),
-                statement.position,
-            ),
+            UnitStatementKind::Other => (OTHER_STATEMENT.to_owned(), statement.position),
         };
         faults.extend(unit_fault(
             PROVIDER_MODULE_SHAPE_CODE,
@@ -178,20 +189,109 @@ fn provider_module_faults(file: &ParsedFile<'_>) -> Vec<Fault> {
 }
 
 /// Why `class` does not belong in provider.py, after `earlier` public Provider subclasses.
-fn class_detail(class: &UnitClass, earlier: usize) -> Option<String> {
+fn class_detail(class: &UnitClass, public_provider: bool, earlier: usize) -> Option<String> {
     let name: &str = &class.name;
     if name.starts_with(PRIVATE_PREFIX) {
         return Some(format!("collaborator class '{name}' belongs in _classes/"));
     }
-    if !is_public_provider(class) {
+    if !public_provider {
         return Some(format!("class '{name}' does not subclass {PROVIDER_BASE}"));
     }
     (earlier > 0).then(|| format!("'{name}' is a second {PROVIDER_BASE} subclass"))
 }
 
-/// Whether `class` is a public subclass of Provider.
-fn is_public_provider(class: &UnitClass) -> bool {
-    !class.name.starts_with(PRIVATE_PREFIX) && class.bases.iter().any(|base| base == PROVIDER_BASE)
+/// What a class's base names: Provider itself, a project class by module and name, or something unknown.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum BaseTarget {
+    Provider,
+    Class(String, String),
+    Unknown,
+}
+
+/// The bases of every class in the parsed files, by module and class name.
+struct ProviderClasses {
+    bases: BTreeMap<(String, String), Vec<BaseTarget>>,
+}
+
+impl ProviderClasses {
+    /// Whether class `name` of `module` subclasses Provider, directly, through an alias or through project classes.
+    fn is_provider(&self, module: &str, name: &str) -> bool {
+        let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
+        let mut pending: Vec<(String, String)> = vec![(module.to_owned(), name.to_owned())];
+        while let Some(key) = pending.pop() {
+            if !seen.insert(key.clone()) {
+                continue;
+            }
+            for base in self.bases.get(&key).into_iter().flatten() {
+                match base {
+                    BaseTarget::Provider => return true,
+                    BaseTarget::Class(module, name) => pending.push((module.clone(), name.clone())),
+                    BaseTarget::Unknown => {}
+                }
+            }
+        }
+        false
+    }
+}
+
+/// Every class of `files` with what each of its bases names.
+fn provider_classes(files: &[ParsedFile<'_>], modules: &BTreeSet<String>) -> ProviderClasses {
+    let mut bases: BTreeMap<(String, String), Vec<BaseTarget>> = BTreeMap::new();
+    for file in files {
+        let module: String = file_module(file.path);
+        for statement in &file.module.statements {
+            if let UnitStatementKind::Class(class) = &statement.kind {
+                let targets: Vec<BaseTarget> = class
+                    .bases
+                    .iter()
+                    .map(|base| base_target(file, base, modules))
+                    .collect();
+                bases.insert((module.clone(), class.name.clone()), targets);
+            }
+        }
+    }
+    ProviderClasses { bases }
+}
+
+/// What `base` names in `file`: an import it binds, a class of the same module, or Provider by its plain name.
+fn base_target(file: &ParsedFile<'_>, base: &str, modules: &BTreeSet<String>) -> BaseTarget {
+    let folder: &[&str] = &file.parts[..file.parts.len() - 1];
+    if let Some(import) = file
+        .module
+        .imports
+        .iter()
+        .find(|import| import.local == base)
+    {
+        let Some(name) = &import.name else {
+            return BaseTarget::Unknown;
+        };
+        return match absolute_module(import, folder, modules) {
+            Some(source)
+                if source.split('.').next() == Some(SQLBUILD_PACKAGE) && name == PROVIDER_BASE =>
+            {
+                BaseTarget::Provider
+            }
+            Some(source) if source.ends_with(&format!(".{name}")) => BaseTarget::Unknown,
+            Some(source) => BaseTarget::Class(source, name.clone()),
+            None => BaseTarget::Unknown,
+        };
+    }
+    let local_class: bool = file.module.statements.iter().any(|statement| {
+        matches!(&statement.kind, UnitStatementKind::Class(class) if class.name == base)
+    });
+    if local_class {
+        return BaseTarget::Class(file_module(file.path), base.to_owned());
+    }
+    if base == PROVIDER_BASE {
+        BaseTarget::Provider
+    } else {
+        BaseTarget::Unknown
+    }
+}
+
+/// The dotted module of a project file, such as `providers.storefront_api.provider`.
+fn file_module(path: &str) -> String {
+    dotted_names(path).pop().unwrap_or_default()
 }
 
 /// Imports of another provider's private code, and a provider's imports of python/ outside utils/ or of orchestration/.

@@ -30,7 +30,7 @@ pub enum UnitStatementKind {
     Import,
     Function(UnitFunction),
     Class(UnitClass),
-    /// An assignment, annotated or not, by the names it binds.
+    /// An assignment, annotated or not, by the names it binds; empty when it binds an attribute or subscript.
     Assignment(Vec<String>),
     /// Any other statement, such as a loop or a call.
     Other,

@@ -7,10 +7,10 @@ Providers are shared runtime services that SQLBuild discovers, configures, and i
 
 ## Defining a provider
 
-Create a Python file under `providers/` in your project. A provider is a class that subclasses `Provider` from `sqlbuild.providers`:
+Create a `provider.py` in a capability folder under `providers/` (see [Project layout](#project-layout)). A provider is a class that subclasses `Provider` from `sqlbuild.providers`:
 
 ```python
-# providers/warehouse_client.py
+# providers/warehouse_client/provider.py
 from sqlbuild.providers import Provider
 
 class WarehouseClient(Provider):
@@ -66,7 +66,7 @@ You can also type-annotate the parameter for IDE support and compile-time valida
 
 ```python
 from sqlbuild.tasks import task
-from providers.warehouse_client import WarehouseClient
+from providers.warehouse_client.provider import WarehouseClient
 
 @task
 def export_orders(ctx, warehouse_client: WarehouseClient):

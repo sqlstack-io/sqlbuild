@@ -133,6 +133,85 @@ class CarrierApi(Provider):
             ],
         },
         PythonRunTestCase {
+            description: "provider.py: Provider through an alias or through _classes/ bases that reach it by relative imports",
+            files: &[
+                (
+                    "providers/storefront_api/provider.py",
+                    r#"from ._classes.paged import PagedApi
+
+
+class StorefrontApi(PagedApi):
+    """Client."""
+"#,
+                ),
+                (
+                    "providers/storefront_api/_classes/paged.py",
+                    "from .base import BaseApi\n\n\nclass PagedApi(BaseApi):\n    pass\n",
+                ),
+                (
+                    "providers/storefront_api/_classes/base.py",
+                    "from sqlbuild.providers import Provider\n\n\nclass BaseApi(Provider):\n    pass\n",
+                ),
+                (
+                    "providers/carrier_api/provider.py",
+                    r#"from sqlbuild.providers import Provider as SqbProvider
+
+
+class CarrierApi(SqbProvider):
+    """Client."""
+"#,
+                ),
+            ],
+            config: json!({ "select": ["SQBRPYTHON014"] }),
+            expected_faults: vec![],
+        },
+        PythonRunTestCase {
+            description: "provider.py: tuple and subscript assignments, and a Provider imported from outside sqlbuild",
+            files: &[
+                (
+                    "providers/storefront_api/provider.py",
+                    r#"import os
+
+from sqlbuild.providers import Provider
+
+_HOST, _PORT = "h", 1
+HOST, _TIMEOUT = "h", 3
+os.environ["TZ"] = "UTC"
+
+
+class StorefrontApi(Provider):
+    """Client."""
+"#,
+                ),
+                (
+                    "providers/carrier_api/provider.py",
+                    r#"from vendor.providers import Provider
+
+
+class CarrierApi(Provider):
+    """Client."""
+"#,
+                ),
+            ],
+            config: json!({ "select": ["SQBRPYTHON014"] }),
+            expected_faults: vec![
+                ("SQBRPYTHON014", "providers/carrier_api/provider.py", 1, 1),
+                ("SQBRPYTHON014", "providers/carrier_api/provider.py", 4, 7),
+                (
+                    "SQBRPYTHON014",
+                    "providers/storefront_api/provider.py",
+                    6,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "providers/storefront_api/provider.py",
+                    7,
+                    1,
+                ),
+            ],
+        },
+        PythonRunTestCase {
             description: "imports: another provider's private code from anywhere, and python/ outside utils/ or orchestration/ from a provider",
             files: &[
                 (
