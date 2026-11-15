@@ -5,8 +5,9 @@ use sqlbuild_pysource::orchestration_modules::models::{
     LiteralArgument, ModuleDeclarations, PythonDeclaration, PythonDeclarationKind, SourcePosition,
 };
 
+use crate::constants::PYTHON_FILE_SUFFIX;
 use crate::orchestration_files::constants::{
-    CALENDAR_KIND, PRIVATE_PREFIX, SENSOR_KIND, TOML_JOBS_HELP,
+    CALENDAR_KIND, PRIVATE_PREFIX, ROLE_FOLDER_DEPTH, SENSOR_KIND, TOML_JOBS_HELP,
 };
 use crate::orchestration_files::errors::FileError;
 use crate::orchestration_files::models::{FilePosition, NamedModule, Positioned};
@@ -55,13 +56,21 @@ fn literal(argument: LiteralArgument, what: &str) -> Result<Positioned<String>, 
     }
 }
 
-/// The one declaration a public module in a `kind` folder makes; `None` for a private support module.
+/// The one declaration a public module at `path` in a `kind` folder makes; `None` for a private support module.
 pub(crate) fn module_declaration(
     text: &str,
-    stem: &str,
+    path: &str,
     kind: PythonDeclarationKind,
     python_version: (u8, u8),
 ) -> Result<Option<NamedModule>, FileError> {
+    let (folders, file_name) = path.rsplit_once('/').unwrap_or(("", path));
+    let stem: &str = file_name
+        .strip_suffix(PYTHON_FILE_SUFFIX)
+        .unwrap_or(file_name);
+    let private_folder: Option<&str> = folders
+        .split('/')
+        .skip(ROLE_FOLDER_DEPTH)
+        .find(|folder| folder.starts_with(PRIVATE_PREFIX));
     let start = SourcePosition { line: 1, column: 1 };
     let Some(ModuleDeclarations {
         declarations,
@@ -98,7 +107,7 @@ pub(crate) fn module_declaration(
             None,
         ));
     }
-    let private: bool = stem.starts_with(PRIVATE_PREFIX);
+    let private: bool = stem.starts_with(PRIVATE_PREFIX) || private_folder.is_some();
     let mut declarations = declarations.into_iter();
     let first: Option<PythonDeclaration> = declarations.next();
     if let Some(second) = declarations.next() {
@@ -120,6 +129,17 @@ pub(crate) fn module_declaration(
             )),
         ));
     };
+    if let Some(folder) = private_folder {
+        return Err(error(
+            declaration.position,
+            format!(
+                "declares a {noun} inside the private folder {folder}/; declarations can't live in a private folder"
+            ),
+            Some(format!(
+                "move the module out of {folder}/ into its domain folder, or move the {noun} into a module there"
+            )),
+        ));
+    }
     if private {
         return Err(error(
             declaration.position,
