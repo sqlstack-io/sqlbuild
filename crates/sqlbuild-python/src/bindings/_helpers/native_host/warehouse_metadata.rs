@@ -29,6 +29,7 @@ use sqlbuild_state::freshness::constants::{
 };
 use sqlbuild_state::observations::constants::OBSERVATION_COLUMN_TYPES;
 use sqlbuild_state::resource_costs::constants::RESOURCE_COST_COLUMN_TYPES;
+use sqlbuild_state::state_tables::main::event_id_index::event_id_index;
 use sqlbuild_state::state_tables::main::read_history_sql::read_history_sql;
 use sqlbuild_state::state_tables::models::HistoryRead;
 
@@ -445,7 +446,7 @@ fn read_page<'py>(
                 .then_some(index)
         })
         .collect();
-    cursor_indexes.push(columns.len());
+    cursor_indexes.push(event_id_index(columns));
     let mut literals = vec![None; key_columns.unwrap_or(columns).len() + 1];
     if let Some(after) = after {
         let classes = SqlValueClasses::load(py)?;
@@ -771,7 +772,7 @@ fn decode_record(
     let mut value = json!({
         "state_database": location.database,
         "state_schema": location.schema,
-        "event_id": row.get_item(columns.len())?.extract::<Option<String>>()?,
+        "event_id": row.get_item(event_id_index(columns))?.extract::<Option<String>>()?,
     });
     for name in columns {
         let name = match *name {
