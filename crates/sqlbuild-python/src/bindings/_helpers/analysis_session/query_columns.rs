@@ -12,13 +12,14 @@ use sqlbuild_analysis::assembly::analysis_session::models::{
 };
 use sqlbuild_analysis::assembly::analysis_session::types::{Pairs, Shapes};
 use sqlbuild_core::panics::main::native_failure::native_failure;
+use sqlbuild_python_base::positional_record;
 
 use crate::bindings::_helpers::analysis_session::nullability_rules::{
     RuleFailure, nullability_callback, raised,
 };
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::models::ProjectCatalog;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const QUERY_COLUMNS_CONTEXT: &str = "native query column analysis";
 const PROJECTION_FACTS_CONTEXT: &str = "native fixture projection facts";

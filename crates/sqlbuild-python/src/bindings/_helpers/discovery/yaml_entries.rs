@@ -16,8 +16,8 @@ use sqlbuild_model_config::errors::{ConfigError, ErrorClass};
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
 use crate::bindings::_helpers::model_config::contract_classes::yaml_entry_classes;
 use crate::bindings::_helpers::model_config::header_metadata::{ContractClasses, audit_tuple};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// The directory whose schema YAML files may declare seeds.
 const SEEDS_DIRECTORY: &str = "seeds";

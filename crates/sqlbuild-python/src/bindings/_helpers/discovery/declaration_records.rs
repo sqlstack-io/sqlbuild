@@ -17,7 +17,6 @@ use sqlbuild_host::entries::models::FacadeHost;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 use std::sync::Arc;
 
-use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
 use crate::bindings::_helpers::discovery::faults::{FileFaults, record_tuple};
 use crate::bindings::_helpers::discovery::header_declarations::typed_constant_record;
 use crate::bindings::_helpers::discovery::project_files::path_object;
@@ -26,13 +25,17 @@ use crate::bindings::_helpers::discovery::snapshot::{
     in_snapshot, project_root, project_tree, snapshot_memo,
 };
 use crate::bindings::_helpers::model_config::header_columns::schema_columns;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sqltext::authored_values::map_to_python;
 use crate::bindings::models::{NativeDiscoverySession, NativeProjectTree};
 use sqlbuild_discovery::declaration_files::main::declaration_file_options::declaration_file_options;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PATHLIB_MODULE: &str = "pathlib";
 const SESSION_MEMO_KEY: &str = "native_discovery_session";
@@ -289,9 +292,9 @@ fn hook_file<'py>(context: &FileContext<'_, 'py>, file: &HookFile) -> PyResult<B
 fn audit_block<'py>(py: Python<'py>, block: &AuditBlock) -> PyResult<Bound<'py, PyAny>> {
     let header_values: Bound<'py, PyDict> = authored(py, &block.header_values)?;
     let mode: Bound<'py, PyAny> =
-        host::entry(py, FacadeHost::AuditEvaluationMode)?.call1((block.evaluation_mode,))?;
+        host_entry(py, FacadeHost::AuditEvaluationMode)?.call1((block.evaluation_mode,))?;
     let measurement: Bound<'py, PyAny> =
-        if mode.is(&host::entry(py, FacadeHost::AuditEvaluationMode)?.getattr(MEASUREMENT_MODE)?) {
+        if mode.is(&host_entry(py, FacadeHost::AuditEvaluationMode)?.getattr(MEASUREMENT_MODE)?) {
             new_record_with(
                 py,
                 RecordId::MeasurementContract,

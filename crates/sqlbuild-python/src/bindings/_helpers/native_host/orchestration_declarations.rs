@@ -17,7 +17,7 @@ use sqlbuild_orchestration::declarations::models::{
 use crate::bindings::_helpers::native_host::constants::{
     AUTHORING_MODULE, CALENDAR_CLASS, CONSTRUCTING_MODULES, SENSOR_CLASS,
 };
-use crate::bindings::_helpers::native_host::host::entry;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 
 #[derive(FromPyObject)]
 pub(crate) struct AuthoredSensorCondition {

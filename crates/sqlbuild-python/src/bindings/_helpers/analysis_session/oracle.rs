@@ -6,9 +6,10 @@ use sqlbuild_analysis::assembly::analysis_session::main::names_set_operation::na
 use sqlbuild_analysis::assembly::analysis_session::main::recover_cte_facts::recover_cte_facts;
 use sqlbuild_analysis::assembly::analysis_session::models::{CteFactRequest, CteFacts};
 use sqlbuild_analysis::assembly::analysis_session::types::{Pairs, Shapes};
+use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 positional_record! {
     extract;

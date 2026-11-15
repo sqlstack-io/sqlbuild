@@ -26,15 +26,15 @@ use crate::bindings::_helpers::compiled_views::model_input_view::{
     AttachedSchema, NativeModelInput, attached_schema, input_analysis_sql, input_model_name,
     input_reference_rows, input_sql_macro_checks,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::semantic_shapes::shapes::{VALID_FROM_DEFAULT, VALID_TO_DEFAULT};
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 
 const LOGGING_MODULE: &str = "logging";
 const DEBUG_LOGGER: &str = "sqlbuild.compile";
@@ -432,7 +432,7 @@ fn log_debug(py: Python<'_>, message: &str, failure: &Bound<'_, PyAny>) -> PyRes
     )?;
     arguments.set_item("message", message)?;
     arguments.set_item("sqlbuild_error", failure)?;
-    host::entry(py, ExecutorHost::LogDebugEvent)?.call((), Some(&arguments))?;
+    host_entry(py, ExecutorHost::LogDebugEvent)?.call((), Some(&arguments))?;
     Ok(())
 }
 

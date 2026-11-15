@@ -1,8 +1,8 @@
 //! The source texts a changed Python node's identity diffs compare.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DEPENDENCY_HEADER_SEPARATOR: &str = " :: ";
 const DEPENDENCY_HEADER_FALLBACK: &str = "dependency";

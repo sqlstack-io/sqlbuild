@@ -18,8 +18,8 @@ use crate::bindings::_helpers::planner_identity::identities::hook_version_hashes
 use crate::bindings::_helpers::planner_identity::metadata::{
     function_local_hashes, model_version_identity_metadata_json, seed_identity,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 pub(crate) const MODEL: &str = "model";
 pub(crate) const SEED: &str = "seed";

@@ -8,10 +8,11 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyType};
 use pyo3::{pyclass, pymethods};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{context_variable, imported};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::context_variable::context_variable;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::types::RecordId;
 
 const TRACKER_VARIABLE: &str = "sqlbuild_build_phase_timing_tracker";
 const PHASES: [&str; 6] = [
@@ -177,7 +178,7 @@ impl ProcessResourceTracker {
         let monotonic: Bound<'_, PyAny> = clock(py, monotonic)?;
         let resource_reader: Bound<'_, PyAny> = match resource_reader {
             Some(reader) => reader,
-            None => host::entry(py, ExecutorHost::ReadProcessResources)?,
+            None => host_entry(py, ExecutorHost::ReadProcessResources)?,
         };
         let started_at: f64 = monotonic.call0()?.extract()?;
         let (started_user, started_system, _): (f64, f64, Bound<'_, PyAny>) =
@@ -207,7 +208,7 @@ impl ProcessResourceTracker {
             non_negative(system_cpu, self.started_system),
         )?;
         keywords.set_item("max_rss_bytes", max_rss_bytes)?;
-        host::entry(py, ExecutorHost::ProcessResourceUsage)?.call((), Some(&keywords))
+        host_entry(py, ExecutorHost::ProcessResourceUsage)?.call((), Some(&keywords))
     }
 }
 

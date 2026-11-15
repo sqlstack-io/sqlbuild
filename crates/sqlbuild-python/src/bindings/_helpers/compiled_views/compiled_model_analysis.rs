@@ -1,5 +1,6 @@
 //! A compiled model's analysis, kept from the native session and projected on demand.
 
+use sqlbuild_python_base::positional_record;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -26,15 +27,15 @@ use sqlbuild_project::models as project_models;
 use sqlbuild_project::types::InferredRow;
 
 use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::CompiledViewClasses;
 use crate::bindings::_helpers::compiled_views::model_input_view::ModelInputRecord;
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::lineage::lineage_facts::{confidence_member, transform_kind_member};
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::render::macro_call_rows::span_expansion;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 const COMPILE_PHASE: &str = "compile";
 const ERROR_SEVERITY: &str = "error";

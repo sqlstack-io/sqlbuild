@@ -11,13 +11,13 @@ use sqlbuild_state::events::constants::{
 };
 use sqlbuild_state::events::models::EventOrder;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::state_rows::constants::{COLUMN_KIND, MODEL_KIND, OLD_NAME_KIND};
 use crate::bindings::_helpers::state_rows::models::{EventTable, EventTableLayout};
 use crate::bindings::_helpers::state_rows::timestamps::presumed_utc;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// The layout of the state table `kind` names: `model`, `column` or `old_name`.
 pub(crate) fn layout(kind: &str) -> PyResult<EventTableLayout> {

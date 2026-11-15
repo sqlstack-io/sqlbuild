@@ -6,10 +6,10 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::planner_scope::constants::MODEL;
 
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 const INCREMENTAL_MATERIALIZATION: &str = "incremental";
 const CREATE_TABLE_ACTION: &str = "create_table";

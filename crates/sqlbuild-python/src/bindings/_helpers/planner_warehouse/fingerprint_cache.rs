@@ -1,12 +1,10 @@
 //! Migration fingerprints computed at most once per model definition and reused across runs.
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::planner_changes::metadata::without_declared_columns_hash;
 use crate::bindings::_helpers::planner_migrations::fingerprint::fingerprint;
 use crate::bindings::_helpers::planner_migrations::fingerprint::migration_fingerprint_ref_names;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_warehouse::models::FingerprintWork;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::PyRefMut;
 use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -18,6 +16,10 @@ use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_key::fingerpri
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_lookup::fingerprint_cache_lookup;
 use sqlbuild_analysis::planner_warehouse::main::fingerprint_cache_shared_digest::fingerprint_cache_shared_digest;
 use sqlbuild_analysis::planner_warehouse::models::FingerprintCacheKey;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{DefaultHasher, Hash, Hasher};
 

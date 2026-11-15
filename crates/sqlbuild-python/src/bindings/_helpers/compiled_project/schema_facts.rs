@@ -1,12 +1,13 @@
 //! Native facts of declared schema columns and families, read once from their Python specs.
 
-use crate::bindings::_helpers::records::fields::{field as native_field, record_attribute_opt};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::compiled_project::models::{
     DynamicFamilyFact, ModelSchemaFact, SchemaColumnFact,
 };
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::record_attribute_opt::record_attribute_opt;
 
 const NAME_FIELD: &str = "name";
 const TYPE_FIELD: &str = "type";

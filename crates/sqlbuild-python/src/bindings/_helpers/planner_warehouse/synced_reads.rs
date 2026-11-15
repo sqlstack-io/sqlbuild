@@ -18,16 +18,17 @@ use sqlbuild_state::warehouse_state::models::{
     WarehouseState,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
 use crate::bindings::_helpers::fingerprints::latest_rows::selected_set;
 use crate::bindings::_helpers::native_host::consumption_state::Location;
-use crate::bindings::_helpers::native_host::host;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use crate::bindings::_helpers::planner_warehouse::reads::{
     CursorProgress, EligibleCursorQuery, FingerprintRead, Read, WarehouseReads, unknown,
 };
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 use crate::bindings::_helpers::state_rows::models::EventTableLayout;
 
 create_exception!(
@@ -66,7 +67,7 @@ pub(crate) fn refused(access: &str) -> pyo3::PyErr {
 
 fn relation_info<'py>(py: Python<'py>, relation: &StateRelation) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(py, AdapterHost::RelationInfo)?,
+        &host_entry(py, AdapterHost::RelationInfo)?,
         &[
             (
                 "database",
@@ -86,7 +87,7 @@ fn relation_columns<'py>(
     py: Python<'py>,
     relation: &StateRelation,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let column_info: Bound<'py, PyAny> = host::entry(py, AdapterHost::ColumnInfo)?;
+    let column_info: Bound<'py, PyAny> = host_entry(py, AdapterHost::ColumnInfo)?;
     let mut columns: Vec<Bound<'py, PyAny>> = Vec::with_capacity(relation.columns.len());
     for column in &relation.columns {
         columns.push(call_with(
@@ -380,7 +381,7 @@ impl WarehouseReads for SyncedReads {
         requests: Bound<'py, PyAny>,
     ) -> PyResult<Read<Bound<'py, PyAny>>> {
         let unavailable =
-            host::entry(py, AdapterHost::TableFreshnessMetadata)?.getattr("unavailable")?;
+            host_entry(py, AdapterHost::TableFreshnessMetadata)?.getattr("unavailable")?;
         let outcome = call_with(
             &unavailable,
             &[("message", PyString::new(py, PREVIEW_MESSAGE).into_any())],

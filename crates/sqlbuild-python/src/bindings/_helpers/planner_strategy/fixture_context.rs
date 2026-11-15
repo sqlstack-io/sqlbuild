@@ -28,7 +28,7 @@ use crate::bindings::_helpers::planner_strategy::models::{
     FixtureReadCacheHost, FixtureRelation, ModelFixtureFacts, RelationFixturePlanningContext,
 };
 use crate::bindings::_helpers::planner_strategy::types::{FixtureKey, FixtureRelationInput};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 static FIXTURE_READS: PyOnceLock<Py<FixtureReadCacheHost>> = PyOnceLock::new();
 

@@ -4,7 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods
 use pyo3::types::{PyBool, PyDict, PyString, PyStringMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
+use sqlbuild_python_base::boundary::models::Request;
 
 /// The setting a validator reads and how it names the setting in errors.
 struct Setting<'py> {

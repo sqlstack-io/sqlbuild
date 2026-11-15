@@ -16,12 +16,12 @@ use sqlbuild_analysis::dag_artifact::models::{
 use sqlbuild_analysis::planner_selection::main::unit_test_selector_rejection::unit_test_selector_rejection;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_selection::carrier::Carrier;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 const PATHLIB_MODULE: &str = "pathlib";
 const JSON_MODULE: &str = "json";
@@ -100,7 +100,7 @@ fn selection_error(py: Python<'_>, error: DagSelectionError, raw: &str) -> PyErr
         DagSelectionError::UnitTest(selector) => {
             carrier.error(unit_test_selector_rejection(&selector))
         }
-        DagSelectionError::Input(message) => host::entry(py, ThirdPartyHost::DagsterDagInputError)
+        DagSelectionError::Input(message) => host_entry(py, ThirdPartyHost::DagsterDagInputError)
             .and_then(|class| class.call1((message,)))
             .map_or_else(|failure| failure, PyErr::from_value),
     }

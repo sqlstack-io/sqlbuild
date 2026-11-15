@@ -7,10 +7,10 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyString};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DECIMAL_MODULE: &str = "decimal";
 const ABSOLUTE_KEY: &str = "absolute";
@@ -22,7 +22,7 @@ const CLI_TOLERANCE_MESSAGE: &str =
 
 /// `ExecutorInputError(message, code=code)`.
 fn input_error(py: Python<'_>, message: String, code: &str) -> PyErr {
-    host::entry(py, ExecutorHost::ExecutorInputError)
+    host_entry(py, ExecutorHost::ExecutorInputError)
         .and_then(|class| {
             let keywords: Bound<'_, PyDict> = PyDict::new(py);
             keywords.set_item("code", code)?;
@@ -43,7 +43,7 @@ fn parse_row_diff_tolerances<'py>(
 
 fn parsed_tolerances<'py>(raw: &Bound<'py, PyAny>, label: &str) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = raw.py();
-    let class: Bound<'py, PyAny> = host::entry(py, AdapterHost::RowDiffTolerances)?;
+    let class: Bound<'py, PyAny> = host_entry(py, AdapterHost::RowDiffTolerances)?;
     if raw.is_none() {
         return class.call0();
     }
@@ -162,7 +162,7 @@ fn tolerance_rule<'py>(raw: &Bound<'py, PyAny>, label: &str) -> PyResult<Bound<'
         ));
     }
     call_with(
-        &host::entry(py, AdapterHost::RowDiffTolerance)?,
+        &host_entry(py, AdapterHost::RowDiffTolerance)?,
         &[
             (
                 "absolute",
@@ -305,7 +305,7 @@ fn resolve_row_diff_sampling<'py>(
         &format!("{label}.row_diff_sample_seed"),
     )?;
     call_with(
-        &host::entry(py, AdapterHost::RowDiffSampling)?,
+        &host_entry(py, AdapterHost::RowDiffSampling)?,
         &[
             ("row_limit", row_limit.into_bound_py_any(py)?),
             ("seed", seed.unwrap_or(0).into_bound_py_any(py)?),
@@ -334,7 +334,7 @@ fn merge_row_diff_tolerances<'py>(
         Ok(combined.into_any())
     };
     call_with(
-        &host::entry(py, AdapterHost::RowDiffTolerances)?,
+        &host_entry(py, AdapterHost::RowDiffTolerances)?,
         &[
             ("by_type", merged("by_type")?),
             ("by_column", merged("by_column")?),

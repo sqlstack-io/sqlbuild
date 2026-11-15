@@ -1,19 +1,19 @@
 //! Warehouse source relation listing and column gathering for planning.
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_phases::objects::{frozenset, text, tuple};
 use crate::bindings::_helpers::planner_warehouse::constants::{
     COLUMN_INFO, METADATA_NAME_FILTER_LIMIT, RELATION_LOOKUP,
 };
 use crate::bindings::_helpers::planner_warehouse::reads::{PlannerReads, Read};
 use crate::bindings::_helpers::planner_warehouse::snapshot::{columns_for, list_relations};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::{BTreeSet, HashSet};
 
 fn entries_of<'py>(
@@ -88,7 +88,7 @@ pub(crate) fn source_inspection<'py>(
     let mut listed: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut listed_names: HashSet<String> = HashSet::new();
     let mut groups: Vec<(String, BTreeSet<String>)> = Vec::new();
-    let column_info = host::entry(py, COLUMN_INFO)?;
+    let column_info = host_entry(py, COLUMN_INFO)?;
     for entry in &entries {
         let expression = native_field(entry, "expression")?;
         if !expression.is_none() {
@@ -134,7 +134,7 @@ pub(crate) fn source_inspection<'py>(
             None => groups.push((key, BTreeSet::from([schema]))),
         }
     }
-    let lookup = host::entry(py, RELATION_LOOKUP)?.getattr("key")?;
+    let lookup = host_entry(py, RELATION_LOOKUP)?.getattr("key")?;
     for (key, schemas) in groups {
         let database = (!key.is_empty()).then_some(key.as_str());
         let database_value = match database {

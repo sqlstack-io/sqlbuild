@@ -24,10 +24,10 @@ use crate::bindings::_helpers::discovery::model_file_record::{NativeModelFile, p
 use crate::bindings::_helpers::model_config::header_audits::HeaderAudits;
 use crate::bindings::_helpers::model_config::header_families::{HeaderFamilies, family_specs};
 use crate::bindings::_helpers::model_config::header_metadata::HeaderColumns;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::macro_call_rows::{SpanRow, span_tuple};
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MODEL_RELATION_KIND: &str = "ref";
 

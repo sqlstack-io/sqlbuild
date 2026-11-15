@@ -17,7 +17,6 @@ use sqlbuild_orchestration::scheduler::constants::MAX_TICKS_PER_BATCH;
 use sqlbuild_orchestration::sensors::models::SensorDefinition;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
 use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
@@ -25,13 +24,16 @@ use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::native_host::constants::{
     CALENDAR_WINDOW_PARAMETER, SOURCE_NEW_DATA_CONDITION, SOURCE_STALE_CONDITION,
 };
-use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     AuthoredSensor, declared_at,
 };
 use crate::bindings::_helpers::native_host::orchestration_environment::{
     callback_code_hash, orchestration_code_hash,
 };
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 
 /// A job's or group's schedule on a named calendar, as its trigger before the calendar's times fill it.
 pub(crate) struct CalendarRequest {

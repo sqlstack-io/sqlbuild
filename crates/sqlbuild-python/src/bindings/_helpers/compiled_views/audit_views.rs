@@ -15,9 +15,9 @@ use crate::bindings::_helpers::compiled_views::model_input_view::{
     InputViewClasses, reference_tuple, view_classes,
 };
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::scopes::scope_report_objects::json_to_python;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const AUDIT_RESOURCE: &str = "audit";
 const AUDIT_CLASSES: &str = "audits";

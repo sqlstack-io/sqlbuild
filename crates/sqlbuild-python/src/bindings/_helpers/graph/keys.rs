@@ -3,10 +3,10 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// One `CompiledObjectKey` per native pair, so shared keys convert once.
 pub(crate) struct KeyCache<'py> {

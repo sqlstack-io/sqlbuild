@@ -8,10 +8,11 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{PyErr, pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_host::compile_context::types::CompileDiagnosticSink;
 
-use crate::bindings::_helpers::boundary::python_calls::{context_variable, imported};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::context_variable::context_variable;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const CONTEXT_VARIABLE_NAME: &str = "sqlbuild_collected_compile_diagnostics";
 

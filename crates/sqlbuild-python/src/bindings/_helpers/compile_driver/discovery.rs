@@ -6,9 +6,6 @@ use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, keywords, within,
-};
 use crate::bindings::_helpers::compile_driver::config_validation::{
     ProjectConfiguration, reject_invalid_project_configuration,
 };
@@ -47,11 +44,15 @@ use crate::bindings::_helpers::discovery::yaml_records::{
 };
 use crate::bindings::_helpers::event_exporting::scope::configure_discovered_event_exporters;
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, produced};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::IntoPyObjectExt;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SQL_ANALYSIS_SETTING_KEY: &str = "sql_analysis";
 /// The setting that turns delta compiles, and the project image they read, off.
@@ -162,7 +163,7 @@ impl Discoverer {
         match self {
             Self::Native(discover) => discover(project_dir.clone(), Some(providers.clone())),
             Self::Host(entry) => call_with(
-                &host::entry(project_dir.py(), entry)?,
+                &host_entry(project_dir.py(), entry)?,
                 &[
                     ("project_dir", project_dir.clone()),
                     ("providers", providers.clone()),
@@ -178,7 +179,7 @@ const PYTHON_NODE_GROUPS: [&str; 5] = ["loaders", "tasks", "assets", "checks", "
 /// `OperationLifecycle(operation_kind="project", operation_name=name)`.
 fn lifecycle<'py>(py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(py, ExecutorHost::OperationLifecycle)?,
+        &host_entry(py, ExecutorHost::OperationLifecycle)?,
         &[
             ("operation_kind", "project".into_pyobject(py)?.into_any()),
             ("operation_name", name.into_pyobject(py)?.into_any()),
@@ -312,7 +313,7 @@ fn assembled_inputs<'py>(
         ),
         secret_policy,
     )?;
-    host::entry(py, UserCodeHost::ValidateDiscoveredInputs)?.call1((&discovered,))?;
+    host_entry(py, UserCodeHost::ValidateDiscoveredInputs)?.call1((&discovered,))?;
     configure_discovered_event_exporters(&discovered)?;
     Ok(discovered)
 }

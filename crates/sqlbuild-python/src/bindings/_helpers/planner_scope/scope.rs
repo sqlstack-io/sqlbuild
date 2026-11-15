@@ -1,6 +1,5 @@
 //! Planner scope assembly using native graph and selector operations.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
@@ -13,9 +12,9 @@ use crate::bindings::_helpers::planner_scope::retained::ScopeData;
 use crate::bindings::_helpers::planner_scope::values::{keys, project_graph};
 use crate::bindings::_helpers::planner_selection::carrier::{Carrier, py_strings};
 use crate::bindings::_helpers::planner_selection::selectors::resolve_graph_keys;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 use crate::bindings::_helpers::references::explicit_references::native_execution_gate_edges;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyTuple};
@@ -26,6 +25,10 @@ use sqlbuild_analysis::planner_scope::main::{
     expand_loaders::expand_loaders, managed_sources::managed_sources,
     source_selectors::source_selectors,
 };
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 use std::collections::HashSet;
 
 pub(crate) fn build_planner_scope<'py>(

@@ -6,7 +6,7 @@ use pyo3::types::{
 };
 use pyo3::{IntoPyObject, pyclass, pymethods};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 const DATETIME_MODULE: &str = "datetime";
 

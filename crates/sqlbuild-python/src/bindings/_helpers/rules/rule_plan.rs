@@ -7,14 +7,7 @@ use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_rules::project_tree::main::pure_path_posix::pure_path_posix;
 use std::path::Path;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::records::project_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::{field, replaced};
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::rules::catalogue::{
     references_custom_rules, resolved_ignore_selectors, rule_catalogue, select_rules,
     verify_custom_rules,
@@ -22,6 +15,14 @@ use crate::bindings::_helpers::rules::catalogue::{
 use crate::bindings::_helpers::rules::constants::{SQL_RULE_PREFIX, TYPE_PROOF_RULE_CODES};
 use crate::bindings::_helpers::rules::fact_replay::{project_attribute, project_models};
 use crate::bindings::_helpers::rules::rule_run::freed_memory_released;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 const MODEL_RESOURCE_TYPE: &str = "model";
 
@@ -62,7 +63,7 @@ pub(crate) fn rule_run_plan<'py>(
         rule_catalogue(&effective_config, &project_dir, include_custom)?;
     let catalogue_tuple: Bound<'py, PyTuple> = PyTuple::new(py, &catalogue)?;
     let custom_payloads: Bound<'py, PyAny> = call_with(
-        &host::entry(py, UserCodeHost::CustomRulePayloads)?,
+        &host_entry(py, UserCodeHost::CustomRulePayloads)?,
         &[
             ("catalogue", catalogue_tuple.clone().into_any()),
             ("project_dir", project_dir.clone()),

@@ -14,21 +14,23 @@ use sqlbuild_core::text::main::python_strip::python_strip;
 
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
 use crate::bindings::_helpers::dbt_interop::profile::build_dbt_init_project_toml;
 use crate::bindings::_helpers::dbt_interop::profile::normalize_dbt_profile_connection;
 use crate::bindings::_helpers::dbt_interop::profile_load::{
     load_dbt_project_metadata, load_selected_dbt_profile_output,
 };
 use crate::bindings::_helpers::dbt_interop::runner::launch_os_error;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::types::CompilerDetach;
 use sqlbuild_config::dbt_profile::models::DbtProjectMetadata;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::types::CompilerDetach;
 
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME as PROJECT_FILE;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 const DEFAULT_OUTPUT_DIR: &str = "sqlbuild_project";
 const PROFILES_FILE: &str = "profiles.yml";
 const PROFILES_DIR_ENV_VAR: &str = "DBT_PROFILES_DIR";
@@ -87,7 +89,7 @@ pub(crate) fn build_dbt_init_project<'py>(
     progress(&callbacks, "complete", "Inspected dbt project and profile.")?;
     progress(&callbacks, "start", "Rendering dbt profile connection...")?;
     let resolved_output: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ThirdPartyHost::RenderSelectedDbtProfileOutput)?,
+        &host_entry(py, ThirdPartyHost::RenderSelectedDbtProfileOutput)?,
         &[
             ("selected", selected.clone()),
             ("project_dir", paths.dbt_project_dir.clone()),
@@ -347,7 +349,7 @@ fn is_value_error(py: Python<'_>, error: &PyErr) -> bool {
 }
 
 fn profile_error(py: Python<'_>, message: String) -> PyErr {
-    match host::entry(py, ThirdPartyHost::DbtProfileError).and_then(|class| class.call1((message,)))
+    match host_entry(py, ThirdPartyHost::DbtProfileError).and_then(|class| class.call1((message,)))
     {
         Ok(instance) => PyErr::from_value(instance),
         Err(error) => error,

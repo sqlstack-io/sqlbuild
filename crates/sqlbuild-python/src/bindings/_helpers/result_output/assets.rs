@@ -10,10 +10,10 @@ use sqlbuild_host::types::ResultEnum;
 
 use crate::bindings::_helpers::plan_output::safety::{future_cursor_safety, maximum_start_safety};
 use crate::bindings::_helpers::plan_output::values::{any, dict, items};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::result_output::projection::{Projection, rounded};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 /// A dictionary of the entries whose value is not `None`, in order.
 pub(crate) fn without_none<'py>(

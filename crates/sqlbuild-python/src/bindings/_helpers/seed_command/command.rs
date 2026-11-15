@@ -17,8 +17,6 @@ use sqlbuild_core::seed_command::main::seed_exit_code::seed_exit_code;
 use sqlbuild_core::seed_command::models::SeedRow;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
@@ -29,16 +27,19 @@ use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hook
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_entries::command_plans::build_seed_command_plan;
 use crate::bindings::_helpers::planner_entries::command_plans::read_selected_seed_fingerprints;
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::result_output::documents::format_seed_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SUCCESS_STATUS: &str = "success";
 const FAILED_STATUS: &str = "failed";
@@ -250,7 +251,7 @@ fn compile_seeds<'py>(
     } else {
         let relay: Bound<'py, SeedConnectionRelay> = connection_relay(&connection_progress)?;
         let hooks: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::ConnectionHooks)?,
+            &host_entry(py, ExecutorHost::ConnectionHooks)?,
             &[
                 (
                     "on_connection_start",
@@ -394,7 +395,7 @@ fn load_seeds<'py>(
     let relay: Bound<'py, SeedConnectionRelay> = connection_relay(&connection_progress)?;
     let loaded: PyResult<Vec<Bound<'py, PyAny>>> = (|| {
         call_with(
-            &host::entry(py, ExecutorHost::RunSeedPipeline)?,
+            &host_entry(py, ExecutorHost::RunSeedPipeline)?,
             &[
                 ("plan", plan),
                 (

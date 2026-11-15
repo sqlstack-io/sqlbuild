@@ -8,12 +8,13 @@ use sqlbuild_cursor::algebra::main::parse_duration::parse_duration;
 use sqlbuild_cursor::algebra::main::shift_by_duration::shift_by_duration;
 use sqlbuild_cursor::algebra::models::{DurationDigits, DurationSpan, Moment};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::cursor::conversion::CursorSession;
 use crate::bindings::_helpers::cursor::values::{
     DATETIME_MODULE, civil_date, local_date_time, replaced,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MONTHS_PER_YEAR: i64 = 12;
 

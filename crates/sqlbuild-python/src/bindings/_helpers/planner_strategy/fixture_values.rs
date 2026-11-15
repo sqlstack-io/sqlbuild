@@ -1,12 +1,12 @@
 //! Fixture boundary records and adapter callbacks.
 
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_analysis::planner_fixtures::models::FixtureColumn;
 use sqlbuild_core::text::main::python_casefold::python_casefold;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_sqltext::resolution::main::unquoted_column_name::unquoted_column_name;
 
 pub(crate) fn folded(value: &Bound<'_, PyAny>) -> PyResult<String> {

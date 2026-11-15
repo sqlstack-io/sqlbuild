@@ -14,7 +14,6 @@ use sqlbuild_core::build_command::models::PythonNodeRow;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
 use crate::bindings::_helpers::build_command::support::{
     boolean, emit, frozenset, or_none, text, tuple,
 };
@@ -24,12 +23,16 @@ use crate::bindings::_helpers::graph::python_lifecycle::{
     build_python_sql_run_lifecycle, native_run_lifecycle,
 };
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_scope::loaders::build_intermediate_source_map;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SUCCESS_STATUS: &str = "success";
 const SKIPPED_STATUS: &str = "skipped";
@@ -344,7 +347,7 @@ fn node_runtime<'py>(
     let py: Python<'py> = connection.py();
     let [start_ts, end_ts, start_int, end_int] = &parts.inputs.cursors;
     call_with(
-        &host::entry(py, ExecutorHost::PythonNodeRuntime)?,
+        &host_entry(py, ExecutorHost::PythonNodeRuntime)?,
         &[
             ("adapter", parts.adapter.clone()),
             ("connection_config", parts.connection_config.clone()),
@@ -529,7 +532,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             adapter.call_method1("connect", (connection_config.clone(),))?;
         let executed: PyResult<Bound<'py, PyAny>> = (|| {
             let callbacks: Bound<'py, PyAny> = call_with(
-                &host::entry(py, ExecutorHost::IngressCallbacks)?,
+                &host_entry(py, ExecutorHost::IngressCallbacks)?,
                 &[
                     ("use_color", boolean(py, context.use_color)),
                     ("on_node_start", inputs.on_node_start.clone()),
@@ -537,7 +540,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                 ],
             )?;
             call_with(
-                &host::entry(py, ExecutorHost::RunIngressPythonLoaderNodes)?,
+                &host_entry(py, ExecutorHost::RunIngressPythonLoaderNodes)?,
                 &[
                     ("python_graph", lifecycle.graph.clone()),
                     ("selected_python_names", ingress_names.clone()),
@@ -579,7 +582,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         }
         let scheduled: Vec<String> = scheduled.into_iter().collect();
         let tracker: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::CreateReadSidePythonExecutionTracker)?,
+            &host_entry(py, ExecutorHost::CreateReadSidePythonExecutionTracker)?,
             &[
                 ("python_graph", lifecycle.graph.clone()),
                 ("selected_python_names", names_set(py, &read_side)?),

@@ -4,12 +4,10 @@ use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, typed_values};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_phases::constants::{
     BIGQUERY_ADAPTER, DECREASE_WARNING, DOWNGRADE_HISTORY_DAYS, PERMANENT_TABLE_TYPE,
     RETENTION_DECREASE, RETENTION_INCREASE, RETENTION_MATCH, SNOWFLAKE_ADAPTER,
@@ -23,16 +21,22 @@ use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_reads;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::reads::Read;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use sqlbuild_analysis::planner_warehouse::main::retention_change::retention_change;
 use sqlbuild_analysis::planner_warehouse::main::retention_direction::retention_direction;
 use sqlbuild_analysis::planner_warehouse::main::table_type_copy_name::table_type_copy_name as copy_name;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 use std::collections::{BTreeMap, BTreeSet};
 
 const MATERIALIZED_KEY: &str = "materialized";
@@ -373,7 +377,7 @@ fn relation_retention<'py>(
     let relation = relations.get_item(model_reads::name_object(model)?)?;
     let relation_transient = native_field(&relation, "is_transient")?;
     let lookup = call_with(
-        &host::entry(py, AdapterHost::RelationLookup)?.getattr("key")?,
+        &host_entry(py, AdapterHost::RelationLookup)?.getattr("key")?,
         &[
             ("database", native_field(&destination, "database")?),
             ("schema", schema),

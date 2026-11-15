@@ -4,16 +4,14 @@ use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::types::PyString;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::compile_driver::config_validation::{
     ProjectConfiguration, reject_invalid_connection_configuration,
 };
 use crate::bindings::_helpers::discovery::project_config::{
     load_local_config_file, load_project_config_file,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// `DiscoveredProjectInputs` with the loaded configuration, inside the project discovery lifecycle.
 pub(crate) fn discover_project_configuration<'py>(
@@ -37,7 +35,7 @@ fn configuration_inputs<'py>(
     validate_connections: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let lifecycle: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::OperationLifecycle)?,
+        &host_entry(py, ExecutorHost::OperationLifecycle)?,
         &[
             ("operation_kind", PyString::new(py, "project").into_any()),
             (

@@ -11,7 +11,6 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{BuildExecutionResult, BuildStatus, ExecutionStatus};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords, within};
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::lifecycle::{
     DirectPythonLifecycle, LifecycleInputs, prepare_direct_python_lifecycle,
@@ -40,16 +39,19 @@ use crate::bindings::_helpers::cursor::overrides::{cursor_integer, cursor_timest
 use crate::bindings::_helpers::freshness::publication::append_freshness_records;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::native_host::consumption_state::recorder_callbacks;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::observations::publication::append_build_observations;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
 use crate::bindings::_helpers::sql_test_command::timeouts::{TimeoutKind, resolve_run_timeout};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_state::consumption::models::ChangedPolicy;
 
 const EXECUTION_COMMAND: &str = "sqb build";
@@ -321,7 +323,7 @@ pub(crate) fn execute_build_plan<'py>(
     let [start_ts, end_ts, start_int, end_int] = &preparation.cursors;
     let request = |name: &str| native_field(&context.request, name);
     let runtime: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::BuildRuntimeParams)?,
+        &host_entry(py, ExecutorHost::BuildRuntimeParams)?,
         &[
             ("run_id", native_field(&project, "run_id")?),
             (
@@ -396,7 +398,7 @@ pub(crate) fn execute_build_plan<'py>(
     let (on_node_complete, before_node_write) = recorder_callbacks(recorder.as_any())?;
     let connection: &Bound<'py, PyAny> = &preparation.connection_progress;
     let build_callbacks: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::BuildCallbacks)?,
+        &host_entry(py, ExecutorHost::BuildCallbacks)?,
         &[
             ("on_migration_progress", line_writer(&context.stream)?),
             (
@@ -439,7 +441,7 @@ pub(crate) fn execute_build_plan<'py>(
         ],
     )?;
     let customizations: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::BuildCustomizations)?,
+        &host_entry(py, ExecutorHost::BuildCustomizations)?,
         &[
             (
                 "custom_materializations",
@@ -453,7 +455,7 @@ pub(crate) fn execute_build_plan<'py>(
         ],
     )?;
     let initial_state: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::BuildInitialState)?,
+        &host_entry(py, ExecutorHost::BuildInitialState)?,
         &[
             (
                 "precompleted_keys",
@@ -464,7 +466,7 @@ pub(crate) fn execute_build_plan<'py>(
         ],
     )?;
     let result: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::RunBuildPipeline)?,
+        &host_entry(py, ExecutorHost::RunBuildPipeline)?,
         &[
             ("plan", lifecycle.ordered_plan(&plan)?),
             ("connection_config", connection_config.clone()),
@@ -616,7 +618,7 @@ fn check_runtime<'py>(
         .map(|check| native_field(check, "name"))
         .collect::<PyResult<_>>()?;
     call_with(
-        &host::entry(py, ExecutorHost::PythonNodeRuntime)?,
+        &host_entry(py, ExecutorHost::PythonNodeRuntime)?,
         &[
             ("adapter", adapter.clone()),
             ("connection_config", context.get("connection_config")?),
@@ -723,7 +725,7 @@ pub(crate) fn run_post_build_python_checks<'py>(
         adapter.call_method1("connect", (context.get("connection_config")?,))?;
     let executed: PyResult<Bound<'py, PyAny>> = (|| {
         let run_state: Bound<'py, PyAny> =
-            host::entry(py, ExecutorHost::PythonNodeRunState)?.call0()?;
+            host_entry(py, ExecutorHost::PythonNodeRunState)?.call0()?;
         record_python_run_state_results(
             &discovered,
             &run_state,
@@ -731,7 +733,7 @@ pub(crate) fn run_post_build_python_checks<'py>(
             Some(&native_field(&plan, "source_map")?),
         )?;
         let callbacks: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::PythonCheckCallbacks)?,
+            &host_entry(py, ExecutorHost::PythonCheckCallbacks)?,
             &[
                 (
                     "on_check_start",
@@ -744,7 +746,7 @@ pub(crate) fn run_post_build_python_checks<'py>(
             ],
         )?;
         call_with(
-            &host::entry(py, ExecutorHost::ExecutePythonChecks)?,
+            &host_entry(py, ExecutorHost::ExecutePythonChecks)?,
             &[
                 ("check_functions", tuple(py, &checks)?),
                 ("python_graph", graph.clone()),

@@ -7,9 +7,9 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_attachments::reference_markers::main::unresolved_reference_marker::unresolved_reference_marker;
 use sqlbuild_attachments::sql_lexing::main::unclosed_message::unclosed_message;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// The reference function and diagnostic code of each marker kind, in the scanner's order.
 const MARKER_KINDS: [(&str, &str); 5] = [

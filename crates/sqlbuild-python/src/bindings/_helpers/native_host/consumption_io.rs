@@ -12,12 +12,12 @@ use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_
 use sqlbuild_state::consumption::models::{ConsumptionAppend, ConsumptionRow};
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
 use crate::bindings::_helpers::native_host::consumption_state::{
     ConsumptionReads, EXECUTION_ID_BATCH, Location, ROWS_PER_STATEMENT, read_row, row_cells,
     state_table_name,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()

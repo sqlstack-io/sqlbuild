@@ -16,24 +16,23 @@ use sqlbuild_config::command_connection::main::unsupported_cli_warehouse::unsupp
 use sqlbuild_config::command_connection::models::AuthoredWarehouse;
 use sqlbuild_core::text::main::python_strip::python_strip;
 
-use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::command_runtime::runtime_errors::{
     expected_resolution_error, raised,
 };
 use crate::bindings::_helpers::command_runtime::warehouse_scope::current_command_warehouse_scope;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_runtime_config;
+use crate::bindings::_helpers::compile_driver::config_validation::session_warehouse_support;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::discovery::configuration::discover_project_configuration;
 use crate::bindings::_helpers::model_config::template_data::expanded_template_data;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The `WarehouseGroup` whose warehouse is a target's `warehouses.build`; any other reads `query`.
 const BUILD_GROUP: &str = "build";
@@ -208,21 +207,6 @@ fn connection_warehouse(connection_config: &Bound<'_, PyAny>) -> PyResult<Option
     }
     let text: String = value.extract()?;
     Ok((!python_strip(&text).is_empty()).then_some(text))
-}
-
-fn session_warehouse_support(
-    py: Python<'_>,
-    adapter_name: &Bound<'_, PyAny>,
-    project_dir: &Bound<'_, PyAny>,
-) -> PyResult<bool> {
-    call_with(
-        &host::entry(py, AdapterHost::AdapterSupportsSessionWarehouse)?,
-        &[
-            ("adapter_name", adapter_name.clone()),
-            ("project_dir", project_dir.clone()),
-        ],
-    )?
-    .is_truthy()
 }
 
 fn checked_cli_warehouse(py: Python<'_>, cli_warehouse: &str) -> PyResult<()> {

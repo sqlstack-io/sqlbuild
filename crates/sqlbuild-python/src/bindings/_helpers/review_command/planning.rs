@@ -19,7 +19,6 @@ use sqlbuild_analysis::review_command::models::{
 };
 use sqlbuild_config::project::models::ReviewConfig;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::build_command::support::{boolean, text};
 use crate::bindings::_helpers::change_selection::base_snapshot::{base_comparison, base_variant};
 use crate::bindings::_helpers::change_selection::definition_snapshot::project_wide_keys;
@@ -39,8 +38,10 @@ use crate::bindings::_helpers::discovery::project_config::{
 use crate::bindings::_helpers::execution_history::conversion::optional_text;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
-use crate::bindings::_helpers::records::fields::{field as native_field, mapping_get};
 use crate::bindings::_helpers::review_command::support::review_error;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 const BASE_REF_ALIAS: &str = "@base";
 const UDF_KIND: &str = "udf";

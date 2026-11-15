@@ -2,11 +2,6 @@
 
 use std::ffi::CString;
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{new_record, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_values;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use pyo3::exceptions::{PyUnicodeDecodeError, PyValueError};
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -18,6 +13,13 @@ use sqlbuild_analysis::fingerprint_storage::main::decode_storage::decode_storage
 use sqlbuild_analysis::fingerprint_storage::main::latest_index::latest_index;
 use sqlbuild_analysis::fingerprint_storage::main::selected_positions::selected_positions;
 use sqlbuild_analysis::fingerprint_storage::models::{FingerprintIdentity, LatestIndex};
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DATETIME_MODULE: &str = "datetime";
 const BINASCII_MODULE: &str = "binascii";

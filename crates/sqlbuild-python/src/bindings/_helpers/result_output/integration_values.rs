@@ -10,14 +10,14 @@ use sqlbuild_core::integration_results::main::encode_integration_value::encode_i
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::native_host::host;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
 /// A contract failure, or a Python failure while reading the values.
 pub(crate) type Checked<T> = PyResult<Result<T, IntegrationRecordError>>;
 
 /// The `ObservabilityValidationError` Python raised for the same contract failure.
 pub(crate) fn validation_error(py: Python<'_>, error: &IntegrationRecordError) -> PyErr {
-    match host::entry(py, ExecutorHost::ObservabilityValidationError)
+    match host_entry(py, ExecutorHost::ObservabilityValidationError)
         .and_then(|class| class.call1((error.message.as_str(),)))
     {
         Ok(instance) => PyErr::from_value(instance),

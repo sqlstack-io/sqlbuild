@@ -2,15 +2,15 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::python_plan::main::run_lifecycle::run_lifecycle;
 use sqlbuild_analysis::python_plan::models::{LifecycleNode, RunLifecycle};
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// `build_python_sql_run_lifecycle(*, selection, python_graph)`: a `PythonSqlRunLifecyclePlan`.
 #[pyfunction]

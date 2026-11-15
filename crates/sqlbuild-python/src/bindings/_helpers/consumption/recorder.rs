@@ -27,7 +27,7 @@ use crate::bindings::_helpers::native_host::consumption_io::ConsumptionConnectio
 use crate::bindings::_helpers::native_host::consumption_state::{
     ConsumptionReads, Location, NodeCompleteHook,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Succeeded rows are flushed once this many executions are pending.
 const FLUSH_EXECUTIONS: usize = 100;

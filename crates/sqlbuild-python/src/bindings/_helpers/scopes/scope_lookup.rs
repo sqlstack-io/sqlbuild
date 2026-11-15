@@ -18,15 +18,16 @@ use sqlbuild_scopes::scope_index::models::{
 };
 use sqlbuild_scopes::scope_report::main::cached_report_records::cached_report_records;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::scopes::placement::{QualifiedRow, qualified_identity};
 use crate::bindings::_helpers::scopes::scope_objects::{
     ScopeClasses, read_index, resource_identity_object, tuple_attribute,
 };
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const TYPES_MODULE: &str = "types";
 

@@ -10,9 +10,9 @@ use sqlbuild_discovery::models::{DiscoveryFailure, ReadFailure, StageFailure};
 use sqlbuild_discovery::tree::models::ProjectTree;
 
 use crate::bindings::_helpers::discovery::project_files::path_object;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const BUILTINS_MODULE: &str = "builtins";
 const OS_MODULE: &str = "os";

@@ -1,12 +1,13 @@
 //! Rule findings converted between the Python `Finding` model and native rows and payloads.
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use serde_json::Value;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_rules::models::Fault;
 
 const PATHLIB_MODULE: &str = "pathlib";

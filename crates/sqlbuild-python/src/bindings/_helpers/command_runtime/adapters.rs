@@ -7,11 +7,11 @@ use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const ADAPTER_CONFIGURATION_CODE: &str = "C601";
 
@@ -36,14 +36,14 @@ pub(crate) fn resolve_cli_adapter<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = adapter_name.py();
     let resolved: PyResult<Bound<'py, PyAny>> = call_with(
-        &host::entry(py, AdapterHost::ResolveAdapter)?,
+        &host_entry(py, AdapterHost::ResolveAdapter)?,
         &[
             ("adapter_name", adapter_name.clone()),
             ("project_dir", project_dir.clone()),
         ],
     );
     match resolved {
-        Err(error) if error.is_instance(py, &host::entry(py, AdapterHost::AdapterUserError)?) => {
+        Err(error) if error.is_instance(py, &host_entry(py, AdapterHost::AdapterUserError)?) => {
             Err(cli_adapter_error(py, &error)?)
         }
         resolved => resolved,

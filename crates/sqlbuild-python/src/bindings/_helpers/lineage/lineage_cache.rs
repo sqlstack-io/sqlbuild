@@ -1,14 +1,15 @@
 //! The disposable SQLite cache of relation lineage, read and written through Python's `sqlite3`.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
 
 use crate::bindings::_helpers::lineage::relation_fingerprint::relation_lineage_fingerprint;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyResult, Python};
 use pyo3::types::{PyBytes, PyBytesMethods, PyDict, PyDictMethods, PyList, PyTuple};
 use sqlbuild_analysis::lineage_command::models::{LineageIndex, LineageKey, LineageNode};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const CACHE_SCHEMA_VERSION: &str = "1";
 const CACHE_ALGORITHM_VERSION: &str = "relation-lineage-graph-v4";

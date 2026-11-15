@@ -41,11 +41,12 @@ use crate::bindings::_helpers::janitor::janitor_plan::{janitor_plan_text, janito
 use crate::bindings::_helpers::janitor::janitor_progress::JanitorProgressPrinter;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::scenario_command::setup::stream_isatty;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const COMMAND_NAME: &str = "janitor";
 /// The code of a cleanup that needs a confirmation stdin cannot give.

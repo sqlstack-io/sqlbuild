@@ -4,10 +4,10 @@ use crate::bindings::_helpers::model_config::typed_config::{
     config_value as typed_config_value, model_values,
 };
 use crate::bindings::_helpers::planner_changes::results::native_enum;
-use crate::bindings::_helpers::records::construct::new_record_with;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString};
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 
 use sqlbuild_analysis::planner_changes::models::{
     SchemaChangeKind, SchemaColumnSource, SchemaFindingRow,
@@ -17,9 +17,10 @@ use sqlbuild_analysis::planner_strategy::models::{
     ChangeFacts, MaterializationType, PlanChangeKind, WarningRow, WarningSeverity,
 };
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const YML_SOURCE: &str = "yml";
 const FULL_BACKFILL: &str = "full";

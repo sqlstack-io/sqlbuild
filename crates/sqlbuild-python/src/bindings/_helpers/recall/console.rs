@@ -3,7 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyBytes;
 
-use crate::bindings::_helpers::native_host::host::write_console;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
 
 /// Write `data` unchanged to stdout's binary buffer after flushing pending text.
 pub(crate) fn write_stdout_bytes(py: Python<'_>, data: &[u8]) -> PyResult<()> {

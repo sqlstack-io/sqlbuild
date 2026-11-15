@@ -27,7 +27,7 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::planner_identity::metadata::{function_local_hashes, seed_identity};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Header values that rename rather than redefine a model.
 const RENAME_CONFIG_KEYS: [&str; 2] = ["migrate_from", "description"];

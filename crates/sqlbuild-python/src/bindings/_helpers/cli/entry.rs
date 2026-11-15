@@ -19,7 +19,6 @@ use sqlbuild_cli::dispatch::models::{CommandFacts, CommandFailure, InvocationPol
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost};
 use sqlbuild_orchestration::runs::models::RunOutcome;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
 use crate::bindings::_helpers::build_progress::transient_lines::shared_transient_line_coordinator;
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
 use crate::bindings::_helpers::cli::dispatch::{command_facts, dispatch_command};
@@ -37,7 +36,6 @@ use crate::bindings::_helpers::compile_command::constants::COMPILE_COMMAND_NAME;
 use crate::bindings::_helpers::compile_command::report::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
 use crate::bindings::_helpers::diff_report::output::render_diff_error_json;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::interrupt::{InterruptHandler, interrupted};
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
@@ -48,15 +46,23 @@ use crate::bindings::_helpers::recall::session::{
     InvocationRecall, effective_selection, finish_invocation_recall, start_invocation_recall,
 };
 use crate::bindings::_helpers::recall::sinks::{RecallLifecycleSink, publish_lifecycle_event};
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::construct::{error_class, new_error};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use crate::bindings::_helpers::workspace_commands::commands::maintain_sqlbuild_skills;
 use sqlbuild_cli::launcher::constants::LAUNCH_RECORD_OPTION;
 use sqlbuild_core::cli_text::main::format_coded_error::format_coded_error;
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const NO_COLOR_OPTION: &str = "--no-color";
 const CLI_LOGGER: &str = "sqlbuild.cli";
@@ -394,7 +400,7 @@ fn failure_kind(py: Python<'_>, error: &Bound<'_, PyAny>) -> PyResult<Option<Com
         return Ok(Some(CommandFailure::Command));
     }
     for failure in EXPECTED_COMMAND_FAILURES {
-        if error.is_instance(&host::entry(py, failure)?)? {
+        if error.is_instance(&host_entry(py, failure)?)? {
             return Ok(Some(CommandFailure::Command));
         }
     }
@@ -474,7 +480,7 @@ fn lifecycle_event<'py>(
     payload: Bound<'py, PyDict>,
 ) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(py, ExecutorHost::CreateLifecycleEvent)?,
+        &host_entry(py, ExecutorHost::CreateLifecycleEvent)?,
         &[
             ("event_type", PyString::new(py, event_type).into_any()),
             ("payload", payload.into_any()),
@@ -705,7 +711,7 @@ fn record_interrupted_end(
         let occurred_at: Bound<'_, PyDateTime> =
             PyDateTime::from_timestamp(py, seconds, Some(&PyTzInfo::utc(py)?.to_owned()))?;
         let started: Bound<'_, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::CreateLifecycleEvent)?,
+            &host_entry(py, ExecutorHost::CreateLifecycleEvent)?,
             &[
                 (
                     "event_type",
@@ -773,7 +779,7 @@ fn external_context(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     match invocation_context(py, None) {
         Ok(context) => Ok(context),
         Err(error)
-            if error.is_instance(py, &host::entry(py, ExecutorHost::OutputCaptureInputError)?) =>
+            if error.is_instance(py, &host_entry(py, ExecutorHost::OutputCaptureInputError)?) =>
         {
             Ok(PyDict::new(py).into_any())
         }
@@ -810,7 +816,7 @@ fn parsed_invocation<'py>(
         .transpose()?
         .flatten();
     if command.as_deref() == Some("location") && location_command.as_deref() == Some("runtime") {
-        return within(&host::redirect_stdout_to_stderr(py)?, |_| {
+        return within(&redirect_stdout_to_stderr(py)?, |_| {
             execute_parsed_invocation(args, handlers, identity, use_color)
         });
     }
@@ -870,7 +876,7 @@ fn execute_parsed_invocation<'py>(
         },
     )?;
     let evidence_scope: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::AuditEvidenceScope)?,
+        &host_entry(py, ExecutorHost::AuditEvidenceScope)?,
         &[(
             "mode",
             PyString::new(py, recall.audit_evidence.setting()).into_any(),
@@ -881,7 +887,7 @@ fn execute_parsed_invocation<'py>(
             call_with(&operation.into_any(), &[])
         } else {
             call_with(
-                &host::entry(py, FacadeHost::DispatchWithComputeLogs)?,
+                &host_entry(py, FacadeHost::DispatchWithComputeLogs)?,
                 &[
                     ("args", args),
                     ("identity", identity.clone()),
@@ -981,15 +987,15 @@ fn invoke<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let external: Bound<'py, PyAny> = external_context(py)?;
     let invocation_scope: Bound<'py, PyAny> =
-        host::entry(py, ExecutorHost::InvocationScope)?.call0()?;
+        host_entry(py, ExecutorHost::InvocationScope)?.call0()?;
     within(&invocation_scope, |identity| {
         let external_scope: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::InvocationExternalContextScope)?,
+            &host_entry(py, ExecutorHost::InvocationExternalContextScope)?,
             &[("external_context", external.clone())],
         )?;
         within(&external_scope, |_| {
             let diagnostics: Bound<'py, PyAny> = call_with(
-                &host::entry(py, ExecutorHost::DiagnosticsContext)?,
+                &host_entry(py, ExecutorHost::DiagnosticsContext)?,
                 &[(
                     "sqlbuild_invocation_id",
                     native_field(identity, "invocation_id")?,

@@ -5,18 +5,18 @@ use sqlbuild_host::entries::models::UserCodeHost;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_identity::metadata::build_function_local_hashes;
 use crate::bindings::_helpers::planner_identity::metadata::build_model_version_identity_metadata_json;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;
 use sqlbuild_analysis::planner_migrations::main::discovery_order::discovery_order;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use std::collections::BTreeMap;
 
 pub(super) fn ordered<'py>(runtime: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -80,7 +80,7 @@ pub(super) fn metadata<'py>(
                 .as_deref(),
         )?,
     )?;
-    let identities = host::entry(py, UserCodeHost::BuildHookIdentities)?
+    let identities = host_entry(py, UserCodeHost::BuildHookIdentities)?
         .call1((native_field(&project, "hook_functions")?,))?;
     let hooks = PyDict::new(py);
     for pair in mapping_items(&identities)?.try_iter()? {

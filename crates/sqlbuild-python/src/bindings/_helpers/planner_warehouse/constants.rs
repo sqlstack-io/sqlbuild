@@ -2,7 +2,7 @@
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::types::RecordId;
 
 pub(crate) const RUN_BOUNDED: AdapterHost = AdapterHost::RunBoundedInspections;
 pub(crate) const COLUMN_INFO: AdapterHost = AdapterHost::ColumnInfo;

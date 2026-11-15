@@ -1,5 +1,6 @@
 //! The compile's natively owned project, which producers record into and consumers read.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Mutex;
 
@@ -20,7 +21,6 @@ use sqlbuild_analysis::compiled_project::models::{
 
 use sqlbuild_project::models::CompiledProject;
 
-use crate::bindings::_helpers::boundary::panics::NativeCompilerError;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AttachedSqlTests;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditSettings;
@@ -60,6 +60,7 @@ use crate::bindings::_helpers::render::declaration_values::ConstantRendering;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_project::types::ObjectKeyRow;
 use sqlbuild_project::types::SourceNamespace;
+use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
 
 pub(crate) const CONTRACT_KEY: &str = "contract";
 const INPUT_CLASSES_UNSET: &str = "no model loop recorded inputs into this project";
@@ -292,7 +293,7 @@ impl NativeCompiledProject {
         if let Some(column) = self
             .inferred_column_projections
             .lock()
-            .map_err(|error| NativeCompilerError::new_err(error.to_string()))?
+            .map_err(|error| native_compiler_error(error.to_string()))?
             .get(row)
         {
             return Ok(column.bind(py).clone());
@@ -304,7 +305,7 @@ impl NativeCompiledProject {
         let column = classes.inferred_column.call((), Some(&fields))?;
         self.inferred_column_projections
             .lock()
-            .map_err(|error| NativeCompilerError::new_err(error.to_string()))?
+            .map_err(|error| native_compiler_error(error.to_string()))?
             .insert(row.clone(), column.clone().unbind());
         Ok(column)
     }

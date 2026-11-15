@@ -13,11 +13,11 @@ use sqlbuild_core::identifier_text::main::is_lowercase_identifier::is_lowercase_
 use sqlbuild_host::entries::models::{FacadeHost, UserCodeHost};
 use sqlbuild_model_config::header_metadata::main::json_meta_problem::json_meta_problem;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const RANDOM_MODULE: &str = "random";
 const MAX_ATTEMPTS_TOO_LOW: &str = "RetryPolicy max_attempts must be at least 1";
@@ -37,7 +37,7 @@ const HOOK_READS_INVALID: &str =
 
 /// `SharedInputError(message)`.
 fn shared_input_error(py: Python<'_>, message: &str) -> PyErr {
-    match host::entry(py, FacadeHost::SharedInputError).and_then(|class| class.call1((message,))) {
+    match host_entry(py, FacadeHost::SharedInputError).and_then(|class| class.call1((message,))) {
         Ok(error) => PyErr::from_value(error),
         Err(error) => error,
     }
@@ -183,7 +183,7 @@ fn validate_audit_case(request: Option<&Bound<'_, PyDict>>) -> Result<(), PyErr>
 #[pyfunction]
 fn normalize_hook_reads<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = value.py();
-    let reference: Bound<'py, PyAny> = host::entry(py, UserCodeHost::SqlResourceRef)?;
+    let reference: Bound<'py, PyAny> = host_entry(py, UserCodeHost::SqlResourceRef)?;
     let reads: Vec<Bound<'py, PyAny>> = if value.is_instance(&reference)? {
         vec![value.clone()]
     } else {

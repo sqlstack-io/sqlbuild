@@ -4,12 +4,12 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyString};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
 use crate::bindings::_helpers::freshness::exception_types::{
     SourceFreshnessInputError, SourceFreshnessObservationError,
 };
 use crate::bindings::_helpers::state_rows::timestamps::{date_time_typed, in_utc, offset_aware};
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 pub(crate) const OBSERVATION_ERROR: fn(String) -> PyErr = SourceFreshnessObservationError::new_err;
 pub(crate) const INPUT_ERROR: fn(String) -> PyErr = SourceFreshnessInputError::new_err;

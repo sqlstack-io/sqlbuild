@@ -14,7 +14,7 @@ use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_discovery::project_validation::main::validate_orchestration_names::validate_orchestration_names;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
 use crate::bindings::_helpers::command_runtime::concurrency::published_concurrency;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
@@ -35,7 +35,8 @@ use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_identity::identities::direct_model_version_identities;
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
 use crate::bindings::_helpers::planner_scope::values::project_graph;
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 /// The Python node kind whose functions load sources.
 const LOADER_KIND: &str = "loader";

@@ -1,7 +1,5 @@
 //! Assemble new and resumed old-name view steps from recorded facts.
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_migrations::column_objects::{model, text};
@@ -15,11 +13,16 @@ use crate::bindings::_helpers::planner_migrations::old_names::old_name_view_skip
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyBool, PyList, PyTuple};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 impl<'py> OldNamePlanner<'py> {
     pub(super) fn new(

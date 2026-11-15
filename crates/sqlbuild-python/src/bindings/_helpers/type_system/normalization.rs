@@ -6,8 +6,9 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::type_system::errors::TypeNormalizationError;
 use sqlbuild_analysis::type_system::main::normalize_type::normalize_type;
 use sqlbuild_analysis::type_system::models::{NormalizedType, TypeNormalization};
+use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 
 positional_record! {
     into;

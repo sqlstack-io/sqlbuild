@@ -26,7 +26,6 @@ use sqlbuild_core::event_export::models::{
 };
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::event_exporting::constants::{
     DISPATCHER_THREAD_NAME, EXIT_JOIN_SECONDS, HEALTH_THREAD_NAME, IDLE_WAIT_SECONDS,
     JOIN_GRACE_SECONDS, NO_SECONDS, NOTIFIER_THREAD_NAME, OUTPUT_SINK_THREAD_NAME, POLL_SECONDS,
@@ -39,12 +38,15 @@ use crate::bindings::_helpers::event_exporting::values::{
     export_policy, input_error, severity_from, state_error,
 };
 use crate::bindings::_helpers::event_exporting::workers::{DispatcherWorker, Lane, WorkerRole};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_threads::constants::OUTPUT_SUPPRESSED_ATTRIBUTE;
 use crate::bindings::_helpers::native_threads::exit_signal::{
     interpreter_exiting, signal_interpreter_exit,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// One bound lifecycle-event sink.
 pub(crate) struct Exporter {
@@ -550,7 +552,7 @@ impl Shared {
             &[
                 (
                     "target",
-                    host::entry(py, UserCodeHost::RunCommandOutputSinks)?,
+                    host_entry(py, UserCodeHost::RunCommandOutputSinks)?,
                 ),
                 ("kwargs", arguments.into_any()),
                 (

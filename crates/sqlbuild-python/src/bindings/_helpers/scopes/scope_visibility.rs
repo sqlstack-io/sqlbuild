@@ -11,15 +11,16 @@ use sqlbuild_scopes::scope_index::models::{
     OwnershipRoot, OwnershipRootKind, RejectedPath, ResourceIdentity, ResourceKind, ResourceRecord,
 };
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::scopes::scope_lookup::{
     NativeScopeLookup, ResolvedRows, TargetRows, scope_path_error,
 };
 use crate::bindings::_helpers::scopes::scope_objects::{
     ScopeClasses, qualified_row, read_resource, tuple_attribute,
 };
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 type PyObject = Py<PyAny>;
 

@@ -5,9 +5,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyString, PyTuple};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 /// Missing callbacks retain the existing renderer-only API for already-current/new schemas.
 pub(crate) fn ensure_event_id_column<'py>(
@@ -39,11 +39,11 @@ pub(crate) fn ensure_event_id_column<'py>(
         return Ok(());
     }
     let string_type = render_type.call1((field(
-        &host::entry(py, AdapterHost::FrameworkType)?,
+        &host_entry(py, AdapterHost::FrameworkType)?,
         "STRING",
     )?,))?;
     let column = call_with(
-        &host::entry(py, AdapterHost::ColumnInfo)?,
+        &host_entry(py, AdapterHost::ColumnInfo)?,
         &[
             ("name", PyString::new(py, "event_id").into_any()),
             ("type", string_type),

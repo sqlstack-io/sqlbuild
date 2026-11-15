@@ -1,6 +1,5 @@
 //! Native migration discovery over existing inspection and fingerprint cache boundaries.
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_migrations::matching::{
@@ -13,9 +12,11 @@ use crate::bindings::_helpers::planner_migrations::{
     discovery_events, discovery_models, discovery_requests,
 };
 use crate::bindings::_helpers::planner_phases::runtime::runtime_dialect;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use pyo3::prelude::{PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple, PyTupleMethods};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::BTreeSet;
 
 /// Manual and automatically discovered migration requests with their destination fingerprints.

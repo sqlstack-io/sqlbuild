@@ -7,7 +7,6 @@ pub(crate) mod consumption_io;
 pub(crate) mod consumption_state;
 pub(crate) mod dialect;
 pub(crate) mod header_projection;
-pub(crate) mod host;
 pub(crate) mod interrupt;
 pub(crate) mod live_reads;
 pub(crate) mod model_lookup;

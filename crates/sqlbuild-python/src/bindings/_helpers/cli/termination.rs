@@ -13,10 +13,10 @@ use pyo3::prelude::{
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 create_exception!(
     sqlbuild._native,
@@ -116,7 +116,7 @@ fn watch(flags: &SigtermFlags, stop: &AtomicBool, main: MainThread) {
         if flags.terminated.load(Ordering::SeqCst) {
             flags.default.store(true, Ordering::SeqCst);
             Python::attach(|py| {
-                let cancelled = host::entry(py, ExecutorHost::CancelRunningStatements)
+                let cancelled = host_entry(py, ExecutorHost::CancelRunningStatements)
                     .and_then(|cancel| cancel.call0());
                 drop(cancelled);
                 if main.handles_interrupt {

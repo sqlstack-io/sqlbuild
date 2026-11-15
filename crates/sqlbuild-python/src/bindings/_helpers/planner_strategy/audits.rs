@@ -15,13 +15,13 @@ use sqlbuild_analysis::planner_strategy::main::effective_run_scope::effective_ru
 use sqlbuild_analysis::planner_strategy::main::singular_attachment::singular_attachment;
 use sqlbuild_analysis::planner_strategy::models::{AuditAttachmentKind, AuditRunScope};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_scope::values::edges;
 use crate::bindings::_helpers::planner_strategy::values::{input_error, optional_string, text};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const AUDITING_TYPES_MODULE: &str = "sqlbuild.compiler.auditing.types";
 const COMPILE_TYPES_MODULE: &str = "sqlbuild.compiler.compile.types";

@@ -19,9 +19,9 @@ use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
 use sqlbuild_host::types::ResultEnum;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const SUCCESS_STATUS: &str = "success";
 const SQL_EVENT_KIND: &str = "sql";
@@ -255,7 +255,7 @@ fn expectation_sql(
     let mut expectations: ExpectationSql = ExpectationSql::default();
     for expected in items(&native_field(scenario_plan, "expected_expectations")?)? {
         let actual_relation: String = call_with(
-            &host::entry(py, AdapterHost::ResolveRelationLocationQualifiedName)?,
+            &host_entry(py, AdapterHost::ResolveRelationLocationQualifiedName)?,
             &[
                 ("adapter", adapter.clone()),
                 ("location", native_field(&expected, "actual_destination")?),

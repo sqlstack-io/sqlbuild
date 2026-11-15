@@ -8,11 +8,7 @@ use sqlbuild_core::scenario_command::main::snapshot_capture_warning::snapshot_ca
 use sqlbuild_core::scenario_command::models::ScenarioNamespace;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::documents::format_scenario_snapshot_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::scenario_command::conversions::succeeded;
@@ -24,6 +20,10 @@ use crate::bindings::_helpers::scenario_command::setup::{
     project_connection_config, selected_scenarios, text, write,
 };
 use crate::bindings::_helpers::scenario_command::test_command::TestRun;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The outcome of syncing local snapshots: its exit code and capture results.
 pub(crate) struct LocalSync<'py> {
@@ -90,7 +90,7 @@ pub(crate) fn sync_local_snapshots<'py>(
         "name",
     )?;
     let names: Vec<String> = call_with(
-        &host::entry(py, ExecutorHost::SelectScenarioSnapshotCaptureCandidates)?,
+        &host_entry(py, ExecutorHost::SelectScenarioSnapshotCaptureCandidates)?,
         &[
             ("project_dir", run.project.project_dir.clone()),
             ("pipeline_result", local_pipeline.clone()),
@@ -176,7 +176,7 @@ pub(crate) fn sync_local_snapshots<'py>(
     let results: Bound<'py, PyTuple> = PyTuple::new(
         py,
         call_with(
-            &host::entry(py, ExecutorHost::RunScenarioCapturePipeline)?,
+            &host_entry(py, ExecutorHost::RunScenarioCapturePipeline)?,
             &[
                 ("project_dir", run.project.project_dir.clone()),
                 ("pipeline_result", pipeline),

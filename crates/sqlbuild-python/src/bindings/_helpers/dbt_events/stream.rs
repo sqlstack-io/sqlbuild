@@ -13,10 +13,10 @@ use sqlbuild_core::dbt_events::main::consume_dbt_event::consume_dbt_event;
 use sqlbuild_core::dbt_events::main::render_dbt_node_row::render_dbt_node_row;
 use sqlbuild_core::dbt_events::models::{DbtRowPosition, DbtStreamState, DbtStreamUpdate};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::dbt_events::event::dbt_event;
 use crate::bindings::_helpers::dbt_events::results::{native_result, python_result};
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 const STREAM_OPTIONS: (&[&str], &[&str]) =
     (&["display_total", "detail_by_unique_id", "use_color"], &[]);

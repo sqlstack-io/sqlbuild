@@ -7,11 +7,11 @@ use sqlbuild_cli::diff_report::errors::DiffUserError;
 use sqlbuild_cli::diff_report::models::DiffRequestFacts;
 use sqlbuild_host::entries::models::HostId;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// `name(**pairs)` with keyword arguments.
 pub(crate) fn call<'py>(
@@ -76,7 +76,7 @@ pub(crate) fn matches_class(
     error: &PyErr,
     class: impl Into<HostId>,
 ) -> PyResult<bool> {
-    error.value(py).is_instance(&host::entry(py, class)?)
+    error.value(py).is_instance(&host_entry(py, class)?)
 }
 
 /// Whether `error` is an instance of the native error class `class`.

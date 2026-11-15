@@ -22,10 +22,6 @@ use sqlbuild_core::debug_report::models::{
     DebugReport, DebugRuntime, WarehouseCheck,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, imported, within,
-};
 use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::{
@@ -43,14 +39,19 @@ use crate::bindings::_helpers::compile_driver::discovery::discover_project_input
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
 use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
-use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::provider_settings::{
     missing_secrets, secret_variables,
 };
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DEBUG_OPTIONS: (&[&str], &[&str]) = (
     &[],

@@ -1,8 +1,8 @@
 //! Computed attributes of the natively hosted scope records.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The completeness sections of a `ScopeCompleteness`.
 const COMPLETENESS_SECTIONS: [&str; 6] = [

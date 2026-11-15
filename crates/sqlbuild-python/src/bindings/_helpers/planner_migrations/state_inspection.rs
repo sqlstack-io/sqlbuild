@@ -15,14 +15,19 @@ use sqlbuild_state::events::models::{EventRelation, FingerprintKey, FingerprintO
 
 use crate::bindings::_helpers::planner_phases::runtime::runtime_reads;
 use crate::bindings::_helpers::planner_warehouse::reads::{FingerprintRead, PlannerReads, Read};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use crate::bindings::_helpers::state_rows::constants::{COLUMN_KIND, MODEL_KIND, OLD_NAME_KIND};
 use crate::bindings::_helpers::state_rows::migration_objects::layout;
 use crate::bindings::_helpers::state_rows::migration_projections::old_name_views;
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_MODEL;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 /// A lowercased schema and relation name.
 type RelationKey = (String, String);

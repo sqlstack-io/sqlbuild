@@ -16,15 +16,10 @@ use sqlbuild_rules::custom_host_pool::types::{FactKey, HostPlan};
 use sqlbuild_rules::custom_rule_cache::models::CustomEvaluation;
 use sqlbuild_rules::custom_rule_cache::types::ReadSet;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::cache::native_store::current_code_identity;
 use crate::bindings::_helpers::compile_context::delta::{
     DeltaInjection, delta_unsupported, injection,
 };
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::rules::constants::{
     CUSTOM_HOST_RUNTIME_VERSION, CUSTOM_RULES_CACHE_FILE,
 };
@@ -43,6 +38,11 @@ use crate::bindings::_helpers::rules::fact_replay::{
     FactReplay, delta_safe_fact, is_tree_fact, read_text_path,
 };
 use crate::bindings::_helpers::rules::rule_run::{bulk_cache_file, rules_bulk_cache_path};
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PROJECT_SUBJECT: &str = "project";
 /// Why a delta compile cannot rerun a custom rule that reads facts of models it does not compile.

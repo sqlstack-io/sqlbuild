@@ -1,9 +1,5 @@
 //! The explicit-reference facts of a compiled project, read from its Python views.
 
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyList, PyTuple};
 use sqlbuild_analysis::explicit_references::models::{
@@ -11,6 +7,10 @@ use sqlbuild_analysis::explicit_references::models::{
     SqlHook,
 };
 use sqlbuild_analysis::explicit_references::types::ResourceKey;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 const MODEL_HOOK_KEYS: [&str; 2] = ["pre_hooks", "post_hooks"];
 const MIGRATE_FROM_KEY: &str = "migrate_from";

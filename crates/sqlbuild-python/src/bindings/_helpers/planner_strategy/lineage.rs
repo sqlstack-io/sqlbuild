@@ -18,9 +18,9 @@ use crate::bindings::_helpers::planner_strategy::microbatches::{
     CAP_ACTIONS, microbatch_limit_config,
 };
 use crate::bindings::_helpers::planner_strategy::values::{input_error, text};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const MICROBATCH_MODE: &str = "microbatch";
 

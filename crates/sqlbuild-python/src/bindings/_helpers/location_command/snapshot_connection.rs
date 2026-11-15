@@ -8,11 +8,11 @@ use sqlbuild_orchestration::snapshots::constants::CONNECTION_DOCUMENT;
 use sqlbuild_orchestration::snapshots::main::connection_details::connection_details;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
-use crate::bindings::_helpers::boundary::python_calls::within;
+use sqlbuild_python_base::boundary::main::within::within;
 use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
 use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehouse_scope;
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 /// The resolved connection's text settings; only `connection_details` decides which are published.
 fn text_settings(

@@ -30,8 +30,8 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_scenario::graph::plan_scenario_graph;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::scenario_command::setup::{flush, write};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MACRO_TEST_MODE: &str = "macro";
 /// The JSON document key of the changes and selection of a `--since` run.

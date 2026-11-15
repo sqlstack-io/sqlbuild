@@ -1,9 +1,9 @@
 //! Reading planner values by attribute and building the JSON documents' dictionaries.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// `str(value)`.
 pub(crate) fn text(value: &Bound<'_, PyAny>) -> PyResult<String> {

@@ -11,9 +11,10 @@ use crate::bindings::_helpers::discovery::model_records::{
 use crate::bindings::_helpers::discovery::project_config::load_project_config_file;
 use crate::bindings::_helpers::discovery::snapshot::in_snapshot;
 use crate::bindings::_helpers::model_config::described_models::externally_described_models as described_models;
-use crate::bindings::_helpers::records::construct::{new_record, new_record_with};
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::render::declaration_indexes::public_model_schema_index;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Models and model schemas, skipping files that cannot be read.
 #[pyfunction]

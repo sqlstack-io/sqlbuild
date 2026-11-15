@@ -10,10 +10,10 @@ use sqlbuild_analysis::type_system::main::same_type::same_type;
 use sqlbuild_analysis::type_system::models::{NormalizedType, TypeNormalization};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::type_system::normalization::normalization_error;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
 const TYPE_NORMALIZATION_LOGGER: &str = "sqlbuild.adapter";
 const TYPE_PARSE_FALLBACK_MESSAGE: &str = "type normalization parse failed; falling back";
@@ -70,7 +70,7 @@ fn log_parse_fallback(
 ) -> PyResult<()> {
     let py: Python<'_> = dialect.py();
     call_with(
-        &host::entry(py, ExecutorHost::LogDebugEvent)?,
+        &host_entry(py, ExecutorHost::LogDebugEvent)?,
         &[
             (
                 "logger",

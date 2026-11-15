@@ -12,7 +12,8 @@ use sqlbuild_core::json::models::{
     JsonDialect, JsonInteger, JsonValue, OrjsonOptions, StdlibJsonOptions,
 };
 
-use crate::bindings::_helpers::boundary::panics::{NativeCompilerError, compiler_guard};
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
 
 const ORJSON_SURROGATE: &str = "str is not valid UTF-8: surrogates not allowed";
 const ORJSON_WIDE_INTEGER: &str = "Integer exceeds 64-bit range";
@@ -245,7 +246,7 @@ impl Conversion {
         if let Ok(text) = key.downcast::<PyString>() {
             return match self.text(text)? {
                 JsonValue::String(text) => Ok(text),
-                _ => Err(NativeCompilerError::new_err(SURROGATE_KEY)),
+                _ => Err(native_compiler_error(SURROGATE_KEY)),
             };
         }
         self.orjson_rejects(ORJSON_KEY.to_owned());

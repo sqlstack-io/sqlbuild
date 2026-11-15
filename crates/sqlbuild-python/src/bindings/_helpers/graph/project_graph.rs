@@ -1,5 +1,6 @@
 //! The compiled project graph and selector resolution, held natively for Python's graph users.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyModule, PyModuleMethods, PyResult, Python};
@@ -20,9 +21,9 @@ use sqlbuild_analysis::graph::models::{
     BuildResources, EdgeDirection, GraphIndexes, GraphResource, ProjectGraph,
 };
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::graph::views::lineage_graph_views;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 positional_record! {
     extract;

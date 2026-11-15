@@ -20,7 +20,7 @@ use sqlbuild_cache::artifacts::main::staged_files::staged_files;
 use sqlbuild_cache::artifacts::main::write_artifacts::write_artifacts;
 use sqlbuild_cache::artifacts::models::{Publication, WrittenArtifacts};
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 
 type PublishedRow = (String, Vec<(String, String)>);
 

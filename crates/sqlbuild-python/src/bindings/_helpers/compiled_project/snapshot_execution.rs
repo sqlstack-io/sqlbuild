@@ -19,7 +19,7 @@ use crate::bindings::_helpers::compiled_project::constants::{
     NO_CHANGE_REASON, SKIP_ACTION, SQL_TEST_KEY_PREFIX,
 };
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 /// Node keys by snapshot node key, such as the models each test checks.
 pub(crate) type NodeKeys = BTreeMap<String, Vec<String>>;

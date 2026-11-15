@@ -8,7 +8,7 @@ use sqlbuild_analysis::fingerprint_storage::main::insert_sql::insert_sql;
 use sqlbuild_analysis::fingerprint_storage::models::StoredFingerprint;
 
 use crate::bindings::_helpers::fingerprints::latest_rows::fingerprint_input_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// One `INSERT` of a single fingerprint.
 pub(crate) fn fingerprint_insert_sql(

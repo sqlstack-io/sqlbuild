@@ -1,8 +1,8 @@
 //! Computed attributes of the natively hosted discovery and pipeline records.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// SQL scalar type labels by logical value kind.
 const SCALAR_TYPE_LABELS: [(&str, &str); 6] = [

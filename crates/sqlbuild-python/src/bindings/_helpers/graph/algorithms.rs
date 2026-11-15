@@ -9,8 +9,8 @@ use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::graph_walk::main::directed_path_nodes::directed_path_nodes;
 
 use crate::bindings::_helpers::graph::node_set::PyNodeSet;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const BUILTINS_MODULE: &str = "builtins";
 

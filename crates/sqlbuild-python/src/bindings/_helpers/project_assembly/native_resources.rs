@@ -15,22 +15,25 @@ use sqlbuild_analysis::assembly::project::models::{
 };
 use sqlbuild_core::panics::main::native_failure::native_failure;
 use sqlbuild_model_config::templates::models::Scalar;
+use sqlbuild_python_base::positional_record;
 
 use crate::bindings::_helpers::authored_values::project_vars::project_var_text;
-use crate::bindings::_helpers::boundary::panics::{NativeCompilerError, compiler_error};
-use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
 use crate::bindings::_helpers::compiled_views::model_input_view::input_reference_rows;
 use crate::bindings::_helpers::model_config::template_data::record_reads;
 use crate::bindings::_helpers::project_assembly::models::{
     NativeProjectResources, NativeResourceFailure,
 };
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::ErrorId;
-use crate::bindings::types::CompilerDetach;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const OS_MODULE: &str = "os";
 const PROJECT_ASSEMBLY_CONTEXT: &str = "native project assembly";
@@ -395,7 +398,7 @@ fn failure_error<'py>(
         }
         AssemblyError::Raise(index) => match held.get(index) {
             Some(error) => Ok(error.clone()),
-            None => Ok(NativeCompilerError::new_err(format!(
+            None => Ok(native_compiler_error(format!(
                 "{NATIVE_FAILURE_PREFIX}{PROJECT_ASSEMBLY_CONTEXT}: unknown failure kind 'held'"
             ))
             .value(py)

@@ -7,7 +7,7 @@ use crate::bindings::_helpers::cursor::conversion::GRAIN_NAMES;
 use crate::bindings::_helpers::exported_constants::constants::{
     EXPORTED_INTEGERS, EXPORTED_TEXT_SETS, EXPORTED_TEXT_TUPLES, EXPORTED_TEXTS,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Registers after the native enums, since `GRAIN_ORDER` is keyed by `CursorGrain` members.
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -9,11 +9,12 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cache::digest::main::sha256_hex::sha256_hex;
 use sqlbuild_host::compile_context::main::record_compile_metric::record_compile_metric;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
 use crate::bindings::_helpers::planner_identity::json_values::{COMPACT, unicode_sorted_dumps};
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const ANALYSIS_CACHE_VERSION: i64 = 13;
 const ANALYSIS_ALGORITHM_FINGERPRINT: &str = "model-sql-analysis-v21-completed-star-shapes";

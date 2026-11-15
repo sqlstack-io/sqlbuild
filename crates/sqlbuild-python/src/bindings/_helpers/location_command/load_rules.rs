@@ -6,14 +6,14 @@ use sqlbuild_orchestration::platform::constants::{
 };
 use sqlbuild_orchestration::platform::models::{LocationRuleFailure, LocationRuleFinding};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::project_graph;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::configured_rule_failures;
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::types::RecordId;
 use crate::bindings::_helpers::rules::early_sql_lint::EarlySqlLint;
 
 /// The configured rules' findings when they fail the compiled project, printed as `sqb compile` would.

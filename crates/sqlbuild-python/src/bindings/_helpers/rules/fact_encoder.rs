@@ -18,10 +18,10 @@ use sqlbuild_cache::digest::main::sha256_hex::sha256_hex;
 use sqlbuild_core::json::main::dumps::dumps;
 use sqlbuild_core::json::models::{JsonDialect, JsonValue, OrjsonOptions};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::record_spec;
-use crate::bindings::_helpers::records::models::NativeRecord;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::record_spec::record_spec;
+use sqlbuild_python_base::records::models::NativeRecord;
 
 const VALUE_LABEL: &str = "value";
 const ERROR_LABEL: &str = "error";

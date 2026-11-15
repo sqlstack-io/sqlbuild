@@ -35,7 +35,6 @@ use sqlbuild_state::state_tables::main::read_history_sql::read_history_sql;
 use sqlbuild_state::state_tables::models::{HistoryRead, NewestVersions};
 
 use crate::bindings::_helpers::authored_values::sql_values::{SqlValueClasses, sql_value};
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
 use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::fingerprints::latest_rows::row_fingerprint;
@@ -47,8 +46,11 @@ use crate::bindings::_helpers::native_host::warehouse_statistics::read_statistic
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
-use crate::bindings::_helpers::records::fields::field;
-use crate::bindings::_helpers::records::{construct::record_class, ids::RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// A node's builds share these columns, as the control store groups them.
 const FINGERPRINT_IDENTITY_COLUMNS: [&str; 5] = [

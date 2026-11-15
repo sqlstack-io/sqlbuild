@@ -6,9 +6,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 /// An asset path as Dagster spells it.
 pub(crate) type AssetPath = Vec<String>;
@@ -63,7 +63,7 @@ pub(crate) fn asset_path_or_empty(node: &Bound<'_, PyAny>) -> PyResult<AssetPath
 
 /// A Dagster integration constant.
 pub(crate) fn constant<'py>(py: Python<'py>, name: ThirdPartyHost) -> PyResult<Bound<'py, PyAny>> {
-    host::entry(py, name)
+    host_entry(py, name)
 }
 
 /// Whether a constant set holds `value`.

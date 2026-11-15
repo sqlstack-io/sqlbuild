@@ -13,9 +13,9 @@ use sqlbuild_core::lifecycle_events::constants::CURRENT_LIFECYCLE_EVENT_SCHEMA_V
 use sqlbuild_core::lifecycle_events::main::catalog::catalog;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::enum_from_value;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// `BoundEventExporter` parameters, in positional order.
 const BOUND_EXPORTER_PARAMETERS: [&str; 5] = [
@@ -31,7 +31,7 @@ static POLICIES: PyOnceLock<HashMap<String, ExportPolicy>> = PyOnceLock::new();
 
 /// The exception class `name` of the event exporter exceptions module, raised with `message`.
 pub(crate) fn exporter_error(py: Python<'_>, name: UserCodeHost, message: &str) -> PyErr {
-    match host::entry(py, name).and_then(|class| class.call1((message,))) {
+    match host_entry(py, name).and_then(|class| class.call1((message,))) {
         Ok(error) => PyErr::from_value(error),
         Err(error) => error,
     }

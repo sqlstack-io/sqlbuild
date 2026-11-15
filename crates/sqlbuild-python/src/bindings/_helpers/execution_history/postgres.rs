@@ -38,9 +38,6 @@ use sqlbuild_state::execution_history::models::{
 };
 use sqlbuild_state::execution_history::types::UtcTime;
 
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, imported, keywords, within,
-};
 use crate::bindings::_helpers::execution_history::appends::prepared_batch;
 use crate::bindings::_helpers::execution_history::conversion::{
     checked, event_filter_spec, exact_int, history_error_of_kind, new_namespace, now,
@@ -50,8 +47,13 @@ use crate::bindings::_helpers::execution_history::conversion::{
 use crate::bindings::_helpers::execution_history::statements::{
     column, execute, execute_plain, execute_query, fetch_all, fetch_one, tuple_of,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const PSYCOPG_MODULE: &str = "psycopg";
 const PSYCOPG_ROWS_MODULE: &str = "psycopg.rows";
@@ -670,7 +672,7 @@ impl PostgresExecutionHistory {
             None => py.None().into_bound(py),
         };
         call_with(
-            &host::entry(py, ExecutorHost::EventPage)?,
+            &host_entry(py, ExecutorHost::EventPage)?,
             &[
                 ("records", tuple_of(py, records)?.into_any()),
                 ("next_cursor", next_cursor),
@@ -737,7 +739,7 @@ impl PostgresExecutionHistory {
             None => py.None().into_bound(py),
         };
         call_with(
-            &host::entry(py, ExecutorHost::RunPage)?,
+            &host_entry(py, ExecutorHost::RunPage)?,
             &[
                 ("records", run_records(py, &runs)?.into_any()),
                 ("next_cursor", next_cursor),

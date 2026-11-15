@@ -12,10 +12,10 @@ use sqlbuild_cache::digest::main::bytes_digest::bytes_digest;
 use sqlbuild_cache::digest::main::hex_digest::hex_digest;
 use sqlbuild_core::json::models::JsonValue;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::compile_outputs::json_report::{orjson_sorted, orjson_value};
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::types::RecordId;
 
 const ALGORITHM_FINGERPRINT: &str = "sql-test-artifact-v5-orjson-blake3-identity";
 /// Items a loop holding the interpreter handles before letting other threads run.

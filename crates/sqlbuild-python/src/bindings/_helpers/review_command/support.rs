@@ -9,14 +9,16 @@ use sqlbuild_analysis::review_command::errors::ReviewPlanError;
 use sqlbuild_analysis::review_command::models::ReviewFailure;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::clone::clone_progress::write_line;
 use crate::bindings::_helpers::execution_history::conversion::optional_text;
 use crate::bindings::_helpers::janitor::janitor_keys::{now_utc, timestamp_fields};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// The code of an unexpected failure inside a review.
 const UNEXPECTED_CODE: &str = "C760";
@@ -143,7 +145,7 @@ pub(crate) fn utc_now_compact(py: Python<'_>) -> PyResult<(ArchiveTimestamp, Str
 /// The current invocation id, when an invocation identity is active.
 pub(crate) fn invocation_id(py: Python<'_>) -> PyResult<Option<String>> {
     let identity: Bound<'_, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::CurrentExecutionIdentity)?,
+        &host_entry(py, ExecutorHost::CurrentExecutionIdentity)?,
         &[],
     )?;
     if identity.is_none() {

@@ -1,6 +1,7 @@
 //! Python rows of macro call sites and splice spans.
 
 use sqlbuild_analysis::semantic_validation::models::Expansion;
+use sqlbuild_python_base::positional_record;
 use sqlbuild_render::macro_calls::models::{MacroCallSite, MacroSpliceSpan};
 use sqlbuild_sqltext::compiler::models::CharSpan;
 

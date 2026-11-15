@@ -18,8 +18,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
 use sqlbuild_host::types::ResultEnum;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::change_selection::base_snapshot::{
     BaseComparison, base_comparison, base_variant,
 };
@@ -27,9 +25,7 @@ use crate::bindings::_helpers::change_selection::selection::{
     ChangedProject, changed_project, tests_and_models, with_since_section,
 };
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::documents::format_scenario_execution_json_with;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
@@ -45,6 +41,10 @@ use crate::bindings::_helpers::scenario_command::setup::{
 use crate::bindings::_helpers::scenario_command::snapshot_sync::{LocalSync, sync_local_snapshots};
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
 use crate::bindings::_helpers::sql_test_command::timeouts::{TimeoutKind, resolve_run_timeout};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const LOCAL_ADAPTER: &str = "duckdb";
 const LOCAL_STATUSES: [&str; 4] = ["PASS", "FAIL", "ERROR", "SKIP"];
@@ -262,7 +262,7 @@ fn run_scenarios(
     ];
     let runner: ExecutorHost = if run.local {
         let replay_source: Bound<'_, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::ScenarioLocalReplaySource)?,
+            &host_entry(py, ExecutorHost::ScenarioLocalReplaySource)?,
             &[
                 (
                     "lexical_syntax",
@@ -284,7 +284,7 @@ fn run_scenarios(
             (
                 "settings",
                 call_with(
-                    &host::entry(py, ExecutorHost::ScenarioTestSettings)?,
+                    &host_entry(py, ExecutorHost::ScenarioTestSettings)?,
                     &[
                         ("retain", request.getattr("retain")?),
                         ("concurrency", int(py, run.concurrency)),
@@ -310,7 +310,7 @@ fn run_scenarios(
         ExecutorHost::RunScenarioTestPipeline
     };
     let results =
-        Vec::<ScenarioRunResult<_>>::read(&call_with(&host::entry(py, runner)?, &arguments)?)?;
+        Vec::<ScenarioRunResult<_>>::read(&call_with(&host_entry(py, runner)?, &arguments)?)?;
     let total: usize = results.len();
     let (counts, ok): (Vec<SummaryCount>, bool) = if run.local {
         let mut tallies: [usize; 4] = [0; 4];

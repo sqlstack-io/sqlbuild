@@ -17,10 +17,12 @@ use sqlbuild_model_config::sql_values::models::{RawKey, RawSqlValue};
 use crate::bindings::_helpers::authored_values::sql_values::{
     SqlValueClasses, raw_value, sql_value,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record};
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 pub(crate) type NativeBlock<'py> = (Bound<'py, PyDict>, String, Bound<'py, PyAny>);
 
@@ -71,7 +73,7 @@ fn test_mode<'py>(py: Python<'py>, mode: &'static str) -> PyResult<Bound<'py, Py
     if let Some(member) = known.get(mode) {
         return Ok(member.bind(py).clone());
     }
-    let member: Bound<'py, PyAny> = host::entry(py, FacadeHost::SqlTestMode)?.call1((mode,))?;
+    let member: Bound<'py, PyAny> = host_entry(py, FacadeHost::SqlTestMode)?.call1((mode,))?;
     let _ = known.insert(mode, member.clone().unbind());
     Ok(member)
 }

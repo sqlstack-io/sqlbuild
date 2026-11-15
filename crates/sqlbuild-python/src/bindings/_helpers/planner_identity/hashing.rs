@@ -16,12 +16,12 @@ use sqlbuild_analysis::sql_tokens::main::compiler_query_fingerprint::compiler_qu
 use sqlbuild_analysis::sql_tokens::main::definition_fingerprint::definition_fingerprint;
 use sqlbuild_core::panics::main::is_compiler_panic::is_compiler_panic;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// Query fingerprints by dialect and SQL text: the text alone decides them, and every plan computes
 /// each model's several times, as do a location's later previews of the same publication.

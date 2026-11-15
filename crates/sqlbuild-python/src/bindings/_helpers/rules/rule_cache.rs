@@ -1,5 +1,6 @@
 //! SQL rule result cache keys, stored-entry lookup and the cache file.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -13,7 +14,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use serde_json::{Value, json};
 use sqlbuild_rules::rule_cache::main::file_rule_key::file_rule_key;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
+use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_rules::rule_cache::main::lint_key::lint_key;
 use sqlbuild_rules::rule_cache::main::lookup_rule_cache::lookup_rule_cache;
 use sqlbuild_rules::rule_cache::main::model_rule_keys::model_rule_keys as parallel_model_rule_keys;
@@ -23,8 +24,8 @@ use sqlbuild_rules::rule_cache::models::{CacheLookup, CachedEntry, LintKeyInput,
 use sqlbuild_rules::rule_cache::types::CachedEntries;
 use sqlbuild_rules::rule_results::models::RuleFinding;
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::rules::lint_pipeline::LintSettings;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Stored entries as `{path: (key, findings JSON)}`.
 pub(crate) type StoredEntries = BTreeMap<String, (String, String)>;

@@ -19,8 +19,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_state::consumption::models::ChangedPolicy;
 use sqlbuild_state::warehouse_state::models::WarehouseState;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::build_command::support::keyword_relay;
 use crate::bindings::_helpers::build_progress::progress_reporters::{
     ConnectionProgressReporter, PlanningProgressReporter,
@@ -36,7 +34,7 @@ use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
 use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, preview_changed};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::native_host::host;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use crate::bindings::_helpers::native_host::live_reads::LiveReads;
 use crate::bindings::_helpers::plan_command::changed::{changed_json, changed_text};
 use crate::bindings::_helpers::plan_output::plan_json::{CHANGED_KEY, format_plan_json};
@@ -44,9 +42,13 @@ use crate::bindings::_helpers::plan_output::plan_text::format_plan;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use crate::bindings::_helpers::planner_warehouse::synced_reads::SyncedReads;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const COMMAND_NAME: &str = "plan";
 /// The plan document's field holding how long each planning step took.
@@ -247,7 +249,7 @@ fn connection_hooks<'py>(invocation: &PlanInvocation<'py>) -> PyResult<Bound<'py
                 .on_progress(arguments.py(), SYNCED_COPY_READING)
         })?;
         return call_with(
-            &host::entry(py, ExecutorHost::ConnectionHooks)?,
+            &host_entry(py, ExecutorHost::ConnectionHooks)?,
             &[
                 ("on_progress", on_progress),
                 ("on_connection_start", reading.into_any()),
@@ -256,7 +258,7 @@ fn connection_hooks<'py>(invocation: &PlanInvocation<'py>) -> PyResult<Bound<'py
     }
     let connection: &Bound<'py, PyAny> = &invocation.connection_progress;
     call_with(
-        &host::entry(py, ExecutorHost::ConnectionHooks)?,
+        &host_entry(py, ExecutorHost::ConnectionHooks)?,
         &[
             ("on_progress", on_progress),
             (

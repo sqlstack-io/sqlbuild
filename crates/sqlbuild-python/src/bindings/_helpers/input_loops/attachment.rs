@@ -14,7 +14,6 @@ use sqlbuild_rules::lint_text::constants::{DEFAULT_LINE_WIDTH, DEFAULT_MAX_DESCR
 use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
 use sqlbuild_rules::lint_text::models::FormatSettings;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditBlockRow;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::DiagnosticSettings;
@@ -31,13 +30,20 @@ use crate::bindings::_helpers::input_loops::resource_attachment::{
     attach_audits, attach_functions, attach_sources, attach_sql_tests,
 };
 use crate::bindings::_helpers::input_loops::resource_diagnostics::resource_diagnostics;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
 use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_CTE_SCAN_ALGORITHM;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 const YAML_FILE_SUFFIXES: [&str; 2] = [".yml", ".yaml"];
 const PATHLIB_MODULE: &str = "pathlib";
@@ -296,8 +302,8 @@ fn parameter_renderer<'py>(value_renderer: &Bound<'py, PyAny>) -> PyResult<Bound
     let errors: Py<PyAny> = PyTuple::new(
         py,
         [
-            host::entry(py, ExecutorHost::SqlValueRenderingError)?,
-            registry::native(py, NativeAttr::SqlValueValidationError)?,
+            host_entry(py, ExecutorHost::SqlValueRenderingError)?,
+            native_attr(py, NativeAttr::SqlValueValidationError)?,
         ],
     )?
     .into_any()
@@ -346,7 +352,7 @@ fn sql_test_settings<'py>(
     }
     settings.set_item(
         "modes",
-        members_by_value(&host::entry(py, FacadeHost::SqlTestMode)?)?,
+        members_by_value(&host_entry(py, FacadeHost::SqlTestMode)?)?,
     )?;
     settings.set_item(
         "test_kind",
@@ -383,7 +389,7 @@ fn sql_test_settings<'py>(
 fn audit_block_row(block: Bound<'_, PyAny>) -> PyResult<AuditBlockRow> {
     let py: Python<'_> = block.py();
     let measurement: Bound<'_, PyAny> =
-        host::entry(py, FacadeHost::AuditEvaluationMode)?.getattr(MEASUREMENT_MODE)?;
+        host_entry(py, FacadeHost::AuditEvaluationMode)?.getattr(MEASUREMENT_MODE)?;
     Ok(AuditBlockRow {
         block: block.clone().unbind(),
         name: attr(&block, "name")?,
@@ -573,7 +579,7 @@ fn diagnostic_settings<'py>(
     settings.set_item(
         "python_resources",
         call_with(
-            &host::entry(py, UserCodeHost::PythonResourceRows)?,
+            &host_entry(py, UserCodeHost::PythonResourceRows)?,
             &[
                 ("discovered_inputs", discovered.clone()),
                 ("source_inputs", source_inputs.clone()),

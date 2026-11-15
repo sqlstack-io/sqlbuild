@@ -8,7 +8,6 @@ use sqlbuild_core::build_command::constants::{
 use sqlbuild_core::build_command::models::PlanSafetyGates;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords};
 use crate::bindings::_helpers::build_command::defer_clone::run_defer_clone_boundary_prephase;
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::policies::{enforce_plan_policies, model_limit};
@@ -20,11 +19,13 @@ use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_a
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::manifest::builder::build_manifest;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::plan_output::plan_text::format_plan;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 
@@ -96,7 +97,7 @@ pub(crate) fn compile_build_plan<'py>(context: &BuildContext<'py>) -> PyResult<B
     emit(&context.stream, "\n")?;
     let connection: Bound<'py, PyAny> = context.get("connection_progress")?;
     let hooks: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::ConnectionHooks)?,
+        &host_entry(py, ExecutorHost::ConnectionHooks)?,
         &[
             (
                 "on_progress",

@@ -11,19 +11,22 @@ use pyo3::types::{PyBool, PyCFunction, PyDict, PyFloat, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
 use crate::bindings::_helpers::native_host::consumption_io::ConsumptionConnection;
 use crate::bindings::_helpers::native_host::consumption_state::Location;
-use crate::bindings::_helpers::native_host::host;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use crate::bindings::_helpers::observations::source_capture::capture_source_columns;
 use crate::bindings::_helpers::planner_phases::objects::planner_error;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_BOUNDED;
 use crate::bindings::_helpers::planner_warehouse::reads::{
     CursorProgress, EligibleCursorQuery, FingerprintRead, PlannerReads, Read, WarehouseReads,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use crate::bindings::_helpers::state_rows::migration_io::{read_events, stored_old_name_columns};
 use crate::bindings::_helpers::state_rows::models::{EventTableLayout, StateAccess};
 use sqlbuild_state::consumption::models::ConsumptionRow;
@@ -100,7 +103,7 @@ impl LiveReads {
     /// The inspection catalog open for this connection, or `None`.
     fn active_catalog<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         call_with(
-            &host::entry(py, ACTIVE_CATALOG)?,
+            &host_entry(py, ACTIVE_CATALOG)?,
             &[
                 ("adapter", self.adapter(py).clone()),
                 ("connection", self.connection(py)),
@@ -162,7 +165,7 @@ fn read_cursor_query<'py>(
         error.str()?.into_any()
     };
     let record = call_with(
-        &host::entry(py, QUERY_RECORD)?,
+        &host_entry(py, QUERY_RECORD)?,
         &[
             ("sql", text(py, sql)),
             ("elapsed_seconds", PyFloat::new(py, elapsed).into_any()),
@@ -170,7 +173,7 @@ fn read_cursor_query<'py>(
             ("error", error_text),
         ],
     )?;
-    call_with(&host::entry(py, RECORD_QUERY)?, &[("record", record)])?;
+    call_with(&host_entry(py, RECORD_QUERY)?, &[("record", record)])?;
     Ok(PyTuple::new(py, [row, PyFloat::new(py, elapsed).into_any(), error])?.into_any())
 }
 
@@ -230,7 +233,7 @@ fn eligible_task<'py>(
                 },
             )?;
             let rows = call_with(
-                &host::entry(py, RUN_RECORDED_QUERY)?,
+                &host_entry(py, RUN_RECORDED_QUERY)?,
                 &[("sql", text(py, &query.sql)), ("run", run.into_any())],
             );
             match rows {
@@ -270,7 +273,7 @@ fn run_bounded<'py>(
     if let Some(on_complete) = on_complete {
         fields.push(("on_complete", on_complete));
     }
-    call_with(&host::entry(py, RUN_BOUNDED)?, &fields)?
+    call_with(&host_entry(py, RUN_BOUNDED)?, &fields)?
         .try_iter()?
         .collect()
 }
@@ -283,7 +286,7 @@ impl WarehouseReads for LiveReads {
         (schemas, names): (Bound<'py, PyAny>, Bound<'py, PyAny>),
     ) -> PyResult<Bound<'py, PyAny>> {
         call_with(
-            &host::entry(py, RELATIONS_MAIN_LIST)?,
+            &host_entry(py, RELATIONS_MAIN_LIST)?,
             &[
                 ("adapter", self.adapter(py).clone()),
                 ("connection", self.connection(py)),
@@ -300,7 +303,7 @@ impl WarehouseReads for LiveReads {
         relations: Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         call_with(
-            &host::entry(py, RELATIONS_MAIN_COLUMNS)?,
+            &host_entry(py, RELATIONS_MAIN_COLUMNS)?,
             &[
                 ("adapter", self.adapter(py).clone()),
                 ("connection", self.connection(py)),
@@ -352,7 +355,7 @@ impl WarehouseReads for LiveReads {
         plan: &mut dyn FnMut() -> PyResult<Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let catalog: Bound<'py, PyAny> = call_with(
-            &host::entry(py, INSPECTION_CATALOG)?,
+            &host_entry(py, INSPECTION_CATALOG)?,
             &[
                 ("adapter", self.adapter(py).clone()),
                 ("connection", self.connection(py)),

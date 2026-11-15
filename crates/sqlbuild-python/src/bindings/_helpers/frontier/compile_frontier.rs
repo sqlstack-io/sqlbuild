@@ -5,11 +5,12 @@ use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::frontier::stage_capture::write_stage_capture;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Produce the frontier object for `until`, capturing it on request.
 #[pyfunction]
@@ -71,7 +72,7 @@ pub(crate) fn frontier_stage(py: Python<'_>, stage: FrontierStage) -> PyResult<B
 /// `stage()` run inside the macro bridge user macros render through.
 pub(crate) fn bridged<'py>(stage: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(stage.py(), UserCodeHost::RunWithMacroBridge)?,
+        &host_entry(stage.py(), UserCodeHost::RunWithMacroBridge)?,
         &[("stage", stage.clone())],
     )
 }

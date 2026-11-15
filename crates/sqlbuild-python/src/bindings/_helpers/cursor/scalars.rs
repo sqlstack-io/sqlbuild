@@ -25,13 +25,13 @@ use sqlbuild_cursor::algebra::main::render::render;
 use sqlbuild_cursor::algebra::models::{Extreme, Grain, Scalar, SortKey};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cursor::conversion::{CursorSession, algebra_error};
 use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DECIMAL_MODULE: &str = "decimal";
 const INTEGER_CURSOR: &str = "integer";
@@ -222,7 +222,7 @@ pub(crate) fn render_value(value: &Bound<'_, PyAny>) -> PyResult<String> {
 #[pyfunction(name = "cursor_sentinel_to_token")]
 #[pyo3(signature = (*, sentinel))]
 pub(crate) fn sentinel_to_token(sentinel: &Bound<'_, PyAny>) -> PyResult<String> {
-    if sentinel.is_instance(&host::entry(sentinel.py(), ExecutorHost::BoundSentinel)?)? {
+    if sentinel.is_instance(&host_entry(sentinel.py(), ExecutorHost::BoundSentinel)?)? {
         return native_field(sentinel, "value")?.extract();
     }
     render_value(sentinel)
@@ -233,7 +233,7 @@ pub(crate) fn sentinel_to_token(sentinel: &Bound<'_, PyAny>) -> PyResult<String>
 #[pyo3(signature = (*, token))]
 fn sentinel_from_token<'py>(token: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
     let py: Python<'py> = token.py();
-    match host::entry(py, ExecutorHost::BoundSentinel)?.call1((token,)) {
+    match host_entry(py, ExecutorHost::BoundSentinel)?.call1((token,)) {
         Ok(sentinel) => Ok(Some(sentinel)),
         Err(error) if error.is_instance_of::<PyValueError>(py) => Ok(None),
         Err(error) => Err(error),

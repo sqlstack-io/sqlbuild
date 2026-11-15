@@ -13,18 +13,19 @@ use sqlbuild_analysis::semantic_checks::models::{
     ResourceSqlFailure, ResourceSqlKind, ResourceSqlRequest, SqlTestSqlInput,
 };
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::compiled_views::audit_views::audit_reference_rows;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::models::ProjectCatalog;
-use crate::bindings::types::CompilerDetach;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const SQL_ANALYSIS_CONFIG_KEY: &str = "sql_analysis";
 const MODEL_HOOK_KEYS: [&str; 2] = ["pre_hooks", "post_hooks"];

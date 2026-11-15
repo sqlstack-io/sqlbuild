@@ -10,8 +10,8 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryRecord,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 pub(crate) fn read_catalog(
     py: Python<'_>,

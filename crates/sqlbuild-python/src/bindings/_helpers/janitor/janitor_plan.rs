@@ -1,6 +1,5 @@
 //! Display facts of the executor's janitor plan and execution result.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::cli_text::models::CliStyle;
@@ -10,6 +9,7 @@ use sqlbuild_core::janitor_text::models::{
     ArchiveCandidateText, ArchivedRelationText, JanitorPlanText, JanitorResultCounts,
     OldNameViewText, RelationUsageText, SourceSchemaText, UsageCheckText,
 };
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 const DATE_FORMAT: &str = "%Y-%m-%d";

@@ -9,8 +9,8 @@ use pyo3::prelude::{
 use pyo3::types::PyTuple;
 use pyo3::{pyclass, pymethods};
 
-use crate::bindings::_helpers::records::ids::NativeAttr;
-use crate::bindings::_helpers::records::registry;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
 
 /// The `sqlbuild._native` attribute tests set to a `CustomHostObserver` to observe host runs.
 const OBSERVER_ATTRIBUTE: &str = "custom_host_observer";
@@ -60,7 +60,7 @@ pub(crate) struct ObservedHosts {
 
 /// The installed observer's overrides and launch log; nothing when no test observes hosts.
 pub(crate) fn observed_hosts(py: Python<'_>) -> PyResult<ObservedHosts> {
-    let installed: Bound<'_, PyAny> = registry::native(py, NativeAttr::CustomHostObserver)?;
+    let installed: Bound<'_, PyAny> = native_attr(py, NativeAttr::CustomHostObserver)?;
     if installed.is_none() {
         return Ok(ObservedHosts {
             cores: None,

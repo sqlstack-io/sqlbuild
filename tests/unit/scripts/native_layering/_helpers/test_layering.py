@@ -13,13 +13,15 @@ ORDER: tuple[str, ...] = (
     "sqlbuild-core",
     "sqlbuild-sqltext",
     "sqlbuild-analysis",
+    "sqlbuild-python-base",
     "sqlbuild-python",
 )
 LAYERED: dict[str, tuple[str, ...]] = {
     "sqlbuild-core": (),
     "sqlbuild-sqltext": ("sqlbuild-core",),
     "sqlbuild-analysis": ("sqlbuild-core", "sqlbuild-sqltext", "polyglot-sql"),
-    "sqlbuild-python": ("sqlbuild-analysis", "pyo3"),
+    "sqlbuild-python-base": ("sqlbuild-analysis", "pyo3"),
+    "sqlbuild-python": ("sqlbuild-python-base", "pyo3"),
 }
 EXTERNAL: dict[str, tuple[str, ...]] = {
     "polyglot-sql": ("serde",),
@@ -33,7 +35,7 @@ EXTERNAL: dict[str, tuple[str, ...]] = {
     "test_case",
     [
         NativeLayeringTestCase(
-            description="one-way layers with PyO3 only in the Python crate",
+            description="one-way layers with PyO3 only in the listed Python crates",
             crate_dependencies=LAYERED,
             external_dependencies=EXTERNAL,
             order=ORDER,
@@ -70,7 +72,9 @@ def test_given_layered_workspace_when_checking_then_returns_no_errors(
             },
             external_dependencies={**EXTERNAL, "python-bridge": ("pyo3",)},
             order=ORDER,
-            expected_errors=("sqlbuild-analysis depends on pyo3; only sqlbuild-python may.",),
+            expected_errors=(
+                "sqlbuild-analysis depends on pyo3; only sqlbuild-python-base, sqlbuild-python may.",
+            ),
         ),
         NativeLayeringTestCase(
             description="crate below the polyglot floor uses polyglot",

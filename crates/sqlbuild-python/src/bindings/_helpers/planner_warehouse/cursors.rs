@@ -1,6 +1,5 @@
 //! Cursor MIN/MAX inspection of selected incremental models and their watermark inputs.
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
 use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
@@ -13,7 +12,6 @@ use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::cursor::scalars::to_inclusive;
 use crate::bindings::_helpers::model_config::typed_config::{config_cursor_bound, model_values};
 use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
     by_name, config_str, model_key, native_member, optional_text, planner_model, text, tuple,
@@ -32,10 +30,6 @@ use crate::bindings::_helpers::planner_warehouse::reads::{
 };
 use crate::bindings::_helpers::planner_warehouse::snapshot::SnapshotRequest;
 use crate::bindings::_helpers::planner_warehouse::watermarks::validate_watermark_column;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -46,6 +40,14 @@ use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_quer
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_identity::cursor_query_identity;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_sql::cursor_query_sql;
 use sqlbuild_analysis::planner_warehouse::models::{CursorTagRequest, PhysicalCursorQuery};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -158,7 +160,7 @@ fn log_debug<'py>(
     let logger = imported(py, "logging", "getLogger")?.call1((PLANNER_LOGGER,))?;
     let mut fields = vec![("logger", logger), ("message", text(py, message))];
     fields.extend(context.iter().cloned());
-    call_with(&host::entry(py, LOG_DEBUG_EVENT)?, &fields)?;
+    call_with(&host_entry(py, LOG_DEBUG_EVENT)?, &fields)?;
     Ok(())
 }
 

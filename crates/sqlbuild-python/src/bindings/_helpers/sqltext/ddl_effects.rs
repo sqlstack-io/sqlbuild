@@ -10,8 +10,8 @@ use sqlbuild_sqltext::ddl_effects::main::relation_name_key::relation_name_key as
 use sqlbuild_sqltext::ddl_effects::main::statement_metadata_effect::statement_metadata_effect as native_statement_metadata_effect;
 use sqlbuild_sqltext::ddl_effects::models::StatementMetadataEffect;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
 const EFFECT_MODEL: AdapterHost = AdapterHost::StatementMetadataEffect;
 
@@ -23,7 +23,7 @@ static EFFECT_CLASS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 fn statement_metadata_effect<'py>(py: Python<'py>, sql: &str) -> PyResult<Bound<'py, PyAny>> {
     let effect: StatementMetadataEffect = py.detach(|| native_statement_metadata_effect(sql));
     let class: &Bound<'py, PyAny> = EFFECT_CLASS
-        .get_or_try_init(py, || host::entry(py, EFFECT_MODEL).map(Bound::unbind))?
+        .get_or_try_init(py, || host_entry(py, EFFECT_MODEL).map(Bound::unbind))?
         .bind(py);
     call_with(
         class,

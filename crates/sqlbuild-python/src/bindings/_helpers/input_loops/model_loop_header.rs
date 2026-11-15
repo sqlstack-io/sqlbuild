@@ -41,8 +41,8 @@ use crate::bindings::_helpers::model_config::header_metadata::{
     parsed_audit_identity,
 };
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, typed_values};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_discovery::model_files::models::{HeaderFacts, NativeColumn};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DESCRIPTION_KEY: &str = "description";
 const COLUMNS_KEY: &str = "columns";

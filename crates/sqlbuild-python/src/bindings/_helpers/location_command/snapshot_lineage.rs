@@ -5,8 +5,8 @@ use serde_json::{Value, json};
 
 use crate::bindings::_helpers::lineage::column_lineage_graph::ProjectColumnLineage;
 use crate::bindings::_helpers::lineage::project_lineage::build_project_column_lineage;
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// FAST column lineage of every model as `[source key, column, target key, column, transform]` rows; `None` without SQL analysis.
 pub(crate) fn column_lineage_document(project: &Bound<'_, PyAny>) -> PyResult<Option<Value>> {

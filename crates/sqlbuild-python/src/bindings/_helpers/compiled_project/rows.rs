@@ -1,6 +1,7 @@
 //! Positional rows shared by the compiled views and the input loops that fill them.
 
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::positional_record;
 
 positional_record! {
     into;

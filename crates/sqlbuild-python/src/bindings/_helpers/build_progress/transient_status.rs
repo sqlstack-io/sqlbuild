@@ -10,12 +10,13 @@ use pyo3::{pyclass, pymethods};
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::progress::main::format_status_spinner_line::format_status_spinner_line;
 
-use crate::bindings::_helpers::boundary::python_calls::{imported, within};
 use crate::bindings::_helpers::build_progress::terminal::{
     CLEAR_LINE, HIDE_CURSOR, SHOW_CURSOR, SPINNER_FRAMES, SPINNER_TICK_SECONDS, claim, flush,
     join_spinner, release, shared_lines, start_spinner, terminal_columns, tty_flag, write,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const NO_PROGRESS_VARIABLE: &str = "SQLBUILD_NO_PROGRESS";
 const PROGRESS_DISABLED_VALUES: [&str; 4] = ["1", "on", "true", "yes"];

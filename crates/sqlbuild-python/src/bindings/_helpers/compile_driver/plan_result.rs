@@ -4,7 +4,6 @@ use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_warehouse::reads::PlannerReads;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_driver::deferral::build_deferred_locations;
 use crate::bindings::_helpers::compile_driver::deferral::gather_deferred_relations;
 use crate::bindings::_helpers::compile_driver::deferral::resolve_deferred_target_config;
@@ -16,8 +15,9 @@ use crate::bindings::_helpers::compiled_views::{project_reads, source_reads};
 use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
 use crate::bindings::_helpers::planner_entries::execution_plan::build_execution_plan;
 use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::records::construct::new_record_with;
 use sqlbuild_analysis::planner_scope::constants::SOURCE;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use std::collections::HashSet;
 
 use pyo3::exceptions::PyException;
@@ -25,13 +25,13 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
 use crate::bindings::_helpers::graph::python_node_graph::run_selection_from_inputs;
 use crate::bindings::_helpers::native_host::connections::connection_failure;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SINGLE_CONNECTION: i64 = 1;
 
@@ -208,7 +208,7 @@ pub(crate) fn pipeline_result<'py>(
         )?),
     )?;
     let custom_materializations: Bound<'py, PyAny> =
-        host::entry(py, UserCodeHost::LoadCustomMaterializations)?
+        host_entry(py, UserCodeHost::LoadCustomMaterializations)?
             .call1((native_field(discovered, "materialization_files")?,))?;
     let python_outputs: Bound<'py, PyAny> = build_python_run_plan_outputs(
         py,

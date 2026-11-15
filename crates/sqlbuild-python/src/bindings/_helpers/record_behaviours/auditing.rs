@@ -8,9 +8,9 @@ use sqlbuild_model_config::header_metadata::main::check_threshold_bound::check_t
 use sqlbuild_model_config::header_metadata::main::check_threshold_pair::check_threshold_pair;
 use sqlbuild_model_config::header_metadata::models::{ThresholdBound, ThresholdInput};
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// The `MeasurementAuditError` carrying `message`.
 fn measurement_error(py: Python<'_>, message: &str) -> PyErr {

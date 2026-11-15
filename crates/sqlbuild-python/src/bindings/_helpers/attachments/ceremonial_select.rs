@@ -6,8 +6,8 @@ use sqlbuild_attachments::ceremonial_select::main::omitted_select_offset::omitte
 use sqlbuild_attachments::ceremonial_select::models::OmittedSelect;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 
 /// The code-point offset to insert `SELECT 1` at, or `None`.
 #[pyfunction]

@@ -9,8 +9,6 @@ use sqlbuild_analysis::janitor_planning::main::old_name_request_matches::old_nam
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::janitor::janitor_facts::{
     SchemaRelations, Warehouse, model_destinations,
@@ -18,17 +16,19 @@ use crate::bindings::_helpers::janitor::janitor_facts::{
 use crate::bindings::_helpers::janitor::janitor_keys::{
     Folded, Key, SchemaKey, optional, record, sorted_schemas, text, tuple,
 };
-use crate::bindings::_helpers::records::construct::enum_member;
 use crate::bindings::_helpers::state_rows::migration_io::{
     read_histories as read_view_histories, stored_columns_binding,
 };
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 
 const IS_COMPATIBILITY_VIEW: ExecutorHost = ExecutorHost::IsCompatibilityView;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 const MIGRATE_FROM_CONFIG_KEY: &str = "migrate_from";
 
 /// Old-name view planning and the old names it owns.
@@ -294,7 +294,7 @@ pub(crate) fn plan_old_name_views<'py>(
         }
     }
     warehouse.prefetch_view_definitions(&definitions)?;
-    let is_compatibility_view: Bound<'py, PyAny> = host::entry(py, IS_COMPATIBILITY_VIEW)?;
+    let is_compatibility_view: Bound<'py, PyAny> = host_entry(py, IS_COMPATIBILITY_VIEW)?;
     let (mut live, mut drops, mut missing) = (Vec::new(), Vec::new(), Vec::new());
     let mut keys: HashSet<Folded> = HashSet::new();
     for history in &histories {

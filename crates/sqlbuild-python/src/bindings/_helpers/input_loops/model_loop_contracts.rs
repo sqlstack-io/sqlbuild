@@ -11,9 +11,9 @@ use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
 use crate::bindings::_helpers::input_loops::model_loop_schema::DeclaredColumns;
 use crate::bindings::_helpers::model_config::config_nodes::{PyConfigNode, config_node};
 use crate::bindings::_helpers::model_config::header_metadata::{HeaderColumn, HeaderColumns};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_model_config::header_metadata::models::ParsedAudit;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const CASES_ATTRIBUTE: &str = "cases";
 const RELATIVE_PATH_ATTRIBUTE: &str = "relative_path";

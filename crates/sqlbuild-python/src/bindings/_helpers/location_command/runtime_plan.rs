@@ -19,7 +19,7 @@ use crate::bindings::_helpers::location_command::constants::PLAN_FAILED_CODE;
 use crate::bindings::_helpers::location_command::types::HeldProject;
 use crate::bindings::_helpers::plan_command::plan::{PlanProject, location_plan};
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 /// The synced state the runtime plans previews from, and the mirror version it was read at.
 struct HeldState {

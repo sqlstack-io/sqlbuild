@@ -9,10 +9,10 @@ use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics_with_spans
 use sqlbuild_attachments::cursor_intrinsics::main::validated_model_intrinsics::validated_model_intrinsics;
 use sqlbuild_attachments::cursor_intrinsics::models::IntrinsicModel;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const INCREMENTAL_MATERIALIZATION: &str = "incremental";
 const CURSOR_START: &str = "__cursor_start";

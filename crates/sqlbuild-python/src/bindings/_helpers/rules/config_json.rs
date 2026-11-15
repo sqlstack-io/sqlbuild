@@ -7,7 +7,7 @@ use pyo3::types::{
 };
 use serde_json::{Map, Number, Value};
 
-use crate::bindings::_helpers::records::models::NativeRecord;
+use sqlbuild_python_base::records::models::NativeRecord;
 
 const DATACLASS_FIELDS: &str = "__dataclass_fields__";
 

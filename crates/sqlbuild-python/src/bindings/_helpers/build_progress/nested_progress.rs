@@ -12,14 +12,15 @@ use sqlbuild_core::nested_progress::main::render_nested_item::render_nested_item
 use sqlbuild_core::nested_progress::main::render_nested_spinner_line::render_nested_spinner_line;
 use sqlbuild_core::nested_progress::models::{NestedChildRow, NestedItem, NestedLayout};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, within};
 use crate::bindings::_helpers::build_progress::result_text::text;
 use crate::bindings::_helpers::build_progress::terminal::{
     CLEAR_LINE, HIDE_CURSOR, SHOW_CURSOR, SPINNER_FRAMES, SPINNER_TICK_SECONDS, claim,
     consume_terminal, flush, join_spinner, projector, release, shared_lines, start_spinner,
     terminal_columns, tty_flag, write,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MIN_NAME_WIDTH: usize = 50;
 const ITEM_OPTIONS: (&[&str], &[&str]) = (

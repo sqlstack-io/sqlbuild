@@ -18,8 +18,6 @@ use sqlbuild_core::json::main::dumps::dumps;
 use sqlbuild_core::json::models::{JsonDialect, StdlibJsonOptions};
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::command_runtime::connection::resolve_target_connection_config;
 use crate::bindings::_helpers::compile_driver::diff::run_diff_pipeline;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
@@ -38,11 +36,13 @@ use crate::bindings::_helpers::diff_report::support::{
 use crate::bindings::_helpers::discovery::configuration::discover_project_configuration;
 use crate::bindings::_helpers::frontier::encoder::emit_error;
 use crate::bindings::_helpers::native_host::connections::connection_failure;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const DEFAULT_DIFF_MAX_FULL_ROWS: i64 = 10_000_000;
 const ADAPTER_ERRORS: AdapterHost = AdapterHost::AdapterUserError;
@@ -426,7 +426,7 @@ fn run_model_diff(
         none(py)
     } else {
         call(
-            &host::entry(py, ExecutorHost::FullDiffSizeLimits)?,
+            &host_entry(py, ExecutorHost::FullDiffSizeLimits)?,
             &[
                 ("left_target", &from_target),
                 ("right_target", &to_target),
@@ -456,7 +456,7 @@ fn run_model_diff(
     let executed: PyResult<Bound<'_, PyAny>> =
         execution_options(request, &extra).and_then(|options| {
             call(
-                &host::entry(py, ExecutorHost::ExecuteDiff)?,
+                &host_entry(py, ExecutorHost::ExecuteDiff)?,
                 &[
                     ("adapter", &adapter),
                     ("connection", &connection),
