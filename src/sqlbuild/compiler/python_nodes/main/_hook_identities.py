@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sqlbuild._native import DiscoveredHookFunction, PythonNodeIdentity
 from sqlbuild.compiler.fingerprints.constants import NODE_TYPE_HOOK
+from sqlbuild.compiler.python_nodes._helpers.identity import identity_pass
 from sqlbuild.compiler.python_nodes.main.identity import build_python_node_identity
 
 
@@ -16,14 +17,15 @@ def build_hook_identities(
 
     identities: dict[str, PythonNodeIdentity] = {}
     hook_function: DiscoveredHookFunction
-    for hook_function in hook_functions:
-        identities[hook_function.name] = build_python_node_identity(
-            node_type=NODE_TYPE_HOOK,
-            node_name=hook_function.name,
-            function=hook_function.function,
-            project_dir=_project_dir(hook_function),
-            decorator_config={"description": hook_function.description},
-        )
+    with identity_pass():
+        for hook_function in hook_functions:
+            identities[hook_function.name] = build_python_node_identity(
+                node_type=NODE_TYPE_HOOK,
+                node_name=hook_function.name,
+                function=hook_function.function,
+                project_dir=_project_dir(hook_function),
+                decorator_config={"description": hook_function.description},
+            )
     return identities
 
 

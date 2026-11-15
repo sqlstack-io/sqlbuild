@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-import ast
-import hashlib
 import inspect
 import json
-import textwrap
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from dataclasses import asdict
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
 
 from sqlbuild._native import PythonIdentityDependency, PythonNodeIdentity
+from sqlbuild.compiler.python_nodes._helpers.object_source import hash_text
+from sqlbuild.compiler.python_nodes.classes.identity_pass import IdentityPass
 
 _IGNORED_PATH_PARTS: frozenset[str] = frozenset(
     {
@@ -28,6 +29,22 @@ _IGNORED_PATH_PARTS: frozenset[str] = frozenset(
     }
 )
 
+_ACTIVE_PASS: ContextVar[IdentityPass | None] = ContextVar("python_identity_pass", default=None)
+
+
+@contextmanager
+def identity_pass() -> Iterator[None]:
+    """Share source work between the identities built inside; a nested pass joins the outer one."""
+
+    if _ACTIVE_PASS.get() is not None:
+        yield
+        return
+    token: Token[IdentityPass | None] = _ACTIVE_PASS.set(IdentityPass())
+    try:
+        yield
+    finally:
+        _ACTIVE_PASS.reset(token)
+
 
 def build_python_identity(
     *,
@@ -39,12 +56,13 @@ def build_python_identity(
 ) -> PythonNodeIdentity:
     """Build read-only identity metadata for one Python node callable."""
 
+    memo: IdentityPass = _ACTIVE_PASS.get() or IdentityPass()
     allowed_roots: tuple[Path, ...] = _allowed_roots(project_dir=project_dir)
-    source: str = _normalized_source(function)
-    source_path: Path | None = _source_path(function)
-    source_hash: str = _hash_text(source)
+    source: str = memo.source(function)
+    source_path: Path | None = memo.source_path(function)
+    source_hash: str = memo.source_hash(function)
     normalized_config: str = _stable_json(dict(decorator_config))
-    definition_hash: str = _hash_text(
+    definition_hash: str = hash_text(
         _stable_json(
             {
                 "decorator_config": normalized_config,
@@ -55,7 +73,12 @@ def build_python_identity(
     dependencies: tuple[PythonIdentityDependency, ...] = _collect_dependencies(
         function=function,
         allowed_roots=allowed_roots,
+        memo=memo,
     )
+    dependency_rows: tuple[dict[str, object], ...] = tuple(
+        asdict(dependency) for dependency in dependencies
+    )
+    display_path: str = _display_path(source_path=source_path, roots=allowed_roots, memo=memo)
     definition_payload: dict[str, object] = {
         "decorator_config": dict(decorator_config),
         "node_name": node_name,
@@ -63,24 +86,22 @@ def build_python_identity(
         "object_module": function.__module__,
         "object_qualname": _object_qualname(function),
         "source_hash": source_hash,
-        "source_path": _display_path(source_path=source_path, roots=allowed_roots),
+        "source_path": display_path,
         "source_text": source,
     }
-    metadata_payload: dict[str, object] = {
-        "dependencies": tuple(asdict(dependency) for dependency in dependencies)
-    }
-    version_hash: str = _hash_text(
+    metadata_payload: dict[str, object] = {"dependencies": dependency_rows}
+    version_hash: str = hash_text(
         _stable_json(
             {
                 "definition_hash": definition_hash,
-                "dependencies": tuple(asdict(dependency) for dependency in dependencies),
+                "dependencies": dependency_rows,
             }
         )
     )
     return PythonNodeIdentity(
         node_type=node_type,
         node_name=node_name,
-        source_path=_display_path(source_path=source_path, roots=allowed_roots),
+        source_path=display_path,
         source_hash=source_hash,
         definition_hash=definition_hash,
         version_hash=version_hash,
@@ -110,12 +131,14 @@ def _collect_dependencies(
     *,
     function: Callable[..., object],
     allowed_roots: tuple[Path, ...],
+    memo: IdentityPass,
 ) -> tuple[PythonIdentityDependency, ...]:
     dependencies: dict[tuple[str, str], PythonIdentityDependency] = {}
     visited: set[tuple[str, str]] = set()
     _visit_object(
         obj=function,
         allowed_roots=allowed_roots,
+        memo=memo,
         visited=visited,
         dependencies=dependencies,
         include_current=False,
@@ -133,15 +156,16 @@ def _visit_object(
     *,
     obj: object,
     allowed_roots: tuple[Path, ...],
+    memo: IdentityPass,
     visited: set[tuple[str, str]],
     dependencies: dict[tuple[str, str], PythonIdentityDependency],
     include_current: bool,
 ) -> None:
-    source_path: Path | None = _source_path(obj)
+    source_path: Path | None = memo.source_path(obj)
     qualname: str = _object_qualname(obj)
     if source_path is None:
         return
-    key: tuple[str, str] = (str(source_path.resolve()), qualname)
+    key: tuple[str, str] = (str(memo.resolved(source_path)), qualname)
     if key in visited:
         return
     visited_objects: set[tuple[str, str]] = visited
@@ -152,29 +176,35 @@ def _visit_object(
             obj=obj,
             source_path=source_path,
             allowed_roots=allowed_roots,
+            memo=memo,
         )
         if dependency is not None:
             collected_dependencies: dict[tuple[str, str], PythonIdentityDependency] = dependencies
             collected_dependencies[key] = dependency
 
-    source: str = _normalized_source(obj)
-    module: ModuleType | None = inspect.getmodule(obj)
-    if module is None:
-        return
-    globals_map: dict[str, object] = vars(module)
-    for ref in _called_references(source):
+    globals_map: Mapping[str, object] | None = getattr(
+        inspect.unwrap(cast(Any, obj)), "__globals__", None
+    )
+    if globals_map is None:
+        module: ModuleType | None = memo.module(obj)
+        if module is None:
+            return
+        globals_map = vars(module)
+    for ref in memo.references(obj):
         target: object | None = _resolve_reference(ref=ref, globals_map=globals_map)
         if target is None or target is obj:
             continue
-        target_path: Path | None = _source_path(target)
+        target_path: Path | None = memo.source_path(target)
         if target_path is None or not _is_first_party_source(
             source_path=target_path,
             allowed_roots=allowed_roots,
+            memo=memo,
         ):
             continue
         _visit_object(
             obj=target,
             allowed_roots=allowed_roots,
+            memo=memo,
             visited=visited,
             dependencies=dependencies,
             include_current=True,
@@ -182,45 +212,18 @@ def _visit_object(
 
 
 def _dependency_for_object(
-    *, obj: object, source_path: Path, allowed_roots: tuple[Path, ...]
+    *, obj: object, source_path: Path, allowed_roots: tuple[Path, ...], memo: IdentityPass
 ) -> PythonIdentityDependency | None:
-    if not _is_first_party_source(source_path=source_path, allowed_roots=allowed_roots):
+    if not _is_first_party_source(source_path=source_path, allowed_roots=allowed_roots, memo=memo):
         return None
     return PythonIdentityDependency(
         kind=_object_kind(obj),
         module=_object_module(obj),
         qualname=_object_qualname(obj),
-        source_path=_display_path(source_path=source_path, roots=allowed_roots),
-        source_hash=_hash_text(_normalized_source(obj)),
-        source_text=_normalized_source(obj),
+        source_path=_display_path(source_path=source_path, roots=allowed_roots, memo=memo),
+        source_hash=memo.source_hash(obj),
+        source_text=memo.source(obj),
     )
-
-
-def _called_references(source: str) -> tuple[tuple[str, ...], ...]:
-    try:
-        tree: ast.AST = ast.parse(source)
-    except SyntaxError:
-        return ()
-    refs: set[tuple[str, ...]] = set()
-    node: ast.AST
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        ref: tuple[str, ...] | None = _reference_parts(node.func)
-        if ref is not None:
-            refs.add(ref)
-    return tuple(sorted(refs))
-
-
-def _reference_parts(node: ast.AST) -> tuple[str, ...] | None:
-    if isinstance(node, ast.Name):
-        return (node.id,)
-    if isinstance(node, ast.Attribute):
-        parent: tuple[str, ...] | None = _reference_parts(node.value)
-        if parent is None:
-            return None
-        return (*parent, node.attr)
-    return None
 
 
 def _resolve_reference(*, ref: tuple[str, ...], globals_map: Mapping[str, object]) -> object | None:
@@ -237,28 +240,13 @@ def _resolve_reference(*, ref: tuple[str, ...], globals_map: Mapping[str, object
     return current
 
 
-def _is_first_party_source(*, source_path: Path, allowed_roots: tuple[Path, ...]) -> bool:
-    resolved: Path = source_path.resolve()
+def _is_first_party_source(
+    *, source_path: Path, allowed_roots: tuple[Path, ...], memo: IdentityPass
+) -> bool:
+    resolved: Path = memo.resolved(source_path)
     if any(part in _IGNORED_PATH_PARTS for part in resolved.parts):
         return False
-    return any(_is_relative_to(path=resolved, root=root) for root in allowed_roots)
-
-
-def _source_path(obj: object) -> Path | None:
-    try:
-        raw_path: str | None = inspect.getsourcefile(cast(Any, obj))
-    except TypeError:
-        return None
-    if raw_path is None:
-        return None
-    return Path(raw_path)
-
-
-def _normalized_source(obj: object) -> str:
-    try:
-        return textwrap.dedent(inspect.getsource(cast(Any, obj))).strip()
-    except (OSError, TypeError):
-        return ""
+    return any(_is_relative_to(path=resolved, root=root, memo=memo) for root in allowed_roots)
 
 
 def _object_kind(obj: object) -> str:
@@ -283,31 +271,26 @@ def _object_qualname(obj: object) -> str:
     return str(getattr(obj, "__qualname__", getattr(obj, "__name__", type(obj).__name__)))
 
 
-def _display_path(*, source_path: Path | None, roots: Iterable[Path]) -> str:
+def _display_path(*, source_path: Path | None, roots: tuple[Path, ...], memo: IdentityPass) -> str:
     if source_path is None:
         return ""
-    resolved: Path = source_path.resolve()
+    resolved: Path = memo.resolved(source_path)
     root: Path
     for root in sorted(
-        (path.resolve() for path in roots),
+        (memo.resolved(path) for path in roots),
         key=lambda item: len(item.parts),
         reverse=True,
     ):
-        if _is_relative_to(path=resolved, root=root):
-            return resolved.relative_to(root).as_posix()
+        if _is_relative_to(path=resolved, root=root, memo=memo):
+            return "/".join(resolved.parts[len(root.parts) :]) or "."
     return resolved.as_posix()
 
 
-def _is_relative_to(*, path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root.resolve())
-    except ValueError:
-        return False
-    return True
+def _is_relative_to(*, path: Path, root: Path, memo: IdentityPass) -> bool:
+    """`path.is_relative_to(root.resolve())`, comparing each path's parts computed once per pass."""
 
-
-def _hash_text(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+    root_parts: tuple[str, ...] = memo.parts(memo.resolved(root))
+    return memo.parts(path)[: len(root_parts)] == root_parts
 
 
 def _stable_json(value: object) -> str:

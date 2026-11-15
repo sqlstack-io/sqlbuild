@@ -197,11 +197,14 @@ pub(crate) fn python_node_graph<'py>(
         providers,
     };
     let mut nodes: Vec<Bound<'py, PyAny>> = Vec::new();
-    for (collection, kind, documented) in KINDS {
-        for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
-            nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
+    host::within_identity_pass(py, || {
+        for (collection, kind, documented) in KINDS {
+            for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
+                nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
+            }
         }
-    }
+        Ok(())
+    })?;
     let inventory: Vec<InventoryNode> = nodes
         .iter()
         .zip(upstream_names(py, &nodes, &vocabulary.sql_ref)?)

@@ -261,12 +261,11 @@ inputs give the same output. See
 [Macros must be deterministic](/docs/concepts/macros/python-macros#macros-must-be-deterministic). A
 compile whose templates read `run.id` is never reused.
 
-A replay differs from a full compile in three ways:
+A replay differs from a full compile in two ways:
 
 - In JSON, only `compile_timings` differs. It holds `project_reuse_hits`, `project_reuse_misses`,
   `project_reuse_bypasses`, `project_reuse_check_ms` and `total_ms`.
 - In text mode, the per-phase progress lines are not printed.
-- Lifecycle sinks receive only the invocation events, because no compile phase runs.
 
 When storing a result for reuse takes noticeable time, for example in a project with very many
 files, compile prints `Recording compile for reuse...` and a completion line on stderr before the

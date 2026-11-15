@@ -9,6 +9,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.debug._test_types import (
     DebugCliTestCase,
+    DebugConfigurationErrorTestCase,
     DebugJsonCliTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
@@ -410,3 +411,45 @@ def test_given_debug_json_with_providers_when_running_then_outputs_provider_summ
     assert payload["success"] is test_case.expected_success
     providers: list[dict[str, str]] = payload["providers"]  # type: ignore[assignment]
     assert providers == test_case.expected_check_tail
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DebugConfigurationErrorTestCase(
+            description="a local SQL analysis opt-out the project forbids fails as compile does",
+            project_toml=(
+                'name = "debug_policy"\nadapter = "duckdb"\n\n'
+                '[connection]\ndatabase = "debug.duckdb"\n\n'
+                "[settings]\nrequire_sql_analysis = true\n"
+            ),
+            local_toml="[settings]\nsql_analysis = false\n",
+            expected_returncode=1,
+            expected_stderr_fragment=(
+                "turns SQL analysis off with [settings] sql_analysis = false, which this project "
+                "does not allow"
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_invalid_project_configuration_when_debugging_then_reports_the_compile_error(
+    tmp_path: Path,
+    test_case: DebugConfigurationErrorTestCase,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="debug_policy",
+        repo_files={
+            "sqlbuild_project.toml": test_case.project_toml,
+            "sqlbuild_local.toml": test_case.local_toml,
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("debug", "--no-connection"),
+        project_dir=project_dir,
+    )
+
+    assert result.returncode == test_case.expected_returncode, result.stdout
+    assert test_case.expected_stderr_fragment in result.stderr

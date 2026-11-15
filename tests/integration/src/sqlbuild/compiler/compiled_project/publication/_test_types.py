@@ -283,6 +283,12 @@ class DevelopmentTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentDiscoveryTestCase:
+    description: str
+    expected_imports: int
+
+
+@dataclass(frozen=True)
 class ComposeDeploymentTestCase:
     description: str
     expected_warehouse_rows: list[list[int]]
