@@ -79,6 +79,8 @@ pub(crate) const LINE_COMMENT_PREFIX: &str = "--";
 pub(crate) const DECLINED_WITHOUT_REASON: &str = "native formatter declined without a reason";
 pub(crate) const MOVED_OMITTED_SELECT: &str =
     "native formatter moved the omitted ceremonial SELECT 1";
+pub(crate) const MOVED_EXPRESSION_ALIAS: &str =
+    "native formatter moved the alias it formats an expression body under";
 pub(crate) const DECLARATION_GROUP_DIRECTORY: &str = "_sqlbuild";
 /// `GLOBAL_NAMED_DECLARATION_ROOTS`, in Python's dict order, with whether each holds audits.
 pub(crate) const GLOBAL_NAMED_ROOTS: [(&[&str], bool); 5] = [
@@ -211,10 +213,12 @@ pub(crate) const GROUPED_NAMED_ROLE_KINDS: [(&[&str], &str); 9] = [
 pub(crate) const CROSS_KEYWORD: &[u8] = b"cross";
 /// What a SQL macro expression body is formatted after, and removed from again.
 pub(crate) const EXPRESSION_SELECT_PREFIX: &str = "SELECT ";
-/// The output name lint gives an expression macro body, so it is not an unnamed projection.
+/// The output name lint and format give an expression body; Snowflake keeps unnamed items as written.
 pub(crate) const LINTED_EXPRESSION_ALIAS: &str = "__sqlbuild_macro_expression__";
 /// The characters that open a quoted string or identifier in formatted SQL.
 pub(crate) const STRING_QUOTES: [char; 3] = ['\'', '"', '`'];
+/// Each half of the `$$` that opens and closes a dollar-quoted string in formatted SQL.
+pub(crate) const DOLLAR_QUOTE: char = '$';
 
 /// A CTE definition, capturing its `name`.
 pub(crate) const CTE_DEFINITION_PATTERN: &str = r#"(?is)(?:\bWITH(?:\s+RECURSIVE)?|,)\s*["`\[]?(?P<name>[A-Za-z_][A-Za-z0-9_]*)["`\]]?(?:\s*\([^)]*\))?\s+AS\s*\("#;

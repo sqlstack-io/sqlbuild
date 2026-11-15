@@ -6,11 +6,30 @@ from pathlib import Path
 import pytest
 
 from sqlbuild._native import run_cli as main
-from tests.integration.src.sqlbuild.cli.commands.main._test_types import FormatterSyntaxTestCase
+from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
+    ExpressionMacroFormatTestCase,
+    FormatterSyntaxTestCase,
+)
 
 # The window syntax cases order by a non-unique column, which SQLCLEAN018 reports.
 _WINDOW_SYNTAX_PROJECT_TOML: str = (
     'name = "orders"\nadapter = "snowflake"\n\n[rules]\nignore = ["SQLCLEAN018"]\n'
+)
+
+
+_NORMALISE_NAME_HEADER: str = (
+    'MACRO (\n  description "Normalise a name",\n  arguments (column_name VARCHAR),\n'
+    "  returns VARCHAR,\n);\n\n"
+)
+_NORMALISE_NAME_AUTHORED: str = (
+    "REGEXP_REPLACE(\n  TRIM(UPPER(\n  -- Collapse repeated spaces\n  REGEXP_REPLACE(\n"
+    "    @column_name,\n    '[[:space:]]+',\n    ' '\n  ))),\n  '(^| )([A-Z]) ',\n"
+    "  '\\\\1\\\\2'\n)\n"
+)
+_NORMALISE_NAME_FORMATTED: str = (
+    "REGEXP_REPLACE(\n  TRIM(\n    UPPER(\n      -- Collapse repeated spaces\n"
+    "      REGEXP_REPLACE(@column_name, '[[:space:]]+', ' ')\n    )\n  ),\n"
+    "  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n"
 )
 
 
@@ -300,6 +319,49 @@ def test_given_multibyte_text_before_restorations_when_formatting_then_output_is
     assert 'description "Orders é € 😀"' in formatted
     assert main(["--project-dir", str(tmp_path), "format", "--check", "--json"]) == 0
     assert model.read_text(encoding="utf-8") == formatted
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ExpressionMacroFormatTestCase(
+            "project macro",
+            "macros/sql",
+            # A project macro needs consumers in more than one folder to stay a project macro.
+            ("staging", "marts"),
+            _NORMALISE_NAME_HEADER + _NORMALISE_NAME_FORMATTED,
+        ),
+        ExpressionMacroFormatTestCase(
+            "scoped macro",
+            "models/staging/_sqlbuild/_macros/sql",
+            ("staging",),
+            _NORMALISE_NAME_HEADER + _NORMALISE_NAME_FORMATTED,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_expression_macro_when_formatting_then_body_is_laid_out_once(
+    test_case: ExpressionMacroFormatTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
+    macro: Path = tmp_path / test_case.macro_directory / "normalise_name.sql"
+    macro.parent.mkdir(parents=True)
+    macro.write_text(_NORMALISE_NAME_HEADER + _NORMALISE_NAME_AUTHORED)
+    for folder in test_case.consumer_folders:
+        model: Path = tmp_path / "models" / folder / f"{folder}_customer_names.sql"
+        model.parent.mkdir(parents=True, exist_ok=True)
+        model.write_text(
+            'MODEL (description "Customer names", database warehouse, schema analytics);\n'
+            "SELECT @sql.normalise_name('ada  lovelace') AS customer_name\n"
+        )
+    assert main(["--project-dir", str(tmp_path), "format", "--json"]) == 0
+    payload: dict[str, object] = json.loads(capsys.readouterr().out)
+    assert payload["faults"] == 0
+    assert macro.read_text() == test_case.expected_macro
+    assert main(["--project-dir", str(tmp_path), "format", "--check", "--json"]) == 0
+    assert main(["--project-dir", str(tmp_path), "format", "--json"]) == 0
+    assert macro.read_text() == test_case.expected_macro
+    assert main(["--project-dir", str(tmp_path), "compile", "--no-cache"]) == 0
 
 
 if __name__ == "__main__":

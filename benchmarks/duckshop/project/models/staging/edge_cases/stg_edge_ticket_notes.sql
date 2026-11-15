@@ -1,9 +1,10 @@
 MODEL (
   description """
     One row per support ticket note with order references and reasons found by regular expressions,
-    written with escaped and dollar-quoted patterns, a SKU normalised by a macro after an escaped
-    quote, campaign and discount codes matched by pattern lists and escapes, and SKUs split at edge
-    positions; the note text and tags are passed on as written
+    written with escaped and dollar-quoted patterns, whitespace collapsed by a macro whose body
+    holds a comment, a SKU normalised by a macro after an escaped quote, campaign and discount
+    codes matched by pattern lists and escapes, and SKUs split at edge positions; the note text and
+    tags are passed on as written
   """,
   tags [edge_case],
   columns (
@@ -51,7 +52,7 @@ final AS (
     REGEXP_LIKE(s.body, '.*ds-o-\\d+.*', 'is') AS mentions_order_regexp_like,
     REGEXP_COUNT(s.body, 'DS-O-\\d+')::INT AS order_ref_count,
     REGEXP_SUBSTR(s.body, 'refund(ed)?', 1, 1, 'i')::VARCHAR AS refund_word,
-    REGEXP_REPLACE(s.body, '\\s+', ' ')::VARCHAR AS body_collapsed,
+    @sql.collapse_whitespace(s.body) AS body_collapsed,
     // A backslash-escaped quote inside a single-quoted literal, then a macro call to expand
     CONTAINS(s.body, 'O\'Brien')::BOOLEAN AS quotes_customer,
     @sql.normalise_sku(s.sku) AS sku_canonical,
