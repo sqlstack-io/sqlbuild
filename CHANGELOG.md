@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.230.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.230.0...v0.230.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* lay out Snowflake expression macro bodies instead of dedenting them ([#1494](https://github.com/sqlstack-io/sqlbuild/issues/1494)) ([1e9f04c](https://github.com/sqlstack-io/sqlbuild/commit/1e9f04c5689e3789c1b5551eaa7ed9f76d789127))
+
 ## [0.230.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.229.0...v0.230.0) (2026-11-15)
 
 
