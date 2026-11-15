@@ -5,13 +5,17 @@ use std::io::{self, Write};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
+use sqlbuild_orchestration::dev_events::main::source_position::source_position;
+use sqlbuild_orchestration::dev_events::models::DevEvent;
 use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseHistoryRead,
 };
 
 use crate::bindings::_helpers::boundary::python_calls::within;
-use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
+use crate::bindings::_helpers::location_command::command::{
+    emit_dev_event, location_arguments, publish_location,
+};
 use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
 use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
@@ -50,6 +54,15 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             write_stderr(
                                 py,
                                 &format!("Location compilation/publication failed: {error}\n"),
+                            )?;
+                            let message: String = error.to_string();
+                            emit_dev_event(
+                                py,
+                                &DevEvent::Failed {
+                                    generation,
+                                    position: source_position(&message),
+                                    message,
+                                },
                             )?;
                             None
                         }

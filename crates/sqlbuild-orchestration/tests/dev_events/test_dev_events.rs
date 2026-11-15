@@ -2,6 +2,7 @@ use crate::dev_events::main::dev_control_line::dev_control_line;
 use crate::dev_events::main::dev_event_line::dev_event_line;
 use crate::dev_events::main::parse_dev_control::parse_dev_control;
 use crate::dev_events::main::parse_dev_event::parse_dev_event;
+use crate::dev_events::main::source_position::source_position;
 use crate::dev_events::models::{DevControl, DevEvent, DevPhase, DevStepState, SourcePosition};
 
 struct ParseTestCase {
@@ -99,4 +100,50 @@ fn given_controls_when_encoding_then_each_reads_back_and_other_lines_are_ignored
     }
     assert_eq!(parse_dev_control("q\n"), None);
     assert_eq!(parse_dev_control("{\"control\":\"warehouse\"}\n"), None);
+}
+
+struct PositionTestCase {
+    description: &'static str,
+    message: &'static str,
+    expected_position: Option<(&'static str, u32, u32)>,
+}
+
+#[test]
+fn given_error_messages_when_finding_position_then_first_source_location_wins() {
+    let test_cases = [
+        PositionTestCase {
+            description: "a compile error with line and column",
+            message: "SQB0101 models/finance/fct_revenue.sql:42:7: unknown column net_amount_usd",
+            expected_position: Some(("models/finance/fct_revenue.sql", 42, 7)),
+        },
+        PositionTestCase {
+            description: "a Python traceback line without a column, in parentheses",
+            message: "failed to import (python/orders.py:12) because of a syntax error",
+            expected_position: Some(("python/orders.py", 12, 1)),
+        },
+        PositionTestCase {
+            description: "a URL with a port is not a source position",
+            message: "Publication outcome is unknown for http://127.0.0.1:8000/snapshots",
+            expected_position: None,
+        },
+        PositionTestCase {
+            description: "a path without a line is not a position",
+            message: "models/orders.sql is not valid",
+            expected_position: None,
+        },
+    ];
+
+    for test_case in test_cases {
+        let position = source_position(test_case.message)
+            .map(|position| (position.path, position.line, position.column));
+
+        assert_eq!(
+            position,
+            test_case
+                .expected_position
+                .map(|(path, line, column)| (path.to_owned(), line, column)),
+            "{}",
+            test_case.description
+        );
+    }
 }
