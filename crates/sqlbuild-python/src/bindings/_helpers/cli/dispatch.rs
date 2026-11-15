@@ -18,6 +18,7 @@ use crate::bindings::_helpers::dbt_command::init::run_dbt_init_command;
 use crate::bindings::_helpers::debug_command::run_debug::run_debug_command;
 use crate::bindings::_helpers::diff_report::command::run_diff_command;
 use crate::bindings::_helpers::diff_report::support::cli_error;
+use crate::bindings::_helpers::discovery::provider_secrets::MissingSecretsScope;
 use crate::bindings::_helpers::format_command::command::run_format_command;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::init_command::command::run_init_command;
@@ -75,6 +76,9 @@ const RAW_QUERY_ATTRIBUTES: [&str; 4] = [
     "right_query",
     "right_query_file",
 ];
+
+/// The namespace attribute of `--allow-missing-secrets`.
+const ALLOW_MISSING_SECRETS_DEST: &str = "allow_missing_secrets";
 
 /// One invocation being dispatched: its namespace and the values derived from it once.
 pub(crate) struct Invocation<'py> {
@@ -448,6 +452,10 @@ fn routed_command<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = args.py();
     let invocation = Invocation::new(args)?;
+    let _secrets = MissingSecretsScope::enter(
+        args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
+            .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
+    );
     match command_dispatch(&command_facts(args)?) {
         Dispatch::Nothing => 0.into_bound_py_any(py),
         Dispatch::Fail(failure) => Err(user_error(py, failure)),

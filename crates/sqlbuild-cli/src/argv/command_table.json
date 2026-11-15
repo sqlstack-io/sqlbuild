@@ -1503,6 +1503,18 @@
        {
         "kind": "store_true",
         "options": [
+         "--allow-missing-secrets"
+        ],
+        "dest": "allow_missing_secrets",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Compile without provider secrets: skip the check for missing secret settings, still validating the others",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
          "--no-color"
         ],
         "dest": "no_color",
@@ -1637,6 +1649,18 @@
          "suppress": true
         },
         "help": "SQLBuild project directory (default: the current directory)",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--allow-missing-secrets"
+        ],
+        "dest": "allow_missing_secrets",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Compile without provider secrets: skip the check for missing secret settings, still validating the others",
         "group": 1
        },
        {
@@ -3691,6 +3715,18 @@
        {
         "kind": "store_true",
         "options": [
+         "--allow-missing-secrets"
+        ],
+        "dest": "allow_missing_secrets",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Compile without provider secrets: skip the check for missing secret settings, still validating the others",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
          "--no-color"
         ],
         "dest": "no_color",
@@ -5246,6 +5282,18 @@
        {
         "kind": "store_true",
         "options": [
+         "--allow-missing-secrets"
+        ],
+        "dest": "allow_missing_secrets",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Compile without provider secrets: skip the check for missing secret settings, still validating the others",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
          "--no-color"
         ],
         "dest": "no_color",
@@ -5351,6 +5399,18 @@
          "suppress": true
         },
         "help": "SQLBuild project directory (default: the current directory)",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--verbose"
+        ],
+        "dest": "verbose",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "List every provider and secret setting, not only the missing ones",
         "group": 1
        },
        {
@@ -5898,6 +5958,18 @@
          "suppress": true
         },
         "help": "SQLBuild project directory (default: the current directory)",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--allow-missing-secrets"
+        ],
+        "dest": "allow_missing_secrets",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Compile without provider secrets: skip the check for missing secret settings, still validating the others",
         "group": 1
        },
        {
@@ -8156,6 +8228,18 @@
               "suppress": true
              },
              "help": "SQLBuild project directory (default: the current directory)",
+             "group": 1
+            },
+            {
+             "kind": "store_true",
+             "options": [
+              "--allow-missing-secrets"
+             ],
+             "dest": "allow_missing_secrets",
+             "nargs": 0,
+             "const": true,
+             "default": false,
+             "help": "Compile without provider secrets: skip the check for missing secret settings, still validating the others",
              "group": 1
             },
             {

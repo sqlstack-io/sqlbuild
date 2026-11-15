@@ -24,6 +24,7 @@ use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::{new_record, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -124,6 +125,10 @@ pub(crate) fn resolve_build_context<'py>(
                     &[
                         ("project_dir", project_dir.clone()),
                         ("extract_output_column_locations", boolean(py, false)),
+                        (
+                            "secret_policy",
+                            pyo3::types::PyString::new(py, SecretPolicy::Defer.name()).into_any(),
+                        ),
                     ],
                 )?),
             )

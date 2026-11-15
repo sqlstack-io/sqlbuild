@@ -2,7 +2,7 @@
 
 use crate::debug_report::models::{DebugLine, DebugReport};
 use crate::json::main::dumps::dumps;
-use crate::json::models::{JsonDialect, JsonValue, StdlibJsonOptions};
+use crate::json::models::{JsonDialect, JsonInteger, JsonValue, StdlibJsonOptions};
 
 fn line_value(line: &DebugLine) -> JsonValue {
     let mut fields: Vec<(String, JsonValue)> = vec![
@@ -42,6 +42,10 @@ pub fn format_debug_json(report: &DebugReport) -> String {
             lines_value(&report.configuration),
         ),
         ("providers".to_owned(), lines_value(&report.providers)),
+        (
+            "missing_secrets".to_owned(),
+            JsonValue::Integer(JsonInteger::from(report.missing_secrets as u64)),
+        ),
         ("connection".to_owned(), lines_value(&report.connection)),
         (
             "local_files".to_owned(),

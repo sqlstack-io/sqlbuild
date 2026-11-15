@@ -9,7 +9,6 @@ from sqlbuild.provider.classes.session import ProviderSession
 
 if TYPE_CHECKING:
     from sqlbuild._native import EventExporterCommandScope
-    from sqlbuild.provider.classes.provider import Provider
 
 
 def build_provider_session(
@@ -18,7 +17,7 @@ def build_provider_session(
     setup_context: object | None = None,
     allow_shared: bool = True,
 ) -> ProviderSession:
-    """Build a runtime provider session with fresh provider instances."""
+    """Build a runtime provider session that reads each provider's settings on first use."""
 
     if allow_shared:
         from sqlbuild._native import current_event_exporter_command_scope
@@ -30,8 +29,11 @@ def build_provider_session(
             )
             if scope.provider_session.keys() == expected_names:
                 return scope.provider_session
-    providers: dict[str, Provider] = {
-        discovered_provider.name: discovered_provider.provider_class()
-        for discovered_provider in discovered_providers
-    }
-    return ProviderSession(providers, setup_context=setup_context)
+    return ProviderSession(
+        {},
+        setup_context=setup_context,
+        deferred={
+            discovered_provider.name: discovered_provider.provider_class
+            for discovered_provider in discovered_providers
+        },
+    )

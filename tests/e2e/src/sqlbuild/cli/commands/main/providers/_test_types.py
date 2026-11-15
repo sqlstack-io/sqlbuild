@@ -131,3 +131,14 @@ class SlowSinkExitE2ETestCase:
     description: str
     command: tuple[str, ...]
     expected_marker_entries: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ProviderSecretE2ETestCase:
+    description: str
+    command: tuple[str, ...]
+    env: dict[str, str]
+    extra_repo_files: dict[str, str]
+    expected_exit_code: int
+    expected_output_fragments: tuple[str, ...]
+    expected_marker_entries: tuple[str, ...]

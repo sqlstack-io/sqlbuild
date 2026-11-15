@@ -10,6 +10,9 @@ use crate::bindings::_helpers::compile_driver::relation_targets::build_project_r
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
+use crate::bindings::_helpers::discovery::provider_secrets::{
+    consumer_uses, require_used_secrets, sink_uses,
+};
 use crate::bindings::_helpers::graph::algorithms::transitive_closure_many;
 use crate::bindings::_helpers::graph::execution_gates::sql_ref_key;
 use crate::bindings::_helpers::graph::python_lifecycle::build_python_sql_run_lifecycle;
@@ -661,6 +664,10 @@ pub(crate) fn run_check_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
     header.set_item("use_color", native_field(&invocation, "use_color")?)?;
     write_execution_header(py, Some(header))?;
     let prepared: Prepared<'_> = prepare(request, &invocation)?;
+    let discovered: Bound<'_, PyAny> = native_field(&invocation, "discovered_inputs")?;
+    let mut uses: Vec<(String, String)> = consumer_uses(&prepared.check_functions)?;
+    uses.extend(sink_uses(&discovered)?);
+    require_used_secrets(&discovered, &uses)?;
     let session: Bound<'_, PyAny> = call_with(
         &host::entry(py, UserCodeHost::BuildProviderSession)?,
         &[(

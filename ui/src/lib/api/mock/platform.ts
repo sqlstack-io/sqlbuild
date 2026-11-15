@@ -376,6 +376,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		secret: type.includes('Secret'),
 		env,
 		description,
+		missing: false,
 		...extra
 	});
 	const providers: ProviderConnection[] = [
@@ -430,7 +431,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			description: 'Incoming webhook of the team chat room.',
 			sourceFile: 'providers/chat.py',
 			settings: [
-				setting('url', 'SecretStr', 'CHAT_WEBHOOK_URL', 'Webhook URL', { required: true }),
+				setting('url', 'SecretStr', 'CHAT_WEBHOOK_URL', 'Webhook URL', { required: true, missing: true }),
 				setting('timeout_seconds', 'int', 'CHAT_WEBHOOK_TIMEOUT_SECONDS', 'Request timeout')
 			],
 			usedBy: [],

@@ -21,6 +21,9 @@ use crate::bindings::_helpers::build_command::planning::{
 };
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::diagnostics::trackers::BuildPhaseTimingTracker;
+use crate::bindings::_helpers::discovery::provider_secrets::{
+    consumer_uses, provider_uses, require_used_secrets, sink_uses,
+};
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::observations::source_capture::{
     arm_source_capture, take_source_capture,
@@ -69,9 +72,25 @@ fn run_cached_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) ->
     built
 }
 
+/// Fail before anything runs when the planned nodes or the sinks need provider secrets that are unset.
+fn require_plan_secrets(context: &BuildContext<'_>, pipeline: &Bound<'_, PyAny>) -> PyResult<()> {
+    let discovered: Bound<'_, PyAny> = context.get("discovered_inputs")?;
+    let mut uses: Vec<(String, String)> = provider_uses(
+        &native_field(&native_field(pipeline, "plan_output")?, "provider_usages")?,
+        None,
+    )?;
+    uses.extend(consumer_uses(&native_field(
+        pipeline,
+        "python_plan_entries",
+    )?)?);
+    uses.extend(sink_uses(&discovered)?);
+    require_used_secrets(&discovered, &uses)
+}
+
 /// Plan and run the build, sharing one relation metadata cache from planning to the run's end.
 fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -> PyResult<i32> {
     let pipeline: Bound<'_, PyAny> = compile_build_plan(context)?;
+    require_plan_secrets(context, &pipeline)?;
     if let Some(worker) = &context.worker {
         worker.enforce_plan_writers(&pipeline)?;
     }

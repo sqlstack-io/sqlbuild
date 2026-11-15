@@ -26,6 +26,7 @@ pub async fn report_location_health(
         LocationHealth::Heartbeat {} => None,
         LocationHealth::CompileFailed { generation }
         | LocationHealth::Connection { generation, .. }
+        | LocationHealth::ProviderSecrets { generation, .. }
         | LocationHealth::WarehouseSync { generation, .. } => Some(generation),
     };
     if generation.is_some_and(|generation| generation < 1) {

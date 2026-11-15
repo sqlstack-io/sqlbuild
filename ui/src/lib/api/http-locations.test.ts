@@ -25,6 +25,13 @@ describe('location health', () => {
 		expect(healthOf([seen(5, { kind: 'connection', generation: 4, healthy: true }), failed], now).health).toBe('healthy');
 	});
 
+	it('reports missing provider secrets ahead of a failed connection until a newer report finds none', () => {
+		const missing = seen(10, { kind: 'provider_secrets', generation: 2, missing: 1 });
+		const unhealthy = seen(10, { kind: 'connection', generation: 2, healthy: false });
+		expect(healthOf([missing, unhealthy], now).health).toBe('missing_secrets');
+		expect(healthOf([seen(5, { kind: 'provider_secrets', generation: 3, missing: 0 }), missing], now).health).toBe('healthy');
+	});
+
 	it('needs attention when the latest connection check failed', () => {
 		const observations = [seen(5, { kind: 'connection', generation: 2, healthy: false }), seen(60, { kind: 'connection', generation: 1, healthy: true })];
 		expect(healthOf(observations, now).health).toBe('degraded');
