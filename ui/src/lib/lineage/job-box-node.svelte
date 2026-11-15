@@ -8,14 +8,26 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
 
+	import type { FolderBoxData } from './folder-graph';
+
+	type JobBoxData = { jobKey: string; nodeCount: number; drawnElsewhere: number; collapsed: boolean; ontoggle?: (jobKey: string) => void; lastRun?: RunRef | null };
+
+	// A job group's member box, or an open lineage folder, whose header closes it.
 	let { data }: NodeProps = $props();
-	const d = $derived(
-		data as { jobKey: string; nodeCount: number; drawnElsewhere: number; collapsed: boolean; ontoggle?: (jobKey: string) => void; lastRun?: RunRef | null }
-	);
+	const d = $derived(data as JobBoxData);
+	const folder = $derived('folder' in data ? (data as FolderBoxData) : null);
+	const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 </script>
 
-<div class="box" class:collapsed={d.collapsed}>
+<div class="box" class:collapsed={!folder && d.collapsed}>
 	<Handle type="target" position={Position.Left} class="box-handle" />
+	{#if folder}
+		<button class="head folder-head nodrag" title="Close {folder.folder}" aria-expanded="true" onclick={() => folder.ontoggle?.(folder.folder)}>
+			<ChevronDownIcon size={14} class="chevron" />
+			<span class="name" title={folder.folder}>{folder.label}</span>
+			<span class="faint">· {plural(folder.nodeCount, 'node')}{#if folder.stale} · <span class="stale">{folder.stale} stale</span>{/if}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>
+		</button>
+	{:else}
 	<div class="head">
 		{#if d.ontoggle}
 			<button class="toggle nodrag" aria-expanded={!d.collapsed} aria-label="{d.collapsed ? 'Expand' : 'Collapse'} {d.jobKey}" onclick={() => d.ontoggle?.(d.jobKey)}>
@@ -31,6 +43,7 @@
 			</a>
 		{/if}
 	</div>
+	{/if}
 	<Handle type="source" position={Position.Right} class="box-handle" />
 </div>
 
@@ -70,6 +83,30 @@
 	.name {
 		font-family: var(--font-mono);
 		font-weight: 600;
+	}
+	.folder-head {
+		width: 100%;
+		gap: 6px;
+		padding-left: 8px;
+		cursor: pointer;
+		text-align: left;
+	}
+	.folder-head:hover {
+		background: var(--sb-hover);
+	}
+	.folder-head .name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.folder-head :global(.chevron) {
+		flex: 0 0 auto;
+		color: var(--muted-foreground);
+	}
+	.stale {
+		color: var(--sb-stale);
+	}
+	.failed {
+		color: var(--sb-error);
 	}
 	.name:hover,
 	.last:hover {

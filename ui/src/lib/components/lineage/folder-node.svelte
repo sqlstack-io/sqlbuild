@@ -8,12 +8,12 @@
 	const d = $derived(data as GroupCard);
 </script>
 
-<!-- A collapsed folder; clicking it opens the folder into its nodes. -->
-<div class="group" class:dimmed={d.dimmed} title="Show the {d.count} nodes in {d.group}">
+<!-- A closed folder; clicking it opens the folder into a box around its folders and nodes. -->
+<div class="group" class:dimmed={d.dimmed} title="Open {d.group}: {d.count} node{d.count === 1 ? '' : 's'}">
 	<Handle type="target" position={Position.Left} class="node-handle" />
 	<div class="head">
 		<FolderIcon size={14} strokeWidth={1.75} class="glyph" />
-		<span class="name">{d.group}</span>
+		<span class="name">{d.label ?? d.group}</span>
 		<span class="count">{d.count}</span>
 		<ChevronRightIcon size={13} class="glyph" />
 	</div>
