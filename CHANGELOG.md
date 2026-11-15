@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.230.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.229.0...v0.230.0) (2026-11-15)
+
+
+### Features
+
+* add SQBRPYTHON provider layout rules for providers/ ([#1492](https://github.com/sqlstack-io/sqlbuild/issues/1492)) ([43ee21d](https://github.com/sqlstack-io/sqlbuild/commit/43ee21d5b9719e881f09102f2aeb91ce3a1aa705))
+
 ## [0.229.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.228.0...v0.229.0) (2026-11-15)
 
 
