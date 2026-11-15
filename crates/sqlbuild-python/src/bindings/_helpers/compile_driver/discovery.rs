@@ -263,15 +263,7 @@ fn assembled_inputs<'py>(
     request: &DiscoveryRequest,
 ) -> PyResult<Bound<'py, PyAny>> {
     let project_dir: &Bound<'py, PyAny> = request.project_dir.bind(py);
-    let project_config: Bound<'py, PyAny> =
-        load_project_config_file(py, project_dir)?.into_bound(py);
-    let local_config: Bound<'py, PyAny> = load_local_config_file(py, project_dir)?.into_bound(py);
-    reject_invalid_project_configuration(&ProjectConfiguration {
-        project_dir,
-        project_config: &project_config,
-        local_config: &local_config,
-    })?;
-    warn_deprecated_settings(py, project_dir)?;
+    let (project_config, local_config) = checked_configuration(project_dir)?;
     reject_unsupported_python_paths(project_dir)?;
     let delta_settings: &Bound<'py, PyAny> =
         if native_field(&local_config, "setting_overrides")?.contains(DELTA_COMPILE_SETTING_KEY)? {
@@ -316,6 +308,44 @@ fn assembled_inputs<'py>(
     host::entry(py, UserCodeHost::ValidateDiscoveredInputs)?.call1((&discovered,))?;
     configure_discovered_event_exporters(&discovered)?;
     Ok(discovered)
+}
+
+/// The project and local configuration after the checks every discovery runs.
+fn checked_configuration<'py>(
+    project_dir: &Bound<'py, PyAny>,
+) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+    let py: Python<'py> = project_dir.py();
+    let project_config: Bound<'py, PyAny> =
+        load_project_config_file(py, project_dir)?.into_bound(py);
+    let local_config: Bound<'py, PyAny> = load_local_config_file(py, project_dir)?.into_bound(py);
+    reject_invalid_project_configuration(&ProjectConfiguration {
+        project_dir,
+        project_config: &project_config,
+        local_config: &local_config,
+    })?;
+    warn_deprecated_settings(py, project_dir)?;
+    Ok((project_config, local_config))
+}
+
+/// Checked configuration and provider classes only; no declaration file or project node is read.
+pub(crate) fn discover_environment<'py>(
+    project_dir: &Bound<'py, PyAny>,
+    secret_policy: SecretPolicy,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = project_dir.py();
+    let (project_config, local_config) = checked_configuration(project_dir)?;
+    let providers: Bound<'py, PyAny> =
+        discover_provider_classes(project_dir.clone(), secret_policy.name())?;
+    new_record_with(
+        py,
+        RecordId::DiscoveredProjectInputs,
+        &[
+            ("project_config", project_config),
+            ("local_config", local_config),
+            ("project_dir", project_dir.clone()),
+            ("providers", providers),
+        ],
+    )
 }
 
 /// Discover all project files and functions into one inputs bundle.
