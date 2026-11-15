@@ -9,6 +9,7 @@ from contextlib import AbstractContextManager, nullcontext
 from operator import attrgetter
 from pathlib import Path
 from types import ModuleType
+from typing import Any, cast
 
 import pytest
 
@@ -304,6 +305,8 @@ def test_given_class_shapes_when_one_pass_reads_sources_then_they_match_inspect(
         identity_pass: IdentityPass = IdentityPass()
 
         shared: list[str] = [identity_pass.source(obj) for obj in objects]
-        inspected: list[str] = [textwrap.dedent(inspect.getsource(obj)).strip() for obj in objects]
+        inspected: list[str] = [
+            textwrap.dedent(inspect.getsource(cast(Any, obj))).strip() for obj in objects
+        ]
 
     assert sum(map(str.__eq__, shared, inspected)) == test_case.expected_sources_like_inspect

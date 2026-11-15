@@ -16,7 +16,7 @@ from functools import partial
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import MappingProxyType, ModuleType
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple, TypeGuard, cast
 
 import pytest
 
@@ -772,7 +772,9 @@ def _write_shared_project(
     )
 
 
-def _is_definition(node: ast.AST) -> bool:
+def _is_definition(
+    node: ast.AST,
+) -> TypeGuard[ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef]:
     return isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
 
 
@@ -782,8 +784,7 @@ def _object_sources(files: dict[str, str]) -> tuple[str, ...]:
     sources: list[str] = []
     for text in files.values():
         lines: list[str] = text.splitlines(keepends=True)
-        for node in filter(_is_definition, ast.walk(ast.parse(text))):
-            definition: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef = node
+        for definition in filter(_is_definition, ast.walk(ast.parse(text))):
             start: int = [*definition.decorator_list, definition][0].lineno
             sources.append(
                 textwrap.dedent("".join(lines[start - 1 : definition.end_lineno])).strip()
@@ -843,15 +844,17 @@ def discovery_work(
     parse: Callable[..., ast.Module] = ast.parse
     sha256: Callable[..., Any] = hashlib.sha256
 
-    def counted_update_cache(filename: str, module_globals: object = None) -> list[str]:
+    def counted_update_cache(
+        filename: str, module_globals: dict[str, Any] | None = None
+    ) -> list[str]:
         work[("read", filename)] += 1
         return update_cache(filename, module_globals)
 
-    def counted_parse(source: object, *args: object, **kwargs: object) -> ast.Module:
+    def counted_parse(source: str | bytes, *args: Any, **kwargs: Any) -> ast.Module:
         work[("parse", source)] += 1
         return parse(source, *args, **kwargs)
 
-    def counted_sha256(data: bytes = b"", *args: object, **kwargs: object) -> Any:
+    def counted_sha256(data: bytes = b"", *args: Any, **kwargs: Any) -> Any:
         work[("hash", bytes(data))] += 1
         return sha256(data, *args, **kwargs)
 
