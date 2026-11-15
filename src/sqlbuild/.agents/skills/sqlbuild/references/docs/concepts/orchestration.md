@@ -44,7 +44,9 @@ sqb build nightly_orders_job        # build what the job builds, locally
 - Subfolders are allowed, such as `orchestration/jobs/finance/revenue_job.toml`.
 - A name must end with its folder's suffix. Names are unique across the whole project, with models,
   sources and every other resource.
-- A Python module whose file name starts with `_` is a private helper and declares nothing.
+- A Python module whose file name starts with `_`, or that sits in a folder starting with `_` under
+  `orchestration/calendars/` or `orchestration/sensors/` (such as `sensors/inventory/_helpers/`), is
+  private support and declares nothing. Declaring a calendar or sensor there fails compilation.
 - Any other file under `orchestration/`, or a folder not in the table, is a `D017` error.
 
 ## Declare a job

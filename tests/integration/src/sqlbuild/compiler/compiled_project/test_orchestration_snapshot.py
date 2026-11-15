@@ -1302,6 +1302,28 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             },
         ),
         SnapshotDiscoveryTestCase(
+            description="DuckShop sensors read support modules in a private folder of their domain",
+            files={**duckshop_orchestration("private_support_orders")},
+            expected_jobs=("inventory_job",),
+            expected_sensors={
+                "on_orders_sensor": {
+                    "description": "Build inventory for every genuine orders rebuild.",
+                    "job_key": "inventory_job",
+                    "when": {
+                        "kind": "node_event",
+                        "selection": ["model:orders"],
+                        "kinds": ["success"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                    "declared_at": {
+                        "path": "orchestration/sensors/inventory/on_orders_sensor.py",
+                        "line": 6,
+                    },
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="failure and recovery selectors preserve their individual transition kinds",
             files={
                 **edited_duckshop_orchestration(
@@ -1595,6 +1617,15 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_error=PythonNodeDiscoveryError,
             expected_message=(
                 "Failed to import orchestration file orchestration/sensors/broken_orders_sensor.py"
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a DuckShop sensor declared in a private folder fails instead of never running",
+            files=duckshop_orchestration("private_folder_sensor"),
+            expected_error=ValueError,
+            expected_message=(
+                "orchestration/sensors/inventory/_helpers/on_orders_sensor.py.*"
+                "declares a sensor inside the private folder _helpers/"
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
