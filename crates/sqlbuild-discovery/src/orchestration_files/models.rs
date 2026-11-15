@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
+use sqlbuild_pysource::orchestration_modules::models::ConditionSource;
+
 use crate::models::{DiscoveryFailure, ReadFailure, StageFailure};
 use crate::project_validation::models::OrchestrationNameFact;
 
@@ -107,6 +109,8 @@ pub struct NamedModule {
     pub job_references: Vec<(&'static str, Positioned<String>)>,
     /// A sensor's targets: empty for every target, `None` when they are not written as literals.
     pub targets: Option<Vec<String>>,
+    /// What a sensor's `when` selects, as far as its own module shows; `None` when it selects no nodes.
+    pub condition: Option<ConditionSource>,
 }
 
 /// The calendars, sensors and every module below their folders.

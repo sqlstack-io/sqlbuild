@@ -76,6 +76,7 @@
 					"docs/concepts/rules/configuration-and-selection",
 					"docs/concepts/rules/findings-and-exceptions",
 					"docs/concepts/rules/python-rules",
+					"docs/concepts/rules/orchestration-rules",
 					"docs/concepts/rules/execution-and-caching"
 				]
 			}

@@ -1,0 +1,4 @@
+# Four nodes listed one by one: over the default limit of three.
+name = "orders_listed_job"
+description = "Lists every orders model by name."
+select = "stg_orders stg_payments int_orders order_totals"

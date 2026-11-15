@@ -1,4 +1,6 @@
 use crate::models::Fault;
+use crate::orchestration_rules::constants::NAMED_SELECTOR_LIMIT_CODE;
+use crate::orchestration_rules::main::evaluate_orchestration_rules::evaluate_orchestration_rules;
 use crate::rules::models::ProjectEvaluationRequest;
 
 pub(crate) fn evaluate_project(
@@ -8,6 +10,9 @@ pub(crate) fn evaluate_project(
     faults.extend(crate::rules::_helpers::evaluation::evaluate_project_rules(
         &request,
     ));
+    if let Some(rule) = request.selected.get(NAMED_SELECTOR_LIMIT_CODE) {
+        faults.extend(evaluate_orchestration_rules(request.request, rule));
+    }
     faults.extend(crate::rules::_helpers::sql_test_rules::evaluate_project(
         request,
     )?);

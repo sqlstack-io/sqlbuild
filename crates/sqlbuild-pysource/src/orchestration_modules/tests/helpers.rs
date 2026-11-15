@@ -36,5 +36,6 @@ pub(super) fn declaration(
         position,
         job_references,
         targets: Some(Vec::new()),
+        condition: None,
     }
 }

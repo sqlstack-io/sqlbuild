@@ -5,6 +5,7 @@ pub mod compact_sql;
 pub mod evaluate;
 pub mod evaluate_project;
 pub mod fingerprint;
+pub mod request_selects;
 pub mod resolve_threshold_overrides;
 pub mod select;
 pub mod selected_codes;

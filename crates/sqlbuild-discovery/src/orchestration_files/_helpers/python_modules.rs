@@ -148,5 +148,6 @@ pub(crate) fn module_declaration(
         position: name.position,
         job_references,
         targets: declaration.targets,
+        condition: declaration.condition,
     }))
 }

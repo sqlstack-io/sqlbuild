@@ -1,6 +1,7 @@
 use crate::configuration::main::validate as config;
 use crate::constants::{
-    API_VERSION, NATIVE_BUILD_IDENTITY, PYTHON_RULE_PREFIX, RELATION_EXCEPTION_RULES,
+    API_VERSION, NATIVE_BUILD_IDENTITY, ORCHESTRATION_RULE_PREFIX, PYTHON_RULE_PREFIX,
+    RELATION_EXCEPTION_RULES,
 };
 use crate::engine::_helpers::cache::{Cache, PendingBucketWrite, RuleCacheBucket, RuleCacheEntry};
 use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
@@ -329,9 +330,17 @@ fn evaluate_python_phase(
     Ok(evaluation)
 }
 
-/// Built-in rules other than SQLClean and the Python rules, which read neither models nor the model cache.
+/// Built-in rules other than SQLClean, the Python rules and the orchestration rules, which read neither models nor the model cache.
 fn reads_models(rule: &RuleMetadata) -> bool {
-    !rule.custom && !rule.code.starts_with("SQLCLEAN") && !rule.scope.evaluates_python()
+    !rule.custom
+        && !rule.code.starts_with("SQLCLEAN")
+        && !rule.scope.evaluates_python()
+        && !rule.code.starts_with(ORCHESTRATION_RULE_PREFIX)
+}
+
+/// Whether a rule code or selector belongs to a family that never reaches model rules.
+fn outside_model_rules(code: &str) -> bool {
+    code.starts_with(PYTHON_RULE_PREFIX) || code.starts_with(ORCHESTRATION_RULE_PREFIX)
 }
 
 fn native_rule_pool(items: usize) -> Result<rayon::ThreadPool, String> {
@@ -361,7 +370,7 @@ fn scoped_faults(
     Ok(faults)
 }
 
-/// Fingerprint model-rule inputs; suppressions, graph-edge exceptions and Python-rule settings never reach model rules.
+/// Fingerprint model-rule inputs; suppressions, graph-edge exceptions, Python and orchestration settings never reach model rules.
 fn model_rules_fingerprint(
     selected: &[&RuleMetadata],
     config: &RulesConfig,
@@ -372,7 +381,7 @@ fn model_rules_fingerprint(
         rule_options: config
             .rule_options
             .iter()
-            .filter(|(code, _)| !code.starts_with(PYTHON_RULE_PREFIX))
+            .filter(|(code, _)| !outside_model_rules(code))
             .map(|(code, options)| (code.clone(), options.clone()))
             .collect(),
         rule_exceptions: Vec::new(),
@@ -384,11 +393,11 @@ fn model_rules_fingerprint(
     fingerprint::fingerprint(selected, &model_config, dialect)
 }
 
-/// The selectors outside the Python family, which alone can name model rules.
+/// The selectors outside the Python and orchestration families, which alone can name model rules.
 fn model_selectors(selectors: &[String]) -> Vec<String> {
     selectors
         .iter()
-        .filter(|selector| !selector.starts_with(PYTHON_RULE_PREFIX))
+        .filter(|selector| !outside_model_rules(selector))
         .cloned()
         .collect()
 }
@@ -490,7 +499,7 @@ fn evaluated_request(
             let model_rules: Vec<&RuleMetadata> = selected
                 .iter()
                 .copied()
-                .filter(|rule| !rule.scope.evaluates_python())
+                .filter(|rule| !outside_model_rules(&rule.code))
                 .collect();
             model_rules_fingerprint(&model_rules, &request.config, &request.dialect)
         })
