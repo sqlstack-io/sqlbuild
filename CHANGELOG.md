@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.232.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.231.0...v0.232.0) (2026-11-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* share Python identity work per discovery pass and keep compile phases out of sinks ([#1501](https://github.com/sqlstack-io/sqlbuild/issues/1501))
+
+### Performance Improvements
+
+* share Python identity work per discovery pass and keep compile phases out of sinks ([#1501](https://github.com/sqlstack-io/sqlbuild/issues/1501)) ([d15ee25](https://github.com/sqlstack-io/sqlbuild/commit/d15ee25919dedb6abde6e1b1c6ad8b5a46cf322b))
+
 ## [0.231.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.230.1...v0.231.0) (2026-11-15)
 
 
