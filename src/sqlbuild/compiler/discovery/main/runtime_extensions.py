@@ -52,7 +52,9 @@ def discover_runtime_extensions(*, project_dir: Path) -> DiscoveredRuntimeExtens
         )
     if not declarations and not output_declarations:
         return DiscoveredRuntimeExtensions()
-    providers: tuple[DiscoveredProvider, ...] = discover_provider_classes(project_dir=project_dir)
+    providers: tuple[DiscoveredProvider, ...] = discover_provider_classes(
+        project_dir=project_dir, secret_policy="defer"
+    )
     exporters: tuple[DiscoveredEventExporter, ...] = bind_event_exporter_declarations(
         declarations=declarations,
         project_dir=project_dir,

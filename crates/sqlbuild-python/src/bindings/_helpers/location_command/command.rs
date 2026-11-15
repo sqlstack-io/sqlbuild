@@ -119,7 +119,7 @@ fn compile_location<'py>(
     let project = project_adapter(
         py,
         Some(arguments.value("project_dir")?),
-        ProjectInputs::Discovered,
+        ProjectInputs::DiscoveredDeferringSecrets,
     )?;
     status(py, "Location project discovered. Compiling snapshot...")?;
     let (snapshot, blocked) = compile_snapshot(py, arguments, (input, &project), None)?;

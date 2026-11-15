@@ -139,7 +139,7 @@ async fn perform_work(
         LocationWork::SyncWarehouse {} => Some((LocationWorkOutcome::SyncStarted {}, Vec::new())),
         LocationWork::CheckConnection {} => check_location_connection(options, script, expires)
             .await?
-            .map(|(healthy, files)| (LocationWorkOutcome::Connection { healthy }, files)),
+            .map(|(healthy, _, files)| (LocationWorkOutcome::Connection { healthy }, files)),
         LocationWork::EvaluateSensor { evaluation } => {
             evaluate_location_sensor(options, script, &evaluation, expires)
                 .await?

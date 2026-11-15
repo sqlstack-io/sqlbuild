@@ -6,6 +6,8 @@ use std::path::PathBuf;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DebugStatus {
     Ok,
+    /// Worth fixing, but the report still succeeds, such as a provider secret this machine lacks.
+    Warn,
     Error,
     Skip,
 }
@@ -16,6 +18,7 @@ impl DebugStatus {
     pub fn label(self) -> &'static str {
         match self {
             Self::Ok => "OK",
+            Self::Warn => "WARN",
             Self::Error => "ERROR",
             Self::Skip => "SKIP",
         }
@@ -38,6 +41,8 @@ pub struct DebugReport {
     pub configuration: Vec<DebugLine>,
     pub providers: Vec<DebugLine>,
     pub connection: Vec<DebugLine>,
+    /// How many provider secret settings the environment leaves unset.
+    pub missing_secrets: usize,
     /// Exact local database paths, not the shortened display values in connection lines.
     pub local_files: Vec<String>,
 }
@@ -118,6 +123,8 @@ pub struct DebugProvider {
     pub name: String,
     pub relative_path: String,
     pub class_name: String,
+    /// Each secret setting's environment variable and whether the environment sets it.
+    pub secrets: Vec<(String, bool)>,
 }
 
 /// One connection setting value, as Python would print it.

@@ -11,6 +11,7 @@ use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -81,7 +82,16 @@ fn invocation_context<'py>(
         Some(discovered) => discovered.clone(),
         None => discover_project_inputs(
             py,
-            Some(keywords(py, &[("project_dir", project_dir.clone())])?),
+            Some(keywords(
+                py,
+                &[
+                    ("project_dir", project_dir.clone()),
+                    (
+                        "secret_policy",
+                        pyo3::types::PyString::new(py, SecretPolicy::Defer.name()).into_any(),
+                    ),
+                ],
+            )?),
         )?,
     };
     let adapter_context: Bound<'py, PyAny> = resolve_adapter_connection_context(

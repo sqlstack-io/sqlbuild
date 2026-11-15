@@ -315,11 +315,7 @@ def test_given_local_default_and_explicit_target_when_debugging_json_then_report
         DebugCliTestCase(
             description="reports discovered providers",
             command=("debug", "--no-connection"),
-            expected_stdout_fragment=(
-                "Providers:\n"
-                "  providers: 1 [OK discovered]\n"
-                "  marker_provider: providers/marker.py:MarkerProvider [OK valid settings]\n"
-            ),
+            expected_stdout_fragment=("Providers:\n  providers: 1 of 1 ready [OK secrets set]\n"),
         )
     ],
     ids=lambda case: case.description,
@@ -369,15 +365,9 @@ def test_given_debug_command_with_providers_when_running_then_outputs_provider_s
             expected_check_tail=[
                 {
                     "label": "providers",
-                    "message": "1",
+                    "message": "1 of 1 ready",
                     "status": "OK",
-                    "status_message": "discovered",
-                },
-                {
-                    "label": "marker_provider",
-                    "message": "providers/marker.py:MarkerProvider",
-                    "status": "OK",
-                    "status_message": "valid settings",
+                    "status_message": "secrets set",
                 },
             ],
         )

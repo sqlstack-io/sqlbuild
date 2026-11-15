@@ -34,7 +34,7 @@ Lifecycle progress is written to stderr so stdout remains valid JSON.
 - `run`: compile and evaluate only one exact code or family prefix.
 - `skills`: install guidance derived from configured Rules; `--check` verifies freshness without writing.
 
-`run` accepts normal SQLBuild model selectors. Native built-ins execute before custom Python Rules.
+`run` accepts normal SQLBuild model selectors and `--allow-missing-secrets`, which runs without provider [secrets](../concepts/python-nodes/providers.md#secrets). Native built-ins execute before custom Python Rules.
 
 ## Exit codes
 

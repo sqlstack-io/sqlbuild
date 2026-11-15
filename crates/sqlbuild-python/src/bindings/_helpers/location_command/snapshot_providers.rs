@@ -4,16 +4,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use serde_json::{Value, json};
-use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_project::snapshot_boundary::relative_path;
-use crate::bindings::_helpers::compiled_project::values::plain_value;
-use crate::bindings::_helpers::discovery::imported_modules::shim;
-use crate::bindings::_helpers::location_command::constants::{
-    ALIAS_PREFIX_TARGET, ALL_PREFIX_TARGET, MODEL_NODE_KIND, SOURCE_NODE_KIND,
+use crate::bindings::_helpers::discovery::provider_secrets::{
+    missing_secrets, provider_class_settings, setting_rows,
 };
+use crate::bindings::_helpers::location_command::constants::{MODEL_NODE_KIND, SOURCE_NODE_KIND};
 use crate::bindings::_helpers::records::fields::field;
 
 /// How a consumer's code runs inside other snapshot nodes, besides its own node.
@@ -46,7 +43,6 @@ pub(crate) fn providers_document(
     discovered_inputs: &Bound<'_, PyAny>,
     nodes: &BTreeMap<String, SnapshotNode>,
 ) -> PyResult<Option<Value>> {
-    let py = discovered_inputs.py();
     let providers = field(discovered_inputs, "providers")?;
     if providers.len()? == 0 {
         return Ok(None);
@@ -68,21 +64,26 @@ pub(crate) fn providers_document(
             }
         }
     }
-    let read_class = shim(py, UserCodeHost::ProviderSettings)?;
     let mut rows: Vec<Value> = Vec::new();
     for provider in providers.try_iter()? {
         let provider = provider?;
         let name: String = field(&provider, "name")?.extract()?;
-        let class = plain_value(&call_with(
-            &read_class,
-            &[("provider_class", field(&provider, "provider_class")?)],
-        )?)?;
+        let provider_class = field(&provider, "provider_class")?;
+        let class = provider_class_settings(&provider_class)?;
+        let missing: Vec<String> = missing_secrets(&provider_class)?;
+        let mut settings: Vec<Value> = setting_rows(&class);
+        for setting in &mut settings {
+            let unset = setting["env"]
+                .as_str()
+                .is_some_and(|env| missing.iter().any(|name| name == env));
+            setting["missing"] = Value::Bool(unset);
+        }
         rows.push(json!({
             "name": name,
             "class": class["class"],
             "description": class["description"],
             "path": relative_path(&provider)?,
-            "settings": settings(&class),
+            "settings": settings,
             "nodes": running.remove(&name).unwrap_or_default(),
             "used_by": used_by.remove(&name).unwrap_or_default(),
         }));
@@ -133,37 +134,4 @@ fn calls_hook(definition: &Value, hook: &str) -> bool {
         }
     }
     false
-}
-
-/// Declared fields with the environment variable each is read from, which pydantic-settings derives from the prefix unless an alias names it.
-fn settings(class: &Value) -> Vec<Value> {
-    let prefix = class["env_prefix"].as_str().unwrap_or_default();
-    let case_sensitive = class["case_sensitive"].as_bool().unwrap_or_default();
-    let target = class["env_prefix_target"].as_str();
-    let alias_prefix = match target {
-        Some(ALIAS_PREFIX_TARGET | ALL_PREFIX_TARGET) => prefix,
-        _ => "",
-    };
-    let name_prefix = match target {
-        Some(ALIAS_PREFIX_TARGET) => "",
-        _ => prefix,
-    };
-    let mut rows: Vec<Value> = Vec::new();
-    for field in class["fields"].as_array().into_iter().flatten() {
-        let name = field["name"].as_str().unwrap_or_default();
-        let type_name = field["type"].as_str().unwrap_or_default();
-        let env = field["alias"].as_str().map_or_else(
-            || format!("{name_prefix}{name}"),
-            |alias| format!("{alias_prefix}{alias}"),
-        );
-        rows.push(json!({
-            "name": name,
-            "type": type_name,
-            "required": field["required"],
-            "secret": type_name.contains("Secret"),
-            "env": if case_sensitive { env } else { env.to_uppercase() },
-            "description": field["description"],
-        }));
-    }
-    rows
 }

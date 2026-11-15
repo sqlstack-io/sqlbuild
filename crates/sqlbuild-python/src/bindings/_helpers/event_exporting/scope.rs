@@ -1,5 +1,6 @@
 //! `EventExporterCommandScope`: typed sink binding, its provider session and the active command scope.
 
+use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
 
 use pyo3::exceptions::PyRuntimeError;
@@ -14,9 +15,11 @@ use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 use crate::bindings::_helpers::boundary::python_calls::{
     KeywordArguments, call_with, context_variable,
 };
+use crate::bindings::_helpers::discovery::provider_secrets::{ProviderState, provider_state};
 use crate::bindings::_helpers::event_exporting::constants::SCOPE_CONTEXT_VARIABLE;
 use crate::bindings::_helpers::event_exporting::models::BoundEventExporter;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 
@@ -77,15 +80,57 @@ fn provider_arguments<'py>(
     Ok(arguments)
 }
 
-/// Bound lifecycle exporters and command-output sinks over `session`'s provider instances.
+/// Each discovered provider whose required secret settings are unset, with their variables.
+fn providers_missing_secrets(
+    providers: &Bound<'_, PyAny>,
+) -> PyResult<HashMap<String, Vec<String>>> {
+    let mut missing: HashMap<String, Vec<String>> = HashMap::new();
+    for provider in providers.try_iter()? {
+        let provider: Bound<'_, PyAny> = provider?;
+        if let ProviderState::MissingSecrets(variables) =
+            provider_state(&native_field(&provider, "provider_class")?)?
+        {
+            missing.insert(native_field(&provider, "name")?.extract()?, variables);
+        }
+    }
+    Ok(missing)
+}
+
+/// Whether `declaration` can bind; when a provider it takes is missing secrets, a notice says it is left unbound.
+fn bindable(
+    declaration: &Bound<'_, PyAny>,
+    missing: &HashMap<String, Vec<String>>,
+) -> PyResult<bool> {
+    for usage in native_field(declaration, "provider_usages")?.try_iter()? {
+        let provider: String = native_field(&usage?, "provider_name")?.extract()?;
+        if let Some(variables) = missing.get(&provider) {
+            write_stderr(
+                declaration.py(),
+                &format!(
+                    "sink '{}' is not bound: provider '{provider}' is missing {}\n",
+                    native_field(declaration, "name")?.str()?,
+                    variables.join(", ")
+                ),
+            )?;
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Bound lifecycle exporters and command-output sinks over `session`, except those using `missing` providers.
 fn bindings<'py>(
     session: &Bound<'py, PyAny>,
     (event_exporters, command_output_sinks): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    missing: &HashMap<String, Vec<String>>,
 ) -> PyResult<(Bound<'py, PyTuple>, Bound<'py, PyTuple>)> {
     let py: Python<'py> = session.py();
     let mut exporters: Vec<Bound<'py, PyAny>> = Vec::new();
     for exporter in event_exporters.try_iter()? {
         let exporter: Bound<'py, PyAny> = exporter?;
+        if !bindable(&exporter, missing)? {
+            continue;
+        }
         let arguments: Bound<'py, PyDict> = provider_arguments(session, &exporter)?;
         exporters.push(
             Bound::new(
@@ -109,6 +154,9 @@ fn bindings<'py>(
     let mut sinks: Vec<Bound<'py, PyAny>> = Vec::new();
     for sink in command_output_sinks.try_iter()? {
         let sink: Bound<'py, PyAny> = sink?;
+        if !bindable(&sink, missing)? {
+            continue;
+        }
         let arguments: Bound<'py, PyDict> = provider_arguments(session, &sink)?;
         sinks.push(call_with(
             &sink_class,
@@ -162,6 +210,7 @@ impl EventExporterCommandScope {
             let empty = PyTuple::empty(py).into_any();
             return self.bind_dispatcher(py, (empty.clone(), empty));
         }
+        let missing: HashMap<String, Vec<String>> = providers_missing_secrets(&providers)?;
         let session: Bound<'_, PyAny> = call_with(
             &host::entry(py, UserCodeHost::BuildProviderSession)?,
             &[
@@ -170,8 +219,11 @@ impl EventExporterCommandScope {
             ],
         )?;
         session.call_method0("hold_open")?;
-        let (exporters, sinks) = match bindings(&session, (&event_exporters, &command_output_sinks))
-        {
+        let (exporters, sinks) = match bindings(
+            &session,
+            (&event_exporters, &command_output_sinks),
+            &missing,
+        ) {
             Ok(bound) => bound,
             Err(error) => {
                 session.call_method0("release")?;

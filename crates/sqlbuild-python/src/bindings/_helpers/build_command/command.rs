@@ -19,8 +19,14 @@ use crate::bindings::_helpers::build_command::planning::{
     compile_build_plan, enforce_build_plan_policies, run_defer_clone_prephase,
     write_compile_target, write_plan_text,
 };
+use crate::bindings::_helpers::build_command::support::{frozenset, tuple};
+use crate::bindings::_helpers::check::check_core::relevant_check_functions;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::diagnostics::trackers::BuildPhaseTimingTracker;
+use crate::bindings::_helpers::discovery::provider_secrets::{
+    consumer_uses, provider_uses, require_used_secrets, sink_uses,
+};
+use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::observations::source_capture::{
     arm_source_capture, take_source_capture,
@@ -69,9 +75,61 @@ fn run_cached_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) ->
     built
 }
 
+/// The post-build check functions that run if every planned node succeeds.
+fn planned_check_functions<'py>(
+    context: &BuildContext<'py>,
+    pipeline: &Bound<'py, PyAny>,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    if !native_field(&context.request, "run_audits")?.extract::<bool>()? {
+        return Ok(Vec::new());
+    }
+    let py: Python<'py> = context.py();
+    let plan: Bound<'py, PyAny> = native_field(pipeline, "plan_output")?;
+    let mut dependencies: Vec<Bound<'py, PyAny>> = Vec::new();
+    for entry in native_field(pipeline, "python_plan_entries")?.try_iter()? {
+        dependencies.push(native_field(&entry?, "name")?);
+    }
+    let mut completed: Vec<Bound<'py, PyAny>> = Vec::new();
+    for entries in ["model_entries", "seed_entries", "source_load_entries"] {
+        for entry in native_field(&plan, entries)?.try_iter()? {
+            completed.push(native_field(&entry?, "name")?);
+        }
+    }
+    for load in native_field(&plan, "source_load_entries")?.try_iter()? {
+        dependencies.push(native_field(&load?, "loader")?);
+    }
+    let discovered: Bound<'py, PyAny> = context.get("discovered_inputs")?;
+    relevant_check_functions(
+        &discovered,
+        &python_node_graph(&discovered)?,
+        native_field(&context.request, "exclude")?,
+        (&frozenset(py, &dependencies)?, &frozenset(py, &completed)?),
+    )
+}
+
+/// Fail before anything runs when planned nodes, their post-build checks or sinks lack provider secrets.
+fn require_plan_secrets(context: &BuildContext<'_>, pipeline: &Bound<'_, PyAny>) -> PyResult<()> {
+    let discovered: Bound<'_, PyAny> = context.get("discovered_inputs")?;
+    let mut uses: Vec<(String, String)> = provider_uses(
+        &native_field(&native_field(pipeline, "plan_output")?, "provider_usages")?,
+        None,
+    )?;
+    uses.extend(consumer_uses(&native_field(
+        pipeline,
+        "python_plan_entries",
+    )?)?);
+    uses.extend(consumer_uses(&tuple(
+        context.py(),
+        &planned_check_functions(context, pipeline)?,
+    )?)?);
+    uses.extend(sink_uses(&discovered)?);
+    require_used_secrets(&discovered, &uses)
+}
+
 /// Plan and run the build, sharing one relation metadata cache from planning to the run's end.
 fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -> PyResult<i32> {
     let pipeline: Bound<'_, PyAny> = compile_build_plan(context)?;
+    require_plan_secrets(context, &pipeline)?;
     if let Some(worker) = &context.worker {
         worker.enforce_plan_writers(&pipeline)?;
     }
