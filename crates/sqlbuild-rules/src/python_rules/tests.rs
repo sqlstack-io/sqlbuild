@@ -1,3 +1,5 @@
+#[path = "tests/test_compile_purity_rules.rs"]
+mod compile_purity_rules;
 #[path = "tests/test_evaluate_python_rules.rs"]
 mod evaluate_python_rules;
 #[path = "tests/helpers.rs"]

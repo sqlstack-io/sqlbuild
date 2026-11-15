@@ -16,12 +16,12 @@ fn given_the_catalogue_when_listing_python_rules_then_each_has_its_own_project_w
         CatalogueTestCase {
             description: "21 SQLBuild layout, unit, provider, orchestration and test placement rules and 86 Fensu core and test rules have distinct codes",
             count: distinct_python_codes,
-            expected_count: 107,
+            expected_count: 108,
         },
         CatalogueTestCase {
             description: "every Python rule reports against the project in the python family",
             count: project_wide_python_rules,
-            expected_count: 107,
+            expected_count: 108,
         },
     ];
     for test_case in test_cases {

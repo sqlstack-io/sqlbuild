@@ -6,6 +6,7 @@ use crate::models::{EvaluateRequest, RuleMetadata};
 use crate::python_rules::_helpers::engine::execution::selected_rules;
 use crate::python_rules::_helpers::engine::layout::layout_faults;
 use crate::python_rules::_helpers::engine::passes::evaluated_pass;
+use crate::python_rules::_helpers::units::compile_purity::compile_purity_faults;
 use crate::python_rules::_helpers::units::orchestration::orchestration_faults;
 use crate::python_rules::_helpers::units::project::unit_faults;
 use crate::python_rules::_helpers::units::providers::provider_faults;
@@ -51,6 +52,9 @@ pub(crate) fn evaluate_python_rules(
         &request.python_test_sources,
         &codes,
     ));
+    evaluation
+        .faults
+        .extend(compile_purity_faults(request, &codes)?);
     evaluation.faults.sort_by(|left, right| {
         (&left.path, left.line, left.column, &left.code).cmp(&(
             &right.path,
