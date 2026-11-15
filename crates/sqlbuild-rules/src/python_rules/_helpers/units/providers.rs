@@ -3,11 +3,13 @@
 use std::collections::BTreeSet;
 
 use sqlbuild_pysource::node_units::main::node_unit_module::node_unit_module;
-use sqlbuild_pysource::node_units::models::{UnitClass, UnitModule, UnitPosition, UnitStatementKind};
+use sqlbuild_pysource::node_units::models::{
+    UnitClass, UnitModule, UnitPosition, UnitStatementKind,
+};
 
 use crate::models::{Fault, PythonSource};
-use crate::python_rules::_helpers::faults::catalogue_fault;
-use crate::python_rules::_helpers::placement::package_anchor;
+use crate::python_rules::_helpers::engine::faults::catalogue_fault;
+use crate::python_rules::_helpers::engine::placement::package_anchor;
 use crate::python_rules::_helpers::units::project::{absolute_module, dotted_names, unit_fault};
 use crate::python_rules::constants::{
     INIT_FILE, ORCHESTRATION_ROOT, PACKAGE_ROOT, PRIVATE_PREFIX, PROVIDER_BASE, PROVIDER_FILE,
@@ -151,7 +153,12 @@ fn provider_module_faults(file: &ParsedFile<'_>) -> Vec<Fault> {
                 statement.position,
             ),
         };
-        faults.extend(unit_fault(PROVIDER_MODULE_SHAPE_CODE, file.path, position, &detail));
+        faults.extend(unit_fault(
+            PROVIDER_MODULE_SHAPE_CODE,
+            file.path,
+            position,
+            &detail,
+        ));
     }
     if providers == 0 {
         faults.extend(unit_fault(
@@ -218,9 +225,9 @@ fn boundary_detail(module: &str, capability: Option<&str>) -> Option<String> {
         [root, ..] if *root == PACKAGE_ROOT => Some(format!(
             "but a provider imports only {PACKAGE_ROOT}/{SHARED_UTILITIES_PACKAGE}/ from {PACKAGE_ROOT}/"
         )),
-        [root, ..] if *root == ORCHESTRATION_ROOT => {
-            Some(format!("but a provider never imports {ORCHESTRATION_ROOT}/"))
-        }
+        [root, ..] if *root == ORCHESTRATION_ROOT => Some(format!(
+            "but a provider never imports {ORCHESTRATION_ROOT}/"
+        )),
         _ => None,
     }
 }
