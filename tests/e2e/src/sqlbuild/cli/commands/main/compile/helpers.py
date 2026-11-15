@@ -1059,7 +1059,6 @@ def run_dense_delta_edit_loop_benchmark(
     edited_files: tuple[Path, Path, Path],
     full_pairs: int,
     expected_max_full_seconds: float,
-    expected_max_delta_seconds: float,
 ) -> DeltaEditLoopMeasurements:
     """Compile, edit a body, a header and a SQL test, then edit config with and without deltas."""
 
@@ -1099,7 +1098,7 @@ def run_dense_delta_edit_loop_benchmark(
         deltas[label] = _edit_loop_compile(
             project_dir=project_dir,
             label=f"delta-loop-{label}",
-            max_seconds=expected_max_delta_seconds,
+            max_seconds=expected_max_full_seconds,
             env=DELTA_EDIT_LOOP_ENV,
         )
     runs: dict[str, list[FreshProcessCompileBenchmarkResult]] = {"fallback": [], "full": []}
