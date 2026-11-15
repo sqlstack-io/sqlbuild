@@ -14,16 +14,21 @@ const FACTORY_MODULE: &str = "@factory\ndef tables():\n    for table in TABLES:\
 fn given_module_when_reading_then_each_top_level_statement_has_its_kind() {
     let test_cases = [
         StatementKindsTestCase {
-            description: "a CRLF node module with a docstring, imports, a value and a node",
+            description: "a CRLF node module with a docstring, imports, an assignment and a node",
             contents: CRLF_NODE_MODULE,
             expected_kinds: Some(vec![
                 "Docstring",
                 "Import",
                 "Import",
                 "Import",
-                "Other",
+                "Assignment",
                 "Function",
             ]),
+        },
+        StatementKindsTestCase {
+            description: "a class and a loop",
+            contents: "class Store(Provider):\n    pass\n\n\nfor row in rows:\n    pass\n",
+            expected_kinds: Some(vec!["Class", "Other"]),
         },
         StatementKindsTestCase {
             description: "a module that does not parse",

@@ -53,7 +53,9 @@ fn node_module_faults(file: &UnitFile<'_>) -> Vec<Fault> {
                     function.position,
                 ),
             },
-            UnitStatementKind::Other => (OTHER_STATEMENT.to_owned(), statement.position),
+            UnitStatementKind::Class(_)
+            | UnitStatementKind::Assignment(_)
+            | UnitStatementKind::Other => (OTHER_STATEMENT.to_owned(), statement.position),
         };
         faults.extend(unit_fault(
             NODE_MODULE_SHAPE_CODE,
@@ -95,7 +97,9 @@ fn main_module_faults(file: &UnitFile<'_>, project: &UnitProject<'_>) -> Vec<Fau
                 format!("function '{}' is not main()", function.name),
                 function.position,
             ),
-            UnitStatementKind::Other => (OTHER_STATEMENT.to_owned(), statement.position),
+            UnitStatementKind::Class(_)
+            | UnitStatementKind::Assignment(_)
+            | UnitStatementKind::Other => (OTHER_STATEMENT.to_owned(), statement.position),
         };
         faults.extend(unit_fault(
             MAIN_MODULE_SHAPE_CODE,
@@ -208,7 +212,9 @@ fn checks_module_faults(file: &UnitFile<'_>, project: &UnitProject<'_>) -> Vec<F
                     function.position,
                 )],
             },
-            UnitStatementKind::Other => {
+            UnitStatementKind::Class(_)
+            | UnitStatementKind::Assignment(_)
+            | UnitStatementKind::Other => {
                 vec![(OTHER_STATEMENT.to_owned(), statement.position)]
             }
         };

@@ -24,10 +24,10 @@ Providers are shared runtime services that SQLBuild discovers, configures, and i
 
 ## Defining a provider
 
-Create a Python file under `providers/` in your project. A provider is a class that subclasses `Provider` from `sqlbuild.providers`:
+Create a `provider.py` in a capability folder under `providers/` (see [Project layout](#project-layout)). A provider is a class that subclasses `Provider` from `sqlbuild.providers`:
 
 ```python
-# providers/warehouse_client.py
+# providers/warehouse_client/provider.py
 from sqlbuild.providers import Provider
 
 class WarehouseClient(Provider):
@@ -83,7 +83,7 @@ You can also type-annotate the parameter for IDE support and compile-time valida
 
 ```python
 from sqlbuild.tasks import task
-from providers.warehouse_client import WarehouseClient
+from providers.warehouse_client.provider import WarehouseClient
 
 @task
 def export_orders(ctx, warehouse_client: WarehouseClient):
@@ -217,19 +217,30 @@ Setting values, defaults included, are never published.
 
 ## Project layout
 
+Give each provider its own folder under `providers/`, named for the capability it provides:
+
 ```
 my-project/
   providers/
-    warehouse_client.py
-    slack_notifier.py
+    warehouse_client/
+      provider.py        # the Provider subclass
+      constants.py
+      _helpers/          # private to warehouse_client
+    slack_notifier/
+      provider.py
   hooks/
     sql/
       record_notification.sql
     python/
       notify.py
   python/
-    loaders/
-      load_orders.py
-    tasks/
-      export_orders.py
+    orders/
+      load_orders/
+        node.py
+        main.py
 ```
+
+Discovery also accepts `.py` files directly in `providers/`. A project that selects the
+[Python Rules](../rules/python-rules.md#laying-out-providers) reports them, along with
+anything else in a provider folder besides `provider.py`, its role files, `_helpers/` and
+`_classes/`.

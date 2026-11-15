@@ -107,7 +107,7 @@ fn nearest_unit(parts: &[&str], units: &BTreeSet<String>) -> Option<String> {
 }
 
 /// The dotted module of a Python path and of every package above it.
-fn dotted_names(path: &str) -> Vec<String> {
+pub(crate) fn dotted_names(path: &str) -> Vec<String> {
     let stem: &str = path.strip_suffix(".py").unwrap_or(path);
     let parts: Vec<&str> = stem
         .split('/')
@@ -208,10 +208,20 @@ pub(crate) fn imported_module(
     file: &UnitFile<'_>,
     project: &UnitProject<'_>,
 ) -> Option<String> {
+    let mut folder: Vec<&str> = vec![PACKAGE_ROOT];
+    folder.extend(&file.parts[..file.parts.len() - 1]);
+    absolute_module(import, &folder, &project.modules)
+}
+
+/// The absolute dotted module `import` reads from a file in the project folder `folder`, given every project module.
+pub(crate) fn absolute_module(
+    import: &UnitImport,
+    folder: &[&str],
+    modules: &BTreeSet<String>,
+) -> Option<String> {
     let mut base: Vec<&str> = Vec::new();
     if import.level > 0 {
-        base.push(PACKAGE_ROOT);
-        base.extend(&file.parts[..file.parts.len() - 1]);
+        base.extend(folder);
         for _ in 1..import.level {
             base.pop()?;
         }
@@ -222,7 +232,7 @@ pub(crate) fn imported_module(
         return Some(module);
     };
     let submodule: String = format!("{module}.{name}");
-    Some(if project.modules.contains(&submodule) {
+    Some(if modules.contains(&submodule) {
         submodule
     } else {
         module

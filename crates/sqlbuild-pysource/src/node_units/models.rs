@@ -29,8 +29,21 @@ pub enum UnitStatementKind {
     /// An import, or an `if TYPE_CHECKING:` block that only imports.
     Import,
     Function(UnitFunction),
-    /// Any other statement, such as a class, an assignment or a loop.
+    Class(UnitClass),
+    /// An assignment, annotated or not, by the names it binds; empty when any target is an attribute or subscript.
+    Assignment(Vec<String>),
+    /// Any other statement, such as a loop or a call.
     Other,
+}
+
+/// A class and its bases.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnitClass {
+    pub name: String,
+    /// Where the class's name is written.
+    pub position: UnitPosition,
+    /// Each base as dotted text, such as `Provider` or `paged.PagedApi`; empty when it is another expression.
+    pub bases: Vec<String>,
 }
 
 /// One imported name of an `import` or `from ... import` at module level.
