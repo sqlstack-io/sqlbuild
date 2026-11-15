@@ -68,6 +68,7 @@ const REVIEWED_SCOPES: &[(&str, RuleScope)] = &[
     ("SQBRPYTHON019", RuleScope::Python),
     ("SQBRPYTHON020", RuleScope::Python),
     ("SQBRPYTHON021", RuleScope::Python),
+    ("SQBRPYTHON022", RuleScope::Python),
     ("SQBRPYTHON101", RuleScope::Python),
     ("SQBRPYTHON102", RuleScope::Python),
     ("SQBRPYTHON103", RuleScope::Python),

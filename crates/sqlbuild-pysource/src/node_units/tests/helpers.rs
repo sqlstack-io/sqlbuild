@@ -1,6 +1,6 @@
 use crate::node_units::main::node_unit_module::node_unit_module;
 use crate::node_units::models::{
-    UnitDecorator, UnitImport, UnitParameter, UnitPosition, UnitStatementKind,
+    DeferredSpan, UnitDecorator, UnitImport, UnitParameter, UnitPosition, UnitStatementKind,
 };
 
 const PYTHON_VERSION: (u8, u8) = (3, 12);
@@ -79,4 +79,9 @@ pub(super) fn import(
         position,
         only_in_depends_on: false,
     }
+}
+
+/// The span from `start` to `end`, each a 1-based line and 0-based byte column.
+pub(super) fn span(start: (usize, usize), end: (usize, usize)) -> DeferredSpan {
+    DeferredSpan { start, end }
 }
