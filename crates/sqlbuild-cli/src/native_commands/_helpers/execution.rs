@@ -812,7 +812,7 @@ pub(crate) async fn check_published_location(
         "Checking location connection with sqb debug...\n",
     )]));
     tokio::pin!(stopped);
-    let Some((connected, files)) =
+    let Some((connected, missing, files)) =
         check_location_connection(options, script, stopped.as_mut()).await?
     else {
         return Ok(None);
@@ -820,6 +820,18 @@ pub(crate) async fn check_published_location(
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         () = report_location_health(options, bearer, session_id, LocationHealth::Connection { generation, healthy: connected }) => {},
+    }
+    tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        () = report_location_health(options, bearer, session_id, LocationHealth::ProviderSecrets { generation, missing }) => {},
+    }
+    if missing > 0 {
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!(
+                "{missing} provider secret(s) are unset in this location's environment; runs that use them fail. Run sqb debug for the list.\n"
+            ),
+        )]));
     }
     drop(write_output(&[(
         Stream::Stderr,
@@ -832,12 +844,12 @@ pub(crate) async fn check_published_location(
     Ok(Some(files))
 }
 
-/// Capture the ordinary debug check's exact local file paths without contaminating publication stdout.
+/// Capture the ordinary debug check's exact local file paths and missing provider secret count without contaminating publication stdout.
 pub(crate) async fn check_location_connection(
     options: &LocationServe,
     script: &Path,
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(bool, Vec<PathBuf>)>, ControlError> {
+) -> Result<Option<(bool, u64, Vec<PathBuf>)>, ControlError> {
     let mut child = location_child(options, script)
         .args(["debug", "--target", &options.target, "--json"])
         .stdout(Stdio::piped())
@@ -856,20 +868,24 @@ pub(crate) async fn check_location_connection(
         },
         result = async { tokio::try_join!(child.wait(), stdout.read_to_end(&mut output)) } => result?.0.success(),
     };
-    let files: Vec<String> = match serde_json::from_slice::<serde_json::Value>(&output)
-        .and_then(|report| serde_json::from_value(report["local_files"].clone()))
-    {
-        Ok(files) => files,
-        Err(_) => {
-            drop(write_output(&[(
-                Stream::Stderr,
-                "Location connection check did not produce a valid report; retaining the published snapshot.\n",
-            )]));
-            return Ok(Some((false, Vec::new())));
-        }
+    let report: Option<(Vec<String>, u64)> = serde_json::from_slice::<serde_json::Value>(&output)
+        .and_then(|report| {
+            Ok((
+                serde_json::from_value(report["local_files"].clone())?,
+                report["missing_secrets"].as_u64().unwrap_or_default(),
+            ))
+        })
+        .ok();
+    let Some((files, missing)) = report else {
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Location connection check did not produce a valid report; retaining the published snapshot.\n",
+        )]));
+        return Ok(Some((false, 0, Vec::new())));
     };
     Ok(Some((
         connected,
+        missing,
         location_database_files(&options.project_dir, files),
     )))
 }

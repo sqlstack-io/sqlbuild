@@ -29,7 +29,9 @@ use crate::bindings::_helpers::compile_attachment::effective_config::build_effec
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::cursor::overrides::{cursor_integer, cursor_timestamp};
-use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
+use crate::bindings::_helpers::discovery::provider_secrets::{
+    SecretPolicy, consumer_uses, require_used_secrets, sink_uses,
+};
 use crate::bindings::_helpers::load::load_progress::{
     LoadCallbackRelay, LoadProgressReporter, load_result_text,
 };
@@ -86,6 +88,27 @@ fn write(stream: &Bound<'_, PyAny>, value: &str) -> PyResult<()> {
     Ok(())
 }
 
+/// Fail before loading anything when the selected sources' loaders or the sinks need provider secrets that are unset.
+fn require_loader_secrets(
+    discovered: &Bound<'_, PyAny>,
+    selected: &[Bound<'_, PyAny>],
+) -> PyResult<()> {
+    let mut loaders: Vec<String> = Vec::new();
+    for entry in selected {
+        let loader: Bound<'_, PyAny> = native_field(entry, "loader")?;
+        if !loader.is_none() {
+            loaders.push(loader.extract()?);
+        }
+    }
+    let mut uses: Vec<(String, String)> =
+        consumer_uses(&native_field(discovered, "loader_functions")?)?
+            .into_iter()
+            .filter(|(_, loader)| loaders.contains(loader))
+            .collect();
+    uses.extend(sink_uses(discovered)?);
+    require_used_secrets(discovered, &uses)
+}
+
 fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Invocation<'py>> {
     let project_dir: Bound<'py, PyAny> = match native_field(request, "project_dir")? {
         directory if !directory.is_none() => directory,
@@ -132,6 +155,7 @@ fn invocation<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<Inv
         ),
         &defaults,
     )?;
+    require_loader_secrets(&discovered, &selected)?;
     loader_write_schemas(
         &discovered,
         (&selected_target, &native_field(request, "cli_vars")?),

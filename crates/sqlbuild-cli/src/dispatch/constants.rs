@@ -504,12 +504,13 @@ pub(crate) const COST_ROUTE: Route = routed(
     REQUEST_SHAPE,
 );
 
-const DEBUG_ARGUMENTS: [Field; 5] = [
+const DEBUG_ARGUMENTS: [Field; 6] = [
     PROJECT_DIR,
     NO_COLOR,
     same("no_connection"),
     SELECTED_TARGET,
     JSON_OUTPUT,
+    same("verbose"),
 ];
 pub(crate) const DEBUG_ROUTE: Route = routed(
     "run_debug",

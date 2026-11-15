@@ -3,6 +3,7 @@ use crate::debug_report::models::{ConnectionValue, DebugLine, DebugReport, Debug
 pub(super) fn sample_report() -> DebugReport {
     DebugReport {
         local_files: vec!["/repo/warehouse.db".into()],
+        missing_secrets: 0,
         runtime: vec![DebugLine::plain("sqlbuild version", "0.2.1")],
         configuration: vec![DebugLine::checked(
             "project file",

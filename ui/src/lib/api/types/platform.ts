@@ -251,6 +251,8 @@ export type ProviderSetting = {
 	/** The environment variable the setting is read from. */
 	env: string;
 	description: string | null;
+	/** Whether this required secret is unset in the location's environment. */
+	missing: boolean;
 };
 
 /** Python code that injects a provider. None of it is a catalog node, so it has no page to open. */

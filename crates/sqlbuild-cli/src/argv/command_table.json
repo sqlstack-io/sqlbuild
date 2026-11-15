@@ -5404,6 +5404,18 @@
        {
         "kind": "store_true",
         "options": [
+         "--verbose"
+        ],
+        "dest": "verbose",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "List every provider and secret setting, not only the missing ones",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
          "--no-color"
         ],
         "dest": "no_color",
