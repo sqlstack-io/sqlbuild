@@ -1,6 +1,7 @@
 """Carrier pickup client."""
 
 from providers.carrier_api.constants import MINIMUM_CHARGE_CENTS
+
 from sqlbuild.providers import Provider
 
 _CENTS_PER_UNIT: int = 100

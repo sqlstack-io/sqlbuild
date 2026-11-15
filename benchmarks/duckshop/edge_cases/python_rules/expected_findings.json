@@ -3,7 +3,7 @@
   "findings": [
     ["SQBRPYTHON101", "hooks/python/alert.py", 4, 11],
     ["SQBRPYTHON015", "providers/carrier_api/provider.py", 3, 8],
-    ["SQBRPYTHON014", "providers/carrier_api/provider.py", 7, 5],
+    ["SQBRPYTHON014", "providers/carrier_api/provider.py", 8, 5],
     ["SQBRPYTHON013", "providers/stock_feed.py", 1, 1],
     ["SQBRPYTHON613", "python/inventory/__init__.py", 1, 1],
     ["SQBRPYTHON002", "python/inventory/common/__init__.py", 1, 1],
