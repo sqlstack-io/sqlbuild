@@ -173,7 +173,7 @@ fn union_names(annotation: &Expr) -> Vec<String> {
 }
 
 /// The last name of a name, an attribute chain, or the subscripted base of either.
-fn last_name(expression: &Expr) -> Option<String> {
+pub(crate) fn last_name(expression: &Expr) -> Option<String> {
     match expression {
         Expr::Name(name) => Some(name.id.to_string()),
         Expr::Attribute(attribute) => Some(attribute.attr.to_string()),
