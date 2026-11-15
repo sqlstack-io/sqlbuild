@@ -7,6 +7,8 @@ pub enum PythonFiles {
     Package,
     /// Every supported project Python file, including hooks, UDFs and orchestration modules.
     All,
+    /// Only the project's Python tests under `tests/python/` and `tests/providers/`.
+    Tests,
 }
 
 /// One `SQBRPYTHON` rule and the Fensu core rule it runs, if any.
@@ -42,6 +44,8 @@ pub(crate) struct PythonTarget {
     pub role: Option<String>,
     pub is_main_module: bool,
     pub is_entry_module: bool,
+    /// Fensu's scope for the file: `test` for project Python tests, else the root scope.
+    pub scope: &'static str,
 }
 
 /// One `evaluate_core_rules` call on a file: the Fensu codes it runs and the context they read.

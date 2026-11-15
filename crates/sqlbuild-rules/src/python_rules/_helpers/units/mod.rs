@@ -5,3 +5,4 @@ pub(crate) mod nodes;
 pub(crate) mod orchestration;
 pub(crate) mod project;
 pub(crate) mod providers;
+pub(crate) mod python_tests;

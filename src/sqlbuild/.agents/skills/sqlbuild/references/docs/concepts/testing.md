@@ -536,6 +536,9 @@ sqb test
 sqb test --select stg_orders
 ```
 
+`sqb test` also runs the project's pytest modules under `tests/python/` and `tests/providers/`;
+`sqb build` never runs them. See [Python tests](../cli/test.md#python-tests).
+
 ## More test features
 
 [Testing reference](testing-reference.md) covers macro, UDF and table function tests,
