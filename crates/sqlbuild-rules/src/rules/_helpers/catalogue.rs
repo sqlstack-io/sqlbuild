@@ -43,6 +43,7 @@ macro_rules! rule {
                     | "SQBRTEST104"
                     | "SQBRTEST203"
                     | "SQBRTEST301"
+                    | "SQBRORCHESTRATION101"
             ),
             custom: false,
             scope: $scope,
@@ -115,6 +116,14 @@ pub(crate) fn catalogue() -> Vec<RuleMetadata> {
             "published-name-shape",
             "each domain's published models must share one name shape",
             "Name every published model of a domain either <domain>__<layer>__<entity> or <domain>__<layer>__<entity>__<qualifier>. Move consumer-specific variants into intermediate or the consuming domain, rename models into the family, or allowlist an intentional qualifier with a reason.",
+        ),
+        rule!(
+            "SQBRORCHESTRATION101",
+            RuleScope::Project,
+            "orchestration",
+            "named-selector-limit",
+            "job and sensor selections must not list nodes one by one",
+            "Select a pipeline by its folder or a tag, which keeps nodes added later; add an exact rule exception with a reason for a job that deliberately targets specific nodes.",
         ),
         rule!(
             "SQBRPROJECT101",

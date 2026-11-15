@@ -29,6 +29,8 @@ pub(crate) const NATIVE_ROWS_MEMO_VERSION: &str = "native-rules-rows-response-v2
 pub(crate) const SQL_RULE_PREFIX: &str = "SQLCLEAN";
 /// The Python rule family, which runs only when a selector names it or one of its codes.
 pub(crate) const PYTHON_RULE_PREFIX: &str = "SQBRPYTHON";
+/// The orchestration rule family, which reads job and sensor declarations rather than models.
+pub(crate) const ORCHESTRATION_RULE_PREFIX: &str = "SQBRORCHESTRATION";
 /// Threshold key setting the fewest test cases a custom rule must ship.
 pub const MIN_CUSTOM_RULE_TEST_CASES_KEY: &str = "min_custom_rule_test_cases";
 /// Rules whose findings name a joined relation, so an exception may cover just that relation.

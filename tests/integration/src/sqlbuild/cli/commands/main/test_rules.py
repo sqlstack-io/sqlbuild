@@ -34,6 +34,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     EmptyRuleSelectionTestCase,
     ExplicitContractOutputRuleIntegrationTestCase,
     ImplicitAliasRuleIntegrationTestCase,
+    NamedSelectorIntegrationTestCase,
     NumericRangeDecisionIntegrationTestCase,
     ProjectRuleScratchStateTestCase,
     PythonRuleCacheSequenceTestCase,
@@ -53,6 +54,7 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     interrupt_main_after,
     observe_hosts,
     write_custom_host_project,
+    write_named_selector_project,
     write_project_files,
     write_project_scratch_rules,
     write_python_rules_project,
@@ -92,6 +94,12 @@ _PYTHON_ALERT: str = (PYTHON_RULES_FIXTURES / "violations" / _PYTHON_ALERT_PATH)
 _PYTHON_ANNOTATED_ALERT: str = _PYTHON_ALERT.replace("def alert(ctx,", "def alert(ctx: object,")
 _PYTHON_CACHE_TOML: str = (
     'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRPYTHON101"]\n'
+)
+_NAMED_SELECTOR_SELECT: str = 'select = ["SQBRORCHESTRATION"]\n'
+_NAMED_SELECTOR_EXCEPTION: str = (
+    '\n[[rules.rule_exceptions]]\nrule = "SQBRORCHESTRATION101"\n'
+    'path = "orchestration/jobs/orders_repair_job.toml"\n'
+    'reason = "Rebuilds the four orders models after a late payments load."\n'
 )
 _CUSTOM_CACHE_MODEL_SQL: str = 'MODEL (description "Orders");\nSELECT 1 AS order_id\n'
 _CUSTOM_CACHE_EDITED_SQL: str = _CUSTOM_CACHE_MODEL_SQL.replace("SELECT 1", "SELECT 2")
@@ -3542,3 +3550,123 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
 
     assert tuple(observed) == test_case.expected_hits_and_misses
     assert tuple(cached) == test_case.expected_python_cache
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NamedSelectorIntegrationTestCase(
+            description=(
+                "listed jobs and sensor conditions over the limit, bound or imported, and computed "
+                "sensor conditions fail; folders, globs, job names and platform events pass"
+            ),
+            rules_toml=_NAMED_SELECTOR_SELECT,
+            expected_exit_code=1,
+            expected_findings=(
+                ("SQBRORCHESTRATION101", "orchestration/jobs/orders_listed_job.toml", 4, 10),
+                ("SQBRORCHESTRATION101", "orchestration/jobs/orders_repair_job.toml", 4, 10),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_built_sensor.py",
+                    10,
+                    10,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_computed_sensor.py",
+                    10,
+                    28,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_failure_sensor.py",
+                    6,
+                    12,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_landed_sensor.py",
+                    10,
+                    10,
+                ),
+            ),
+            expected_text="job 'orders_listed_job' names 4 nodes in its selection (limit 3)",
+        ),
+        NamedSelectorIntegrationTestCase(
+            description="an exact rule exception keeps a deliberate list",
+            rules_toml=_NAMED_SELECTOR_SELECT + _NAMED_SELECTOR_EXCEPTION,
+            expected_exit_code=1,
+            expected_findings=(
+                ("SQBRORCHESTRATION101", "orchestration/jobs/orders_listed_job.toml", 4, 10),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_built_sensor.py",
+                    10,
+                    10,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_computed_sensor.py",
+                    10,
+                    28,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_failure_sensor.py",
+                    6,
+                    12,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_landed_sensor.py",
+                    10,
+                    10,
+                ),
+            ),
+            expected_text="sensor 'on_orders_failure_sensor' names 4 nodes in its selection",
+        ),
+        NamedSelectorIntegrationTestCase(
+            description="a raised limit passes every list but still reports computed conditions",
+            rules_toml=(
+                _NAMED_SELECTOR_SELECT
+                + "\n[rules.rule_options.SQBRORCHESTRATION101]\nmax_named_selectors = 4\n"
+            ),
+            expected_exit_code=1,
+            expected_findings=(
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_built_sensor.py",
+                    10,
+                    10,
+                ),
+                (
+                    "SQBRORCHESTRATION101",
+                    "orchestration/sensors/on_orders_computed_sensor.py",
+                    10,
+                    28,
+                ),
+            ),
+            expected_text="`landed_after(...)` is a function call",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_orchestration_selections_when_compiling_then_named_selector_limit_follows_configuration(
+    test_case: NamedSelectorIntegrationTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_named_selector_project(project_dir=tmp_path, rules_toml=test_case.rules_toml)
+
+    exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
+    diagnostics: list[dict[str, Any]] = json.loads(capsys.readouterr().out)["diagnostics"]
+
+    assert exit_code == test_case.expected_exit_code
+    assert (
+        tuple(
+            (item["code"], item.get("path"), item.get("line"), item.get("column"))
+            for item in diagnostics
+        )
+        == test_case.expected_findings
+    )
+    assert test_case.expected_text in json.dumps(diagnostics)

@@ -12,6 +12,7 @@ use crate::engine::_helpers::evaluation::{EvaluationControl, evaluate_request_wi
 use crate::engine::_helpers::retained::encoded_rows;
 use crate::errors::RowsError;
 use crate::models::{EvaluateRequest, Model, RetainedRows, RowsEvaluation, RowsRequest};
+use crate::orchestration_rules::main::orchestration_facts::orchestration_facts;
 use crate::python_rules::main::python_sources::python_sources;
 
 /// The shared key prefix of fields a request serializes but evaluation derives again.
@@ -59,6 +60,7 @@ pub(crate) fn prepare(rows: RowsRequest, keyed: bool) -> Result<PreparedRows, Ro
         .map(digested)
         .collect::<Result<_, _>>()?;
     request.python_sources = python_sources(&request).map_err(RowsError::Rules)?;
+    request.orchestration = orchestration_facts(&request).map_err(RowsError::Rules)?;
     let mut request_json: Option<Vec<u8>> = None;
     let memo: Option<(String, PathBuf)> = match memo {
         Some((code_identity, path)) => {

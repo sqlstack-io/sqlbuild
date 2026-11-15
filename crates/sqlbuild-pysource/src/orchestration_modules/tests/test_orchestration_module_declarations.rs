@@ -1,5 +1,7 @@
 use crate::orchestration_modules::main::orchestration_module_declarations::orchestration_module_declarations;
-use crate::orchestration_modules::models::{ModuleDeclarations, PythonDeclarationKind};
+use crate::orchestration_modules::models::{
+    ConditionSource, ModuleDeclarations, PythonDeclaration, PythonDeclarationKind,
+};
 use crate::orchestration_modules::tests::helpers::{at, declaration, non_literal, text};
 use crate::orchestration_modules::tests::test_types::ScanTestCase;
 
@@ -32,6 +34,64 @@ fn given_orchestration_modules_when_scanning_then_reads_declarations_and_removed
                         ("run_event", text("orders_job", 6, 22)),
                     ],
                 )],
+                removed_imports: Vec::new(),
+            }),
+        },
+        ScanTestCase {
+            description: "each selecting condition keeps its selection, literal or not, under any import name",
+            contents: "from sqlbuild.orchestration import node_event, sensor, source_new_data as fresh\nSELECTION = \"source:raw_orders\"\na = sensor(\"a_sensor\", description=\"d\", when=node_event(select=\"fct_orders fct_refunds\", kinds=[]), run=\"a_job\")\nb = sensor(\"b_sensor\", description=\"d\", when=fresh(select=SELECTION), run=\"b_job\")\n",
+            expected_module: Some(ModuleDeclarations {
+                declarations: vec![
+                    PythonDeclaration {
+                        condition: Some(ConditionSource::Selection(text(
+                            "fct_orders fct_refunds",
+                            3,
+                            64,
+                        ))),
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("a_sensor", 3, 12),
+                            at(3, 5),
+                            vec![("run", text("a_job", 3, 105))],
+                        )
+                    },
+                    PythonDeclaration {
+                        condition: Some(ConditionSource::Selection(non_literal(4, 59))),
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("b_sensor", 4, 12),
+                            at(4, 5),
+                            vec![("run", text("b_job", 4, 75))],
+                        )
+                    },
+                ],
+                removed_imports: Vec::new(),
+            }),
+        },
+        ScanTestCase {
+            description: "a condition bound to a module-level name is followed, and one whose select is unpacked cannot be counted",
+            contents: "from sqlbuild.orchestration import node_event, sensor\nFAILED = node_event(select=\"a b c d\", kinds=[\"failure\"])\nOPTIONS = {\"select\": \"a\"}\nc = sensor(\"c_sensor\", description=\"d\", when=FAILED, run=\"c_job\")\nd = sensor(\"d_sensor\", description=\"d\", when=node_event(**OPTIONS), run=\"d_job\")\n",
+            expected_module: Some(ModuleDeclarations {
+                declarations: vec![
+                    PythonDeclaration {
+                        condition: Some(ConditionSource::Selection(text("a b c d", 2, 28))),
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("c_sensor", 4, 12),
+                            at(4, 5),
+                            vec![("run", text("c_job", 4, 58))],
+                        )
+                    },
+                    PythonDeclaration {
+                        condition: Some(ConditionSource::Selection(non_literal(5, 46))),
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("d_sensor", 5, 12),
+                            at(5, 5),
+                            vec![("run", text("d_job", 5, 73))],
+                        )
+                    },
+                ],
                 removed_imports: Vec::new(),
             }),
         },
@@ -99,6 +159,56 @@ fn given_orchestration_modules_when_scanning_then_reads_declarations_and_removed
                         at(5, 5),
                         vec![("run", text("b_job", 5, 55))],
                     ),
+                ],
+                removed_imports: Vec::new(),
+            }),
+        },
+        ScanTestCase {
+            description: "a platform event, a function call, an imported name and a rebinding after the sensor",
+            contents: "from orchestration.sensors._conditions import LATE as LATE_ORDERS\nfrom sqlbuild.orchestration import node_event, platform_event, sensor\nTICK = platform_event(kinds=[\"tick\"])\nC = node_event(select=\"a b\", kinds=[])\np = sensor(\"p_sensor\", description=\"d\", when=TICK, run=\"p_job\")\nf = sensor(\"f_sensor\", description=\"d\", when=make_condition(\"x\"), run=\"f_job\")\ni = sensor(\"i_sensor\", description=\"d\", when=LATE_ORDERS, run=\"i_job\")\nr = sensor(\"r_sensor\", description=\"d\", when=C, run=\"r_job\")\nC = platform_event(kinds=[])\n",
+            expected_module: Some(ModuleDeclarations {
+                declarations: vec![
+                    declaration(
+                        PythonDeclarationKind::Sensor,
+                        text("p_sensor", 5, 12),
+                        at(5, 5),
+                        vec![("run", text("p_job", 5, 56))],
+                    ),
+                    PythonDeclaration {
+                        condition: Some(ConditionSource::Unresolvable {
+                            what: "`make_condition(...)` is a function call".to_owned(),
+                            position: at(6, 46),
+                        }),
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("f_sensor", 6, 12),
+                            at(6, 5),
+                            vec![("run", text("f_job", 6, 71))],
+                        )
+                    },
+                    PythonDeclaration {
+                        condition: Some(ConditionSource::Imported {
+                            module: "orchestration.sensors._conditions".to_owned(),
+                            level: 0,
+                            name: "LATE".to_owned(),
+                            position: at(7, 46),
+                        }),
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("i_sensor", 7, 12),
+                            at(7, 5),
+                            vec![("run", text("i_job", 7, 63))],
+                        )
+                    },
+                    PythonDeclaration {
+                        condition: Some(ConditionSource::Selection(text("a b", 4, 23))),
+                        ..declaration(
+                            PythonDeclarationKind::Sensor,
+                            text("r_sensor", 8, 12),
+                            at(8, 5),
+                            vec![("run", text("r_job", 8, 53))],
+                        )
+                    },
                 ],
                 removed_imports: Vec::new(),
             }),

@@ -73,3 +73,9 @@ pub(super) struct NeedsJobsTestCase {
     pub(super) also_known: &'static [&'static str],
     pub(super) expected_needs_jobs: bool,
 }
+
+pub(super) struct NamedAtomsTestCase {
+    pub(super) description: &'static str,
+    pub(super) selection: &'static str,
+    pub(super) expected_atoms: &'static [&'static str],
+}

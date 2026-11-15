@@ -1164,6 +1164,17 @@ class SqlRuleCacheSequenceTestCase:
 
 
 @dataclass(frozen=True)
+class NamedSelectorIntegrationTestCase:
+    """One compile of the DuckShop named-selector fixture under a `[rules]` table."""
+
+    description: str
+    rules_toml: str
+    expected_exit_code: int
+    expected_findings: tuple[tuple[str, str | None, int | None, int | None], ...]
+    expected_text: str = ""
+
+
+@dataclass(frozen=True)
 class PythonRulesIntegrationTestCase:
     """One compile of a DuckShop Python-rules fixture under a `[rules]` table."""
 

@@ -12,6 +12,7 @@ pub mod errors;
 pub mod fix_verification;
 pub mod lint_text;
 pub mod models;
+pub mod orchestration_rules;
 pub mod project_tree;
 pub mod python_rules;
 pub mod query_facts;

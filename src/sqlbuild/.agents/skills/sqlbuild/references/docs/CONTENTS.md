@@ -49,6 +49,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [Configuration and selection](concepts/rules/configuration-and-selection.md) (`concepts/rules/configuration-and-selection`) - Select built-in and custom Rules by exact code or family prefix.
 - [Findings and exceptions](concepts/rules/findings-and-exceptions.md) (`concepts/rules/findings-and-exceptions`) - Understand Rule diagnostics and record intentional exceptions safely.
 - [Python Rules](concepts/rules/python-rules.md) (`concepts/rules/python-rules`) - Check the project's Python for annotations, imports, function shape and the layout of python/.
+- [Orchestration Rules](concepts/rules/orchestration-rules.md) (`concepts/rules/orchestration-rules`) - Keep job and sensor selections from listing nodes one by one.
 - [Execution and caching](concepts/rules/execution-and-caching.md) (`concepts/rules/execution-and-caching`) - Understand Rule enforcement order, focused runs, and dependency-aware reuse.
 
 ## Ship
