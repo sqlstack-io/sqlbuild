@@ -102,6 +102,15 @@ pub(crate) struct CacheSplit<'a> {
     pub stale: Vec<FilePlan<'a>>,
 }
 
+/// One parsed project file, its path parts from the project root, and its text.
+#[derive(Debug)]
+pub(crate) struct ParsedFile<'a> {
+    pub path: &'a str,
+    pub parts: Vec<&'a str>,
+    pub text: &'a str,
+    pub module: sqlbuild_pysource::node_units::models::UnitModule,
+}
+
 /// One parsed module under `python/` and the unit folder it sits in.
 #[derive(Debug)]
 pub(crate) struct UnitFile<'a> {

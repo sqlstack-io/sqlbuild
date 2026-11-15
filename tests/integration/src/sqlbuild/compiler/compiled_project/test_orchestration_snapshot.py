@@ -36,6 +36,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotExpressionRangeTestCase,
     SnapshotIdentityTestCase,
     SnapshotLineageTestCase,
+    SnapshotProcessReuseTestCase,
     SnapshotProvidersTestCase,
     SnapshotRejectionTestCase,
     SnapshotScheduleTestCase,
@@ -1302,6 +1303,28 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             },
         ),
         SnapshotDiscoveryTestCase(
+            description="DuckShop sensors read support modules in a private folder of their domain",
+            files={**duckshop_orchestration("private_support_orders")},
+            expected_jobs=("inventory_job",),
+            expected_sensors={
+                "on_orders_sensor": {
+                    "description": "Build inventory for every genuine orders rebuild.",
+                    "job_key": "inventory_job",
+                    "when": {
+                        "kind": "node_event",
+                        "selection": ["model:orders"],
+                        "kinds": ["success"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                    "declared_at": {
+                        "path": "orchestration/sensors/inventory/on_orders_sensor.py",
+                        "line": 7,
+                    },
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="failure and recovery selectors preserve their individual transition kinds",
             files={
                 **edited_duckshop_orchestration(
@@ -1598,6 +1621,15 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
+            description="a DuckShop sensor declared in a private folder fails instead of never running",
+            files=duckshop_orchestration("private_folder_sensor"),
+            expected_error=ValueError,
+            expected_message=(
+                "orchestration/sensors/inventory/_helpers/on_orders_sensor.py.*"
+                "declares a sensor inside the private folder _helpers/"
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
             description="DuckShop settings cannot replace the selection",
             files={**duckshop_orchestration("invalid_settings")},
             expected_error=ValueError,
@@ -1869,6 +1901,44 @@ def test_given_broken_declaration_modules_when_compiling_then_no_partial_snapsho
                 project_dir=tmp_path,
                 discovered_inputs=discovered,
             )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotProcessReuseTestCase(
+            description="a project whose sensor imports orchestration/ leaves the next project compilable",
+            fixtures=("private_support_orders", "node_orders", "private_support_orders"),
+            expected_sensors=(("on_orders_sensor",), ("on_orders_sensor",), ("on_orders_sensor",)),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_projects_compiled_in_one_process_when_one_imports_orchestration_then_each_compiles(
+    tmp_path: Path, test_case: SnapshotProcessReuseTestCase
+) -> None:
+    sensors: list[tuple[str, ...]] = []
+    for index, fixture in enumerate(test_case.fixtures):
+        project_dir: Path = tmp_path / f"project_{index}"
+        write_files(
+            project_dir=project_dir, files=TYPE_PROOF_FILES | duckshop_orchestration(fixture)
+        )
+        discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=project_dir)
+        publication: dict[str, Any] = json.loads(
+            compile_snapshot(
+                project=build_compiled_project(
+                    discovered_inputs=discovered,
+                    adapter=DuckDbAdapter(),
+                    resolved_connection={"database": "warehouse", "schema": "main"},
+                ),
+                metadata_json=json.dumps(METADATA),
+                project_dir=project_dir,
+                discovered_inputs=discovered,
+            ).to_json()
+        )
+        sensors.append(tuple(publication["documents"].get("triggers", {})))
+
+    assert tuple(sensors) == test_case.expected_sensors
 
 
 @pytest.mark.parametrize(

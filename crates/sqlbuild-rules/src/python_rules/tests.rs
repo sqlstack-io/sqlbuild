@@ -4,6 +4,8 @@ mod evaluate_python_rules;
 mod helpers;
 #[path = "tests/test_node_units.rs"]
 mod node_units;
+#[path = "tests/test_orchestration_rules.rs"]
+mod orchestration_rules;
 #[path = "tests/test_provider_rules.rs"]
 mod provider_rules;
 #[path = "tests/test_python_cache.rs"]

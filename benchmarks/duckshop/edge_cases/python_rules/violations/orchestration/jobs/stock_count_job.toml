@@ -1,0 +1,3 @@
+name = "stock_count_job"
+description = "Count stock."
+select = "stock_count"
