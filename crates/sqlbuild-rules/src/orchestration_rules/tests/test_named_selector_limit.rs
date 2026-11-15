@@ -163,7 +163,7 @@ fn given_job_and_sensor_selections_when_evaluating_then_more_named_nodes_than_th
             ],
         },
         NamedSelectorLimitTestCase {
-            description: "a CRLF condition module is read like any other, and a later import rebinds an assigned name",
+            description: "a CRLF condition module is read like any other, and a name follows its last binding before the use",
             files: vec![
                 export_job(),
                 (
@@ -186,6 +186,13 @@ fn given_job_and_sensor_selections_when_evaluating_then_more_named_nodes_than_th
                     "orchestration/sensors/orders/rebound.py",
                     format!("from ._rebound import WIDE\n{}", sensor("orders_rebound", "WIDE")),
                 ),
+                (
+                    "orchestration/sensors/orders/reimported.py",
+                    format!(
+                        "from ._wide import WIDE\n{}from ._crlf import X as WIDE\n",
+                        sensor("orders_reimported", "WIDE")
+                    ),
+                ),
             ],
             config: selected.clone(),
             expected_findings: vec![
@@ -200,6 +207,12 @@ fn given_job_and_sensor_selections_when_evaluating_then_more_named_nodes_than_th
                     5,
                     77,
                     "sensor 'orders_rebound_sensor' names 4 nodes in its selection (limit 3)",
+                ),
+                (
+                    "orchestration/sensors/orders/reimported.py",
+                    5,
+                    83,
+                    "sensor 'orders_reimported_sensor' names 4 nodes in its selection (limit 3)",
                 ),
             ],
         },

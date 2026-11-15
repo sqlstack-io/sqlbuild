@@ -32,7 +32,7 @@ pub fn module_binding_condition(
         .assignments
         .get(name)
         .and_then(|bindings| bindings.last());
-    let imported = scope.imports.get(name);
+    let imported = scope.imports.get(name).and_then(|bindings| bindings.last());
     match (assigned, imported) {
         (Some((at, value)), imported) if imported.is_none_or(|import| import.start < *at) => {
             condition_source(value, *at, &scope)

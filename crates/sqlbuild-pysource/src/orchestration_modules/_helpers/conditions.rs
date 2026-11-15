@@ -27,9 +27,9 @@ pub(crate) fn module_assignments(body: &[Stmt]) -> BTreeMap<&str, Vec<(TextSize,
     assignments
 }
 
-/// Each name a module-level `from ... import` binds, with its module, relative level and imported name.
-pub(crate) fn module_imports(body: &[Stmt]) -> BTreeMap<&str, ImportedName<'_>> {
-    let mut imports: BTreeMap<&str, ImportedName<'_>> = BTreeMap::new();
+/// Each name's module-level `from ... import` bindings, in source order.
+pub(crate) fn module_imports(body: &[Stmt]) -> BTreeMap<&str, Vec<ImportedName<'_>>> {
+    let mut imports: BTreeMap<&str, Vec<ImportedName<'_>>> = BTreeMap::new();
     for statement in body {
         let Stmt::ImportFrom(import) = statement else {
             continue;
@@ -41,15 +41,12 @@ pub(crate) fn module_imports(body: &[Stmt]) -> BTreeMap<&str, ImportedName<'_>> 
             .unwrap_or_default();
         for alias in &import.names {
             let local: &str = alias.asname.as_ref().unwrap_or(&alias.name).as_str();
-            imports.insert(
-                local,
-                ImportedName {
-                    module: module.clone(),
-                    level: import.level,
-                    name: alias.name.as_str(),
-                    start: statement.range().start(),
-                },
-            );
+            imports.entry(local).or_default().push(ImportedName {
+                module: module.clone(),
+                level: import.level,
+                name: alias.name.as_str(),
+                start: statement.range().start(),
+            });
         }
     }
     imports
@@ -76,7 +73,10 @@ pub(crate) fn condition_source(
                         .find(|(start, _)| *start < at)
                         .copied()
                 });
-                let imported = scope.imports.get(id).filter(|import| import.start < at);
+                let imported = scope
+                    .imports
+                    .get(id)
+                    .and_then(|bindings| bindings.iter().rev().find(|import| import.start < at));
                 match (assigned, imported) {
                     (Some((start, bound)), imported)
                         if imported.is_none_or(|import| import.start < start) =>
