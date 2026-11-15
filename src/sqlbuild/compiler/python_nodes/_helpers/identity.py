@@ -10,6 +10,7 @@ from contextvars import ContextVar, Token
 from dataclasses import asdict
 from pathlib import Path
 from types import ModuleType
+from typing import Any, cast
 
 from sqlbuild._native import PythonIdentityDependency, PythonNodeIdentity
 from sqlbuild.compiler.python_nodes._helpers.object_source import hash_text
@@ -181,10 +182,14 @@ def _visit_object(
             collected_dependencies: dict[tuple[str, str], PythonIdentityDependency] = dependencies
             collected_dependencies[key] = dependency
 
-    module: ModuleType | None = memo.module(obj)
-    if module is None:
-        return
-    globals_map: dict[str, object] = vars(module)
+    globals_map: Mapping[str, object] | None = getattr(
+        inspect.unwrap(cast(Any, obj)), "__globals__", None
+    )
+    if globals_map is None:
+        module: ModuleType | None = memo.module(obj)
+        if module is None:
+            return
+        globals_map = vars(module)
     for ref in memo.references(obj):
         target: object | None = _resolve_reference(ref=ref, globals_map=globals_map)
         if target is None or target is obj:
