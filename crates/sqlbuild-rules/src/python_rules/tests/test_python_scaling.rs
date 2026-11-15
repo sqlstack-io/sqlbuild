@@ -4,10 +4,11 @@ use std::time::Duration;
 use serde_json::json;
 
 use crate::python_rules::tests::helpers::{
-    median_growth, scaling_project, serial_timing, timed_python_codes, unit_scaling_project,
+    median_growth, purity_chain_project, scaling_project, serial_timing, timed_python_codes,
+    unit_scaling_project,
 };
 use crate::python_rules::tests::test_types::{
-    PythonGrowthTestCase, PythonScalingTestCase, UnitScalingTestCase,
+    PurityScalingTestCase, PythonGrowthTestCase, PythonScalingTestCase, UnitScalingTestCase,
 };
 
 #[test]
@@ -123,6 +124,36 @@ fn given_many_linked_node_units_when_evaluating_unit_rules_then_finishes_within_
             "{}: growing the project {}x multiplied the time by {ratio:.2}",
             test_case.description,
             test_case.growth
+        );
+    }
+}
+
+#[test]
+fn given_many_roots_sharing_deep_call_chains_when_checking_compile_time_purity_then_finishes_within_budget()
+ {
+    let _serial = serial_timing();
+    let test_cases = [PurityScalingTestCase {
+        description: "5000 module-scope roots into 10 helper chains of 400 calls each",
+        roots: 5000,
+        chains: 10,
+        depth: 400,
+        expected_faults: 5000,
+        expected_max_duration: Duration::from_secs(3),
+    }];
+    for test_case in test_cases {
+        let files = purity_chain_project(test_case.roots, test_case.chains, test_case.depth);
+        let (codes, elapsed) =
+            timed_python_codes(&files, json!({ "select": ["SQBRPYTHON022"] })).expect("rules run");
+        assert_eq!(
+            codes.len(),
+            test_case.expected_faults,
+            "{}",
+            test_case.description
+        );
+        assert!(
+            elapsed < test_case.expected_max_duration,
+            "{}: took {elapsed:?}",
+            test_case.description
         );
     }
 }

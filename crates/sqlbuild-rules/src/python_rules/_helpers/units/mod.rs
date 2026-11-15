@@ -1,3 +1,4 @@
+pub(crate) mod compile_purity;
 pub(crate) mod imports;
 pub(crate) mod layout;
 pub(crate) mod modules;

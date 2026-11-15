@@ -3426,6 +3426,28 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
             ),
         ),
         PythonRulesIntegrationTestCase(
+            description="an approved loader boundary stops compile-time purity at that function",
+            fixture="violations",
+            rules_toml=(
+                'select = ["SQBRPYTHON022"]\n\n[rules.rule_options.SQBRPYTHON022]\n'
+                "approved_loader_boundaries = "
+                '["python.inventory.restock._helpers.thresholds.load_thresholds"]\n'
+            ),
+            expected_exit_code=0,
+            expected_findings=(),
+        ),
+        PythonRulesIntegrationTestCase(
+            description="a loader boundary glob fails configuration",
+            fixture="violations",
+            rules_toml=(
+                'select = ["SQBRPYTHON022"]\n\n[rules.rule_options.SQBRPYTHON022]\n'
+                'approved_loader_boundaries = ["python.inventory.*"]\n'
+            ),
+            expected_exit_code=1,
+            expected_findings=(("C000", None, None, None),),
+            expected_text="globs are not accepted",
+        ),
+        PythonRulesIntegrationTestCase(
             description="a rule option tightens a Python threshold",
             fixture="violations",
             rules_toml=(
@@ -3520,7 +3542,7 @@ def test_given_project_python_when_running_python_rules_then_findings_match_comp
                     _PYTHON_ANNOTATED_ALERT,
                 ),
             ),
-            expected_hits_and_misses=((0, 1), (0, 18), (17, 1), (0, 18), (19, 0)),
+            expected_hits_and_misses=((0, 1), (0, 21), (20, 1), (0, 21), (22, 0)),
             expected_python_cache=(False, True, True, True, True),
         )
     ],

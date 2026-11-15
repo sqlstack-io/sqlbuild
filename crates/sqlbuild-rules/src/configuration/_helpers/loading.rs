@@ -6,6 +6,7 @@ use crate::constants::{
     RELATION_EXCEPTION_RULES,
 };
 use crate::models::RulesConfig;
+use crate::python_rules::constants::{APPROVED_LOADER_BOUNDARIES_OPTION, COMPILE_TIME_PURITY_CODE};
 use fensu_policy::policy::types::RuleCodeGrammar;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_sqltext::header_strings::main::fold_prose::fold_prose;
@@ -248,6 +249,7 @@ pub(crate) fn validate(config: &RulesConfig) -> Result<(), String> {
         }
     }
     validate_published_layer_options(config)?;
+    validate_approved_loader_boundaries(config)?;
     for exception in &config.rule_exceptions {
         if exception.rule.trim().is_empty()
             || exception.path.trim().is_empty()
@@ -307,6 +309,40 @@ pub(crate) fn validate(config: &RulesConfig) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Approved loader boundaries are dotted function names, such as `python.orders._helpers.specs.load_specs`.
+fn validate_approved_loader_boundaries(config: &RulesConfig) -> Result<(), String> {
+    let Some(values) = config
+        .rule_options
+        .get(COMPILE_TIME_PURITY_CODE)
+        .and_then(|options| options.get(APPROVED_LOADER_BOUNDARIES_OPTION))
+        .and_then(serde_json::Value::as_array)
+    else {
+        return Ok(());
+    };
+    for value in values {
+        let name: &str = value.as_str().unwrap_or_default();
+        let parts: Vec<&str> = name.split('.').collect();
+        if !name.contains('.') || !parts.iter().all(|part| python_identifier(part)) {
+            return Err(format!(
+                "rules.rule_options.{COMPILE_TIME_PURITY_CODE}.{APPROVED_LOADER_BOUNDARIES_OPTION} \
+                 entries must be fully qualified project functions such as \
+                 python.orders._helpers.specs.load_specs; globs are not accepted: {value}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Whether `part` is a Python identifier.
+fn python_identifier(part: &str) -> bool {
+    part.chars()
+        .next()
+        .is_some_and(|first| first == '_' || first.is_alphabetic())
+        && part
+            .chars()
+            .all(|character| character == '_' || character.is_alphanumeric())
 }
 
 /// Published layers name model layers; allowed qualifiers are literal and carry a reason.

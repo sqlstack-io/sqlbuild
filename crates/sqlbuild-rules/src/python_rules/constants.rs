@@ -5,7 +5,7 @@ use fensu_native::rules::constants as fensu;
 use crate::python_rules::models::{PythonFiles, PythonRuleSpec};
 
 /// Every `SQBRPYTHON` rule; numbers are never reused, and new rules append to their band.
-pub(crate) const PYTHON_RULES: [PythonRuleSpec; 107] = [
+pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
     PythonRuleSpec {
         code: "SQBRPYTHON001",
         fensu_code: None,
@@ -257,6 +257,18 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 107] = [
         options: &[],
         message: "Python tests must mirror an existing module under python/ or providers/",
         remediation: "Move the test to tests/python/ or tests/providers/ at the path of the module it tests: tests/python/orders/storefront_import/test_main.py tests python/orders/storefront_import/main.py.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON022",
+        fensu_code: None,
+        slug: "compile-time-purity",
+        family: "purity",
+        owner: "file",
+        applies: PythonFiles::All,
+        enabled_by_default: true,
+        options: &[],
+        message: "Python that runs while the project compiles must not reach a subprocess, the network, a database or a remote client",
+        remediation: "Keep module scope and @factory bodies to static data such as specs in constants.py; move the call into a node body, main() or a provider, or list a deliberate discovery function in approved_loader_boundaries.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON101",
@@ -1463,6 +1475,89 @@ pub(crate) const ORCHESTRATION_MODULE_SURFACE_CODE: &str = "SQBRPYTHON018";
 pub(crate) const ORCHESTRATION_IMPORT_DIRECTION_CODE: &str = "SQBRPYTHON019";
 pub(crate) const ORCHESTRATION_NO_DOCSTRING_CODE: &str = "SQBRPYTHON020";
 pub(crate) const PYTHON_TEST_PLACEMENT_CODE: &str = "SQBRPYTHON021";
+pub(crate) const COMPILE_TIME_PURITY_CODE: &str = "SQBRPYTHON022";
+/// The option listing project functions whose calls compile-time purity does not follow.
+pub(crate) const APPROVED_LOADER_BOUNDARIES_OPTION: &str = "approved_loader_boundaries";
+/// Calls that start a subprocess, send a request, open a socket or a database, or build a remote client.
+pub(crate) const EXTERNAL_CALLS: [&str; 51] = [
+    "subprocess.run",
+    "subprocess.Popen",
+    "subprocess.call",
+    "subprocess.check_call",
+    "subprocess.check_output",
+    "subprocess.getoutput",
+    "subprocess.getstatusoutput",
+    "os.system",
+    "os.popen",
+    "os.posix_spawn",
+    "asyncio.create_subprocess_exec",
+    "asyncio.create_subprocess_shell",
+    "requests.get",
+    "requests.post",
+    "requests.put",
+    "requests.patch",
+    "requests.delete",
+    "requests.head",
+    "requests.options",
+    "requests.request",
+    "httpx.get",
+    "httpx.post",
+    "httpx.put",
+    "httpx.patch",
+    "httpx.delete",
+    "httpx.head",
+    "httpx.options",
+    "httpx.request",
+    "httpx.stream",
+    "aiohttp.request",
+    "urllib.request.urlopen",
+    "urllib3.request",
+    "http.client.HTTPConnection",
+    "http.client.HTTPSConnection",
+    "socket.socket",
+    "socket.create_connection",
+    "socket.getaddrinfo",
+    "socket.gethostbyname",
+    "sqlalchemy.create_engine",
+    "sqlalchemy.ext.asyncio.create_async_engine",
+    "pymongo.MongoClient",
+    "redis.Redis",
+    "redis.StrictRedis",
+    "redis.from_url",
+    "clickhouse_connect.get_client",
+    "google.cloud.bigquery.Client",
+    "boto3.client",
+    "boto3.resource",
+    "paramiko.SSHClient",
+    "paramiko.Transport",
+    "fabric.Connection",
+];
+/// Call prefixes that replace the process or spawn another, such as `os.execv` and `os.spawnl`.
+pub(crate) const EXTERNAL_CALL_PREFIXES: [&str; 2] = ["os.exec", "os.spawn"];
+/// Driver packages whose `connect` or `create_pool` opens a database or remote session.
+pub(crate) const CONNECTING_PACKAGES: [&str; 17] = [
+    "asyncpg",
+    "asyncssh",
+    "clickhouse_driver",
+    "cx_Oracle",
+    "databricks",
+    "duckdb",
+    "oracledb",
+    "psycopg",
+    "psycopg2",
+    "pymssql",
+    "pymysql",
+    "pyodbc",
+    "redshift_connector",
+    "snowflake",
+    "sqlite3",
+    "teradatasql",
+    "trino",
+];
+/// The functions of a connecting package that open a connection.
+pub(crate) const CONNECTING_FUNCTIONS: [&str; 2] = ["connect", "create_pool"];
+/// The module file of a package.
+pub(crate) const PACKAGE_INIT_MODULE: &str = "__init__";
 /// Fensu's scope for test files, the only scope its test rules check.
 pub(crate) const TEST_SCOPE: &str = "test";
 /// The prefix of a test module's file name; other files in a mirrored test folder need only the folder.
@@ -1537,6 +1632,9 @@ pub(crate) const NODE_KINDS: [(&str, &str); 3] = [
 pub(crate) const CHECK_KIND: (&str, &str) = ("check", "CheckContext");
 /// Decorators that generate nodes or checks.
 pub(crate) const FACTORY_DECORATORS: [&str; 1] = ["factory"];
+
+/// Text a source must contain to have code its import never runs: a lambda or a `__main__` block.
+pub(crate) const DEFERRED_CODE_MARKERS: [&str; 2] = ["lambda", "__main__"];
 /// The loader decorator, which takes no description because its managed source has one.
 pub(crate) const LOADER_DECORATOR: &str = "loader";
 /// Return annotations `main()` may use, by node decorator.

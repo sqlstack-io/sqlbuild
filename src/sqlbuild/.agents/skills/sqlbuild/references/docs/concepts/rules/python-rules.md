@@ -15,6 +15,7 @@ Online: https://sqlbuild.com/docs/concepts/rules/python-rules/
 - Laying out providers
 - Laying out sensors and calendars
 - Testing Python
+- Keeping compile-time Python pure
 - Main modules and entry modules
 - Unreachable definitions
 - Rule options
@@ -282,6 +283,47 @@ def test_given_a_status_when_mapping_then_returns_its_label(test_case: RowMappin
 | `SQBRPYTHON701` to `SQBRPYTHON711` | A test folder or module whose layout, imports, helpers, conditionals or test-case dataclasses break the pattern above | Follow the pattern above |
 | `SQBRPYTHON712` to `SQBRPYTHON724` | A test function or `pytest.mark.parametrize` that is not named `test_given_<state>_when_<action>_then_<outcome>`, or does not take dataclass cases through `test_case` with ids from each `description` | Follow the pattern above |
 
+## Keeping compile-time Python pure
+
+`sqb compile` imports project Python with no warehouse connection, so the code that runs then must
+not reach outside the machine. `SQBRPYTHON022` checks every call made at module scope, in a class
+body, or directly in a `@factory` body, in every file it reads, and follows the project functions
+those calls reach. A call that reaches a subprocess, an HTTP request, a socket, a database or
+warehouse driver, or a cloud or SSH client is reported at the call where the walk started:
+
+```python
+# python/orders/storefront_import/constants.py
+import requests
+
+STOREFRONT_REGIONS = requests.get("https://example.com/regions").json()  # reported
+```
+
+```text
+error[SQBRPYTHON022]: Python that runs while the project compiles must not reach a subprocess, the network, a database or a remote client: calls requests.get
+  --> python/orders/storefront_import/constants.py:3:22
+```
+
+When the external call sits in a project function, the message names it and its line instead, such
+as `reaches requests.get at python/orders/storefront_import/_helpers/regions.py:8`.
+
+Calls inside node bodies, `main()`, the nodes a factory generates, and provider methods run when
+the node runs, so they are not checked. Only calls whose target is known from the imports are
+followed, so a call through a variable or a method of an object is never reported.
+
+Keep the data a factory loops over in its unit's `constants.py` or `models.py`. When a factory must
+discover what to generate, put that discovery behind one function and approve it. The walk does not
+enter an approved function, and an approved factory's body is not checked:
+
+```toml
+[rules.rule_options.SQBRPYTHON022]
+approved_loader_boundaries = [
+  "python.inventory.warehouse_snapshots._helpers.spec_loading.load_warehouse_specs",
+]
+```
+
+Each entry is the fully qualified name of a project function. A glob fails configuration with
+`C000`, and an entry that names a module fails the run.
+
 ## Main modules and entry modules
 
 Some Rules apply only to a domain's main modules: files under a `main/` folder, and a unit's
@@ -312,7 +354,7 @@ reason = "Carriers are looked up by name from the shipment's carrier code."
 
 ## Rule options
 
-Configure the size limits by exact code:
+Configure the size limits and approved boundaries by exact code:
 
 ```toml
 [rules.rule_options.SQBRPYTHON504]
@@ -332,8 +374,10 @@ max_arguments = 6
 | `SQBRPYTHON611` | `max_role_depth` | 1 | How many package levels may sit below a role package. |
 | `SQBRPYTHON615` | `min_shared_domain_prefix_packages` | 2 | Fewest sibling domains sharing a name prefix that are reported; 0 turns the rule off. |
 | `SQBRPYTHON627` | `max_file_lines` | 2000 | Most lines one Python file may hold. |
+| `SQBRPYTHON022` | `approved_loader_boundaries` | none | Project functions the [compile-time purity](#keeping-compile-time-python-pure) walk does not enter. |
 
-Each option takes a whole number of 0 or more. Unknown option names, text values and negative
+`approved_loader_boundaries` takes a list of fully qualified function names; every other option
+takes a whole number of 0 or more. Unknown option names, values of the wrong type and negative
 numbers fail configuration with `C000`.
 
 ## Rule reference
@@ -380,6 +424,12 @@ remediation.
 | `SQBRPYTHON018` | orchestration-module-surface | All | yes | A sensor or calendar module holds imports, private constants and its one declaration |
 | `SQBRPYTHON019` | orchestration-import-direction | All | yes | Sensors and calendars import only providers, `python/utils/` and their own support; nothing outside `orchestration/` imports them |
 | `SQBRPYTHON020` | orchestration-no-docstring | All | yes | Sensor and calendar functions have no docstring |
+
+### Compile-time purity
+
+| Code | Name | Files | Default | Checks |
+|---|---|---|---|---|
+| `SQBRPYTHON022` | compile-time-purity | All | yes | Module scope, class bodies and `@factory` bodies reach no subprocess, network, database or remote client |
 
 ### Python tests
 
