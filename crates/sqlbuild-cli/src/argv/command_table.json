@@ -2885,6 +2885,9 @@
         "title": "options"
        }
       ],
+      "mutex_groups": [
+       false
+      ],
       "actions": [
        {
         "kind": "help",
@@ -2992,6 +2995,32 @@
         "const": true,
         "default": false,
         "help": "with --since, show why each test was selected",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--sql"
+        ],
+        "dest": "sql_only",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run only SQL tests",
+        "mutex_group": 0,
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--python"
+        ],
+        "dest": "python_only",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run only Python tests under tests/python/ and tests/providers/",
+        "mutex_group": 0,
         "group": 1
        },
        {

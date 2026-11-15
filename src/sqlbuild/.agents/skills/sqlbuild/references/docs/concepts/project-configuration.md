@@ -770,10 +770,11 @@ Code that extends SQLBuild itself keeps its own root:
 Compilation rejects Python anywhere else with `D016`, so indirectly importable modules cannot create
 an unofficial project structure.
 
-Keep repository pytest tests outside the SQLBuild project's `tests/` directory, which is reserved for
-SQLBuild SQL tests and scenarios. Orchestrator code such as Dagster or Rivers definitions lives outside
-the SQLBuild project directory and points at it; see [Dagster](../integrations/dagster.md) and
-[Rivers](../integrations/rivers.md).
+The project's `tests/` directory holds SQL tests and scenarios, and pytest tests of project Python
+under `tests/python/` and `tests/providers/`, which `sqb test` runs; see
+[Python tests](../cli/test.md#python-tests). Orchestrator code such as Dagster or Rivers definitions
+lives outside the SQLBuild project directory and points at it; see
+[Dagster](../integrations/dagster.md) and [Rivers](../integrations/rivers.md).
 
 ## sqlbuild_local.toml
 

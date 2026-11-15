@@ -7102,6 +7102,8 @@ class TestCommandRequest(NativeRecord):
     test_timeout: str | None
     since: str | None
     explain: bool
+    sql_only: bool
+    python_only: bool
     def __init__(
         self,
         project_dir: Path | None = None,
@@ -7119,6 +7121,8 @@ class TestCommandRequest(NativeRecord):
         test_timeout: str | None = None,
         since: str | None = None,
         explain: bool = False,
+        sql_only: bool = False,
+        python_only: bool = False,
     ) -> None: ...
 
 class RefactorCommandRequest(NativeRecord):

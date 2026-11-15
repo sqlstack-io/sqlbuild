@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::PyBool;
 use serde_json::Value;
 use sqlbuild_analysis::review_command::constants::{
     CLONE_START, FULL_REFRESH_START, SEED_KIND, UNIT_TEST_LABEL,
@@ -289,6 +290,7 @@ pub(crate) fn run_changed_tests(
             ("json_output_path", path_object(py, &output)?),
             ("concurrency", native_field(inputs.request, "concurrency")?),
             ("since", text(py, &settings.since)),
+            ("sql_only", PyBool::new(py, true).to_owned().into_any()),
         ],
     )?;
     let ran: PyResult<i32> = quietly(inputs.output, || run_test_command(py, &request));
