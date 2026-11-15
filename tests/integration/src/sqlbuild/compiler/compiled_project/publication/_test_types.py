@@ -318,6 +318,13 @@ class CatalogBoundaryTestCase:
 
 
 @dataclass(frozen=True)
+class ReadFailureTestCase:
+    description: str
+    table: str
+    expected_stderr: str
+
+
+@dataclass(frozen=True)
 class StatisticsRecoveryTestCase:
     description: str
     expected_log: str

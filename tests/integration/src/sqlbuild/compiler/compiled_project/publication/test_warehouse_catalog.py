@@ -168,7 +168,10 @@ def test_given_non_authoritative_adapter_scope_when_reading_catalog_then_no_page
     )
     assert result.returncode == 0, result.stderr
     assert (json.loads(result.stdout) is not None) is test_case.expected_page_delivered
-    assert "No page delivered" in result.stderr
+    assert (
+        "Warehouse metadata read (catalog) failed: ValueError: catalog listing is not "
+        "authoritative for this namespace; scan incomplete. No page delivered."
+    ) in result.stderr
 
 
 @pytest.mark.parametrize(

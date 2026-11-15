@@ -1,9 +1,9 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
-use crate::state_tables::constants::{MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
+use crate::state_tables::constants::{EVENT_ID_COLUMN, MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER};
 use crate::state_tables::models::HistoryRead;
 
-/// Cursor values are already rendered by the adapter; `None` sorts before every SQL value.
+/// Rendered cursor values, `None` first; a trailing event ID repeating an `event_id` key is ignored.
 pub fn read_history_sql(
     qualified_name: &str,
     after: Option<&[Option<String>]>,
@@ -19,17 +19,21 @@ pub fn read_history_sql(
         limit,
     } = read;
     let mut projection = columns.join(", ");
-    projection.push_str(if has_event_id {
-        ", event_id"
-    } else {
-        ", NULL AS event_id"
-    });
-    let mut columns = key_columns.unwrap_or(columns).to_vec();
-    columns.push(if has_event_id {
-        "event_id"
-    } else {
-        MISSING_EVENT_ID_KEY
-    });
+    if !columns.contains(&EVENT_ID_COLUMN) {
+        projection.push_str(if has_event_id {
+            ", event_id"
+        } else {
+            ", NULL AS event_id"
+        });
+    }
+    let mut columns: Vec<&str> = key_columns.unwrap_or(columns).to_vec();
+    if !columns.contains(&EVENT_ID_COLUMN) {
+        columns.push(if has_event_id {
+            EVENT_ID_COLUMN
+        } else {
+            MISSING_EVENT_ID_KEY
+        });
+    }
     let ordered = columns
         .iter()
         .map(|column| {

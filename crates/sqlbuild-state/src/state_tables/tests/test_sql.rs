@@ -1,10 +1,13 @@
+use crate::events::constants::{
+    COLUMN_MIGRATION_COLUMNS, MIGRATION_COLUMNS, NODE_RESULT_COLUMNS, OLD_NAME_VIEW_COLUMNS,
+};
 use crate::state_tables::main::create_table_sql::create_table_sql;
 use crate::state_tables::main::read_history_sql::read_history_sql;
 use crate::state_tables::main::values_insert_sql::values_insert_sql;
 use crate::state_tables::models::HistoryRead;
 use crate::state_tables::tests::helpers::column;
 use crate::state_tables::tests::test_types::{
-    CreateTableTestCase, HistoryReadTestCase, ValuesInsertTestCase,
+    CreateTableTestCase, EventKeyTestCase, HistoryReadTestCase, ValuesInsertTestCase,
 };
 
 #[test]
@@ -108,5 +111,128 @@ fn given_a_table_without_event_ids_when_paging_history_then_the_missing_key_neve
             "{}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_event_tables_keyed_by_event_id_when_paging_history_then_each_column_and_key_appears_once()
+{
+    let test_cases = [
+        EventKeyTestCase {
+            description: "migrations",
+            columns: &MIGRATION_COLUMNS,
+            key_columns: &["event_id", "created_at"],
+            timestamp_column: "created_at",
+            expected_ordering_keys: &["event_id", "created_at"],
+        },
+        EventKeyTestCase {
+            description: "column migrations",
+            columns: &COLUMN_MIGRATION_COLUMNS,
+            key_columns: &["event_id", "created_at"],
+            timestamp_column: "created_at",
+            expected_ordering_keys: &["event_id", "created_at"],
+        },
+        EventKeyTestCase {
+            description: "old-name views",
+            columns: &OLD_NAME_VIEW_COLUMNS,
+            key_columns: &["event_id", "created_at"],
+            timestamp_column: "created_at",
+            expected_ordering_keys: &["event_id", "created_at"],
+        },
+        EventKeyTestCase {
+            description: "microbatches",
+            columns: &["event_id", "record_type", "scope_kind", "created_at"],
+            key_columns: &["event_id", "created_at"],
+            timestamp_column: "created_at",
+            expected_ordering_keys: &["event_id", "created_at"],
+        },
+        EventKeyTestCase {
+            description: "janitor events",
+            columns: &["event_id", "schema_version", "event_type", "occurred_at"],
+            key_columns: &["event_id", "occurred_at"],
+            timestamp_column: "occurred_at",
+            expected_ordering_keys: &["event_id", "occurred_at"],
+        },
+        EventKeyTestCase {
+            description: "node results, which carry no event ID column",
+            columns: &NODE_RESULT_COLUMNS,
+            key_columns: &[
+                "node_type",
+                "node_name",
+                "target_database",
+                "target_schema",
+                "target_name",
+                "run_id",
+                "status",
+                "ts",
+            ],
+            timestamp_column: "ts",
+            expected_ordering_keys: &[
+                "node_type",
+                "node_name",
+                "target_database",
+                "target_schema",
+                "target_name",
+                "run_id",
+                "status",
+                "ts",
+                "event_id",
+            ],
+        },
+    ];
+    let adapters = [
+        "snowflake",
+        "duckdb",
+        "motherduck",
+        "sqlite",
+        "postgres",
+        "bigquery",
+        "databricks",
+        "sqlserver",
+        "clickhouse",
+    ];
+    for test_case in test_cases {
+        for adapter in adapters {
+            let protocol_cursor = vec![Some("'x'".to_owned()); test_case.key_columns.len() + 1];
+            let sql = read_history_sql(
+                "s.t",
+                Some(&protocol_cursor),
+                HistoryRead {
+                    columns: test_case.columns,
+                    key_columns: Some(test_case.key_columns),
+                    timestamp_column: test_case.timestamp_column,
+                    observed_since: None,
+                    adapter,
+                    has_event_id: true,
+                    limit: 5,
+                },
+            )
+            .expect("supported adapter");
+            let head = sql.strip_prefix("SELECT ").expect("select");
+            let head = head.strip_prefix("TOP 5 ").unwrap_or(head);
+            let (projection, rest) = head.split_once(" FROM ").expect("from");
+            let mut selected: Vec<&str> = projection.split(", ").collect();
+            selected.sort_unstable();
+            selected.dedup();
+            assert_eq!(
+                selected.len(),
+                test_case.columns.len() + usize::from(!test_case.columns.contains(&"event_id")),
+                "{} on {adapter}: each column selected once in {sql}",
+                test_case.description
+            );
+            let ordering_keys: Vec<&str> = rest
+                .split_once(" ORDER BY ")
+                .expect("order")
+                .1
+                .split("CASE WHEN ")
+                .skip(1)
+                .filter_map(|item| item.split_once(" IS NULL").map(|(key, _)| key))
+                .collect();
+            assert_eq!(
+                ordering_keys, test_case.expected_ordering_keys,
+                "{} on {adapter}: {sql}",
+                test_case.description
+            );
+        }
     }
 }
