@@ -329,13 +329,24 @@ def test_given_multibyte_text_before_restorations_when_formatting_then_output_is
             "macros/sql",
             # A project macro needs consumers in more than one folder to stay a project macro.
             ("staging", "marts"),
+            _NORMALISE_NAME_HEADER + _NORMALISE_NAME_AUTHORED,
             _NORMALISE_NAME_HEADER + _NORMALISE_NAME_FORMATTED,
         ),
         ExpressionMacroFormatTestCase(
             "scoped macro",
             "models/staging/_sqlbuild/_macros/sql",
             ("staging",),
+            _NORMALISE_NAME_HEADER + _NORMALISE_NAME_AUTHORED,
             _NORMALISE_NAME_HEADER + _NORMALISE_NAME_FORMATTED,
+        ),
+        ExpressionMacroFormatTestCase(
+            "multi-line string after a backslash-escaped quote",
+            "models/staging/_sqlbuild/_macros/sql",
+            ("staging",),
+            _NORMALISE_NAME_HEADER
+            + "CONCAT(\n  @column_name,\n  'O\\'Brien\n      kept indent',\n  'tail'\n)\n",
+            _NORMALISE_NAME_HEADER
+            + "CONCAT(@column_name, 'O\\'Brien\n      kept indent', 'tail')\n",
         ),
     ],
     ids=lambda case: case.description,
@@ -346,7 +357,7 @@ def test_given_snowflake_expression_macro_when_formatting_then_body_is_laid_out_
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
     macro: Path = tmp_path / test_case.macro_directory / "normalise_name.sql"
     macro.parent.mkdir(parents=True)
-    macro.write_text(_NORMALISE_NAME_HEADER + _NORMALISE_NAME_AUTHORED)
+    macro.write_text(test_case.authored_macro)
     for folder in test_case.consumer_folders:
         model: Path = tmp_path / "models" / folder / f"{folder}_customer_names.sql"
         model.parent.mkdir(parents=True, exist_ok=True)

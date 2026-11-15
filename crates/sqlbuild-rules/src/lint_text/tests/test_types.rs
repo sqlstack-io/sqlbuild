@@ -116,12 +116,14 @@ pub(crate) struct SitePatternTestCase {
 
 pub(crate) struct UnwrappedExpressionTestCase {
     pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
     pub(crate) formatted: &'static str,
     pub(crate) expected_expression: Option<&'static str>,
 }
 
 pub(crate) struct ExpressionMacroFormatTestCase {
     pub(crate) description: &'static str,
+    pub(crate) dialects: &'static [&'static str],
     pub(crate) contents: String,
     pub(crate) expected_formatted: String,
 }
