@@ -1,7 +1,6 @@
 //! The project's Python tests, which a local `sqb test` runs with pytest after its SQL tests.
 
 use std::collections::BTreeSet;
-use std::os::fd::AsFd;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 use std::time::Instant;
@@ -166,7 +165,7 @@ pub(crate) fn run_python_tests(
         .env("PYTHONPATH", python_path(&project_dir)?)
         .stdin(Stdio::null());
     if native_field(request, "json_output")?.is_truthy()? {
-        command.stdout(Stdio::from(std::io::stderr().as_fd().try_clone_to_owned()?));
+        command.stdout(Stdio::from(std::io::stderr()));
     }
     let started: Instant = Instant::now();
     let status: ExitStatus = py
