@@ -122,3 +122,9 @@ pub(super) struct LexicalRulesCallsTestCase {
     pub(super) sql: &'static str,
     pub(super) expected_calls: &'static [&'static str],
 }
+
+pub(crate) struct ProbeSchemaLookupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) relation: &'static str,
+    pub(crate) expected_column: Option<&'static str>,
+}

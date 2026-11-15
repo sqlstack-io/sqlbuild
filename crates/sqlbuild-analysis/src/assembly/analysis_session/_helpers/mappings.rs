@@ -318,6 +318,10 @@ fn typed_columns(
     columns: &Pairs,
     known: Option<&Pairs>,
 ) -> Vec<SchemaColumn> {
+    let mut spelled: HashMap<&str, &str> = HashMap::new();
+    for (name, value) in known.into_iter().flatten() {
+        let _ = spelled.entry(name.as_str()).or_insert(value.as_str());
+    }
     columns
         .iter()
         .map(|(name, data_type)| {
@@ -325,19 +329,13 @@ fn typed_columns(
                 name,
                 (!data_type.is_empty() && data_type != UNKNOWN_TYPE)
                     .then(|| dialect.session_type(data_type)),
-                column_nullability(known, name),
+                column_nullability(spelled.get(name.as_str()).copied()),
             )
         })
         .collect()
 }
 
-fn column_nullability(known: Option<&Pairs>, column: &str) -> Nullability {
-    let spelled: Option<&str> = known.and_then(|pairs| {
-        pairs
-            .iter()
-            .find(|(name, _)| name == column)
-            .map(|(_, value)| value.as_str())
-    });
+fn column_nullability(spelled: Option<&str>) -> Nullability {
     match spelled {
         Some("non_null") => Nullability::NonNull,
         Some("nullable") => Nullability::Nullable,
