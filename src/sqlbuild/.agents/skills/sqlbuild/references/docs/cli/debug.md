@@ -24,7 +24,14 @@ The command reports four groups of checks:
 
 **Configuration** - Finds and validates `sqlbuild_project.toml`, loads `sqlbuild_local.toml` if present, resolves the adapter, active target, connection, database, and schema. For Snowflake it also shows the warehouse each [command group](../concepts/adapters/snowflake.md#command-group-warehouses) connects with and where that value came from.
 
-**Providers** - Lists the [providers](../concepts/python-nodes/providers.md) the project defines.
+**Providers** - Counts the [providers](../concepts/python-nodes/providers.md) whose [secrets](../concepts/python-nodes/providers.md#secrets) are all set, and lists each missing secret as `WARN`. When every secret is set it prints one line. `--verbose` lists every provider and secret.
+
+```text
+Providers:
+  providers: 2 of 3 ready [WARN missing secrets]
+  slack_alerts: SLACK_WEBHOOK_URL [WARN missing]
+  more: sqb debug --verbose lists every provider [SKIP]
+```
 
 **Connection** - Displays connection settings as `sqb debug` itself uses them, with the `query` warehouse group applied (secrets are masked), attempts to connect to the warehouse, and runs `SELECT 1` to verify query execution.
 
@@ -33,7 +40,8 @@ The command reports four groups of checks:
 | Flag | Description |
 |------|-------------|
 | `--no-connection` | Skip the connection and query tests. Useful for validating config without warehouse access. |
-| `--json` | Output results as JSON instead of formatted text. |
+| `--json` | Output results as JSON instead of formatted text, with `missing_secrets` counting the unset provider secrets. |
+| `--verbose` | List every provider and secret setting, set or missing. |
 | `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `query` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
 ## Example
@@ -81,7 +89,7 @@ Connection:
 
 ## Exit codes
 
-Returns `0` when all checks pass, `1` when any check fails (e.g. connection refused, invalid config).
+Returns `0` when all checks pass, `1` when any check fails (e.g. connection refused, invalid config). A missing provider secret is a warning and doesn't fail the command.
 A failed run is recorded in [Recall](../concepts/observability/recall.md) with the first failed
 check as its cause:
 

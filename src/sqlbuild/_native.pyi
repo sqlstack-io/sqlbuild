@@ -5175,7 +5175,9 @@ def discover_hook_functions(
 def discover_materialization_files(
     *, project_dir: Path, providers: tuple[DiscoveredProvider, ...] | None = None
 ) -> tuple[DiscoveredMaterializationFile, ...]: ...
-def discover_provider_classes(*, project_dir: Path) -> tuple[DiscoveredProvider, ...]: ...
+def discover_provider_classes(
+    *, project_dir: Path, secret_policy: str = ...
+) -> tuple[DiscoveredProvider, ...]: ...
 def discover_event_exporter_declarations(
     *, project_dir: Path
 ) -> tuple[DiscoveredEventExporterDeclaration, ...]: ...
@@ -7100,6 +7102,8 @@ class TestCommandRequest(NativeRecord):
     test_timeout: str | None
     since: str | None
     explain: bool
+    sql_only: bool
+    python_only: bool
     def __init__(
         self,
         project_dir: Path | None = None,
@@ -7117,6 +7121,8 @@ class TestCommandRequest(NativeRecord):
         test_timeout: str | None = None,
         since: str | None = None,
         explain: bool = False,
+        sql_only: bool = False,
+        python_only: bool = False,
     ) -> None: ...
 
 class RefactorCommandRequest(NativeRecord):
@@ -12023,6 +12029,7 @@ class SettingsConfig(NativeRecord):
     scenario_timeout: str | None
     scenario_timeout_seconds: int | None
     delta_compile: bool
+    allow_missing_secrets: bool
     def __init__(
         self,
         sql_analysis: bool = ...,
@@ -12042,6 +12049,7 @@ class SettingsConfig(NativeRecord):
         scenario_timeout: str | None = ...,
         scenario_timeout_seconds: int | None = ...,
         delta_compile: bool = ...,
+        allow_missing_secrets: bool = ...,
     ) -> None: ...
     @property
     def sql_validation(self) -> bool: ...

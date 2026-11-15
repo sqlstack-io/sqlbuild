@@ -91,7 +91,7 @@ fn location_health(namespace: &Namespace) -> i32 {
             ]));
             i32::from(matches!(
                 state,
-                LocationState::Broken | LocationState::FallingBack
+                LocationState::Broken | LocationState::FallingBack | LocationState::MissingSecrets
             ))
         }
         Err(error) => {

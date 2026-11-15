@@ -19,10 +19,6 @@ pub(crate) const COMMAND_IMPLEMENTATIONS: [(RunCommand, &str); 5] = [
 pub(crate) const MODEL_NODE_KIND: &str = "model";
 pub(crate) const SOURCE_NODE_KIND: &str = "source";
 
-/// `env_prefix_target` values under which pydantic-settings prefixes alias names too.
-pub(crate) const ALIAS_PREFIX_TARGET: &str = "alias";
-pub(crate) const ALL_PREFIX_TARGET: &str = "all";
-
 /// DuckDB's message when another process, such as a running build, holds the database file.
 pub(crate) const DUCKDB_LOCK_CONFLICT: &str = "Conflicting lock is held";
 
@@ -36,3 +32,5 @@ pub(crate) const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];
 
 /// A SQL unit test's published kind; a frozen run selects it back with `test:<name>`.
 pub(crate) const SQL_TEST_NODE_KIND: &str = "sql_test";
+/// The setting-row field the published providers document leaves out: secret matching reads it, the UI does not.
+pub(crate) const SNAPSHOT_HIDDEN_SETTING: &str = "alias";

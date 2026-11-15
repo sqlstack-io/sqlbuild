@@ -491,6 +491,7 @@ delta_compile = true
 | `test_timeout` | `30s` | Time limit for each SQL unit test, or `"disabled"` |
 | `scenario_timeout` | none | Time limit for each scenario, or `"disabled"` |
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](/docs/cli/compile#compiling-after-an-edit). |
+| `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](/docs/concepts/python-nodes/providers#secrets). |
 
 ### Unit test and scenario limits
 
@@ -744,10 +745,11 @@ Code that extends SQLBuild itself keeps its own root:
 Compilation rejects Python anywhere else with `D016`, so indirectly importable modules cannot create
 an unofficial project structure.
 
-Keep repository pytest tests outside the SQLBuild project's `tests/` directory, which is reserved for
-SQLBuild SQL tests and scenarios. Orchestrator code such as Dagster or Rivers definitions lives outside
-the SQLBuild project directory and points at it; see [Dagster](/docs/integrations/dagster) and
-[Rivers](/docs/integrations/rivers).
+The project's `tests/` directory holds SQL tests and scenarios, and pytest tests of project Python
+under `tests/python/` and `tests/providers/`, which `sqb test` runs; see
+[Python tests](/docs/cli/test#python-tests). Orchestrator code such as Dagster or Rivers definitions
+lives outside the SQLBuild project directory and points at it; see
+[Dagster](/docs/integrations/dagster) and [Rivers](/docs/integrations/rivers).
 
 ## sqlbuild_local.toml
 

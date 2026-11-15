@@ -32,3 +32,5 @@ pub(crate) const GROUPED_PYTHON_HOOK_ROLES: [[&str; 3]; 2] = [
 ];
 /// The prefix of a hidden directory the walk skips.
 pub(crate) const HIDDEN_PREFIX: &str = ".";
+/// The folders holding project Python tests, each mirroring the project folder its second part names.
+pub(crate) const PYTHON_TEST_ROOTS: [[&str; 2]; 2] = [["tests", "providers"], ["tests", "python"]];

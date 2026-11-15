@@ -20,6 +20,7 @@ use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::native_host::constants::{
     CALENDAR_WINDOW_PARAMETER, SOURCE_NEW_DATA_CONDITION, SOURCE_STALE_CONDITION,
@@ -156,8 +157,10 @@ pub(crate) fn compile_calendars(
     if requests.is_empty() {
         return Ok(definitions);
     }
-    let providers =
-        discover_provider_classes(imported(py, "pathlib", "Path")?.call1((project_dir,))?)?;
+    let providers = discover_provider_classes(
+        imported(py, "pathlib", "Path")?.call1((project_dir,))?,
+        SecretPolicy::Defer.name(),
+    )?;
     let by_name = provider_by_name(&providers)?;
     let session = call_with(
         &entry(py, UserCodeHost::BuildProviderSession)?,

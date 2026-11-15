@@ -7,6 +7,8 @@ pub enum PythonFiles {
     Package,
     /// Every supported project Python file, including hooks, UDFs and orchestration modules.
     All,
+    /// Only the project's Python tests under `tests/python/` and `tests/providers/`.
+    Tests,
 }
 
 /// One `SQBRPYTHON` rule and the Fensu core rule it runs, if any.
@@ -42,6 +44,8 @@ pub(crate) struct PythonTarget {
     pub role: Option<String>,
     pub is_main_module: bool,
     pub is_entry_module: bool,
+    /// Fensu's scope for the file: `test` for project Python tests, else the root scope.
+    pub scope: &'static str,
 }
 
 /// One `evaluate_core_rules` call on a file: the Fensu codes it runs and the context they read.
@@ -100,6 +104,15 @@ pub(crate) struct FilePlan<'a> {
 pub(crate) struct CacheSplit<'a> {
     pub fresh: Vec<(String, PythonCacheEntry)>,
     pub stale: Vec<FilePlan<'a>>,
+}
+
+/// One parsed project file, its path parts from the project root, and its text.
+#[derive(Debug)]
+pub(crate) struct ParsedFile<'a> {
+    pub path: &'a str,
+    pub parts: Vec<&'a str>,
+    pub text: &'a str,
+    pub module: sqlbuild_pysource::node_units::models::UnitModule,
 }
 
 /// One parsed module under `python/` and the unit folder it sits in.

@@ -2,13 +2,26 @@
 
 use crate::models::PythonSource;
 use crate::python_rules::constants::{
-    INIT_FILE, MAIN_ROLE, PACKAGE_ROOT, ROLE_DIRECTORIES, ROLE_FILES, UNIT_MAIN_FILE,
+    INIT_FILE, MAIN_ROLE, PACKAGE_ROOT, ROLE_DIRECTORIES, ROLE_FILES, ROOT_SCOPE, TEST_SCOPE,
+    UNIT_MAIN_FILE,
 };
 use crate::python_rules::models::PythonTarget;
 
 /// Place every source: files under `python/` in the runtime package, the rest under their own folder.
 pub(crate) fn python_targets(sources: &[PythonSource]) -> Vec<PythonTarget> {
     sources.iter().enumerate().map(placed).collect()
+}
+
+/// Place every Python test under its own folder in Fensu's test scope.
+pub(crate) fn test_targets(sources: &[PythonSource]) -> Vec<PythonTarget> {
+    sources
+        .iter()
+        .enumerate()
+        .map(|source| PythonTarget {
+            scope: TEST_SCOPE,
+            ..placed(source)
+        })
+        .collect()
 }
 
 fn placed((source, python): (usize, &PythonSource)) -> PythonTarget {
@@ -32,6 +45,7 @@ fn placed((source, python): (usize, &PythonSource)) -> PythonTarget {
             is_entry_module: is_main_module
                 && relative_parts.last().is_some_and(|name| name != INIT_FILE),
             relative_parts,
+            scope: ROOT_SCOPE,
         };
     }
     let (root, file) = python
@@ -47,6 +61,7 @@ fn placed((source, python): (usize, &PythonSource)) -> PythonTarget {
         role: None,
         is_main_module: false,
         is_entry_module: false,
+        scope: ROOT_SCOPE,
     }
 }
 

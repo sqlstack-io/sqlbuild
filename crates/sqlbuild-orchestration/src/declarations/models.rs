@@ -391,6 +391,9 @@ pub struct ProviderSetting {
     /// The environment variable the setting is read from.
     pub env: String,
     pub description: Option<String>,
+    /// Whether this required secret is unset in the location's environment.
+    #[serde(default)]
+    pub missing: bool,
 }
 
 /// Code that injects a provider: a node (`loader`, `task`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`.
