@@ -11,99 +11,119 @@ use sqlbuild_orchestration::dev_events::models::{
     DevEvent, DevPhase, DevStepState, SourcePosition,
 };
 
-use crate::dev_screen::_helpers::lines::{Report, report_lines, step_row};
-use crate::dev_screen::_helpers::rows::live_rows;
+use crate::dev_screen::_helpers::lines::{Report, report_lines};
+use crate::dev_screen::_helpers::rows::{elapsed_since, live_rows};
 use crate::dev_screen::constants::{FAILED_HINT, LOG_RING_LINES, SNAPSHOT_ID_CHARS};
-use crate::dev_screen::models::{DevScreen, DevStep, ScreenAction};
+use crate::dev_screen::models::{DevScreen, DevStep, ScreenAction, StepRow};
 
-/// A startup step began; the plain screen opens with the location and target.
+/// The screen after a message, and the lines it prints for good.
+pub(crate) type Printed = (DevScreen, Vec<String>);
+
+/// A startup step began; discovery starts a new generation, so its later steps go back to pending.
 pub(crate) fn step_started(
-    screen: &mut DevScreen,
+    mut screen: DevScreen,
     (step, detail): (DevStep, String),
     now: Instant,
-) -> Vec<String> {
+) -> Printed {
     if step == DevStep::Discover {
         screen.generation_started = Some(now);
     }
     if screen.ready {
-        return Vec::new();
+        return (screen, Vec::new());
     }
-    if step == DevStep::Discover {
-        for later in [DevStep::Compile, DevStep::Publish] {
-            if let Some(row) = step_row(screen, later) {
-                row.state = PhaseState::Pending;
-                row.detail.clear();
-                row.started = None;
-                row.elapsed = None;
-            }
+    let reset: &[DevStep] = if step == DevStep::Discover {
+        &[DevStep::Compile, DevStep::Publish]
+    } else {
+        &[]
+    };
+    for row in &mut screen.steps {
+        if reset.contains(&row.step) {
+            *row = pending(row.step);
+        }
+        if row.step == step {
+            *row = StepRow {
+                state: PhaseState::Running { frame: 0 },
+                detail: detail.clone(),
+                started: Some(now),
+                ..pending(step)
+            };
         }
     }
-    if let Some(row) = step_row(screen, step) {
-        row.state = PhaseState::Running { frame: 0 };
-        row.detail = detail;
-        row.started = Some(now);
-        row.elapsed = None;
+    (screen, Vec::new())
+}
+
+/// A checklist row that has not started.
+pub(crate) fn pending(step: DevStep) -> StepRow {
+    StepRow {
+        step,
+        state: PhaseState::Pending,
+        detail: String::new(),
+        started: None,
+        elapsed: None,
     }
-    if step == DevStep::ControlStore && !screen.live {
-        return vec![format_plain_line(
-            &format!(
-                "location {} \u{b7} target {}",
-                screen.location, screen.header.target
-            ),
-            None,
-        )];
+}
+
+/// The location is known; the plain screen names it and the target.
+pub(crate) fn located(mut screen: DevScreen, location: String) -> Printed {
+    screen.location = location;
+    if screen.live {
+        return (screen, Vec::new());
     }
-    Vec::new()
+    let line: String = format_plain_line(
+        &format!(
+            "location {} \u{b7} target {}",
+            screen.location, screen.header.target
+        ),
+        None,
+    );
+    (screen, vec![line])
 }
 
 /// A startup step ended in `state`; the plain screen reports the control store and the compile.
 pub(crate) fn step_finished(
-    screen: &mut DevScreen,
+    mut screen: DevScreen,
     (step, state): (DevStep, PhaseState),
     detail: String,
     now: Instant,
-) -> Vec<String> {
-    if step == DevStep::Compile {
-        screen.compile_detail.clone_from(&detail);
+) -> Printed {
+    match step {
+        DevStep::Compile => screen.compile_detail.clone_from(&detail),
+        DevStep::Api => screen.ui_url = format!("http://{detail}"),
+        _ => {}
     }
     if screen.ready {
-        return Vec::new();
+        return (screen, Vec::new());
     }
-    let elapsed: Option<Duration> = step_row(screen, step).map(|row| {
-        let elapsed: Duration = row
-            .started
-            .map(|started| now.saturating_duration_since(started))
-            .unwrap_or_default();
-        row.state = state;
-        row.detail = detail;
-        row.elapsed = Some(elapsed);
-        elapsed
-    });
-    if screen.live {
-        return Vec::new();
-    }
-    match step {
-        DevStep::ControlStore => vec![format_plain_line("control store ready", elapsed)],
-        DevStep::Compile => {
-            let since: Option<Duration> = screen
-                .generation_started
-                .map(|started| now.saturating_duration_since(started));
-            vec![format_plain_line(
-                &format!("discovered {}", screen.compile_detail),
-                since,
-            )]
+    let mut elapsed: Option<Duration> = None;
+    for row in &mut screen.steps {
+        if row.step == step {
+            row.elapsed = Some(elapsed_since(row.started, now).unwrap_or_default());
+            row.state = state;
+            row.detail.clone_from(&detail);
+            elapsed = row.elapsed;
         }
-        _ => Vec::new(),
     }
+    if screen.live {
+        return (screen, Vec::new());
+    }
+    let lines: Vec<String> = match step {
+        DevStep::ControlStore => vec![format_plain_line("control store ready", elapsed)],
+        DevStep::Compile => vec![format_plain_line(
+            &format!("discovered {}", screen.compile_detail),
+            elapsed_since(screen.generation_started, now),
+        )],
+        _ => Vec::new(),
+    };
+    (screen, lines)
 }
 
 /// An event from the location child.
 pub(crate) fn child_event(
-    screen: &mut DevScreen,
+    mut screen: DevScreen,
     event: DevEvent,
     now: Instant,
     clock: &str,
-) -> Vec<String> {
+) -> Printed {
     match event {
         DevEvent::Step {
             phase,
@@ -131,36 +151,27 @@ pub(crate) fn child_event(
             if more > 0 {
                 titles.push(format!("{more} more files"));
             }
-            titles
+            let lines: Vec<String> = titles
                 .into_iter()
-                .flat_map(|title| {
-                    report_lines(
-                        screen,
-                        Report {
-                            clock,
-                            mark: EventMark::Changed,
-                            plain: format!("changed {title}"),
-                            title,
-                            detail: String::new(),
-                            elapsed: None,
-                            notes: Vec::new(),
-                        },
-                    )
-                })
-                .collect()
+                .flat_map(|title| changed_line(&screen, clock, title))
+                .collect();
+            (screen, lines)
         }
-        DevEvent::Restarted { reason } => report_lines(
-            screen,
-            Report {
-                clock,
-                mark: EventMark::Restarted,
-                title: "location restarted".to_owned(),
-                plain: format!("location restarted: {reason}"),
-                detail: reason,
-                elapsed: None,
-                notes: Vec::new(),
-            },
-        ),
+        DevEvent::Restarted { reason } => {
+            let lines: Vec<String> = report_lines(
+                &screen,
+                Report {
+                    clock,
+                    mark: EventMark::Restarted,
+                    title: "location restarted".to_owned(),
+                    plain: format!("location restarted: {reason}"),
+                    detail: reason,
+                    elapsed: None,
+                    notes: Vec::new(),
+                },
+            );
+            (screen, lines)
+        }
         DevEvent::Published {
             generation,
             snapshot_id,
@@ -174,37 +185,52 @@ pub(crate) fn child_event(
     }
 }
 
+fn changed_line(screen: &DevScreen, clock: &str, title: String) -> Vec<String> {
+    report_lines(
+        screen,
+        Report {
+            clock,
+            mark: EventMark::Changed,
+            plain: format!("changed {title}"),
+            title,
+            detail: String::new(),
+            elapsed: None,
+            notes: Vec::new(),
+        },
+    )
+}
+
 fn published(
-    screen: &mut DevScreen,
+    mut screen: DevScreen,
     (generation, snapshot_id): (i64, &str),
     now: Instant,
     clock: &str,
-) -> Vec<String> {
+) -> Printed {
     let short: String = snapshot_id.chars().take(SNAPSHOT_ID_CHARS).collect();
-    let elapsed: Option<Duration> = screen
-        .generation_started
-        .take()
-        .map(|started| now.saturating_duration_since(started));
+    let elapsed: Option<Duration> = elapsed_since(screen.generation_started.take(), now);
     let changes: usize = std::mem::take(&mut screen.pending_changes);
     screen.serving = Some(generation);
     let plain: String = format!("published gen {generation} {short}");
     if !screen.ready {
-        let row_elapsed: Option<Duration> = step_row(screen, DevStep::Publish).and_then(|row| {
-            row.detail = format!("gen {generation} \u{b7} {short}");
-            row.elapsed
-        });
-        if screen.live {
-            return Vec::new();
+        let mut row_elapsed: Option<Duration> = None;
+        for row in &mut screen.steps {
+            if row.step == DevStep::Publish {
+                row.detail = format!("gen {generation} \u{b7} {short}");
+                row_elapsed = row.elapsed;
+            }
         }
-        return vec![format_plain_line(&plain, row_elapsed)];
+        if screen.live {
+            return (screen, Vec::new());
+        }
+        return (screen, vec![format_plain_line(&plain, row_elapsed)]);
     }
     let detail: String = match changes {
         0 => String::new(),
         1 => "1 file changed".to_owned(),
         count => format!("{count} files changed"),
     };
-    report_lines(
-        screen,
+    let lines: Vec<String> = report_lines(
+        &screen,
         Report {
             clock,
             mark: EventMark::Succeeded,
@@ -214,59 +240,40 @@ fn published(
             notes: Vec::new(),
             plain,
         },
-    )
+    );
+    (screen, lines)
 }
 
 fn failed(
-    screen: &mut DevScreen,
+    mut screen: DevScreen,
     (generation, message, position): (i64, &str, Option<&SourcePosition>),
     now: Instant,
     clock: &str,
-) -> Vec<String> {
+) -> Printed {
     screen.generation_started = None;
     screen.pending_changes = 0;
-    if !screen.ready {
-        for row in &mut screen.steps {
-            if let PhaseState::Running { .. } = row.state {
-                row.state = PhaseState::Fail;
-                row.elapsed = row
-                    .started
-                    .map(|started| now.saturating_duration_since(started));
-                row.detail = format!("gen {generation} failed");
-            }
+    for row in &mut screen.steps {
+        if !screen.ready && matches!(row.state, PhaseState::Running { .. }) {
+            row.state = PhaseState::Fail;
+            row.elapsed = elapsed_since(row.started, now);
+            row.detail = format!("gen {generation} failed");
         }
     }
     let title: String = match screen.serving {
         Some(serving) => format!("gen {generation} failed \u{b7} still serving gen {serving}"),
         None => format!("gen {generation} failed"),
     };
-    let mut first_note: Vec<Segment> = Vec::new();
-    let mut place: String = String::new();
-    if let Some(position) = position {
-        place = format!("{}:{}:{}", position.path, position.line, position.column);
-        first_note.push(Segment {
-            text: place.clone(),
-            tone: Tone::Link,
-            link: Some(format!(
-                "file://{}/{}",
-                screen.project_root.trim_end_matches('/'),
-                position.path
-            )),
-        });
-        first_note.push(Segment {
-            text: "  ".to_owned(),
-            tone: Tone::Plain,
-            link: None,
-        });
-        place.push(' ');
-    }
+    let (place, mut first_note): (String, Vec<Segment>) = match position {
+        Some(position) => position_note(&screen.project_root, position),
+        None => (String::new(), Vec::new()),
+    };
     first_note.push(Segment {
         text: message.to_owned(),
         tone: Tone::Plain,
         link: None,
     });
-    report_lines(
-        screen,
+    let lines: Vec<String> = report_lines(
+        &screen,
         Report {
             clock,
             mark: EventMark::Failed,
@@ -283,16 +290,39 @@ fn failed(
                 }],
             ],
         },
-    )
+    );
+    (screen, lines)
+}
+
+/// `path:line:col ` for the plain line, and the clickable position the live note starts with.
+fn position_note(project_root: &str, position: &SourcePosition) -> (String, Vec<Segment>) {
+    let place: String = format!("{}:{}:{}", position.path, position.line, position.column);
+    let note: Vec<Segment> = vec![
+        Segment {
+            text: place.clone(),
+            tone: Tone::Link,
+            link: Some(format!(
+                "file://{}/{}",
+                project_root.trim_end_matches('/'),
+                position.path
+            )),
+        },
+        Segment {
+            text: "  ".to_owned(),
+            tone: Tone::Plain,
+            link: None,
+        },
+    ];
+    (format!("{place} "), note)
 }
 
 /// The foreground connection settled: close any framed client block and record the outcome.
 pub(crate) fn warehouse_settled(
-    screen: &mut DevScreen,
+    mut screen: DevScreen,
     (adapter, state): (String, WarehouseState),
     now: Instant,
     clock: &str,
-) -> (String, Vec<String>) {
+) -> (DevScreen, String, Vec<String>) {
     let mut raw: String = String::new();
     if screen.client_output {
         if screen.client_partial {
@@ -324,19 +354,19 @@ pub(crate) fn warehouse_settled(
         ),
     };
     if !screen.ready {
-        step_finished(screen, (DevStep::Warehouse, row_state), detail, now);
+        let (screen, _) = step_finished(screen, (DevStep::Warehouse, row_state), detail, now);
         let lines: Vec<String> = match (screen.live, plain) {
             (false, Some(plain)) => vec![format_plain_line(&plain, None)],
             _ => Vec::new(),
         };
-        return (raw, lines);
+        return (screen, raw, lines);
     }
     let (mark, title): (EventMark, &str) = match row_state {
         PhaseState::Ok => (EventMark::Succeeded, "warehouse connected"),
         _ => (EventMark::Failed, "warehouse not connected"),
     };
     let lines: Vec<String> = report_lines(
-        screen,
+        &screen,
         Report {
             clock,
             mark,
@@ -347,16 +377,16 @@ pub(crate) fn warehouse_settled(
             notes: Vec::new(),
         },
     );
-    (raw, lines)
+    (screen, raw, lines)
 }
 
 /// The client's own output, written as it came; the first chunk freezes the checklist above a rule.
-pub(crate) fn client_text(screen: &mut DevScreen, text: &str, now: Instant) -> String {
+pub(crate) fn client_text(mut screen: DevScreen, text: &str, now: Instant) -> (DevScreen, String) {
     let mut output: String = String::new();
     if !screen.client_output {
         screen.client_output = true;
         if screen.live {
-            let rows: Vec<String> = live_rows(screen, now);
+            let rows: Vec<String> = live_rows(&screen, now);
             output.push_str(&redraw_rows(screen.drawn, &rows));
             screen.drawn = 0;
         }
@@ -365,7 +395,7 @@ pub(crate) fn client_text(screen: &mut DevScreen, text: &str, now: Instant) -> S
         screen.client_partial = !text.ends_with('\n');
     }
     output.push_str(text);
-    output
+    (screen, output)
 }
 
 /// A run started or finished.
@@ -407,7 +437,7 @@ pub(crate) fn run_reported(
 }
 
 /// Keep `line` in the ring, and show it when the log is open.
-pub(crate) fn logged(screen: &mut DevScreen, line: String) -> Vec<String> {
+pub(crate) fn logged(mut screen: DevScreen, line: String) -> Printed {
     if screen.log.len() == LOG_RING_LINES {
         screen.log.pop_front();
     }
@@ -417,32 +447,33 @@ pub(crate) fn logged(screen: &mut DevScreen, line: String) -> Vec<String> {
         Vec::new()
     };
     screen.log.push_back(line);
-    shown
+    (screen, shown)
 }
 
 /// What a key asks for; `l` toggles the log and opens it with the lines kept so far.
-pub(crate) fn key_pressed(screen: &mut DevScreen, key: char) -> (Vec<String>, ScreenAction) {
+pub(crate) fn key_pressed(mut screen: DevScreen, key: char) -> (DevScreen, Vec<String>, ScreenAction) {
     if !screen.live {
-        return (Vec::new(), ScreenAction::None);
+        return (screen, Vec::new(), ScreenAction::None);
     }
     let action: ScreenAction = match key {
         'o' => ScreenAction::OpenUi,
         'r' => ScreenAction::Recompile,
         's' => ScreenAction::RetryWarehouse,
         'q' => ScreenAction::Quit,
-        'l' => {
-            screen.show_log = !screen.show_log;
-            if screen.show_log {
-                let lines: Vec<String> = screen
-                    .log
-                    .iter()
-                    .map(|line| render_log_line(line, &screen.facts))
-                    .collect();
-                return (lines, ScreenAction::None);
-            }
-            ScreenAction::None
-        }
         _ => ScreenAction::None,
     };
-    (Vec::new(), action)
+    if key != 'l' {
+        return (screen, Vec::new(), action);
+    }
+    screen.show_log = !screen.show_log;
+    let shown: Vec<String> = if screen.show_log {
+        screen
+            .log
+            .iter()
+            .map(|line| render_log_line(line, &screen.facts))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    (screen, shown, action)
 }

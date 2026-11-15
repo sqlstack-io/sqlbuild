@@ -3,10 +3,9 @@
 use std::collections::VecDeque;
 use std::time::Instant;
 
-use sqlbuild_core::screen_text::models::PhaseState;
-
 use crate::dev_screen::constants::STEPS;
-use crate::dev_screen::models::{DevScreen, ScreenSetup, StepRow};
+use crate::dev_screen::_helpers::transitions::pending;
+use crate::dev_screen::models::{DevScreen, ScreenSetup};
 
 /// Every step pending, the warehouse unknown and nothing drawn yet.
 pub(crate) fn new_dev_screen(setup: ScreenSetup, started: Instant) -> DevScreen {
@@ -16,19 +15,11 @@ pub(crate) fn new_dev_screen(setup: ScreenSetup, started: Instant) -> DevScreen 
         header: setup.header,
         ui_url: String::new(),
         watching: setup.watching,
+        triggers: String::new(),
         started,
-        steps: STEPS
-            .iter()
-            .map(|step| StepRow {
-                step: *step,
-                state: PhaseState::Pending,
-                detail: String::new(),
-                started: None,
-                elapsed: None,
-            })
-            .collect(),
+        steps: STEPS.into_iter().map(pending).collect(),
         ready: false,
-        location: setup.location,
+        location: String::new(),
         adapter: String::new(),
         warehouse: None,
         generation_started: None,

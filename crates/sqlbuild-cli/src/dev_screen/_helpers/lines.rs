@@ -9,7 +9,7 @@ use sqlbuild_core::screen_text::main::render_ready_card::render_ready_card;
 use sqlbuild_core::screen_text::models::{EventLine, EventMark, ReadyCard, Segment};
 
 use crate::dev_screen::_helpers::rows::live_rows;
-use crate::dev_screen::models::{DevScreen, DevStep, StepRow};
+use crate::dev_screen::models::{DevScreen, DevStep};
 
 /// One event: its live line, and the plain line's message.
 pub(crate) struct Report<'a> {
@@ -40,13 +40,8 @@ pub(crate) fn report_lines(screen: &DevScreen, report: Report<'_>) -> Vec<String
     )
 }
 
-/// The checklist row of `step`.
-pub(crate) fn step_row(screen: &mut DevScreen, step: DevStep) -> Option<&mut StepRow> {
-    screen.steps.iter_mut().find(|row| row.step == step)
-}
-
 /// The card, or the plain `ready` line, once the first generation is published and the warehouse settled.
-pub(crate) fn ready_lines(screen: &mut DevScreen, now: Instant) -> Vec<String> {
+pub(crate) fn ready_lines(mut screen: DevScreen, now: Instant) -> (DevScreen, Vec<String>) {
     let published: bool = screen
         .steps
         .iter()
@@ -57,22 +52,17 @@ pub(crate) fn ready_lines(screen: &mut DevScreen, now: Instant) -> Vec<String> {
         screen.ready,
         published,
     ) else {
-        return Vec::new();
+        return (screen, Vec::new());
     };
     screen.ready = true;
     if !screen.live {
-        return vec![format_plain_line(&format!("ready {}", screen.ui_url), None)];
+        let line: String = format_plain_line(&format!("ready {}", screen.ui_url), None);
+        return (screen, vec![line]);
     }
-    let mut location: String = format!("{} \u{b7} gen {generation}", screen.location);
+    let mut location: String = format!("{} \u{b7} gen {generation}", screen.header.target);
     if !screen.compile_detail.is_empty() {
         location = format!("{location} \u{b7} {}", screen.compile_detail);
     }
-    let triggers: String = screen
-        .steps
-        .iter()
-        .find(|row| row.step == DevStep::Scheduler)
-        .map(|row| row.detail.clone())
-        .unwrap_or_default();
     let lines: Vec<String> = render_ready_card(
         &ReadyCard {
             version: screen.header.version.clone(),
@@ -81,32 +71,36 @@ pub(crate) fn ready_lines(screen: &mut DevScreen, now: Instant) -> Vec<String> {
             location,
             adapter: screen.adapter.clone(),
             warehouse,
-            triggers,
+            triggers: screen.triggers.clone(),
             watching: screen.watching.clone(),
         },
         &screen.facts,
     );
     screen.event_gap = true;
-    lines
+    (screen, lines)
 }
 
 /// `raw` client text, then `lines` printed for good, then the live rows redrawn below them.
-pub(crate) fn compose(screen: &mut DevScreen, raw: &str, lines: &[String], now: Instant) -> String {
+pub(crate) fn compose(
+    mut screen: DevScreen,
+    (raw, lines): (&str, &[String]),
+    now: Instant,
+) -> (DevScreen, String) {
     let mut text: String = raw.to_owned();
     if !screen.live {
         for line in lines {
             text.push_str(line);
             text.push('\n');
         }
-        return text;
+        return (screen, text);
     }
     if screen.client_output {
-        return text;
+        return (screen, text);
     }
-    let live: Vec<String> = live_rows(screen, now);
+    let live: Vec<String> = live_rows(&screen, now);
     let mut rows: Vec<String> = lines.to_vec();
     rows.extend(live.iter().cloned());
     text.push_str(&redraw_rows(screen.drawn, &rows));
     screen.drawn = live.len();
-    text
+    (screen, text)
 }

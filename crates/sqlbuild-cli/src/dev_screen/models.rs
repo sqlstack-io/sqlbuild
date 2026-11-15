@@ -28,6 +28,10 @@ pub(crate) enum ScreenMessage {
         detail: String,
     },
     Child(DevEvent),
+    /// The development location's ID, known once the control store is open.
+    Location(String),
+    /// The dev target's triggers, such as `41 paused`, read after the first publication.
+    Triggers(String),
     /// The foreground warehouse connection's outcome.
     Warehouse {
         adapter: String,
@@ -81,7 +85,6 @@ pub(crate) struct ScreenSetup {
     pub(crate) live: bool,
     pub(crate) facts: ScreenFacts,
     pub(crate) header: DevHeader,
-    pub(crate) location: String,
     pub(crate) watching: String,
     pub(crate) project_root: String,
 }
@@ -95,6 +98,7 @@ pub(crate) struct DevScreen {
     pub(crate) header: DevHeader,
     pub(crate) ui_url: String,
     pub(crate) watching: String,
+    pub(crate) triggers: String,
     pub(crate) started: Instant,
     pub(crate) steps: Vec<StepRow>,
     pub(crate) ready: bool,

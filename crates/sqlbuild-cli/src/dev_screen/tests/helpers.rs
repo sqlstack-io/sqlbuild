@@ -1,20 +1,25 @@
-//! A screen at a fixed width, a transcript of messages, and a terminal that replays the redraws.
+//! Screens at fixed widths, the messages of a session, and a terminal that replays the redraws.
 
 use std::time::{Duration, Instant};
 
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts, WarehouseState};
-use sqlbuild_orchestration::dev_events::models::{DevEvent, DevPhase, DevStepState};
+use sqlbuild_orchestration::dev_events::models::{
+    DevEvent, DevPhase, DevStepState, SourcePosition,
+};
 
 use crate::dev_screen::main::apply_screen_message::apply_screen_message;
 use crate::dev_screen::main::new_dev_screen::new_dev_screen;
-use crate::dev_screen::models::{
-    DevScreen, DevStep, ScreenAction, ScreenMessage, ScreenSetup,
-};
+use crate::dev_screen::models::{DevScreen, DevStep, ScreenMessage, ScreenOutput, ScreenSetup};
+use crate::dev_screen::tests::test_types::Transcript;
+
+const LOCATION_ID: &str = "01a1d7ff-0b3a-7631-ba35-e44d44d072f2";
+const CLEAR_BELOW: &str = "\u{1b}[J";
+const CURSOR_UP: &str = "\u{1b}[";
 
 /// An uncoloured screen `columns` wide; `None` makes it plain.
 pub(super) fn screen(columns: Option<usize>, start: Instant) -> DevScreen {
-    let mut screen: DevScreen = new_dev_screen(
+    new_dev_screen(
         ScreenSetup {
             live: columns.is_some(),
             facts: ScreenFacts {
@@ -28,14 +33,11 @@ pub(super) fn screen(columns: Option<usize>, start: Instant) -> DevScreen {
                 project: "shop".to_owned(),
                 target: "dev".to_owned(),
             },
-            location: "dev".to_owned(),
             watching: "project/".to_owned(),
             project_root: "/work/shop".to_owned(),
         },
         start,
-    );
-    screen.ui_url = "http://127.0.0.1:8000".to_owned();
-    screen
+    )
 }
 
 pub(super) fn step(phase: DevPhase, state: DevStepState, detail: Option<&str>) -> ScreenMessage {
@@ -57,6 +59,7 @@ pub(super) fn startup() -> Vec<ScreenMessage> {
             step: DevStep::ControlStore,
             detail: "sqlite \u{b7} /home/analyst/projects/shop/.sqlbuild/control.sqlite3".to_owned(),
         },
+        ScreenMessage::Location(LOCATION_ID.to_owned()),
         ScreenMessage::Started {
             step: DevStep::Api,
             detail: String::new(),
@@ -88,6 +91,7 @@ pub(super) fn startup() -> Vec<ScreenMessage> {
             snapshot_id: "b429729b5c1e".to_owned(),
             record: serde_json::Value::Null,
         }),
+        ScreenMessage::Triggers("41 paused".to_owned()),
         ScreenMessage::Started {
             step: DevStep::Warehouse,
             detail: "duckdb \u{b7} connecting".to_owned(),
@@ -104,70 +108,152 @@ pub(super) fn connected() -> ScreenMessage {
     }
 }
 
-/// What a terminal shows after `messages`, and the actions they asked for.
-pub(super) struct Transcript {
-    pub(super) rows: Vec<String>,
-    pub(super) actions: Vec<ScreenAction>,
-    pub(super) writes: Vec<String>,
+pub(super) fn not_connected() -> ScreenMessage {
+    ScreenMessage::Warehouse {
+        adapter: "snowflake".to_owned(),
+        state: WarehouseState::NotConnected {
+            reason: "sign-in skipped".to_owned(),
+        },
+    }
 }
 
-/// Apply `messages` 100 ms apart, at clock `09:41:0N`, and replay the output on a terminal.
-pub(super) fn play(screen: &mut DevScreen, start: Instant, messages: Vec<ScreenMessage>) -> Transcript {
-    let mut terminal: Terminal = Terminal::default();
-    let mut actions: Vec<ScreenAction> = Vec::new();
-    let mut writes: Vec<String> = Vec::new();
-    for (index, message) in messages.into_iter().enumerate() {
-        let now: Instant = start + Duration::from_millis(100 * (index as u64 + 1));
-        let clock: String = format!("09:41:{:02}", index % 60);
-        let output = apply_screen_message(screen, message, now, &clock);
-        terminal.write(&output.text);
-        actions.push(output.action);
-        writes.push(output.text);
-    }
+/// `messages` after startup.
+pub(super) fn after_startup(messages: Vec<ScreenMessage>) -> Vec<ScreenMessage> {
+    startup().into_iter().chain(messages).collect()
+}
+
+/// Two edits after ready: one publishes, the next fails at a source position.
+pub(super) fn edits() -> Vec<ScreenMessage> {
+    vec![
+        ScreenMessage::Child(DevEvent::Changed {
+            paths: vec!["models/orders/int_orders.sql".to_owned()],
+            more: 0,
+        }),
+        step(DevPhase::Discover, DevStepState::Started, None),
+        ScreenMessage::Child(DevEvent::Published {
+            generation: 2,
+            snapshot_id: "c01d2e3f4a".to_owned(),
+            record: serde_json::Value::Null,
+        }),
+        ScreenMessage::Child(DevEvent::Changed {
+            paths: vec!["models/finance/fct_revenue.sql".to_owned()],
+            more: 2,
+        }),
+        step(DevPhase::Discover, DevStepState::Started, None),
+        ScreenMessage::Child(DevEvent::Failed {
+            generation: 3,
+            message: "unknown column net_amount_usd".to_owned(),
+            position: Some(SourcePosition {
+                path: "models/finance/fct_revenue.sql".to_owned(),
+                line: 42,
+                column: 7,
+            }),
+        }),
+    ]
+}
+
+/// A Snowflake-style sign-in prompt, ticks while it waits, a log line, then the connection.
+pub(super) fn framed_sign_in() -> Vec<ScreenMessage> {
+    vec![
+        ScreenMessage::ClientOutput(
+            "Initiating login request with your identity provider...\n".to_owned(),
+        ),
+        ScreenMessage::Tick,
+        ScreenMessage::ClientOutput("Enter the URL the OAuth flow redirected you to: ".to_owned()),
+        ScreenMessage::Tick,
+        ScreenMessage::Log("connection check started".to_owned()),
+        connected(),
+    ]
+}
+
+/// The ready card with `warehouse` on its warehouse row.
+pub(super) fn card(warehouse: &str, ready_in: &str) -> Vec<String> {
+    vec![
+        format!("  sqlbuild dev  v0.232.0   ready in {ready_in}"),
+        String::new(),
+        "  \u{279c}  UI          http://127.0.0.1:8000".to_owned(),
+        "  \u{279c}  Location    dev \u{b7} gen 1 \u{b7} 412 python nodes, 2280 models".to_owned(),
+        format!("  \u{279c}  Warehouse   {warehouse}"),
+        "  \u{279c}  Triggers    41 paused".to_owned(),
+        "  \u{279c}  Watching    project/".to_owned(),
+    ]
+}
+
+/// The startup checklist, its detail column `width` wide.
+pub(super) fn checklist(control_store: &str, width: usize) -> Vec<String> {
+    let row = |glyph: &str, label: &str, detail: &str, time: &str| -> String {
+        format!("  {glyph} {label:<20} {detail:<width$} {time:>8}")
+    };
+    vec![
+        "  sqlbuild dev  v0.232.0 \u{b7} shop \u{b7} target dev".to_owned(),
+        String::new(),
+        row("\u{2713}", "Control store", control_store, "0.1s"),
+        row("\u{2713}", "API", "127.0.0.1:8000", "0.1s"),
+        row("\u{2713}", "Scheduler", "41 paused", "0.1s"),
+        row("\u{2713}", "Discover project", "", "0.1s"),
+        row("\u{2713}", "Compile snapshot", "412 python nodes, 2280 models", "0.1s"),
+        row("\u{2713}", "Publish", "gen 1 \u{b7} b429729b", "0.1s"),
+        row("\u{280b}", "Warehouse", "duckdb \u{b7} connecting", "0.0s"),
+    ]
+}
+
+/// Lines in order, each followed by a newline.
+pub(super) fn lines_of<I: IntoIterator<Item = S>, S: Into<String>>(lines: I) -> Vec<String> {
+    lines.into_iter().map(Into::into).collect()
+}
+
+/// Apply `messages` 100 ms apart at clock `09:41:<index>`, then replay what they wrote.
+pub(super) fn play(columns: Option<usize>, messages: Vec<ScreenMessage>) -> Transcript {
+    let start: Instant = Instant::now();
+    let (_, outputs): (DevScreen, Vec<ScreenOutput>) = messages.into_iter().enumerate().fold(
+        (screen(columns, start), Vec::new()),
+        |(screen, mut outputs), (index, message)| {
+            let now: Instant = start + Duration::from_millis(100 * (index as u64 + 1));
+            let (screen, output) =
+                apply_screen_message(screen, message, now, &format!("09:41:{:02}", index % 60));
+            outputs.push(output);
+            (screen, outputs)
+        },
+    );
     Transcript {
-        rows: terminal.rows(),
-        actions,
-        writes,
+        rows: replay(outputs.iter().map(|output| output.text.as_str())),
+        actions: outputs.iter().map(|output| output.action).collect(),
     }
 }
 
-/// Lines of text with the cursor at the start of a row; understands `ESC[nF` and `ESC[J`.
-#[derive(Default)]
-struct Terminal {
-    lines: Vec<String>,
-    cursor: usize,
+/// The rows a terminal shows after `writes`; `ESC[nF ESC[J` erases the last `n` rows.
+fn replay<'a>(writes: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let text: String = writes
+        .flat_map(|write| write.split_inclusive(CLEAR_BELOW))
+        .fold(String::new(), |shown, piece| {
+            let clears: bool = piece.ends_with(CLEAR_BELOW);
+            let piece: &str = piece.trim_end_matches(CLEAR_BELOW);
+            let (printed, up): (&str, usize) = piece
+                .rsplit_once(CURSOR_UP)
+                .filter(|_| clears)
+                .map_or((piece, 0), |(printed, rows)| {
+                    (printed, rows.trim_end_matches('F').parse().unwrap_or(0))
+                });
+            let shown: String = shown + printed;
+            let keep: usize = shown.split_inclusive('\n').count().saturating_sub(up);
+            shown.split_inclusive('\n').take(keep).collect()
+        });
+    text.split_inclusive('\n')
+        .map(|row| row.trim_end_matches('\n').to_owned())
+        .collect()
 }
 
-impl Terminal {
-    fn write(&mut self, text: &str) {
-        let mut rest: &str = text;
-        while !rest.is_empty() {
-            if let Some(after) = rest.strip_prefix("\u{1b}[J") {
-                self.lines.truncate(self.cursor);
-                rest = after;
-            } else if let Some(after) = rest.strip_prefix("\u{1b}[") {
-                let digits: usize = after.find('F').expect("cursor-up sequence");
-                let up: usize = after[..digits].parse().expect("row count");
-                self.cursor = self.cursor.saturating_sub(up);
-                rest = &after[digits + 1..];
-            } else {
-                let end: usize = rest.find('\u{1b}').unwrap_or(rest.len());
-                for character in rest[..end].chars() {
-                    if self.lines.len() == self.cursor {
-                        self.lines.push(String::new());
-                    }
-                    if character == '\n' {
-                        self.cursor += 1;
-                    } else {
-                        self.lines[self.cursor].push(character);
-                    }
-                }
-                rest = &rest[end..];
-            }
-        }
-    }
+/// `count` log lines from `log line <first>`, as the open log shows them.
+pub(super) fn log_rows(first: usize, count: usize) -> Vec<String> {
+    (first..first + count)
+        .map(|index| format!("  log line {index}"))
+        .collect()
+}
 
-    fn rows(&self) -> Vec<String> {
-        self.lines.clone()
-    }
+/// Every row that is a log line.
+pub(super) fn shown_log(rows: &[String]) -> Vec<String> {
+    rows.iter()
+        .filter(|row| row.starts_with("  log line "))
+        .cloned()
+        .collect()
 }
