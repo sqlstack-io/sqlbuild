@@ -91,7 +91,7 @@ fn given_published_providers_when_people_read_them_then_jobs_using_their_nodes_a
                     "description": "Client for the fulfillment service.",
                     "path": "providers/fulfillment.py",
                     "settings": [
-                        {"name": "api_key", "type": "SecretStr", "required": true, "secret": true, "env": "API_KEY", "description": null},
+                        {"name": "api_key", "type": "SecretStr", "required": true, "secret": true, "env": "API_KEY", "description": null, "missing": true},
                         {"name": "endpoint", "type": "str", "required": false, "secret": false, "env": "ENDPOINT", "description": "Base URL"},
                     ],
                     "used_by": [
@@ -113,8 +113,8 @@ fn given_published_providers_when_people_read_them_then_jobs_using_their_nodes_a
                     "description": "Client for the fulfillment service.",
                     "path": "providers/fulfillment.py",
                     "settings": [
-                        {"name": "api_key", "type": "SecretStr", "required": true, "secret": true, "env": "API_KEY", "description": null},
-                        {"name": "endpoint", "type": "str", "required": false, "secret": false, "env": "ENDPOINT", "description": "Base URL"},
+                        {"name": "api_key", "type": "SecretStr", "required": true, "secret": true, "env": "API_KEY", "description": null, "missing": true},
+                        {"name": "endpoint", "type": "str", "required": false, "secret": false, "env": "ENDPOINT", "description": "Base URL", "missing": false},
                     ],
                     "used_by": [
                         {"kind": "hook", "name": "notify_fulfillment"},

@@ -85,6 +85,7 @@ These identities are for inspection. SQL authored inside the owning model contin
 | `--kind KIND` | Keep `macro`, `enum`, or `constant` declarations. Repeat to include multiple kinds. |
 | `--match GLOB` | Match declaration names or qualified identities with a deterministic, case-sensitive glob. |
 | `--used-only` | Keep declarations used by the target. |
+| `--allow-missing-secrets` | Run without provider secrets; see [Secrets](../concepts/python-nodes/providers.md#secrets) |
 | `--include-nearby` | Include bounded nearby declarations that are unavailable to the target. |
 | `--nearby-depth N` | Set filesystem proximity for nearby descendant and sibling discovery (default: `1`). |
 | `--dependency-depth N` | Expand dependencies from declarations in the used section by `N` edges (default: `0`). |

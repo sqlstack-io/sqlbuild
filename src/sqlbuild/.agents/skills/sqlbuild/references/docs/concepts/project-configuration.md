@@ -516,6 +516,7 @@ delta_compile = true
 | `test_timeout` | `30s` | Time limit for each SQL unit test, or `"disabled"` |
 | `scenario_timeout` | none | Time limit for each scenario, or `"disabled"` |
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](../cli/compile.md#compiling-after-an-edit). |
+| `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](python-nodes/providers.md#secrets). |
 
 ### Unit test and scenario limits
 

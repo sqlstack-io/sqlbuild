@@ -25,8 +25,14 @@ class ProviderSession:
         providers: Mapping[str, Provider] | Iterable[tuple[str, Provider]],
         *,
         setup_context: object | None = None,
+        deferred: Mapping[str, type[Provider]] | None = None,
     ) -> None:
         self._providers: dict[str, Provider] = dict(providers)
+        self._deferred: dict[str, type[Provider]] = {
+            name: provider_class
+            for name, provider_class in (deferred or {}).items()
+            if name not in self._providers
+        }
         self._setup_context: object | None = setup_context
         self._container: ProviderContainer = ProviderContainer(self)
         self._setup_names: list[str] = []
@@ -41,7 +47,7 @@ class ProviderSession:
         return self._container
 
     def __contains__(self, name: object) -> bool:
-        return isinstance(name, str) and name in self._providers
+        return isinstance(name, str) and (name in self._providers or name in self._deferred)
 
     def __enter__(self) -> ProviderSession:
         return self
@@ -56,12 +62,14 @@ class ProviderSession:
         return False
 
     def keys(self) -> tuple[str, ...]:
-        return tuple(self._providers)
+        return (*self._providers, *self._deferred)
 
     def get(self, name: str) -> Provider:
         with self._lifecycle_lock:
             if self._is_closed:
                 raise ProviderLookupError(f"Provider session is closed; cannot access '{name}'")
+            if name in self._deferred:
+                self._providers[name] = self._instantiate(name=name)
             provider: Provider | None = self._providers.get(name)
             if provider is None:
                 available: str = ", ".join(self.keys()) or "none"
@@ -110,6 +118,24 @@ class ProviderSession:
                     )
             if errors:
                 raise ProviderTeardownError("\n".join(errors))
+
+    def _instantiate(self, *, name: str) -> Provider:
+        """Read a deferred provider's settings from the environment on its first use."""
+
+        from pydantic import ValidationError
+
+        provider_class: type[Provider] = self._deferred.pop(name)
+        try:
+            return provider_class()
+        except ValidationError as error:
+            details: list[str] = []
+            for item in error.errors(include_input=False):
+                location: str = ".".join(str(part) for part in item["loc"])
+                details.append(f"{location}: {item['msg']}")
+            raise ProviderSetupError(
+                f"Provider '{name}' ({provider_class.__name__}) has missing or invalid "
+                f"settings: {'; '.join(details)}"
+            ) from error
 
     def _setup_provider(self, *, name: str, provider: Provider) -> None:
         try:
