@@ -929,6 +929,7 @@ class ExpressionMacroFormatTestCase:
     description: str
     macro_directory: str
     consumer_folders: tuple[str, ...]
+    authored_macro: str
     expected_macro: str
 
 
