@@ -215,10 +215,6 @@ pub(crate) const CROSS_KEYWORD: &[u8] = b"cross";
 pub(crate) const EXPRESSION_SELECT_PREFIX: &str = "SELECT ";
 /// The output name lint and format give an expression body; Snowflake keeps unnamed items as written.
 pub(crate) const LINTED_EXPRESSION_ALIAS: &str = "__sqlbuild_macro_expression__";
-/// The characters that open a quoted string or identifier in formatted SQL.
-pub(crate) const STRING_QUOTES: [char; 3] = ['\'', '"', '`'];
-/// Each half of the `$$` that opens and closes a dollar-quoted string in formatted SQL.
-pub(crate) const DOLLAR_QUOTE: char = '$';
 
 /// A CTE definition, capturing its `name`.
 pub(crate) const CTE_DEFINITION_PATTERN: &str = r#"(?is)(?:\bWITH(?:\s+RECURSIVE)?|,)\s*["`\[]?(?P<name>[A-Za-z_][A-Za-z0-9_]*)["`\]]?(?:\s*\([^)]*\))?\s+AS\s*\("#;

@@ -26,12 +26,17 @@ use crate::lint_text::tests::test_types::{
     UnavailableFinding, UnavailableLintTestCase, UnwrappedExpressionTestCase,
 };
 use sqlbuild_analysis::sql_macros::main::parse_sql_macro::parse_sql_macro;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 
 const SUPPRESSED_FILE: &str =
     "-- sqb: ignore SQLCLEAN005 because kept\n\n-- note\nselect 1\n-- sqb: ignore nope\nselect 2\n";
 const CROSS_JOIN_FILE: &str = "select o.order_id\nfrom orders as o\n-- sqb: ignore SQLCLEAN038 because every order meets every policy\ncross join __seed(\"order_policy\") as p\n";
 
 const NORMALISE_NAME_MACRO: &str = "MACRO (\n  description \"Normalise a name\",\n  arguments (column_name VARCHAR),\n  returns VARCHAR,\n);\n\nREGEXP_REPLACE(\n  TRIM(UPPER(\n  -- Collapse repeated spaces\n  REGEXP_REPLACE(\n    @column_name,\n    '[[:space:]]+',\n    ' '\n  ))),\n  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n";
+const ESCAPED_QUOTE_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(\n  @v,\n  'O\\'Brien\n      kept indent',\n  'tail'\n)\n";
+const ESCAPED_QUOTE_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(@v, 'O\\'Brien\n      kept indent', 'tail')\n";
+const BLOCK_COMMENT_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* first\n      second */\n  'x'\n)\n";
+const BLOCK_COMMENT_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* first\n      second */ 'x'\n)\n";
 const NORMALISE_NAME_FORMATTED: &str = "MACRO (\n  description \"Normalise a name\",\n  arguments (column_name VARCHAR),\n  returns VARCHAR,\n);\n\nREGEXP_REPLACE(\n  TRIM(\n    UPPER(\n      -- Collapse repeated spaces\n      REGEXP_REPLACE(@column_name, '[[:space:]]+', ' ')\n    )\n  ),\n  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n";
 
 #[test]
@@ -652,26 +657,55 @@ fn given_expanded_bodies_when_linting_then_findings_map_to_authored_lines() {
 fn given_a_formatted_expression_select_when_unwrapping_then_strings_keep_their_lines() {
     let test_cases = [
         UnwrappedExpressionTestCase {
+            dialect: "duckdb",
             description: "the expression is dedented one level",
             formatted: "SELECT\n  ROUND(\n    @v,\n    2\n  )",
             expected_expression: Some("ROUND(\n  @v,\n  2\n)"),
         },
         UnwrappedExpressionTestCase {
+            dialect: "duckdb",
             description: "lines inside a multi-line string literal are not dedented",
             formatted: "SELECT\n  CONCAT(\n    'first\n    second',\n    @v\n  )",
             expected_expression: Some("CONCAT(\n  'first\n    second',\n  @v\n)"),
         },
         UnwrappedExpressionTestCase {
+            dialect: "duckdb",
             description: "lines inside a dollar-quoted string are not dedented",
             formatted: "SELECT\n  CONCAT(\n    $$first\n    'second'\n    $$,\n    @v\n  )",
             expected_expression: Some("CONCAT(\n  $$first\n    'second'\n    $$,\n  @v\n)"),
         },
         UnwrappedExpressionTestCase {
+            dialect: "duckdb",
             description: "a $$ inside an identifier does not open a string",
             formatted: "SELECT\n  COALESCE(\n    col$$x,\n    @v\n  )",
             expected_expression: Some("COALESCE(\n  col$$x,\n  @v\n)"),
         },
         UnwrappedExpressionTestCase {
+            dialect: "snowflake",
+            description: "a Snowflake string continues past a backslash-escaped quote",
+            formatted: "SELECT\n  CONCAT(\n    'O\\'Brien\n      kept',\n    @v\n  )",
+            expected_expression: Some("CONCAT(\n  'O\\'Brien\n      kept',\n  @v\n)"),
+        },
+        UnwrappedExpressionTestCase {
+            dialect: "snowflake",
+            description: "an apostrophe in a Snowflake // comment opens no string",
+            formatted: "SELECT\n  COALESCE(\n    @v, // it's here\n    'x'\n  )",
+            expected_expression: Some("COALESCE(\n  @v, // it's here\n  'x'\n)"),
+        },
+        UnwrappedExpressionTestCase {
+            dialect: "duckdb",
+            description: "lines inside a block comment keep their text",
+            formatted: "SELECT\n  COALESCE(\n    @v, /* first\n      second */\n    'x'\n  )",
+            expected_expression: Some("COALESCE(\n  @v, /* first\n      second */\n  'x'\n)"),
+        },
+        UnwrappedExpressionTestCase {
+            dialect: "duckdb",
+            description: "a block comment on the SELECT line does not set the indent",
+            formatted: "SELECT /* first\n   second */\n  COALESCE(\n    @v,\n    'x'\n  )",
+            expected_expression: Some("/* first\n   second */\nCOALESCE(\n  @v,\n  'x'\n)"),
+        },
+        UnwrappedExpressionTestCase {
+            dialect: "duckdb",
             description: "text that is not a select is not an expression",
             formatted: "WITH a AS (SELECT 1)",
             expected_expression: None,
@@ -679,7 +713,10 @@ fn given_a_formatted_expression_select_when_unwrapping_then_strings_keep_their_l
     ];
 
     for test_case in test_cases {
-        let unwrapped: Option<String> = unwrapped_expression(test_case.formatted);
+        let unwrapped: Option<String> = unwrapped_expression(
+            test_case.formatted,
+            &dialect_lexical_syntax(test_case.dialect),
+        );
 
         assert_eq!(
             unwrapped.as_deref(),
@@ -974,18 +1011,32 @@ fn given_expression_macro_bodies_when_formatting_twice_then_every_dialect_lays_t
     let test_cases = [
         ExpressionMacroFormatTestCase {
             description: "a body with a comment between nested calls",
+            dialects: &["duckdb", "snowflake"],
             contents: NORMALISE_NAME_MACRO.to_string(),
             expected_formatted: NORMALISE_NAME_FORMATTED.to_string(),
         },
         ExpressionMacroFormatTestCase {
             description: "a body nesting fifteen calls, authored flush left",
+            dialects: &["duckdb", "snowflake"],
             contents: nested_macro(15, ""),
             expected_formatted: nested_macro(15, "  "),
+        },
+        ExpressionMacroFormatTestCase {
+            description: "a multi-line string after a backslash-escaped quote",
+            dialects: &["snowflake"],
+            contents: ESCAPED_QUOTE_MACRO.to_string(),
+            expected_formatted: ESCAPED_QUOTE_FORMATTED.to_string(),
+        },
+        ExpressionMacroFormatTestCase {
+            description: "a block comment with indented lines",
+            dialects: &["duckdb", "snowflake"],
+            contents: BLOCK_COMMENT_MACRO.to_string(),
+            expected_formatted: BLOCK_COMMENT_FORMATTED.to_string(),
         },
     ];
 
     for test_case in test_cases {
-        for dialect in ["duckdb", "snowflake"] {
+        for dialect in test_case.dialects {
             let once: String = formatted_macro(&test_case.contents, dialect)?;
             let twice: String = formatted_macro(&once, dialect)?;
 

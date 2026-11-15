@@ -8,6 +8,7 @@ use sqlbuild_attachments::ceremonial_select::main::omitted_select_offset::omitte
 use sqlbuild_attachments::ceremonial_select::models::OmittedSelect;
 use sqlbuild_core::text::main::python_isspace::python_isspace;
 use sqlbuild_core::text::main::python_splitlines::python_splitlines;
+use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::dsl_headers::main::declares_table_returns::declares_table_returns;
@@ -17,16 +18,18 @@ use crate::dsl_headers::main::sql_body_ranges::sql_body_ranges;
 use crate::dsl_headers::models::HeaderSpan;
 use crate::lint_text::_helpers::sites::compiled;
 use crate::lint_text::constants::{
-    DECLARATION_GROUP_DIRECTORY, DECLINED_WITHOUT_REASON, DOLLAR_QUOTE, EXPRESSION_SELECT_PREFIX,
-    FIXTURE_HEADER_KINDS, FORMAT_API_VERSION, FUNCTION_HEADER_KIND, GLOBAL_NAMED_ROOTS,
-    GROUPED_NAMED_ROLES, LINE_COMMENT_PREFIX, LINTED_EXPRESSION_ALIAS, MACRO_HEADER_KIND,
-    MAX_FUNCTION_CALL_DEPTH, MOVED_EXPRESSION_ALIAS, MOVED_OMITTED_SELECT,
-    OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN, STRING_QUOTES,
+    BLOCK_COMMENT_OPENER, DECLARATION_GROUP_DIRECTORY, DECLINED_WITHOUT_REASON,
+    EXPRESSION_SELECT_PREFIX, FIXTURE_HEADER_KINDS, FORMAT_API_VERSION, FUNCTION_HEADER_KIND,
+    GLOBAL_NAMED_ROOTS, GROUPED_NAMED_ROLES, LINE_COMMENT_PREFIX, LINTED_EXPRESSION_ALIAS,
+    MACRO_HEADER_KIND, MAX_FUNCTION_CALL_DEPTH, MOVED_EXPRESSION_ALIAS, MOVED_OMITTED_SELECT,
+    OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN,
 };
 use crate::lint_text::errors::LintTextError;
 use crate::lint_text::main::neutralize_interpolation::neutralize_interpolation;
 use crate::lint_text::main::restore_interpolation::restore_interpolation;
-use crate::lint_text::models::{FormatFault, FormatFile, InterpolationSite, PreparedBody};
+use crate::lint_text::models::{
+    FormatFault, FormatFile, FormatRun, InterpolationSite, PreparedBody,
+};
 use sqlclean::sql_lint::models::{FormatRequest, FormatResponse};
 
 static OMITTED_SELECT_SUFFIX: LazyLock<Result<Regex, regex::Error>> =
@@ -260,6 +263,7 @@ fn printed_width(text: &str) -> usize {
 pub(crate) fn formatted_body(
     prepared: &PreparedBody,
     response: &FormatResponse,
+    syntax: &LexicalSyntax,
 ) -> Result<Option<String>, String> {
     if !response.formatted {
         return Err(response
@@ -287,7 +291,7 @@ pub(crate) fn formatted_body(
         let Some(alias) = pattern.find(sql) else {
             return Err(MOVED_EXPRESSION_ALIAS.to_string());
         };
-        unwrapped = unwrapped_expression(&sql[..alias.start()])
+        unwrapped = unwrapped_expression(&sql[..alias.start()], syntax)
             .ok_or_else(|| MOVED_EXPRESSION_ALIAS.to_string())?;
         sql = &unwrapped;
         changed = true;
@@ -305,13 +309,13 @@ pub(crate) fn splice_file(
     index: usize,
     contents: &str,
     bodies: &[PreparedBody],
-    responses: &[FormatResponse],
+    run: &FormatRun<'_>,
 ) -> (Option<String>, Vec<FormatFault>) {
     let original: Vec<char> = contents.chars().collect();
     let mut updated: Vec<char> = original.clone();
     let mut faults: Vec<FormatFault> = Vec::new();
     for body in bodies.iter().rev() {
-        match formatted_body(body, &responses[body.request]) {
+        match formatted_body(body, &run.responses[body.request], run.syntax) {
             Ok(Some(replacement)) => {
                 let _ = updated.splice(body.start..body.end, replacement.chars());
             }
@@ -324,7 +328,7 @@ pub(crate) fn splice_file(
                     .count()
                     + 1,
                 reason,
-                unavailable: responses[body.request].unavailable.is_some(),
+                unavailable: run.responses[body.request].unavailable.is_some(),
             }),
         }
     }
@@ -332,78 +336,59 @@ pub(crate) fn splice_file(
     (formatted, faults)
 }
 
-/// The expression of a formatted one-item `SELECT`, dedented, or `None` if it is not one.
-pub(crate) fn unwrapped_expression(formatted: &str) -> Option<String> {
+/// The expression of a formatted one-item `SELECT`, dedented except inside comments and strings.
+pub(crate) fn unwrapped_expression(formatted: &str, syntax: &LexicalSyntax) -> Option<String> {
     let trimmed: &str = formatted.trim_start();
     let keyword: &str = trimmed.get(..EXPRESSION_SELECT_PREFIX.trim_end().len())?;
     if !keyword.eq_ignore_ascii_case(EXPRESSION_SELECT_PREFIX.trim_end()) {
         return None;
     }
     let rest: &str = &trimmed[keyword.len()..];
-    let lines: Vec<&str> = rest.trim_start_matches([' ', '\t']).lines().collect();
-    let first: &str = lines.first().copied().unwrap_or_default();
-    let (first, rest_lines): (&str, &[&str]) = if first.trim().is_empty() {
-        (
-            lines.get(1).copied().unwrap_or_default(),
-            lines.get(2..).unwrap_or_default(),
-        )
-    } else {
-        (first, lines.get(1..).unwrap_or_default())
-    };
-    let code: &str = std::iter::once(first)
-        .chain(rest_lines.iter().copied())
-        .find(|line| !line.trim_start().starts_with(LINE_COMMENT_PREFIX))
-        .unwrap_or(first);
+    let opaque: Vec<(usize, usize)> = dialect_non_code_ranges(rest, syntax);
+    let mut offset: usize = rest.len() - rest.trim_start_matches([' ', '\t']).len();
+    let mut lines: Vec<(usize, &str)> = Vec::new();
+    for line in rest[offset..].split('\n') {
+        lines.push((offset, line.strip_suffix('\r').unwrap_or(line)));
+        offset += line.len() + 1;
+    }
+    if lines.len() > 1 && lines[0].1.trim().is_empty() {
+        let _ = lines.remove(0);
+    }
+    let (_, first): (usize, &str) = lines[0];
+    let code: &str = lines
+        .iter()
+        .find(|&&(start, line)| {
+            let lead: usize = start + line.len() - line.trim_start().len();
+            !line.trim().is_empty() && !in_comment(rest, &opaque, lead, syntax)
+        })
+        .map_or(first, |&(_, line)| line);
     let indent: usize = code.len() - code.trim_start().len();
+    let mut ranges = opaque.iter().peekable();
     let mut dedented: Vec<&str> = vec![first.trim_start()];
-    let mut quote: Option<char> = open_quote(None, first);
-    for line in rest_lines {
-        if quote.is_some() {
+    for &(start, line) in &lines[1..] {
+        while ranges.next_if(|&&(_, end)| end <= start).is_some() {}
+        if ranges.peek().is_some_and(|&&(open, _)| open < start) {
             dedented.push(line);
         } else {
             let leading: usize = line.len() - line.trim_start().len();
             dedented.push(&line[leading.min(indent)..]);
         }
-        quote = open_quote(quote, line);
     }
     Some(dedented.join("\n").trim_end().to_owned())
 }
 
-/// The quote still open after `line`, given the one before it; `$` stands for `$$`, which has no escapes.
-fn open_quote(mut quote: Option<char>, line: &str) -> Option<char> {
-    let mut characters = line.chars().peekable();
-    let mut previous: Option<char> = None;
-    while let Some(character) = characters.next() {
-        let after_word: bool = previous.is_some_and(|before| {
-            before.is_alphanumeric() || before == '_' || before == DOLLAR_QUOTE
-        });
-        previous = Some(character);
-        if character == DOLLAR_QUOTE
-            && (quote == Some(DOLLAR_QUOTE) || (quote.is_none() && !after_word))
-            && characters.peek() == Some(&DOLLAR_QUOTE)
-        {
-            let _ = characters.next();
-            quote = if quote.is_some() {
-                None
-            } else {
-                Some(DOLLAR_QUOTE)
-            };
-            continue;
-        }
-        match quote {
-            Some(DOLLAR_QUOTE) => {}
-            Some(open) if character == open => {
-                if characters.peek() == Some(&open) {
-                    let _ = characters.next();
-                } else {
-                    quote = None;
-                }
-            }
-            Some(_) => {}
-            None if STRING_QUOTES.contains(&character) => quote = Some(character),
-            None if character == '-' && characters.peek() == Some(&'-') => return None,
-            None => {}
-        }
-    }
-    quote
+/// Whether offset `at` of `text` lies in one of its non-code `ranges` that is a comment.
+fn in_comment(text: &str, ranges: &[(usize, usize)], at: usize, syntax: &LexicalSyntax) -> bool {
+    ranges
+        .iter()
+        .any(|&(open, end)| open <= at && at < end && is_comment(&text[open..], syntax))
+}
+
+/// Whether the non-code text at the start of `text` is a comment rather than quoted text.
+fn is_comment(text: &str, syntax: &LexicalSyntax) -> bool {
+    text.starts_with(BLOCK_COMMENT_OPENER)
+        || syntax
+            .line_comment_prefixes
+            .iter()
+            .any(|prefix| text.starts_with(prefix.as_str()))
 }

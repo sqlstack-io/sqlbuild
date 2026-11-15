@@ -83,6 +83,13 @@ pub struct FormattedBodies {
     pub faults: Vec<FormatFault>,
 }
 
+/// What splicing reads from one formatting run: every response, and the dialect's lexical syntax.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FormatRun<'a> {
+    pub(crate) responses: &'a [sqlclean::sql_lint::models::FormatResponse],
+    pub(crate) syntax: &'a sqlbuild_sqltext::sql_scan::models::LexicalSyntax,
+}
+
 /// One authored body prepared for batched formatting; offsets are character positions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PreparedBody {
