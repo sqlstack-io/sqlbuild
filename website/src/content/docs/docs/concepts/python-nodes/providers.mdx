@@ -200,23 +200,30 @@ Setting values, defaults included, are never published.
 
 ## Project layout
 
+Give each provider its own folder under `providers/`, named for the capability it provides:
+
 ```
 my-project/
   providers/
-    warehouse_client.py
-    slack_notifier.py
+    warehouse_client/
+      provider.py        # the Provider subclass
+      constants.py
+      _helpers/          # private to warehouse_client
+    slack_notifier/
+      provider.py
   hooks/
     sql/
       record_notification.sql
     python/
       notify.py
   python/
-    loaders/
-      load_orders.py
-    tasks/
-      export_orders.py
+    orders/
+      load_orders/
+        node.py
+        main.py
 ```
 
-A project that selects the [Python Rules](/docs/concepts/rules/python-rules#laying-out-providers)
-keeps each provider in its own folder, `providers/<capability>/provider.py`, and each node in its
-own unit folder under its domain.
+Discovery also accepts `.py` files directly in `providers/`. A project that selects the
+[Python Rules](/docs/concepts/rules/python-rules#laying-out-providers) reports them, along with
+anything else in a provider folder besides `provider.py`, its role files, `_helpers/` and
+`_classes/`.

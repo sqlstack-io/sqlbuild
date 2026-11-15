@@ -1,9 +1,9 @@
 """Carrier pickup client."""
 
-from python.utils.currency import amounts
+from providers.carrier_api.constants import MINIMUM_CHARGE_CENTS
 from sqlbuild.providers import Provider
 
-_MINIMUM_CHARGE_CENTS: int = 250
+_CENTS_PER_UNIT: int = 100
 
 
 class CarrierApi(Provider):
@@ -11,6 +11,6 @@ class CarrierApi(Provider):
 
     endpoint: str = "https://carrier.example.com"
 
-    def minimum_charge(self) -> str:
-        """Return the minimum pickup charge as text."""
-        return amounts.cents_text(_MINIMUM_CHARGE_CENTS)
+    def minimum_charge(self) -> float:
+        """Return the minimum pickup charge in currency units."""
+        return MINIMUM_CHARGE_CENTS / _CENTS_PER_UNIT

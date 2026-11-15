@@ -2,6 +2,8 @@
 
 use std::collections::BTreeSet;
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
 use sqlbuild_pysource::node_units::main::node_unit_module::node_unit_module;
 use sqlbuild_pysource::node_units::models::{
     UnitClass, UnitModule, UnitPosition, UnitStatementKind,
@@ -39,7 +41,7 @@ pub(crate) fn provider_faults(
     }
     let mut faults: Vec<Fault> = provider_layout_faults(sources);
     let files: Vec<ParsedFile<'_>> = sources
-        .iter()
+        .par_iter()
         .filter_map(|source| {
             Some(ParsedFile {
                 path: source.relative_path.as_str(),
@@ -140,10 +142,14 @@ fn provider_module_faults(file: &ParsedFile<'_>) -> Vec<Fault> {
                     None => continue,
                 }
             }
-            UnitStatementKind::Class(class) => match class_detail(class, &mut providers) {
-                Some(detail) => (detail, class.position),
-                None => continue,
-            },
+            UnitStatementKind::Class(class) => {
+                let detail: Option<String> = class_detail(class, providers);
+                providers += usize::from(is_public_provider(class));
+                match detail {
+                    Some(detail) => (detail, class.position),
+                    None => continue,
+                }
+            }
             UnitStatementKind::Function(function) => (
                 format!("function '{}' belongs in _helpers/", function.name),
                 function.position,
@@ -171,17 +177,21 @@ fn provider_module_faults(file: &ParsedFile<'_>) -> Vec<Fault> {
     faults
 }
 
-/// Why `class` does not belong in provider.py, counting public Provider subclasses in `providers`.
-fn class_detail(class: &UnitClass, providers: &mut usize) -> Option<String> {
+/// Why `class` does not belong in provider.py, after `earlier` public Provider subclasses.
+fn class_detail(class: &UnitClass, earlier: usize) -> Option<String> {
     let name: &str = &class.name;
     if name.starts_with(PRIVATE_PREFIX) {
         return Some(format!("collaborator class '{name}' belongs in _classes/"));
     }
-    if !class.bases.iter().any(|base| base == PROVIDER_BASE) {
+    if !is_public_provider(class) {
         return Some(format!("class '{name}' does not subclass {PROVIDER_BASE}"));
     }
-    *providers += 1;
-    (*providers > 1).then(|| format!("'{name}' is a second {PROVIDER_BASE} subclass"))
+    (earlier > 0).then(|| format!("'{name}' is a second {PROVIDER_BASE} subclass"))
+}
+
+/// Whether `class` is a public subclass of Provider.
+fn is_public_provider(class: &UnitClass) -> bool {
+    !class.name.starts_with(PRIVATE_PREFIX) && class.bases.iter().any(|base| base == PROVIDER_BASE)
 }
 
 /// Imports of another provider's private code, and a provider's imports of python/ outside utils/ or of orchestration/.
