@@ -37,9 +37,9 @@ pub fn node_unit_module(contents: &str, python_version: (u8, u8)) -> Option<Unit
                     position: unit_position(&source, class.name.range().start()),
                     bases: class.bases().iter().filter_map(last_name).collect(),
                 }),
-                Stmt::Assign(assign) => {
-                    UnitStatementKind::Assignment(assign.targets.iter().filter_map(target_name).collect())
-                }
+                Stmt::Assign(assign) => UnitStatementKind::Assignment(
+                    assign.targets.iter().filter_map(target_name).collect(),
+                ),
                 Stmt::AnnAssign(assign) => {
                     UnitStatementKind::Assignment(target_name(&assign.target).into_iter().collect())
                 }
