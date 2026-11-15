@@ -4,17 +4,21 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PySet, PySetMethods};
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::compile_analysis_selection;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::diagnostics::trackers::current_tracker;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The current build's phase timing tracker, when one is recording.
 pub(crate) fn timing_tracker(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {

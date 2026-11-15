@@ -1,8 +1,5 @@
 //! Gather a frozen point-in-time warehouse snapshot for planning.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
@@ -12,7 +9,6 @@ use crate::bindings::_helpers::fingerprints::latest_rows::select_latest_fingerpr
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
 use crate::bindings::_helpers::planner_phases::objects::object;
@@ -25,10 +21,6 @@ use crate::bindings::_helpers::planner_warehouse::constants::{
     RELATIONS_MAIN_COLUMNS, RELATIONS_MAIN_LIST,
 };
 use crate::bindings::_helpers::planner_warehouse::cursors::{CursorInputs, cursor_snapshots};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::fields::mapping_values;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -42,6 +34,14 @@ use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
+use sqlbuild_python_base::records::types::RecordId;
 use std::collections::{BTreeSet, HashSet};
 
 /// Everything one snapshot gather needs.
@@ -252,7 +252,7 @@ fn active_catalog<'py>(
     connection: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(adapter.py(), ACTIVE_CATALOG)?,
+        &host_entry(adapter.py(), ACTIVE_CATALOG)?,
         &[
             ("adapter", adapter.clone()),
             ("connection", connection.clone()),
@@ -325,7 +325,7 @@ pub(crate) fn list_relations<'py>(
     names: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(adapter.py(), RELATIONS_MAIN_LIST)?,
+        &host_entry(adapter.py(), RELATIONS_MAIN_LIST)?,
         &[
             ("adapter", adapter.clone()),
             ("connection", connection.clone()),
@@ -342,7 +342,7 @@ pub(crate) fn columns_for<'py>(
     relations: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(adapter.py(), RELATIONS_MAIN_COLUMNS)?,
+        &host_entry(adapter.py(), RELATIONS_MAIN_COLUMNS)?,
         &[
             ("adapter", adapter.clone()),
             ("connection", connection.clone()),

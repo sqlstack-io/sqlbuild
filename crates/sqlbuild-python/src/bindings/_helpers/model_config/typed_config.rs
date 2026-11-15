@@ -20,10 +20,11 @@ use crate::bindings::_helpers::model_config::config_nodes::{
     HostHandle, PyConfigEntries, PyConfigNode, config_node, config_object, is_exact_container,
 };
 use crate::bindings::_helpers::model_config::config_values::config_value_type_error;
-use crate::bindings::_helpers::records::fields::{
-    cached_value, field as native_field, mapping_get, store_cached,
-};
-use crate::bindings::_helpers::records::models::NativeRecord;
+use sqlbuild_python_base::records::main::fields::cached_value::cached_value;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::store_cached::store_cached;
+use sqlbuild_python_base::records::models::NativeRecord;
 
 const CONFIG_FIELD: &str = "config";
 const VALUES_FIELD: &str = "values";

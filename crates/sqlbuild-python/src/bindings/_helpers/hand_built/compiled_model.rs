@@ -5,15 +5,17 @@ use crate::bindings::_helpers::analysis::binding_locations::{
 };
 use crate::bindings::_helpers::analysis_session::outcome_objects::dynamic_contract_proof;
 use crate::bindings::_helpers::analysis_session::outcome_objects::session_outcome_analysis;
-use crate::bindings::_helpers::records::construct::{enum_from_value, enum_member, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::models::Positional;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 use sqlbuild_analysis::semantic_validation::models::DiagnosticRow;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 type Object<'py> = Bound<'py, PyAny>;
 

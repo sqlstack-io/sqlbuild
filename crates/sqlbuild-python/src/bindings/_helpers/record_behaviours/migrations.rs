@@ -9,10 +9,10 @@ use sqlbuild_core::migration_values::main::migration_decision_traits::migration_
 use sqlbuild_core::migration_values::main::plan_label::plan_label;
 use sqlbuild_core::migration_values::models::{ColumnDecisionTraits, DecisionTraits};
 
-use crate::bindings::_helpers::boundary::call_arguments::call_argument;
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_argument::call_argument;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn value(member: &Bound<'_, PyAny>) -> PyResult<String> {
     member.str()?.extract()

@@ -8,10 +8,10 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_pysource::string_literals::main::string_literal_locations::string_literal_locations;
 use sqlbuild_pysource::string_literals::models::StringQuery;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The discovered Python declarations whose files a refactoring searches.
 const PYTHON_DECLARATIONS: [&str; 8] = [

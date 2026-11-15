@@ -12,11 +12,11 @@ use sqlbuild_host::models::{
 };
 use sqlbuild_host::types::ResultEnum;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::projection::Projection;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Borrowed executor results with canonical terminals, used by the build JSON projection.
 pub(crate) struct RetainedBuildResults<'a, V> {
@@ -178,7 +178,7 @@ pub(crate) fn aggregated_build_result<'py>(
     sections: &[Bound<'py, PyAny>],
 ) -> PyResult<Bound<'py, PyAny>> {
     let counts: BuildCounts = aggregate_build_counts(&facts(sections)?);
-    let status: Bound<'py, PyAny> = host::entry(py, ExecutorHost::BuildStatus)?
+    let status: Bound<'py, PyAny> = host_entry(py, ExecutorHost::BuildStatus)?
         .getattr(if counts.failed { "FAILED" } else { "SUCCESS" })?;
     let mut keywords: Vec<(&str, Bound<'py, PyAny>)> = vec![("status", status)];
     keywords.extend(RESULT_FIELDS.iter().copied().zip(sections.iter().cloned()));
@@ -194,7 +194,7 @@ pub(crate) fn aggregated_build_result<'py>(
         ),
     ]);
     call_with(
-        &host::entry(py, ExecutorHost::BuildExecutionResult)?,
+        &host_entry(py, ExecutorHost::BuildExecutionResult)?,
         &keywords,
     )
 }

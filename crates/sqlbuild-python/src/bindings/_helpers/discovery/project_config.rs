@@ -21,13 +21,14 @@ use sqlbuild_config::project::models::{
     Built, ChangesConfig, ConfigFile, ConfigPaths, ReviewConfig,
 };
 
-use crate::bindings::_helpers::boundary::config_values::config_value_to_python;
-use crate::bindings::_helpers::native_host::host::write_console;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{new_record, record_class};
-use crate::bindings::_helpers::records::ids::ErrorId;
-use crate::bindings::_helpers::records::registry;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_python_base::boundary::main::config_value_to_python::config_value_to_python;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::registry::record_named::record_named;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const FILE_NAMES: [&str; 4] = [
     PROJECT_CONFIG_FILENAME,
@@ -124,7 +125,7 @@ fn enum_member<'py>(py: Python<'py>, class: &str, value: &str) -> PyResult<Bound
     let class_object: Bound<'py, PyAny> =
         match PYTHON_ENUM_MODULES.iter().find(|(name, _)| *name == class) {
             Some((_, module)) => py.import(*module)?.getattr(class)?,
-            None => record_class(py, registry::record_named(class)?)?,
+            None => record_class(py, record_named(class)?)?,
         };
     class_object.call1((value,))
 }
@@ -138,7 +139,7 @@ fn object<'py>(
     for (name, value) in fields {
         keywords.set_item(name, built(py, value)?)?;
     }
-    new_record(py, registry::record_named(class)?, (), Some(&keywords))
+    new_record(py, record_named(class)?, (), Some(&keywords))
 }
 
 fn built(py: Python<'_>, value: Built) -> PyResult<Py<PyAny>> {

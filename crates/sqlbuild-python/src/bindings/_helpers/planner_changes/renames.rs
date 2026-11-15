@@ -1,7 +1,8 @@
 //! Model renames that downstream `__ref` names may have been rewritten for.
 
 use crate::bindings::_helpers::fingerprints::query_hashes::compute_query_hash;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use std::collections::BTreeSet;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -12,15 +13,17 @@ use sqlbuild_analysis::planner_changes::main::origin_reference_names::origin_ref
 use sqlbuild_analysis::planner_changes::models::{NameSpan, RenameCandidate};
 use sqlbuild_rules::lint_text::main::neutralize_interpolation::neutralize_interpolation;
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_identity::hashing::baselined_model_query_hash;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 
 const GENERIC_DIALECT: &str = "generic";
 const FINAL_NEWLINE: &str = "\n";

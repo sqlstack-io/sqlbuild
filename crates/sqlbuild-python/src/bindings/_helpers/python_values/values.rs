@@ -8,9 +8,9 @@ use pyo3::types::{
 use sqlbuild_analysis::python_values::models::{PythonKey, PythonValue};
 use sqlbuild_core::json::models::JsonInteger;
 
-use crate::bindings::_helpers::boundary::panics::NativeCompilerError;
 use crate::bindings::_helpers::compile_outputs::json_report::float_key;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DATACLASS_FIELDS: &str = "__dataclass_fields__";
 const SURROGATE_KEY: &str = "a JSON artifact mapping key holds a lone surrogate, which the native \
@@ -60,7 +60,7 @@ fn key_value(key: &Bound<'_, PyAny>) -> PyResult<PythonKey> {
                 text: Ok(text.to_owned()),
                 is_str: true,
             })
-            .map_err(|_| NativeCompilerError::new_err(SURROGATE_KEY));
+            .map_err(|_| native_compiler_error(SURROGATE_KEY));
     }
     Ok(PythonKey {
         text: scalar_key_text(key)?,

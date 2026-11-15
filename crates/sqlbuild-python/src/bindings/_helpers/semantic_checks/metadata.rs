@@ -13,15 +13,11 @@ use sqlbuild_analysis::semantic_checks::models::{
 use sqlbuild_analysis::semantic_validation::models as validation;
 use sqlbuild_model_config::header_metadata::constants::ACCEPTED_VALUES_ARGUMENT;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_reads::binding_validated;
 use crate::bindings::_helpers::model_config::config_nodes::PyConfigNode;
 use crate::bindings::_helpers::model_config::header_audits::AuditInstance;
 use crate::bindings::_helpers::model_config::header_metadata::HeaderValue;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::semantic_checks::failures::semantic_error;
 use crate::bindings::_helpers::semantic_checks::inputs::{
     column_names, resource_sql_diagnostics, sql_test_columns,
@@ -29,9 +25,13 @@ use crate::bindings::_helpers::semantic_checks::inputs::{
 use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
 use crate::bindings::_helpers::semantic_checks::type_recovery::items;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
-use crate::bindings::types::CompilerDetach;
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_project::models::ModelMetadataTexts;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// `SqlReferenceKind.UDF` and `SqlReferenceKind.TABLE_FUNCTION` values.
 const FUNCTION_REFERENCE_KINDS: [&str; 2] = ["udf", "table_fn"];

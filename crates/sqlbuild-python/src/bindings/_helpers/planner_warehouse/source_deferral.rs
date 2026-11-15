@@ -3,7 +3,6 @@
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::authored_values::project_vars::render_project_var_text;
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
@@ -11,7 +10,6 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
     optional_text, planner_error, replace, text,
@@ -19,13 +17,15 @@ use crate::bindings::_helpers::planner_phases::objects::{
 use crate::bindings::_helpers::planner_warehouse::constants::{
     MODEL_HOOK_CONFIG_KEYS, SQL_HOOK_ENTRY,
 };
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
 use sqlbuild_analysis::planner_warehouse::main::source_call_names::source_call_names;
 use sqlbuild_analysis::planner_warehouse::main::source_deferral_field::source_deferral_field;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::BTreeSet;
 
 fn managed_names(project: &Bound<'_, PyAny>) -> PyResult<BTreeSet<String>> {
@@ -56,7 +56,7 @@ fn hook_source_reads(
     let mut names: Vec<String> = Vec::new();
     let py = model.py();
     let hook_entry = record_class(py, SQL_HOOK_ENTRY)?;
-    let source_kind = host::entry(py, UserCodeHost::SqlResourceRefKind)?.getattr("SOURCE")?;
+    let source_kind = host_entry(py, UserCodeHost::SqlResourceRefKind)?.getattr("SOURCE")?;
     let values = model_values(model)?;
     for key in MODEL_HOOK_CONFIG_KEYS {
         let value = config_value(py, &values, key)?;

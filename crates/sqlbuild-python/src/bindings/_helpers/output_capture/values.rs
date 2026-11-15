@@ -12,17 +12,17 @@ use sqlbuild_core::command_output::types::PassText;
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::macro_bridge::store_keys::text;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const SURROGATE_PASS: &str = "surrogatepass";
 const UTF8: &str = "utf-8";
 
 /// The exception class `name` of the output capture exceptions module, raised with `message`.
 pub(crate) fn output_error(py: Python<'_>, name: ExecutorHost, message: &str) -> PyErr {
-    match host::entry(py, name).and_then(|class| class.call1((message,))) {
+    match host_entry(py, name).and_then(|class| class.call1((message,))) {
         Ok(error) => PyErr::from_value(error),
         Err(error) => error,
     }

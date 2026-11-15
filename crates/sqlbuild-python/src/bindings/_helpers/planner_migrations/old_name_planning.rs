@@ -2,11 +2,8 @@
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_migrations::models::{MigrationPhase, OldNameViewPlanning};
 use crate::bindings::_helpers::planner_migrations::old_name_objects::recorded_view;
 use crate::bindings::_helpers::planner_migrations::old_names::old_name_claim_errors;
@@ -14,10 +11,13 @@ use crate::bindings::_helpers::planner_migrations::old_names::old_name_schemas_t
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PySet, PySetMethods, PyTuple};
 use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::HashMap;
 
 fn schemas<'py>(
@@ -50,7 +50,7 @@ fn schemas<'py>(
             let existing = native_field(&snapshot, "existing_relations")?
                 .call_method1("get", (model_reads::name_object(item)?,))?;
             if !existing.is_none()
-                && host::entry(py, AdapterHost::NormalizeRelationType)?
+                && host_entry(py, AdapterHost::NormalizeRelationType)?
                     .call1((native_field(&existing, "relation_type")?,))?
                     .eq("view")?
             {

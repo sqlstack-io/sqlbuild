@@ -10,15 +10,15 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseHistoryRead,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::within;
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
 use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
-use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::{
     close_history_session, open_history_session, read_history,
 };
 use crate::bindings::_helpers::recall::console::write_stderr;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
 
 pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResult<i32> {
     options.set_item("action", "publish")?;

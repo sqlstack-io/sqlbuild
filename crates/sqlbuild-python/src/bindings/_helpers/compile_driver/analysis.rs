@@ -8,9 +8,6 @@ use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 
-use crate::bindings::_helpers::boundary::python_calls::{
-    Status, call_with, imported, keywords, within,
-};
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph_with_analysis_selection;
@@ -20,19 +17,25 @@ use crate::bindings::_helpers::compile_driver::stage_work::{
 use crate::bindings::_helpers::contracts::contract_diagnostics::evaluate_model_contracts;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::lineage::project_lineage::build_project_column_lineage;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::rules::constants::RULE_FIX_AVAILABLE_NOTE;
 use crate::bindings::_helpers::rules::early_builtin_rules::{EarlyRulesScope, EarlyRulesSettings};
 use crate::bindings::_helpers::rules::early_sql_lint::EarlySqlLint;
 use crate::bindings::_helpers::rules::results::rules_progress;
 use crate::bindings::_helpers::rules::rule_dispatch::evaluate_rules;
 use crate::bindings::_helpers::rules::rules_config::load_rules_config_with_cache;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::Status;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 const RICH_LINEAGE: &str = "rich";
 const FAST_LINEAGE: &str = "fast";
@@ -374,7 +377,7 @@ impl<'py> Driver<'_, 'py> {
         let started: Instant = Instant::now();
         self.status.start("Compiling project graph...")?;
         let lifecycle: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::OperationLifecycle)?,
+            &host_entry(py, ExecutorHost::OperationLifecycle)?,
             &[
                 ("operation_kind", PyString::new(py, "project").into_any()),
                 (

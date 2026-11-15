@@ -15,11 +15,11 @@ use sqlbuild_scopes::scope_report::models::{
     ScopeFolder, ScopeReport, ScopeResult, ScopeSection, SourceLocation,
 };
 
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::scopes::scope_objects::{
     ScopeClasses, field, optional_item, read_declaration_identity, read_diagnostic, read_qualified,
 };
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 type PyObject = Py<PyAny>;
 

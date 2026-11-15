@@ -7,9 +7,10 @@ use pyo3::types::{PyString, PyTuple};
 use sqlbuild_analysis::janitor_planning::models::ArchiveTimestamp;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DATETIME_MODULE: &str = "datetime";
 
@@ -144,7 +145,7 @@ pub(crate) fn record<'py>(
     class_name: ExecutorHost,
     pairs: &[(&str, Bound<'py, PyAny>)],
 ) -> PyResult<Bound<'py, PyAny>> {
-    call_with(&host::entry(py, class_name)?, pairs)
+    call_with(&host_entry(py, class_name)?, pairs)
 }
 
 fn utc(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {

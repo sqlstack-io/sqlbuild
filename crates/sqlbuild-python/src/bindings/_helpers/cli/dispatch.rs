@@ -32,7 +32,6 @@ use crate::bindings::_helpers::query_command::dag::run_dag_command;
 use crate::bindings::_helpers::query_command::query::run_query_command;
 use crate::bindings::_helpers::recall::command::run_recall_command;
 use crate::bindings::_helpers::recall::session::InvocationRecall;
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
 use crate::bindings::_helpers::refactor::refactor_command::run_refactor_command;
 use crate::bindings::_helpers::review_command::command::run_review_command;
 use crate::bindings::_helpers::scenario_command::capture_command::run_scenario_capture_command;
@@ -56,12 +55,16 @@ use sqlbuild_cli::dispatch::models::{
     ClassRef, CommandFacts, DiffSide, Dispatch, DispatchFailure, Field, Route, Source,
 };
 use sqlbuild_core::format_command::main::format_path_selectors::format_path_selectors;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
 
-use crate::bindings::_helpers::boundary::python_calls::{imported, within};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
-use crate::bindings::_helpers::records::registry;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::record_named::record_named;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PATHLIB_MODULE: &str = "pathlib";
 const UTF8: &str = "utf-8";
@@ -243,7 +246,7 @@ fn path_class(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 }
 
 fn class_object<'py>(py: Python<'py>, class: ClassRef) -> PyResult<Bound<'py, PyAny>> {
-    record_class(py, registry::record_named(class.name)?)
+    record_class(py, record_named(class.name)?)
 }
 
 fn tuple_of<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {

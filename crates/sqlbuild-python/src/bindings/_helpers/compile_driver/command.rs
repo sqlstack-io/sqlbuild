@@ -15,9 +15,6 @@ use sqlbuild_rules::custom_host_pool::constants::{
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use crate::bindings::_helpers::boundary::python_calls::{
-    Status, call_with, imported, keywords, within,
-};
 use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::compile_command::models::CompileReuseAttempt;
 use crate::bindings::_helpers::compile_command::report::{
@@ -37,13 +34,20 @@ use crate::bindings::_helpers::compile_driver::phases::{
     target_dir, write_artifacts, write_dag_artifact,
 };
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::{NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
 use crate::bindings::_helpers::rules::results::format_skipped_type_proof_rules;
 use crate::bindings::_helpers::rules::rules_config::rules_config_of;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::Status;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 
 const BYPASS_OUTCOME: &str = "bypass";
@@ -285,7 +289,7 @@ pub(crate) fn compile_phases<'py>(
             |input_reads| {
                 let artifact_writes: Py<CompileArtifactWrites> = new_artifact_recorder(py)?;
                 let manager: Bound<'py, PyAny> = call_with(
-                    &registry::native(py, NativeAttr::PreparedCompileArtifacts)?,
+                    &native_attr(py, NativeAttr::PreparedCompileArtifacts)?,
                     &[
                         ("enabled", PyBool::new(py, staging).to_owned().into_any()),
                         (

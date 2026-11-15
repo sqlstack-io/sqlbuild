@@ -6,11 +6,11 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::lifecycle_events::main::validate_known_event::validate_known_event;
 use sqlbuild_core::lifecycle_events::models::KnownEventFacts;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::lifecycle_events::payloads::{
     PathSegment, frozen, object_entries, validation_error,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const CORRELATION_FIELDS: [&str; 5] = [
     "run_id",

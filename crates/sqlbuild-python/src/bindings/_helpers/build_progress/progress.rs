@@ -17,12 +17,12 @@ use sqlbuild_core::progress::models::{
 };
 use sqlbuild_core::terminal_events::models::TerminalRequest;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::build_progress::transient_lines::shared_transient_line_coordinator;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 /// The module attribute holding the `ContextVar` of the installed projector.
 const CONTEXT_ATTRIBUTE: &str = "_native_progress_projector_context";

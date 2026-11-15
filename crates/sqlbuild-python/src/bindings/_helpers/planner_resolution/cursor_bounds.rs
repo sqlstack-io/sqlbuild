@@ -2,16 +2,10 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::cursor::conversion::{CursorSession, algebra_error};
 use crate::bindings::_helpers::cursor::scalars::try_parse;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_resolution::maximum_safety::apply_maximum_start_policy;
 use crate::bindings::_helpers::planner_resolution::values::string;
-use crate::bindings::_helpers::records::construct::{new_record, new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
@@ -20,6 +14,14 @@ use sqlbuild_cursor::algebra::models::{DurationSpan, Grain, Scalar};
 use sqlbuild_cursor::planner::main::raw_bounds::raw_bounds;
 use sqlbuild_cursor::planner::main::replay_start::replay_start;
 use sqlbuild_cursor::planner::models::{CursorKind, CursorSnapshot, ReplayPolicy};
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 pub(super) fn optional_scalar<'py>(
     session: &CursorSession<'py>,
@@ -195,7 +197,7 @@ pub(crate) fn compute_cursor_bounds<'py>(
         ),
     )?;
     if args.flag("is_microbatch")? {
-        let sentinel = host::entry(py, ExecutorHost::BoundSentinel)?;
+        let sentinel = host_entry(py, ExecutorHost::BoundSentinel)?;
         return new_record_with(
             py,
             RecordId::CursorBounds,

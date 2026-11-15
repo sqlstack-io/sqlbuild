@@ -12,11 +12,12 @@ use sqlbuild_rules::configuration::errors::RulesConfigLoadError;
 use sqlbuild_rules::configuration::main::load_rules_config::load_rules_config as load_config;
 use sqlbuild_rules::models::RulesConfig;
 
-use crate::bindings::_helpers::boundary::config_values::json_value_to_python;
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::boundary::main::json_value_to_python::json_value_to_python;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 struct Models<'py> {
     py: Python<'py>,

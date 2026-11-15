@@ -4,11 +4,14 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::lineage::lineage_facts::{confidence_member, transform_kind_member};
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record, record_class};
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::types::RecordId;
 
 const LINEAGE_NATIVE: &str = "native";
 

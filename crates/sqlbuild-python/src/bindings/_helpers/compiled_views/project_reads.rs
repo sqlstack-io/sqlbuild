@@ -4,7 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 use crate::bindings::_helpers::compile_driver::stage_work::{COMPILED_VIEW_FALLBACKS, count_stage};
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MODELS_FIELD: &str = "models";
 const SOURCES_FIELD: &str = "sources";

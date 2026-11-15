@@ -1,6 +1,5 @@
 //! Resolve scenario SQL through the shared native scanner and adapter callbacks.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_scenario::constants::{
     SCENARIO_PLAN_MISSING_RELATION_TARGET, SCENARIO_PLAN_UNRESOLVED_RELATION_MARKER,
@@ -9,8 +8,6 @@ use crate::bindings::_helpers::planner_scenario::{
     models::SqlContext,
     values::{error, string},
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
@@ -18,6 +15,9 @@ use pyo3::types::{PyDict, PyStringMethods};
 use sqlbuild_analysis::planner_scenario::{
     errors::MarkerError, main::replace_markers::replace_markers,
 };
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_sqltext::sql_scan::models::Unclosed;
 
 pub(super) fn resolve_sql(

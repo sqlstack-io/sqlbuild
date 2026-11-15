@@ -6,13 +6,13 @@ use crate::bindings::_helpers::planner_migrations::constants::{
     DONE, MISSING_ORIGIN_ALLOW_OUTCOME, MISSING_ORIGIN_CONFIRMATION_OUTCOME,
     MISSING_ORIGIN_DENY_OUTCOME,
 };
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::planner_migrations::main::column_warning::column_warning;
 use sqlbuild_analysis::planner_migrations::models::ColumnWarning;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 pub(super) fn warning<'py>(
     entry: &Bound<'py, PyAny>,

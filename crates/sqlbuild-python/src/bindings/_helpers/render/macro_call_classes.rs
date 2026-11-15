@@ -8,9 +8,9 @@ use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_render::macro_calls::main::call_class_store_text::call_class_store_text;
 
 use crate::bindings::_helpers::macro_bridge::store_keys::{context_store_token, macro_store_token};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::render::macro_expansion_facts::ResourceRef;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 /// `(kind, name, owner (kind, name))` of a `DeclarationIdentity`, compared by value.
 type IdentityKey = (String, String, Option<(String, String)>);

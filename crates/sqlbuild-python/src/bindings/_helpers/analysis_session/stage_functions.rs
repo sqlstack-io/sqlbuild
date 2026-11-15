@@ -19,16 +19,17 @@ use crate::bindings::_helpers::analysis_session::session::{
     ContractRow, ExpressionShapesRow, FamilyRow, NativeModelAnalysisSession, PivotModelRow,
     PivotRequestRow, infer_expression_source_shapes, prove_dynamic_column_contracts,
 };
-use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::compile_driver::stage_work::{
     EXPRESSION_SHAPE_BATCHES, EXPRESSION_SHAPES_INFERRED, count_stage,
 };
 use crate::bindings::_helpers::model_config::header_families::family_specs;
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::models::ProjectCatalog;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 
 const BATCH_MODE: &str = "batch";
 const TABLE_FUNCTION_KIND: &str = "table_fn";

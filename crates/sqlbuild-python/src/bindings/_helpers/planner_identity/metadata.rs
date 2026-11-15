@@ -16,7 +16,6 @@ use sqlbuild_analysis::planner_identity::main::function_fingerprint_sql::functio
 use sqlbuild_analysis::planner_identity::models::FunctionFingerprintFields;
 use sqlbuild_core::fingerprint_identity::main::stable_identity_hash::stable_identity_hash;
 
-use crate::bindings::_helpers::boundary::python_calls::{imported, keywords, within};
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
@@ -27,9 +26,12 @@ use crate::bindings::_helpers::planner_identity::hashing::{
     baselined_function_definition_hash, function_definition_hash,
 };
 use crate::bindings::_helpers::planner_identity::json_values::{COMPACT, SPACED, sorted_dumps};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const LOCAL_FUNCTION_HASHES_KEY: &str = "local_function_hashes";
 const DATACLASSES_MODULE: &str = "dataclasses";

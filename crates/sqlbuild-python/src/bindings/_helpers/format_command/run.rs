@@ -18,8 +18,6 @@ use sqlbuild_rules::lint_text::models::{
     FormatFault, FormatFile, FormattedBodies, SuppressionFinding,
 };
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_driver::stage_work::{
     FORMAT_CACHE_HITS, FORMAT_CACHE_MISSES, FORMAT_LINT_BATCHES, FORMAT_LINT_FILES, count_stage,
 };
@@ -32,16 +30,20 @@ use crate::bindings::_helpers::format_command::stages::{
     QuoteFix, each_file, format_header_text, lint_header_text, on_format_workers, parse_faults,
     quote_fixed_text,
 };
-use crate::bindings::_helpers::records::construct::{error_class, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::rules::dsl_headers::rules_config;
 use crate::bindings::_helpers::rules::fixture_formatting::format_redundant_fixture_nulls;
 use crate::bindings::_helpers::rules::lint_pipeline::{
     LintViolationRow, ViolationClasses, project_relative_path,
 };
 use crate::bindings::_helpers::rules::lint_text::{relative_parts, unsafe_fault};
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const DESCRIPTION_PRESENT: &str = "description-present";
 /// The fix that rewrites descriptions escaping or doubling double quotes as `"""` strings.

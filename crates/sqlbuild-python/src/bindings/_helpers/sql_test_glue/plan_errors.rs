@@ -1,15 +1,16 @@
 //! Project native planning failures into existing located diagnostic exceptions.
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::sql_test_glue::plan_values::string;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_analysis::sql_test_attachment::main::sql_test_cte_location::sql_test_cte_location;
 use sqlbuild_analysis::sql_test_attachment::models::CteLocation;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The location of `call` inside one CTE of a SQL test block, else the CTE header, else the block.
 fn cte_call_location<'py>(

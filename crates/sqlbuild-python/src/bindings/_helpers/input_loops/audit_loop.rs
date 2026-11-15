@@ -43,9 +43,9 @@ use crate::bindings::_helpers::model_config::header_audits::{AuditInstance, Head
 use crate::bindings::_helpers::model_config::header_metadata::HeaderColumns;
 use crate::bindings::_helpers::model_config::header_metadata::thresholds;
 use crate::bindings::_helpers::model_config::model_validator::NativeModelValidator;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::models::AttachedTarget;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const THRESHOLDS_KEY: &str = "thresholds";
 const MINIMUM_SAMPLES_KEY: &str = "minimum_samples";

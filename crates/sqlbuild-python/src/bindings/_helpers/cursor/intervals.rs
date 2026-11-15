@@ -18,11 +18,11 @@ use sqlbuild_cursor::algebra::main::validate_interval::validate_interval;
 use sqlbuild_cursor::algebra::models::{Interval, Scalar};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::cursor::conversion::CursorSession;
 use crate::bindings::_helpers::cursor::scalars::as_scalar;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const RAW_INTERVAL_CURSOR_TYPES: [&str; 2] = ["timestamp", "integer"];
 
@@ -113,7 +113,7 @@ fn merge_raw_intervals<'py>(
     let py: Python<'py> = intervals.py();
     let kind: String = cursor_type.str()?.extract()?;
     if !RAW_INTERVAL_CURSOR_TYPES.contains(&kind.as_str()) {
-        return Err(host::entry(py, ExecutorHost::MicrobatchStateError)
+        return Err(host_entry(py, ExecutorHost::MicrobatchStateError)
             .and_then(|class| class.call1((format!("unsupported cursor type: {kind}"),)))
             .map_or_else(|error| error, PyErr::from_value));
     }
@@ -139,7 +139,7 @@ fn merge_raw_intervals<'py>(
     if let Some(error) = failure {
         return Err(error);
     }
-    let class: Bound<'py, PyAny> = host::entry(py, ExecutorHost::MicrobatchInterval)?;
+    let class: Bound<'py, PyAny> = host_entry(py, ExecutorHost::MicrobatchInterval)?;
     let mut merged: Vec<RawInterval<'py>> = Vec::new();
     for next in parsed {
         let Some(last) = merged.last_mut() else {

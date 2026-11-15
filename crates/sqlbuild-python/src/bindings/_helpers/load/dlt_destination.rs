@@ -12,11 +12,12 @@ use sqlbuild_core::dlt_destination::models::{
 };
 use sqlbuild_core::loader_connection::models::LoaderConnection;
 use sqlbuild_host::entries::models::ThirdPartyHost;
+use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::load::ingestr_command::connection;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 const DLT_ERROR: ThirdPartyHost = ThirdPartyHost::DltIntegrationError;
 
@@ -33,7 +34,7 @@ positional_record! {
 
 /// A `DltIntegrationError`, or the failure to construct one.
 fn dlt_error(py: Python<'_>, message: String) -> PyErr {
-    host::entry(py, DLT_ERROR)
+    host_entry(py, DLT_ERROR)
         .and_then(|class| class.call1((message,)))
         .map_or_else(|error| error, PyErr::from_value)
 }

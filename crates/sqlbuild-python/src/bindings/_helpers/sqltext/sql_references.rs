@@ -5,21 +5,23 @@ use pyo3::prelude::{
 };
 use pyo3::types::PyTuple;
 use pyo3::{IntoPyObject, IntoPyObjectExt, pyclass, pyfunction, pymethods, wrap_pyfunction};
+use sqlbuild_python_base::positional_record;
 use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_references;
 use sqlbuild_sqltext::sql_references::models::{
     InvalidReferenceCall, ReferenceExtraction, SqlReference,
 };
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::compile_context::diagnostic_collector::report_compile_diagnostic;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{
-    enum_from_value, enum_member, new_record_with,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const REFERENCE_CALL_SYNTAX_CODE: &str = "P012";
 

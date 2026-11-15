@@ -4,8 +4,8 @@ use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObjectExt, pyclass, pymethods};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_command::constants::REUSE_ATTEMPT_FIELDS;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
 
 /// Result of checking for a reusable compile, carried into a full compile on a miss.
 #[pyclass(module = "sqlbuild._native", frozen, get_all)]

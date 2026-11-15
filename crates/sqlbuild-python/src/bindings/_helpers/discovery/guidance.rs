@@ -11,8 +11,8 @@ use sqlbuild_config::project::main::snippet_help_text::snippet_help_text;
 use sqlbuild_config::project::main::sql_analysis_off_guidance::sql_analysis_off_guidance as analysis_off;
 use sqlbuild_config::project::models::{SettingSite, SettingText};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 
 /// The note and help for turning SQL analysis on, or `None` when it is effectively on.

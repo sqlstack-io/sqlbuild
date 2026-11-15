@@ -17,17 +17,18 @@ use sqlbuild_recall::writer::models::{
 };
 use sqlbuild_recall::writer::types::{OutputReplacement, PendingLifecycleEvent};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::event_exporting::models::BoundEventExporter;
 use crate::bindings::_helpers::event_exporting::values::export_policy;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_threads::constants::OUTPUT_SUPPRESSED_ATTRIBUTE;
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use crate::bindings::_helpers::recall::constants::{
     EVENT_PARAMETER, RECORD_PARAMETER, UTC_OFFSET, UTC_SUFFIX,
 };
 use crate::bindings::_helpers::recall::writer::RecallWriter;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 thread_local! {
     /// Set while this thread runs a replacement sink, whose own writes Recall never records.
@@ -89,7 +90,7 @@ fn invoke(
     arguments.set_item(parameter, record)?;
     arguments.set_item(writer_parameter, writer)?;
     call_with(
-        &host::entry(py, UserCodeHost::InvokeRecallSink)?,
+        &host_entry(py, UserCodeHost::InvokeRecallSink)?,
         &[
             ("function", function.bind(py).clone()),
             ("arguments", arguments.into_any()),
@@ -251,7 +252,7 @@ impl OutputSink {
         let context: Bound<'py, PyAny> =
             invocation_context(py, None).unwrap_or_else(|_| PyDict::new(py).into_any());
         call_with(
-            &host::entry(py, ExecutorHost::CommandOutputRecord)?,
+            &host_entry(py, ExecutorHost::CommandOutputRecord)?,
             &[
                 (
                     "invocation_id",
@@ -261,7 +262,7 @@ impl OutputSink {
                 ("occurred_at", occurred_at),
                 (
                     "stream",
-                    host::entry(py, ExecutorHost::CommandOutputStream)?
+                    host_entry(py, ExecutorHost::CommandOutputStream)?
                         .call1((chunk.stream.as_str(),))?,
                 ),
                 (

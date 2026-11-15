@@ -8,16 +8,8 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::model_config::template_data::record_reads;
 use crate::bindings::_helpers::model_config::unicode_environment::unicode_environment;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::construct::{new_record, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
-use crate::bindings::_helpers::records::ids::{ErrorId, NativeAttr};
-use crate::bindings::_helpers::records::registry;
 use crate::bindings::_helpers::render::declaration_expansion::{
     DeclarationExpansion, ExpandedDeclarations, ExpansionClasses, ExpansionConsumer,
     expand_declarations, span_rows,
@@ -33,6 +25,16 @@ use crate::bindings::_helpers::sqltext::lexical_syntax::optional_record_syntax;
 use crate::bindings::_helpers::sqltext::static_sql::{
     InterpolationRow, InterpolationSources, interpolation_batch,
 };
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The macro context field holding the project's `SqlLexicalSyntax`.
 const LEXICAL_SYNTAX_FIELD: &str = "_lexical_syntax";
@@ -67,7 +69,7 @@ fn substituted<'py>(
         } else {
             Some(context_values.downcast()?.clone())
         },
-        registry::native(py, NativeAttr::RenderProjectVarText)?,
+        native_attr(py, NativeAttr::RenderProjectVarText)?,
         syntax.cloned(),
     );
     let text: String = sql.extract()?;

@@ -1,6 +1,5 @@
 //! Write-hash reconciliation and plan entry construction.
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_configured_concurrency;
 use crate::bindings::_helpers::planner_entries::contexts::default_microbatch_limit_action;
 use crate::bindings::_helpers::planner_entries::model_entries::plan_entries;
@@ -15,9 +14,10 @@ use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::{ChangeReconciliation, ModelEntryResults};
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyFrozenSet;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The execution scope's changes with honest write hashes, and the actions merged from them.
 pub(crate) fn reconcile_execution_changes<'py>(

@@ -1,7 +1,7 @@
 //! Read-only warehouse evidence gathered once for all model migrations in one plan.
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
@@ -14,15 +14,10 @@ use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
 use sqlbuild_state::events::models::{EventRelation, FingerprintKey, FingerprintOrder};
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_migrations::constants::{
     GET_COLUMNS_FOR_INSPECTION, LIST_RELATIONS_FOR_INSPECTION,
 };
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
 use crate::bindings::_helpers::state_rows::constants::{COLUMN_KIND, MODEL_KIND, OLD_NAME_KIND};
 use crate::bindings::_helpers::state_rows::migration_io::{read_events, stored_old_name_columns};
 use crate::bindings::_helpers::state_rows::migration_objects::layout;
@@ -30,6 +25,11 @@ use crate::bindings::_helpers::state_rows::migration_projections::old_name_views
 use crate::bindings::_helpers::state_rows::models::StateAccess;
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_MODEL;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 /// A lowercased schema and relation name.
 type RelationKey = (String, String);
@@ -152,7 +152,7 @@ impl MigrationStateInspection {
         names: Bound<'py, PyAny>,
     ) -> PyResult<Vec<Bound<'py, PyAny>>> {
         call_with(
-            &host::entry(py, LIST_RELATIONS_FOR_INSPECTION)?,
+            &host_entry(py, LIST_RELATIONS_FOR_INSPECTION)?,
             &[
                 ("adapter", self.adapter.bind(py).clone()),
                 ("connection", self.connection.bind(py).clone()),
@@ -489,7 +489,7 @@ impl MigrationStateInspection {
             let connection: Bound<'_, PyAny> = this.connection.bind(py).clone();
             drop(this);
             call_with(
-                &host::entry(py, GET_COLUMNS_FOR_INSPECTION)?,
+                &host_entry(py, GET_COLUMNS_FOR_INSPECTION)?,
                 &[
                     ("adapter", adapter),
                     ("connection", connection),

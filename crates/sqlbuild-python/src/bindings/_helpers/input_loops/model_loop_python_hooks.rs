@@ -11,7 +11,7 @@ use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, compile_er
 use crate::bindings::_helpers::input_loops::model_loop_named::{
     PYTHON_HOOK_DECLARATION, named_usages,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Hook keys in the sorted order `validate_python_hook_config` reads them.
 const SORTED_HOOK_KEYS: [&str; 2] = ["post_hooks", "pre_hooks"];

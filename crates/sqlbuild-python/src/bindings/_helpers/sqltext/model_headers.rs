@@ -2,10 +2,12 @@
 
 use pyo3::prelude::{Bound, Py, PyAny, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::boundary::panics::{compiler_guard, value_error};
 use crate::bindings::_helpers::sqltext::authored_values::optional_authored_value_to_python;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 pub(crate) type ParsedModelHeader = (
     Option<Py<PyAny>>,

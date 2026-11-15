@@ -13,7 +13,6 @@ use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_state::freshness::main::configuration_error::configuration_error;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::freshness::exception_types::SourceFreshnessObservationError;
 use crate::bindings::_helpers::freshness::observation::{
     Observer, observation_record, observation_source, observe_adapter_batch, observe_configured,
@@ -21,15 +20,17 @@ use crate::bindings::_helpers::freshness::observation::{
 };
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
 use crate::bindings::_helpers::freshness::support::text;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::synced_copy::WarehouseAccessRefusedError;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::state_rows::freshness::{age_policy, equivalent};
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::types::RecordId;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavailable";
@@ -42,7 +43,7 @@ fn handled_message<'py>(py: Python<'py>, error: &PyErr) -> PyResult<Option<Bound
         return Ok(Some(text(py, PREVIEW_MESSAGE)));
     }
     let value: Bound<'py, PyAny> = error.value(py).clone().into_any();
-    if value.is_instance(&host::entry(py, AdapterHost::AdapterUserError)?)? {
+    if value.is_instance(&host_entry(py, AdapterHost::AdapterUserError)?)? {
         return native_field(&value, "message").map(Some);
     }
     if error.is_instance_of::<SourceFreshnessObservationError>(py) {
@@ -237,7 +238,7 @@ pub(crate) fn build_direct_source_freshness_planning_result<'py>(
                     };
                     let is_observation_error: bool = !error
                         .value(py)
-                        .is_instance(&host::entry(py, AdapterHost::AdapterUserError)?)?;
+                        .is_instance(&host_entry(py, AdapterHost::AdapterUserError)?)?;
                     if is_observation_error && configuration_error(&message.extract::<String>()?) {
                         return Err(error);
                     }

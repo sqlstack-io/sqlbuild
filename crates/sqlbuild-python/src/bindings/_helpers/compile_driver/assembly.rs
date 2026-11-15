@@ -8,16 +8,18 @@ use pyo3::types::{PyCFunction, PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, within};
 use crate::bindings::_helpers::compile_context::diagnostic_collector::collect_compile_diagnostics;
 use crate::bindings::_helpers::compile_driver::assembly_project::assembled_project;
 use crate::bindings::_helpers::compile_driver::project::lineage_mode;
 use crate::bindings::_helpers::compiled_views::records::project_with;
 use crate::bindings::_helpers::compiled_views::records::record_model_analyses;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::references::explicit_references::explicit_reference_report;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const STAGE_REACHED: &str = "assembly stopped before the requested stage";
 const EXPRESSION_SHAPES_STAGE: &str = "expression_shapes";
@@ -179,7 +181,7 @@ pub(crate) fn chained<'py>(
 /// The undecorated `assemble_project`.
 fn referenced_project(py: Python<'_>, request: AssemblyRequest) -> PyResult<Bound<'_, PyAny>> {
     let inputs: Bound<'_, PyAny> = request.inputs.bind(py).clone();
-    let project: Bound<'_, PyAny> = if host::entry(py, UserCodeHost::ActiveMacroBridge)?
+    let project: Bound<'_, PyAny> = if host_entry(py, UserCodeHost::ActiveMacroBridge)?
         .call0()?
         .is_none()
     {
@@ -192,7 +194,7 @@ fn referenced_project(py: Python<'_>, request: AssemblyRequest) -> PyResult<Boun
             },
         )?;
         call_with(
-            &host::entry(py, UserCodeHost::RunWithMacroBridge)?,
+            &host_entry(py, UserCodeHost::RunWithMacroBridge)?,
             &[("stage", stage.into_any())],
         )?
     } else {

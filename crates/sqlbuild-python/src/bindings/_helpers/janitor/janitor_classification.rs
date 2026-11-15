@@ -26,8 +26,8 @@ use crate::bindings::_helpers::janitor::janitor_keys::{
     relation_age_timestamp, sorted_schemas, text, timestamp_fields, tuple, utc_datetime,
 };
 use crate::bindings::_helpers::planner_scenario::artifacts::is_scenario_artifact_physical_name;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::relation_naming::fitting::shared_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Protection rules for one plan.
 pub(crate) struct Protection {

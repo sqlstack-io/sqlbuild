@@ -8,11 +8,9 @@ use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_quer
 use sqlbuild_analysis::planner_warehouse::models::CursorTagRequest;
 use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::{model_reads, project_reads};
 use crate::bindings::_helpers::consumption::relation_reads::relation;
 use crate::bindings::_helpers::native_host::consumption_state::{ConsumptionConnection, Location};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::observations_state::{
     ObservationAppend, append_observations,
 };
@@ -20,7 +18,9 @@ use crate::bindings::_helpers::observations::source_capture::take_source_capture
 use crate::bindings::_helpers::planner_phases::objects::config_str;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_BOUNDED;
 use crate::bindings::_helpers::planner_warehouse::cursors::{adapter_cursor_sql, bound_task};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Dependency kind of a source in a model's `dep_rows`.
 const SOURCE_DEPENDENCY: &str = "source";
@@ -141,7 +141,7 @@ fn observe<'py>(
         .extract::<i64>()?
         .clamp(1, MAX_OBSERVATION_READS);
     let outcomes: Vec<Bound<'py, PyAny>> = call_with(
-        &host::entry(py, RUN_BOUNDED)?,
+        &host_entry(py, RUN_BOUNDED)?,
         &[
             ("tasks", pyo3::types::PyTuple::new(py, tasks)?.into_any()),
             ("concurrency", concurrency.into_pyobject(py)?.into_any()),

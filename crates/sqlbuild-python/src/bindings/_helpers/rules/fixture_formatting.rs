@@ -8,12 +8,13 @@ use sqlbuild_rules::lint_text::main::format_fixture_blocks::format_fixture_block
 use sqlbuild_rules::lint_text::models::FixtureFormatBlock;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::boundary::panics::{compiler_guard, value_error};
 use crate::bindings::_helpers::discovery::sql_test_records::parse_sql_test_file;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::rules::constants::MODEL_TEST_MODE;
 use crate::bindings::_helpers::rules::fixture_schemas;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 #[pyfunction]
 #[pyo3(signature = (*, files, project_dir, discovered_inputs, sql_lexical_syntax))]

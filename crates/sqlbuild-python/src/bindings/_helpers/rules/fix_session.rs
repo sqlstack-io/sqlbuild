@@ -15,19 +15,12 @@ use sqlbuild_rules::fix_verification::main::refusal::refusal;
 use sqlbuild_rules::fix_verification::main::with_edits::with_edits;
 use sqlbuild_rules::fix_verification::models::{FixEdit, FixEligibility};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::compiled_views::relation_keys::{
     RelationKeys, project_relation_keys,
 };
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::{field, replaced};
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
@@ -40,6 +33,16 @@ use crate::bindings::_helpers::rules::lint_pipeline::{
     LintFile, LintOutcome, LintRequest, LintSettings, ViolationClasses, lint, lint_sources,
 };
 use crate::bindings::_helpers::rules::run_lint::given_files;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const VERIFICATION_FAILURE: &str =
     "Compilation could not prove unchanged output columns, types, dependencies and lineage";
@@ -95,7 +98,7 @@ pub(crate) fn plan_rule_fixes<'py>(
     }
     let adapter = args.value("adapter")?;
     let inputs = args.value("discovered_inputs")?;
-    if !adapter.is_instance(&host::entry(py, AdapterHost::BaseAdapter)?)? || inputs.is_none() {
+    if !adapter.is_instance(&host_entry(py, AdapterHost::BaseAdapter)?)? || inputs.is_none() {
         return Err(PyErr::from_value(
             error_class(py, ErrorId::ProjectCompile)?
                 .call1(("format --fix requires discovered compiler inputs and an adapter",))?,

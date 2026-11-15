@@ -17,7 +17,6 @@ use sqlbuild_cli::diff_report::models::{
 use sqlbuild_cli::diff_report::types::DiffNamedValue;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords};
 use crate::bindings::_helpers::build_command::support::{boolean, text};
 use crate::bindings::_helpers::compile_driver::diff::run_diff_pipeline;
 use crate::bindings::_helpers::compiled_views::project_reads;
@@ -27,10 +26,12 @@ use crate::bindings::_helpers::diff_report::facts::diff_facts;
 use crate::bindings::_helpers::diff_report::support::{error_text, matches_class};
 use crate::bindings::_helpers::execution_history::conversion::optional_text;
 use crate::bindings::_helpers::execution_history::statements::fetch_one;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::review_command::planning::ReviewSettings;
 use crate::bindings::_helpers::review_command::support::review_error;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const KEYED_CHECK: &str = "keyed comparison";
 const MAX_EXAMPLE_LENGTH: usize = 80;
@@ -141,12 +142,10 @@ fn run_one<'py>(
         ),
     ];
     pairs.extend(options.iter().cloned());
-    let options: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::DiffExecutionOptions)?,
-        &pairs,
-    )?;
+    let options: Bound<'py, PyAny> =
+        call_with(&host_entry(py, ExecutorHost::DiffExecutionOptions)?, &pairs)?;
     let result: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::ExecuteDiff)?,
+        &host_entry(py, ExecutorHost::ExecuteDiff)?,
         &[
             ("adapter", context.adapter.clone()),
             ("connection", context.connection.clone()),
@@ -538,7 +537,7 @@ pub(crate) fn prepare_sides<'py>(
         ));
     }
     let limits: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::FullDiffSizeLimits)?,
+        &host_entry(py, ExecutorHost::FullDiffSizeLimits)?,
         &[
             ("left_target", text(py, &settings.against)),
             ("right_target", text(py, context.review_target)),

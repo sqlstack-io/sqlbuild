@@ -4430,7 +4430,6 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "fensu-policy",
- "mimalloc",
  "pyo3",
  "rayon",
  "rusqlite",
@@ -4452,6 +4451,7 @@ dependencies = [
  "sqlbuild-orchestration",
  "sqlbuild-project",
  "sqlbuild-pysource",
+ "sqlbuild-python-base",
  "sqlbuild-recall",
  "sqlbuild-refactor",
  "sqlbuild-render",
@@ -4463,6 +4463,21 @@ dependencies = [
  "stacker",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "sqlbuild-python-base"
+version = "0.0.0"
+dependencies = [
+ "mimalloc",
+ "pyo3",
+ "serde_json",
+ "sqlbuild-analysis",
+ "sqlbuild-config",
+ "sqlbuild-core",
+ "sqlbuild-discovery",
+ "sqlbuild-host",
+ "sqlbuild-rules",
 ]
 
 [[package]]

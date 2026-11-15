@@ -14,8 +14,8 @@ use sqlbuild_analysis::dag_artifact::types::DagValue;
 use sqlbuild_analysis::dag_artifact::types::DagColumnLineage;
 
 use crate::bindings::_helpers::python_values::values::python_value;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 const AUDIT_SEVERITY_MODULE: &str = "sqlbuild.compiler.auditing.types";
 const DECIMAL_KIND: &str = "decimal";

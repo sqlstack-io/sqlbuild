@@ -5,14 +5,16 @@ use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::FacadeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{enum_member, record_class};
-use crate::bindings::_helpers::records::fields::by_attribute;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::by_attribute::by_attribute;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The materializations a model's storage policies are inherited for, besides none.
 const TABLE_BACKED_MATERIALIZATIONS: [&str; 3] = ["TABLE", "INCREMENTAL", "SNAPSHOT"];
@@ -304,13 +306,10 @@ fn input_view_classes<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
                 dict(
                     py,
                     vec![
-                        (
-                            "audit_severity",
-                            host::entry(py, FacadeHost::AuditSeverity)?,
-                        ),
+                        ("audit_severity", host_entry(py, FacadeHost::AuditSeverity)?),
                         (
                             "attached_target_kind",
-                            host::entry(py, FacadeHost::AttachedAuditTargetKind)?,
+                            host_entry(py, FacadeHost::AttachedAuditTargetKind)?,
                         ),
                     ],
                 )?
@@ -331,7 +330,7 @@ fn input_view_classes<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
                         ),
                         (
                             "function_language",
-                            host::entry(py, FacadeHost::FunctionLanguage)?,
+                            host_entry(py, FacadeHost::FunctionLanguage)?,
                         ),
                     ],
                 )?

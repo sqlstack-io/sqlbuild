@@ -1,9 +1,9 @@
 //! Authored header values as the Python header objects: scalars, sets, constants and hooks.
 
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{IntoPyObject, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_sqltext::compiler::main::header_word_value::header_word_value;
 use sqlbuild_sqltext::compiler::models::{AuthoredValue, HeaderWord};
 

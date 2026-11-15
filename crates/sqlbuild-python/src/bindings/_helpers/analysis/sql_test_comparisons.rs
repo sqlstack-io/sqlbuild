@@ -11,10 +11,10 @@ use sqlbuild_analysis::compiler::main::scenario_expected_comparison_sql::scenari
 use sqlbuild_analysis::compiler::main::sql_test_difference_sampling::render_difference_sample_json;
 use sqlbuild_analysis::compiler::main::sql_test_rendering::render_json;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const RENDER_WORKERS: usize = 4;
 const DEFAULT_SET_DIFFERENCE: &str = "EXCEPT";

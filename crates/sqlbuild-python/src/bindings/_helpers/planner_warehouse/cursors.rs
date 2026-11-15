@@ -1,6 +1,5 @@
 //! Cursor MIN/MAX inspection of selected incremental models and their watermark inputs.
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
 use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
@@ -12,7 +11,6 @@ use crate::bindings::_helpers::cursor::scalars::compare_values;
 use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::cursor::scalars::to_inclusive;
 use crate::bindings::_helpers::model_config::typed_config::{config_cursor_bound, model_values};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
@@ -32,10 +30,6 @@ use crate::bindings::_helpers::planner_warehouse::snapshot::{
     SnapshotRequest, inspection_concurrency,
 };
 use crate::bindings::_helpers::planner_warehouse::watermarks::validate_watermark_column;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyException;
@@ -47,6 +41,14 @@ use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_quer
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_identity::cursor_query_identity;
 use sqlbuild_analysis::planner_warehouse::main::cursor_query_sql::cursor_query_sql;
 use sqlbuild_analysis::planner_warehouse::models::{CursorTagRequest, PhysicalCursorQuery};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -159,7 +161,7 @@ fn log_debug<'py>(
     let logger = imported(py, "logging", "getLogger")?.call1((PLANNER_LOGGER,))?;
     let mut fields = vec![("logger", logger), ("message", text(py, message))];
     fields.extend(context.iter().cloned());
-    call_with(&host::entry(py, LOG_DEBUG_EVENT)?, &fields)?;
+    call_with(&host_entry(py, LOG_DEBUG_EVENT)?, &fields)?;
     Ok(())
 }
 
@@ -606,7 +608,7 @@ fn read_cursor_query<'py>(
         error.str()?.into_any()
     };
     let record = call_with(
-        &host::entry(py, QUERY_RECORD)?,
+        &host_entry(py, QUERY_RECORD)?,
         &[
             ("sql", text(py, sql)),
             ("elapsed_seconds", PyFloat::new(py, elapsed).into_any()),
@@ -614,7 +616,7 @@ fn read_cursor_query<'py>(
             ("error", error_text),
         ],
     )?;
-    call_with(&host::entry(py, RECORD_QUERY)?, &[("record", record)])?;
+    call_with(&host_entry(py, RECORD_QUERY)?, &[("record", record)])?;
     Ok(PyTuple::new(py, [row, PyFloat::new(py, elapsed).into_any(), error])?.into_any())
 }
 
@@ -798,7 +800,7 @@ fn execute_queries<'py>(
             )?);
         }
         call_with(
-            &host::entry(py, RUN_BOUNDED)?,
+            &host_entry(py, RUN_BOUNDED)?,
             &[
                 ("tasks", tuple(py, tasks)?),
                 ("concurrency", concurrency.into_pyobject(py)?.into_any()),
@@ -857,7 +859,7 @@ fn eligible_task<'py>(
                 },
             )?;
             let rows = call_with(
-                &host::entry(py, RUN_RECORDED_QUERY)?,
+                &host_entry(py, RUN_RECORDED_QUERY)?,
                 &[("sql", text(py, &sql)), ("run", run.into_any())],
             );
             match rows {
@@ -965,7 +967,7 @@ fn eligible_target_maxes<'py>(
         )?);
     }
     let rows_by_request = call_with(
-        &host::entry(py, RUN_BOUNDED)?,
+        &host_entry(py, RUN_BOUNDED)?,
         &[
             ("tasks", tuple(py, tasks)?),
             (

@@ -10,12 +10,14 @@ use sqlbuild_analysis::planner_strategy::main::cursor_type_warning::cursor_type_
 use sqlbuild_analysis::planner_strategy::models::{CursorType, CursorTypeCheck};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_changes::results::planner_enum;
 use crate::bindings::_helpers::planner_strategy::values::{optional_string, plan_warning, text};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PLANNER_LOGGER: &str = "sqlbuild.planner";
 
@@ -23,7 +25,7 @@ const PLANNER_LOGGER: &str = "sqlbuild.planner";
 fn log_parse_failure(py: Python<'_>, failure: &TypeParseFailure) -> PyResult<()> {
     let text = |value: &str| PyString::new(py, value).into_any();
     call_with(
-        &host::entry(py, ExecutorHost::LogDebugEvent)?,
+        &host_entry(py, ExecutorHost::LogDebugEvent)?,
         &[
             (
                 "logger",

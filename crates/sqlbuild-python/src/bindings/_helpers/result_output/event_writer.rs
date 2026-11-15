@@ -9,8 +9,6 @@ use pyo3::{pyclass, pymethods};
 use sqlbuild_core::integration_results::errors::IntegrationRecordError;
 use sqlbuild_core::terminal_events::models::TerminalRequest;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::integration_records::{
     clone_record, degraded_record, degraded_warning, execution_succeeded, integration_record,
 };
@@ -19,6 +17,8 @@ use crate::bindings::_helpers::result_output::projection::resource_identity;
 use crate::bindings::_helpers::result_output::terminal_index::{
     TerminalEventClaim, TerminalEventIndex, current_index_object,
 };
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(crate) const RESULT_PATH_ENV: &str = "SQLBUILD_INTEGRATION_RESULT_PATH";
 const BUILD_OPTIONS: (&[&str], &[&str]) = (&["result", "plan"], &["command"]);

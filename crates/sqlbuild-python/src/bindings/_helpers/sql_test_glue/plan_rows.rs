@@ -1,7 +1,5 @@
 //! Materialize native plan rows as the existing executor-facing dataclasses.
 
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record_with};
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sql_test_glue::planning::PlanRow;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
@@ -9,6 +7,9 @@ use pyo3::types::PyTuple;
 use sqlbuild_analysis::compiler::models::{
     SqlTestAssertionStep, SqlTestChainStep, SqlTestPlan, SqlTestPlanWarning,
 };
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn chain_step<'py>(py: Python<'py>, step: SqlTestChainStep) -> PyResult<Bound<'py, PyAny>> {
     let SqlTestChainStep {

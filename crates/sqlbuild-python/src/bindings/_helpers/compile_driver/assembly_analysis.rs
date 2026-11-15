@@ -23,7 +23,6 @@ use crate::bindings::_helpers::analysis_session::profile_inputs::{
     ADAPTER_RULE_ID, nullability_rules, text_pairs,
 };
 use crate::bindings::_helpers::analysis_session::stage_functions::expression_source_shapes;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_context::compile_timings::PythonProcessClock;
 use crate::bindings::_helpers::compile_driver::analysis_cache::analysis_cache_context;
 use crate::bindings::_helpers::compile_driver::assembly::{AssemblyRequest, AssemblyStage};
@@ -33,19 +32,22 @@ use crate::bindings::_helpers::compile_driver::stage_work::{
 use crate::bindings::_helpers::compiled_views::model_input_view::attached_schema;
 use crate::bindings::_helpers::compiled_views::source_views::read_source_view;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::project_assembly::declared_relations::{
     DeclaredRelations, DeclaredShapes, declared_relations,
 };
-use crate::bindings::_helpers::records::construct::{enum_member, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
 use crate::bindings::_helpers::sqltext::lexical_syntax::optional_record_syntax;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::log_warning_message::log_warning_message;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 use std::collections::HashMap;
 
@@ -203,7 +205,7 @@ fn profile_with_catalog<'py>(
     let profile: Bound<'py, PyAny> = if inference_profile.is_truthy()? {
         inference_profile.clone()
     } else {
-        host::entry(py, AdapterHost::ExpressionInferenceProfile)?.call0()?
+        host_entry(py, AdapterHost::ExpressionInferenceProfile)?.call0()?
     };
     let (known_functions, known_types): (Bound<'py, PyAny>, Bound<'py, PyAny>) =
         declared_names(inputs, column_types)?;
@@ -312,7 +314,7 @@ fn warn_unapplied_nullability_rules(
         .or(dialect.as_deref())
         .unwrap_or(GENERIC_DIALECT);
     match unapplied_nullability_rules(&route, named, &functions) {
-        Some(warning) => host::log_warning_message(inputs.py(), COMPILE_LOGGER, &warning),
+        Some(warning) => log_warning_message(inputs.py(), COMPILE_LOGGER, &warning),
         None => Ok(()),
     }
 }

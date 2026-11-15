@@ -1,13 +1,13 @@
 //! Canonical snake_case resource identity checks and SQL function node types.
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
 use pyo3::types::{PyDict, PyString, PyStringMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_model_config::resource_identities::main::resource_identity_failure::resource_identity_failure;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const TABLE_FUNCTION_NODE_TYPE: &str = "table_fn";
 const UDF_NODE_TYPE: &str = "udf";

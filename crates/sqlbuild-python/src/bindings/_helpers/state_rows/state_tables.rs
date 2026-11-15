@@ -16,12 +16,12 @@ use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql;
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 use sqlbuild_state::state_tables::models::TableColumn;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::freshness::record_event_id;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MISSING_SCHEMA_MESSAGE: &str = "source freshness table requires a target schema";
 /// Each state value type a state table may declare and the framework type that renders it.
@@ -42,7 +42,7 @@ pub(crate) fn state_table_create_sql<'py>(
     render_framework_type: &Bound<'py, PyAny>,
 ) -> PyResult<String> {
     let py: Python<'py> = render_framework_type.py();
-    let framework_types: Bound<'py, PyAny> = host::entry(py, AdapterHost::FrameworkType)?;
+    let framework_types: Bound<'py, PyAny> = host_entry(py, AdapterHost::FrameworkType)?;
     let mut rendered: Vec<(&str, String)> = Vec::with_capacity(DECLARED_TYPES.len());
     for (declared, framework) in DECLARED_TYPES {
         let text: String = render_framework_type
@@ -85,7 +85,7 @@ fn render_create_sql(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
 }
 
 fn adapter_user_error(py: Python<'_>, message: &str) -> PyErr {
-    match host::entry(py, AdapterHost::AdapterUserError).and_then(|class| {
+    match host_entry(py, AdapterHost::AdapterUserError).and_then(|class| {
         call_with(
             &class,
             &[("message", PyString::new(py, message).into_any())],

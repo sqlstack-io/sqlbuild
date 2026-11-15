@@ -21,9 +21,9 @@ use sqlbuild_host::models::{
 };
 use sqlbuild_host::types::ResultEnum;
 
-use crate::bindings::_helpers::records::construct::enum_from_value;
-use crate::bindings::_helpers::records::fields::field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Extraction at the permanent Python executor edge, including nested result records.
 pub(crate) trait ReadResult<'py>: Sized {

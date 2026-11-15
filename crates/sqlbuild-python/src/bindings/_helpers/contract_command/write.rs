@@ -4,19 +4,20 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::format_command::files::write_file_atomically;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::refactor::contract_edits::edit_contract_model;
 use crate::bindings::_helpers::refactor::contract_edits::edit_contract_source;
 use crate::bindings::_helpers::refactor::contract_edits::remaining_contract_findings;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::RecordId;
 
 const UTF8: &str = "utf-8";
 

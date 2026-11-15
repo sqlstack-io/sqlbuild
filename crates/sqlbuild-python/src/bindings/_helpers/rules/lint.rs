@@ -5,10 +5,10 @@ use pyo3::{FromPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_rules::lint_text::models::InterpolationSite;
 use sqlbuild_rules::lint_text::types::PreparedSql;
 
-use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::compiled_views::relation_keys;
 use crate::bindings::models::Positional;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 #[pyfunction]
 fn lint_sql_json(py: Python<'_>, request_json: &str) -> PyResult<String> {

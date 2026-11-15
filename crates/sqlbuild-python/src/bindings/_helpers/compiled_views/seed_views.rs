@@ -6,6 +6,7 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::PyTuple;
 use pyo3::{IntoPyObjectExt, pyclass, pymethods};
 use sqlbuild_attachments::seeds::main::pair_seed_declarations::pair_seed_declarations;
+use sqlbuild_python_base::positional_record;
 
 use sqlbuild_project::models as project_models;
 
@@ -16,8 +17,8 @@ use crate::bindings::_helpers::compiled_views::compiled_model_view::{
 use crate::bindings::_helpers::compiled_views::model_input_view::{InputViewClasses, view_classes};
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::models::DestinationFact;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const SEED_RESOURCE: &str = "seed";
 const TAGS_ATTRIBUTE: &str = "tags";

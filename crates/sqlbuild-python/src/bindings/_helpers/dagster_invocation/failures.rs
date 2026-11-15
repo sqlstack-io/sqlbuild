@@ -9,12 +9,12 @@ use sqlbuild_core::dagster_invocation::main::failure_summary::failure_summary;
 use sqlbuild_core::dagster_invocation::models::{AssetFailure, FailedCheck};
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::dagster_invocation::access::{
     constant_contains, get, items, text_of,
 };
 use crate::bindings::_helpers::dagster_invocation::results::{SKIPPED_CHECK_STATUS, warn_severity};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Failed checks listed in failure metadata; `failed_check_count` counts them all.
 const MAX_FAILED_CHECK_METADATA: usize = 100;

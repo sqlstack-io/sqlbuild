@@ -17,12 +17,12 @@ use crate::bindings::_helpers::compiled_views::model_reads::enum_columns;
 use crate::bindings::_helpers::compiled_views::records::{
     compiled_audit_record, compiled_function_record, compiled_seed_record, compiled_source_record,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::rules::custom_host_columns::PayloadColumn;
 use crate::bindings::_helpers::rules::custom_hosts::pickled;
 use crate::bindings::_helpers::rules::fact_replay::{
     ModelEntry, project_attribute, project_models,
 };
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The first bytes of every payload file; hosts reject any other.
 pub(crate) const CUSTOM_HOST_PAYLOAD_MAGIC: &[u8; 8] = b"SQBHOST1";

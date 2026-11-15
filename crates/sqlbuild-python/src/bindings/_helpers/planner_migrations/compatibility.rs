@@ -1,6 +1,5 @@
 //! Convert existing planner contracts for origin compatibility checks.
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
@@ -8,15 +7,18 @@ use crate::bindings::_helpers::planner_changes::detect::detect_model_changes;
 use crate::bindings::_helpers::planner_migrations::models::{
     CompatibilityCheck, MigrationCompatibilityResult,
 };
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
 use sqlbuild_analysis::planner_migrations::main::compatibility_findings::compatibility_findings;
 use sqlbuild_analysis::planner_migrations::models::CompatibilityFinding;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn config(model: &Bound<'_, PyAny>, key: &str) -> PyResult<Option<String>> {
     config_value(model.py(), &model_values(model)?, key)?.extract()

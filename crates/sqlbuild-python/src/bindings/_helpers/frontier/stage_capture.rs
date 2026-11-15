@@ -8,9 +8,12 @@ use sqlbuild_cache::stage_capture::constants::OMITTED_ATTRIBUTES;
 use sqlbuild_cache::stage_capture::main::mask_capture_noise::mask_capture_noise as masked;
 use sqlbuild_cache::stage_capture::main::next_capture_number::next_capture_number;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
 use crate::bindings::_helpers::frontier::encoder::{CaptureEncoder, emit_error};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(crate) const CAPTURE_DIR_ENV_VAR: &str = "SQLBUILD_COMPILER_STAGE_CAPTURE_DIR";
 const CAPTURE_SUFFIX: &str = ".json";

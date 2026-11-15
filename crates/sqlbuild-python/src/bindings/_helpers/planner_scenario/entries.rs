@@ -1,6 +1,5 @@
 //! Existing seed and function plan dataclass construction.
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
@@ -10,13 +9,14 @@ use crate::bindings::_helpers::planner_scenario::{
     models::SqlContext, sql::required_target, values::error,
 };
 use crate::bindings::_helpers::planner_strategy::model_entries::extract_seed_columns;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::by_attribute;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyString;
 use pyo3::types::{PyDictMethods, PyTuple};
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::by_attribute::by_attribute;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 pub(super) fn seed_entries<'py>(
     project: &Bound<'py, PyAny>,

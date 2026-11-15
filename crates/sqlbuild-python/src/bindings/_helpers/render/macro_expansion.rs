@@ -1,5 +1,6 @@
 //! One authored string's macro expansion: scanned, memoised, evaluated and spliced natively.
 
+use sqlbuild_python_base::positional_record;
 use std::cell::RefCell;
 
 use pyo3::exceptions::{PyIndexError, PyValueError};
@@ -18,9 +19,6 @@ use sqlbuild_render::macro_calls::models::{
 };
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::records::construct::new_helped_error;
-use crate::bindings::_helpers::records::fields::{field as native_field, field_text};
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::render::declaration_expansion::usage_visibility;
 use crate::bindings::_helpers::render::macro_call_classes::{CallClass, ClassInputs};
 use crate::bindings::_helpers::render::macro_call_memo::{MacroCallMemo, poisoned};
@@ -33,6 +31,10 @@ use crate::bindings::_helpers::render::macro_generated_references::{
     GeneratedOrigin, GeneratedReferenceClasses, report_generated_references,
 };
 use crate::bindings::_helpers::sqltext::lexical_syntax::optional_record_syntax;
+use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::field_text::field_text;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const RELATION_PREFIX: &str = "__sqlbuild_relation_";
 const MEMO_ATTRIBUTE: &str = "memo";

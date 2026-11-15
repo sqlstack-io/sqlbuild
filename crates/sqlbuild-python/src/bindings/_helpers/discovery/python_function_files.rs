@@ -16,16 +16,17 @@ use sqlbuild_pysource::udf_functions::constants::UDF_KEYS;
 use sqlbuild_pysource::udf_functions::main::udf_function::udf_function;
 use sqlbuild_pysource::udf_functions::models::{UdfFunction, UdfShape};
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::discovery::declaration_records::path_class;
 use crate::bindings::_helpers::discovery::project_files::path_object;
 use crate::bindings::_helpers::discovery::raised::{failure_error, read_error, stage_error};
 use crate::bindings::_helpers::discovery::snapshot::{in_snapshot, project_root, project_tree};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::models::NativeProjectTree;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const AST_MODULE: &str = "ast";
 const DESCRIPTION_KEY: &str = "description";

@@ -16,7 +16,6 @@ use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_
 use sqlbuild_model_config::execution_limits::models::ExecutionLimit;
 use sqlbuild_model_config::model_validation::constants::PHYSICAL_STORAGE_KEYS;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
@@ -24,7 +23,6 @@ use crate::bindings::_helpers::model_config::typed_config::{
     ConfigValues, config_cursor_bound, config_flag, config_integer_object, config_text_object,
     config_text_tuple, config_value, model_values,
 };
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_strategy::constants::{
     CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, MICROBATCH_MODE,
     PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE, TABLE_RECREATING_ACTIONS,
@@ -41,10 +39,15 @@ use crate::bindings::_helpers::planner_strategy::strategy::{
 use crate::bindings::_helpers::planner_strategy::values::{
     input_error, optional_string, plan_warning, text,
 };
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Model config keys copied to the plan entry as optional strings, with their entry fields.
 const STRING_FIELDS: [(&str, &str); 15] = [
@@ -108,7 +111,7 @@ fn schema_columns<'py>(
     if entry.is_none() {
         return Ok(PyTuple::empty(py));
     }
-    let class: Bound<'py, PyAny> = host::entry(py, AdapterHost::ColumnInfo)?;
+    let class: Bound<'py, PyAny> = host_entry(py, AdapterHost::ColumnInfo)?;
     let mut columns: Vec<Bound<'py, PyAny>> = Vec::new();
     for column in native_field(&entry, "columns")?.try_iter()? {
         let column: Bound<'py, PyAny> = column?;
@@ -132,7 +135,7 @@ fn schema_columns<'py>(
 /// The model's typed inferred output columns, which adapters without CTAS types declare.
 fn inferred_columns<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = model.py();
-    let class: Bound<'py, PyAny> = host::entry(py, AdapterHost::ColumnInfo)?;
+    let class: Bound<'py, PyAny> = host_entry(py, AdapterHost::ColumnInfo)?;
     let mut columns: Vec<Bound<'py, PyAny>> = Vec::new();
     for (name, column_type, _) in model_reads::inferred_rows(model)?.unwrap_or_default() {
         if let Some(column_type) = column_type {
@@ -461,7 +464,7 @@ fn ddl_cursor_bounds<'py>(request: &ModelEntryDecisions<'py>) -> PyResult<Bound<
     let microbatch_range: &Bound<'py, PyAny> = &request.microbatch_range;
     Ok(
         if request.runtime_owned_cursor_bounds && !request.cursor_column.is_none() {
-            let sentinel: Bound<'py, PyAny> = host::entry(py, ExecutorHost::BoundSentinel)?;
+            let sentinel: Bound<'py, PyAny> = host_entry(py, ExecutorHost::BoundSentinel)?;
             new_record_with(
                 py,
                 RecordId::CursorBounds,

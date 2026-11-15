@@ -23,7 +23,7 @@ use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSourc
 use crate::bindings::_helpers::graph::project_graph::{
     NativeProjectGraph, ResourceRow, project_graph,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MODELS_FIELD: &str = "models";
 const RUN_ID_FIELD: &str = "run_id";

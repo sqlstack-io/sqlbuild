@@ -1,9 +1,5 @@
 //! Typed SQL value normalization between Python authored values and native `SqlValue`s.
 
-use crate::bindings::_helpers::records::construct::{new_record, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -16,6 +12,12 @@ use sqlbuild_core::models::{SqlLogicalType, SqlValue};
 use sqlbuild_model_config::sql_values::errors::SqlValueFailure;
 use sqlbuild_model_config::sql_values::main::normalize_sql_value::normalize_sql_value as normalized;
 use sqlbuild_model_config::sql_values::models::{RawKey, RawSqlValue, SqlValueLimits};
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The Python classes authored values are told apart by and normalized values are built from.
 pub(crate) struct SqlValueClasses<'py> {
@@ -176,7 +178,7 @@ pub(crate) fn sql_value<'py>(
 pub(crate) fn sql_value_error(py: Python<'_>, failure: SqlValueFailure) -> PyResult<PyErr> {
     Ok(match failure {
         SqlValueFailure::Invalid(message) => PyErr::from_value(
-            registry::native(py, NativeAttr::SqlValueValidationError)?.call1((message,))?,
+            native_attr(py, NativeAttr::SqlValueValidationError)?.call1((message,))?,
         ),
         SqlValueFailure::DecimalOverflow => {
             let overflow = py.import("decimal")?.getattr("Overflow")?;

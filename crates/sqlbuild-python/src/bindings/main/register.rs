@@ -2,23 +2,33 @@ use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::pymodule;
 use sqlbuild_rules::constants::{API_VERSION, NATIVE_BUILD_IDENTITY};
 
-use crate::bindings::_helpers::boundary::panics::NativeCompilerError;
 use crate::bindings::_helpers::{
-    analysis, analysis_session, attachments, auditing, authored_values, boundary, cache, cli,
+    analysis, analysis_session, attachments, auditing, authored_values, cache, cli,
     compile_attachment, compile_command, compile_driver, compile_outputs, compiled_project,
     contracts, cursor, dag_artifact, diagnostics, discovery, exported_constants, fingerprints,
     frontier, graph, lifecycle_events, lineage, macro_bridge, manifest, microbatches, model_config,
-    native_host, plan_output, planner_registration, project_assembly, records, refactor,
+    native_host, plan_output, planner_registration, project_assembly, record_behaviours, refactor,
     references, render, rules, scopes, semantic_checks, semantic_shapes, sql_test_glue, sqltext,
     state_rows, type_system,
 };
 use crate::bindings::models;
+use sqlbuild_python_base::boundary::main::register_expected_errors::register_expected_errors;
+use sqlbuild_python_base::boundary::main::register_native_compiler_error::register_native_compiler_error;
+use sqlbuild_python_base::boundary::main::register_oracles::register_oracles;
+use sqlbuild_python_base::records::main::registry::capture::capture;
+use sqlbuild_python_base::records::main::registry::register_records::register_records;
+use sqlbuild_python_base::records::main::registry::verify_attributes::verify_attributes;
+use sqlbuild_python_base::records::main::registry::verify_tables::verify_tables;
 
 #[pymodule]
 pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    records::registration::register(module)?;
-    records::registry::verify_tables()?;
-    records::construct::capture(module)?;
+    register_records(
+        module,
+        record_behaviours::constants::GETTER_TABLES,
+        &record_behaviours::constants::RECORD_BEHAVIOURS,
+    )?;
+    verify_tables()?;
+    capture(module)?;
     native_host::registration::register(module)?;
     rules::registration::register(module)?;
     cli::registration::register(module)?;
@@ -26,8 +36,8 @@ pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     analysis::queries::register(module)?;
     analysis::sql_tests::register(module)?;
     sqltext::registration::register(module)?;
-    boundary::oracles::register(module)?;
-    boundary::expected_errors::register(module)?;
+    register_oracles(module)?;
+    register_expected_errors(module)?;
     discovery::registration::register(module)?;
     scopes::registration::register(module)?;
     model_config::registration::register(module)?;
@@ -36,14 +46,11 @@ pub fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     register_analysis_stages(module)?;
     module.add("API_VERSION", API_VERSION)?;
     module.add("BUILD_IDENTITY", NATIVE_BUILD_IDENTITY)?;
-    records::registry::verify_attributes(module)
+    verify_attributes(module)
 }
 
 fn register_project_stages(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add(
-        "NativeCompilerError",
-        module.py().get_type::<NativeCompilerError>(),
-    )?;
+    register_native_compiler_error(module)?;
     module.add_class::<models::ProjectCatalog>()?;
     module.add_class::<models::CompactAnalysisJob>()?;
     module.add_class::<models::BindingPositions>()?;

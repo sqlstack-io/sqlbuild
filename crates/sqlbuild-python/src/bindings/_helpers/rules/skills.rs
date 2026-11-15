@@ -2,8 +2,8 @@
 
 use pyo3::prelude::{PyResult, Python};
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::rules::selection::rules_error;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 
 const SKILL_OWNER: &str = "sqlbuild";
 const SKILL_IDENTITY: &str = "sqlbuild-rules";

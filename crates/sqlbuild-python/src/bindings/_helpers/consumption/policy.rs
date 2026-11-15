@@ -12,7 +12,7 @@ use sqlbuild_state::consumption::models::{
 use crate::bindings::_helpers::compiled_project::job_catalog::triggered_jobs;
 use crate::bindings::_helpers::discovery::project_config::configured_changes;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DEFINITION: &str = "definition";
 const SOURCE_DATA: &str = "source_data";

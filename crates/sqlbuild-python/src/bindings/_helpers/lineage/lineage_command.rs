@@ -49,11 +49,13 @@ use crate::bindings::_helpers::planner_selection::selectors::{
 };
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 const UNKNOWN_SELECTOR_ERROR_CODE: &str = "S007";
 const RICH_MODE: &str = "rich";
@@ -373,7 +375,7 @@ fn column_lineage<'py>(
         py,
         (&message, rich && count >= RICH_STATUS_MODEL_THRESHOLD),
         || {
-            registry::native(py, NativeAttr::BuildProjectColumnLineage)?.call1((
+            native_attr(py, NativeAttr::BuildProjectColumnLineage)?.call1((
                 native_field(graph, "project")?,
                 dialect,
                 mode,

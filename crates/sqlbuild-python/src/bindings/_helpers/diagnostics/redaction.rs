@@ -9,8 +9,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 use sqlbuild_core::redaction::main::secret_field_name::secret_field_name;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const REDACTED: &str = "[REDACTED]";
 

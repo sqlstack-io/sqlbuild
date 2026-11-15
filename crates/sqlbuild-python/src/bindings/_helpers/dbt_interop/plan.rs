@@ -8,14 +8,16 @@ use sqlbuild_core::cli_text::main::format_dbt_interop_plan::format_dbt_interop_p
 use sqlbuild_core::cli_text::main::format_dbt_interop_plan_json::format_dbt_interop_plan_json;
 use sqlbuild_core::cli_text::models::{DbtInteropPlanText, DbtLsNodeText, DisplayLimit};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
 use crate::bindings::_helpers::plan_output::plan_text::format_plan;
-use crate::bindings::_helpers::records::construct::{
-    enum_from_value, enum_member, new_record, new_record_with,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::types::RecordId;
 
 const BUILD_OPTIONS: (&[&str], &[&str]) = (
     &[

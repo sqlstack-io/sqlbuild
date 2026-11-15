@@ -4,9 +4,9 @@ use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::types::PyDict;
 
 use crate::bindings::_helpers::freshness::observation::require_aware_utc_datetime;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// `SourceFreshnessRecord.observed_at` position.
 const OBSERVED_AT_FIELD: usize = 9;

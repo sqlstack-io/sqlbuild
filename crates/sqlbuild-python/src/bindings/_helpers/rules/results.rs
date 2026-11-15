@@ -8,7 +8,8 @@ use sqlbuild_rules::rule_results::main::format_rules_progress::format_rules_prog
 use sqlbuild_rules::rule_results::main::format_skipped_rules::format_skipped_rules;
 use sqlbuild_rules::rule_results::models::{ResultCounts, RuleFinding};
 
-use crate::bindings::_helpers::records::fields::{field, path_posix};
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
 
 pub(crate) fn rule_finding(finding: &Bound<'_, PyAny>) -> PyResult<RuleFinding> {
     Ok(RuleFinding {

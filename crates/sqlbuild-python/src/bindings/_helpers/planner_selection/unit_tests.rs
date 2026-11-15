@@ -15,9 +15,10 @@ use sqlbuild_analysis::planner_selection::models::{
 use crate::bindings::_helpers::compiled_project::job_catalog::job_names;
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::planner_selection::carrier::{Carrier, py_strings};
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::{field as native_field, path_stem};
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::path_stem::path_stem;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// A bare selector's kind.
 const NAME_SELECTOR_KIND: &str = "name";

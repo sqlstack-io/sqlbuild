@@ -8,7 +8,7 @@ use crate::bindings::_helpers::compile_attachment::effective_config::build_effec
 use crate::bindings::_helpers::contracts::spec_resolution::{
     resolve_target_config, resolve_target_name,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const CONCURRENCY: &str = "concurrency";
 

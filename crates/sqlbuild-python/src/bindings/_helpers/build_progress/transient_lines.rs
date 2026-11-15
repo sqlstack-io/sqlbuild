@@ -6,8 +6,8 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, P
 use pyo3::sync::PyOnceLock;
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::build_progress::terminal::tty_flag;
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 /// The stream a transient line is drawn on and the renderer that owns it.
 type ActiveLine = (Py<PyAny>, Py<PyAny>);

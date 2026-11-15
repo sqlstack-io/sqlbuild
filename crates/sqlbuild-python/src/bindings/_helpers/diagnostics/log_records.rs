@@ -25,12 +25,12 @@ use sqlbuild_core::diagnostic_routing::models::{RecordFacts, RouteOptions, Third
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::diagnostics::redaction::redacted_value;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const PRIVATE_SQL_MARKER: ExecutorHost = ExecutorHost::SqlPrivateRecordMarker;
 
@@ -363,7 +363,7 @@ fn compute_diagnostic_log_fields<'py>(
         return Ok(None);
     }
     let trusted_private_sql: bool = match values.get_item(SQL_PRIVATE_RECORD_FIELD)? {
-        Some(marker) => marker.is(&host::entry(py, PRIVATE_SQL_MARKER)?),
+        Some(marker) => marker.is(&host_entry(py, PRIVATE_SQL_MARKER)?),
         None => false,
     };
     let mut identities: Vec<(&str, Option<String>)> = Vec::new();

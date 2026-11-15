@@ -72,8 +72,16 @@ use crate::bindings::_helpers::record_behaviours::scopes::{
 use crate::bindings::_helpers::record_behaviours::values::{
     finish_fingerprint_set, logical_type_display_name, sql_value_kind,
 };
-use crate::bindings::_helpers::records::models::RecordBehaviours;
-use crate::bindings::_helpers::records::types::{ClassMethod, ClassProperty, RecordFinish};
+use crate::bindings::_helpers::{
+    analysis, analysis_session, build_progress, compile_command, compile_context, compiled_views,
+    compute_logs, dbt_events, dbt_interop, diagnostics, discovery, event_exporting,
+    execution_history, graph, model_config, planner_entries, planner_migrations, planner_phases,
+    presentation_text, project_assembly, result_output, rules, scopes,
+};
+use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
+use sqlbuild_python_base::records::types::ClassMethod;
+use sqlbuild_python_base::records::types::ClassProperty;
+use sqlbuild_python_base::records::types::RecordFinish;
 
 /// Compiler records whose bound values are normalized or validated natively.
 pub(crate) const BEHAVIOUR_FINISHERS: &[(&str, RecordFinish)] = &[
@@ -343,6 +351,33 @@ pub(crate) const BEHAVIOUR_ORDERED: &[&str] = &[
     "DeclarationIdentity",
     "OwnershipRoot",
     "ProjectPath",
+];
+
+/// The getter tables of every module that defines native pyclasses.
+pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
+    analysis::getters::GETTERS,
+    analysis_session::getters::GETTERS,
+    build_progress::getters::GETTERS,
+    compile_command::getters::GETTERS,
+    compile_context::getters::GETTERS,
+    compiled_views::getters::GETTERS,
+    compute_logs::getters::GETTERS,
+    dbt_events::getters::GETTERS,
+    dbt_interop::getters::GETTERS,
+    diagnostics::getters::GETTERS,
+    discovery::getters::GETTERS,
+    event_exporting::getters::GETTERS,
+    execution_history::getters::GETTERS,
+    graph::getters::GETTERS,
+    model_config::getters::GETTERS,
+    planner_entries::getters::GETTERS,
+    planner_migrations::getters::GETTERS,
+    planner_phases::getters::GETTERS,
+    presentation_text::getters::GETTERS,
+    project_assembly::getters::GETTERS,
+    result_output::getters::GETTERS,
+    rules::getters::GETTERS,
+    scopes::getters::GETTERS,
 ];
 
 /// Every record behaviour, installed into `records::behaviours` at registration.

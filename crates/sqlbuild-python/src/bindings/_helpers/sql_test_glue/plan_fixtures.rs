@@ -4,13 +4,13 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 
 use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
 use crate::bindings::_helpers::sql_test_glue::authored_ctes::prefixed_ctes;
 use crate::bindings::_helpers::sql_test_glue::fixture_validation::validated_fixtures;
 use crate::bindings::_helpers::sql_test_glue::plan_driver::resolve_sql_test_model_chains;
 use crate::bindings::_helpers::sql_test_glue::plan_values::model_payload;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 
 pub(super) fn validated_test<'py>(
     test: &Bound<'py, PyAny>,

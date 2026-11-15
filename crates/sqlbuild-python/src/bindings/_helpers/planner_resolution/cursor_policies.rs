@@ -1,12 +1,13 @@
 //! Model-level cursor safety policy overrides over project configuration.
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
-use crate::bindings::_helpers::records::construct::{enum_from_value, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyString;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const POLICY_DISABLED: &str = "disabled";
 

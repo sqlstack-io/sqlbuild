@@ -2,10 +2,10 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_changes::results::native_enum;
-use crate::bindings::_helpers::records::construct::new_record_with;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
 use sqlbuild_analysis::planner_strategy::main::model_plan_action::model_plan_action;
@@ -15,13 +15,14 @@ use sqlbuild_analysis::planner_strategy::models::{
     ModelStrategy, PlanAction, PlanReason, SchemaActionKind, WarningInputs,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::planner_changes::results::planner_enum;
 use crate::bindings::_helpers::planner_strategy::values::{
     change_facts, config_value, finding_rows, input_error, materialization_value,
     model_materialization, optional_string, plan_warning, text,
 };
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn action_value(action: PlanAction) -> &'static str {
     match action {

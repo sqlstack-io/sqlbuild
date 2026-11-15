@@ -19,16 +19,17 @@ use sqlbuild_core::dbt_graph::models::{
 };
 use sqlbuild_core::dbt_graph::types::DbtSelectorResolver;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::dbt_interop::manifest::resolve_sqlbuild_model_dbt_refs;
 use crate::bindings::_helpers::planner_selection::model_selectors::{
     resolve_sqlbuild_model_selector_names, split_selector_expansion,
 };
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const MODEL_RESOURCE_TYPE: &str = "model";
 const SELECTION_OPTIONS: (&[&str], &[&str]) = (

@@ -19,8 +19,6 @@ use sqlbuild_core::clone_text::main::validate_clone_target_names::validate_clone
 use sqlbuild_core::clone_text::models::CloneItemText;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
 use crate::bindings::_helpers::clone::clone_execution::{
     destination_entry_count, execute_clone_plan, resource_types_by_name,
@@ -35,16 +33,21 @@ use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::connections::connection_failure;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_entries::clone_plans::PhaseTimings;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::result_output::documents::format_clone_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const CLONE_LOGGER: &str = "sqlbuild.clone";
 /// The clone phase that copies relations into the destination.
@@ -101,7 +104,7 @@ fn progress_reporter<'py>(
 
 fn lifecycle<'py>(py: Python<'py>, (kind, name): (&str, &str)) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(py, ExecutorHost::OperationLifecycle)?,
+        &host_entry(py, ExecutorHost::OperationLifecycle)?,
         &[
             ("operation_kind", text(py, kind)),
             ("operation_name", text(py, name)),

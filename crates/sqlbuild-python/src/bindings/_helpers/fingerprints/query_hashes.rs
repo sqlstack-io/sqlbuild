@@ -8,10 +8,10 @@ use sqlbuild_analysis::sql_tokens::main::normalized_query_text::normalized_query
 
 use sqlbuild_core::panics::main::is_compiler_panic::is_compiler_panic;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// `QueryFingerprintError(message)`, or the compiler error a native panic becomes.
 fn query_fingerprint_error(py: Python<'_>, message: String) -> PyErr {

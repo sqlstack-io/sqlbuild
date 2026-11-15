@@ -14,14 +14,14 @@ use sqlbuild_state::microbatches::models::{MicrobatchEventIdentity, ScopeRead};
 use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql;
 use sqlbuild_state::state_tables::models::TableColumn;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
 use crate::bindings::_helpers::frontier::encoder::emit_error;
 use crate::bindings::_helpers::microbatches::conversion::{optional_text, state_error};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const MISSING_SCHEMA: &str = "microbatch history requires a target schema";
 const EMPTY_INSERT: &str = "bulk microbatch event insert requires at least one event";
@@ -37,8 +37,8 @@ struct Layout {
 
 impl Layout {
     fn new(py: Python<'_>) -> PyResult<Self> {
-        let columns: Vec<String> = host::entry(py, ExecutorHost::MicrobatchColumns)?.extract()?;
-        let types: Bound<'_, PyAny> = host::entry(py, ExecutorHost::MicrobatchColumnTypes)?;
+        let columns: Vec<String> = host_entry(py, ExecutorHost::MicrobatchColumns)?.extract()?;
+        let types: Bound<'_, PyAny> = host_entry(py, ExecutorHost::MicrobatchColumnTypes)?;
         let declared: Vec<String> = columns
             .iter()
             .map(|column| types.get_item(column)?.str()?.extract())
@@ -60,8 +60,8 @@ impl Layout {
         timestamp_type: Option<&str>,
     ) -> PyResult<Vec<String>> {
         let py: Python<'_> = event.py();
-        let values: Bound<'_, PyAny> = host::entry(py, ExecutorHost::MicrobatchEventCodec)?
-            .call_method1("values", (event,))?;
+        let values: Bound<'_, PyAny> =
+            host_entry(py, ExecutorHost::MicrobatchEventCodec)?.call_method1("values", (event,))?;
         values
             .try_iter()?
             .zip(&self.declared)
@@ -167,8 +167,7 @@ fn read_scope(
     let py: Python<'_> = scope.py();
     let table: String = scope_table(render_qualified_name, scope)?;
     let layout: Layout = Layout::new(py)?;
-    let wildcard: String =
-        host::entry(py, ExecutorHost::MicrobatchGenerationWildcard)?.extract()?;
+    let wildcard: String = host_entry(py, ExecutorHost::MicrobatchGenerationWildcard)?.extract()?;
     let generation: Bound<'_, PyAny> = native_field(scope, "physical_generation_id")?;
     let generation: Option<String> = if generation.extract::<String>()? == wildcard {
         None
@@ -200,7 +199,7 @@ fn create_table(request: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
     )?
     .ok_or_else(|| state_error(py, MISSING_SCHEMA))?;
     let render_framework_type: Bound<'_, PyAny> = request.get("render_framework_type")?;
-    let framework: Bound<'_, PyAny> = host::entry(py, AdapterHost::FrameworkType)?;
+    let framework: Bound<'_, PyAny> = host_entry(py, AdapterHost::FrameworkType)?;
     let text_type: String = render_framework_type
         .call1((native_field(&framework, "STRING")?,))?
         .extract()?;
@@ -250,7 +249,7 @@ fn create_indexes<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'
         render_identifier.call1((name,))?.extract()
     };
     let mut indexes: Vec<(String, Vec<String>)> = Vec::new();
-    let definitions: Bound<'_, PyAny> = host::entry(py, ExecutorHost::MicrobatchDirectIndexes)?;
+    let definitions: Bound<'_, PyAny> = host_entry(py, ExecutorHost::MicrobatchDirectIndexes)?;
     for item in mapping_items(&definitions)?.try_iter()? {
         let (name, columns): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
         let columns: Vec<String> = columns

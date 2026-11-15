@@ -9,13 +9,13 @@ use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::{GraphIndexes, ProjectGraph};
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The native graph's pairs for `keys`, in order.
 #[pyfunction]

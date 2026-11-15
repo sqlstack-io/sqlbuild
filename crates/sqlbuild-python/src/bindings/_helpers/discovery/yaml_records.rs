@@ -16,8 +16,6 @@ use sqlbuild_discovery::yaml_files::main::source_yaml_paths::source_yaml_paths;
 use sqlbuild_discovery::yaml_files::models::{YamlFileOutcome, YamlPathFailure};
 use std::path::PathBuf;
 
-use crate::bindings::_helpers::boundary::config_values::config_value_to_python;
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::discovery::faults::{FileFaults, record_tuple};
 use crate::bindings::_helpers::discovery::project_files::path_object;
 use crate::bindings::_helpers::discovery::raised::{
@@ -29,9 +27,11 @@ use crate::bindings::_helpers::discovery::snapshot::{
 use crate::bindings::_helpers::discovery::yaml_entries::{
     parse_schema_document, parse_sources_document,
 };
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::models::{NativeProjectTree, YamlDiscoveryRequest};
+use sqlbuild_python_base::boundary::main::config_value_to_python::config_value_to_python;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The most YAML bytes one native load reads before its files are built and released.
 const YAML_BATCH_BYTES: u64 = 4 * 1024 * 1024;

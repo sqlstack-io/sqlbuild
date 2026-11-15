@@ -5,9 +5,11 @@ use pyo3::pyfunction;
 use pyo3::types::PyBool;
 use sqlbuild_rules::lint_text::main::named_declaration_role_kind::named_declaration_role_kind;
 
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const HOOKS_FOLDER: &str = "hooks";
 

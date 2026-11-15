@@ -3,8 +3,10 @@
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::graph::python_lifecycle::build_python_sql_run_lifecycle;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::replaced;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -14,12 +16,14 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::python_plan::main::ordered_python_names::ordered_python_names;
 use sqlbuild_analysis::python_plan::main::upstream_closure::upstream_closure;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SKIPPED_UPSTREAM_CODE: &str = "P501";
 
@@ -31,7 +35,7 @@ struct NodeKinds<'py> {
 
 impl<'py> NodeKinds<'py> {
     fn load(py: Python<'py>) -> PyResult<Self> {
-        let kinds: Bound<'py, PyAny> = host::entry(py, UserCodeHost::PythonNodeKind)?;
+        let kinds: Bound<'py, PyAny> = host_entry(py, UserCodeHost::PythonNodeKind)?;
         Ok(Self {
             task: native_field(&kinds, "TASK")?,
             asset: native_field(&kinds, "ASSET")?,
@@ -87,7 +91,7 @@ pub(crate) fn python_read_source_names_for<'py>(
     }
     let graph: Bound<'py, PyAny> = node_graph(&arguments.value("discovered_inputs")?)?;
     let source: Bound<'py, PyAny> =
-        host::entry(py, UserCodeHost::SqlResourceRefKind)?.getattr("SOURCE")?;
+        host_entry(py, UserCodeHost::SqlResourceRefKind)?.getattr("SOURCE")?;
     let mut names: Vec<Bound<'py, PyAny>> = Vec::new();
     for reference in call_with(
         &native_field(&graph, "selected_sql_refs")?,

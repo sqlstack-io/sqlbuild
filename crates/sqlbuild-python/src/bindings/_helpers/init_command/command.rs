@@ -13,13 +13,14 @@ use sqlbuild_core::init_command::main::init_project_name::init_project_name;
 use sqlbuild_core::init_command::main::init_project_toml::init_project_toml;
 use sqlbuild_core::init_command::main::render_init_summary::render_init_summary;
 
-use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
 use crate::bindings::_helpers::init_command::scaffold::scaffold_blank_project;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::workspace_commands::commands::update_sqlbuild_skills;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const EXISTS_MESSAGE: &str = "sqlbuild_project.toml already exists in this directory";
 

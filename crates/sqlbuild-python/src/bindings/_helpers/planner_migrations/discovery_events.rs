@@ -2,15 +2,15 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_migrations::column_objects::config;
 use crate::bindings::_helpers::planner_migrations::models::ModelMigrationDeclaration;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::migration_projections::newest_move;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(super) fn identity(item: &Bound<'_, PyAny>) -> PyResult<bool> {
     let materialized = config(item, "materialized")?;
@@ -26,13 +26,13 @@ pub(super) fn newest<'py>(
     events: &Bound<'py, PyAny>,
     location: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let relation = host::entry(location.py(), ExecutorHost::MigrationRelationForLocation)?
+    let relation = host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?
         .call1((location,))?;
     newest_move(events, &relation)
 }
 
 pub(super) fn relation<'py>(location: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    host::entry(location.py(), ExecutorHost::MigrationRelationForLocation)?.call1((location,))
+    host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?.call1((location,))
 }
 
 pub(super) fn declared<'py>(

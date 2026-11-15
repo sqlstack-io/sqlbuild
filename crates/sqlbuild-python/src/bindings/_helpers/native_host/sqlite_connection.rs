@@ -13,7 +13,7 @@ use rusqlite::{Connection, Error, ErrorCode, OpenFlags, params_from_iter};
 use sqlbuild_state::execution_history::constants::MEMORY_PATH;
 use sqlbuild_state::execution_history::models::SqlParam;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 /// Preserve DB-API exception classes at the public storage-error boundary.
 fn database_error(py: Python<'_>, error: Error) -> PyErr {

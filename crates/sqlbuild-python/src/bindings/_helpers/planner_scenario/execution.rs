@@ -1,7 +1,5 @@
 //! Assemble scenario execution plans through existing planner and adapter APIs.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::records::compiled_model_record;
@@ -27,12 +25,6 @@ use crate::bindings::_helpers::planner_scenario::{
 };
 use crate::bindings::_helpers::planner_strategy::fixture_completion::complete_fixtures as complete_relation_fixtures;
 use crate::bindings::_helpers::planner_strategy::fixture_context::planning_context;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::by_attribute;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sql_test_glue::constants::{
     DEFAULT_INTEGER_END, DEFAULT_INTEGER_START, DEFAULT_TIMESTAMP_END, DEFAULT_TIMESTAMP_START,
 };
@@ -42,6 +34,16 @@ use sqlbuild_analysis::compiler::main::scenario_expected_column_message::scenari
 use sqlbuild_analysis::compiler::main::scenario_expected_columns::scenario_expected_columns;
 use sqlbuild_analysis::compiler::main::scenario_reader_sql::scenario_reader_sql;
 use sqlbuild_discovery::constants::{SCENARIO_EXPECTED_COLUMNS_ALL, SCENARIO_EXPECTED_COLUMNS_KEY};
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::by_attribute::by_attribute;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::RecordId;
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]

@@ -1,5 +1,6 @@
 //! Declared unique keys of project relations, derived natively from their key facts.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -21,7 +22,7 @@ use crate::bindings::_helpers::compiled_views::source_views::{
     SourceKeyFacts, SourceViews, read_source_view,
 };
 use crate::bindings::_helpers::discovery::project_facts::seed_csv_settings;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MATERIALIZED_CONFIG: &str = "materialized";
 const INCREMENTAL_MODE_CONFIG: &str = "incremental_mode";

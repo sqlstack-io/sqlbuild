@@ -4,9 +4,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const RELATIVE_PATH_FIELD: &str = "relative_path";
 const SQL_HOOK_FIELDS: [&str; 6] = [

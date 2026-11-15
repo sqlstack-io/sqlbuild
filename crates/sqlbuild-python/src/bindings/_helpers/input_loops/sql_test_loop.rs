@@ -50,8 +50,8 @@ use crate::bindings::_helpers::input_loops::model_loop_calls::{
 use crate::bindings::_helpers::input_loops::source_loop::{
     AuthoredExpansion, expanded_authored_sql, scoped_declarations,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::sql_macro_tests::without_with_list_calls;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MODEL_MODE: &str = "model";
 const MACRO_MODE: &str = "macro";

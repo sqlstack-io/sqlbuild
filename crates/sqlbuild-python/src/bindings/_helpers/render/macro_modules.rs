@@ -10,9 +10,11 @@ use sqlbuild_pysource::macro_modules::models::{
 };
 use sqlbuild_pysource::macro_modules::models::{MacroLoadPlan, MacroModuleSpec};
 use sqlbuild_pysource::macro_modules::types::MacroScopeKind;
+use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::boundary::panics::{NativeCompilerError, compiler_error};
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 positional_record! {
     extract;
@@ -134,7 +136,7 @@ pub(crate) fn inventory_macro_modules(
     } = py
         .compiler_detach(|| Ok(inventory(&sources)))
         .map_err(compiler_error)?
-        .map_err(|error| NativeCompilerError::new_err(error.to_string()))?;
+        .map_err(|error| native_compiler_error(error.to_string()))?;
     Ok((
         exports.into_iter().map(export_row).collect(),
         faults.into_iter().map(fault_row).collect(),

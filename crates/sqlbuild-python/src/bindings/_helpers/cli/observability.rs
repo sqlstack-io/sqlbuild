@@ -15,19 +15,23 @@ use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
 use crate::bindings::_helpers::build_progress::progress::NativeProgressProjector;
 use crate::bindings::_helpers::build_progress::progress::machine_output_mode;
 use crate::bindings::_helpers::cli::launch_state::withhold_launch_record;
 use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
 use crate::bindings::_helpers::event_exporting::scope::EventExporterCommandScope;
 use crate::bindings::_helpers::event_exporting::scope::event_exporter_command_scope;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::terminal_index::TerminalEventIndex;
 use crate::bindings::_helpers::result_output::terminal_index::terminal_event_index_scope;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const OBSERVABILITY_LOGGER: &str = "sqlbuild.cli.observability";
 const DEBUG_COMMAND: &str = "debug";
@@ -55,7 +59,7 @@ fn log_debug<'py>(
         ("message", PyString::new(py, message).into_any()),
     ];
     pairs.extend(fields.iter().cloned());
-    call_with(&host::entry(py, ExecutorHost::LogDebugEvent)?, &pairs)?;
+    call_with(&host_entry(py, ExecutorHost::LogDebugEvent)?, &pairs)?;
     Ok(())
 }
 
@@ -342,12 +346,12 @@ impl Observed {
         if native_field(args, "command")?.ne(LINEAGE_COMMAND)? {
             let discover = || {
                 call_with(
-                    &host::entry(py, UserCodeHost::DiscoverRuntimeExtensions)?,
+                    &host_entry(py, UserCodeHost::DiscoverRuntimeExtensions)?,
                     &[("project_dir", project_dir.clone())],
                 )
             };
             let extensions: Bound<'_, PyAny> = if machine_output_mode(args)? {
-                within(&host::redirect_stdout_to_stderr(py)?, |_| discover())?
+                within(&redirect_stdout_to_stderr(py)?, |_| discover())?
             } else {
                 discover()?
             };
@@ -420,7 +424,7 @@ impl Observed {
             }
         }
         self.enter(
-            host::entry(py, ExecutorHost::DispatcherScope)?.call1((self.dispatcher.bind(py),))?,
+            host_entry(py, ExecutorHost::DispatcherScope)?.call1((self.dispatcher.bind(py),))?,
         )?;
         self.enter(pyo3::IntoPyObjectExt::into_bound_py_any(
             terminal_event_index_scope(terminal_index.extract::<Py<TerminalEventIndex>>()?),
@@ -438,10 +442,10 @@ impl Observed {
             py,
         )?)?;
         let identity: Bound<'_, PyAny> =
-            host::entry(py, ExecutorHost::CurrentExecutionIdentity)?.call0()?;
+            host_entry(py, ExecutorHost::CurrentExecutionIdentity)?.call0()?;
         if !identity.is_none() && command_output_sinks {
             self.enter(call_with(
-                &host::entry(py, ExecutorHost::ConfiguredOutputCaptureScope)?,
+                &host_entry(py, ExecutorHost::ConfiguredOutputCaptureScope)?,
                 &[
                     ("exporter_scope", scope),
                     ("identity", identity),
@@ -494,7 +498,7 @@ impl CliObservabilityScope {
     fn __enter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let args: &Bound<'_, PyAny> = self.args.bind(py);
         let dispatcher: Bound<'_, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::EventDispatcher)?,
+            &host_entry(py, ExecutorHost::EventDispatcher)?,
             &[(
                 "health_callback",
                 wrap_pyfunction!(log_dispatch_failure, py)?.into_any(),

@@ -5,9 +5,6 @@ use pyo3::types::{PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, keywords, within,
-};
 use crate::bindings::_helpers::compile_attachment::declaration_scope::build_declaration_scope;
 use crate::bindings::_helpers::compile_attachment::effective_config::{
     build_effective_connection, build_effective_settings, build_effective_vars,
@@ -19,14 +16,18 @@ use crate::bindings::_helpers::compiled_views::records::{compile_inputs_view, in
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::input_loops::attachment::{attach_checks, attach_resources};
 use crate::bindings::_helpers::model_config::template_data::run_id;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::render::declaration_indexes::{
     public_declaration_indexes, public_model_schema_index,
 };
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 const REQUIRED: [&str; 2] = ["discovered_inputs", "adapter_context"];
 const OPTIONAL: [&str; 8] = [
@@ -148,7 +149,7 @@ fn compile_inputs<'py>(py: Python<'py>, request: &InputsRequest) -> PyResult<Bou
     let adapter_context: Bound<'py, PyAny> = request.adapter_context.bind(py).clone();
     let target: TargetContext<'py> = target_context(request, &discovered, &adapter_context)?;
     let run_id: Bound<'py, PyAny> = run_id(&request.run_id.bind(py).clone())?;
-    let loaded_macros: Bound<'py, PyAny> = host::entry(py, UserCodeHost::LoadProjectMacros)?
+    let loaded_macros: Bound<'py, PyAny> = host_entry(py, UserCodeHost::LoadProjectMacros)?
         .call1((native_field(&discovered, "macro_files")?,))?;
     let syntax: Bound<'py, PyAny> = native_field(&adapter_context, "sql_lexical_syntax")?;
     let declaration_scope: Bound<'py, PyAny> = build_declaration_scope(
@@ -257,7 +258,7 @@ fn target_context<'py>(
 ) -> PyResult<TargetContext<'py>> {
     let py: Python<'py> = discovered.py();
     let selected: Bound<'py, PyAny> = call_with(
-        &host::entry(py, UserCodeHost::TargetContextWithMacroCallStore)?,
+        &host_entry(py, UserCodeHost::TargetContextWithMacroCallStore)?,
         &[
             ("discovered_inputs", discovered.clone()),
             ("selected_target", request.selected_target.bind(py).clone()),
