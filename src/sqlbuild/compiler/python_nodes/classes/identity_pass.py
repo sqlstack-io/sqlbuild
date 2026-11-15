@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -32,6 +33,7 @@ class IdentityPass:
         self._modules: dict[int, tuple[object, ModuleType | None]] = {}
         self._class_lines: dict[str, tuple[list[str], dict[str, int]]] = {}
         self._resolved: dict[str, Path] = {}
+        self._parts: dict[str, tuple[str, ...]] = {}
 
     def source_path(self, obj: object) -> Path | None:
         """The file `inspect` reads `obj`'s source from."""
@@ -67,6 +69,16 @@ class IdentityPass:
             resolved = path.resolve()
             self._resolved[key] = resolved
         return resolved
+
+    def parts(self, path: Path) -> tuple[str, ...]:
+        """`path.parts` as `PurePath` equality compares them, case-folded where paths are."""
+
+        key: str = str(path)
+        parts: tuple[str, ...] | None = self._parts.get(key)
+        if parts is None:
+            parts = tuple(os.path.normcase(part) for part in path.parts)
+            self._parts[key] = parts
+        return parts
 
     @staticmethod
     def _cached(

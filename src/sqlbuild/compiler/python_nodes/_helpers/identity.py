@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict
@@ -269,7 +269,9 @@ def _object_qualname(obj: object) -> str:
     return str(getattr(obj, "__qualname__", getattr(obj, "__name__", type(obj).__name__)))
 
 
-def _display_path(*, source_path: Path | None, roots: Iterable[Path], memo: IdentityPass) -> str:
+def _display_path(
+    *, source_path: Path | None, roots: tuple[Path, ...], memo: IdentityPass
+) -> str:
     if source_path is None:
         return ""
     resolved: Path = memo.resolved(source_path)
@@ -280,16 +282,15 @@ def _display_path(*, source_path: Path | None, roots: Iterable[Path], memo: Iden
         reverse=True,
     ):
         if _is_relative_to(path=resolved, root=root, memo=memo):
-            return resolved.relative_to(root).as_posix()
+            return "/".join(resolved.parts[len(root.parts) :]) or "."
     return resolved.as_posix()
 
 
 def _is_relative_to(*, path: Path, root: Path, memo: IdentityPass) -> bool:
-    try:
-        path.relative_to(memo.resolved(root))
-    except ValueError:
-        return False
-    return True
+    """`path.is_relative_to(root.resolve())`, comparing each path's parts computed once per pass."""
+
+    root_parts: tuple[str, ...] = memo.parts(memo.resolved(root))
+    return memo.parts(path)[: len(root_parts)] == root_parts
 
 
 def _stable_json(value: object) -> str:

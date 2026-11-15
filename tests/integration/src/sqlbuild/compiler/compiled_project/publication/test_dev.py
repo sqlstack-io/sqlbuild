@@ -18,6 +18,7 @@ import duckdb
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
+    PYTHON_PIPELINE_FILES,
     TYPE_PROOF_FILES,
     duckshop_orchestration,
 )
@@ -214,3 +215,41 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
         )
     for line in output.read_text().splitlines():
         assert json.loads(line)["location_id"] == identity
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+def test_given_development_start_when_location_is_ready_then_project_python_is_discovered_once(
+    tmp_path: Path,
+) -> None:
+    project: Path = tmp_path / "project"
+    imports: Path = tmp_path / "python_imports.txt"
+    probe: str = (
+        "import os\nfrom pathlib import Path\nfrom sqlbuild.tasks import task\n"
+        f"with Path({str(imports)!r}).open('a') as imported:\n"
+        "    imported.write(f'{os.getpid()}\\n')\n"
+        "@task(description='Probe.')\n"
+        "def import_probe(ctx):\n    return None\n"
+    )
+    write_files(
+        project_dir=project,
+        files=PYTHON_PIPELINE_FILES
+        | {
+            "sqlbuild_project.toml": 'default_target = "development"\n'
+            + PYTHON_PIPELINE_FILES["sqlbuild_project.toml"]
+            + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
+            + '[targets.development]\nschema = "main"\n',
+            "python/probes/import_probe.py": probe,
+        },
+    )
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    log: Path = tmp_path / "development.log"
+    output: Path = tmp_path / "publications.jsonl"
+    arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
+    environment: dict[str, str] = dict(os.environ)
+    _ = environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
+    with location_process(arguments, log, output, env=environment) as process:
+        wait_for_log(process, log, "connection check passed", timeout=60)
+        interpreters: list[str] = imports.read_text().splitlines()
+        stop_location(process, int(interpreters[0]), log)
+
+    assert len(interpreters) == 1, log.read_text()
