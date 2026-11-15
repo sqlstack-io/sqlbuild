@@ -5,7 +5,7 @@ use fensu_native::rules::constants as fensu;
 use crate::python_rules::models::{PythonFiles, PythonRuleSpec};
 
 /// Every `SQBRPYTHON` rule; numbers are never reused, and new rules append to their band.
-pub(crate) const PYTHON_RULES: [PythonRuleSpec; 64] = [
+pub(crate) const PYTHON_RULES: [PythonRuleSpec; 74] = [
     PythonRuleSpec {
         code: "SQBRPYTHON001",
         fensu_code: None,
@@ -16,7 +16,7 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 64] = [
         enabled_by_default: true,
         options: &[],
         message: "python/ may hold only domain packages, utils/ and __init__.py",
-        remediation: "Move direct modules into a domain package, and nest node-kind and role folders such as loaders/, tasks/, main/ and _helpers/ inside a domain.",
+        remediation: "Move direct modules into a domain package. Give each node its own unit folder holding node.py and main.py inside its domain, such as python/orders/partner_export/, and keep role folders such as _helpers/ inside the domain or unit.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON002",
@@ -29,6 +29,126 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 64] = [
         options: &[],
         message: "packages under python/ must be named for what they own",
         remediation: "Rename generic packages such as common/, shared/ or helpers/ after the domain or capability they hold; utils/ is allowed only directly under python/.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON003",
+        fensu_code: None,
+        slug: "node-unit-layout",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "a unit folder holds node.py, main.py, optional role files and _helpers/ only",
+        remediation: "Add main.py beside node.py, and move any other module into _helpers/ or a named role file: checks.py, models.py, types.py, constants.py or exceptions.py.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON004",
+        fensu_code: None,
+        slug: "node-module-shape",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "node.py holds imports and exactly one node or factory declaration",
+        remediation: "Keep one @loader, @task, @asset or @factory function in node.py; move helpers to _helpers/, constants to constants.py and checks to checks.py.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON005",
+        fensu_code: None,
+        slug: "node-delegates-to-main",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "a node declaration's body is `return main(...)` from its unit's main.py, with every argument passed by keyword",
+        remediation: "Move the logic into main() in the unit's main.py, import it with `from .main import main` or its full python. path, and pass each argument as name=value, including ctx.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON006",
+        fensu_code: None,
+        slug: "main-module-shape",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "main.py holds imports and one public main() whose return annotation fits the node kind",
+        remediation: "Move other functions and classes into _helpers/ or a role file, and annotate main() with the result it returns: ctx.result(...) or ctx.skip(...) for a task or asset, and rows or a loader result for a loader.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON007",
+        fensu_code: None,
+        slug: "node-signature",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "a node takes ctx as its only positional parameter and its providers as annotated keyword-only parameters",
+        remediation: "Write the signature as (ctx: <Kind>Context, *, provider: ProviderClass), with no *args or **kwargs.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON008",
+        fensu_code: None,
+        slug: "node-import-boundaries",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "a unit imports only its own files, its domain's role files and _helpers/, python/utils/, provider role files, and other units' node.py for depends_on",
+        remediation: "Import shared code from python/utils/<capability>/ or the domain's role files, and name another unit's node only in depends_on; never import another unit's main.py, role files or _helpers/.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON009",
+        fensu_code: None,
+        slug: "checks-module-shape",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "checks.py holds imports and @check functions, or one @factory, each depending on the unit's own node",
+        remediation: "Name the unit's node in each check's depends_on, return directly from each check, and move other logic to _helpers/.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON010",
+        fensu_code: None,
+        slug: "factory-shape",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "a factory iterates over specs from its unit's constants.py or models.py and declares named nodes that return main(...)",
+        remediation: "Loop over a spec collection imported from the unit's constants.py or models.py, give every generated node name=, and make each body `return main(...)` with keyword arguments.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON011",
+        fensu_code: None,
+        slug: "node-description-not-docstring",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "@task, @asset and @check set description= without a docstring, and @loader sets neither",
+        remediation: "Move the docstring text into description=; for a loader, describe the managed source in its YAML instead.",
+    },
+    PythonRuleSpec {
+        code: "SQBRPYTHON012",
+        fensu_code: None,
+        slug: "node-declared-in-unit",
+        family: "units",
+        owner: "file",
+        applies: PythonFiles::Package,
+        enabled_by_default: true,
+        options: &[],
+        message: "nodes are declared in a unit's node.py, and checks in a unit's checks.py",
+        remediation: "Move the declaration into its own unit folder under its domain, with the implementation in that folder's main.py.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON101",
@@ -904,3 +1024,93 @@ pub(crate) const GENERIC_PACKAGE_NAMES: [&str; 9] = [
 pub(crate) const SHARED_UTILITIES_PACKAGE: &str = "utils";
 pub(crate) const PROJECT_ROOT_ALLOWLIST_CODE: &str = "SQBRPYTHON001";
 pub(crate) const RUNTIME_PACKAGE_OWNER_NAMES_CODE: &str = "SQBRPYTHON002";
+pub(crate) const NODE_UNIT_LAYOUT_CODE: &str = "SQBRPYTHON003";
+pub(crate) const NODE_MODULE_SHAPE_CODE: &str = "SQBRPYTHON004";
+pub(crate) const NODE_DELEGATES_TO_MAIN_CODE: &str = "SQBRPYTHON005";
+pub(crate) const MAIN_MODULE_SHAPE_CODE: &str = "SQBRPYTHON006";
+pub(crate) const NODE_SIGNATURE_CODE: &str = "SQBRPYTHON007";
+pub(crate) const NODE_IMPORT_BOUNDARIES_CODE: &str = "SQBRPYTHON008";
+pub(crate) const CHECKS_MODULE_SHAPE_CODE: &str = "SQBRPYTHON009";
+pub(crate) const FACTORY_SHAPE_CODE: &str = "SQBRPYTHON010";
+pub(crate) const NODE_DESCRIPTION_CODE: &str = "SQBRPYTHON011";
+pub(crate) const NODE_DECLARED_IN_UNIT_CODE: &str = "SQBRPYTHON012";
+/// The fewest folders below `python/` a unit sits in: its domain and its own.
+pub(crate) const MIN_UNIT_DEPTH: usize = 2;
+/// The file that declares a unit's node and makes its folder a unit.
+pub(crate) const UNIT_NODE_FILE: &str = "node.py";
+/// The file holding a unit's checks.
+pub(crate) const UNIT_CHECKS_FILE: &str = "checks.py";
+/// The files a unit folder may hold beside `node.py` and `main.py`.
+pub(crate) const UNIT_ROLE_FILES: [&str; 6] = [
+    "checks.py",
+    "models.py",
+    "types.py",
+    "constants.py",
+    "exceptions.py",
+    INIT_FILE,
+];
+/// The one folder a unit may hold.
+pub(crate) const UNIT_HELPERS_FOLDER: &str = "_helpers";
+/// The role modules a unit may import from its domain and from a provider.
+pub(crate) const SHARED_ROLE_MODULES: [&str; 4] = ["models", "types", "constants", "exceptions"];
+/// The modules a factory may take its specs from.
+pub(crate) const SPEC_MODULES: [&str; 2] = ["constants", "models"];
+/// The project folder holding providers, imported as `providers`.
+pub(crate) const PROVIDERS_ROOT: &str = "providers";
+/// The public files of a provider capability a unit may import, as module names.
+pub(crate) const PROVIDER_ROLE_MODULES: [&str; 5] =
+    ["provider", "models", "types", "constants", "exceptions"];
+/// The module a node delegates to, and the function it calls.
+pub(crate) const MAIN_NAME: &str = "main";
+/// The module a unit declares its node in.
+pub(crate) const NODE_MODULE: &str = "node";
+/// The only positional parameter of a node or check.
+pub(crate) const CONTEXT_PARAMETER: &str = "ctx";
+/// The decorator keywords the unit rules read.
+pub(crate) const DESCRIPTION_KEYWORD: &str = "description";
+pub(crate) const NAME_KEYWORD: &str = "name";
+/// Node decorators and the context type each node's `ctx` is annotated with.
+pub(crate) const NODE_KINDS: [(&str, &str); 3] = [
+    ("loader", "LoaderContext"),
+    ("task", "TaskContext"),
+    ("asset", "AssetContext"),
+];
+/// The check decorator and its context type.
+pub(crate) const CHECK_KIND: (&str, &str) = ("check", "CheckContext");
+/// Decorators that generate nodes or checks.
+pub(crate) const FACTORY_DECORATORS: [&str; 1] = ["factory"];
+/// The loader decorator, which takes no description because its managed source has one.
+pub(crate) const LOADER_DECORATOR: &str = "loader";
+/// Return annotations `main()` may use, by node decorator.
+pub(crate) const MAIN_RESULTS: [(&str, &[&str]); 3] = [
+    ("task", &["PythonNodeResult", "PythonNodeSkipResult"]),
+    ("asset", &["PythonNodeResult", "PythonNodeSkipResult"]),
+    (
+        "loader",
+        &[
+            "list",
+            "tuple",
+            "Collection",
+            "Iterator",
+            "Iterable",
+            "Generator",
+            "Sequence",
+            "LoaderResult",
+            "LoaderSkipResult",
+            "None",
+        ],
+    ),
+];
+/// The unit rules, which read parsed modules under `python/`.
+pub(crate) const UNIT_RULE_CODES: [&str; 10] = [
+    NODE_UNIT_LAYOUT_CODE,
+    NODE_MODULE_SHAPE_CODE,
+    NODE_DELEGATES_TO_MAIN_CODE,
+    MAIN_MODULE_SHAPE_CODE,
+    NODE_SIGNATURE_CODE,
+    NODE_IMPORT_BOUNDARIES_CODE,
+    CHECKS_MODULE_SHAPE_CODE,
+    FACTORY_SHAPE_CODE,
+    NODE_DESCRIPTION_CODE,
+    NODE_DECLARED_IN_UNIT_CODE,
+];

@@ -194,6 +194,60 @@ pub(super) fn scaling_project(
         .collect()
 }
 
+/// A project of a chain of `units` node units over 50 domains, each node depending on the one before, plus `undescribed` unlinked units whose nodes have no description.
+pub(super) fn unit_scaling_project(units: usize, undescribed: usize) -> Vec<(String, String)> {
+    let head = unit_files(0, "", "description=\"Unit 0.\"");
+    let chain = (1..units).flat_map(|unit| {
+        let previous = unit - 1;
+        unit_files(
+            unit,
+            &format!(
+                "from {}.node import node_{previous}\n",
+                unit_module(previous)
+            ),
+            &format!("depends_on=[node_{previous}], description=\"Unit {unit}.\""),
+        )
+    });
+    let bare = (units..units + undescribed).flat_map(|unit| unit_files(unit, "", ""));
+    let utils = (
+        "python/utils/text/join.py".to_owned(),
+        "def joined(value: str) -> str:\n    return value\n".to_owned(),
+    );
+    head.into_iter()
+        .chain(chain)
+        .chain(bare)
+        .chain(std::iter::once(utils))
+        .collect()
+}
+
+fn unit_module(unit: usize) -> String {
+    format!("python.area{}.unit_{unit}", unit % 50)
+}
+
+/// The node, main and checks files of `unit`, its node importing `upstream` and declared with `arguments`.
+fn unit_files(unit: usize, upstream: &str, arguments: &str) -> [(String, String); 3] {
+    let module = unit_module(unit);
+    let dir = module.replace('.', "/");
+    [
+        (
+            format!("{dir}/node.py"),
+            format!(
+                "{upstream}from {module}.main import main\n\n\n@task({arguments})\ndef node_{unit}(ctx: TaskContext) -> None:\n    return main(ctx=ctx)\n"
+            ),
+        ),
+        (
+            format!("{dir}/main.py"),
+            "from sqlbuild import PythonNodeResult\n\nfrom python.utils.text.join import joined\n\n\ndef main(ctx: TaskContext) -> PythonNodeResult:\n    return ctx.result(joined(\"\"))\n".to_owned(),
+        ),
+        (
+            format!("{dir}/checks.py"),
+            format!(
+                "from {module}.node import node_{unit}\n\n\n@check(depends_on=[node_{unit}], description=\"Ran.\")\ndef ran_{unit}(ctx: CheckContext) -> bool:\n    return ctx.ok()\n"
+            ),
+        ),
+    ]
+}
+
 /// The codes of the Python faults `files` produce under `config` with the cache off, and how long evaluation took.
 pub(super) fn timed_python_codes(
     files: &[(String, String)],

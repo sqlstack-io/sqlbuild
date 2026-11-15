@@ -13,10 +13,10 @@ use fensu_native::{
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::models::{Fault, RuleMetadata};
-use crate::python_rules::_helpers::contexts::{rule_context, threshold_calls};
-use crate::python_rules::_helpers::faults::python_fault;
-use crate::python_rules::_helpers::file_cache::{answers_digest, file_identity};
-use crate::python_rules::_helpers::observations::{
+use crate::python_rules::_helpers::engine::contexts::{rule_context, threshold_calls};
+use crate::python_rules::_helpers::engine::faults::python_fault;
+use crate::python_rules::_helpers::engine::file_cache::{answers_digest, file_identity};
+use crate::python_rules::_helpers::engine::observations::{
     observations, relative_queries, repository_index,
 };
 use crate::python_rules::constants::{PACKAGE_ROOT, PYTHON_RULES, ROOT_SCOPE};

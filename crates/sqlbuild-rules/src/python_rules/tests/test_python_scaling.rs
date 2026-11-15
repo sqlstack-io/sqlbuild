@@ -1,11 +1,14 @@
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use serde_json::json;
 
 use crate::python_rules::tests::helpers::{
-    median_growth, scaling_project, serial_timing, timed_python_codes,
+    median_growth, scaling_project, serial_timing, timed_python_codes, unit_scaling_project,
 };
-use crate::python_rules::tests::test_types::{PythonGrowthTestCase, PythonScalingTestCase};
+use crate::python_rules::tests::test_types::{
+    PythonGrowthTestCase, PythonScalingTestCase, UnitScalingTestCase,
+};
 
 #[test]
 fn given_many_modules_and_dense_findings_when_evaluating_python_rules_then_finishes_within_budget()
@@ -65,6 +68,54 @@ fn given_four_times_the_modules_when_finding_unreachable_definitions_then_time_g
             unreachable, test_case.expected_unreachable_definitions,
             "{}",
             test_case.description
+        );
+        let ratio: f64 = median_growth(&small, &large, &test_case.config, test_case.pairs);
+        assert!(
+            ratio < test_case.expected_max_ratio,
+            "{}: growing the project {}x multiplied the time by {ratio:.2}",
+            test_case.description,
+            test_case.growth
+        );
+    }
+}
+
+#[test]
+fn given_many_linked_node_units_when_evaluating_unit_rules_then_finishes_within_budget_and_grows_near_linearly()
+ {
+    let _serial = serial_timing();
+    let test_cases = [UnitScalingTestCase {
+        description: "default rules over a chain of 2000 units of node, main and checks, and 200 undescribed units",
+        units: 2000,
+        undescribed: 200,
+        config: json!({ "select": ["SQBRPYTHON"] }),
+        expected_codes: vec![("SQBRPYTHON011", 200)],
+        expected_max_duration: Duration::from_secs(5),
+        growth: 4,
+        pairs: 5,
+        expected_max_ratio: 6.5,
+    }];
+    for test_case in test_cases {
+        let large = unit_scaling_project(test_case.units, test_case.undescribed);
+        let (codes, elapsed) =
+            timed_python_codes(&large, test_case.config.clone()).expect("rules run");
+        let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+        for code in &codes {
+            *counts.entry(code.as_str()).or_default() += 1;
+        }
+        assert_eq!(
+            counts.into_iter().collect::<Vec<_>>(),
+            test_case.expected_codes,
+            "{}",
+            test_case.description
+        );
+        assert!(
+            elapsed < test_case.expected_max_duration,
+            "{}: took {elapsed:?}",
+            test_case.description
+        );
+        let small = unit_scaling_project(
+            test_case.units / test_case.growth,
+            test_case.undescribed / test_case.growth,
         );
         let ratio: f64 = median_growth(&small, &large, &test_case.config, test_case.pairs);
         assert!(

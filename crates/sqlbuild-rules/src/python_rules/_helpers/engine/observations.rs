@@ -8,8 +8,8 @@ use fensu_facts::snapshot::models::{
 };
 use fensu_native::NativeProjectQuery;
 
-use crate::python_rules::_helpers::placement::package_anchor;
-use crate::python_rules::_helpers::programs::Programs;
+use crate::python_rules::_helpers::engine::placement::package_anchor;
+use crate::python_rules::_helpers::engine::programs::Programs;
 use crate::python_rules::constants::PROJECT_ROOT_QUERY_PATH;
 
 const TRUE_TEXT: &str = "true";

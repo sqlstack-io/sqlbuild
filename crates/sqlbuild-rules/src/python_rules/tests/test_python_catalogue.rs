@@ -14,14 +14,14 @@ use crate::rules::models::BuiltinOptionKind;
 fn given_the_catalogue_when_listing_python_rules_then_each_has_its_own_project_wide_code() {
     let test_cases = [
         CatalogueTestCase {
-            description: "two SQLBuild layout rules and 62 Fensu core rules have distinct codes",
+            description: "12 SQLBuild layout and unit rules and 62 Fensu core rules have distinct codes",
             count: distinct_python_codes,
-            expected_count: 64,
+            expected_count: 74,
         },
         CatalogueTestCase {
             description: "every Python rule reports against the project in the python family",
             count: project_wide_python_rules,
-            expected_count: 64,
+            expected_count: 74,
         },
     ];
     for test_case in test_cases {

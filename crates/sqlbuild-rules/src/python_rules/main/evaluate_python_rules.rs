@@ -3,13 +3,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::models::{EvaluateRequest, RuleMetadata};
-use crate::python_rules::_helpers::contexts::context_settings;
-use crate::python_rules::_helpers::execution::{evaluated_files, file_plans, selected_rules};
-use crate::python_rules::_helpers::file_cache::project_digest;
-use crate::python_rules::_helpers::layout::layout_faults;
-use crate::python_rules::_helpers::placement::python_targets;
-use crate::python_rules::_helpers::programs::Programs;
-use crate::python_rules::_helpers::project_plane::loaded_project;
+use crate::python_rules::_helpers::engine::contexts::context_settings;
+use crate::python_rules::_helpers::engine::execution::{
+    evaluated_files, file_plans, selected_rules,
+};
+use crate::python_rules::_helpers::engine::file_cache::project_digest;
+use crate::python_rules::_helpers::engine::layout::layout_faults;
+use crate::python_rules::_helpers::engine::placement::python_targets;
+use crate::python_rules::_helpers::engine::programs::Programs;
+use crate::python_rules::_helpers::engine::project_plane::loaded_project;
+use crate::python_rules::_helpers::units::project::unit_faults;
 use crate::python_rules::models::{
     CallInputs, PythonCacheEntry, PythonEvaluation, PythonRuleSpec, PythonTarget,
 };
@@ -41,6 +44,11 @@ pub(crate) fn evaluate_python_rules(
     evaluation
         .faults
         .extend(layout_faults(&request.python_sources, &codes));
+    evaluation.faults.extend(unit_faults(
+        &request.python_sources,
+        &codes,
+        request.python_version,
+    ));
     evaluation.faults.sort_by(|left, right| {
         (&left.path, left.line, left.column, &left.code).cmp(&(
             &right.path,

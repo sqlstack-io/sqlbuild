@@ -3,10 +3,11 @@
 use std::collections::BTreeSet;
 
 use crate::models::{Fault, PythonSource};
-use crate::python_rules::_helpers::placement::package_anchor;
+use crate::python_rules::_helpers::engine::faults::catalogue_fault;
+use crate::python_rules::_helpers::engine::placement::package_anchor;
 use crate::python_rules::constants::{
     GENERIC_PACKAGE_NAMES, INIT_FILE, NODE_KIND_DIRECTORIES, PACKAGE_ROOT,
-    PROJECT_ROOT_ALLOWLIST_CODE, PYTHON_RULES, ROLE_DIRECTORIES, RUNTIME_PACKAGE_OWNER_NAMES_CODE,
+    PROJECT_ROOT_ALLOWLIST_CODE, ROLE_DIRECTORIES, RUNTIME_PACKAGE_OWNER_NAMES_CODE,
     SHARED_UTILITIES_PACKAGE,
 };
 
@@ -95,14 +96,5 @@ fn package_parts(sources: &[PythonSource]) -> impl Iterator<Item = Vec<&str>> {
 
 /// A layout fault of rule `code` on the file at `path`.
 fn layout_fault(code: &str, path: &str, detail: &str) -> Option<Fault> {
-    let rule = PYTHON_RULES.iter().find(|rule| rule.code == code)?;
-    Some(Fault {
-        unevaluated: false,
-        code: code.to_owned(),
-        path: path.to_owned(),
-        line: 1,
-        column: 1,
-        message: format!("{}: {detail}", rule.message),
-        remediation: rule.remediation.to_owned(),
-    })
+    catalogue_fault(code, path, (1, 1), detail)
 }

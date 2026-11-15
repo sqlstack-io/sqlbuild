@@ -56,8 +56,8 @@ pub(crate) struct RuleCall {
 #[derive(Debug)]
 pub(crate) struct CallInputs<'a> {
     pub request: &'a crate::models::EvaluateRequest,
-    pub settings: crate::python_rules::_helpers::contexts::ContextSettings,
-    pub programs: &'a crate::python_rules::_helpers::programs::Programs<'a>,
+    pub settings: crate::python_rules::_helpers::engine::contexts::ContextSettings,
+    pub programs: &'a crate::python_rules::_helpers::engine::programs::Programs<'a>,
     /// Cached findings by file from the last run with the same ruleset.
     pub cached: &'a std::collections::BTreeMap<String, PythonCacheEntry>,
     /// The digest of the ruleset and interpreter version the cached findings must match.
@@ -100,4 +100,31 @@ pub(crate) struct FilePlan<'a> {
 pub(crate) struct CacheSplit<'a> {
     pub fresh: Vec<(String, PythonCacheEntry)>,
     pub stale: Vec<FilePlan<'a>>,
+}
+
+/// One parsed module under `python/` and the unit folder it sits in.
+#[derive(Debug)]
+pub(crate) struct UnitFile<'a> {
+    pub path: &'a str,
+    /// Path parts below `python/`.
+    pub parts: Vec<&'a str>,
+    pub module: sqlbuild_pysource::node_units::models::UnitModule,
+    /// The nearest unit folder below `python/` that contains the file, at any depth.
+    pub unit: Option<String>,
+}
+
+/// The project's parsed `python/` modules, its unit folders and every module name it holds.
+#[derive(Debug)]
+pub(crate) struct UnitProject<'a> {
+    pub files: Vec<UnitFile<'a>>,
+    /// Folders below `python/` that hold a `node.py`, below a domain.
+    pub units: std::collections::BTreeSet<String>,
+    /// Every project Python path.
+    pub paths: std::collections::BTreeSet<&'a str>,
+    /// Each file's position in `files`, by path.
+    pub index: std::collections::BTreeMap<&'a str, usize>,
+    /// The dotted module of every unit's `node.py`, such as `python.orders.daily.node`.
+    pub node_modules: std::collections::BTreeSet<String>,
+    /// Every project module and package as a dotted name, such as `python.orders.constants`.
+    pub modules: std::collections::BTreeSet<String>,
 }

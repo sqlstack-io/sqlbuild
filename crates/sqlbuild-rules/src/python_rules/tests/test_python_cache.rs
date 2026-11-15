@@ -2,7 +2,7 @@ use serde_json::json;
 
 use fensu_native::NativeProjectQuery;
 
-use crate::python_rules::_helpers::observations::relative_query;
+use crate::python_rules::_helpers::engine::observations::relative_query;
 use crate::python_rules::tests::helpers::{cached_runs, named_faults};
 use crate::python_rules::tests::test_types::{
     CachedRuns, PythonCacheTestCase, RelativeQueryTestCase,
