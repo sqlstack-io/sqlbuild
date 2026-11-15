@@ -1,5 +1,7 @@
 //! Resolve host entries: targets read once from `sqlbuild._native_host`, attributes read live.
 
+use std::path::PathBuf;
+
 use pyo3::PyErr;
 use pyo3::exceptions::PyImportError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -71,6 +73,25 @@ pub(crate) fn write_console(py: Python<'_>, stream: &str, text: &str) -> PyResul
     stream.call_method1("write", (text,))?;
     stream.call_method0("flush")?;
     Ok(())
+}
+
+/// Flush the interpreter's live console `stream` so text written before a child process appears first.
+pub(crate) fn flush_console(py: Python<'_>, stream: &str) -> PyResult<()> {
+    py.import("sys")?.getattr(stream)?.call_method0("flush")?;
+    Ok(())
+}
+
+/// The interpreter running SQLBuild, which child processes reuse.
+pub(crate) fn python_executable(py: Python<'_>) -> PyResult<PathBuf> {
+    py.import("sys")?.getattr("executable")?.extract()
+}
+
+/// Whether this interpreter can import the top-level module `name`.
+pub(crate) fn module_installed(py: Python<'_>, name: &str) -> PyResult<bool> {
+    Ok(!py
+        .import("importlib.util")?
+        .call_method1("find_spec", (name,))?
+        .is_none())
 }
 
 /// Keep user prints off machine-readable stdout while running project code.

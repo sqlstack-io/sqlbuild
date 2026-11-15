@@ -41,6 +41,13 @@ pub(super) struct PythonRunTestCase {
     pub(super) expected_faults: Vec<(&'static str, &'static str, u64, u64)>,
 }
 
+pub(super) struct PythonRunFailureTestCase {
+    pub(super) description: &'static str,
+    pub(super) files: &'static [(&'static str, &'static str)],
+    pub(super) config: serde_json::Value,
+    pub(super) expected_error: &'static str,
+}
+
 pub(super) struct PythonParseFailureTestCase {
     pub(super) description: &'static str,
     pub(super) files: &'static [(&'static str, &'static str)],
@@ -71,6 +78,15 @@ pub(super) struct PythonScalingTestCase {
     pub(super) functions: usize,
     pub(super) config: serde_json::Value,
     pub(super) expected_annotation_faults: usize,
+    pub(super) expected_max_duration: std::time::Duration,
+}
+
+pub(super) struct PurityScalingTestCase {
+    pub(super) description: &'static str,
+    pub(super) roots: usize,
+    pub(super) chains: usize,
+    pub(super) depth: usize,
+    pub(super) expected_faults: usize,
     pub(super) expected_max_duration: std::time::Duration,
 }
 

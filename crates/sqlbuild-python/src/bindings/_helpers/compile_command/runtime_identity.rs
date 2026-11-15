@@ -8,6 +8,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
+use crate::bindings::_helpers::discovery::provider_secrets::invocation_allows_missing_secrets;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::NativeAttr;
 use crate::bindings::_helpers::records::registry;
@@ -86,6 +87,7 @@ pub(crate) fn invocation_identity<'py>(
     for field in REQUEST_CHOICES {
         payload.set_item(field, native_field(request, field)?)?;
     }
+    payload.set_item("allow_missing_secrets", invocation_allows_missing_secrets())?;
     payload.set_item("cwd", py.import("os")?.getattr("getcwd")?.call0()?)?;
     payload.set_item("use_color", use_color)?;
     payload.set_item("select", listed(native_field(request, "select")?)?)?;

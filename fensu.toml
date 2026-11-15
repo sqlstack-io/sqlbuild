@@ -2486,7 +2486,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/semantic_shapes/coverage.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/semantic_shapes/shapes.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/semantic_shapes/source_bindings.rs=13",
-    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=100",
+    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=99",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/assembly.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/authored_ctes.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/compiled_tests.rs=4",
@@ -3031,3 +3031,7 @@ reason = "Each is a short stack walk over a JSON syntax tree with its own stop a
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-cli/src/native_commands/_helpers/project_facts.rs", "crates/sqlbuild-python/src/bindings/_helpers/rules/native_header_parser.rs"]
 reason = "Field lookups on unrelated value types in different crates: project configuration takes the first matching field of a built object, while rule headers take the last entry of an authored map so a repeated key overrides earlier ones."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-rules/src/python_rules/_helpers/units/orchestration.rs", "crates/sqlbuild-rules/src/python_rules/_helpers/units/providers.rs"]
+reason = "Each is one rule family's entry point: return early when no rule is selected, then run its own layout, module and import checks. Parsing, project modules and import resolution share files_naming, project_modules and rejected_import_faults."

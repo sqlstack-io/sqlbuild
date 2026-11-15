@@ -248,6 +248,43 @@ fn unit_files(unit: usize, upstream: &str, arguments: &str) -> [(String, String)
     ]
 }
 
+/// Root modules calling into helper chains that each end in a request.
+pub(super) fn purity_chain_project(
+    roots: usize,
+    chains: usize,
+    depth: usize,
+) -> Vec<(String, String)> {
+    let mut files: Vec<(String, String)> = Vec::new();
+    for chain in 0..chains {
+        for step in 1..depth {
+            files.push((
+                format!("python/utils/chain_{chain}/step_{previous}.py", previous = step - 1),
+                format!(
+                    "from python.utils.chain_{chain} import step_{step}\n\n\ndef run():\n    return step_{step}.run()\n"
+                ),
+            ));
+        }
+        files.push((
+            format!(
+                "python/utils/chain_{chain}/step_{last}.py",
+                last = depth - 1
+            ),
+            "import requests\n\n\ndef run():\n    return requests.get(\"https://example.com\")\n"
+                .to_owned(),
+        ));
+    }
+    for root in 0..roots {
+        files.push((
+            format!("python/orders/export_{root}/constants.py"),
+            format!(
+                "from python.utils.chain_{chain} import step_0\n\nREGIONS = step_0.run()\n",
+                chain = root % chains
+            ),
+        ));
+    }
+    files
+}
+
 /// The codes of the Python faults `files` produce under `config` with the cache off, and how long evaluation took.
 pub(super) fn timed_python_codes(
     files: &[(String, String)],

@@ -98,6 +98,15 @@ fn answer(
             Some(module) => programs.program(module)?.is_public_facade(&query.argument),
             None => false,
         })],
+        "dataclasses" => match programs.index_of(path) {
+            Some(module) => programs
+                .program(module)?
+                .dataclass_rows()
+                .iter()
+                .map(|row| row.name.clone())
+                .collect(),
+            None => Vec::new(),
+        },
         "package_anchor" => vec![bool_text(
             package_anchor(programs.sources, path).is_some_and(|anchor| anchor == query.argument),
         )],

@@ -81,6 +81,13 @@ pub fn builtin_options(code: &str) -> Vec<BuiltinOption> {
             description: "Reviewed SQL test names that may assert only that empty inputs produce \
                           no rows; listed tests count toward min_tests_per_model.",
         }],
+        "SQBRPYTHON022" => vec![BuiltinOption {
+            kind: BuiltinOptionKind::StringList(&[]),
+            name: "approved_loader_boundaries",
+            description: "Fully qualified project functions, such as \
+                          python.inventory.snapshots._helpers.specs.load_specs, whose calls \
+                          compile-time purity does not follow.",
+        }],
         _ => python_rule_options(code),
     }
 }

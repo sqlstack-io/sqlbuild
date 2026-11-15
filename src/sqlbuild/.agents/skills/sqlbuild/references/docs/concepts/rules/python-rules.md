@@ -13,6 +13,9 @@ Online: https://sqlbuild.com/docs/concepts/rules/python-rules/
 - Laying out `python/`
 - Writing nodes as units
 - Laying out providers
+- Laying out sensors and calendars
+- Testing Python
+- Keeping compile-time Python pure
 - Main modules and entry modules
 - Unreachable definitions
 - Rule options
@@ -62,10 +65,12 @@ sqb rules run SQBRPYTHON
 The Python Rules read every supported project Python file: the runtime package under `python/` and
 the folders that extend SQLBuild, such as `hooks/python/`, `functions/python/`, `providers/`,
 `rules/` and `macros/`. See [Project Python](../project-configuration.md#project-python)
-for the full list. Files under `tests/` are not checked.
+for the full list. Under `tests/`, only the [Python tests](#testing-python) in `tests/python/` and
+`tests/providers/` are checked, and only by the Rules marked `tests/`.
 
 Rules marked `python/` in the [reference](#rule-reference) check only the runtime package, because
-they describe how its packages are organised. The others check every file.
+they describe how its packages are organised. Rules marked `tests/` check only Python tests. The
+others check every file except Python tests.
 
 ## Laying out `python/`
 
@@ -189,6 +194,136 @@ A capability folder may also hold `types.py`, `constants.py`, `exceptions.py`, `
 `Provider` through an alias or a base class in `_classes/`. A class whose base comes from another
 package is never reported as not being a provider.
 
+## Laying out sensors and calendars
+
+`SQBRPYTHON016` to `SQBRPYTHON020` keep each sensor and calendar module in a domain folder, named
+for what it checks, with its private support beside it:
+
+```text
+orchestration/
+  sensors/
+    inventory/
+      stock_feed.py      # one sensor
+      _constants.py
+      _helpers/
+        feed_age.py
+  calendars/
+    finance/
+      month_end.py       # one calendar
+```
+
+A domain folder's private support is `_models.py`, `_types.py`, `_constants.py`,
+`_exceptions.py` and `_helpers/`. These are reported:
+
+| Code | Finding | Fix |
+|---|---|---|
+| `SQBRPYTHON016` | A module directly in `sensors/` or `calendars/`, nested below its domain folder, or named `main.py`, `definitions.py`, `sensors.py`, `calendars.py` or `processing.py` | Move it to `<role>/<domain>/<capability>.py` |
+| `SQBRPYTHON017` | Other private files or folders, private support outside a domain folder, or an import of another domain's private support | Use the support files or `_helpers/`; share code through `python/utils/` or a provider |
+| `SQBRPYTHON018` | A sensor or calendar module holding a function, a class, a public constant or another statement besides its declaration | Move it to `_helpers/`, `_models.py` or `_constants.py` |
+| `SQBRPYTHON019` | A sensor or calendar importing `python/` outside `utils/`, or code outside `orchestration/` importing it | Read node results through the sensor's context; share code through `python/utils/` or a provider |
+| `SQBRPYTHON020` | A sensor or calendar function with a docstring | Keep the text in `description=` only |
+
+Providers importing `orchestration/` are reported by `SQBRPYTHON015` instead.
+
+## Testing Python
+
+`sqb test` runs the pytest modules under `tests/python/` and `tests/providers/`; see
+[Python tests](../../cli/test.md#python-tests). `SQBRPYTHON021` keeps each test beside a mirror of the
+code it tests, and `SQBRPYTHON701` to `SQBRPYTHON724` keep tests table-driven:
+
+```text
+python/
+  orders/
+    storefront_import/
+      node.py
+      _helpers/
+        row_mapping.py
+tests/
+  python/
+    orders/
+      storefront_import/
+        _helpers/
+          _test_types.py      # the test-case dataclasses
+          test_row_mapping.py # tests row_mapping.py
+```
+
+```python
+# tests/python/orders/storefront_import/_helpers/_test_types.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class RowMappingTestCase:
+    description: str
+    status: str
+    expected_label: str
+```
+
+```python
+# tests/python/orders/storefront_import/_helpers/test_row_mapping.py
+import pytest
+
+from python.orders.storefront_import._helpers.row_mapping import status_label
+from tests.python.orders.storefront_import._helpers._test_types import RowMappingTestCase
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RowMappingTestCase(description="shipped orders", status="S", expected_label="shipped"),
+        RowMappingTestCase(description="open orders", status="O", expected_label="open"),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_status_when_mapping_then_returns_its_label(test_case: RowMappingTestCase) -> None:
+    assert status_label(test_case.status) == test_case.expected_label
+```
+
+| Code | Finding | Fix |
+|---|---|---|
+| `SQBRPYTHON021` | A test module whose folder does not mirror one under `python/` or `providers/`, or a `test_<name>.py` with no `<name>.py` or `<name>/` package beside the code it tests | Move the test to the mirrored folder, or rename it for the module it tests |
+| `SQBRPYTHON701` to `SQBRPYTHON711` | A test folder or module whose layout, imports, helpers, conditionals or test-case dataclasses break the pattern above | Follow the pattern above |
+| `SQBRPYTHON712` to `SQBRPYTHON724` | A test function or `pytest.mark.parametrize` that is not named `test_given_<state>_when_<action>_then_<outcome>`, or does not take dataclass cases through `test_case` with ids from each `description` | Follow the pattern above |
+
+## Keeping compile-time Python pure
+
+`sqb compile` imports project Python with no warehouse connection, so the code that runs then must
+not reach outside the machine. `SQBRPYTHON022` checks every call made at module scope, in a class
+body, or directly in a `@factory` body, in every file it reads, and follows the project functions
+those calls reach. A call that reaches a subprocess, an HTTP request, a socket, a database or
+warehouse driver, or a cloud or SSH client is reported at the call where the walk started:
+
+```python
+# python/orders/storefront_import/constants.py
+import requests
+
+STOREFRONT_REGIONS = requests.get("https://example.com/regions").json()  # reported
+```
+
+```text
+error[SQBRPYTHON022]: Python that runs while the project compiles must not reach a subprocess, the network, a database or a remote client: calls requests.get
+  --> python/orders/storefront_import/constants.py:3:22
+```
+
+When the external call sits in a project function, the message names it and its line instead, such
+as `reaches requests.get at python/orders/storefront_import/_helpers/regions.py:8`.
+
+Calls inside node bodies, `main()`, the nodes a factory generates, and provider methods run when
+the node runs, so they are not checked. Only calls whose target is known from the imports are
+followed, so a call through a variable or a method of an object is never reported.
+
+Keep the data a factory loops over in its unit's `constants.py` or `models.py`. When a factory must
+discover what to generate, put that discovery behind one function and approve it. The walk does not
+enter an approved function, and an approved factory's body is not checked:
+
+```toml
+[rules.rule_options.SQBRPYTHON022]
+approved_loader_boundaries = [
+  "python.inventory.warehouse_snapshots._helpers.spec_loading.load_warehouse_specs",
+]
+```
+
+Each entry is the fully qualified name of a project function. A glob fails configuration with
+`C000`, and an entry that names a module fails the run.
+
 ## Main modules and entry modules
 
 Some Rules apply only to a domain's main modules: files under a `main/` folder, and a unit's
@@ -219,7 +354,7 @@ reason = "Carriers are looked up by name from the shipment's carrier code."
 
 ## Rule options
 
-Configure the size limits by exact code:
+Configure the size limits and approved boundaries by exact code:
 
 ```toml
 [rules.rule_options.SQBRPYTHON504]
@@ -239,8 +374,10 @@ max_arguments = 6
 | `SQBRPYTHON611` | `max_role_depth` | 1 | How many package levels may sit below a role package. |
 | `SQBRPYTHON615` | `min_shared_domain_prefix_packages` | 2 | Fewest sibling domains sharing a name prefix that are reported; 0 turns the rule off. |
 | `SQBRPYTHON627` | `max_file_lines` | 2000 | Most lines one Python file may hold. |
+| `SQBRPYTHON022` | `approved_loader_boundaries` | none | Project functions the [compile-time purity](#keeping-compile-time-python-pure) walk does not enter. |
 
-Each option takes a whole number of 0 or more. Unknown option names, text values and negative
+`approved_loader_boundaries` takes a list of fully qualified function names; every other option
+takes a whole number of 0 or more. Unknown option names, values of the wrong type and negative
 numbers fail configuration with `C000`.
 
 ## Rule reference
@@ -277,6 +414,52 @@ remediation.
 | `SQBRPYTHON013` | provider-layout | All | yes | `providers/` holds capability folders with `provider.py`, role files, `_helpers/` and `_classes/` only |
 | `SQBRPYTHON014` | provider-module-shape | All | yes | `provider.py` holds imports, private constants and one public `Provider` subclass |
 | `SQBRPYTHON015` | provider-import-boundaries | All | yes | A provider's `_helpers/` and `_classes/` are private to it; providers import only `python/utils/` from `python/` and nothing from `orchestration/` |
+
+### Sensors and calendars
+
+| Code | Name | Files | Default | Checks |
+|---|---|---|---|---|
+| `SQBRPYTHON016` | orchestration-module-paths | All | yes | Sensor and calendar modules sit at `orchestration/<role>/<domain>/<capability>.py` with a specific name |
+| `SQBRPYTHON017` | orchestration-private-support | All | yes | A domain folder's private support is its support files and `_helpers/`, imported only from that folder |
+| `SQBRPYTHON018` | orchestration-module-surface | All | yes | A sensor or calendar module holds imports, private constants and its one declaration |
+| `SQBRPYTHON019` | orchestration-import-direction | All | yes | Sensors and calendars import only providers, `python/utils/` and their own support; nothing outside `orchestration/` imports them |
+| `SQBRPYTHON020` | orchestration-no-docstring | All | yes | Sensor and calendar functions have no docstring |
+
+### Compile-time purity
+
+| Code | Name | Files | Default | Checks |
+|---|---|---|---|---|
+| `SQBRPYTHON022` | compile-time-purity | All | yes | Module scope, class bodies and `@factory` bodies reach no subprocess, network, database or remote client |
+
+### Python tests
+
+| Code | Name | Files | Default | Checks |
+|---|---|---|---|---|
+| `SQBRPYTHON021` | python-test-placement | `tests/` | yes | Python tests must mirror an existing module under `python/` or `providers/` |
+| `SQBRPYTHON701` | test-init-module-empty | `tests/` | yes | Test package `__init__.py` files must be empty or docstring-only |
+| `SQBRPYTHON702` | test-absolute-imports | `tests/` | yes | Tests must use absolute imports |
+| `SQBRPYTHON703` | test-no-top-level-helpers | `tests/` | yes | Test modules may contain only tests, imports, and declarations |
+| `SQBRPYTHON704` | test-no-conditionals | `tests/` | yes | Tests and local test helpers must not contain conditional control flow |
+| `SQBRPYTHON705` | test-private-constant-order | `tests/` | yes | Private test constants must appear before test functions |
+| `SQBRPYTHON706` | test-no-complex-comprehensions | `tests/` | yes | Nested or multi-generator comprehensions hide control flow and data shapes |
+| `SQBRPYTHON707` | test-case-description | `tests/` | yes | Test-case dataclasses must define a `description` field |
+| `SQBRPYTHON708` | test-case-expected-field | `tests/` | yes | Test-case dataclasses must define at least one `expected_` field |
+| `SQBRPYTHON709` | test-local-types-import | `tests/` | yes | Tests must import test-case types from their local `_test_types.py` |
+| `SQBRPYTHON710` | test-local-types-file | `tests/` | yes | Test directories must provide a local `_test_types.py` |
+| `SQBRPYTHON711` | test-file-name | `tests/` | yes | Test modules must use a `test_` filename |
+| `SQBRPYTHON712` | test-function-name | `tests/` | yes | Test functions must use `test_given_<state>_when_<action>_then_<outcome>` |
+| `SQBRPYTHON713` | test-dataclass-parametrize | `tests/` | yes | Tests must use dataclass-backed pytest parameterization |
+| `SQBRPYTHON714` | test-accepts-test-case | `tests/` | yes | Parametrized tests must accept a `test_case` argument |
+| `SQBRPYTHON715` | test-case-annotation | `tests/` | yes | `test_case` parameters must use a local test-case dataclass annotation |
+| `SQBRPYTHON716` | test-expected-field-assertion | `tests/` | yes | Tests must assert against an `expected_` field from `test_case` |
+| `SQBRPYTHON717` | test-parametrize-arguments | `tests/` | yes | Pytest parametrize decorators must define parameter names and values |
+| `SQBRPYTHON718` | test-parametrize-test-case | `tests/` | yes | Pytest parametrize must expose cases through the `test_case` parameter |
+| `SQBRPYTHON719` | test-parametrize-ids | `tests/` | yes | Pytest parametrize decorators must define readable case ids |
+| `SQBRPYTHON720` | test-inline-parametrize-values | `tests/` | yes | Pytest parametrize values must be a visible list, tuple, or local comprehension |
+| `SQBRPYTHON721` | test-nonempty-parametrize-values | `tests/` | yes | Pytest parametrize case sequences must not be empty |
+| `SQBRPYTHON722` | test-no-dict-cases | `tests/` | yes | Pytest cases must use typed dataclasses instead of dictionaries |
+| `SQBRPYTHON723` | test-local-case-constructors | `tests/` | yes | Pytest cases must construct dataclasses from the local `_test_types.py` |
+| `SQBRPYTHON724` | test-description-ids | `tests/` | yes | Pytest case ids must come from each test case `description` |
 
 ### Type annotations
 

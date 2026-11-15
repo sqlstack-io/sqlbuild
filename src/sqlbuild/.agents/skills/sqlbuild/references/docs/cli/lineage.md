@@ -44,6 +44,7 @@ Exactly one of a positional target or `--select` is required.
 | `--json` | Shorthand for `--format json`. |
 | `--mode` | Column lineage analysis mode: `rich` (default) or `fast`. |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias). |
+| `--allow-missing-secrets` | Run without provider secrets; see [Secrets](../concepts/python-nodes/providers.md#secrets) |
 | `--select`, `-s` | Select resources using the same selector syntax as `sqb compile`, `sqb plan` and `sqb build`, for example `path:models/marts`, `tag:finance` or `stg_*`. |
 | `--exclude` | Exclude resources from the selection. |
 

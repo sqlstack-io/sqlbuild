@@ -15,6 +15,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
     FilteredSinkFailureE2ETestCase,
     NoExporterCommandE2ETestCase,
     ReadOnlyProviderE2ETestCase,
+    SharedSinkProviderE2ETestCase,
     SlowSinkExitE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
@@ -535,3 +536,98 @@ def test_given_sink_call_in_flight_at_shutdown_when_process_exits_then_teardown_
         tuple(marker_path.read_text(encoding="utf-8").splitlines())
         == test_case.expected_marker_entries
     )
+
+
+SHARED_PROVIDER: str = dedent(
+    """
+    import os
+    from pathlib import Path
+
+    from sqlbuild.providers import Provider
+
+
+    class {class_name}(Provider):
+        '''Test provider {class_name}.'''
+
+        def setup(self, ctx):
+            del ctx
+            with Path(os.environ["SETUP_LOG_PATH"]).open("a", encoding="utf-8") as log:
+                log.write("{name}\\n")
+    """
+).strip()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        SharedSinkProviderE2ETestCase(
+            description="the shared provider sorts after one the sink does not use",
+            unused_provider_name="a_first",
+            expected_setups=("z_shared",),
+        ),
+        SharedSinkProviderE2ETestCase(
+            description="the shared provider sorts before one the sink does not use",
+            unused_provider_name="zz_last",
+            expected_setups=("z_shared",),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_once(
+    test_case: SharedSinkProviderE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    setup_log: Path = tmp_path / "setups.log"
+    setup_log.write_text("", encoding="utf-8")
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="shared_sink_provider_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "shared_sink_provider_project"\nadapter = "duckdb"\n\n'
+                '[connection]\ndatabase = "shared_sink_provider_project.duckdb"\n'
+            ),
+            f"providers/{test_case.unused_provider_name}.py": SHARED_PROVIDER.format(
+                class_name="UnusedProvider", name=test_case.unused_provider_name
+            )
+            + "\n",
+            "providers/z_shared.py": SHARED_PROVIDER.format(
+                class_name="SharedProvider", name="z_shared"
+            )
+            + "\n",
+            "sinks/events.py": dedent(
+                """
+                from providers.z_shared import SharedProvider
+                from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+
+
+                @lifecycle_event_sink
+                def export_event(event: LifecycleEvent, shared_provider: SharedProvider) -> None:
+                    del event, shared_provider
+                """
+            ).strip()
+            + "\n",
+            "python/tasks/uses_shared.py": dedent(
+                """
+                from providers.z_shared import SharedProvider
+                from sqlbuild.tasks import task
+
+
+                @task
+                def uses_shared(ctx, shared_provider: SharedProvider):
+                    '''Test task uses_shared.'''
+                    del ctx, shared_provider
+                """
+            ).strip()
+            + "\n",
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", "--select", "uses_shared"),
+        project_dir=project_dir,
+        env={"SETUP_LOG_PATH": str(setup_log)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert tuple(setup_log.read_text(encoding="utf-8").splitlines()) == test_case.expected_setups

@@ -13,7 +13,7 @@ use crate::helpers::{api_ready, start_control};
 use crate::test_types::LocationHealthTestCase;
 
 #[test]
-fn given_location_health_reports_when_checking_health_then_down_or_falling_back_locations_exit_nonzero()
+fn given_location_health_reports_when_checking_health_then_down_falling_back_or_missing_secret_locations_exit_nonzero()
  {
     let test_cases = [
         LocationHealthTestCase {
@@ -59,6 +59,26 @@ fn given_location_health_reports_when_checking_health_then_down_or_falling_back_
             other_target_connections: 120,
             expected_state: "falling_back",
             expected_exit: 1,
+        },
+        LocationHealthTestCase {
+            description: "a provider secret is unset, even with a failed connection check",
+            reports: &[
+                r#"{"kind":"connection","generation":2,"healthy":false}"#,
+                r#"{"kind":"provider_secrets","generation":2,"missing":1}"#,
+            ],
+            other_target_connections: 0,
+            expected_state: "missing_secrets",
+            expected_exit: 1,
+        },
+        LocationHealthTestCase {
+            description: "a later load found every provider secret set",
+            reports: &[
+                r#"{"kind":"provider_secrets","generation":2,"missing":2}"#,
+                r#"{"kind":"provider_secrets","generation":3,"missing":0}"#,
+            ],
+            other_target_connections: 0,
+            expected_state: "healthy",
+            expected_exit: 0,
         },
         LocationHealthTestCase {
             description: "the warehouse connection check failed",

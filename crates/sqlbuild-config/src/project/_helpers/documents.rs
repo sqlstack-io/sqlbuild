@@ -24,8 +24,9 @@ use crate::project::_helpers::targets::{
 };
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
-    COLUMN_CONTRACT_MODES, LEGACY_COLUMN_CONTRACT_MODE_KEY, LEGACY_EVENT_EXPORTERS_KEY,
-    LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SQL_ANALYSIS_KEY,
+    ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, LEGACY_COLUMN_CONTRACT_MODE_KEY,
+    LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY,
+    REQUIRE_SQL_ANALYSIS_KEY, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{
@@ -184,6 +185,21 @@ fn identity(payload: &Entries) -> Loaded<Fields> {
 }
 
 fn sections(payload: &Entries) -> Loaded<Fields> {
+    if get(payload, "settings")
+        .and_then(ConfigValue::as_map)
+        .is_some_and(|settings| has(settings, ALLOW_MISSING_SECRETS_KEY))
+    {
+        return Err(ConfigFailure::at(
+            PROJECT_FILE,
+            format!(
+                "cannot set [settings] {ALLOW_MISSING_SECRETS_KEY}; it applies to one machine, \
+                 so only {LOCAL_CONFIG_FILENAME} can set it"
+            ),
+        )
+        .with_help(format!(
+            "move it to {LOCAL_CONFIG_FILENAME}, or set SQLBUILD_ALLOW_MISSING_SECRETS=1 in CI"
+        )));
+    }
     Ok(vec![
         (
             "settings",

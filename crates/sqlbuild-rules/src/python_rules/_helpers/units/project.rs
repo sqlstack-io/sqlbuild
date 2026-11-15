@@ -22,7 +22,7 @@ use crate::python_rules::constants::{
     NODE_MODULE, PACKAGE_ROOT, ROLE_DIRECTORIES, SHARED_UTILITIES_PACKAGE, UNIT_NODE_FILE,
     UNIT_RULE_CODES,
 };
-use crate::python_rules::models::{UnitFile, UnitProject};
+use crate::python_rules::models::{ParsedFile, UnitFile, UnitProject};
 
 /// Faults of the selected unit rules among `codes`.
 pub(crate) fn unit_faults(
@@ -60,10 +60,7 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
             (root == PACKAGE_ROOT).then(|| (source, rest.split('/').collect()))
         })
         .collect();
-    let units: BTreeSet<String> = package
-        .iter()
-        .filter_map(|(_, parts)| unit_folder(parts))
-        .collect();
+    let units: BTreeSet<String> = unit_folders(sources);
     let files: Vec<UnitFile<'_>> = package
         .par_iter()
         .filter_map(|(source, parts)| {
@@ -91,15 +88,82 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
             .iter()
             .map(|source| source.relative_path.as_str())
             .collect(),
-        modules: sources
-            .iter()
-            .flat_map(|source| dotted_names(&source.relative_path))
-            .collect(),
+        modules: project_modules(sources),
     }
 }
 
+/// Every dotted module the project's Python files define, packages included.
+pub(crate) fn project_modules(sources: &[PythonSource]) -> BTreeSet<String> {
+    sources
+        .iter()
+        .flat_map(|source| dotted_names(&source.relative_path))
+        .collect()
+}
+
+/// The files under `root/` or whose text names it, parsed; a file that does not parse is left out.
+pub(crate) fn files_naming<'a>(
+    sources: &'a [PythonSource],
+    root: &str,
+    python_version: (u8, u8),
+) -> Vec<ParsedFile<'a>> {
+    sources
+        .par_iter()
+        .filter(|source| {
+            source.relative_path.split('/').next() == Some(root) || source.text.contains(root)
+        })
+        .filter_map(|source| {
+            Some(ParsedFile {
+                path: source.relative_path.as_str(),
+                parts: source.relative_path.split('/').collect(),
+                text: source.text.as_str(),
+                module: node_unit_module(&source.text, python_version)?,
+            })
+        })
+        .collect()
+}
+
+/// Each import in `file` of a project module that `reason` rejects, as a fault of its rule and detail.
+pub(crate) fn rejected_import_faults(
+    file: &ParsedFile<'_>,
+    modules: &BTreeSet<String>,
+    reason: impl Fn(&str) -> Option<(&'static str, String)>,
+) -> Vec<Fault> {
+    let folder: &[&str] = &file.parts[..file.parts.len() - 1];
+    file.module
+        .imports
+        .iter()
+        .filter_map(|import| {
+            let module: String = absolute_module(import, folder, modules)?;
+            if !modules.contains(&module) {
+                return None;
+            }
+            let (code, detail): (&str, String) = reason(&module)?;
+            unit_fault(
+                code,
+                file.path,
+                import.position,
+                &format!("{} imports {module}, {detail}", file.path),
+            )
+        })
+        .collect()
+}
+
+/// The unit folders under `python/`, each relative to it.
+pub(crate) fn unit_folders(sources: &[PythonSource]) -> BTreeSet<String> {
+    sources
+        .iter()
+        .filter_map(|source| {
+            let (root, rest) = source.relative_path.split_once('/')?;
+            let parts: Vec<&str> = rest.split('/').collect();
+            (root == PACKAGE_ROOT)
+                .then(|| unit_folder(&parts))
+                .flatten()
+        })
+        .collect()
+}
+
 /// The deepest unit folder among the file's folders.
-fn nearest_unit(parts: &[&str], units: &BTreeSet<String>) -> Option<String> {
+pub(crate) fn nearest_unit(parts: &[&str], units: &BTreeSet<String>) -> Option<String> {
     (1..parts.len())
         .rev()
         .map(|depth| parts[..depth].join("/"))

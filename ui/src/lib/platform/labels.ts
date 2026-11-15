@@ -20,6 +20,7 @@ import type {
 export const healthTone: Record<LocationHealth, string> = {
 	healthy: 'var(--sb-success)',
 	degraded: 'var(--sb-warning)',
+	missing_secrets: 'var(--sb-error)',
 	falling_back: 'var(--sb-warning)',
 	broken: 'var(--sb-error)'
 };
@@ -27,6 +28,7 @@ export const healthTone: Record<LocationHealth, string> = {
 export const healthLabel: Record<LocationHealth, string> = {
 	healthy: 'Healthy',
 	degraded: 'Needs attention',
+	missing_secrets: 'Missing provider secrets',
 	falling_back: 'Running previous version',
 	broken: 'Not starting scheduled runs'
 };

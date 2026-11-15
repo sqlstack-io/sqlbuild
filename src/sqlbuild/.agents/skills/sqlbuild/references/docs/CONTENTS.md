@@ -140,7 +140,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [sqb debug](cli/debug.md) (`cli/debug`) - Validate project configuration and test the warehouse connection.
 - [sqb compile](cli/compile.md) (`cli/compile`) - Compile models into resolved SQL, validate contracts, and write target artifacts - fully offline.
 - [sqb format](cli/format.md) (`cli/format`) - Apply canonical SQLBuild SQL formatting.
-- [sqb test](cli/test.md) (`cli/test`) - Run SQL unit tests and multi-model tests in isolation.
+- [sqb test](cli/test.md) (`cli/test`) - Run SQL unit tests, multi-model tests and the project's Python tests in isolation.
 - [sqb scenario](cli/scenario.md) (`cli/scenario`) - Run end-to-end scenario tests against the warehouse or locally with DuckDB.
 - [sqb lineage](cli/lineage.md) (`cli/lineage`) - Explore model and column-level dependency graphs from the command line.
 - [sqb scope](cli/scope.md) (`cli/scope`) - Inspect declaration visibility, usage, placement, and move impact offline.

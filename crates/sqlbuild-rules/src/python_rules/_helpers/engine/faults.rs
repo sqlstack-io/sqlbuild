@@ -45,7 +45,7 @@ pub(crate) fn python_fault(
 }
 
 /// The 1-based character column of 0-based UTF-8 byte offset `column` on 1-based `line`.
-fn character_column(text: &str, line: u32, column: u32) -> u64 {
+pub(crate) fn character_column(text: &str, line: u32, column: u32) -> u64 {
     let Some(start): Option<usize> = line_start(text, line) else {
         return 1;
     };

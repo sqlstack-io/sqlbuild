@@ -1,0 +1,3 @@
+name = "inventory_job"
+description = "Destination inventory."
+select = "stg_orders"
