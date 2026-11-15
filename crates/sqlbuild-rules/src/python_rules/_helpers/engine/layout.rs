@@ -3,8 +3,8 @@
 use std::collections::BTreeSet;
 
 use crate::models::{Fault, PythonSource};
-use crate::python_rules::_helpers::faults::catalogue_fault;
-use crate::python_rules::_helpers::placement::package_anchor;
+use crate::python_rules::_helpers::engine::faults::catalogue_fault;
+use crate::python_rules::_helpers::engine::placement::package_anchor;
 use crate::python_rules::constants::{
     GENERIC_PACKAGE_NAMES, INIT_FILE, NODE_KIND_DIRECTORIES, PACKAGE_ROOT,
     PROJECT_ROOT_ALLOWLIST_CODE, ROLE_DIRECTORIES, RUNTIME_PACKAGE_OWNER_NAMES_CODE,

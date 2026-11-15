@@ -2,13 +2,15 @@
 
 use std::collections::BTreeSet;
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
 use sqlbuild_pysource::node_units::main::node_unit_module::node_unit_module;
 use sqlbuild_pysource::node_units::models::{
     UnitDecorator, UnitFunction, UnitImport, UnitPosition, UnitStatementKind,
 };
 
 use crate::models::{Fault, PythonSource};
-use crate::python_rules::_helpers::faults::catalogue_fault;
+use crate::python_rules::_helpers::engine::faults::catalogue_fault;
 use crate::python_rules::_helpers::units::imports::import_boundary_faults;
 use crate::python_rules::_helpers::units::layout::{
     declared_outside_unit_faults, unit_layout_faults,
@@ -16,7 +18,8 @@ use crate::python_rules::_helpers::units::layout::{
 use crate::python_rules::_helpers::units::modules::module_shape_faults;
 use crate::python_rules::_helpers::units::nodes::declaration_faults;
 use crate::python_rules::constants::{
-    CHECK_KIND, FACTORY_DECORATORS, INIT_FILE, NODE_KINDS, PACKAGE_ROOT, UNIT_NODE_FILE,
+    CHECK_KIND, FACTORY_DECORATORS, INIT_FILE, MIN_UNIT_DEPTH, NODE_KIND_DIRECTORIES, NODE_KINDS,
+    NODE_MODULE, PACKAGE_ROOT, ROLE_DIRECTORIES, SHARED_UTILITIES_PACKAGE, UNIT_NODE_FILE,
     UNIT_RULE_CODES,
 };
 use crate::python_rules::models::{UnitFile, UnitProject};
@@ -40,6 +43,15 @@ pub(crate) fn unit_faults(
     faults
 }
 
+/// The unit folder `parts` declares, when it is a `node.py` deep enough and outside every role folder.
+fn unit_folder(parts: &[&str]) -> Option<String> {
+    let (last, folders) = parts.split_last()?;
+    let declares: bool = *last == UNIT_NODE_FILE
+        && folders.len() >= MIN_UNIT_DEPTH
+        && !folders.iter().copied().any(is_role_folder);
+    declares.then(|| folders.join("/"))
+}
+
 fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProject<'_> {
     let package: Vec<(&PythonSource, Vec<&str>)> = sources
         .iter()
@@ -50,13 +62,10 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
         .collect();
     let units: BTreeSet<String> = package
         .iter()
-        .filter(
-            |(_, parts)| matches!(parts.as_slice(), [_, _, .., last] if *last == UNIT_NODE_FILE),
-        )
-        .map(|(_, parts)| parts[..parts.len() - 1].join("/"))
+        .filter_map(|(_, parts)| unit_folder(parts))
         .collect();
     let files: Vec<UnitFile<'_>> = package
-        .iter()
+        .par_iter()
         .filter_map(|(source, parts)| {
             Some(UnitFile {
                 path: source.relative_path.as_str(),
@@ -67,6 +76,15 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
         })
         .collect();
     UnitProject {
+        index: files
+            .iter()
+            .enumerate()
+            .map(|(position, file)| (file.path, position))
+            .collect(),
+        node_modules: units
+            .iter()
+            .map(|unit| format!("{PACKAGE_ROOT}.{}.{NODE_MODULE}", unit.replace('/', ".")))
+            .collect(),
         files,
         units,
         paths: sources
@@ -129,7 +147,17 @@ pub(crate) fn unit_member<'p, 'a>(
     name: &str,
 ) -> Option<&'p UnitFile<'a>> {
     let path: String = format!("{PACKAGE_ROOT}/{unit}/{name}");
-    project.files.iter().find(|file| file.path == path)
+    project
+        .index
+        .get(path.as_str())
+        .and_then(|position| project.files.get(*position))
+}
+
+/// Whether a folder under `python/` holds shared or role code rather than a domain or a unit.
+pub(crate) fn is_role_folder(folder: &str) -> bool {
+    folder == SHARED_UTILITIES_PACKAGE
+        || NODE_KIND_DIRECTORIES.contains(&folder)
+        || ROLE_DIRECTORIES.iter().any(|(name, _)| *name == folder)
 }
 
 /// What a decorator declares: a node kind, `check`, or a factory.
@@ -142,10 +170,12 @@ pub(crate) enum Declared {
 
 /// What `function`'s decorators declare, if anything.
 pub(crate) fn declared(function: &UnitFunction) -> Option<(Declared, &UnitDecorator)> {
-    function
-        .decorators
-        .iter()
-        .find_map(|decorator| decorator_declares(&decorator.name).map(|what| (what, decorator)))
+    function.decorators.iter().find_map(declaration)
+}
+
+/// What `decorator` declares, with the decorator, if anything.
+fn declaration(decorator: &UnitDecorator) -> Option<(Declared, &UnitDecorator)> {
+    Some((decorator_declares(&decorator.name)?, decorator))
 }
 
 /// What a decorator named `name` declares, if anything.
@@ -199,13 +229,13 @@ pub(crate) fn imported_module(
     })
 }
 
-/// The names `file` binds by importing from `python.<unit>.<module>`, one of `modules`.
-pub(crate) fn names_from_unit_modules(
-    file: &UnitFile<'_>,
+/// The imports in `file` of `python.<unit>.<module>`, one of `modules`, or of names from it.
+pub(crate) fn unit_imports<'f>(
+    file: &'f UnitFile<'_>,
     project: &UnitProject<'_>,
     unit: &str,
     modules: &[&str],
-) -> BTreeSet<String> {
+) -> Vec<&'f UnitImport> {
     let targets: Vec<String> = modules
         .iter()
         .map(|module| format!("{PACKAGE_ROOT}.{}.{module}", unit.replace('/', ".")))
@@ -217,6 +247,35 @@ pub(crate) fn names_from_unit_modules(
         .filter(|import| {
             imported_module(import, file, project).is_some_and(|module| targets.contains(&module))
         })
+        .collect()
+}
+
+/// The names `file` binds by importing from `python.<unit>.<module>`, one of `modules`.
+pub(crate) fn names_from_unit_modules(
+    file: &UnitFile<'_>,
+    project: &UnitProject<'_>,
+    unit: &str,
+    modules: &[&str],
+) -> BTreeSet<String> {
+    unit_imports(file, project, unit, modules)
+        .into_iter()
         .map(|import| import.local.clone())
         .collect()
+}
+
+/// Whether `import` binds a module, as `from python.orders.daily import main` binds `main.py` itself.
+pub(crate) fn binds_module(
+    import: &UnitImport,
+    file: &UnitFile<'_>,
+    project: &UnitProject<'_>,
+) -> bool {
+    let Some(name) = &import.name else {
+        return true;
+    };
+    let package = UnitImport {
+        name: None,
+        ..import.clone()
+    };
+    imported_module(import, file, project)
+        == imported_module(&package, file, project).map(|module| format!("{module}.{name}"))
 }

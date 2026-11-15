@@ -1,6 +1,7 @@
 //! A function's decorators, signature and body shape, and the decorated functions inside it.
 
 use ruff_python_ast::{Decorator, Expr, Parameter, Stmt, StmtFunctionDef};
+use ruff_python_parser::{Mode, ParseOptions};
 use ruff_text_size::Ranged;
 
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
@@ -54,10 +55,7 @@ pub(crate) fn unit_function(function: &StmtFunctionDef, source: &UnitText<'_>) -
             .iter()
             .filter_map(|node| match node {
                 CpythonNode::Stmt(Stmt::For(loop_statement)) => {
-                    Some(match loop_statement.iter.as_ref() {
-                        Expr::Name(name) => Some(name.id.to_string()),
-                        _ => None,
-                    })
+                    Some(root_name(&loop_statement.iter))
                 }
                 _ => None,
             })
@@ -154,6 +152,8 @@ fn union_names(annotation: &Expr) -> Vec<String> {
             names
         }
         Expr::NoneLiteral(_) => vec![NONE_NAME.to_owned()],
+        Expr::StringLiteral(literal) => string_expression(literal.value.to_str())
+            .map_or_else(Vec::new, |expression| union_names(&expression)),
         Expr::Subscript(subscript)
             if last_name(&subscript.value)
                 .is_some_and(|name| UNION_NAMES.contains(&name.as_str())) =>
@@ -177,19 +177,28 @@ fn last_name(expression: &Expr) -> Option<String> {
         Expr::Name(name) => Some(name.id.to_string()),
         Expr::Attribute(attribute) => Some(attribute.attr.to_string()),
         Expr::Subscript(subscript) => last_name(&subscript.value),
-        Expr::StringLiteral(literal) => Some(
-            literal
-                .value
-                .to_str()
-                .rsplit('.')
-                .next()
-                .unwrap_or_default()
-                .split('[')
-                .next()
-                .unwrap_or_default()
-                .trim()
-                .to_owned(),
-        ),
+        Expr::StringLiteral(literal) => last_name(&string_expression(literal.value.to_str())?),
+        _ => None,
+    }
+}
+
+/// The expression a string annotation holds, if it parses.
+fn string_expression(text: &str) -> Option<Expr> {
+    let parsed =
+        ruff_python_parser::parse_unchecked(text.trim(), ParseOptions::from(Mode::Expression));
+    if !parsed.has_no_syntax_errors() {
+        return None;
+    }
+    Some(*parsed.try_into_expression()?.into_syntax().body)
+}
+
+/// The name an iterable is read from: `SPECS` for `SPECS`, `SPECS.items()`, `SPECS[1:]` or `SPECS.rows`.
+fn root_name(expression: &Expr) -> Option<String> {
+    match expression {
+        Expr::Name(name) => Some(name.id.to_string()),
+        Expr::Attribute(attribute) => root_name(&attribute.value),
+        Expr::Call(call) => root_name(&call.func),
+        Expr::Subscript(subscript) => root_name(&subscript.value),
         _ => None,
     }
 }

@@ -1034,6 +1034,8 @@ pub(crate) const CHECKS_MODULE_SHAPE_CODE: &str = "SQBRPYTHON009";
 pub(crate) const FACTORY_SHAPE_CODE: &str = "SQBRPYTHON010";
 pub(crate) const NODE_DESCRIPTION_CODE: &str = "SQBRPYTHON011";
 pub(crate) const NODE_DECLARED_IN_UNIT_CODE: &str = "SQBRPYTHON012";
+/// The fewest folders below `python/` a unit sits in: its domain and its own.
+pub(crate) const MIN_UNIT_DEPTH: usize = 2;
 /// The file that declares a unit's node and makes its folder a unit.
 pub(crate) const UNIT_NODE_FILE: &str = "node.py";
 /// The file holding a unit's checks.
@@ -1087,6 +1089,8 @@ pub(crate) const MAIN_RESULTS: [(&str, &[&str]); 3] = [
         "loader",
         &[
             "list",
+            "tuple",
+            "Collection",
             "Iterator",
             "Iterable",
             "Generator",

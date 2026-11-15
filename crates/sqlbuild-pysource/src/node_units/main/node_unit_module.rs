@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::cpython_tree::main::parse_cpython_module::parse_cpython_module;
 use crate::cpython_tree::models::ParsedSource;
 use crate::node_units::_helpers::functions::{leading_docstring, unit_function};
-use crate::node_units::_helpers::imports::module_imports;
+use crate::node_units::_helpers::imports::{is_type_checking_imports, module_imports};
 use crate::node_units::_helpers::positions::{UnitText, unit_position};
 use crate::node_units::models::{UnitModule, UnitStatement, UnitStatementKind};
 
@@ -28,6 +28,7 @@ pub fn node_unit_module(contents: &str, python_version: (u8, u8)) -> Option<Unit
             kind: match statement {
                 _ if index == 0 && has_docstring => UnitStatementKind::Docstring,
                 Stmt::Import(_) | Stmt::ImportFrom(_) => UnitStatementKind::Import,
+                Stmt::If(block) if is_type_checking_imports(block) => UnitStatementKind::Import,
                 Stmt::FunctionDef(function) => {
                     UnitStatementKind::Function(unit_function(function, &source))
                 }

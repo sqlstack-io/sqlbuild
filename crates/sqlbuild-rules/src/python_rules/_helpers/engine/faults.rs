@@ -3,7 +3,7 @@
 use fensu_native::NativeFaultRow;
 
 use crate::models::Fault;
-use crate::python_rules::_helpers::programs::Programs;
+use crate::python_rules::_helpers::engine::programs::Programs;
 use crate::python_rules::constants::{CATALOGUE_REMEDIATION_CODES, PACKAGE_ROOT, PYTHON_RULES};
 use crate::python_rules::models::{PythonFiles, PythonRuleSpec, PythonTarget};
 

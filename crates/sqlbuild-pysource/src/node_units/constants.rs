@@ -10,3 +10,5 @@ pub(crate) const NONE_NAME: &str = "None";
 pub(crate) const OPTIONAL_NAME: &str = "Optional";
 /// The typing forms whose members a return annotation unions.
 pub(crate) const UNION_NAMES: [&str; 2] = ["Union", OPTIONAL_NAME];
+/// The typing flag that guards imports needed only for annotations.
+pub(crate) const TYPE_CHECKING_NAME: &str = "TYPE_CHECKING";

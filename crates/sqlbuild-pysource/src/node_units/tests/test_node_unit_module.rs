@@ -1,6 +1,6 @@
-use crate::node_units::models::{UnitFunction, UnitImport};
+use crate::node_units::models::{UnitFunction, UnitImport, UnitStatementKind};
 use crate::node_units::tests::helpers::{
-    at, decorator, first_function, import, imports, names, parameter, statement_kinds,
+    at, decorator, import, imports, last_statement, names, parameter, statement_kinds,
 };
 use crate::node_units::tests::test_types::{
     FunctionTestCase, ImportsTestCase, StatementKindsTestCase,
@@ -17,12 +17,12 @@ fn given_module_when_reading_then_each_top_level_statement_has_its_kind() {
             description: "a CRLF node module with a docstring, imports, a value and a node",
             contents: CRLF_NODE_MODULE,
             expected_kinds: Some(vec![
-                "docstring",
-                "import",
-                "import",
-                "import",
-                "other",
-                "function",
+                "Docstring",
+                "Import",
+                "Import",
+                "Import",
+                "Other",
+                "Function",
             ]),
         },
         StatementKindsTestCase {
@@ -34,7 +34,9 @@ fn given_module_when_reading_then_each_top_level_statement_has_its_kind() {
     for test_case in test_cases {
         assert_eq!(
             statement_kinds(test_case.contents),
-            test_case.expected_kinds,
+            test_case
+                .expected_kinds
+                .map(|kinds| kinds.into_iter().map(str::to_owned).collect()),
             "{}",
             test_case.description
         );
@@ -44,7 +46,7 @@ fn given_module_when_reading_then_each_top_level_statement_has_its_kind() {
 #[test]
 fn given_imports_when_reading_then_each_bound_name_records_whether_only_depends_on_uses_it() {
     let test_cases = [ImportsTestCase {
-        description: "a relative import, an aliased node used in depends_on and a dotted import",
+        description: "a relative import, an aliased node used in depends_on and an unused dotted import",
         contents: CRLF_NODE_MODULE,
         expected_imports: vec![
             UnitImport {
@@ -60,10 +62,7 @@ fn given_imports_when_reading_then_each_bound_name_records_whether_only_depends_
                     at(3, 38),
                 )
             },
-            UnitImport {
-                only_in_depends_on: true,
-                ..import("python.utils.text", None, "python", at(4, 8))
-            },
+            import("python.utils.text", None, "python", at(4, 8)),
         ],
     }];
     for test_case in test_cases {
@@ -103,7 +102,7 @@ fn given_declaration_when_reading_then_signature_body_and_inner_declarations_are
             },
         },
         FunctionTestCase {
-            description: "a factory whose generated node computes before returning",
+            description: "a factory looping over a name and a call, whose generated node computes before returning",
             contents: FACTORY_MODULE,
             expected_function: UnitFunction {
                 name: "tables".to_owned(),
@@ -132,7 +131,7 @@ fn given_declaration_when_reading_then_signature_body_and_inner_declarations_are
                     inner: vec![],
                     loops: vec![],
                 }],
-                loops: vec![Some("TABLES".to_owned()), None],
+                loops: vec![Some("TABLES".to_owned()), Some("specs".to_owned())],
             },
         },
         FunctionTestCase {
@@ -157,8 +156,8 @@ fn given_declaration_when_reading_then_signature_body_and_inner_declarations_are
     ];
     for test_case in test_cases {
         assert_eq!(
-            first_function(test_case.contents),
-            Some(test_case.expected_function),
+            last_statement(test_case.contents),
+            Some(UnitStatementKind::Function(test_case.expected_function)),
             "{}",
             test_case.description
         );

@@ -5,15 +5,14 @@ use std::collections::BTreeSet;
 use sqlbuild_pysource::node_units::models::UnitFunction;
 
 use crate::models::{Fault, PythonSource};
-use crate::python_rules::_helpers::faults::catalogue_fault;
-use crate::python_rules::_helpers::placement::package_anchor;
+use crate::python_rules::_helpers::engine::faults::catalogue_fault;
+use crate::python_rules::_helpers::engine::placement::package_anchor;
 use crate::python_rules::_helpers::units::project::{
-    Declared, declared, top_functions, unit_fault, unit_file_name,
+    Declared, declared, is_role_folder, top_functions, unit_fault, unit_file_name,
 };
 use crate::python_rules::constants::{
-    NODE_DECLARED_IN_UNIT_CODE, NODE_KIND_DIRECTORIES, NODE_UNIT_LAYOUT_CODE, PACKAGE_ROOT,
-    ROLE_DIRECTORIES, SHARED_UTILITIES_PACKAGE, UNIT_CHECKS_FILE, UNIT_HELPERS_FOLDER,
-    UNIT_MAIN_FILE, UNIT_NODE_FILE, UNIT_ROLE_FILES,
+    NODE_DECLARED_IN_UNIT_CODE, NODE_UNIT_LAYOUT_CODE, PACKAGE_ROOT, UNIT_CHECKS_FILE,
+    UNIT_HELPERS_FOLDER, UNIT_MAIN_FILE, UNIT_NODE_FILE, UNIT_ROLE_FILES,
 };
 use crate::python_rules::models::{UnitFile, UnitProject};
 
@@ -145,13 +144,9 @@ fn domain(file: &UnitFile<'_>) -> String {
     let [first, _, ..] = file.parts.as_slice() else {
         return "<domain>".to_owned();
     };
-    let first: &str = first;
-    let not_a_domain: bool = first == SHARED_UTILITIES_PACKAGE
-        || NODE_KIND_DIRECTORIES.contains(&first)
-        || ROLE_DIRECTORIES.iter().any(|(name, _)| *name == first);
-    if not_a_domain {
+    if is_role_folder(first) {
         "<domain>".to_owned()
     } else {
-        first.to_owned()
+        (*first).to_owned()
     }
 }

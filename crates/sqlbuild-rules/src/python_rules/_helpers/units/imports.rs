@@ -5,7 +5,7 @@ use sqlbuild_pysource::node_units::models::UnitImport;
 use crate::models::Fault;
 use crate::python_rules::_helpers::units::project::{imported_module, unit_fault};
 use crate::python_rules::constants::{
-    NODE_IMPORT_BOUNDARIES_CODE, NODE_MODULE, PACKAGE_ROOT, PROVIDER_ROLE_MODULES, PROVIDERS_ROOT,
+    NODE_IMPORT_BOUNDARIES_CODE, PACKAGE_ROOT, PROVIDER_ROLE_MODULES, PROVIDERS_ROOT,
     SHARED_ROLE_MODULES, SHARED_UTILITIES_PACKAGE, UNIT_HELPERS_FOLDER,
 };
 use crate::python_rules::models::UnitProject;
@@ -55,11 +55,7 @@ fn allowed(module: &str, import: &UnitImport, unit: &str, project: &UnitProject<
     if shared.iter().any(|prefix| within(module, prefix)) || provider_role(module) {
         return true;
     }
-    let other_node: bool = project
-        .units
-        .iter()
-        .any(|other| module == format!("{PACKAGE_ROOT}.{}.{NODE_MODULE}", other.replace('/', ".")));
-    other_node && import.name.is_some() && import.only_in_depends_on
+    project.node_modules.contains(module) && import.only_in_depends_on
 }
 
 /// Whether `module` is a public role file of a provider capability, `providers.<capability>.<role>`.

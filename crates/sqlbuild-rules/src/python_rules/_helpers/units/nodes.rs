@@ -6,7 +6,8 @@ use sqlbuild_pysource::node_units::models::{UnitDecorator, UnitFunction};
 
 use crate::models::Fault;
 use crate::python_rules::_helpers::units::project::{
-    Declared, declared, names_from_unit_modules, top_functions, unit_fault, unit_file_name,
+    Declared, binds_module, declared, names_from_unit_modules, top_functions, unit_fault,
+    unit_file_name, unit_imports,
 };
 use crate::python_rules::constants::{
     CHECK_KIND, CONTEXT_PARAMETER, DESCRIPTION_KEYWORD, FACTORY_SHAPE_CODE, LOADER_DECORATOR,
@@ -32,7 +33,11 @@ pub(crate) fn declaration_faults(project: &UnitProject<'_>) -> Vec<Fault> {
             continue;
         };
         let names = UnitNames {
-            main: names_from_unit_modules(file, project, unit, &[MAIN_NAME]),
+            main: unit_imports(file, project, unit, &[MAIN_NAME])
+                .into_iter()
+                .filter(|import| !binds_module(import, file, project))
+                .map(|import| import.local.clone())
+                .collect(),
             specs: names_from_unit_modules(file, project, unit, &SPEC_MODULES),
         };
         for function in top_functions(file) {
@@ -148,17 +153,17 @@ fn description_detail(function: &UnitFunction, decorator: &UnitDecorator) -> Opt
 /// A factory's loops, generated names and generated declarations.
 fn factory_faults(file: &UnitFile<'_>, factory: &UnitFunction, names: &UnitNames) -> Vec<Fault> {
     let mut details: Vec<String> = Vec::new();
+    let reads_specs: bool = factory
+        .loops
+        .iter()
+        .flatten()
+        .any(|name| names.specs.contains(name));
     if factory.loops.is_empty() {
         details.push(format!(
             "factory '{}' does not loop over specs",
             factory.name
         ));
-    }
-    if factory.loops.iter().any(|iterable| {
-        !iterable
-            .as_ref()
-            .is_some_and(|name| names.specs.contains(name))
-    }) {
+    } else if !reads_specs {
         details.push(format!(
             "factory '{}' loops over something that is not imported from its unit's constants.py or models.py",
             factory.name

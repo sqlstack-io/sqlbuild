@@ -56,8 +56,8 @@ pub(crate) struct RuleCall {
 #[derive(Debug)]
 pub(crate) struct CallInputs<'a> {
     pub request: &'a crate::models::EvaluateRequest,
-    pub settings: crate::python_rules::_helpers::contexts::ContextSettings,
-    pub programs: &'a crate::python_rules::_helpers::programs::Programs<'a>,
+    pub settings: crate::python_rules::_helpers::engine::contexts::ContextSettings,
+    pub programs: &'a crate::python_rules::_helpers::engine::programs::Programs<'a>,
     /// Cached findings by file from the last run with the same ruleset.
     pub cached: &'a std::collections::BTreeMap<String, PythonCacheEntry>,
     /// The digest of the ruleset and interpreter version the cached findings must match.
@@ -121,6 +121,10 @@ pub(crate) struct UnitProject<'a> {
     pub units: std::collections::BTreeSet<String>,
     /// Every project Python path.
     pub paths: std::collections::BTreeSet<&'a str>,
+    /// Each file's position in `files`, by path.
+    pub index: std::collections::BTreeMap<&'a str, usize>,
+    /// The dotted module of every unit's `node.py`, such as `python.orders.daily.node`.
+    pub node_modules: std::collections::BTreeSet<String>,
     /// Every project module and package as a dotted name, such as `python.orders.constants`.
     pub modules: std::collections::BTreeSet<String>,
 }

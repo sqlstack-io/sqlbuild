@@ -10,7 +10,7 @@ use fensu_native::{NativeProjectModule, NativeProjectPlane};
 use sqlbuild_pysource::definition_locations::main::decorated_functions::decorated_functions;
 
 use crate::models::EvaluateRequest;
-use crate::python_rules::_helpers::programs::Programs;
+use crate::python_rules::_helpers::engine::programs::Programs;
 use crate::python_rules::constants::{
     ENTRYPOINT_KIND, INIT_FILE, LOADED_DECORATORS, PACKAGE_ROOT, ROOT_SCOPE,
 };

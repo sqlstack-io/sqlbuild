@@ -612,3 +612,164 @@ def tables():
         );
     }
 }
+
+#[test]
+fn given_valid_shapes_and_hidden_mistakes_when_evaluating_unit_rules_then_reports_only_the_mistakes()
+ {
+    let test_cases = [
+        PythonRunTestCase {
+            description: "a node.py in utils/, a role folder or a unit's _helpers/ is not a unit",
+            files: &[
+                ("python/utils/graph/node.py", "class Node:\n    pass\n"),
+                ("python/orders/models/node.py", "class Node:\n    pass\n"),
+                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/main.py", TASK_MAIN),
+                (
+                    "python/orders/daily/_helpers/node.py",
+                    "class Node:\n    pass\n",
+                ),
+                (
+                    "python/orders/daily/_helpers/rows.py",
+                    "from python.orders.daily.main import main\n",
+                ),
+            ],
+            config: json!({ "select": UNIT_RULES }),
+            expected_faults: vec![],
+        },
+        PythonRunTestCase {
+            description: "a factory may read specs through a method or a module attribute, and loop again inside",
+            files: &[
+                (
+                    "python/orders/regions/constants.py",
+                    "SPECS: dict = {}\nTABLES: tuple = ()\n",
+                ),
+                (
+                    "python/orders/regions/node.py",
+                    r#"from . import constants
+from .constants import SPECS
+from .main import main
+
+
+@factory
+def region_exports():
+    for region, spec in SPECS.items():
+        for column in spec.columns:
+
+            @task(name=f"export_{region}_{column}", description="E.")
+            def export(ctx: TaskContext) -> None:
+                return main(ctx=ctx, region=region)
+
+    for table in constants.TABLES:
+
+        @task(name=table, description="T.")
+        def load(ctx: TaskContext) -> None:
+            return main(ctx=ctx)
+"#,
+                ),
+                ("python/orders/regions/main.py", TASK_MAIN),
+            ],
+            config: json!({ "select": ["SQBRPYTHON010"] }),
+            expected_faults: vec![],
+        },
+        PythonRunTestCase {
+            description: "imports under if TYPE_CHECKING: are imports, and their boundaries are checked",
+            files: &[
+                ("providers/store/provider.py", ""),
+                (
+                    "python/orders/daily/node.py",
+                    r#"from typing import TYPE_CHECKING
+
+from .main import main
+
+if TYPE_CHECKING:
+    from providers.store.provider import Store
+    from python.orders.weekly.main import main as weekly_main
+
+
+@task(description="Daily.")
+def daily(ctx: TaskContext, *, store: "Store") -> None:
+    return main(ctx=ctx, store=store)
+"#,
+                ),
+                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/weekly/node.py", DAILY_TASK),
+                ("python/orders/weekly/main.py", TASK_MAIN),
+            ],
+            config: json!({ "select": ["SQBRPYTHON004", "SQBRPYTHON007", "SQBRPYTHON008"] }),
+            expected_faults: vec![("SQBRPYTHON008", "python/orders/daily/node.py", 7, 43)],
+        },
+        PythonRunTestCase {
+            description: "a node named through import a.b in depends_on passes; an unused import of a node does not",
+            files: &[
+                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/main.py", TASK_MAIN),
+                (
+                    "python/orders/weekly/node.py",
+                    r#"import python.orders.daily.node
+
+from .main import main
+
+
+@task(depends_on=[python.orders.daily.node.daily], description="W.")
+def weekly(ctx: TaskContext) -> None:
+    return main(ctx=ctx)
+"#,
+                ),
+                ("python/orders/weekly/main.py", TASK_MAIN),
+                (
+                    "python/orders/weekly/_helpers/rows.py",
+                    "from python.orders.daily.node import daily\n",
+                ),
+            ],
+            config: json!({ "select": ["SQBRPYTHON008"] }),
+            expected_faults: vec![(
+                "SQBRPYTHON008",
+                "python/orders/weekly/_helpers/rows.py",
+                1,
+                38,
+            )],
+        },
+        PythonRunTestCase {
+            description: "a quoted union result and a loader's tuple of rows fit their node",
+            files: &[
+                ("python/orders/daily/node.py", DAILY_TASK),
+                (
+                    "python/orders/daily/main.py",
+                    "def main(ctx: TaskContext) -> \"PythonNodeResult | PythonNodeSkipResult\":\n    return ctx.result()\n",
+                ),
+                (
+                    "python/orders/raw/node.py",
+                    "from .main import main\n\n\n@loader\ndef raw(ctx: LoaderContext) -> tuple:\n    return main(ctx=ctx)\n",
+                ),
+                (
+                    "python/orders/raw/main.py",
+                    "def main(ctx: LoaderContext) -> \"tuple[python.orders.raw.types.Row, ...]\":\n    return ()\n",
+                ),
+            ],
+            config: json!({ "select": ["SQBRPYTHON006"] }),
+            expected_faults: vec![],
+        },
+        PythonRunTestCase {
+            description: "a node that calls the main.py module instead of main() reports",
+            files: &[
+                (
+                    "python/orders/daily/node.py",
+                    "from . import main\n\n\n@task(description=\"D.\")\ndef daily(ctx: TaskContext) -> None:\n    return main(ctx=ctx)\n",
+                ),
+                ("python/orders/daily/main.py", TASK_MAIN),
+            ],
+            config: json!({ "select": ["SQBRPYTHON005"] }),
+            expected_faults: vec![("SQBRPYTHON005", "python/orders/daily/node.py", 5, 5)],
+        },
+    ];
+    for test_case in test_cases {
+        let faults = python_rule_faults(test_case.files, test_case.config.clone());
+
+        assert_eq!(
+            faults,
+            Ok(owned_faults(&test_case.expected_faults)),
+            "{}",
+            test_case.description
+        );
+    }
+}

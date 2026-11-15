@@ -1,12 +1,12 @@
 //! Module-level imports and whether each bound name is used only to name a dependency.
 
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{Expr, Stmt, StmtIf};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::CpythonNode;
 use crate::node_units::_helpers::positions::{UnitText, unit_position};
-use crate::node_units::constants::DEPENDS_ON_KEYWORD;
+use crate::node_units::constants::{DEPENDS_ON_KEYWORD, TYPE_CHECKING_NAME};
 use crate::node_units::models::UnitImport;
 
 /// Every name the module's top-level imports bind, in source order.
@@ -15,7 +15,7 @@ pub(crate) fn module_imports(body: &[Stmt], source: &UnitText<'_>) -> Vec<UnitIm
         walk_breadth_first(body.iter().map(CpythonNode::Stmt).collect());
     let dependency_ranges: Vec<TextRange> = depends_on_ranges(&nodes);
     let mut imports: Vec<UnitImport> = Vec::new();
-    for statement in body {
+    for statement in body.iter().flat_map(import_statements) {
         match statement {
             Stmt::Import(import) => imports.extend(import.names.iter().map(|alias| UnitImport {
                 module: alias.name.to_string(),
@@ -59,9 +59,33 @@ pub(crate) fn module_imports(body: &[Stmt], source: &UnitText<'_>) -> Vec<UnitIm
     imports
 }
 
-/// Whether every load of `local` sits inside one of `ranges`.
+/// Whether `local` is loaded at least once, and every load sits inside one of `ranges`.
 fn used_only_in(nodes: &[CpythonNode<'_>], local: &str, ranges: &[TextRange]) -> bool {
-    name_uses(nodes, local).all(|start| within_any(ranges, start))
+    let mut uses = name_uses(nodes, local).peekable();
+    uses.peek().is_some() && uses.all(|start| within_any(ranges, start))
+}
+
+/// `statement` itself, or the imports of an import-only `if TYPE_CHECKING:` block.
+fn import_statements(statement: &Stmt) -> &[Stmt] {
+    match statement {
+        Stmt::If(block) if is_type_checking_imports(block) => &block.body,
+        other => std::slice::from_ref(other),
+    }
+}
+
+/// Whether `block` is `if TYPE_CHECKING:` or `if typing.TYPE_CHECKING:`, holding only imports and no other branch.
+pub(crate) fn is_type_checking_imports(block: &StmtIf) -> bool {
+    let guard: bool = match block.test.as_ref() {
+        Expr::Name(name) => name.id.as_str() == TYPE_CHECKING_NAME,
+        Expr::Attribute(attribute) => attribute.attr.as_str() == TYPE_CHECKING_NAME,
+        _ => false,
+    };
+    guard
+        && block.elif_else_clauses.is_empty()
+        && block
+            .body
+            .iter()
+            .all(|statement| matches!(statement, Stmt::Import(_) | Stmt::ImportFrom(_)))
 }
 
 fn within_any(ranges: &[TextRange], offset: TextSize) -> bool {

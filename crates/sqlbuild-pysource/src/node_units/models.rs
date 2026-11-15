@@ -26,6 +26,7 @@ pub struct UnitStatement {
 pub enum UnitStatementKind {
     /// The module docstring.
     Docstring,
+    /// An import, or an `if TYPE_CHECKING:` block that only imports.
     Import,
     Function(UnitFunction),
     /// Any other statement, such as a class, an assignment or a loop.
@@ -43,7 +44,7 @@ pub struct UnitImport {
     /// The name the import binds in the module.
     pub local: String,
     pub position: UnitPosition,
-    /// Whether every use of the bound name sits inside a decorator's `depends_on` value.
+    /// Whether the bound name is used, and every use sits inside a decorator's `depends_on` value.
     pub only_in_depends_on: bool,
 }
 
@@ -70,7 +71,7 @@ pub struct UnitFunction {
     pub delegation: Option<bool>,
     /// The decorated functions defined anywhere in the body.
     pub inner: Vec<UnitFunction>,
-    /// The iterable of each `for` loop in the body: its name, or `None` when it is not a plain name.
+    /// The name each `for` loop in the body reads its iterable from, such as `SPECS` for `SPECS.items()`; `None` when it reads no name.
     pub loops: Vec<Option<String>>,
 }
 
