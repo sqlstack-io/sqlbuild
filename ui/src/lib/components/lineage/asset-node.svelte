@@ -13,6 +13,8 @@
 		Repeat,
 		Columns3,
 		Workflow,
+		Package,
+		TableProperties,
 		type Icon as IconType
 	} from '@lucide/svelte';
 	import { nodeFields } from '$lib/lineage/node-fields.svelte';
@@ -76,6 +78,9 @@
 		delete_insert: Repeat,
 		microbatch: Layers,
 		task: Workflow,
+		asset: Package,
+		udf: FunctionSquare,
+		table_fn: TableProperties,
 		fn: FunctionSquare
 	};
 	const Glyph = $derived(icons[d.icon ?? ''] ?? Table2);

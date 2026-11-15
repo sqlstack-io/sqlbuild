@@ -30,6 +30,33 @@ describe('catalog node mapping', () => {
 		]);
 	});
 
+	it('lists Python nodes and functions with their edges, and leaves out audits, tests, scenarios, checks, macros and hooks', () => {
+		const nodes = toCatalogNodes([
+			node('asset:order_feed'),
+			node('loader:raw_customers'),
+			node('task:refresh_inventory', { dependencies: ['model:orders'] }),
+			node('udf:cents_to_amount'),
+			node('table_fn:orders_between'),
+			node('model:orders', { materialization: 'table', dependencies: ['asset:order_feed', 'udf:cents_to_amount', 'audit:orders_positive'] }),
+			node('audit:orders_positive'),
+			node('sql_test:orders_total'),
+			node('sql_scenario:orders_backfill'),
+			node('check:orders_recent'),
+			node('macro:cents'),
+			node('hook:notify')
+		]);
+		expect(nodes.map((n) => [n.key, n.kind, n.materialization])).toEqual([
+			['asset:order_feed', 'asset', null],
+			['loader:raw_customers', 'loader', null],
+			['task:refresh_inventory', 'task', null],
+			['udf:cents_to_amount', 'udf', null],
+			['table_fn:orders_between', 'table_fn', null],
+			['model:orders', 'table', 'table']
+		]);
+		expect(nodes.find((n) => n.key === 'model:orders')?.upstream).toEqual(['asset:order_feed', 'udf:cents_to_amount']);
+		expect(nodes.find((n) => n.key === 'task:refresh_inventory')?.upstream).toEqual(['model:orders']);
+	});
+
 	it('keeps only upstream nodes that are listed, so graphs never point at a hidden node', () => {
 		const [orders] = toCatalogNodes([
 			node('model:orders', { dependencies: ['source:raw_orders', 'macro:cents', 'model:unpublished'] }),

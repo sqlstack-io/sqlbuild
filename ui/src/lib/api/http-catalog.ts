@@ -7,9 +7,15 @@ import type { NodeKind } from './types/operate';
 
 type Wire = components['schemas'];
 
-/** The catalog shows models, seeds and sources; audits, functions, macros and hooks are not catalog nodes. */
-function kindOf(wire: Wire['CatalogNodeRecord']): NodeKind | null {
-	if (wire.kind === 'source' || wire.kind === 'seed') return wire.kind;
+/** Snapshot kinds that are graph nodes under their own name; models take theirs from the materialization. */
+const GRAPH_KINDS: ReadonlySet<string> = new Set<NodeKind>(['source', 'seed', 'asset', 'loader', 'task', 'udf', 'table_fn']);
+
+/**
+ * Every graph node kind is a catalog node: models, sources, seeds, Python nodes and functions.
+ * Audits, SQL tests, scenarios, checks, macros and hooks are not.
+ */
+export function kindOf(wire: Pick<Wire['CatalogNodeRecord'], 'kind' | 'materialization'>): NodeKind | null {
+	if (GRAPH_KINDS.has(wire.kind)) return wire.kind as NodeKind;
 	if (wire.kind !== 'model') return null;
 	if (wire.materialization === 'view') return 'view';
 	return wire.materialization?.startsWith('incremental') ? 'incremental' : 'table';
@@ -29,7 +35,7 @@ export function toCatalogNode(wire: Wire['CatalogNodeRecord']): CatalogNode | nu
 	return {
 		key: wire.node_key,
 		kind,
-		materialization: kind === 'source' || kind === 'seed' ? null : (wire.materialization ?? null),
+		materialization: kind === 'source' || kind === 'seed' || kind === 'udf' || kind === 'table_fn' ? null : (wire.materialization ?? null),
 		group: null,
 		tags: wire.tags,
 		description: wire.description ?? '',

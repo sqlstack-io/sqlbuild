@@ -18,7 +18,7 @@
 	import { untrack } from 'svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
-	import { kindLine, nodeIcon, nodeIconKey, nodeKindPlural, shortName, sqlVersions } from '$lib/build-area/labels';
+	import { kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, shortName, sqlVersions } from '$lib/build-area/labels';
 	import { cardData } from '$lib/lineage/catalog-graph';
 	import OverviewTab from './overview-tab.svelte';
 	import DriftTab from './drift-tab.svelte';
@@ -95,7 +95,7 @@
 
 <div class="asset-page">
 	<header class="asset-header">
-		<nav class="crumbs"><a href={to(`/catalog`)}>Catalog</a><span>/</span>{#if n}<a href={to(`/catalog?kind=${n.kind}`)}>{nodeKindPlural[n.kind]}</a>{/if}</nav>
+		<nav class="crumbs"><a href={to(`/catalog`)}>Catalog</a><span>/</span>{#if n}<a href={to(`/catalog?kind=${kindTabOf(n.kind)}`)}>{kindTabLabel[kindTabOf(n.kind)]}</a>{/if}</nav>
 		<div class="title-row">
 			<Glyph size={18} strokeWidth={1.75} />
 			<h2 title={name}>{shortName(n?.key ?? name)}</h2>

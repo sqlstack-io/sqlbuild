@@ -2,7 +2,7 @@
 
 import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode, StaleReason } from '$lib/api';
-import { kindLine, nodeIconKey, shortName } from '$lib/build-area/labels';
+import { FUNCTION_KINDS, PYTHON_KINDS, kindLine, nodeIconKey, shortName } from '$lib/build-area/labels';
 
 export type CardStatus = 'ok' | 'fail' | 'warn' | 'src' | 'none';
 export type CardStale = 'changed' | 'compiled' | 'upstream' | 'behind';
@@ -69,7 +69,8 @@ export function folderOf(node: CatalogNode): string {
 	const path = node.path.replace(/^models\//, '');
 	if (node.kind === 'source') return path.replace(/\.[^./]+$/, '') || 'sources';
 	const slash = path.lastIndexOf('/');
-	return slash > 0 ? path.slice(0, slash) : node.kind === 'seed' ? 'seeds' : 'models';
+	if (slash > 0) return path.slice(0, slash);
+	return node.kind === 'seed' ? 'seeds' : PYTHON_KINDS.includes(node.kind) ? 'python' : FUNCTION_KINDS.includes(node.kind) ? 'functions' : 'models';
 }
 
 /** The outermost folder around a node, such as `marts`, which the catalog filters and Overview counts by. */
