@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.228.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.227.0...v0.228.0) (2026-11-15)
+
+
+### Features
+
+* add opt-in SQBRPYTHON rules for project Python ([#1487](https://github.com/sqlstack-io/sqlbuild/issues/1487)) ([0592ea7](https://github.com/sqlstack-io/sqlbuild/commit/0592ea7e1d2287f73601265839c8f3efd0893b25))
+
 ## [0.227.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.226.1...v0.227.0) (2026-11-14)
 
 
