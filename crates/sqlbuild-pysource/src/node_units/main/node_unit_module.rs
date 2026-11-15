@@ -38,10 +38,10 @@ pub fn node_unit_module(contents: &str, python_version: (u8, u8)) -> Option<Unit
                     bases: class.bases().iter().filter_map(last_name).collect(),
                 }),
                 Stmt::Assign(assign) => UnitStatementKind::Assignment(
-                    assign.targets.iter().filter_map(target_name).collect(),
+                    assign.targets.iter().flat_map(target_names).collect(),
                 ),
                 Stmt::AnnAssign(assign) => {
-                    UnitStatementKind::Assignment(target_name(&assign.target).into_iter().collect())
+                    UnitStatementKind::Assignment(target_names(&assign.target))
                 }
                 _ => UnitStatementKind::Other,
             },
@@ -54,10 +54,13 @@ pub fn node_unit_module(contents: &str, python_version: (u8, u8)) -> Option<Unit
     })
 }
 
-/// The name an assignment target binds, when it is a plain name.
-fn target_name(target: &Expr) -> Option<String> {
+/// The names an assignment target binds: a plain name, or the names inside a tuple, list or starred target.
+fn target_names(target: &Expr) -> Vec<String> {
     match target {
-        Expr::Name(name) => Some(name.id.to_string()),
-        _ => None,
+        Expr::Name(name) => vec![name.id.to_string()],
+        Expr::Tuple(tuple) => tuple.elts.iter().flat_map(target_names).collect(),
+        Expr::List(list) => list.elts.iter().flat_map(target_names).collect(),
+        Expr::Starred(starred) => target_names(&starred.value),
+        _ => Vec::new(),
     }
 }

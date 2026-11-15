@@ -1,13 +1,12 @@
 """Carrier pickup client."""
 
-from python.inventory.restock.main import restock
+import python.report
 from sqlbuild.providers import Provider
 
 
 def pickup_label(sku: str) -> str:
     """Return the pickup label of one product."""
-    restock(sku)
-    return sku
+    return f"{sku} {python.report.__name__}"
 
 
 class CarrierApi(Provider):
