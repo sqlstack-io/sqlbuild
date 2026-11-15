@@ -1175,6 +1175,11 @@ reason = "The custom-rule host tests compute expected module-state tokens with i
 [targets.python.thresholds]
 max_positional_args = 1
 
+[[targets.python.threshold_overrides]]
+paths = ["src/sqlbuild/__init__.py"]
+thresholds = { max_crate_code_lines = 89457 }
+reason = "The runtime package is above the code-line limit; this caps it at its current size until it is split into packages by area. Lower the cap as code moves out."
+
 [targets.python.rule_options.XSB074]
 pending_budgets = [
     "tests/e2e/src/sqlbuild/cli/commands/main/compile/helpers.py=6",
@@ -1638,6 +1643,16 @@ rule_modules = [
     "scripts.fensu_policy.rules.unused_state",
 ]
 select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078", "XSB079"]
+
+[[targets.rust.threshold_overrides]]
+paths = ["crates/sqlbuild-python/Cargo.toml"]
+thresholds = { max_crate_code_lines = 217769 }
+reason = "The Python bindings crate is above the code-line limit; this caps it at its current size until it is split into crates by area. Lower the cap as code moves out."
+
+[[targets.rust.threshold_overrides]]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers"]
+thresholds = { max_helpers_container_buckets = 111 }
+reason = "The bindings helpers container is above the bucket limit; this caps it at its current bucket count until cohesive groups move into their own modules or crates. Lower the cap as buckets move out."
 
 [targets.rust.rule_options.XSB076]
 schema_paths = ["crates/sqlbuild-orchestration/src/store"]

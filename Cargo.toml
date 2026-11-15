@@ -77,8 +77,8 @@ tower-http = { version = "0.6", default-features = false, features = ["compressi
 fensu-policy = "=0.22.0"
 # Fensu's Python facts and core rules without their Python bindings: the default `python`
 # feature adds PyO3, rusqlite, flate2 and sha2.
-fensu-facts = { version = "=0.30.0", default-features = false }
-fensu-native = { version = "=0.30.0", default-features = false }
+fensu-facts = { version = "=0.31.0", default-features = false }
+fensu-native = { version = "=0.31.0", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 # `sqb` names compute log captures with random ids, as `uuid.uuid4().hex`.
 getrandom = "0.4"
