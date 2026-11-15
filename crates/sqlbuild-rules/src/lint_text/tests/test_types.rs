@@ -119,3 +119,9 @@ pub(crate) struct UnwrappedExpressionTestCase {
     pub(crate) formatted: &'static str,
     pub(crate) expected_expression: Option<&'static str>,
 }
+
+pub(crate) struct ExpressionMacroFormatTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) contents: String,
+    pub(crate) expected_formatted: String,
+}

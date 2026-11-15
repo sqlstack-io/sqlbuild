@@ -923,6 +923,16 @@ class SqlReadabilityTestCase:
 
 
 @dataclass(frozen=True)
+class ExpressionMacroFormatTestCase:
+    """A Snowflake expression macro in one location, and the file formatting leaves."""
+
+    description: str
+    macro_directory: str
+    consumer_folders: tuple[str, ...]
+    expected_macro: str
+
+
+@dataclass(frozen=True)
 class FormatterSyntaxTestCase:
     """Authored constructs that must survive canonical layout formatting."""
 

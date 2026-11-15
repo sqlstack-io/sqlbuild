@@ -18,17 +18,21 @@ use crate::lint_text::main::neutralize_test_parameters::neutralize_test_paramete
 use crate::lint_text::main::reject_inline_suppressions::reject_inline_suppressions;
 use crate::lint_text::main::restore_interpolation::restore_interpolation;
 use crate::lint_text::models::{ExpansionSpan, FormatFile, LintSqlBody, LintSqlOptions};
-use crate::lint_text::tests::helpers::directive_finding;
+use crate::lint_text::tests::helpers::{directive_finding, formatted_macro, nested_macro};
 use crate::lint_text::tests::test_types::{
-    ExitCountTestCase, Finding, FormatBodiesTestCase, LintBodiesTestCase, NeutralizeTestCase,
-    ParameterTestCase, RestoreTestCase, SitePatternTestCase, SlotReadTestCase, SuppressionTestCase,
-    TokenAtTestCase, UnavailableFinding, UnavailableLintTestCase, UnwrappedExpressionTestCase,
+    ExitCountTestCase, ExpressionMacroFormatTestCase, Finding, FormatBodiesTestCase,
+    LintBodiesTestCase, NeutralizeTestCase, ParameterTestCase, RestoreTestCase,
+    SitePatternTestCase, SlotReadTestCase, SuppressionTestCase, TokenAtTestCase,
+    UnavailableFinding, UnavailableLintTestCase, UnwrappedExpressionTestCase,
 };
 use sqlbuild_analysis::sql_macros::main::parse_sql_macro::parse_sql_macro;
 
 const SUPPRESSED_FILE: &str =
     "-- sqb: ignore SQLCLEAN005 because kept\n\n-- note\nselect 1\n-- sqb: ignore nope\nselect 2\n";
 const CROSS_JOIN_FILE: &str = "select o.order_id\nfrom orders as o\n-- sqb: ignore SQLCLEAN038 because every order meets every policy\ncross join __seed(\"order_policy\") as p\n";
+
+const NORMALISE_NAME_MACRO: &str = "MACRO (\n  description \"Normalise a name\",\n  arguments (column_name VARCHAR),\n  returns VARCHAR,\n);\n\nREGEXP_REPLACE(\n  TRIM(UPPER(\n  -- Collapse repeated spaces\n  REGEXP_REPLACE(\n    @column_name,\n    '[[:space:]]+',\n    ' '\n  ))),\n  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n";
+const NORMALISE_NAME_FORMATTED: &str = "MACRO (\n  description \"Normalise a name\",\n  arguments (column_name VARCHAR),\n  returns VARCHAR,\n);\n\nREGEXP_REPLACE(\n  TRIM(\n    UPPER(\n      -- Collapse repeated spaces\n      REGEXP_REPLACE(@column_name, '[[:space:]]+', ' ')\n    )\n  ),\n  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n";
 
 #[test]
 fn given_site_patterns_when_text_opens_with_another_byte_then_no_site_starts_there()
@@ -510,6 +514,36 @@ fn given_sql_files_when_formatting_bodies_then_sites_and_fixture_ceremony_surviv
             expected_fault_lines: vec![],
         },
         FormatBodiesTestCase {
+            description: "an expression macro body ending in a semicolon",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MACRO (arguments (q INTEGER), returns INTEGER);\n\n@q   +   1 ;\n",
+            expected_formatted: vec![(
+                0,
+                "MACRO (arguments (q INTEGER), returns INTEGER);\n\n@q + 1;\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "an expression macro body keeps the line comment that ends it",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MACRO (arguments (q INTEGER), returns INTEGER);\n\n@q   +   1 -- note\n",
+            expected_formatted: vec![(
+                0,
+                "MACRO (arguments (q INTEGER), returns INTEGER);\n\n@q + 1 -- note\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "an unparseable Snowflake expression macro body is a fault, not rewritten",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MACRO (arguments (q VARCHAR), returns VARCHAR);\n\nTRIM(\n    UPPER(@q,,\n  )\n",
+            expected_formatted: vec![],
+            expected_fault_lines: vec![3],
+        },
+        FormatBodiesTestCase {
             description: "an unparseable body is a fault on its first line",
             dialect: "duckdb",
             relative_parts: None,
@@ -626,6 +660,16 @@ fn given_a_formatted_expression_select_when_unwrapping_then_strings_keep_their_l
             description: "lines inside a multi-line string literal are not dedented",
             formatted: "SELECT\n  CONCAT(\n    'first\n    second',\n    @v\n  )",
             expected_expression: Some("CONCAT(\n  'first\n    second',\n  @v\n)"),
+        },
+        UnwrappedExpressionTestCase {
+            description: "lines inside a dollar-quoted string are not dedented",
+            formatted: "SELECT\n  CONCAT(\n    $$first\n    'second'\n    $$,\n    @v\n  )",
+            expected_expression: Some("CONCAT(\n  $$first\n    'second'\n    $$,\n  @v\n)"),
+        },
+        UnwrappedExpressionTestCase {
+            description: "a $$ inside an identifier does not open a string",
+            formatted: "SELECT\n  COALESCE(\n    col$$x,\n    @v\n  )",
+            expected_expression: Some("COALESCE(\n  col$$x,\n  @v\n)"),
         },
         UnwrappedExpressionTestCase {
             description: "text that is not a select is not an expression",
@@ -922,4 +966,39 @@ fn given_findings_when_deciding_exit_then_only_lint_unavailable_never_fails_a_co
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_expression_macro_bodies_when_formatting_twice_then_every_dialect_lays_them_out_stably()
+-> Result<(), LintTextError> {
+    let test_cases = [
+        ExpressionMacroFormatTestCase {
+            description: "a body with a comment between nested calls",
+            contents: NORMALISE_NAME_MACRO.to_string(),
+            expected_formatted: NORMALISE_NAME_FORMATTED.to_string(),
+        },
+        ExpressionMacroFormatTestCase {
+            description: "a body nesting fifteen calls, authored flush left",
+            contents: nested_macro(15, ""),
+            expected_formatted: nested_macro(15, "  "),
+        },
+    ];
+
+    for test_case in test_cases {
+        for dialect in ["duckdb", "snowflake"] {
+            let once: String = formatted_macro(&test_case.contents, dialect)?;
+            let twice: String = formatted_macro(&once, dialect)?;
+
+            assert_eq!(
+                (once.as_str(), twice.as_str()),
+                (
+                    test_case.expected_formatted.as_str(),
+                    test_case.expected_formatted.as_str()
+                ),
+                "{} on {dialect}",
+                test_case.description
+            );
+        }
+    }
+    Ok(())
 }

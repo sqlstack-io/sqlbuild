@@ -17,11 +17,11 @@ use crate::dsl_headers::main::sql_body_ranges::sql_body_ranges;
 use crate::dsl_headers::models::HeaderSpan;
 use crate::lint_text::_helpers::sites::compiled;
 use crate::lint_text::constants::{
-    DECLARATION_GROUP_DIRECTORY, DECLINED_WITHOUT_REASON, EXPRESSION_SELECT_PREFIX,
+    DECLARATION_GROUP_DIRECTORY, DECLINED_WITHOUT_REASON, DOLLAR_QUOTE, EXPRESSION_SELECT_PREFIX,
     FIXTURE_HEADER_KINDS, FORMAT_API_VERSION, FUNCTION_HEADER_KIND, GLOBAL_NAMED_ROOTS,
-    GROUPED_NAMED_ROLES, LINE_COMMENT_PREFIX, MACRO_HEADER_KIND, MAX_FUNCTION_CALL_DEPTH,
-    MOVED_OMITTED_SELECT, OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN,
-    STRING_QUOTES,
+    GROUPED_NAMED_ROLES, LINE_COMMENT_PREFIX, LINTED_EXPRESSION_ALIAS, MACRO_HEADER_KIND,
+    MAX_FUNCTION_CALL_DEPTH, MOVED_EXPRESSION_ALIAS, MOVED_OMITTED_SELECT,
+    OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN, STRING_QUOTES,
 };
 use crate::lint_text::errors::LintTextError;
 use crate::lint_text::main::neutralize_interpolation::neutralize_interpolation;
@@ -31,6 +31,9 @@ use sqlclean::sql_lint::models::{FormatRequest, FormatResponse};
 
 static OMITTED_SELECT_SUFFIX: LazyLock<Result<Regex, regex::Error>> =
     LazyLock::new(|| Regex::new(OMITTED_SELECT_SUFFIX_PATTERN));
+/// The alias that closes a formatted expression body, with or without an `AS` before it.
+static EXPRESSION_ALIAS_SUFFIX: LazyLock<Result<Regex, regex::Error>> =
+    LazyLock::new(|| Regex::new(&format!(r"(?i)\s+(?:AS\s+)?{LINTED_EXPRESSION_ALIAS}\s*\z")));
 
 /// Deduplicated format requests, keyed by neutralized SQL and sentinel widths.
 #[derive(Default)]
@@ -157,16 +160,26 @@ pub(crate) fn prepare_file(
             trailing = characters[offset..].iter().collect::<String>() + &trailing;
             core = characters[..offset].iter().collect();
         }
+        if wraps_expression && let Some(statement) = core.strip_suffix(';') {
+            trailing = format!(";{trailing}");
+            core = statement.trim_end().to_string();
+        }
         let neutralized = neutralize_interpolation(&core, dialect, true)?;
         let mut sql: String = if wraps_expression {
-            format!("{EXPRESSION_SELECT_PREFIX}{}", neutralized.text)
+            format!(
+                "{EXPRESSION_SELECT_PREFIX}{}\n{LINTED_EXPRESSION_ALIAS}",
+                neutralized.text
+            )
         } else {
             neutralized.text
         };
         if omitted.is_some() {
             sql.push_str(OMITTED_CEREMONIAL_SELECT_SQL);
         }
-        let widths: BTreeMap<String, usize> = sentinel_widths(&neutralized.sites);
+        let mut widths: BTreeMap<String, usize> = sentinel_widths(&neutralized.sites);
+        if wraps_expression {
+            let _ = widths.insert(LINTED_EXPRESSION_ALIAS.to_uppercase(), 0);
+        }
         let body: PreparedBody = PreparedBody {
             start,
             end,
@@ -187,7 +200,7 @@ enum MacroBodyForm {
     CteList,
     /// A `SELECT` list, formatted as it stands.
     ColumnList,
-    /// An expression, formatted as the one item of a `SELECT` that is removed again.
+    /// An expression, formatted as the one aliased item of a `SELECT` that is removed again.
     Expression,
 }
 
@@ -269,8 +282,15 @@ pub(crate) fn formatted_body(
     }
     let unwrapped: String;
     if prepared.wraps_expression {
-        unwrapped = unwrapped_expression(sql).ok_or_else(|| MOVED_OMITTED_SELECT.to_string())?;
+        let pattern: &Regex =
+            compiled(&EXPRESSION_ALIAS_SUFFIX).map_err(|error| error.to_string())?;
+        let Some(alias) = pattern.find(sql) else {
+            return Err(MOVED_EXPRESSION_ALIAS.to_string());
+        };
+        unwrapped = unwrapped_expression(&sql[..alias.start()])
+            .ok_or_else(|| MOVED_EXPRESSION_ALIAS.to_string())?;
         sql = &unwrapped;
+        changed = true;
     }
     if !changed {
         return Ok(None);
@@ -349,11 +369,29 @@ pub(crate) fn unwrapped_expression(formatted: &str) -> Option<String> {
     Some(dedented.join("\n").trim_end().to_owned())
 }
 
-/// The quote still open after `line`, given the one open before it; a doubled quote escapes.
+/// The quote still open after `line`, given the one before it; `$` stands for `$$`, which has no escapes.
 fn open_quote(mut quote: Option<char>, line: &str) -> Option<char> {
     let mut characters = line.chars().peekable();
+    let mut previous: Option<char> = None;
     while let Some(character) = characters.next() {
+        let after_word: bool = previous.is_some_and(|before| {
+            before.is_alphanumeric() || before == '_' || before == DOLLAR_QUOTE
+        });
+        previous = Some(character);
+        if character == DOLLAR_QUOTE
+            && (quote == Some(DOLLAR_QUOTE) || (quote.is_none() && !after_word))
+            && characters.peek() == Some(&DOLLAR_QUOTE)
+        {
+            let _ = characters.next();
+            quote = if quote.is_some() {
+                None
+            } else {
+                Some(DOLLAR_QUOTE)
+            };
+            continue;
+        }
         match quote {
+            Some(DOLLAR_QUOTE) => {}
             Some(open) if character == open => {
                 if characters.peek() == Some(&open) {
                     let _ = characters.next();
