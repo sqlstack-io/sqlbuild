@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.231.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.230.1...v0.231.0) (2026-11-15)
+
+
+### Features
+
+* add SQBRPYTHON rules for orchestration sensors and calendars ([f5bab28](https://github.com/sqlstack-io/sqlbuild/commit/f5bab28d245338a8a474ec13bdf15fcc2d18a280))
+* add SQBRPYTHON022 compile-time purity rule ([f5bab28](https://github.com/sqlstack-io/sqlbuild/commit/f5bab28d245338a8a474ec13bdf15fcc2d18a280))
+* run commands without provider secrets they don't need ([f5bab28](https://github.com/sqlstack-io/sqlbuild/commit/f5bab28d245338a8a474ec13bdf15fcc2d18a280))
+* run project Python tests with sqb test and check them with SQBRPYTHON rules ([f5bab28](https://github.com/sqlstack-io/sqlbuild/commit/f5bab28d245338a8a474ec13bdf15fcc2d18a280))
+
+
+### Bug Fixes
+
+* keep strings and comments intact when re-indenting expression macro bodies ([#1496](https://github.com/sqlstack-io/sqlbuild/issues/1496)) ([755b468](https://github.com/sqlstack-io/sqlbuild/commit/755b468b24a547e38d622be0bdb3c0f4cff35c4c))
+
 ## [0.230.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.230.0...v0.230.1) (2026-11-15)
 
 
