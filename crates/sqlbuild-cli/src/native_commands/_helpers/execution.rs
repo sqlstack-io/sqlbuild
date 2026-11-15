@@ -1,6 +1,6 @@
 //! Running a Python-free command: its checks, then its output with the observed services.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -14,6 +14,7 @@ use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
+use sqlbuild_cache::project_snapshot::models::PathStamp;
 use sqlbuild_config::project::main::load_control_config::load_control_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
@@ -21,6 +22,12 @@ use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
+use sqlbuild_orchestration::dev_events::constants::DEV_EVENTS_VARIABLE;
+use sqlbuild_orchestration::dev_events::main::dev_event_line::dev_event_line;
+use sqlbuild_orchestration::dev_events::main::dev_events_enabled::dev_events_enabled;
+use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
+use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
+use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
@@ -74,17 +81,18 @@ use crate::native_commands::_helpers::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
-    ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
-    METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS, METADATA_RECONCILE_SECONDS,
-    METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS, METADATA_SYNC_CHECK_SECONDS,
-    SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS,
+    METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
+    METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
+    METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
+    UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
+    CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
     MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
 };
@@ -228,7 +236,7 @@ fn development_location_role(
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
 pub(crate) async fn compile_generation(
-    requests: &mpsc::Sender<LocationCompileRequest>,
+    (requests, dev_events): (&mpsc::Sender<LocationCompileRequest>, bool),
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -260,6 +268,16 @@ pub(crate) async fn compile_generation(
                     "Location compiler failed; generation {generation} may already be published: {error}\n"
                 ),
             )]));
+            if dev_events {
+                drop(write_output(&[(
+                    Stream::Stdout,
+                    &dev_event_line(&DevEvent::Failed {
+                        generation,
+                        position: None,
+                        message: error,
+                    }),
+                )]));
+            }
             None
         }
     };
@@ -270,9 +288,20 @@ pub(crate) async fn compile_generation(
         refresh_at = refresh
             .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
         locations = state_locations;
-        let output = serde_json::to_string(&record)
-            .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
+        let output: String = if dev_events {
+            dev_event_line(&DevEvent::Published {
+                generation,
+                snapshot_id: record.snapshot_id.to_string(),
+                record: serde_json::to_value(&record)
+                    .map_err(|error| ControlError::Invalid(error.to_string()))?,
+            })
+        } else {
+            let mut output: String = serde_json::to_string(&record)
+                .map_err(|error| ControlError::Invalid(error.to_string()))?;
+            output.push('\n');
+            output
+        };
+        if write_output(&[(Stream::Stdout, &output)]).is_some() {
             return Err(ControlError::Invalid(format!(
                 "Snapshot {} was published, but result delivery failed",
                 record.snapshot_id
@@ -293,10 +322,17 @@ pub(crate) async fn exchange_location_generation(
         .await?;
     compiler.stdin.flush().await?;
     let mut line = String::new();
-    if compiler.stdout.read_line(&mut line).await? == 0 {
-        return Err(ControlError::Invalid(
-            "location interpreter exited before replying".into(),
-        ));
+    loop {
+        line.clear();
+        if compiler.stdout.read_line(&mut line).await? == 0 {
+            return Err(ControlError::Invalid(
+                "location interpreter exited before replying".into(),
+            ));
+        }
+        if parse_dev_event(&line).is_none() {
+            break;
+        }
+        drop(write_output(&[(Stream::Stdout, &line)]));
     }
     serde_json::from_str(&line).map_err(|_| {
         ControlError::Invalid("location interpreter returned an invalid publication record".into())
@@ -731,6 +767,7 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
         image_id: text(namespace, "location_image_id"),
         metadata_reconcile_seconds,
         safety_sync_seconds,
+        dev_events: dev_events_enabled(),
     })
 }
 
@@ -798,12 +835,14 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
     if let Some(image) = &options.image_id {
         command.args(["--image-id", image]);
     }
+    if options.dev_events {
+        command.env(DEV_EVENTS_VARIABLE, "1");
+    }
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
 }
 
 pub(crate) async fn check_published_location(
-    options: &LocationServe,
-    script: &Path,
+    (options, script, connect): (&LocationServe, &Path, bool),
     (bearer, session_id, generation): (&str, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Vec<PathBuf>>, ControlError> {
@@ -813,7 +852,7 @@ pub(crate) async fn check_published_location(
     )]));
     tokio::pin!(stopped);
     let Some((connected, missing, files)) =
-        check_location_connection(options, script, stopped.as_mut()).await?
+        check_location_connection((options, script, connect), stopped.as_mut()).await?
     else {
         return Ok(None);
     };
@@ -846,14 +885,15 @@ pub(crate) async fn check_published_location(
 
 /// Capture the ordinary debug check's exact local file paths and missing provider secret count without contaminating publication stdout.
 pub(crate) async fn check_location_connection(
-    options: &LocationServe,
-    script: &Path,
+    (options, script, connect): (&LocationServe, &Path, bool),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(bool, u64, Vec<PathBuf>)>, ControlError> {
-    let mut child = location_child(options, script)
-        .args(["debug", "--target", &options.target, "--json"])
-        .stdout(Stdio::piped())
-        .spawn()?;
+    let mut command = location_child(options, script);
+    command.args(["debug", "--target", &options.target, "--json"]);
+    if !connect {
+        command.arg("--no-connection");
+    }
+    let mut child = command.stdout(Stdio::piped()).spawn()?;
     let mut stdout = child
         .stdout
         .take()
@@ -887,7 +927,7 @@ pub(crate) async fn check_location_connection(
         }
     };
     Ok(Some((
-        connected,
+        connect && connected,
         missing,
         location_database_files(&options.project_dir, files),
     )))
@@ -900,6 +940,7 @@ pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command 
         command.env(COLUMNS_VARIABLE, FALLBACK_COLUMNS.to_string());
     }
     command
+        .env_remove(DEV_EVENTS_VARIABLE)
         .stdin(Stdio::null())
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
@@ -1348,6 +1389,67 @@ pub(crate) async fn next_turn(
         result = stopped => Some(result),
         _ = clock.tick() => None,
     }
+}
+
+/// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state.
+pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevControlState> {
+    let (sender, receiver) = watch::channel(DevControlState {
+        warehouse: (!options.dev_events).then_some(true),
+        recompiles: 0,
+    });
+    if options.dev_events {
+        tokio::task::spawn_blocking(move || {
+            for line in std::io::stdin().lines().map_while(Result::ok) {
+                match parse_dev_control(&line) {
+                    Some(DevControl::Warehouse { connected }) => {
+                        sender.send_modify(|state| state.warehouse = Some(connected));
+                    }
+                    Some(DevControl::Recompile) => {
+                        sender.send_modify(|state| state.recompiles += 1);
+                    }
+                    None => {}
+                }
+            }
+        });
+    }
+    receiver
+}
+
+/// Tell `sqb dev` which inputs changed since the last compile: the first few paths and how many more.
+pub(crate) fn report_changed_inputs(before: &[PathStamp], after: &[PathStamp]) {
+    let before: BTreeMap<&str, &PathStamp> = before
+        .iter()
+        .map(|stamp| (stamp.relative_path.as_str(), stamp))
+        .collect();
+    let after: BTreeMap<&str, &PathStamp> = after
+        .iter()
+        .map(|stamp| (stamp.relative_path.as_str(), stamp))
+        .collect();
+    let changed: Vec<&str> = after
+        .iter()
+        .filter(|(path, stamp)| before.get(*path) != Some(*stamp))
+        .map(|(path, _)| *path)
+        .chain(
+            before
+                .keys()
+                .copied()
+                .filter(|path| !after.contains_key(path)),
+        )
+        .collect();
+    if changed.is_empty() {
+        return;
+    }
+    let shown: usize = changed.len().min(CHANGED_PATHS_SHOWN);
+    drop(write_output(&[(
+        Stream::Stdout,
+        &dev_event_line(&DevEvent::Changed {
+            paths: changed[..shown]
+                .iter()
+                .map(|path| (*path).to_owned())
+                .collect(),
+            more: changed.len() - shown,
+        }),
+    )]));
 }
 
 /// The location's 250 ms turn; a slow turn skips missed ticks instead of bursting.

@@ -116,3 +116,5 @@ pub(crate) const PLAN_COMMAND: &str = "plan";
 /// How much `sqb plan --json` output a location reads; model diffs over the server's cap are dropped.
 pub(crate) const PLAN_OUTPUT_BYTES: usize =
     8 * sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
+/// `sqb dev` names at most this many changed inputs per change event.
+pub(crate) const CHANGED_PATHS_SHOWN: usize = 3;

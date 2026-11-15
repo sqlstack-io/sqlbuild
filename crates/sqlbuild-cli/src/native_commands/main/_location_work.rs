@@ -137,9 +137,11 @@ async fn perform_work(
     drop(write_output(&[(Stream::Stderr, message)]));
     Ok(match work {
         LocationWork::SyncWarehouse {} => Some((LocationWorkOutcome::SyncStarted {}, Vec::new())),
-        LocationWork::CheckConnection {} => check_location_connection(options, script, expires)
-            .await?
-            .map(|(healthy, _, files)| (LocationWorkOutcome::Connection { healthy }, files)),
+        LocationWork::CheckConnection {} => {
+            check_location_connection((options, script, true), expires)
+                .await?
+                .map(|(healthy, _, files)| (LocationWorkOutcome::Connection { healthy }, files))
+        }
         LocationWork::EvaluateSensor { evaluation } => {
             evaluate_location_sensor(options, script, &evaluation, expires)
                 .await?

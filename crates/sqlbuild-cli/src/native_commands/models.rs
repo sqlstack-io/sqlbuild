@@ -152,6 +152,16 @@ pub(crate) struct LocationServe {
     pub(crate) metadata_reconcile_seconds: u32,
     /// Seconds between safety syncs of an idle location; `0` turns them off.
     pub(crate) safety_sync_seconds: u64,
+    /// `sqb dev` reads events on stdout and sends control lines on stdin.
+    pub(crate) dev_events: bool,
+}
+
+/// What `sqb dev` last asked its location: the foreground warehouse verdict and how many recompiles.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct DevControlState {
+    /// `None` until `sqb dev` reports its foreground connection; outside `sqb dev`, always connected.
+    pub(crate) warehouse: Option<bool>,
+    pub(crate) recompiles: u64,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.

@@ -4,20 +4,22 @@ use std::future::Future;
 use std::path::Path;
 use std::time::Duration;
 
+use sqlbuild_cache::project_snapshot::models::PathStamp;
 use sqlbuild_orchestration::platform::main::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationWorkClient, LocationWorkPoll,
 };
 use sqlbuild_orchestration::store::errors::ControlError;
-use tokio::sync::mpsc;
+use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
+use tokio::sync::{mpsc, watch};
 use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
-    check_published_location, close_metadata_reader, compile_generation, location_clock,
-    location_generation, location_heartbeats, metadata_sync, next_turn, report_location_health,
-    shutdown_signal,
+    check_published_location, close_metadata_reader, compile_generation, dev_controls,
+    location_clock, location_generation, location_heartbeats, metadata_sync, next_turn,
+    report_changed_inputs, report_location_health, shutdown_signal,
 };
 use crate::native_commands::_helpers::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
@@ -27,7 +29,7 @@ use crate::native_commands::main::_location_compiler::run_location_compiler;
 use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::main::_location_work::run_location_work;
 use crate::native_commands::models::{
-    LocationCompileRequest, LocationMetadataSync, LocationServe, LocationWatch,
+    DevControlState, LocationCompileRequest, LocationMetadataSync, LocationServe, LocationWatch,
 };
 
 pub(super) async fn run_location(
@@ -43,9 +45,10 @@ pub(super) async fn run_location(
         target: options.target.clone(),
     };
     let (requests, receiver) = mpsc::channel(1);
+    let controls = dev_controls(&options);
     let serving = async {
         tokio::select! {
-            result = watch_location(&options, script, (bearer, &client, &poll), requests) => result,
+            result = watch_location(&options, script, (bearer, &client, &poll), (requests, controls)) => result,
             result = location_heartbeats(&options, bearer, session_id) => result,
         }
     };
@@ -58,9 +61,15 @@ async fn watch_location(
     options: &LocationServe,
     script: &Path,
     (bearer, client, poll): (&str, &LocationWorkClient, &LocationWorkPoll),
-    requests: mpsc::Sender<LocationCompileRequest>,
+    (requests, mut controls): (
+        mpsc::Sender<LocationCompileRequest>,
+        watch::Receiver<DevControlState>,
+    ),
 ) -> Result<(), ControlError> {
     let mut watch = location_watch(&options.project_dir);
+    let mut recompiles: u64 = 0;
+    let mut compiled_inputs: Option<Vec<PathStamp>> = None;
+    let mut deferred_sync: Option<(Vec<WarehouseStateLocation>, i64)> = None;
     let mut work_at = Instant::now() + Duration::from_secs(2);
     let mut published_generation = None;
     let mut metadata = None;
@@ -80,6 +89,32 @@ async fn watch_location(
         .await
         {
             return result;
+        }
+        let control: DevControlState = *controls.borrow_and_update();
+        if control.recompiles != recompiles {
+            recompiles = control.recompiles;
+            watch.retry_at = Some(Instant::now());
+        }
+        if control.warehouse == Some(true)
+            && let Some((locations, generation)) = deferred_sync.take()
+        {
+            metadata = Some(metadata_sync(
+                (locations, generation),
+                (
+                    options.metadata_reconcile_seconds,
+                    options.safety_sync_seconds,
+                ),
+            ));
+            let Some(files) = check_published_location(
+                (options, script, true),
+                (bearer, poll.session_id, generation),
+                stopped.as_mut(),
+            )
+            .await?
+            else {
+                return Ok(());
+            };
+            watch = exclude_location_databases(&options.project_dir, files, watch);
         }
         let ready;
         (watch, ready) = observe_location_inputs(&options.project_dir, watch);
@@ -116,24 +151,44 @@ async fn watch_location(
             Stream::Stderr,
             &format!("Compiling location generation {generation} in an isolated interpreter...\n"),
         )]));
-        let Some((published, refresh_at, locations)) =
-            compile_generation(&requests, generation, &watch.observed.0, stopped.as_mut()).await?
+        if options.dev_events {
+            if let Some(before) = &compiled_inputs {
+                report_changed_inputs(before, &watch.observed.0);
+            }
+            compiled_inputs = Some(watch.observed.0.clone());
+        }
+        let Some((published, refresh_at, locations)) = compile_generation(
+            (&requests, options.dev_events),
+            generation,
+            &watch.observed.0,
+            stopped.as_mut(),
+        )
+        .await?
         else {
             return Ok(());
         };
         if published {
             watch.retry_at = refresh_at;
             published_generation = Some(generation);
-            metadata = Some(metadata_sync(
-                (locations, generation),
-                (
-                    options.metadata_reconcile_seconds,
-                    options.safety_sync_seconds,
-                ),
-            ));
+            let connect: bool = tokio::select! {
+                result = &mut stopped => return result,
+                verdict = controls.wait_for(|control| control.warehouse.is_some()) => {
+                    verdict.is_ok_and(|control| control.warehouse == Some(true))
+                },
+            };
+            if connect {
+                metadata = Some(metadata_sync(
+                    (locations, generation),
+                    (
+                        options.metadata_reconcile_seconds,
+                        options.safety_sync_seconds,
+                    ),
+                ));
+            } else {
+                deferred_sync = Some((locations, generation));
+            }
             let Some(files) = check_published_location(
-                options,
-                script,
+                (options, script, connect),
                 (bearer, poll.session_id, generation),
                 stopped.as_mut(),
             )
