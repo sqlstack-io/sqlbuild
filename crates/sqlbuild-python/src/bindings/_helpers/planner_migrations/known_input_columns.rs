@@ -1,10 +1,10 @@
 //! Physical columns of the relations a model reads, as inspected by the planner.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyFrozenSet;
 use pyo3::{pyclass, pymethods};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 const SOURCE_INPUT_FUNCTION: &str = "__source";
 const REF_INPUT_FUNCTION: &str = "__ref";

@@ -8,14 +8,15 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::text::main::python_strip::python_strip;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::dbt_interop::cli::resolved_path;
 use crate::bindings::_helpers::dbt_interop::profile::normalize_dbt_profile_connection;
 use crate::bindings::_helpers::dbt_interop::profile_load::{
     default_profiles_dir, load_dbt_project_metadata, load_selected_dbt_profile_output,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DBT_PROFILE_SOURCE: &str = "dbt_profile";
 const PROFILE_CONNECTION_OPTIONS: (&[&str], &[&str]) = (
@@ -30,7 +31,7 @@ const PROFILE_CONNECTION_OPTIONS: (&[&str], &[&str]) = (
 const NON_EMPTY_MESSAGE: &str = "dbt_profile connection values must be non-empty strings";
 
 pub(crate) fn profile_error(py: Python<'_>, message: String) -> PyErr {
-    match host::entry(py, ThirdPartyHost::DbtProfileError).and_then(|class| class.call1((message,)))
+    match host_entry(py, ThirdPartyHost::DbtProfileError).and_then(|class| class.call1((message,)))
     {
         Ok(instance) => PyErr::from_value(instance),
         Err(error) => error,
@@ -89,7 +90,7 @@ fn profile_connection<'py>(
     let selected: Bound<'py, PyAny> =
         load_selected_dbt_profile_output(&profiles_dir, &profile_name, target_name.as_deref())?;
     let resolved: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ThirdPartyHost::RenderSelectedDbtProfileOutput)?,
+        &host_entry(py, ThirdPartyHost::RenderSelectedDbtProfileOutput)?,
         &[
             ("selected", selected),
             ("project_dir", dbt_project_dir),

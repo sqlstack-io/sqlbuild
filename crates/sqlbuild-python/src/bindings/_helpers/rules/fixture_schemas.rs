@@ -12,7 +12,7 @@ use std::path::Path;
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::model_config::header_columns::schema_columns;
 use crate::bindings::_helpers::model_config::model_config_builder::raised_config_error;
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 pub(crate) fn columns(columns: &Bound<'_, PyAny>) -> PyResult<Vec<FixtureFormatColumn>> {
     columns

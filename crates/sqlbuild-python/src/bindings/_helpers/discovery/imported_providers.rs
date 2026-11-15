@@ -9,7 +9,6 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyType};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::compile_context::input_reads::record_settings_class_read;
 use crate::bindings::_helpers::contracts::resource_identities::validate_resource_identity;
 use crate::bindings::_helpers::discovery::constants::ALLOW_MISSING_SECRETS_FLAG;
@@ -18,11 +17,15 @@ use crate::bindings::_helpers::discovery::imported_modules::{
     provider_by_name, provider_usages, shim, tuple_of,
 };
 use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::provider_settings::{ProviderState, provider_state};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PROVIDER_ERROR: ErrorId = ErrorId::ProviderDiscovery;
 const SINK_ERROR: ErrorId = ErrorId::EventExporterDiscovery;
@@ -58,7 +61,7 @@ fn provider_name<'py>(
     let name: Bound<'py, PyAny> = match provider_class.call_method0("name") {
         Ok(name) => name,
         Err(error) => {
-            let input_error: Bound<'py, PyAny> = host::entry(py, PROVIDER_INPUT_ERROR)?;
+            let input_error: Bound<'py, PyAny> = host_entry(py, PROVIDER_INPUT_ERROR)?;
             if !error.value(py).is_instance(&input_error)? {
                 return Err(error);
             }
@@ -263,7 +266,7 @@ fn report_allowed(py: Python<'_>, policy: SecretPolicy, allowed: &[String]) -> P
     } else {
         "providers have"
     };
-    host::write_console(
+    write_console(
         py,
         "stderr",
         &format!(
@@ -300,7 +303,7 @@ pub(crate) fn discover_event_exporter_declarations<'py>(
     {
         return tuple_of(py, Vec::new());
     }
-    let read_definition: Bound<'py, PyAny> = host::entry(py, SINK_DEFINITION)?;
+    let read_definition: Bound<'py, PyAny> = host_entry(py, SINK_DEFINITION)?;
     let mut declarations: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut seen: Vec<(String, Bound<'py, PyAny>)> = Vec::new();
     for file_path in project.module_files("sinks", true)? {

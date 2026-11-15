@@ -8,9 +8,10 @@ use sqlbuild_rules::rules::main::builtin_options::builtin_options;
 use sqlbuild_rules::rules::main::catalogue::catalogue;
 use sqlbuild_rules::rules::models::{BuiltinOption, BuiltinOptionKind};
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::records::construct::{new_record, record_class};
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::types::RecordId;
 
 const FAMILY_SUFFIX_LENGTH: usize = 3;
 

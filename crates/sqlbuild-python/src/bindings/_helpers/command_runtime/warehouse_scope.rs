@@ -10,8 +10,9 @@ use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 
 use sqlbuild_config::command_connection::constants::COMMAND_WAREHOUSE_GROUPS;
 
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record_with};
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 const CONTEXT_ATTRIBUTE: &str = "_command_warehouse_scope_context";
 const CONTEXT_NAME: &str = "sqlbuild_command_warehouse_scope";

@@ -1,12 +1,12 @@
 //! Python objects read in place as authored header values.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods};
 use pyo3::types::{
     PyBool, PyBoolMethods, PyDict, PyDictMethods, PyFloat, PyInt, PyList, PyListMethods, PyString,
     PyStringMethods, PyTuple, PyTupleMethods,
 };
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// One Python object viewed as an authored value; parsed results keep the object itself.
 #[derive(Clone, Debug)]

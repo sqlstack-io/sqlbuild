@@ -21,7 +21,7 @@ use crate::bindings::_helpers::sqltext::authored_values::{
     map_to_python, optional_authored_value_to_python,
 };
 use crate::bindings::models::{ModelTextRequest, NativeProjectTree};
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::types::CompilerDetach;
 
 pub(crate) type PyObject = Py<PyAny>;
 
@@ -109,7 +109,7 @@ fn parse_model_contents(
     };
     let parsed = py
         .compiler_detach(|| Ok(parse_model_text(&request.file_path, contents, &options)))
-        .map_err(crate::bindings::_helpers::boundary::panics::compiler_error)?;
+        .map_err(sqlbuild_python_base::boundary::main::compiler_error::compiler_error)?;
     let model: DiscoveredModelFile = parsed.map_err(|failure| failure_error(py, failure))?;
     let path: Bound<'_, PyAny> = py
         .import("pathlib")?

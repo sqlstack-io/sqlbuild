@@ -32,7 +32,7 @@ use crate::bindings::_helpers::compiled_views::relation_keys::RelationKeyRow;
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;
 use crate::bindings::_helpers::model_config::header_metadata::HeaderColumns;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DATABASE_KEY: &str = "database";
 const SCHEMA_KEY: &str = "schema";

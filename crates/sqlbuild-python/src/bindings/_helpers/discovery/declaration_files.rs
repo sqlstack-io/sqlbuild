@@ -10,7 +10,7 @@ use sqlbuild_discovery::declaration_files::models::{
 use sqlbuild_discovery::models::FileOutcome;
 
 use crate::bindings::models::{DeclarationTextRequest, NativeDiscoverySession};
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const PARSED_TAG: &str = "ok";
 const FAILED_TAG: &str = "error";
@@ -42,7 +42,7 @@ fn parse_declaration_contents(
                 &options,
             ))
         })
-        .map_err(crate::bindings::_helpers::boundary::panics::compiler_error)?;
+        .map_err(sqlbuild_python_base::boundary::main::compiler_error::compiler_error)?;
     match parsed {
         Some(FileOutcome::Parsed(_)) => Ok(PARSED_TAG),
         Some(FileOutcome::Failed(_)) => Ok(FAILED_TAG),

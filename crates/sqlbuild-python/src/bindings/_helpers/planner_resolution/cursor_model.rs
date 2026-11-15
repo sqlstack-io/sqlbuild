@@ -2,14 +2,11 @@
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::model_config::typed_config::{
     config_cursor_bound, config_text_object, model_values,
 };
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::plan_output::display::resolve_bounded_cursor_override;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
@@ -27,12 +24,16 @@ use crate::bindings::_helpers::planner_resolution::cursor_windows::without_desti
 use crate::bindings::_helpers::planner_resolution::future_safety::resolve_future_cursor_safety;
 use crate::bindings::_helpers::planner_resolution::models::ModelSqlRequest;
 use crate::bindings::_helpers::planner_resolution::values::string;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::{IntoPyObject, PyErr};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn config<'py>(model: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = model.py();
@@ -47,7 +48,7 @@ fn config<'py>(model: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAn
 
 /// Bounds the run resolves when it starts, as for inputs another node of the run produces.
 pub(crate) fn unbounded(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    let sentinel = host::entry(py, ExecutorHost::BoundSentinel)?;
+    let sentinel = host_entry(py, ExecutorHost::BoundSentinel)?;
     new_record_with(
         py,
         RecordId::CursorBounds,
@@ -66,7 +67,7 @@ fn destination_exists(model: &Bound<'_, PyAny>, snapshot: &Bound<'_, PyAny>) -> 
     }
     let destination = model_reads::destination(model)?;
     let key = call_with(
-        &host::entry(model.py(), AdapterHost::RelationLookup)?.getattr("key")?,
+        &host_entry(model.py(), AdapterHost::RelationLookup)?.getattr("key")?,
         &[
             ("database", native_field(&destination, "database")?),
             ("schema", native_field(&destination, "schema")?),

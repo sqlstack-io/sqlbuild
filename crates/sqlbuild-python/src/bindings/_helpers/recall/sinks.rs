@@ -12,13 +12,13 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_recall::records::main::parse_event::parse_event;
 use sqlbuild_recall::writer::models::RecallSession;
 
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::recall::constants::{
     INVOCATION_COMPLETED, INVOCATION_FAILED, INVOCATION_STARTED, STATEMENT_COMPLETED,
     STATEMENT_FAILED,
 };
 use crate::bindings::_helpers::recall::events::{escaped_text, event_object};
 use crate::bindings::_helpers::recall::replacements::RecallReplacements;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
 /// `event` as the JSON object `lifecycle_event_to_json` encodes; `None` when it cannot be encoded.
 pub(crate) fn lifecycle_event_object(
@@ -28,7 +28,7 @@ pub(crate) fn lifecycle_event_object(
     if let Some(object) = event_object(event)? {
         return Ok(Some(object));
     }
-    let encoded = host::entry(py, ExecutorHost::LifecycleEventToJson)?.call1((event,))?;
+    let encoded = host_entry(py, ExecutorHost::LifecycleEventToJson)?.call1((event,))?;
     let text = escaped_text(encoded.downcast::<PyString>()?)?;
     match parse_event(&text) {
         Ok(object) => Ok(Some(object)),

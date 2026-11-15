@@ -13,8 +13,8 @@ use sqlbuild_scopes::scope_index::models::{
     DeclarationIdentity, IdentityFailure, QualifiedIdentity, ResourceIdentity, ScopePathFailure,
 };
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::scopes::declaration_contexts::NativeDeclarationContexts;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const PATH_CACHE_PREFIX: &str = "<path>";
 const IDENTITY_SEPARATOR: char = ':';

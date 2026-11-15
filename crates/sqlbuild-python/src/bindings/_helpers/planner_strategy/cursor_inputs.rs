@@ -7,7 +7,6 @@ use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyTuple};
 use sqlbuild_analysis::planner_strategy::main::cursor_input_column::cursor_input_column_failure;
 use sqlbuild_analysis::planner_strategy::models::{CursorInputColumnCheck, CursorInputColumnOwner};
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::cursor::scalars::parse_value;
@@ -23,12 +22,15 @@ use crate::bindings::_helpers::planner_strategy::constants::{
 use crate::bindings::_helpers::planner_strategy::lineage::resolve_lineage_reference;
 use crate::bindings::_helpers::planner_strategy::models::CursorInputLookups;
 use crate::bindings::_helpers::planner_strategy::values::{input_error, text};
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Whether a model is incremental with a cursor column.
 fn incremental_cursor_flag(

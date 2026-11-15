@@ -4,13 +4,13 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyList, PyTuple, PyTupleMethods};
 
-use crate::bindings::_helpers::boundary::call_arguments::call_argument;
 use crate::bindings::_helpers::graph::project_graph::{ResourceRow, project_graph};
 use crate::bindings::_helpers::record_behaviours::compiled::compile_input_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::declaration_values::{
     constant_declaration_sql, render_enum_member_value,
 };
+use sqlbuild_python_base::boundary::main::call_argument::call_argument;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The parameter name through which a macro receives its context.
 const MACRO_CONTEXT_PARAMETER_NAME: &str = "ctx";

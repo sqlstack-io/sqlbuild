@@ -23,14 +23,15 @@ use sqlbuild_core::command_output::models::{
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_threads::constants::OUTPUT_SUPPRESSED_ATTRIBUTE;
 use crate::bindings::_helpers::native_threads::exit_signal::signal_interpreter_exit;
 use crate::bindings::_helpers::output_capture::values::{
     freeze, object, output_error, pass_text, python_text, unencodable,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const THREAD_NAME: &str = "sqlbuild-output-exporter";
 /// Attribute naming a capture thread's worker, for the exit hook.
@@ -190,7 +191,7 @@ impl Shared {
             ("occurred_at", self.occurred_at(py)?),
             (
                 "stream",
-                host::entry(py, ExecutorHost::CommandOutputStream)?
+                host_entry(py, ExecutorHost::CommandOutputStream)?
                     .call1((stream_value(draft.stream),))?,
             ),
             ("message", python_text(py, &draft.message)?),
@@ -199,7 +200,7 @@ impl Shared {
             ("chunk_count", object(py, draft.chunk_count)?),
             (
                 "priority",
-                host::entry(py, ExecutorHost::OutputRecordPriority)?
+                host_entry(py, ExecutorHost::OutputRecordPriority)?
                     .call1((priority_value(draft.priority),))?,
             ),
         ];
@@ -207,10 +208,7 @@ impl Shared {
             fields.push(("record_type", object(py, COMMAND_OUTPUT_LOSS_RECORD_TYPE)?));
             fields.push(("dropped_records", object(py, draft.dropped_records)?));
         }
-        call_with(
-            &host::entry(py, ExecutorHost::CommandOutputRecord)?,
-            &fields,
-        )
+        call_with(&host_entry(py, ExecutorHost::CommandOutputRecord)?, &fields)
     }
 
     /// Create and queue the records of `drafts` in order.
@@ -354,7 +352,7 @@ impl OutputCaptureDispatcher {
     #[new]
     #[pyo3(signature = (**options))]
     fn new(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> PyResult<Self> {
-        let options = crate::bindings::_helpers::boundary::python_calls::KeywordArguments::read(
+        let options = sqlbuild_python_base::boundary::models::KeywordArguments::read(
             py,
             "OutputCaptureDispatcher",
             options,
@@ -548,7 +546,7 @@ impl OutputCaptureDispatcher {
         }
         let (accepted, delivered, failed, dropped, depth, capacity, flush_complete) = counts;
         call_with(
-            &host::entry(py, ExecutorHost::CommandOutputCaptureSummary)?,
+            &host_entry(py, ExecutorHost::CommandOutputCaptureSummary)?,
             &[
                 ("accepted", object(py, accepted)?),
                 ("delivered", object(py, delivered)?),

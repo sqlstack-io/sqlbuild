@@ -11,7 +11,7 @@ use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_cache::startup_inputs::main::startup_stamps::startup_stamps;
 use sqlbuild_cache::startup_inputs::models::{StartupLocations, StartupStamp};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 const OS_MODULE: &str = "os";
 

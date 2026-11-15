@@ -6,11 +6,12 @@ use pyo3::types::PyTuple;
 use sqlbuild_discovery::yaml_entries::main::integration_loader_name::integration_loader_name;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// One integration: its kind constant and the runtime module building its loader functions.
 struct Integration {
@@ -54,8 +55,8 @@ pub(crate) fn integration_loader_functions<'py>(
     let external: Bound<'py, PyAny> = enum_member(py, RecordId::LoaderConnectionMode, "EXTERNAL")?;
     let mut loaders: Vec<Bound<'py, PyAny>> = Vec::new();
     for integration in &INTEGRATIONS {
-        let kind: String = host::entry(py, integration.kind_constant)?.extract()?;
-        let factory: Bound<'py, PyAny> = host::entry(py, integration.loader_factory)?;
+        let kind: String = host_entry(py, integration.kind_constant)?.extract()?;
+        let factory: Bound<'py, PyAny> = host_entry(py, integration.loader_factory)?;
         for (_, source_file, source_entry) in declared.iter().filter(|loader| loader.0 == kind) {
             let name: String = integration_loader_name(
                 &kind,

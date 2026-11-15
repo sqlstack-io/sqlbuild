@@ -1,18 +1,19 @@
 //! Scenario artifact dataclasses and adapter identifier callbacks.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::planner_scenario::constants::{
     SCENARIO_PLAN_HASH_COLLISION, SCENARIO_PLAN_INVALID_HASH_PREFIX,
     SCENARIO_PLAN_RELATION_COLLISION,
 };
 use crate::bindings::_helpers::planner_scenario::values::{error, string};
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::relation_naming::fitting::fitted_logical_name;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_scenario::main::{hash_prefix, parse_artifact_name};
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SCENARIO_ARTIFACT_LABEL: &str = "Scenario artifact";
 

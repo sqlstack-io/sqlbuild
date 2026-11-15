@@ -8,7 +8,6 @@ use sqlbuild_analysis::planner_fixtures::main::{
     collection_mismatch::collection_mismatch, fixture_line::fixture_line,
 };
 
-use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::planner_strategy::constants::MODEL_REFERENCE_KIND;
 use crate::bindings::_helpers::planner_strategy::fixture_completion::complete_fixtures;
 use crate::bindings::_helpers::planner_strategy::fixture_sql::{
@@ -16,12 +15,13 @@ use crate::bindings::_helpers::planner_strategy::fixture_sql::{
 };
 use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sql_test_glue::constants::FIXTURE_PREFIXES;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Report every statically provable fixture defect or return the completed fixture SQL groups.
 pub(super) fn validated_fixtures<'py>(

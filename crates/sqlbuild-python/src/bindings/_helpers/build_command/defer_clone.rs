@@ -16,7 +16,6 @@ use sqlbuild_core::graph_walk::models::ClonePolicy;
 use sqlbuild_core::build_command::errors::BuildCommandError;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords};
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::policies::build_command_error;
 use crate::bindings::_helpers::build_command::policies::enforce_model_execution_limit_binding;
@@ -24,14 +23,17 @@ use crate::bindings::_helpers::clone::clone_pipeline::run_clone_pipeline_with_op
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_scope::retained::{ScopeData, scope_data};
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
 use crate::bindings::_helpers::planner_selection::unit_tests::split_unit_test_selectors;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 const VIEW_MATERIALIZATION: &str = "view";
 const RECREATED_TYPES: [&str; 2] = ["udf", "table_fn"];
@@ -210,7 +212,7 @@ fn clone_input<'py>(
         selected.push(native_field(&entry?, "name")?);
     }
     let retention: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::BuildDestinationRetentionRequests)?,
+        &host_entry(py, ExecutorHost::BuildDestinationRetentionRequests)?,
         &[
             ("project", project.clone()),
             (
@@ -230,7 +232,7 @@ fn clone_input<'py>(
     let allow_decrease: bool = native_field(&target, "time_travel_retention_decrease")?
         .eq(enum_member(py, RecordId::RetentionDecreasePolicy, "ALLOW")?)?;
     let sources: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::CloneSourceEntries)?,
+        &host_entry(py, ExecutorHost::CloneSourceEntries)?,
         &[
             ("origin", native_field(pipeline, "origin_source_entries")?),
             (
@@ -240,7 +242,7 @@ fn clone_input<'py>(
         ],
     )?;
     call_with(
-        &host::entry(py, ExecutorHost::CloneExecutionInput)?,
+        &host_entry(py, ExecutorHost::CloneExecutionInput)?,
         &[
             ("source_entries", sources),
             (
@@ -275,7 +277,7 @@ fn clone_input<'py>(
             (
                 "destination_transient_models",
                 call_with(
-                    &host::entry(py, ExecutorHost::BuildDestinationTransientModels)?,
+                    &host_entry(py, ExecutorHost::BuildDestinationTransientModels)?,
                     &[("project", project.clone())],
                 )?,
             ),
@@ -297,7 +299,7 @@ fn executed_clone<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = context.py();
     let progress_stream: Bound<'py, PyAny> = native_field(&context.invocation, "progress_stream")?;
-    let execute: Bound<'py, PyAny> = host::entry(py, ExecutorHost::ExecuteClone)?;
+    let execute: Bound<'py, PyAny> = host_entry(py, ExecutorHost::ExecuteClone)?;
     if progress_stream.is_none() {
         let inputs: Bound<'py, PyAny> = clone_input(
             context,
@@ -335,7 +337,7 @@ fn executed_clone<'py>(
         },
     )?;
     call_with(
-        &host::entry(py, ExecutorHost::RunPrephaseCloneStream)?,
+        &host_entry(py, ExecutorHost::RunPrephaseCloneStream)?,
         &[
             ("stream", progress_stream),
             ("title", text(py, "defer clone")),
@@ -348,7 +350,7 @@ fn executed_clone<'py>(
 
 fn failed_items(result: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     let py: Python<'_> = result.py();
-    let status: Bound<'_, PyAny> = host::entry(py, ExecutorHost::CloneStatus)?;
+    let status: Bound<'_, PyAny> = host_entry(py, ExecutorHost::CloneStatus)?;
     let (failed, warning) = (
         native_field(&status, "FAILED")?,
         native_field(&status, "WARNING")?,
@@ -450,7 +452,7 @@ fn clone_boundaries<'py>(
     }
     let project: Bound<'py, PyAny> = native_field(&pipeline, "destination_project")?;
     call_with(
-        &host::entry(py, ExecutorHost::CopyCloneFingerprints)?,
+        &host_entry(py, ExecutorHost::CopyCloneFingerprints)?,
         &[
             ("result", result),
             (

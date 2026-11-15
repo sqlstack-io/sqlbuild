@@ -15,11 +15,11 @@ use sqlbuild_core::dbt_plan::main::merged_dbt_execution_args::merged_dbt_executi
 use sqlbuild_core::dbt_plan::main::render_dbt_execution_summary::render_dbt_execution_summary;
 use sqlbuild_core::dbt_plan::models::DbtExecutedNode;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::dbt_interop::cli::option_values;
 use crate::bindings::_helpers::dbt_interop::graph::{DbtCombinedGraph, texts};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const MERGED_OPTIONS: (&[&str], &[&str]) = (&["command", "options", "routed_args", "plan"], &[]);
 

@@ -6,7 +6,7 @@ use sqlbuild_config::project::main::unsupported_target_warehouse::unsupported_ta
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
 
 use crate::bindings::_helpers::contracts::spec_resolution::{
     resolve_effective_adapter_name, resolve_target_config,
@@ -14,12 +14,12 @@ use crate::bindings::_helpers::contracts::spec_resolution::{
 use crate::bindings::_helpers::discovery::project_config::{
     resolve_config_file_path, validate_local_sql_analysis,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
 const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 /// `WarehouseGroup` members in declaration order.
@@ -86,13 +86,14 @@ fn first_configured_group(config: &Bound<'_, PyAny>) -> PyResult<Option<(String,
     Ok(None)
 }
 
-fn session_warehouse_support(
+/// Whether the adapter can switch warehouses per session, as the adapter host answers.
+pub(crate) fn session_warehouse_support(
     py: Python<'_>,
     adapter_name: &Bound<'_, PyAny>,
     project_dir: &Bound<'_, PyAny>,
 ) -> PyResult<bool> {
     call_with(
-        &host::entry(py, AdapterHost::AdapterSupportsSessionWarehouse)?,
+        &host_entry(py, AdapterHost::AdapterSupportsSessionWarehouse)?,
         &[
             ("adapter_name", adapter_name.clone()),
             ("project_dir", project_dir.clone()),

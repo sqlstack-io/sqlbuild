@@ -9,18 +9,21 @@ use sqlbuild_core::clone_text::main::clone_relation_flow_text::clone_relation_fl
 use sqlbuild_core::clone_text::models::FingerprintProgress;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::clone::clone_command::Invocation;
 use crate::bindings::_helpers::clone::clone_progress::{
     CloneFingerprintReporter, CloneItemPrinter,
 };
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DESTINATION_ENTRY_GROUPS: [&str; 4] = [
     "destination_source_entries",
@@ -180,7 +183,7 @@ fn execution_input<'py>(
         .map(|entry| native_field(&entry?, "name"))
         .collect::<PyResult<_>>()?;
     let retention: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::BuildDestinationRetentionRequests)?,
+        &host_entry(py, ExecutorHost::BuildDestinationRetentionRequests)?,
         &[
             ("project", project.clone()),
             (
@@ -200,7 +203,7 @@ fn execution_input<'py>(
     let allow_decrease: bool = native_field(&config, "time_travel_retention_decrease")?
         .eq(enum_member(py, RecordId::RetentionDecreasePolicy, "ALLOW")?)?;
     let source_entries: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::CloneSourceEntries)?,
+        &host_entry(py, ExecutorHost::CloneSourceEntries)?,
         &[
             ("origin", native_field(pipeline, "origin_source_entries")?),
             (
@@ -210,7 +213,7 @@ fn execution_input<'py>(
         ],
     )?;
     let transient: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::BuildDestinationTransientModels)?,
+        &host_entry(py, ExecutorHost::BuildDestinationTransientModels)?,
         &[("project", project.clone())],
     )?;
     let mut fields: Vec<(&str, Bound<'py, PyAny>)> = vec![("source_entries", source_entries)];
@@ -246,10 +249,7 @@ fn execution_input<'py>(
         ),
         ("on_item", on_item),
     ]);
-    call_with(
-        &host::entry(py, ExecutorHost::CloneExecutionInput)?,
-        &fields,
-    )
+    call_with(&host_entry(py, ExecutorHost::CloneExecutionInput)?, &fields)
 }
 
 /// Copy fingerprints of the cloned relations, reporting what was not confirmed on failure.
@@ -288,7 +288,7 @@ fn copy_fingerprints<'py>(
         ("on_progress", reporter.clone().into_any()),
     ]);
     let lifecycle: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::OperationLifecycle)?,
+        &host_entry(py, ExecutorHost::OperationLifecycle)?,
         &[
             ("operation_kind", PyString::new(py, "clone").into_any()),
             (
@@ -299,7 +299,7 @@ fn copy_fingerprints<'py>(
     )?;
     let copied: PyResult<Bound<'py, PyAny>> = within(&lifecycle, |_| {
         call_with(
-            &host::entry(py, ExecutorHost::CopyCloneFingerprints)?,
+            &host_entry(py, ExecutorHost::CopyCloneFingerprints)?,
             &fields,
         )
     });
@@ -344,7 +344,7 @@ pub(crate) fn execute_clone_plan<'py>(
             ),
         )?;
         call_with(
-            &host::entry(py, ExecutorHost::ExecuteClone)?,
+            &host_entry(py, ExecutorHost::ExecuteClone)?,
             &[("inputs", input)],
         )
     })();

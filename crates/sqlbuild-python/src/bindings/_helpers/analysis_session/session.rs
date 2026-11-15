@@ -25,6 +25,7 @@ use sqlbuild_analysis::assembly::analysis_session::models::{
 use sqlbuild_analysis::assembly::analysis_session::types::{Pairs, Shapes};
 use sqlbuild_analysis::semantic_validation::models::DiagnosticRow;
 use sqlbuild_analysis::sql_macros::models::SqlMacroCheck;
+use sqlbuild_python_base::positional_record;
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
 use sqlbuild_cache::store::models::NativeStore;
@@ -37,11 +38,11 @@ use std::path::PathBuf;
 use crate::bindings::_helpers::analysis_session::nullability_rules::{
     RuleFailure, nullability_callback, raised,
 };
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::cache::native_store::{open_store, save_store};
 use crate::bindings::models::Positional;
 use crate::bindings::models::ProjectCatalog;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// `(name, type, nullability)`.
 type ColumnRow = (String, Option<String>, String);

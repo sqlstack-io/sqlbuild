@@ -1,6 +1,5 @@
 //! Live candidate inspection and automatic request materialization.
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_migrations::column_objects::config;
@@ -12,16 +11,17 @@ use crate::bindings::_helpers::planner_migrations::models::{
     ModelMigrationDeclaration, ModelMigrationRequest,
 };
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{
     PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PySet, PySetMethods, PyString, PyTuple,
 };
 use sqlbuild_analysis::planner_migrations::main::discovery_materialization::discovery_materialization;
 use sqlbuild_analysis::planner_migrations::main::stored_migration_fingerprint::stored_migration_fingerprint;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 use std::collections::BTreeMap;
 
 fn location<'py>(

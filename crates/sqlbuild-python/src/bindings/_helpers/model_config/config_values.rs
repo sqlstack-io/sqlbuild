@@ -10,12 +10,12 @@ use sqlbuild_model_config::config_values::main::checked_text::checked_text;
 use sqlbuild_model_config::config_values::main::checked_texts::checked_texts;
 use sqlbuild_model_config::config_values::models::CursorBound;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::model_config::config_nodes::{PyConfigNode, config_node};
 use crate::bindings::_helpers::model_config::typed_config::type_error;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const ISOFORMAT_METHOD: &str = "isoformat";
 

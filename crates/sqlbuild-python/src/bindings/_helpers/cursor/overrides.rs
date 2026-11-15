@@ -5,12 +5,12 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyInt, PyString, PyStringMethods};
 use sqlbuild_cursor::algebra::main::parse_integer_text::parse_integer_text;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cursor::conversion::algebra_error;
 use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DECIMAL_MODULE: &str = "decimal";
 const INTEGER_AS_TIMESTAMP: &str = "an integer cursor cannot be used as a timestamp";

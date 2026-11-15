@@ -10,7 +10,7 @@ pub(crate) fn normalization_results(
         .map(|result| match result {
             Ok(sql) => Ok(sql.into_pyobject(py)?.into_any().unbind()),
             Err(error) => Ok(
-                crate::bindings::_helpers::boundary::panics::compiler_error(error)
+                sqlbuild_python_base::boundary::main::compiler_error::compiler_error(error)
                     .into_value(py)
                     .into_any(),
             ),

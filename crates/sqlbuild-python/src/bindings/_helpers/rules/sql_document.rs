@@ -10,8 +10,10 @@ use sqlbuild_analysis::sql_tree::errors::SqlTreeError;
 use sqlbuild_analysis::sql_tree::main::sql_tree_nodes::sql_tree_nodes;
 use sqlbuild_analysis::sql_tree::models::SqlTreeNode as TreeNode;
 
-use crate::bindings::_helpers::records::construct::{new_annotated_error, new_record_with};
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The kind of the root node that holds a document's statements.
 const DOCUMENT_KIND: &str = "document";

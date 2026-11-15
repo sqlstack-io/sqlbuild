@@ -37,7 +37,6 @@ use sqlbuild_recall::writer::models::{
 };
 
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use crate::bindings::_helpers::recall::clickhouse_store::{
     ClickHouseLocation, ClickHouseStoreOpener, missing_database_reason,
@@ -52,7 +51,8 @@ use crate::bindings::_helpers::recall::constants::{
 use crate::bindings::_helpers::recall::events::escaped_text;
 use crate::bindings::_helpers::recall::replacements::{RecallReplacements, in_replacement_sink};
 use crate::bindings::_helpers::recall::sinks::InvocationEvents;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// What the invocation records: its session, when enabled, and the resolved target and adapter.
 #[derive(Clone, Debug, Default)]
@@ -221,7 +221,7 @@ fn external_context(py: Python<'_>) -> PyResult<Option<String>> {
     let context: Bound<'_, PyAny> = match invocation_context(py, None) {
         Ok(context) => context,
         Err(error)
-            if error.is_instance(py, &host::entry(py, ExecutorHost::OutputCaptureInputError)?) =>
+            if error.is_instance(py, &host_entry(py, ExecutorHost::OutputCaptureInputError)?) =>
         {
             return Ok(None);
         }

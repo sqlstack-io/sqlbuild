@@ -11,19 +11,21 @@ use sqlbuild_cursor::algebra::models::{Grain, Scalar};
 use crate::bindings::_helpers::attachments::cursor_intrinsics::{
     compile_input_error, resolve_cursor_intrinsics,
 };
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::cursor::conversion::CursorSession;
 use crate::bindings::_helpers::cursor::scalars::{parse_value, render_value};
 use crate::bindings::_helpers::model_config::typed_config::{config_text_object, model_values};
-use crate::bindings::_helpers::records::construct::{enum_from_value, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sql_test_glue::constants::{
     CURSOR_ALGEBRA_EXCEPTIONS, CURSOR_END_KEY, CURSOR_START_KEY, DEFAULT_INTEGER_END,
     DEFAULT_INTEGER_START, DEFAULT_TIMESTAMP_END, DEFAULT_TIMESTAMP_START, INTEGER_CURSOR_TYPE,
     TIMESTAMP_CURSOR_TYPE,
 };
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// One model's cursor name, type and timestamp grain.
 struct ModelCursor<'py> {

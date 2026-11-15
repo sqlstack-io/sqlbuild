@@ -13,13 +13,15 @@ use sqlbuild_core::dbt_cli::main::dbt_flag_value::dbt_flag_value;
 use sqlbuild_core::dbt_cli::models::DbtParsedFlags;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords};
 use crate::bindings::_helpers::dbt_interop::cli::resolve_dbt_config;
 use crate::bindings::_helpers::dbt_interop::cli::{raised, resolved_path};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const ARGUMENT_ERROR: ErrorId = ErrorId::DbtInteropArgument;
 const CONFIG_ERROR: ErrorId = ErrorId::DbtInteropConfig;
@@ -339,7 +341,7 @@ pub(crate) fn interop_adapter<'py>(
     project_dir: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = adapter_name.py();
-    let builtin: Bound<'py, PyDict> = host::entry(py, AdapterHost::BuiltinAdapterClasses)?
+    let builtin: Bound<'py, PyDict> = host_entry(py, AdapterHost::BuiltinAdapterClasses)?
         .call0()?
         .cast_into()?;
     let mut adapter_class: Option<Bound<'py, PyAny>> = None;
@@ -349,7 +351,7 @@ pub(crate) fn interop_adapter<'py>(
             .getattr("frozenset")?
             .call1((builtin.clone(),))?;
         let local: Bound<'py, PyDict> = call_with(
-            &host::entry(py, AdapterHost::DiscoverProjectAdapters)?,
+            &host_entry(py, AdapterHost::DiscoverProjectAdapters)?,
             &[
                 ("project_dir", project_dir.clone()),
                 ("reserved_names", reserved),

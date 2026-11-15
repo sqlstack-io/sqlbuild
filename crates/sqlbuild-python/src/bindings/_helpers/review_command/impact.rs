@@ -10,9 +10,9 @@ use sqlbuild_analysis::review_command::models::NodeComparison;
 use crate::bindings::_helpers::compiled_views::{model_reads, project_reads};
 use crate::bindings::_helpers::lineage::column_lineage_graph::ProjectColumnLineage;
 use crate::bindings::_helpers::lineage::project_lineage::build_project_column_lineage;
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The columns of a changed model a comparison proved changed, or `None` when every column may.
 fn changed_columns(comparison: Option<&NodeComparison>) -> Option<Vec<String>> {

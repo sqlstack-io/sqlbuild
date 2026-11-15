@@ -17,17 +17,17 @@ use sqlbuild_rules::engine::main::start_speculative_rows::start_speculative_rows
 use sqlbuild_rules::errors::RowsError;
 use sqlbuild_rules::models::{RowsEvaluation, RowsRequest, SpeculativeAnswer, SpeculativeRows};
 
-use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::records::{
     compiled_project_facts, record_model_analyses,
 };
-use crate::bindings::_helpers::records::fields::field;
 use crate::bindings::_helpers::rules::catalogue::references_custom_rules;
 use crate::bindings::_helpers::rules::rule_dispatch::speculative_rules_request;
 use crate::bindings::_helpers::rules::rule_plan::{rule_run_plan, selects_row_rules};
 use crate::bindings::_helpers::rules::rules_config::load_rules_config_with_cache;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const CANCELLED: &str = "native rules evaluation was cancelled";
 const BUILD_PHASE: &str = "early_rules_build_ms";

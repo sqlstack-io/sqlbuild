@@ -9,9 +9,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 
 use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, VisibleDeclarations};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::sql_macro_host::MacroScopes;
 use crate::bindings::_helpers::scopes::declaration_contexts::NativeDeclarationContexts;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const NAME_FIELD: &str = "name";
 const NATIVE_CONTEXTS_ATTRIBUTE: &str = "native_contexts";

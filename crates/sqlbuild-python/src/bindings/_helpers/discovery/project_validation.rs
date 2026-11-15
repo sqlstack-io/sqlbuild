@@ -11,7 +11,7 @@ use sqlbuild_discovery::project_validation::models::{ProjectFacts, ValidationFai
 use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
 use crate::bindings::_helpers::discovery::project_facts::{NodeRow, project_facts};
 use crate::bindings::_helpers::discovery::raised::{failure_error, read_error};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const CSV_MODULE: &str = "csv";
 const BUILTINS_MODULE: &str = "builtins";

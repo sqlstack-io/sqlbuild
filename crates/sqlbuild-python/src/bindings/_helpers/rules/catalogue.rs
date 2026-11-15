@@ -13,16 +13,20 @@ use sqlbuild_rules::models::RulesConfig;
 use sqlbuild_rules::rule_catalogue::main::sorted_catalogue_order::sorted_catalogue_order;
 use sqlbuild_rules::rule_catalogue::models::{CatalogueRule, OptionKind, OptionSpec, OptionValue};
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
-use crate::bindings::_helpers::records::fields::{field as record_field, path_posix, replaced};
 use crate::bindings::_helpers::rules::builtin_catalogue::builtin_rules;
 use crate::bindings::_helpers::rules::config_json::asdict_json;
 use crate::bindings::_helpers::rules::custom_rule_evidence::verify_custom_rules as verify_rule_sources;
 use crate::bindings::_helpers::rules::fact_replay::{project_attribute, project_models};
 use crate::bindings::_helpers::rules::selection::{rules_error, selected_rule_codes};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as record_field;
+use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const JSON_MODULE: &str = "json";
@@ -194,7 +198,7 @@ fn custom_rules<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py,
         ));
     }
     call_with(
-        &host::entry(py, UserCodeHost::LoadCustomRules)?,
+        &host_entry(py, UserCodeHost::LoadCustomRules)?,
         &[("project_dir", project_dir.clone())],
     )?
     .try_iter()?
@@ -241,7 +245,7 @@ pub(crate) fn select_rules<'py>(
     let payloads: Bound<'py, PyAny> = match custom_payloads {
         Some(payloads) if !payloads.is_none() => payloads,
         _ => call_with(
-            &host::entry(py, UserCodeHost::CustomRulePayloads)?,
+            &host_entry(py, UserCodeHost::CustomRulePayloads)?,
             &[
                 ("catalogue", PyTuple::new(py, catalogue)?.into_any()),
                 ("project_dir", project_dir.clone()),

@@ -6,7 +6,6 @@ use pyo3::types::{PyDict, PyString, PyTuple};
 
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::contracts::effective_config::effective_config_settings;
 use crate::bindings::_helpers::contracts::effective_config::effective_config_vars;
 use crate::bindings::_helpers::contracts::effective_config::effective_connection_fields;
@@ -16,10 +15,13 @@ use crate::bindings::_helpers::contracts::spec_resolution::{
 use crate::bindings::_helpers::model_config::template_data::{
     expanded_effective_vars, expanded_template_data, run_id,
 };
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{new_record, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const CONNECTION_LABEL: &str = "effective connection";
 

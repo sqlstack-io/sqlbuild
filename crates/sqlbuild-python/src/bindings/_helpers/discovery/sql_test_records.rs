@@ -16,7 +16,6 @@ use sqlbuild_discovery::sql_tests::models::{
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_execution_limit;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::discovery::faults::{FileFaults, record_tuple};
 use crate::bindings::_helpers::discovery::project_files::path_object;
 use crate::bindings::_helpers::discovery::raised::{
@@ -26,13 +25,14 @@ use crate::bindings::_helpers::discovery::snapshot::{in_snapshot, project_root, 
 use crate::bindings::_helpers::discovery::sql_test_blocks::{
     sql_test_block_records, validate_block_names,
 };
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sqltext::authored_values::map_to_python;
 use crate::bindings::models::NativeProjectTree;
 use sqlbuild_discovery::constants;
 use sqlbuild_discovery::sql_tests::main::sql_test_file_options::sql_test_file_options;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SQL_TESTS_OWNERSHIP_ROOT: &str = "tests/unit";
 const SQL_SCENARIOS_OWNERSHIP_ROOT: &str = "tests/scenarios";

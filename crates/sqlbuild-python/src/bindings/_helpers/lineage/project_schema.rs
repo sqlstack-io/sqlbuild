@@ -6,7 +6,7 @@ use sqlbuild_analysis::lineage::models::{
 };
 
 use crate::bindings::_helpers::compiled_views::model_reads::{declared_rows, inferred_rows};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 type TypedColumns = Vec<(String, Option<String>)>;
 

@@ -18,10 +18,10 @@ use sqlbuild_host::entries::models::FacadeHost;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::ids::NativeAttr;
-use crate::bindings::_helpers::records::registry;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// Hexadecimal digest of length-prefixed UTF-8 `parts`, the digest every native cache key uses.
 #[pyfunction]
@@ -93,13 +93,13 @@ pub(crate) fn save_store(
 pub(crate) fn compiled_code_identity(py: Python<'_>) -> PyResult<String> {
     static INSTALLED: PyOnceLock<String> = PyOnceLock::new();
     let installed: &String = INSTALLED.get_or_try_init(py, || installed_identity(py))?;
-    let build_identity: String = registry::native(py, NativeAttr::BuildIdentity)?.extract()?;
+    let build_identity: String = native_attr(py, NativeAttr::BuildIdentity)?.extract()?;
     Ok(compiled(installed, &build_identity))
 }
 
 /// `compiled_code_identity`, looked up on the extension module so tests can replace it.
 pub(crate) fn current_code_identity(py: Python<'_>) -> PyResult<String> {
-    registry::native(py, NativeAttr::CompiledCodeIdentity)?
+    native_attr(py, NativeAttr::CompiledCodeIdentity)?
         .call0()?
         .extract()
 }
@@ -126,7 +126,7 @@ fn installed_identity(py: Python<'_>) -> PyResult<String> {
             .getattr("minor")?
             .extract()?,
     );
-    let package_file: PathBuf = host::entry(py, FacadeHost::PackageFile)?.extract()?;
+    let package_file: PathBuf = host_entry(py, FacadeHost::PackageFile)?.extract()?;
     let (mut facts, editable) = py
         .compiler_detach(|| Ok(installed_code_facts(&search_paths)))
         .map_err(PyRuntimeError::new_err)?;

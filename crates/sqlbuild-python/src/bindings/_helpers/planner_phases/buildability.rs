@@ -12,11 +12,11 @@ use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::source_tables::check_selected_source_tables_exist;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing_upstream_message;
 use sqlbuild_analysis::planner_identity::main::missing_upstreams::missing_upstreams;
 use sqlbuild_analysis::planner_identity::models::{AvailableUpstreams, GraphKey};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(crate) fn check_selected_scope_buildability<'py>(
     runtime: &Bound<'py, PyAny>,

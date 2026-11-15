@@ -1,8 +1,8 @@
 //! The sparse mapping of a project's `[defaults]` that every model's config layers over.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyList};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Each default in `project_defaults_to_mapping`'s order, and whether a falsy value is unset.
 const DEFAULT_KEYS: [(&str, bool); 31] = [

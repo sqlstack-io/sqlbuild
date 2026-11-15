@@ -7,11 +7,11 @@ use sqlbuild_analysis::identifier_fitting::main::fit_artifact_logical_name::fit_
 use sqlbuild_analysis::identifier_fitting::main::fit_auxiliary_relation_name::fit_auxiliary_relation_name as fit_auxiliary;
 use sqlbuild_host::entries::models::FacadeHost;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::native_host::host;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
 pub(crate) fn shared_error(py: Python<'_>, message: String) -> PyErr {
-    host::entry(py, FacadeHost::SharedInputError)
+    host_entry(py, FacadeHost::SharedInputError)
         .and_then(|class| class.call1((message,)))
         .map_or_else(|error| error, PyErr::from_value)
 }

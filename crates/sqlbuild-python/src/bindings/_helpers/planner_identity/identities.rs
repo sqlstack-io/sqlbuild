@@ -15,22 +15,22 @@ use sqlbuild_analysis::planner_identity::models::{GraphKey, IdentityGraph, Ident
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_identity::hashing::{baselined_model_query_hash, graph_key};
 use crate::bindings::_helpers::planner_identity::metadata::{
     function_local_hashes, model_version_identity_metadata_json, seed_identity,
 };
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn key_of(kind: &str, name: &str) -> GraphKey {
     GraphKey {
@@ -57,7 +57,7 @@ pub(crate) fn hook_version_hashes<'py>(
     let py: Python<'py> = hook_functions.py();
     let hashes: Bound<'py, PyDict> = PyDict::new(py);
     let identities: Bound<'py, PyAny> =
-        host::entry(py, UserCodeHost::BuildHookIdentities)?.call1((hook_functions,))?;
+        host_entry(py, UserCodeHost::BuildHookIdentities)?.call1((hook_functions,))?;
     for item in mapping_items(&identities)?.try_iter()? {
         let (name, identity): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
         hashes.set_item(name, native_field(&identity, "version_hash")?)?;

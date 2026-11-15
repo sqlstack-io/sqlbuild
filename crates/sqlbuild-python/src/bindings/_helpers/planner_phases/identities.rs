@@ -1,6 +1,5 @@
 //! Expected version identities and stale-warning change detection.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_changes::detect::scope_model_changes;
 use crate::bindings::_helpers::planner_identity::identities::direct_model_version_identities;
@@ -10,9 +9,6 @@ use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::objects::native;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::sync::PyOnceLock;
@@ -20,6 +16,10 @@ use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{Py, PyRefMut, Python};
 use sqlbuild_analysis::planner_scope::constants::MODEL;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 use std::collections::{BTreeMap, HashSet};
 
 static IDENTITY_WORK: PyOnceLock<Py<IdentityWork>> = PyOnceLock::new();

@@ -2,13 +2,8 @@
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_migrations::old_name_objects::relation;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PySet, PyTuple};
@@ -16,6 +11,12 @@ use sqlbuild_analysis::planner_migrations::main::{
     declared_column_aliases as aliases, old_name_claim_message as claim, old_name_schemas,
     old_name_skip_reason,
 };
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 pub(crate) fn declared_column_aliases<'py>(
     py: Python<'py>,
@@ -95,7 +96,7 @@ pub(crate) fn old_name_claim_errors<'py>(
         if existing.is_none() {
             continue;
         }
-        let kind = host::entry(py, AdapterHost::NormalizeRelationType)?
+        let kind = host_entry(py, AdapterHost::NormalizeRelationType)?
             .call1((native_field(&existing, "relation_type")?,))?;
         if !kind.eq("view")? {
             continue;

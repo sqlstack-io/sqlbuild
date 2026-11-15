@@ -1,10 +1,10 @@
 //! Existing Python model constructors and scenario diagnostics.
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use pyo3::prelude::{Bound, PyAny, PyErr, PyResult, Python};
 use pyo3::types::PyString;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 pub(super) fn string<'py>(py: Python<'py>, text: &str) -> Bound<'py, PyAny> {
     PyString::new(py, text).into_any()

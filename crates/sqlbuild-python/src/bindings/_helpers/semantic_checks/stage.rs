@@ -7,10 +7,7 @@ use pyo3::types::{PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::panics::NativeCompilerError;
 use crate::bindings::_helpers::compiled_views::model_reads::output_proven;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::rules::early_builtin_rules::start_early_rules;
 use crate::bindings::_helpers::semantic_checks::completion::completed_diagnostics;
 use crate::bindings::_helpers::semantic_checks::metadata::metadata_diagnostics;
@@ -19,6 +16,9 @@ use crate::bindings::_helpers::semantic_checks::type_recovery::{
     StageShared, items, recovered_types,
 };
 use crate::bindings::models::ProjectCatalog;
+use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const NO_CATALOG_MESSAGE: &str =
     "NativeCompilerError: native semantic completion: the project has no analysis catalog";
@@ -113,7 +113,7 @@ fn semantic_metadata_diagnostics<'py>(
 fn project_catalog<'py>(project: &Bound<'py, PyAny>) -> PyResult<PyRef<'py, ProjectCatalog>> {
     let binding_catalog: Bound<'py, PyAny> = native_field(project, "binding_catalog")?;
     if binding_catalog.is_none() {
-        return Err(NativeCompilerError::new_err(NO_CATALOG_MESSAGE));
+        return Err(native_compiler_error(NO_CATALOG_MESSAGE));
     }
     native_field(&binding_catalog, "native")?.extract()
 }

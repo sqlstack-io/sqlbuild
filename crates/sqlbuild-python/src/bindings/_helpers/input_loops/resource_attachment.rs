@@ -20,8 +20,8 @@ use crate::bindings::_helpers::input_loops::audit_loop::{
 };
 use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
 use crate::bindings::_helpers::input_loops::resource_diagnostics::resource_diagnostics;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const RELATIVE_PATH_ATTRIBUTE: &str = "relative_path";
 const SOURCE_OWNER: &str = "source";

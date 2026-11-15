@@ -14,10 +14,6 @@ use sqlbuild_scopes::placement::models::{
 };
 use sqlbuild_scopes::scope_index::models::ResourceIdentity;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::_helpers::records::construct::{enum_member, error_class};
-use crate::bindings::_helpers::records::fields::{field as native_field, replaced_keywords};
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::scopes::compile_usages::{
     MergeRows, SourceRow, merged_usage_rows, model_schema_scope_usages,
 };
@@ -26,7 +22,14 @@ use crate::bindings::_helpers::scopes::scope_objects::{
     ScopeClasses, enum_text, field, identity_row, optional_item, qualified_row, read_completeness,
     read_placement_index, root_object, tuple_attribute, value_of,
 };
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const RUNTIME_USAGE: usize = 2;
 /// Compile input groups whose items carry declaration usages, after the model inputs.

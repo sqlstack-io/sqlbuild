@@ -12,16 +12,16 @@ use sqlbuild_core::cost_report::main::format_cost_breakdown::format_cost_breakdo
 use sqlbuild_core::cost_report::models::BreakdownOptions;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::cost_report::attribution::report_cost_status;
 use crate::bindings::_helpers::cost_report::publication::publish_resource_costs;
 use crate::bindings::_helpers::cost_report::records::cost_run;
 use crate::bindings::_helpers::cost_report::store;
 use crate::bindings::_helpers::cost_telemetry::values::cost_aware;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const LOGGER_NAME: &str = "sqlbuild.cli.commands._helpers.cost.collection";
 const COLLECTION_LOGGER_NAME: &str = "sqlbuild.cost";
@@ -176,7 +176,7 @@ fn summary<'py>(
     message: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(py, ExecutorHost::RunCostSummary)?,
+        &host_entry(py, ExecutorHost::RunCostSummary)?,
         &[
             ("status", status),
             ("usd_per_credit", native_field(config, "usd_per_credit")?),
@@ -252,7 +252,7 @@ fn collection_failure<'py>(
         COLLECTION_LOGGER_NAME,
     )?;
     let status: Bound<'py, PyAny> =
-        host::entry(py, ExecutorHost::CostStatus)?.getattr("COLLECTION_FAILED")?;
+        host_entry(py, ExecutorHost::CostStatus)?.getattr("COLLECTION_FAILED")?;
     report_cost_status(&status)?;
     let message: Bound<'py, PyAny> = PyString::new(
         py,
@@ -327,7 +327,7 @@ pub(crate) fn finalize_build_cost<'py>(
             return collection_failure(finalization, rate, "capability detection", &error);
         }
     };
-    if capability.eq(host::entry(py, ExecutorHost::CostCapability)?.getattr("NONE")?)? {
+    if capability.eq(host_entry(py, ExecutorHost::CostCapability)?.getattr("NONE")?)? {
         return Ok(py.None().into_bound(py));
     }
     let cost: Bound<'py, PyAny> = if native_field(finalization, "collect")?.is_truthy()? {

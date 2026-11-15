@@ -9,7 +9,6 @@ use pyo3::types::{
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::compiled_project::models::CompiledModelFacts;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::compiled_project::project::{
     AnalysisPy, NativeCompiledProject, ProofPy, model_facts,
 };
@@ -18,10 +17,13 @@ use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompil
 use crate::bindings::_helpers::compiled_views::inputs_view::NativeInputsView;
 use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::record_spec;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::record_spec::record_spec;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const DECIMAL_KIND: &str = "decimal";

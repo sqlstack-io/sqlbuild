@@ -283,13 +283,16 @@ OBSERVABILITY_DEFINITION_MODULES: tuple[tuple[str, ...], ...] = (
     ("sqlbuild", "runtime", "observability", "models"),
 )
 PUBLIC_EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "sinks")
-NATIVE_BINDINGS_ROOT: str = "crates/sqlbuild-python/src/"
+NATIVE_BINDINGS_ROOTS: tuple[str, ...] = (
+    "crates/sqlbuild-python/src/",
+    "crates/sqlbuild-python-base/src/",
+)
 NATIVE_CROSSING_PATTERNS: tuple[str, ...] = (
     r"\.getattr\(",
     r"\.setattr\(",
     r"\.call_method[01]?\(",
     r"\.call[01]?\(",
-    r"\bregistry::(?:native|error)\(",
+    r"\b(?:registry::(?:native|error)|native_attr)\(",
     r"\bimported\(",
     r"\.import\(",
     r"\bPyModule::import\(",

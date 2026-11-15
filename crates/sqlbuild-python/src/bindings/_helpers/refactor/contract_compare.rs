@@ -7,15 +7,16 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::contracts::spec_resolution::matching_dynamic_families;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{enum_from_value, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::type_system::equality::types_equal as native_types_equal;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 const MODEL_RESOURCE: &str = "model";
 const SOURCE_RESOURCE: &str = "source";
@@ -96,7 +97,7 @@ fn column_infos<'py>(
     py: Python<'py>,
     columns: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let column_type: Bound<'py, PyAny> = host::entry(py, AdapterHost::ColumnInfo)?;
+    let column_type: Bound<'py, PyAny> = host_entry(py, AdapterHost::ColumnInfo)?;
     let mut infos: Vec<Bound<'py, PyAny>> = Vec::new();
     for column in columns.try_iter()? {
         let column: Bound<'py, PyAny> = column?;
@@ -446,7 +447,7 @@ fn compare_contract_evidence<'py>(
 fn relation_info<'py>(item: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = item.py();
     keyword_call(
-        &host::entry(py, AdapterHost::RelationInfo)?,
+        &host_entry(py, AdapterHost::RelationInfo)?,
         vec![
             ("database", native_field(item, "database")?),
             ("schema", native_field(item, "schema")?),

@@ -14,17 +14,18 @@ use sqlbuild_cursor::algebra::models::{
 use sqlbuild_cursor::algebra::types::ZoneRules;
 use sqlbuild_host::entries::models::FacadeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::cursor::values::{
     DATETIME_MODULE, civil_date, local_date_time, naive_date_time, plain_date, replaced,
     timedelta_micros,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{
-    enum_from_value, new_record_with, record_class,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Cursor grain names, finest first.
 pub(crate) const GRAIN_NAMES: [(&str, Grain); 6] = [
@@ -38,8 +39,7 @@ pub(crate) const GRAIN_NAMES: [(&str, Grain); 6] = [
 
 /// `CursorAlgebraError(message)`.
 pub(crate) fn algebra_error(py: Python<'_>, message: &str) -> PyErr {
-    match host::entry(py, FacadeHost::CursorAlgebraError).and_then(|class| class.call1((message,)))
-    {
+    match host_entry(py, FacadeHost::CursorAlgebraError).and_then(|class| class.call1((message,))) {
         Ok(error) => PyErr::from_value(error),
         Err(error) => error,
     }

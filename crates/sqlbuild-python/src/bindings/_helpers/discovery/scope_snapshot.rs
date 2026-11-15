@@ -22,11 +22,12 @@ use crate::bindings::_helpers::discovery::sql_test_records::{
     discover_scenario_files, discover_test_files,
 };
 use crate::bindings::_helpers::discovery::yaml_records::discover_source_files;
-use crate::bindings::_helpers::records::construct::{new_record, new_record_with};
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
 const FALLBACK_PROJECT_NAME: &str = "project";
 const FALLBACK_ADAPTER: &str = "duckdb";

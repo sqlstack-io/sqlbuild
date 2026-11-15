@@ -11,8 +11,10 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::PyTuple;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, context_variable, imported};
-use crate::bindings::_helpers::native_host::host;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::context_variable::context_variable;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
 const CONTEXT_VARIABLE: &str = "sqlbuild_output_capture_context";
 static CURRENT_CONTEXT: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
@@ -28,7 +30,7 @@ pub(crate) struct CommandOutputContext {
 impl CommandOutputContext {
     fn __enter__(&self, py: Python<'_>) -> PyResult<()> {
         let context = call_with(
-            &host::entry(py, ExecutorHost::OutputCaptureContext)?,
+            &host_entry(py, ExecutorHost::OutputCaptureContext)?,
             &[(
                 "external_context",
                 imported(py, "builtins", "dict")?.call1((self.external_context.bind(py),))?,

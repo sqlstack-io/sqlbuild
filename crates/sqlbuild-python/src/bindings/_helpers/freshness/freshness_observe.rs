@@ -12,19 +12,19 @@ use sqlbuild_core::freshness_text::main::freshness_json::freshness_json;
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::freshness::observation::{
     Observer, observation_record, observation_source, observe_adapter_batch, observe_configured,
     strategy,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::state_rows::freshness::{age_policy, equivalent};
 use sqlbuild_core::freshness_text::main::freshness_status::freshness_status;
 use sqlbuild_core::freshness_text::models::{
     FreshnessSourceResult, FreshnessStatus, StateComparison,
 };
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const UNAVAILABLE_REASON: &str = "unavailable";
@@ -279,7 +279,7 @@ pub(crate) fn observe_freshness(
     let Some(run_id) = run_id else {
         return observe_sources(observer, &chosen, state);
     };
-    let scope: Bound<'_, PyAny> = host::entry(py, ExecutorHost::RunScope)?.call1((run_id,))?;
+    let scope: Bound<'_, PyAny> = host_entry(py, ExecutorHost::RunScope)?.call1((run_id,))?;
     scope.call_method0("__enter__")?;
     match observe_sources(observer, &chosen, state) {
         Ok(results) => {

@@ -36,8 +36,9 @@ from scripts.fensu_policy.models import LayerPlan
     slug="native-python-crossing",
     message="native bindings must not call back into Python outside the configured edges",
     remediation=(
-        "Read native records with records::fields::field, build them with records::construct, "
-        "call Rust functions directly, or route a real edge through bindings/_helpers/native_host."
+        "Read native records with sqlbuild_python_base::records::main::fields, build them with "
+        "sqlbuild_python_base::records::main::construct, call Rust functions directly, or route "
+        "a real edge through sqlbuild_python_base::native_host."
     ),
     analyzers=(AnalyzerId.RUST,),
     options=(NATIVE_EDGE_PATHS, NATIVE_PENDING_BUDGETS),
@@ -54,7 +55,7 @@ def native_python_crossing(*, file: File, ctx: RuleContext) -> list[Fault]:
     message="native bindings must not store Python objects outside the configured edges",
     remediation=(
         "Store Rust values or typed native records; keep Python objects only in "
-        "bindings/_helpers/native_host for user values, adapters, hooks and streams."
+        "sqlbuild_python_base::native_host for user values, adapters, hooks and streams."
     ),
     analyzers=(AnalyzerId.RUST,),
     options=(NATIVE_EDGE_PATHS, NATIVE_PENDING_BUDGETS),

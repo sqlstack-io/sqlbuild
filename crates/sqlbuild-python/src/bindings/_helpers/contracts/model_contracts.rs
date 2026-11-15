@@ -16,10 +16,10 @@ use sqlbuild_analysis::contracts::models::{
 use sqlbuild_analysis::sql_macros::main::untyped_call_outputs::untyped_call_outputs;
 use sqlbuild_analysis::type_system::errors::TypeNormalizationError;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::type_system::normalization::normalization_error;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// One contract diagnostic: its code, severity, message, column, location, related output and help.
 #[derive(Clone)]

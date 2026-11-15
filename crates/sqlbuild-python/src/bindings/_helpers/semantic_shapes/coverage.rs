@@ -8,10 +8,10 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::compile_context::delta::ModelCoverage;
 use crate::bindings::_helpers::compiled_views::model_reads::{inferred_rows, star_flags};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::semantic_shapes::delta_shapes::semantic_reasons;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
 use sqlbuild_project::types::InferredRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const TYPE_CHECKED_DIALECTS: [&str; 4] = ["duckdb", "snowflake", "postgresql", "bigquery"];
 const SOURCE_KIND: &str = "source";

@@ -25,7 +25,6 @@ use crate::bindings::_helpers::model_config::config_templates::{
 use crate::bindings::_helpers::project_assembly::resources::{
     syntax_error_message, syntax_error_messages,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::declaration_expansion::{
     DeclarationExpansion, ExpandedDeclarations, ExpansionClasses, ExpansionConsumer,
     expand_declarations,
@@ -35,6 +34,7 @@ use crate::bindings::_helpers::scopes::declaration_contexts::NativeDeclarationCo
 use crate::bindings::_helpers::sqltext::declaration_references::declaration_scan;
 use crate::bindings::_helpers::sqltext::static_sql::{InterpolationSources, interpolated};
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MACRO_TOKEN: char = '@';
 const NATIVE_CONTEXTS_ATTRIBUTE: &str = "native_contexts";

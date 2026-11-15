@@ -4,8 +4,8 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 use crate::bindings::_helpers::model_config::errors::NativeConfigError;
-use crate::bindings::_helpers::records::getters::class_of;
-use crate::bindings::_helpers::records::models::GetterEntry;
+use sqlbuild_python_base::records::main::registry::class_of::class_of;
+use sqlbuild_python_base::records::models::GetterEntry;
 
 /// The getter readers of this module's native pyclasses.
 pub(crate) const GETTERS: &[GetterEntry] = &[GetterEntry {

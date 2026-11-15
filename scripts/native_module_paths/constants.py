@@ -3,6 +3,7 @@
 import re
 
 SCANNED_SOURCE_ROOTS: tuple[str, ...] = (
+    "crates/sqlbuild-python-base/src",
     "crates/sqlbuild-python/src",
     "crates/sqlbuild-cli/src",
     "crates/sqlbuild-host/src",

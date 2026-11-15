@@ -10,9 +10,9 @@ use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_
 use sqlbuild_model_config::execution_limits::models::ExecutionLimit;
 
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
-use crate::bindings::_helpers::records::construct::new_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const INVALID_TIMEOUT_CODE: &str = "C418";
 const LOCAL_FILE: &str = "sqlbuild_local.toml";

@@ -11,20 +11,20 @@ use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_analysis::semantic_validation::models as validation;
 use sqlbuild_analysis::semantic_validation::models::DiagnosticRow;
 
-use crate::bindings::types::IntoPositional;
 use sqlbuild_analysis::semantic_validation::types::{BindingRequest, Relations};
+use sqlbuild_python_base::types::IntoPositional;
 
 use crate::bindings::_helpers::analysis::conversions;
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::fields::mapping_values;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::models::{CatalogInput, ProjectCatalog};
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// Dialects whose quoted identifiers bind case-sensitively unless the session says otherwise.
 pub(crate) const CASE_SENSITIVE_BINDING_DIALECTS: [&str; 2] = ["snowflake", "postgresql"];

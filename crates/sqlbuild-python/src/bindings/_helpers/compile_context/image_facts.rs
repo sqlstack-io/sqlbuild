@@ -6,7 +6,7 @@ use sqlbuild_cache::digest::main::bytes_digest::bytes_digest;
 use sqlbuild_cache::digest::main::hex_digest::hex_digest;
 
 use crate::bindings::_helpers::compile_context::delta::{capture, capture_unsupported};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Record the digest of one model's scope usages, which decide declaration placement.
 pub(crate) fn record_model_usages(

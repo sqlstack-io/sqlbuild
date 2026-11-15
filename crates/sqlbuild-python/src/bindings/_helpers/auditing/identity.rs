@@ -1,8 +1,5 @@
 //! Audit gate identities of planned audits, built as `AuditGateIdentity` objects.
 
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
@@ -10,6 +7,9 @@ use sqlbuild_analysis::auditing::main::audit_gate_identity::audit_gate_identity;
 use sqlbuild_analysis::auditing::models::{
     GateIdentity, MeasurementFacts, PlannedAudit, ThresholdBound, Thresholds,
 };
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const MEASUREMENT_MODE: &str = "measurement";
 

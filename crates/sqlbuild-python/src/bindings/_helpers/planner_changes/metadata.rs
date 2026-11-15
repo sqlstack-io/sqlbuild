@@ -8,7 +8,7 @@ use sqlbuild_analysis::planner_changes::main::with_declared_columns_hash::with_d
 use sqlbuild_analysis::planner_changes::main::without_declared_columns_hash::without_declared_columns_hash as without_hash;
 use sqlbuild_analysis::planner_changes::models::IdentityPayload;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 /// The decoded metadata that participates in version identity, the raw text when it is not JSON, or `None`.
 #[pyfunction]

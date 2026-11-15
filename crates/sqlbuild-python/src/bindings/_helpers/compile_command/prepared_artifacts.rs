@@ -7,9 +7,6 @@ use pyo3::prelude::{
 use pyo3::types::{PyCFunction, PyDict, PyFrozenSet, PyTuple};
 use pyo3::{IntoPyObjectExt, pyclass, pymethods};
 
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, imported, keywords,
-};
 use crate::bindings::_helpers::compile_command::reuse_recording::CompileArtifactWrites;
 use crate::bindings::_helpers::compile_command::target_writer::{
     PlannedStaticSqlTests, plan_tests,
@@ -21,7 +18,11 @@ use crate::bindings::_helpers::compile_driver::stage_work::{
     BACKGROUND_SQL_TEST_PLANS, count_stage,
 };
 use crate::bindings::_helpers::compile_outputs::artifacts::staged_artifact_files;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MIN_PREPARED_ARTIFACT_MODELS: usize = 128;
 const MAX_PREPARED_ARTIFACT_MODELS: usize = 5000;

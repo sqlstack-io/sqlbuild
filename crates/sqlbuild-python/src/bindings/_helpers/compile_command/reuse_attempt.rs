@@ -16,7 +16,6 @@ use sqlbuild_core::command_output::constants::INVOCATION_CONTEXT_ENV;
 use sqlbuild_cli::replay::constants::{LAUNCH_RECORD_DIRECTORY, LAUNCH_RECORD_FORMAT};
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
 use crate::bindings::_helpers::build_progress::progress::{
     NativeProgressProjector, current_projector,
 };
@@ -51,11 +50,14 @@ use crate::bindings::_helpers::compile_outputs::reuse::{
 use crate::bindings::_helpers::discovery::project_config::warn_deprecated_settings;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
 use crate::bindings::_helpers::macro_bridge::first_compile::keep_delta_claim;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::NativeAttr;
-use crate::bindings::_helpers::records::registry;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
 
 const REUSE_REQUEST: FacadeHost = FacadeHost::CompileReuseRequest;
 const HIT: &str = "hit";
@@ -88,7 +90,7 @@ fn reuse_debug_with<'py>(
 /// The reuse constants the native check, the stored compile and the launch record share.
 pub(crate) fn reuse_rules(py: Python<'_>) -> PyResult<ReuseRulesPy> {
     let mut excluded_root: Vec<String> =
-        registry::native(py, NativeAttr::CompileReuseExcludedRootDirectories)?
+        native_attr(py, NativeAttr::CompileReuseExcludedRootDirectories)?
             .try_iter()?
             .map(|value| value?.extract())
             .collect::<PyResult<_>>()?;
@@ -111,7 +113,7 @@ pub(crate) fn reuse_rules(py: Python<'_>) -> PyResult<ReuseRulesPy> {
             ),
         ],
         config_filenames: PROJECT_CONFIG_FILENAMES.map(str::to_owned).into(),
-        racy_window_ns: registry::native(py, NativeAttr::CompileReuseRacyWindowNs)?.extract()?,
+        racy_window_ns: native_attr(py, NativeAttr::CompileReuseRacyWindowNs)?.extract()?,
         max_stored_entries: REUSE_MAX_STORED_ENTRIES as usize,
         max_entry_bytes: REUSE_MAX_ENTRY_BYTES as usize,
         missing_environment_value: MISSING_ENVIRONMENT_VALUE.to_owned(),
@@ -140,7 +142,7 @@ fn launch_payload<'py>(
     let capture: Bound<'py, PyAny> = if py
         .import("sys")?
         .getattr("stdout")?
-        .is_instance(&host::entry(py, ExecutorHost::TextComputeLogTee)?)?
+        .is_instance(&host_entry(py, ExecutorHost::TextComputeLogTee)?)?
     {
         let logs: Bound<'py, PyAny> = resolved
             .call_method1("__truediv__", (COMPUTE_LOG_DIRECTORY_NAME,))?
@@ -174,7 +176,7 @@ fn launch_payload<'py>(
     payload.set_item("search_path", search_path)?;
     payload.set_item(
         "startup_inputs",
-        host::entry(py, FacadeHost::StartupInputs)?.call0()?,
+        host_entry(py, FacadeHost::StartupInputs)?.call0()?,
     )?;
     payload.set_item("json_output", native_field(attempt, "json_output")?)?;
     let native_rules: ReuseRulesPy = reuse_rules(py)?;
@@ -460,7 +462,7 @@ fn reuse_request<'py>(request: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>
         fields.push((name, native_field(request, name)?));
     }
     fields.push(("profiling", profiling.into_bound_py_any(py)?));
-    call_with(&host::entry(py, REUSE_REQUEST)?, &fields)
+    call_with(&host_entry(py, REUSE_REQUEST)?, &fields)
 }
 
 /// Run one compile command request, replaying the previous compile when nothing changed.

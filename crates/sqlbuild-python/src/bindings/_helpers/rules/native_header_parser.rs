@@ -12,10 +12,10 @@ use sqlbuild_sqltext::compiler::models::{AuthoredValue, HeaderWord};
 use sqlbuild_sqltext::header_strings::main::quote_failure::quote_failure;
 use sqlbuild_sqltext::header_strings::models::QuoteFailure;
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::sqltext::model_headers::header_failure;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// The path header rules report header syntax errors at.
 const SENTINEL_PATH: &str = "<lint>";

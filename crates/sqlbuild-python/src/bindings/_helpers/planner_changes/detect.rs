@@ -9,10 +9,10 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::contracts::spec_resolution::matching_dynamic_families;
 use crate::bindings::_helpers::model_config::typed_config::{config_text, model_values};
 use crate::bindings::_helpers::planner_changes::results::native_enum;
-use crate::bindings::_helpers::records::construct::new_record_with;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 
 use sqlbuild_analysis::planner_changes::constants::{
     CASE_FOLDING_DIALECT, EMPTY_FINGERPRINT_METADATA_JSON,
@@ -30,9 +30,7 @@ use sqlbuild_analysis::planner_changes::models::{
     SchemaFindingRow,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::compiled_views::model_reads::{inferred_rows, star_flags};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_changes::renames::origin_names;
 use crate::bindings::_helpers::planner_changes::results::{
     backfill_result, change_kind, planner_enum, replay_policy_error, schema_findings,
@@ -45,13 +43,17 @@ use crate::bindings::_helpers::planner_identity::metadata::{
     model_version_identity_metadata_json,
 };
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::semantic_shapes::shapes::snapshot_validity_columns;
 use crate::bindings::_helpers::type_system::equality::types_equal as native_types_equal;
 use sqlbuild_project::types::InferredRow;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 
 const CHANGES_LOGGER: &str = "sqlbuild.planner.changes";
 const REPLAY_CONFIG_KEY: &str = "replay_on_change";
@@ -232,7 +234,7 @@ pub(crate) fn scope_model_changes<'py>(
     )?
     .into_any();
     let hook_version_hashes: Bound<'py, PyDict> = PyDict::new(py);
-    let identities: Bound<'py, PyAny> = host::entry(py, UserCodeHost::BuildHookIdentities)?
+    let identities: Bound<'py, PyAny> = host_entry(py, UserCodeHost::BuildHookIdentities)?
         .call1((native_field(project, "hook_functions")?,))?;
     for item in mapping_items(&identities)?.try_iter()? {
         let item: Bound<'py, PyAny> = item?;
@@ -444,7 +446,7 @@ fn log_query_check(
         imported(py, "logging", "getLogger")?.call1((CHANGES_LOGGER,))?;
     let text = |value: &str| PyString::new(py, value).into_any();
     call_with(
-        &host::entry(py, ExecutorHost::LogDebugEvent)?,
+        &host_entry(py, ExecutorHost::LogDebugEvent)?,
         &[
             ("logger", logger.clone()),
             (
@@ -469,7 +471,7 @@ fn log_query_check(
             ),
         ],
     )?;
-    let log_sql: Bound<'_, PyAny> = host::entry(py, ExecutorHost::LogSql)?;
+    let log_sql: Bound<'_, PyAny> = host_entry(py, ExecutorHost::LogSql)?;
     call_with(
         &log_sql,
         &[

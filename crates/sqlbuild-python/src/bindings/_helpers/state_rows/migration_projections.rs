@@ -11,12 +11,12 @@ use sqlbuild_state::events::models::{
     ColumnEventKey, EventOrder, EventRelation, MoveEventKey, OldNameFactKey, OldNameStep,
 };
 
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::state_rows::constants::OLD_NAME_VIEW_CONFIG_KEY;
 use crate::bindings::_helpers::state_rows::events::relation as event_relation;
 use crate::bindings::_helpers::state_rows::migration_objects::event_order;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn collected<'py>(events: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
     events.try_iter()?.collect()

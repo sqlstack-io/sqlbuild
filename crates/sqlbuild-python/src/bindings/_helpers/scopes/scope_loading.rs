@@ -11,7 +11,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_host::entries::models::{AdapterHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::inputs::{InputsRequest, attached_inputs};
 use crate::bindings::_helpers::compile_driver::project::compile_adapter_context;
@@ -19,10 +18,6 @@ use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_ada
 use crate::bindings::_helpers::discovery::scope_snapshot::discover_scope_snapshot;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::scopes::scope_cache::{
     project_fingerprint, read_scope_index_cache, write_scope_index_cache,
 };
@@ -31,6 +26,11 @@ use crate::bindings::_helpers::scopes::scope_tolerant::scope_tolerant_index;
 use crate::bindings::_helpers::scopes::scope_validation::scope_index_with_compile_usages;
 use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_EXPECTED_MODELS_SCAN_ALGORITHM;
 use pyo3::IntoPyObjectExt;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SCOPE_CACHE_DIRECTORY_NAME: &str = "declaration-scopes-v2";
 const SCOPE_CACHE_FILENAME: &str = "scope-index.json";
@@ -65,7 +65,7 @@ fn project_adapter<'py>(
     )
     .and_then(|value| value.into_bound_py_any(py))?;
     let adapter: Bound<'py, PyAny> = call_with(
-        &host::entry(py, AdapterHost::ResolveAdapter)?,
+        &host_entry(py, AdapterHost::ResolveAdapter)?,
         &[("adapter_name", adapter_name)],
     )?;
     Ok((discovered, adapter))
@@ -115,7 +115,7 @@ fn tolerant_index<'py>(
     let snapshot: Bound<'py, PyAny> = discover_scope_snapshot(project_dir)?;
     let discovered: Bound<'py, PyAny> = native_field(&snapshot, "discovered_inputs")?;
     let inventory: Bound<'py, PyAny> = call_with(
-        &host::entry(py, UserCodeHost::InventoryProjectMacros)?,
+        &host_entry(py, UserCodeHost::InventoryProjectMacros)?,
         &[("macro_files", native_field(&discovered, "macro_files")?)],
     )?;
     let native: Bound<'py, PyAny> = Bound::new(

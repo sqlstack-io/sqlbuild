@@ -4,8 +4,9 @@ use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_cursor::algebra::models::{CivilDate, LocalDateTime};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(crate) const DATETIME_MODULE: &str = "datetime";
 const MICROS_PER_SECOND: i64 = 1_000_000;

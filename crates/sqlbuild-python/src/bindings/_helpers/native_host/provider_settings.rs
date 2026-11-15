@@ -6,10 +6,11 @@ use pyo3::types::{PyDict, PyDictMethods};
 use serde_json::{Value, json};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::native_host::constants::{ALIAS_PREFIX_TARGET, ALL_PREFIX_TARGET};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 const VALIDATION_ERROR: (&str, &str) = ("pydantic", "ValidationError");
 const MISSING_ERROR_TYPE: &str = "missing";
@@ -27,7 +28,7 @@ pub(crate) enum ProviderState<'py> {
 pub(crate) fn provider_class_settings(provider_class: &Bound<'_, PyAny>) -> PyResult<Value> {
     let py: Python<'_> = provider_class.py();
     let settings: Bound<'_, PyAny> = call_with(
-        &host::entry(py, UserCodeHost::ProviderSettings)?,
+        &host_entry(py, UserCodeHost::ProviderSettings)?,
         &[("provider_class", provider_class.clone())],
     )?;
     let text: String = imported(py, "json", "dumps")?

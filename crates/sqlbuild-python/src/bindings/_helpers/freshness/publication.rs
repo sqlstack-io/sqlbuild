@@ -5,18 +5,19 @@ use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, imported, within,
-};
 use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::freshness::state_io::write_source_freshness_records;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Observed records grouped by `(database, schema)` in first-seen order.
 type RecordsByLocation<'py> = Vec<(
@@ -28,7 +29,7 @@ type RecordsByLocation<'py> = Vec<(
 fn successful_model_names(result: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     let py = result.py();
     let success: Bound<'_, PyAny> =
-        host::entry(py, ExecutorHost::ExecutionStatus)?.getattr("SUCCESS")?;
+        host_entry(py, ExecutorHost::ExecutionStatus)?.getattr("SUCCESS")?;
     let mut names: Vec<String> = Vec::new();
     for model_result in native_field(result, "model_results")?.try_iter()? {
         let model_result: Bound<'_, PyAny> = model_result?;
@@ -262,19 +263,19 @@ pub(crate) fn append_freshness_records<'py>(
     if record_count == 0 {
         return Ok(());
     }
-    let run_scope: Bound<'py, PyAny> = host::entry(py, ExecutorHost::RunScope)?.call1((run_id,))?;
+    let run_scope: Bound<'py, PyAny> = host_entry(py, ExecutorHost::RunScope)?.call1((run_id,))?;
     within(&run_scope, |_| {
         let metadata: Bound<'py, PyDict> = PyDict::new(py);
         metadata.set_item("item_count", record_count)?;
         let attributes: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::OperationAttributes)?,
+            &host_entry(py, ExecutorHost::OperationAttributes)?,
             &[
                 ("phase", PyString::new(py, "publish").into_any()),
                 ("target_kind", PyString::new(py, "state_batch").into_any()),
             ],
         )?;
         let lifecycle: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::OperationLifecycle)?,
+            &host_entry(py, ExecutorHost::OperationLifecycle)?,
             &[
                 ("operation_kind", PyString::new(py, "freshness").into_any()),
                 (

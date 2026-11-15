@@ -23,10 +23,11 @@ use sqlbuild_state::consumption::models::{
 use sqlbuild_state::execution_history::constants::MEMORY_PATH;
 use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, SqliteCursor};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 create_exception!(
     sqlbuild._native,
@@ -368,7 +369,7 @@ impl SyncedCopyAdapter {
         record: &WarehouseCatalogRecord,
     ) -> PyResult<Bound<'py, PyAny>> {
         call_with(
-            &host::entry(py, AdapterHost::RelationInfo)?,
+            &host_entry(py, AdapterHost::RelationInfo)?,
             &[
                 (
                     "database",
@@ -393,7 +394,7 @@ impl SyncedCopyAdapter {
         py: Python<'py>,
         record: &WarehouseCatalogRecord,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        let column_info: Bound<'py, PyAny> = host::entry(py, AdapterHost::ColumnInfo)?;
+        let column_info: Bound<'py, PyAny> = host_entry(py, AdapterHost::ColumnInfo)?;
         let mut columns: Vec<Bound<'py, PyAny>> = Vec::with_capacity(record.columns.len());
         for column in &record.columns {
             columns.push(call_with(

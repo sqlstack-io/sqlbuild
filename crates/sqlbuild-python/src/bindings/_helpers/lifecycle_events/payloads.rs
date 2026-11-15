@@ -5,13 +5,13 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyList, PyStrin
 use sqlbuild_core::lifecycle_events::models::PayloadValue;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 /// `ObservabilityValidationError(message)`.
 pub(crate) fn validation_error(py: Python<'_>, message: &str) -> PyErr {
-    match host::entry(py, ExecutorHost::ObservabilityValidationError)
+    match host_entry(py, ExecutorHost::ObservabilityValidationError)
         .and_then(|class| class.call1((message,)))
     {
         Ok(error) => PyErr::from_value(error),

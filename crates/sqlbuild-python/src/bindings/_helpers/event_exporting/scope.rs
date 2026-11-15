@@ -12,15 +12,16 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, context_variable,
-};
 use crate::bindings::_helpers::event_exporting::constants::SCOPE_CONTEXT_VARIABLE;
 use crate::bindings::_helpers::event_exporting::models::BoundEventExporter;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::provider_settings::{ProviderState, provider_state};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::context_variable::context_variable;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 static CURRENT_SCOPE: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
@@ -103,7 +104,7 @@ fn bindable(
     for usage in native_field(declaration, "provider_usages")?.try_iter()? {
         let provider: String = native_field(&usage?, "provider_name")?.extract()?;
         if let Some(variables) = missing.get(&provider) {
-            host::write_console(
+            write_console(
                 declaration.py(),
                 "stderr",
                 &format!(
@@ -150,7 +151,7 @@ fn bindings<'py>(
             .into_any(),
         );
     }
-    let sink_class: Bound<'py, PyAny> = host::entry(py, ExecutorHost::BoundCommandOutputSink)?;
+    let sink_class: Bound<'py, PyAny> = host_entry(py, ExecutorHost::BoundCommandOutputSink)?;
     let mut sinks: Vec<Bound<'py, PyAny>> = Vec::new();
     for sink in command_output_sinks.try_iter()? {
         let sink: Bound<'py, PyAny> = sink?;
@@ -212,7 +213,7 @@ impl EventExporterCommandScope {
         }
         let missing: HashMap<String, Vec<String>> = providers_missing_secrets(&providers)?;
         let session: Bound<'_, PyAny> = call_with(
-            &host::entry(py, UserCodeHost::BuildProviderSession)?,
+            &host_entry(py, UserCodeHost::BuildProviderSession)?,
             &[
                 ("discovered_providers", providers),
                 ("allow_shared", PyBool::new(py, false).to_owned().into_any()),

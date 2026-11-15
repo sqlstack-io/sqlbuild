@@ -17,7 +17,7 @@ use crate::bindings::_helpers::execution_history::conversion::{
     checked, event_filter_spec, exact_int, projection_facts, run_filter_spec, run_records,
     run_rows, text_of, utc_zone,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Return the required stable ID from a known or opaque lifecycle event.
 #[pyfunction]

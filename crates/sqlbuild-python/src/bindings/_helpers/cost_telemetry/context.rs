@@ -6,10 +6,12 @@ use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObjectExt, pyclass, pymethods};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::cost_telemetry::values::process_object;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const CONTEXT_VARIABLE_NAME: &str = "sqlbuild_cost_resource_context";
 const DEFAULT_PHASE: &str = "execute";
@@ -111,7 +113,7 @@ impl CostContext {
             }
         };
         let context: Bound<'_, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::CostResourceContext)?,
+            &host_entry(py, ExecutorHost::CostResourceContext)?,
             &[
                 ("run_id", arguments.value("run_id")?),
                 ("resource_type", arguments.value("resource_type")?),
@@ -161,7 +163,7 @@ impl CostContext {
             DEFAULT_ATTEMPT.into_bound_py_any(py)?
         };
         let context: Bound<'_, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::CostResourceContext)?,
+            &host_entry(py, ExecutorHost::CostResourceContext)?,
             &[
                 ("run_id", native_field(&current, "run_id")?),
                 ("resource_type", arguments.value("resource_type")?),

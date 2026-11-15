@@ -15,9 +15,10 @@ use crate::bindings::_helpers::compiled_views::model_input_view::{
 use crate::bindings::_helpers::compiled_views::source_views::{
     AttachedSource, SourceViews, read_source_view,
 };
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::fields::{enum_member_value, field as native_field};
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::fields::enum_member_value::enum_member_value;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const UNKNOWN_TYPE: &str = "UNKNOWN";
 const NOT_NULL_AUDIT_NAME: &str = "not_null";

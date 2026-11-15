@@ -8,6 +8,7 @@ use sqlbuild_analysis::binding_locations::models::{
     AuthoredSpan, BindingSource, LocatedDiagnostic,
 };
 use sqlbuild_analysis::semantic_validation::models::{DiagnosticRow, Expansion};
+use sqlbuild_python_base::positional_record;
 
 use crate::bindings::models::Positional;
 

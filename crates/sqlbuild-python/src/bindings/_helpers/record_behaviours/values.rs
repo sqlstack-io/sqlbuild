@@ -1,10 +1,10 @@
 //! Computed attributes of the natively hosted SQL value and fingerprint records.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_values;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 
 /// `SqlLogicalType.display_name`: the kind, with its element type in angle brackets.
 pub(crate) fn logical_type_display_name(instance: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {

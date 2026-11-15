@@ -19,11 +19,13 @@ use sqlbuild_config::dbt_manifest::models::{
     ManifestNode, NodeChecksum, ParsedModel, ParsedSeed, ParsedSource,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DBT_REF_KIND: &str = "dbt_ref";
 const RELATION_OPTIONS: (&[&str], &[&str]) =

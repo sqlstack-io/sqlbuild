@@ -14,11 +14,11 @@ use sqlbuild_core::dbt_command::models::ForwardedArg;
 use crate::bindings::_helpers::build_progress::progress_reporters::DbtInitProgressReporter;
 use crate::bindings::_helpers::dbt_command::init_project::build_dbt_init_project;
 use crate::bindings::_helpers::dbt_command::support::{color_enabled, flag, path, stream};
-use crate::bindings::_helpers::records::construct::new_record_with;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn project_config_found(directory: &Bound<'_, PyAny>) -> PyResult<bool> {
     let name: Bound<'_, PyAny> =

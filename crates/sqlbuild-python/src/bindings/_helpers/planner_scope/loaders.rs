@@ -6,15 +6,15 @@ use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::planner_scope::values::{
     dependency_names, edges, keys, loader_graph, loader_names, project_graph,
 };
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, IntoPyObject, PyAny, PyAnyMethods, PyResult, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::planner_scope::main::{
     expand_loaders::expand_loaders, intermediate_sources::intermediate_sources,
 };
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 use std::collections::HashSet;
 
 #[pyfunction]

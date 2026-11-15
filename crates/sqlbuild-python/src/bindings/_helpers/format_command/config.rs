@@ -9,9 +9,9 @@ use pyo3::types::PyString;
 use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
 use sqlbuild_rules::lint_text::models::FormatSettings;
 
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::rules::rules_config::load_rules_config;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Format settings resolved for one run.
 pub(crate) struct FormatConfig {

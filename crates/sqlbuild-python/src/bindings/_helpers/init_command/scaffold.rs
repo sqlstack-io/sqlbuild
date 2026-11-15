@@ -3,10 +3,10 @@
 use std::io;
 use std::path::Path;
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use sqlbuild_core::init_command::errors::ScaffoldError;
 use sqlbuild_core::init_command::main::scaffold_blank_project::scaffold_blank_project as scaffold;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// `OSError(errno, strerror, filename)`, which Python narrows to its errno subclass.
 fn os_error(py: Python<'_>, error: &io::Error, path: &Path) -> PyErr {

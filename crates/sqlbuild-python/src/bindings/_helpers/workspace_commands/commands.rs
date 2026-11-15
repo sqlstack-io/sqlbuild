@@ -20,14 +20,16 @@ use sqlbuild_config::workspace::models::{PlaygroundRequest, SkillInstallRequest}
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::FacadeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SKILLS_DIRECTORY: &str = ".agents/skills/sqlbuild";
 const TEMPLATES_DIRECTORY: &str = "playground_templates";
@@ -68,7 +70,7 @@ fn raised(py: Python<'_>, error: WorkspaceError) -> PyErr {
 
 /// The installed `sqlbuild` package directory.
 fn package_dir(py: Python<'_>) -> PyResult<PathBuf> {
-    let file: PathBuf = host::entry(py, FacadeHost::PackageFile)?.extract()?;
+    let file: PathBuf = host_entry(py, FacadeHost::PackageFile)?.extract()?;
     Ok(file.parent().map(Path::to_path_buf).unwrap_or_default())
 }
 

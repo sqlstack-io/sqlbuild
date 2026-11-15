@@ -13,7 +13,7 @@ use crate::bindings::_helpers::compile_context::delta::{
 };
 use crate::bindings::_helpers::compile_outputs::json_report::plain_json;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The graph key kind of a model.
 const MODEL_KIND: &str = "model";

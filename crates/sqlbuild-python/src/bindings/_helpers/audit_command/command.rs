@@ -16,7 +16,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome};
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords, within};
 use crate::bindings::_helpers::build_progress::audit_progress::AuditProgressReporter;
 use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
@@ -28,18 +27,22 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_entries::command_plans::build_audit_command_plan;
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::result_output::documents::{
     audit_execution_json, audit_projection, write_execution_json_output,
 };
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use crate::bindings::_helpers::result_output::projection::audit_check_id;
 use crate::bindings::_helpers::result_output::resource_ids::audit_identity;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const EXECUTION_COMMAND: &str = "sqb audit";
 
@@ -368,7 +371,7 @@ fn execute<'py>(
         .into_any();
         within(&scope, |_| {
             let callbacks: Bound<'py, PyAny> = call_with(
-                &host::entry(py, ExecutorHost::AuditPipelineCallbacks)?,
+                &host_entry(py, ExecutorHost::AuditPipelineCallbacks)?,
                 &[
                     (
                         "on_connection_start",
@@ -401,7 +404,7 @@ fn execute<'py>(
                 ],
             )?;
             call_with(
-                &host::entry(py, ExecutorHost::RunAuditPipelineWithCallbacks)?,
+                &host_entry(py, ExecutorHost::RunAuditPipelineWithCallbacks)?,
                 &[
                     ("plan", plan.clone()),
                     (
@@ -445,7 +448,7 @@ fn audit_payload<'py>(
     (concurrency, worker_count): (i64, i64),
 ) -> PyResult<String> {
     let projection: Bound<'py, PyAny> =
-        host::entry(py, ExecutorHost::CurrentAuditResultProjection)?.call0()?;
+        host_entry(py, ExecutorHost::CurrentAuditResultProjection)?.call0()?;
     let trailing = if projection.is_none() {
         Vec::new()
     } else {
@@ -472,7 +475,7 @@ fn audit_payload<'py>(
 /// The warning line for audit results that could not be stored in the warehouse history table; audit outcomes are unaffected.
 fn projection_warning(py: Python<'_>, style: CliStyle) -> PyResult<Option<String>> {
     let projection: Bound<'_, PyAny> =
-        host::entry(py, ExecutorHost::CurrentAuditResultProjection)?.call0()?;
+        host_entry(py, ExecutorHost::CurrentAuditResultProjection)?.call0()?;
     if projection.is_none() || !native_field(&projection, "degraded")?.is_truthy()? {
         return Ok(None);
     }

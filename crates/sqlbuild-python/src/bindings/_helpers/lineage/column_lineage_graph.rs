@@ -1,5 +1,6 @@
 //! `ProjectColumnLineage`: the project column lineage graph with lazily materialised views.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::HashMap;
 
 use pyo3::prelude::{
@@ -12,9 +13,9 @@ use sqlbuild_analysis::lineage_graph::models::{EdgeIndex, EdgeKey};
 
 use crate::bindings::_helpers::lineage::lineage_facts::{confidence_member, transform_kind_member};
 use crate::bindings::_helpers::lineage::lineage_objects::LineageClasses;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 /// Where a compact model's facts are: given, or projected from its compiled model on first read.
 pub(crate) enum CompactColumns {
