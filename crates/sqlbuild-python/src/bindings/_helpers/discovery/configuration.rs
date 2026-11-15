@@ -11,8 +11,11 @@ use crate::bindings::_helpers::compile_driver::config_validation::{
 use crate::bindings::_helpers::discovery::project_config::{
     load_local_config_file, load_project_config_file,
 };
+use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::new_record_with;
+use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
 
 /// `DiscoveredProjectInputs` with the loaded configuration, inside the project discovery lifecycle.
@@ -29,6 +32,27 @@ pub(crate) fn discover_connection_configuration<'py>(
     project_dir: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     loaded_configuration(py, project_dir, true)
+}
+
+/// The validated configuration and the provider classes, without importing any other project Python.
+pub(crate) fn discover_configured_providers<'py>(
+    py: Python<'py>,
+    project_dir: &Bound<'py, PyAny>,
+    secret_policy: SecretPolicy,
+) -> PyResult<Bound<'py, PyAny>> {
+    let configuration: Bound<'py, PyAny> = loaded_configuration(py, project_dir, true)?;
+    let providers: Bound<'py, PyAny> =
+        discover_provider_classes(project_dir.clone(), secret_policy.name())?;
+    new_record_with(
+        py,
+        RecordId::DiscoveredProjectInputs,
+        &[
+            ("project_dir", project_dir.clone()),
+            ("project_config", native_field(&configuration, "project_config")?),
+            ("local_config", native_field(&configuration, "local_config")?),
+            ("providers", providers),
+        ],
+    )
 }
 
 fn configuration_inputs<'py>(

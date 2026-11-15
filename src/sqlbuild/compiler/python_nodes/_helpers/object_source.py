@@ -8,25 +8,23 @@ import inspect
 import linecache
 import sys
 import textwrap
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
 
-# Before Python 3.13, `inspect.findsource` parses the whole file again for every class it locates.
-_LOCATES_CLASSES_BY_PARSING: bool = sys.version_info < (3, 13)
+_CLASS_FIRSTLINENO_VERSION: tuple[int, int] = (3, 13)
+_FINDSOURCE_PARSES_FILE_PER_CLASS: bool = sys.version_info < _CLASS_FIRSTLINENO_VERSION
 
 
-def normalized_source(obj: object, class_lines: dict[str, tuple[list[str], dict[str, int]]]) -> str:
-    """`inspect.getsource(obj)`, dedented and stripped; empty when there is no source.
-
-    `class_lines` holds each file's lines and class start lines, so a file is parsed at most once.
-    """
+def normalized_source(*, obj: object, class_starts: Callable[..., dict[str, int]]) -> str:
+    """`inspect.getsource(obj)` dedented and stripped, finding classes through `class_starts`."""
 
     try:
         target: object = inspect.unwrap(cast(Any, obj))
-        if not (_LOCATES_CLASSES_BY_PARSING and inspect.isclass(target)):
+        if not (_FINDSOURCE_PARSES_FILE_PER_CLASS and inspect.isclass(target)):
             return textwrap.dedent(inspect.getsource(cast(Any, obj))).strip()
-        lines, start = _class_location(target, class_lines)
+        lines, start = _class_location(cast(type, target), class_starts=class_starts)
         return textwrap.dedent("".join(inspect.getblock(lines[start:]))).strip()
     except (OSError, TypeError):
         return ""
@@ -79,8 +77,14 @@ def _reference_parts(node: ast.AST) -> tuple[str, ...] | None:
     return None
 
 
+def parse_class_starts(lines: list[str]) -> dict[str, int]:
+    """Each class qualname's first decorator or `class` line index, as `inspect` finds it."""
+
+    return _class_starts(ast.parse("".join(lines)))
+
+
 def _class_location(
-    cls: type, class_lines: dict[str, tuple[list[str], dict[str, int]]]
+    cls: type, *, class_starts: Callable[..., dict[str, int]]
 ) -> tuple[list[str], int]:
     """The lines and start index `inspect.findsource` returns for `cls` on Python 3.12."""
 
@@ -97,19 +101,13 @@ def _class_location(
     )
     if not lines:
         raise OSError("could not get source code")
-    cached: tuple[list[str], dict[str, int]] | None = class_lines.get(file)
-    if cached is None or cached[0] is not lines:
-        cached = (lines, _class_starts(ast.parse("".join(lines))))
-        class_lines[file] = cached
-    start: int | None = cached[1].get(cls.__qualname__)
+    start: int | None = class_starts(file=file, lines=lines).get(cls.__qualname__)
     if start is None:
         raise OSError("could not find class definition")
     return lines, start
 
 
 def _class_starts(tree: ast.AST) -> dict[str, int]:
-    """Each class qualname's first decorator or `class` line, first match in `inspect` order."""
-
     starts: dict[str, int] = {}
     pending: list[tuple[ast.AST, tuple[str, ...]]] = [(tree, ())]
     while pending:

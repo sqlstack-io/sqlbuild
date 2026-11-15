@@ -23,6 +23,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     duckshop_orchestration,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    DevelopmentDiscoveryTestCase,
     DevelopmentTestCase,
     SnapshotApi,
 )
@@ -218,8 +219,13 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [DevelopmentDiscoveryTestCase("python nodes imported once per start", 1)],
+    ids=lambda case: case.description,
+)
 def test_given_development_start_when_location_is_ready_then_project_python_is_discovered_once(
-    tmp_path: Path,
+    test_case: DevelopmentDiscoveryTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
     imports: Path = tmp_path / "python_imports.txt"
@@ -252,4 +258,4 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
         interpreters: list[str] = imports.read_text().splitlines()
         stop_location(process, int(interpreters[0]), log)
 
-    assert len(interpreters) == 1, log.read_text()
+    assert len(interpreters) == test_case.expected_imports, log.read_text()

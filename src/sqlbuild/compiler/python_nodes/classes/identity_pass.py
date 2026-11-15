@@ -7,58 +7,58 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
-from typing import TypeVar
+from typing import cast
 
 from sqlbuild.compiler.python_nodes._helpers.object_source import (
     called_references,
     hash_text,
     normalized_source,
+    parse_class_starts,
     source_file,
 )
 
-_Fact = TypeVar("_Fact")
-
 
 class IdentityPass:
-    """Reads, parses, hashes and resolves each object or path once for one discovery pass.
-
-    Tables keep the objects they describe alive, so an object id is never reused during the pass.
-    """
+    """Read, parse, hash and resolve each object or path once; facts keep their objects alive."""
 
     def __init__(self) -> None:
-        self._source_paths: dict[int, tuple[object, Path | None]] = {}
-        self._sources: dict[int, tuple[object, str]] = {}
-        self._hashes: dict[int, tuple[object, str]] = {}
-        self._references: dict[int, tuple[object, tuple[tuple[str, ...], ...]]] = {}
-        self._modules: dict[int, tuple[object, ModuleType | None]] = {}
-        self._class_lines: dict[str, tuple[list[str], dict[str, int]]] = {}
+        self._facts: dict[tuple[str, int], tuple[object, object]] = {}
+        self._class_starts: dict[str, tuple[list[str], dict[str, int]]] = {}
         self._resolved: dict[str, Path] = {}
         self._parts: dict[str, tuple[str, ...]] = {}
 
     def source_path(self, obj: object) -> Path | None:
         """The file `inspect` reads `obj`'s source from."""
 
-        return self._cached(self._source_paths, obj, source_file)
+        return self._fact(name="source_path", obj=obj, compute=source_file)
 
     def source(self, obj: object) -> str:
         """`obj`'s dedented, stripped source."""
 
-        return self._cached(self._sources, obj, lambda item: normalized_source(item, self._class_lines))
+        return self._fact(
+            name="source",
+            obj=obj,
+            compute=lambda item: normalized_source(obj=item, class_starts=self._starts),
+        )
 
     def source_hash(self, obj: object) -> str:
         """The SHA-256 of `obj`'s source."""
 
-        return self._cached(self._hashes, obj, lambda item: hash_text(self.source(item)))
+        return self._fact(
+            name="source_hash", obj=obj, compute=lambda item: hash_text(self.source(item))
+        )
 
     def references(self, obj: object) -> tuple[tuple[str, ...], ...]:
         """The dotted names `obj`'s source calls."""
 
-        return self._cached(self._references, obj, lambda item: called_references(self.source(item)))
+        return self._fact(
+            name="references", obj=obj, compute=lambda item: called_references(self.source(item))
+        )
 
     def module(self, obj: object) -> ModuleType | None:
         """The module `obj` belongs to."""
 
-        return self._cached(self._modules, obj, inspect.getmodule)
+        return self._fact(name="module", obj=obj, compute=inspect.getmodule)
 
     def resolved(self, path: Path) -> Path:
         """`path.resolve()`."""
@@ -80,12 +80,16 @@ class IdentityPass:
             self._parts[key] = parts
         return parts
 
-    @staticmethod
-    def _cached(
-        table: dict[int, tuple[object, _Fact]], obj: object, compute: Callable[[object], _Fact]
-    ) -> _Fact:
-        entry: tuple[object, _Fact] | None = table.get(id(obj))
+    def _starts(self, *, file: str, lines: list[str]) -> dict[str, int]:
+        cached: tuple[list[str], dict[str, int]] | None = self._class_starts.get(file)
+        if cached is None or cached[0] is not lines:
+            cached = (lines, parse_class_starts(lines))
+            self._class_starts[file] = cached
+        return cached[1]
+
+    def _fact[Fact](self, *, name: str, obj: object, compute: Callable[[object], Fact]) -> Fact:
+        entry: tuple[object, object] | None = self._facts.get((name, id(obj)))
         if entry is None:
             entry = (obj, compute(obj))
-            table[id(obj)] = entry
-        return entry[1]
+            self._facts[(name, id(obj))] = entry
+        return cast(Fact, entry[1])

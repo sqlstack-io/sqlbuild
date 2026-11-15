@@ -653,12 +653,25 @@ def test_given_stdout_redirected_into_project_when_rerun_then_it_reuses_the_comp
     assert (first_hits, second_hits) == test_case.expected_hit_counts
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CompileReuseEventTestCase(
+            description="phase_events_stay_out_of_compile_sinks",
+            sink_name="orders_phases",
+            expected_event_types=("invocation_started", "invocation_completed"),
+        )
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_operation_sink_when_compiling_then_only_invocation_events_are_exported(
-    compile_reuse_project: Path, tmp_path: Path
+    compile_reuse_project: Path, tmp_path: Path, test_case: CompileReuseEventTestCase
 ) -> None:
     project_dir: Path = compile_reuse_project
     write_recording_sink(
-        project_dir=project_dir, sink_name="orders_phases", event_kinds=("INVOCATION", "OPERATION")
+        project_dir=project_dir,
+        sink_name=test_case.sink_name,
+        event_kinds=("INVOCATION", "OPERATION"),
     )
     compile_events: Path = tmp_path / "compile-events.jsonl"
     dag_events: Path = tmp_path / "dag-events.jsonl"
@@ -676,9 +689,9 @@ def test_given_operation_sink_when_compiling_then_only_invocation_events_are_exp
     dag_types: set[object] = {event["event_type"] for event in recorded_events(path=dag_events)}
 
     assert compiled.returncode == 0, compiled.stderr
-    assert tuple(event["event_type"] for event in recorded_events(path=compile_events)) == (
-        "invocation_started",
-        "invocation_completed",
+    assert (
+        tuple(event["event_type"] for event in recorded_events(path=compile_events))
+        == test_case.expected_event_types
     )
     assert dag.returncode == 0, dag.stderr
     assert "operation_started" in dag_types

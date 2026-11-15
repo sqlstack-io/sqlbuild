@@ -6,7 +6,7 @@ import inspect
 import json
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from dataclasses import asdict
 from pathlib import Path
 from types import ModuleType
@@ -33,15 +33,12 @@ _ACTIVE_PASS: ContextVar[IdentityPass | None] = ContextVar("python_identity_pass
 
 @contextmanager
 def identity_pass() -> Iterator[None]:
-    """Share source reads, parses, hashes and path resolution between the identities built inside.
-
-    Discovery enters one pass around all of its nodes; a nested pass joins the outer one.
-    """
+    """Share source work between the identities built inside; a nested pass joins the outer one."""
 
     if _ACTIVE_PASS.get() is not None:
         yield
         return
-    token = _ACTIVE_PASS.set(IdentityPass())
+    token: Token[IdentityPass | None] = _ACTIVE_PASS.set(IdentityPass())
     try:
         yield
     finally:
@@ -269,9 +266,7 @@ def _object_qualname(obj: object) -> str:
     return str(getattr(obj, "__qualname__", getattr(obj, "__name__", type(obj).__name__)))
 
 
-def _display_path(
-    *, source_path: Path | None, roots: tuple[Path, ...], memo: IdentityPass
-) -> str:
+def _display_path(*, source_path: Path | None, roots: tuple[Path, ...], memo: IdentityPass) -> str:
     if source_path is None:
         return ""
     resolved: Path = memo.resolved(source_path)
