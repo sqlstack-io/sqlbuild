@@ -17,7 +17,7 @@ use crate::python_rules::constants::{
     INIT_FILE, ORCHESTRATION_ROOT, PACKAGE_ROOT, PRIVATE_PREFIX, PROVIDER_BASE, PROVIDER_FILE,
     PROVIDER_IMPORT_BOUNDARIES_CODE, PROVIDER_LAYOUT_CODE, PROVIDER_MODULE_SHAPE_CODE,
     PROVIDER_PRIVATE_FOLDERS, PROVIDER_ROLE_FILES, PROVIDER_RULE_CODES, PROVIDERS_ROOT,
-    SHARED_UTILITIES_PACKAGE,
+    SHARED_UTILITIES_PACKAGE, STAR_IMPORT,
 };
 
 const FILE_START: UnitPosition = UnitPosition { line: 1, column: 1 };
@@ -215,8 +215,7 @@ enum Verdict {
     Unknown,
 }
 
-/// What a class's base names: Provider itself, a project class by module and name, a builtin, or
-/// something the parsed sources cannot resolve.
+/// What a class's base names: Provider, a project class, a builtin, or something unresolved.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum BaseTarget {
     Provider,
@@ -231,8 +230,7 @@ struct ProviderClasses {
 }
 
 impl ProviderClasses {
-    /// Whether class `name` of `module` subclasses Provider, directly, through an alias or through project
-    /// classes; `Unknown` when a base chain leaves the parsed classes before reaching Provider.
+    /// Whether class `name` of `module` reaches Provider; `Unknown` when a base chain leaves the parsed classes.
     fn verdict(&self, module: &str, name: &str) -> Verdict {
         let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
         let mut pending: Vec<(String, String)> = vec![(module.to_owned(), name.to_owned())];
@@ -281,8 +279,7 @@ fn provider_classes(files: &[ParsedFile<'_>], modules: &BTreeSet<String>) -> Pro
     ProviderClasses { bases }
 }
 
-/// What `base` names in `file`: Provider, a class of a project module reached through an import or the
-/// same module, a builtin, or something unknown such as another package's class.
+/// What `base` names in `file`, resolved through its imports and its own classes.
 fn base_target(file: &ParsedFile<'_>, base: &str, modules: &BTreeSet<String>) -> BaseTarget {
     let (first, attributes): (&str, Option<&str>) = match base.split_once('.') {
         Some((first, attributes)) => (first, Some(attributes)),
@@ -328,7 +325,13 @@ fn base_target(file: &ParsedFile<'_>, base: &str, modules: &BTreeSet<String>) ->
             BaseTarget::Class(module, name.to_owned())
         };
     }
-    if attributes.is_some() || file.module.imports.iter().any(|import| import.local == "*") {
+    if attributes.is_some()
+        || file
+            .module
+            .imports
+            .iter()
+            .any(|import| import.local == STAR_IMPORT)
+    {
         return BaseTarget::Unknown;
     }
     let local_class: bool = file.module.statements.iter().any(|statement| {

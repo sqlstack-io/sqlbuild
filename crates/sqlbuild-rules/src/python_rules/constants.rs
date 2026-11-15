@@ -1099,6 +1099,8 @@ pub(crate) const PROVIDER_BASE: &str = "Provider";
 pub(crate) const ORCHESTRATION_ROOT: &str = "orchestration";
 /// The prefix of a private name.
 pub(crate) const PRIVATE_PREFIX: &str = "_";
+/// The name a `from module import *` binds.
+pub(crate) const STAR_IMPORT: &str = "*";
 /// The file that declares a unit's node and makes its folder a unit.
 pub(crate) const UNIT_NODE_FILE: &str = "node.py";
 /// The file holding a unit's checks.
