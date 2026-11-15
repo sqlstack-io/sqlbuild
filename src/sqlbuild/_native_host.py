@@ -235,6 +235,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.compiler.python_nodes._helpers.user_inventory",
         "python_node_dependency_key",
     ),
+    "python_identity_pass": (
+        "sqlbuild.compiler.python_nodes._helpers.user_inventory",
+        "python_identity_pass",
+    ),
     "python_node_identity": (
         "sqlbuild.compiler.python_nodes._helpers.user_inventory",
         "python_node_identity",

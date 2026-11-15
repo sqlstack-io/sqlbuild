@@ -188,6 +188,9 @@ from sqlbuild.compiler.pipeline._helpers.materializations import (
     load_custom_materializations as load_custom_materializations,
 )
 from sqlbuild.compiler.python_nodes._helpers.user_inventory import (
+    python_identity_pass as python_identity_pass,
+)
+from sqlbuild.compiler.python_nodes._helpers.user_inventory import (
     python_node_dependency_key as python_node_dependency_key,
 )
 from sqlbuild.compiler.python_nodes._helpers.user_inventory import (

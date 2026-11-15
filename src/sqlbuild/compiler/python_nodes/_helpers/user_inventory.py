@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 from sqlbuild._native import PythonNodeIdentity
-from sqlbuild.compiler.python_nodes._helpers.identity import build_python_identity
+from sqlbuild.compiler.python_nodes._helpers.identity import build_python_identity, identity_pass
 from sqlbuild.python_nodes.main.read_asset_definition import read_asset_definition
 from sqlbuild.python_nodes.main.read_check_definition import read_check_definition
 from sqlbuild.python_nodes.main.read_loader_definition import read_loader_definition
@@ -17,6 +18,12 @@ from sqlbuild.python_nodes.models import (
     LoaderDefinition,
     TaskDefinition,
 )
+
+
+def python_identity_pass() -> AbstractContextManager[None]:
+    """One discovery pass: identities built inside share each object's source facts."""
+
+    return identity_pass()
 
 
 def python_node_identity(

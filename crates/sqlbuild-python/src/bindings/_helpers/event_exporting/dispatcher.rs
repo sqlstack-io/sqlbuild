@@ -140,6 +140,8 @@ pub(crate) struct Shared {
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct EventExporterDispatcher {
     shared: Arc<Shared>,
+    /// Event kinds this command never exports, such as compile's phase operations.
+    withheld_kinds: Vec<String>,
     thread: Py<PyAny>,
     notification_thread: Option<Py<PyAny>>,
     health_thread: Option<Py<PyAny>>,
@@ -664,9 +666,16 @@ impl EventExporterDispatcher {
                     "health_interval_seconds",
                     "failure_callback",
                     "summary_callback",
+                    "withheld_kinds",
                 ],
             ),
         )?;
+        let withheld: Bound<'_, PyAny> = options.value("withheld_kinds")?;
+        let withheld_kinds: Vec<String> = if withheld.is_none() {
+            Vec::new()
+        } else {
+            withheld.extract()?
+        };
         let limits: Limits = limits(&options)?;
         let exporters: Bound<'_, PyAny> = options.value("exporters")?;
         let (bound_exporters, filters) = if exporters.is_none() {
@@ -755,6 +764,7 @@ impl EventExporterDispatcher {
         thread.call_method0("start")?;
         Ok(Self {
             shared,
+            withheld_kinds,
             thread: thread.unbind(),
             notification_thread: notification_thread.map(Bound::unbind),
             health_thread: health_thread.map(Bound::unbind),
@@ -777,6 +787,9 @@ impl EventExporterDispatcher {
     fn enqueue(&self, py: Python<'_>, event: &Bound<'_, PyAny>) -> PyResult<()> {
         let event_type: String = native_field(event, "event_type")?.extract()?;
         let policy: ExportPolicy = export_policy(py, &event_type)?;
+        if self.withheld_kinds.contains(&policy.kind) {
+            return Ok(());
+        }
         let shared = &self.shared;
         let _held = shared.hold(py)?;
         let mut state = shared.locked()?;

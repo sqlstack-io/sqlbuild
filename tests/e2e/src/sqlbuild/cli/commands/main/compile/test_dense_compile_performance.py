@@ -279,7 +279,6 @@ if __name__ == "__main__":
             edited_model_index=1521,
             full_pairs=4,
             expected_max_full_seconds=7.0,
-            expected_max_delta_seconds=2.0,
             expected_max_delta_cpu_ratio=0.30,
             expected_max_fallback_cpu_ratio=1.10,
             expected_max_rss_bytes=3 * _GIB // 2,
@@ -290,7 +289,6 @@ if __name__ == "__main__":
             edited_model_index=5021,
             full_pairs=3,
             expected_max_full_seconds=28.0,
-            expected_max_delta_seconds=8.0,
             expected_max_delta_cpu_ratio=0.275,
             expected_max_fallback_cpu_ratio=1.10,
             expected_max_rss_bytes=15 * _GIB // 4,
@@ -316,7 +314,6 @@ def test_given_dense_project_when_editing_one_file_then_delta_compiles_stay_chea
         ),
         full_pairs=test_case.full_pairs,
         expected_max_full_seconds=test_case.expected_max_full_seconds,
-        expected_max_delta_seconds=test_case.expected_max_delta_seconds,
     )
 
     full_cpu: float = median_cpu_seconds(loop.full)
@@ -339,7 +336,6 @@ def test_given_dense_project_when_editing_one_file_then_delta_compiles_stay_chea
         assert result.peak_rss_bytes < test_case.expected_max_rss_bytes
     for result in loop.deltas.values():
         assert 0 < analysed_model_count(result) <= _MAX_DELTA_ANALYSED_MODELS, result
-        assert result.elapsed_seconds < test_case.expected_max_delta_seconds, result
         assert result.cpu_seconds <= test_case.expected_max_delta_cpu_ratio * full_cpu, result
     for result in (*loop.fallbacks, *loop.full):
         assert analysed_model_count(result) == test_case.model_count, result

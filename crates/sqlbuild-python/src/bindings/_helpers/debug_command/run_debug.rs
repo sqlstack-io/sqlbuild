@@ -39,9 +39,9 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
     CommandScope, WarehouseInputs, apply_warehouse, command_scope, find_authored, resolve_warehouse,
 };
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
-use crate::bindings::_helpers::compile_driver::discovery::discover_environment;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
+use crate::bindings::_helpers::discovery::configuration::discover_configured_providers;
 use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::provider_settings::{
@@ -281,7 +281,7 @@ fn build_report(
     let project_dir_object: Bound<'_, PyAny> =
         imported(py, "pathlib", "Path")?.call1((project_dir,))?;
     let discovered_inputs: Bound<'_, PyAny> =
-        discover_environment(&project_dir_object, SecretPolicy::Defer)?;
+        discover_configured_providers(py, &project_dir_object, SecretPolicy::Defer)?;
     let files: DebugConfigFiles = debug_config_files(project_dir);
     let adapter_name: Bound<'_, PyAny> = resolve_effective_adapter_name(
         &native_field(&discovered_inputs, "project_config")?,

@@ -420,7 +420,8 @@ pub(crate) fn discover_python_node_functions<'py>(
                 ("project_dir", project.path.clone()),
             ],
         )?;
-        let discovered_nodes: PyResult<()> = buckets.discover_nodes(&project, &providers);
+        let discovered_nodes: PyResult<()> =
+            host::within_identity_pass(py, || buckets.discover_nodes(&project, &providers));
         call_with(
             &shim(py, UserCodeHost::RestorePythonRootModules)?,
             &[("saved_modules", saved)],
