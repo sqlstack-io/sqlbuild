@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::cpython_tree::main::parse_cpython_module::parse_cpython_module;
 use crate::cpython_tree::models::ParsedSource;
-use crate::node_units::_helpers::functions::{last_name, leading_docstring, unit_function};
+use crate::node_units::_helpers::functions::{leading_docstring, unit_function};
 use crate::node_units::_helpers::imports::{is_type_checking_imports, module_imports};
 use crate::node_units::_helpers::positions::{UnitText, unit_position};
 use crate::node_units::models::{UnitClass, UnitModule, UnitStatement, UnitStatementKind};
@@ -35,13 +35,23 @@ pub fn node_unit_module(contents: &str, python_version: (u8, u8)) -> Option<Unit
                 Stmt::ClassDef(class) => UnitStatementKind::Class(UnitClass {
                     name: class.name.to_string(),
                     position: unit_position(&source, class.name.range().start()),
-                    bases: class.bases().iter().filter_map(last_name).collect(),
+                    bases: class
+                        .bases()
+                        .iter()
+                        .map(|base| dotted_name(base).unwrap_or_default())
+                        .collect(),
                 }),
                 Stmt::Assign(assign) => UnitStatementKind::Assignment(
-                    assign.targets.iter().flat_map(target_names).collect(),
+                    assign
+                        .targets
+                        .iter()
+                        .map(target_names)
+                        .collect::<Option<Vec<Vec<String>>>>()
+                        .map(|names| names.concat())
+                        .unwrap_or_default(),
                 ),
                 Stmt::AnnAssign(assign) => {
-                    UnitStatementKind::Assignment(target_names(&assign.target))
+                    UnitStatementKind::Assignment(target_names(&assign.target).unwrap_or_default())
                 }
                 _ => UnitStatementKind::Other,
             },
@@ -54,13 +64,38 @@ pub fn node_unit_module(contents: &str, python_version: (u8, u8)) -> Option<Unit
     })
 }
 
-/// The names an assignment target binds: a plain name, or the names inside a tuple, list or starred target.
-fn target_names(target: &Expr) -> Vec<String> {
+/// The names an assignment target binds, through tuples, lists and starred targets; `None` when any part
+/// of it is an attribute or subscript.
+fn target_names(target: &Expr) -> Option<Vec<String>> {
     match target {
-        Expr::Name(name) => vec![name.id.to_string()],
-        Expr::Tuple(tuple) => tuple.elts.iter().flat_map(target_names).collect(),
-        Expr::List(list) => list.elts.iter().flat_map(target_names).collect(),
+        Expr::Name(name) => Some(vec![name.id.to_string()]),
+        Expr::Tuple(tuple) => elements_names(&tuple.elts),
+        Expr::List(list) => elements_names(&list.elts),
         Expr::Starred(starred) => target_names(&starred.value),
-        _ => Vec::new(),
+        _ => None,
+    }
+}
+
+/// The names the elements of a tuple or list target bind; `None` when any of them binds no plain name.
+fn elements_names(elements: &[Expr]) -> Option<Vec<String>> {
+    elements
+        .iter()
+        .map(target_names)
+        .collect::<Option<Vec<Vec<String>>>>()
+        .map(|names| names.concat())
+}
+
+/// A name or attribute chain as dotted text, such as `paged.PagedApi`, seen through a subscript such as
+/// `Generic[T]`; `None` for any other expression.
+fn dotted_name(expression: &Expr) -> Option<String> {
+    match expression {
+        Expr::Name(name) => Some(name.id.to_string()),
+        Expr::Attribute(attribute) => Some(format!(
+            "{}.{}",
+            dotted_name(&attribute.value)?,
+            attribute.attr
+        )),
+        Expr::Subscript(subscript) => dotted_name(&subscript.value),
+        _ => None,
     }
 }

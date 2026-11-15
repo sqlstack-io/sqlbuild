@@ -133,7 +133,7 @@ class CarrierApi(Provider):
             ],
         },
         PythonRunTestCase {
-            description: "provider.py: Provider through an alias or through _classes/ bases that reach it by relative imports",
+            description: "provider.py: Provider through an alias, a module attribute or _classes/ bases reached by relative imports; bases outside the parsed sources stay silent",
             files: &[
                 (
                     "providers/storefront_api/provider.py",
@@ -161,12 +161,48 @@ class CarrierApi(SqbProvider):
     """Client."""
 "#,
                 ),
+                (
+                    "providers/billing_api/provider.py",
+                    "from ._classes import paged\n\n\nclass BillingApi(paged.PagedApi):\n    \"\"\"Client.\"\"\"\n",
+                ),
+                (
+                    "providers/billing_api/_classes/paged.py",
+                    "from sqlbuild.providers import Provider\n\n\nclass PagedApi(Provider):\n    pass\n",
+                ),
+                (
+                    "providers/ledger_api/provider.py",
+                    "from ._classes import LedgerBase\n\n\nclass LedgerApi(LedgerBase):\n    \"\"\"Client.\"\"\"\n",
+                ),
+                (
+                    "providers/ledger_api/_classes/__init__.py",
+                    "from .base import LedgerBase\n",
+                ),
+                (
+                    "providers/ledger_api/_classes/base.py",
+                    "from sqlbuild.providers import Provider\n\n\nclass LedgerBase(Provider):\n    pass\n",
+                ),
+                (
+                    "providers/catalog_api/provider.py",
+                    "from python.utils.clients import PagedClient\n\n\nclass CatalogApi(PagedClient):\n    \"\"\"Client.\"\"\"\n",
+                ),
+                (
+                    "python/utils/clients.py",
+                    "from python.utils.base import BaseClient\n\n\nclass PagedClient(BaseClient):\n    pass\n",
+                ),
+                (
+                    "python/utils/base.py",
+                    "from sqlbuild.providers import Provider\n\n\nclass BaseClient(Provider):\n    pass\n",
+                ),
+                (
+                    "providers/partner_api/provider.py",
+                    "from vendor.clients import VendorProvider\n\n\nclass PartnerApi(VendorProvider):\n    \"\"\"Client.\"\"\"\n",
+                ),
             ],
             config: json!({ "select": ["SQBRPYTHON014"] }),
             expected_faults: vec![],
         },
         PythonRunTestCase {
-            description: "provider.py: tuple and subscript assignments, and a Provider imported from outside sqlbuild",
+            description: "provider.py: tuple, subscript, mixed and chained assignments, a builtin base and a module attribute naming a plain class",
             files: &[
                 (
                     "providers/storefront_api/provider.py",
@@ -177,6 +213,8 @@ from sqlbuild.providers import Provider
 _HOST, _PORT = "h", 1
 HOST, _TIMEOUT = "h", 3
 os.environ["TZ"] = "UTC"
+_ZONE, os.environ["TZ"] = "h", "UTC"
+_TZ = os.environ["TZ"] = "UTC"
 
 
 class StorefrontApi(Provider):
@@ -185,18 +223,23 @@ class StorefrontApi(Provider):
                 ),
                 (
                     "providers/carrier_api/provider.py",
-                    r#"from vendor.providers import Provider
-
-
-class CarrierApi(Provider):
-    """Client."""
-"#,
+                    "from ._classes import shapes\n\n\nclass CarrierApi(shapes.Parcel):\n    \"\"\"Client.\"\"\"\n",
+                ),
+                (
+                    "providers/carrier_api/_classes/shapes.py",
+                    "class Parcel:\n    pass\n",
+                ),
+                (
+                    "providers/returns_api/provider.py",
+                    "class ReturnsApi(Exception):\n    \"\"\"Client.\"\"\"\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON014"] }),
             expected_faults: vec![
                 ("SQBRPYTHON014", "providers/carrier_api/provider.py", 1, 1),
                 ("SQBRPYTHON014", "providers/carrier_api/provider.py", 4, 7),
+                ("SQBRPYTHON014", "providers/returns_api/provider.py", 1, 1),
+                ("SQBRPYTHON014", "providers/returns_api/provider.py", 1, 7),
                 (
                     "SQBRPYTHON014",
                     "providers/storefront_api/provider.py",
@@ -207,6 +250,18 @@ class CarrierApi(Provider):
                     "SQBRPYTHON014",
                     "providers/storefront_api/provider.py",
                     7,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "providers/storefront_api/provider.py",
+                    8,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "providers/storefront_api/provider.py",
+                    9,
                     1,
                 ),
             ],

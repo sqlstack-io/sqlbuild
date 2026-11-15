@@ -30,18 +30,19 @@ pub enum UnitStatementKind {
     Import,
     Function(UnitFunction),
     Class(UnitClass),
-    /// An assignment, annotated or not, by the names it binds; empty when it binds an attribute or subscript.
+    /// An assignment, annotated or not, by the names it binds; empty when any target is an attribute or subscript.
     Assignment(Vec<String>),
     /// Any other statement, such as a loop or a call.
     Other,
 }
 
-/// A class and the last name of each of its bases.
+/// A class and its bases.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnitClass {
     pub name: String,
     /// Where the class's name is written.
     pub position: UnitPosition,
+    /// Each base as dotted text, such as `Provider` or `paged.PagedApi`; empty when it is another expression.
     pub bases: Vec<String>,
 }
 

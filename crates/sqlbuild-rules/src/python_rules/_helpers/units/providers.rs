@@ -139,6 +139,7 @@ fn provider_module_faults(file: &ParsedFile<'_>, classes: &ProviderClasses) -> V
     let module: String = file_module(file.path);
     let mut faults: Vec<Fault> = Vec::new();
     let mut providers: usize = 0;
+    let mut undecided: usize = 0;
     for statement in &file.module.statements {
         let (detail, position): (String, UnitPosition) = match &statement.kind {
             UnitStatementKind::Docstring | UnitStatementKind::Import => continue,
@@ -155,10 +156,12 @@ fn provider_module_faults(file: &ParsedFile<'_>, classes: &ProviderClasses) -> V
                 }
             }
             UnitStatementKind::Class(class) => {
-                let public_provider: bool = !class.name.starts_with(PRIVATE_PREFIX)
-                    && classes.is_provider(&module, &class.name);
-                let detail: Option<String> = class_detail(class, public_provider, providers);
-                providers += usize::from(public_provider);
+                let verdict: Verdict = classes.verdict(&module, &class.name);
+                let detail: Option<String> = class_detail(class, verdict, providers);
+                if !class.name.starts_with(PRIVATE_PREFIX) {
+                    providers += usize::from(verdict == Verdict::Provider);
+                    undecided += usize::from(verdict == Verdict::Unknown);
+                }
                 match detail {
                     Some(detail) => (detail, class.position),
                     None => continue,
@@ -177,7 +180,7 @@ fn provider_module_faults(file: &ParsedFile<'_>, classes: &ProviderClasses) -> V
             &detail,
         ));
     }
-    if providers == 0 {
+    if providers == 0 && undecided == 0 {
         faults.extend(unit_fault(
             PROVIDER_MODULE_SHAPE_CODE,
             file.path,
@@ -189,22 +192,36 @@ fn provider_module_faults(file: &ParsedFile<'_>, classes: &ProviderClasses) -> V
 }
 
 /// Why `class` does not belong in provider.py, after `earlier` public Provider subclasses.
-fn class_detail(class: &UnitClass, public_provider: bool, earlier: usize) -> Option<String> {
+fn class_detail(class: &UnitClass, verdict: Verdict, earlier: usize) -> Option<String> {
     let name: &str = &class.name;
     if name.starts_with(PRIVATE_PREFIX) {
         return Some(format!("collaborator class '{name}' belongs in _classes/"));
     }
-    if !public_provider {
-        return Some(format!("class '{name}' does not subclass {PROVIDER_BASE}"));
+    match verdict {
+        Verdict::NotProvider => Some(format!("class '{name}' does not subclass {PROVIDER_BASE}")),
+        Verdict::Provider => {
+            (earlier > 0).then(|| format!("'{name}' is a second {PROVIDER_BASE} subclass"))
+        }
+        Verdict::Unknown => None,
     }
-    (earlier > 0).then(|| format!("'{name}' is a second {PROVIDER_BASE} subclass"))
 }
 
-/// What a class's base names: Provider itself, a project class by module and name, or something unknown.
+/// Whether a class subclasses Provider, as far as the parsed project sources show.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Verdict {
+    Provider,
+    NotProvider,
+    /// A base leads outside what was parsed, such as another package, so the rule stays silent.
+    Unknown,
+}
+
+/// What a class's base names: Provider itself, a project class by module and name, a builtin, or
+/// something the parsed sources cannot resolve.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum BaseTarget {
     Provider,
     Class(String, String),
+    Builtin,
     Unknown,
 }
 
@@ -214,23 +231,34 @@ struct ProviderClasses {
 }
 
 impl ProviderClasses {
-    /// Whether class `name` of `module` subclasses Provider, directly, through an alias or through project classes.
-    fn is_provider(&self, module: &str, name: &str) -> bool {
+    /// Whether class `name` of `module` subclasses Provider, directly, through an alias or through project
+    /// classes; `Unknown` when a base chain leaves the parsed classes before reaching Provider.
+    fn verdict(&self, module: &str, name: &str) -> Verdict {
         let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
         let mut pending: Vec<(String, String)> = vec![(module.to_owned(), name.to_owned())];
+        let mut unknown: bool = false;
         while let Some(key) = pending.pop() {
             if !seen.insert(key.clone()) {
                 continue;
             }
-            for base in self.bases.get(&key).into_iter().flatten() {
+            let Some(bases) = self.bases.get(&key) else {
+                unknown = true;
+                continue;
+            };
+            for base in bases {
                 match base {
-                    BaseTarget::Provider => return true,
+                    BaseTarget::Provider => return Verdict::Provider,
                     BaseTarget::Class(module, name) => pending.push((module.clone(), name.clone())),
-                    BaseTarget::Unknown => {}
+                    BaseTarget::Builtin => {}
+                    BaseTarget::Unknown => unknown = true,
                 }
             }
         }
-        false
+        if unknown {
+            Verdict::Unknown
+        } else {
+            Verdict::NotProvider
+        }
     }
 }
 
@@ -253,39 +281,65 @@ fn provider_classes(files: &[ParsedFile<'_>], modules: &BTreeSet<String>) -> Pro
     ProviderClasses { bases }
 }
 
-/// What `base` names in `file`: an import it binds, a class of the same module, or Provider by its plain name.
+/// What `base` names in `file`: Provider, a class of a project module reached through an import or the
+/// same module, a builtin, or something unknown such as another package's class.
 fn base_target(file: &ParsedFile<'_>, base: &str, modules: &BTreeSet<String>) -> BaseTarget {
+    let (first, attributes): (&str, Option<&str>) = match base.split_once('.') {
+        Some((first, attributes)) => (first, Some(attributes)),
+        None => (base, None),
+    };
+    if first.is_empty() {
+        return BaseTarget::Unknown;
+    }
     let folder: &[&str] = &file.parts[..file.parts.len() - 1];
     if let Some(import) = file
         .module
         .imports
         .iter()
-        .find(|import| import.local == base)
+        .find(|import| import.local == first)
     {
-        let Some(name) = &import.name else {
+        let Some(source) = absolute_module(import, folder, modules) else {
             return BaseTarget::Unknown;
         };
-        return match absolute_module(import, folder, modules) {
-            Some(source)
-                if source.split('.').next() == Some(SQLBUILD_PACKAGE) && name == PROVIDER_BASE =>
-            {
-                BaseTarget::Provider
+        let (module, name): (String, &str) = match (&import.name, attributes) {
+            (Some(name), None) if source.ends_with(&format!(".{name}")) => {
+                return BaseTarget::Unknown;
             }
-            Some(source) if source.ends_with(&format!(".{name}")) => BaseTarget::Unknown,
-            Some(source) => BaseTarget::Class(source, name.clone()),
-            None => BaseTarget::Unknown,
+            (Some(name), None) => (source, name.as_str()),
+            (bound, Some(attributes)) => {
+                let bound_module: String = match bound {
+                    Some(name) if source.ends_with(&format!(".{name}")) => source,
+                    Some(_) => return BaseTarget::Unknown,
+                    None if import.module.split('.').next() == Some(import.local.as_str()) => {
+                        import.local.clone()
+                    }
+                    None => source,
+                };
+                match attributes.rsplit_once('.') {
+                    Some((path, name)) => (format!("{bound_module}.{path}"), name),
+                    None => (bound_module, attributes),
+                }
+            }
+            (None, None) => return BaseTarget::Unknown,
         };
+        return if module.split('.').next() == Some(SQLBUILD_PACKAGE) && name == PROVIDER_BASE {
+            BaseTarget::Provider
+        } else {
+            BaseTarget::Class(module, name.to_owned())
+        };
+    }
+    if attributes.is_some() || file.module.imports.iter().any(|import| import.local == "*") {
+        return BaseTarget::Unknown;
     }
     let local_class: bool = file.module.statements.iter().any(|statement| {
         matches!(&statement.kind, UnitStatementKind::Class(class) if class.name == base)
     });
     if local_class {
-        return BaseTarget::Class(file_module(file.path), base.to_owned());
-    }
-    if base == PROVIDER_BASE {
+        BaseTarget::Class(file_module(file.path), base.to_owned())
+    } else if base == PROVIDER_BASE {
         BaseTarget::Provider
     } else {
-        BaseTarget::Unknown
+        BaseTarget::Builtin
     }
 }
 
