@@ -348,13 +348,35 @@ def test_given_multibyte_text_before_restorations_when_formatting_then_output_is
             _NORMALISE_NAME_HEADER
             + "CONCAT(@column_name, 'O\\'Brien\n      kept indent', 'tail')\n",
         ),
+        ExpressionMacroFormatTestCase(
+            "Databricks multi-line string after a backslash-escaped quote",
+            "models/staging/_sqlbuild/_macros/sql",
+            ("staging",),
+            _NORMALISE_NAME_HEADER
+            + "CONCAT(\n  @column_name,\n  'O\\'Brien\n      kept indent',\n  'tail'\n)\n",
+            _NORMALISE_NAME_HEADER
+            + "CONCAT(@column_name, 'O\\'Brien\n      kept indent', 'tail')\n",
+            adapter="databricks",
+        ),
+        ExpressionMacroFormatTestCase(
+            "DuckDB multi-line E-string after a backslash-escaped quote",
+            "models/staging/_sqlbuild/_macros/sql",
+            ("staging",),
+            _NORMALISE_NAME_HEADER
+            + "CONCAT(\n  @column_name,\n  E'O\\'Brien\n      kept indent',\n  'tail'\n)\n",
+            _NORMALISE_NAME_HEADER
+            + "CONCAT(@column_name, E'O\\'Brien\n      kept indent', 'tail')\n",
+            adapter="duckdb",
+        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_snowflake_expression_macro_when_formatting_then_body_is_laid_out_once(
+def test_given_expression_macro_when_formatting_then_body_is_laid_out_once(
     test_case: ExpressionMacroFormatTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
+    (tmp_path / "sqlbuild_project.toml").write_text(
+        f'name = "orders"\nadapter = "{test_case.adapter}"\n'
+    )
     macro: Path = tmp_path / test_case.macro_directory / "normalise_name.sql"
     macro.parent.mkdir(parents=True)
     macro.write_text(test_case.authored_macro)

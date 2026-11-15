@@ -924,13 +924,14 @@ class SqlReadabilityTestCase:
 
 @dataclass(frozen=True)
 class ExpressionMacroFormatTestCase:
-    """A Snowflake expression macro in one location, and the file formatting leaves."""
+    """An expression macro in one location, and the file formatting leaves on an adapter."""
 
     description: str
     macro_directory: str
     consumer_folders: tuple[str, ...]
     authored_macro: str
     expected_macro: str
+    adapter: str = "snowflake"
 
 
 @dataclass(frozen=True)

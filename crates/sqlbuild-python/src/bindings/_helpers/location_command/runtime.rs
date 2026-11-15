@@ -2,9 +2,11 @@
 
 use std::io::{self, Write};
 
+use pyo3::PyErr;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseHistoryRead,
@@ -55,9 +57,9 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         }
                     };
                     serde_json::to_string(&record)
-                } else if WarehouseHistoryKind::ALL
+                } else if let Some(kind) = WarehouseHistoryKind::ALL
                     .iter()
-                    .any(|kind| request.get(kind.as_str()).is_some())
+                    .find(|kind| request.get(kind.as_str()).is_some())
                 {
                     let metadata: WarehouseHistoryRead =
                         serde_json::from_value(request).map_err(|_| {
@@ -73,7 +75,10 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 if !busy {
                                     write_stderr(
                                         py,
-                                        "Warehouse connection for metadata reads failed.\n",
+                                        &format!(
+                                            "Warehouse connection for metadata reads failed: {}\n",
+                                            failure_reason(&error)
+                                        ),
                                     )?;
                                 } else if !reported_busy {
                                     write_stderr(
@@ -86,16 +91,13 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         };
                     }
                     let page = match &session {
-                        Some(opened) => {
-                            match read_history(py, (opened, stream.take()), &metadata) {
-                                Ok((page, open)) => {
-                                    stream = open;
-                                    Some(page)
-                                }
-                                Err(_) => None,
-                            }
-                        }
-                        None => None,
+                        Some(opened) => read_history(py, (opened, stream.take()), &metadata)
+                            .map(|(page, open)| {
+                                stream = open;
+                                page
+                            })
+                            .map_err(|error| format!(": {}", failure_reason(&error))),
+                        None => Err(String::new()),
                     };
                     if session.as_ref().is_some_and(|opened| opened.local)
                         && let Some(opened) = session.take()
@@ -106,16 +108,23 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     if busy {
                         serde_json::to_string(&serde_json::json!({ "busy": true }))
                     } else {
-                        if page.is_none() {
-                            if let Some(opened) = session.take() {
-                                drop(close_history_session(opened, None));
+                        let delivered = match &page {
+                            Ok(page) => Some(page),
+                            Err(reason) => {
+                                if let Some(opened) = session.take() {
+                                    drop(close_history_session(opened, None));
+                                }
+                                write_stderr(
+                                    py,
+                                    &format!(
+                                        "Warehouse metadata read ({}) failed{reason}. No page delivered.\n",
+                                        kind.as_str()
+                                    ),
+                                )?;
+                                None
                             }
-                            write_stderr(
-                                py,
-                                "Warehouse metadata read failed. No page delivered.\n",
-                            )?;
-                        }
-                        serde_json::to_string(&page)
+                        };
+                        serde_json::to_string(&delivered)
                     }
                 } else {
                     let evaluation: SensorEvaluationRequest = serde_json::from_value(request)
@@ -161,4 +170,12 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
         }
         result
     })
+}
+
+/// The driver's class and message on one line, redacted as warehouse error text.
+fn failure_reason(error: &PyErr) -> String {
+    redact_error_text(&error.to_string())
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }

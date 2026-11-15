@@ -444,7 +444,21 @@ def warehouse_history_page(
     observed_since: str | None = None,
 ) -> Any:
     """Exercise the real isolated reader without a server, state database or declaration import."""
-    result: subprocess.CompletedProcess[str] = subprocess.run(
+    result: subprocess.CompletedProcess[str] = warehouse_history_read(
+        project, table, after, observed_since
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def warehouse_history_read(
+    project: Path,
+    table: str,
+    after: list[str | None] | None = None,
+    observed_since: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """One isolated reader exchange, with the reader's own report of a failed read."""
+    return subprocess.run(
         [
             str(Path(sys.executable).with_name("sqb")),
             "--project-dir",
@@ -472,9 +486,8 @@ def warehouse_history_page(
         capture_output=True,
         timeout=20,
         env=os.environ | {"SQLBUILD_CONTROL_DATABASE_URL": "unsupported://must-not-open"},
+        check=False,
     )
-    assert result.returncode == 0, result.stderr
-    return json.loads(result.stdout)
 
 
 def warehouse_history_pages(
