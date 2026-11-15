@@ -2834,6 +2834,7 @@ class EventExporterDispatcher:
         health_interval_seconds: float | None = None,
         failure_callback: Callable[[EventExporterFailure], object] | None = None,
         summary_callback: Callable[[EventExportSummary], object] | None = None,
+        withheld_kinds: Sequence[str] | None = None,
     ) -> None: ...
     @property
     def thread(self) -> threading.Thread: ...

@@ -7,7 +7,7 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{PyBool, PyString, PyTuple, PyTupleMethods};
+use pyo3::types::{PyBool, PyList, PyString, PyTuple, PyTupleMethods};
 use pyo3::{IntoPyObjectExt, pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_cli::dispatch::main::closing_status::closing_status;
 use sqlbuild_cli::dispatch::main::event_export_warning::event_export_warning;
@@ -32,6 +32,9 @@ use crate::bindings::_helpers::result_output::terminal_index::terminal_event_ind
 const OBSERVABILITY_LOGGER: &str = "sqlbuild.cli.observability";
 const DEBUG_COMMAND: &str = "debug";
 const LINEAGE_COMMAND: &str = "lineage";
+/// Compile's phase operations stay out of project lifecycle sinks; its invocation events do not.
+const COMPILE_COMMAND: &str = "compile";
+const COMPILE_WITHHELD_KINDS: &[&str] = &["operation"];
 const INVOCATION_COMPLETED: &str = "invocation_completed";
 const INVOCATION_FAILED: &str = "invocation_failed";
 /// What an incomplete-export notice says is the only thing affected.
@@ -369,12 +372,18 @@ impl Observed {
                     timeout.extract::<f64>()?
                 };
                 let timeout: Bound<'_, PyAny> = timeout.into_bound_py_any(py)?;
+                let withheld: &[&str] = if native_field(args, "command")?.eq(COMPILE_COMMAND)? {
+                    COMPILE_WITHHELD_KINDS
+                } else {
+                    &[]
+                };
                 let delivery: Bound<'_, PyAny> = EventExporterDispatcher::new(
                     py,
                     Some(keywords(
                         py,
                         &[
                             ("shutdown_timeout_seconds", timeout),
+                            ("withheld_kinds", PyList::new(py, withheld)?.into_any()),
                             (
                                 "failure_callback",
                                 wrap_pyfunction!(log_exporter_failure, py)?.into_any(),

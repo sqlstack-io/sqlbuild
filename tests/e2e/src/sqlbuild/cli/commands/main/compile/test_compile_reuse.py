@@ -30,6 +30,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     RetiredCompilerCacheTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
+    COMPILE_REUSE_ENV,
     COMPILE_REUSE_HIT_LINE,
     COMPILE_REUSE_REGION_ENV_VAR,
     ORDERS_API_TIMEOUT_ENV_VAR,
@@ -67,6 +68,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
     replace_project_text,
     rewrite_compiled_model_unchanged,
     rewrite_macro_without_change,
+    run_installed_sqb,
     run_reuse_compile,
     run_reuse_compile_into_file,
     run_reuse_text_compile,
@@ -649,6 +651,37 @@ def test_given_stdout_redirected_into_project_when_rerun_then_it_reuses_the_comp
 
     assert (first.returncode, second.returncode) == (0, 0), first.stderr + second.stderr
     assert (first_hits, second_hits) == test_case.expected_hit_counts
+
+
+def test_given_operation_sink_when_compiling_then_only_invocation_events_are_exported(
+    compile_reuse_project: Path, tmp_path: Path
+) -> None:
+    project_dir: Path = compile_reuse_project
+    write_recording_sink(
+        project_dir=project_dir, sink_name="orders_phases", event_kinds=("INVOCATION", "OPERATION")
+    )
+    compile_events: Path = tmp_path / "compile-events.jsonl"
+    dag_events: Path = tmp_path / "dag-events.jsonl"
+
+    compiled: CompileReuseRun = run_reuse_compile(
+        project_dir=project_dir,
+        env={"ORDERS_EVENT_PATH": str(compile_events)},
+        args=("--no-cache",),
+    )
+    dag: subprocess.CompletedProcess[str] = run_installed_sqb(
+        project_dir=project_dir,
+        args=("dag", "--json"),
+        env={**COMPILE_REUSE_ENV, "ORDERS_EVENT_PATH": str(dag_events)},
+    )
+    dag_types: set[object] = {event["event_type"] for event in recorded_events(path=dag_events)}
+
+    assert compiled.returncode == 0, compiled.stderr
+    assert tuple(event["event_type"] for event in recorded_events(path=compile_events)) == (
+        "invocation_started",
+        "invocation_completed",
+    )
+    assert dag.returncode == 0, dag.stderr
+    assert "operation_started" in dag_types
 
 
 @pytest.mark.parametrize(

@@ -3533,9 +3533,12 @@ def progress_only(*, text: str) -> bool:
     return all(_PROGRESS_LINE.fullmatch(line) is not None for line in text.splitlines())
 
 
-def write_recording_sink(*, project_dir: Path, sink_name: str) -> None:
-    """Add a lifecycle sink that appends invocation events to ORDERS_EVENT_PATH."""
+def write_recording_sink(
+    *, project_dir: Path, sink_name: str, event_kinds: tuple[str, ...] = ("INVOCATION",)
+) -> None:
+    """Add a lifecycle sink that appends events of `event_kinds` to ORDERS_EVENT_PATH."""
 
+    kinds: str = ", ".join(f"LifecycleEventKind.{kind}" for kind in event_kinds)
     write_project_file(
         project_dir,
         f"sinks/{sink_name}.py",
@@ -3543,7 +3546,7 @@ def write_recording_sink(*, project_dir: Path, sink_name: str) -> None:
         "from sqlbuild.sinks import (\n    LifecycleEvent,\n    LifecycleEventKind,\n"
         "    lifecycle_event_sink,\n    lifecycle_event_to_json,\n)\n\n\n"
         f'@lifecycle_event_sink(name="{sink_name}", '
-        "event_kinds={LifecycleEventKind.INVOCATION})\n"
+        f"event_kinds={{{kinds}}})\n"
         "def record_event(event: LifecycleEvent) -> None:\n"
         '    with Path(os.environ["ORDERS_EVENT_PATH"]).open("a", encoding="utf-8") as stream:\n'
         '        stream.write(lifecycle_event_to_json(event) + "\\n")\n',
