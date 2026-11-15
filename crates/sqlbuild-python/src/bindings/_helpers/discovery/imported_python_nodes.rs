@@ -8,7 +8,7 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
+use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::discovery::imported_modules::{
     ProjectDir, definition, discovered, discovery_error, discovery_error_from, is_exception,
     module_functions, provider_by_name, provider_usages, shim, tuple_of,
@@ -420,7 +420,11 @@ pub(crate) fn discover_python_node_functions<'py>(
                 ("project_dir", project.path.clone()),
             ],
         )?;
-        let discovered_nodes: PyResult<()> = buckets.discover_nodes(&project, &providers);
+        let identity_pass: Bound<'py, PyAny> =
+            host::entry(py, UserCodeHost::PythonIdentityPass)?.call0()?;
+        let discovered_nodes: PyResult<()> = within(&identity_pass, |_| {
+            buckets.discover_nodes(&project, &providers)
+        });
         call_with(
             &shim(py, UserCodeHost::RestorePythonRootModules)?,
             &[("saved_modules", saved)],

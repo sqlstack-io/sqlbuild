@@ -157,6 +157,7 @@ pub enum UserCodeHost {
     ActiveMacroBridge,
     LoadCustomMaterializations,
     PythonNodeDependencyKey,
+    PythonIdentityPass,
     PythonNodeIdentity,
     BuildHookIdentities,
     PythonNodeKind,

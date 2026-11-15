@@ -8,7 +8,7 @@ use sqlbuild_analysis::python_selection::models::{InventoryIndexes, InventoryNod
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
+use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::discovery::imported_modules::provider_usages;
 use crate::bindings::_helpers::discovery::imported_python_nodes::node_identity;
 use crate::bindings::_helpers::graph::python_selection::resolve_python_sql_run_selection;
@@ -197,11 +197,16 @@ pub(crate) fn python_node_graph<'py>(
         providers,
     };
     let mut nodes: Vec<Bound<'py, PyAny>> = Vec::new();
-    for (collection, kind, documented) in KINDS {
-        for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
-            nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
+    let identity_pass: Bound<'py, PyAny> =
+        host::entry(py, UserCodeHost::PythonIdentityPass)?.call0()?;
+    within(&identity_pass, |_| {
+        for (collection, kind, documented) in KINDS {
+            for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
+                nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
+            }
         }
-    }
+        Ok(())
+    })?;
     let inventory: Vec<InventoryNode> = nodes
         .iter()
         .zip(upstream_names(py, &nodes, &vocabulary.sql_ref)?)
