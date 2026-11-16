@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/concepts/interpolation/
 - Syntax reference
 - Project variables
 - Environment variables
+- Config value functions
 - Context variables
 - Deferred placeholders
 - Audit parameters
@@ -39,6 +40,7 @@ The rule is simple: if it's any SQL that will be executed, it uses `@`. If it's 
 | `@name` / `@'name'` | Generic audit SQL | Raw / SQL-literal audit argument |
 | `${CTX:...}` | TOML/YAML config values | Config compilation |
 | `${ENV:...}` | TOML/YAML config values | Config compilation |
+| `${coalesce(...)}`, `${if(...)}`, `${eq(...)}`, `${ne(...)}` | TOML/YAML config values | Config compilation - see [Config value functions](#config-value-functions) |
 
 `@@CTX:` is intentionally SQL-hook-only. Model SQL describes a relation's data and should not reference its own destination identity. SQL hooks are the operational SQL layer where destination context is useful - grants, logging, post-materialization DDL. Python hooks access the same information through `ctx.destination` on the [`HookContext`](models/hooks/python.md#hook-context) object.
 
@@ -105,6 +107,36 @@ WHERE source_system = '@@ENV:SOURCE_SYSTEM'
 ```
 
 If the environment variable is not set, SQLBuild raises a compile error.
+
+## Config value functions
+
+A `${...}` config value can choose between values with a function. This target uses
+`WAREHOUSE_SCHEMA` when it is set, and builds `DEV_<user>` from `WAREHOUSE_USER` otherwise:
+
+```toml
+[targets.dev]
+schema = "${coalesce(ENV:WAREHOUSE_SCHEMA, 'DEV_${ENV:WAREHOUSE_USER}')}"
+```
+
+| Function | Returns |
+|----------|---------|
+| `coalesce(a, b, ...)` | The first argument that is set and true; otherwise the last argument |
+| `if(condition, a, b)` | `a` when `condition` is true, otherwise `b` |
+| `eq(a, b)` | `true` when `a` and `b` read the same as text |
+| `ne(a, b)` | `true` when `a` and `b` read differently as text |
+
+An argument is a project variable (`schema_prefix`), `ENV:NAME`, `CTX:name`, `true`, `false`,
+`null`, a quoted string or another function call. A quoted string can hold `${...}` templates,
+which render into it as text, as in `'DEV_${ENV:WAREHOUSE_USER}'`.
+
+Details:
+
+- An argument is false when it is `null`, `false`, empty, `0` or `false` in any case.
+- A missing variable makes its argument missing, so `coalesce` moves on to the next argument. When
+  every argument is missing, SQLBuild reports the missing variable in the last one.
+- A backslash in a quoted string keeps the next character as written, so `'\${ENV:USER}'` is the
+  text `${ENV:USER}`.
+- A template inside a quoted string can use the same quotes as the string around it.
 
 ## Context variables
 

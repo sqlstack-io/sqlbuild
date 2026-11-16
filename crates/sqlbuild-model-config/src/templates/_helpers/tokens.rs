@@ -1,12 +1,19 @@
 //! The Python template tokenizer.
 
+use crate::templates::_helpers::expressions::parse_expression;
+use crate::templates::_helpers::pattern::{is_quote, template_body_length};
 use crate::templates::errors::TemplateError;
-use crate::templates::models::TemplateFailure;
+use crate::templates::models::{TemplateFailure, TextPart};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum TokenKind {
     Word(String),
     Text(String),
+    /// A quoted argument holding `${...}` templates, and its text as written.
+    Interpolated {
+        written: String,
+        parts: Vec<TextPart>,
+    },
     Symbol(char),
     End,
 }
@@ -22,7 +29,9 @@ impl Token {
     /// Return the token's value as Python's error messages show it.
     pub(crate) fn value(&self) -> String {
         match &self.kind {
-            TokenKind::Word(text) | TokenKind::Text(text) => text.clone(),
+            TokenKind::Word(text)
+            | TokenKind::Text(text)
+            | TokenKind::Interpolated { written: text, .. } => text.clone(),
             TokenKind::Symbol(symbol) => symbol.to_string(),
             TokenKind::End => String::new(),
         }
@@ -47,9 +56,9 @@ pub(crate) fn tokenize(expression: &str) -> Result<Vec<Token>, TemplateFailure> 
             });
             index += 1;
         } else if is_quote(character) {
-            let (text, next) = quoted_text(&characters, index)?;
+            let (kind, next) = quoted_text(&characters, index)?;
             tokens.push(Token {
-                kind: TokenKind::Text(text),
+                kind,
                 position: index,
             });
             index = next;
@@ -74,8 +83,9 @@ pub(crate) fn tokenize(expression: &str) -> Result<Vec<Token>, TemplateFailure> 
     Ok(tokens)
 }
 
-fn quoted_text(characters: &[char], start: usize) -> Result<(String, usize), TemplateFailure> {
+fn quoted_text(characters: &[char], start: usize) -> Result<(TokenKind, usize), TemplateFailure> {
     let quote = characters[start];
+    let mut parts: Vec<TextPart> = Vec::new();
     let mut text = String::new();
     let mut index = start + 1;
     while let Some(&character) = characters.get(index) {
@@ -88,7 +98,23 @@ fn quoted_text(characters: &[char], start: usize) -> Result<(String, usize), Tem
             text.push(escaped);
             index += 2;
         } else if character == quote {
-            return Ok((text, index + 1));
+            let kind = if parts.is_empty() {
+                TokenKind::Text(text)
+            } else {
+                parts.push(TextPart::Text(text));
+                TokenKind::Interpolated {
+                    written: characters[start + 1..index].iter().collect(),
+                    parts,
+                }
+            };
+            return Ok((kind, index + 1));
+        } else if let Some((body, length)) = nested_template(characters, index) {
+            parts.push(TextPart::Text(std::mem::take(&mut text)));
+            parts.push(TextPart::Template {
+                expression: parse_expression(&body)?,
+                body,
+            });
+            index += length;
         } else {
             text.push(character);
             index += 1;
@@ -103,6 +129,14 @@ fn quoted_text(characters: &[char], start: usize) -> Result<(String, usize), Tem
     ))
 }
 
-fn is_quote(character: char) -> bool {
-    matches!(character, '\'' | '"')
+/// The body of a complete `${...}` template at `index`, and its length in characters.
+fn nested_template(characters: &[char], index: usize) -> Option<(String, usize)> {
+    if characters.get(index) != Some(&'$') || characters.get(index + 1) != Some(&'{') {
+        return None;
+    }
+    let rest: String = characters[index + 2..].iter().collect();
+    let length: usize = template_body_length(&rest)?;
+    let body: String = rest[..length].to_owned();
+    let count: usize = body.chars().count();
+    Some((body, count + 3))
 }
