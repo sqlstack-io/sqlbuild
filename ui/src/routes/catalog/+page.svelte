@@ -17,6 +17,7 @@
 	import { topFolder } from '$lib/lineage/catalog-graph';
 	import { app } from '$lib/state/app.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { createVirtualRows } from '$lib/components/list/virtual-rows.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
 	import { KIND_TABS, kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, parseKindTab, shortName, shortRunId, type KindTab } from '$lib/build-area/labels';
@@ -74,6 +75,10 @@
 		{ value: 'warn', label: 'Last build warned' }
 	];
 
+	const ROW_H = 52;
+	const win = createVirtualRows(ROW_H, () => filtered.length);
+	const visible = $derived(filtered.slice(win.first, win.last));
+
 	const filteredRunnable = $derived(filtered.filter((n) => n.kind !== 'source').map((n) => n.key));
 	const narrowed = $derived(filtered.length !== all.length);
 </script>
@@ -107,8 +112,15 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="sb-list-wrap">
-	<table class="sb-list">
+<div class="sb-list-wrap" {@attach win.attach}>
+	<table class="sb-list catalog">
+		<colgroup>
+			<col />
+			<col style:width="170px" />
+			{#if showBuildState}<col style:width="150px" /><col style:width="170px" />{/if}
+			{#if showChecks}<col style:width="90px" />{/if}
+			<col style:width="130px" />
+		</colgroup>
 		<thead>
 			<tr>
 				<th>Name</th>
@@ -119,9 +131,10 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each filtered as n (n.key)}
+			{#if win.first > 0}<tr class="spacer" style:height="{win.before}px"><td colspan={columns}></td></tr>{/if}
+			{#each visible as n (n.key)}
 				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
-				<tr onclick={(e) => linksNodes && openRow(e, `/catalog/${n.key}`)}>
+				<tr style:height="{ROW_H}px" onclick={(e) => linksNodes && openRow(e, `/catalog/${n.key}`)}>
 					<td>
 						<div class="cell-name">
 							<Glyph size={15} strokeWidth={1.75} />
@@ -159,6 +172,36 @@
 			{:else}
 				<LoadRow colspan={columns} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet. Deploy the project to see its models, sources and seeds here.'} />
 			{/each}
+			{#if win.last < filtered.length}<tr class="spacer" style:height="{win.after}px"><td colspan={columns}></td></tr>{/if}
 		</tbody>
 	</table>
 </div>
+
+<style>
+	/* Fixed layout: a long description truncates instead of widening the table past the page. */
+	.catalog {
+		min-width: 900px;
+		table-layout: fixed;
+	}
+	.catalog tbody tr:not(.load-row) td {
+		overflow: hidden;
+		padding-top: 4px;
+		padding-bottom: 4px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.catalog .cell-name a,
+	.catalog .cell-name .mono {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.catalog :global(.stale-badges) {
+		flex-wrap: nowrap;
+	}
+	.spacer td,
+	.spacer {
+		padding: 0 !important;
+		border: 0 !important;
+	}
+</style>

@@ -4,7 +4,7 @@
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import RadarIcon from '@lucide/svelte/icons/radar';
 	import UserIcon from '@lucide/svelte/icons/user';
-	import { onMount } from 'svelte';
+	import { createVirtualRows } from '$lib/components/list/virtual-rows.svelte';
 	import type { RunRow } from '$lib/api';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import RunStatusPill from '$lib/components/operate/run-status-pill.svelte';
@@ -20,22 +20,10 @@
 
 	const ROW_H = 52;
 	const OVERSCAN = 8;
-	let scroller = $state<HTMLDivElement>();
-	let scrollTop = $state(0);
-	let viewH = $state(600);
-
-	onMount(() => {
-		const el = scroller;
-		if (!el) return;
-		const ro = new ResizeObserver(() => (viewH = el.clientHeight));
-		ro.observe(el);
-		viewH = el.clientHeight;
-		return () => ro.disconnect();
-	});
-
 	const rows = $derived(list.display);
-	const first = $derived(Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN));
-	const last = $derived(Math.min(rows.length, Math.ceil((scrollTop + viewH) / ROW_H) + OVERSCAN));
+	const win = createVirtualRows(ROW_H, () => rows.length, OVERSCAN);
+	const first = $derived(win.first);
+	const last = $derived(win.last);
 	const visible = $derived(rows.slice(first, last));
 
 	// Fetch the next cursor page when the window nears the end.
@@ -51,7 +39,7 @@
 	<button type="button" class="chip" onclick={() => onfilter(key, value)} {title}>{label}</button>
 {/snippet}
 
-<div bind:this={scroller} class="sb-list-wrap scroller" onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)}>
+<div class="sb-list-wrap scroller" {@attach win.attach}>
 	<table class="sb-list runs">
 		<colgroup>
 			<col style:width="40px" />
@@ -76,7 +64,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#if first > 0}<tr class="spacer" style:height="{first * ROW_H}px"><td colspan="7"></td></tr>{/if}
+			{#if first > 0}<tr class="spacer" style:height="{win.before}px"><td colspan="7"></td></tr>{/if}
 			{#each visible as d (d.key)}
 				{@const r = d.row.run}
 				{@const line = statusLine(d.row, app.now)}
@@ -149,7 +137,7 @@
 					</td>
 				</tr>
 			{/each}
-			{#if last < rows.length}<tr class="spacer" style:height="{(rows.length - last) * ROW_H}px"><td colspan="7"></td></tr>{/if}
+			{#if last < rows.length}<tr class="spacer" style:height="{win.after}px"><td colspan="7"></td></tr>{/if}
 			{#if !rows.length}
 				<tr class="load-row">
 					<td colspan="7" class="empty">

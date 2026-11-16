@@ -16,6 +16,7 @@
 	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { createVirtualRows } from '$lib/components/list/virtual-rows.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel } from '$lib/build-area/labels';
@@ -65,6 +66,11 @@
 	const runSelection = $derived([...new Set(filtered.map((c) => c.node).filter((n): n is string => !!n))]);
 	const linksNodes = $derived(app.client.supports('getCatalogNode'));
 	const hasRecent = $derived(all.some((c) => c.recentOutcomes !== null));
+	const columns = $derived(hasRecent ? 9 : 8);
+
+	const ROW_H = 52;
+	const win = createVirtualRows(ROW_H, () => filtered.length);
+	const visible = $derived(filtered.slice(win.first, win.last));
 </script>
 
 <AppTopbar title="Checks">
@@ -90,8 +96,19 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="sb-list-wrap">
-	<table class="sb-list">
+<div class="sb-list-wrap" {@attach win.attach}>
+	<table class="sb-list checks">
+		<colgroup>
+			<col />
+			<col style:width="120px" />
+			<col style:width="240px" />
+			<col style:width="100px" />
+			<col style:width="120px" />
+			<col style:width="130px" />
+			<col style:width="100px" />
+			{#if hasRecent}<col style:width="100px" />{/if}
+			<col style:width="130px" />
+		</colgroup>
 		<thead>
 			<tr>
 				<th>Check</th>
@@ -106,20 +123,21 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each filtered as c (c.id)}
+			{#if win.first > 0}<tr class="spacer" style:height="{win.before}px"><td colspan={columns}></td></tr>{/if}
+			{#each visible as c (c.id)}
 				{@const o = outcomeOf(c)}
-				<tr onclick={(e) => openRow(e, `/checks/${c.id}`)}>
+				<tr style:height="{ROW_H}px" onclick={(e) => openRow(e, `/checks/${c.id}`)}>
 					<td>
 						<div class="cell-name">
 							<ShieldCheckIcon size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								<a href={to(`/checks/${c.id}`)} class="check-name">{c.name}</a>
+								<a href={to(`/checks/${c.id}`)} class="check-name" title={c.name}>{c.name}</a>
 								<div class="cell-desc">{kindLabel(c)}</div>
 							</div>
 						</div>
 					</td>
 					<td><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /></td>
-					<td>
+					<td title={c.node ? `${c.node}${c.column ? `.${c.column}` : ''}` : undefined}>
 						{#if c.node}{#if linksNodes}<a href={to(`/catalog/${c.node}`)} class="link">{c.node}</a>{:else}<span>{c.node}</span>{/if}{#if c.column}<span class="muted">.{c.column}</span>{/if}
 						{:else}<span class="muted">{attachmentLabel[c.attachment]}</span>{/if}
 					</td>
@@ -131,14 +149,35 @@
 					<td><RelativeTime value={formatAgo(c.latest?.evaluatedAt, app.now)} exact={formatStamp(c.latest?.evaluatedAt)} /></td>
 				</tr>
 			{:else}
-				<LoadRow colspan={hasRecent ? 9 : 8} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet. Add audits or tests to a model and they show up here after the next deploy.'} />
+				<LoadRow colspan={columns} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet. Add audits or tests to a model and they show up here after the next deploy.'} />
 			{/each}
+			{#if win.last < filtered.length}<tr class="spacer" style:height="{win.after}px"><td colspan={columns}></td></tr>{/if}
 		</tbody>
 	</table>
 </div>
 
 <style>
+	/* Fixed layout: long names and node keys truncate instead of widening the table. */
+	.checks {
+		min-width: 1150px;
+		table-layout: fixed;
+	}
+	.checks tbody tr:not(.load-row) td {
+		overflow: hidden;
+		padding-top: 4px;
+		padding-bottom: 4px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.spacer td,
+	.spacer {
+		padding: 0 !important;
+		border: 0 !important;
+	}
 	.check-name {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		color: var(--foreground);
 		font: 12px var(--font-mono);
 	}
