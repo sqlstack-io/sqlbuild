@@ -12,14 +12,14 @@ use sqlbuild_analysis::compiler::models::{
 
 use sqlbuild_core::panics::main::native_failure::native_failure;
 
-use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
-use crate::bindings::_helpers::records::fields::{
-    field as native_field, path_posix_text, path_stem,
-};
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
-use crate::bindings::types::CompilerDetach;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::path_posix_text::path_posix_text;
+use sqlbuild_python_base::records::main::fields::path_stem::path_stem;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const MACRO_TOKEN: char = '@';
 const INPUT_FAILURE: &str = "input";

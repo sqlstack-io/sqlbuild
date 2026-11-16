@@ -1,5 +1,6 @@
 //! Decorated Python nodes, audit factories, hooks and materializations from imported modules.
 
+use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -8,17 +9,18 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::discovery::imported_modules::{
     ProjectDir, definition, discovered, discovery_error, discovery_error_from, is_exception,
     module_functions, provider_by_name, provider_usages, shim, tuple_of,
 };
 use crate::bindings::_helpers::discovery::imported_providers;
 use crate::bindings::_helpers::discovery::python_hook_files::discover_python_hook_files;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 const NODE_ERROR: ErrorId = ErrorId::PythonNodeDiscovery;
 const AUDIT_CASE: UserCodeHost = UserCodeHost::AuditCase;
 const READ_FACTORY: UserCodeHost = UserCodeHost::ReadFactoryDefinition;
@@ -336,7 +338,7 @@ fn audit_cases<'py>(
             ),
         ));
     }
-    let audit_case: Bound<'py, PyAny> = host::entry(py, AUDIT_CASE)?;
+    let audit_case: Bound<'py, PyAny> = host_entry(py, AUDIT_CASE)?;
     let mut cases: Vec<Bound<'py, PyAny>> = Vec::new();
     for (index, item) in result.try_iter()?.enumerate() {
         let item: Bound<'py, PyAny> = item?;
@@ -420,7 +422,8 @@ pub(crate) fn discover_python_node_functions<'py>(
                 ("project_dir", project.path.clone()),
             ],
         )?;
-        let discovered_nodes: PyResult<()> = buckets.discover_nodes(&project, &providers);
+        let discovered_nodes: PyResult<()> =
+            within_identity_pass(py, || buckets.discover_nodes(&project, &providers));
         call_with(
             &shim(py, UserCodeHost::RestorePythonRootModules)?,
             &[("saved_modules", saved)],
@@ -622,11 +625,11 @@ pub(crate) fn node_identity<'py>(
     (kind, documented): (&str, bool),
     get: &dyn Fn(&str) -> PyResult<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let kind_value: Bound<'py, PyAny> = host::entry(py, UserCodeHost::PythonNodeKind)?
+    let kind_value: Bound<'py, PyAny> = host_entry(py, UserCodeHost::PythonNodeKind)?
         .getattr(kind)?
         .getattr("value")?;
     call_with(
-        &host::entry(py, UserCodeHost::PythonNodeIdentity)?,
+        &host_entry(py, UserCodeHost::PythonNodeIdentity)?,
         &[
             ("kind", kind_value),
             ("name", get("name")?),

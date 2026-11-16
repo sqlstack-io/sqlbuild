@@ -16,9 +16,9 @@ use sqlbuild_analysis::dag_artifact::models::{
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
 use crate::bindings::_helpers::dag_artifact::selection::selected_node_ids;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 const PROJECT_NAME_KEY: &str = "project_name";
 const DEFAULT_MATERIALIZATION: &str = "table";
@@ -114,14 +114,14 @@ fn translated_nodes<'py>(artifact: &ArtifactGraph<'py>) -> PyResult<Vec<Bound<'p
 }
 
 fn kind_set(py: Python<'_>, constant: ThirdPartyHost) -> PyResult<BTreeSet<String>> {
-    listed(&host::entry(py, constant)?)?
+    listed(&host_entry(py, constant)?)?
         .iter()
         .map(text)
         .collect()
 }
 
 fn constant_text(py: Python<'_>, constant: ThirdPartyHost) -> PyResult<String> {
-    text(&host::entry(py, constant)?)
+    text(&host_entry(py, constant)?)
 }
 
 fn picked<'py>(objects: &[Bound<'py, PyAny>], indexes: &[usize]) -> Vec<Bound<'py, PyAny>> {

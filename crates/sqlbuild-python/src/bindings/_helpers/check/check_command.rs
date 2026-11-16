@@ -2,7 +2,6 @@
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
@@ -10,6 +9,9 @@ use crate::bindings::_helpers::compile_driver::relation_targets::build_project_r
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
+use crate::bindings::_helpers::discovery::provider_secrets::{
+    consumer_uses, require_used_secrets, sink_uses,
+};
 use crate::bindings::_helpers::graph::algorithms::transitive_closure_many;
 use crate::bindings::_helpers::graph::execution_gates::sql_ref_key;
 use crate::bindings::_helpers::graph::python_lifecycle::build_python_sql_run_lifecycle;
@@ -18,7 +20,6 @@ use crate::bindings::_helpers::planner_entries::command_plans::build_relation_co
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_selection::selectors::parse_project_selector;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with, record_class};
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -31,8 +32,11 @@ use sqlbuild_core::check_command::main::render_check_summary::render_check_summa
 use sqlbuild_core::check_command::main::validate_check_selection::validate_check_selection;
 use sqlbuild_core::check_command::models::CheckResultText;
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::check::check_core::{
     ReadSideInputs, load_results_by_loader_name, record_python_run_state_results,
     run_read_side_dependencies,
@@ -44,11 +48,13 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_com
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_python_check_runtime_target;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::graph::python_selection::python_node_names;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const GRAPH_OPERATOR_CODE: &str = "C681";
 const GRAPH_OPERATOR_MESSAGE: &str = "sqb check selectors do not support graph operators; \
@@ -140,7 +146,7 @@ fn selected_check_names<'py>(
         .collect::<PyResult<_>>()?;
     refuse_graph_selectors(py, &selectors)?;
     let check_kind: Bound<'py, PyAny> =
-        host::entry(py, UserCodeHost::PythonNodeKind)?.getattr("CHECK")?;
+        host_entry(py, UserCodeHost::PythonNodeKind)?.getattr("CHECK")?;
     if select.is_truthy()? {
         let selected: Bound<'py, PyAny> = python_nodes(graph, (select, exclude))?;
         let mut non_checks: Vec<String> = Vec::new();
@@ -191,7 +197,7 @@ fn compile_pipeline<'py>(
         )?,
     )?;
     let loader_kind: Bound<'py, PyAny> =
-        host::entry(py, UserCodeHost::PythonNodeKind)?.getattr("LOADER")?;
+        host_entry(py, UserCodeHost::PythonNodeKind)?.getattr("LOADER")?;
     let mut loaders: Vec<Bound<'py, PyAny>> = Vec::new();
     for name in closure.try_iter()? {
         let name: Bound<'py, PyAny> = name?;
@@ -407,7 +413,7 @@ fn node_runtime<'py>(
         fields.push(("project_relations", prepared.project_relations.clone()));
     }
     fields.push(("providers", providers.clone()));
-    call_with(&host::entry(py, ExecutorHost::PythonNodeRuntime)?, &fields)
+    call_with(&host_entry(py, ExecutorHost::PythonNodeRuntime)?, &fields)
 }
 
 fn record_run_state<'py>(
@@ -441,11 +447,11 @@ fn run_checks<'py>(
     let plan_output: Bound<'py, PyAny> = native_field(&prepared.pipeline, "plan_output")?;
     let source_map: Bound<'py, PyAny> = native_field(&plan_output, "source_map")?;
     let callbacks: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::IngressCallbacks)?,
+        &host_entry(py, ExecutorHost::IngressCallbacks)?,
         &[("use_color", native_field(invocation, "use_color")?)],
     )?;
     let ingress: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::ExecuteIngressPythonLoaderNodes)?,
+        &host_entry(py, ExecutorHost::ExecuteIngressPythonLoaderNodes)?,
         &[
             ("python_graph", prepared.python_graph.clone()),
             (
@@ -508,11 +514,11 @@ fn run_checks<'py>(
     )?
     .into_any();
     let check_callbacks: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::PythonCheckCallbacks)?,
+        &host_entry(py, ExecutorHost::PythonCheckCallbacks)?,
         &[("on_check_complete", on_complete)],
     )?;
     call_with(
-        &host::entry(py, ExecutorHost::ExecutePythonChecks)?,
+        &host_entry(py, ExecutorHost::ExecutePythonChecks)?,
         &[
             ("check_functions", prepared.check_functions.clone()),
             ("python_graph", prepared.python_graph.clone()),
@@ -661,8 +667,12 @@ pub(crate) fn run_check_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
     header.set_item("use_color", native_field(&invocation, "use_color")?)?;
     write_execution_header(py, Some(header))?;
     let prepared: Prepared<'_> = prepare(request, &invocation)?;
+    let discovered: Bound<'_, PyAny> = native_field(&invocation, "discovered_inputs")?;
+    let mut uses: Vec<(String, String)> = consumer_uses(&prepared.check_functions)?;
+    uses.extend(sink_uses(&discovered)?);
+    require_used_secrets(&discovered, &uses)?;
     let session: Bound<'_, PyAny> = call_with(
-        &host::entry(py, UserCodeHost::BuildProviderSession)?,
+        &host_entry(py, UserCodeHost::BuildProviderSession)?,
         &[(
             "discovered_providers",
             native_field(&invocation, "discovered_inputs")?.getattr("providers")?,

@@ -22,10 +22,6 @@ use sqlbuild_core::debug_report::models::{
     DebugReport, DebugRuntime, WarehouseCheck,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, imported, within,
-};
 use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::{
@@ -39,14 +35,23 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
     CommandScope, WarehouseInputs, apply_warehouse, command_scope, find_authored, resolve_warehouse,
 };
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
-use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
+use crate::bindings::_helpers::discovery::configuration::discover_configured_providers;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
+use crate::bindings::_helpers::native_host::provider_settings::{
+    missing_secrets, secret_variables,
+};
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DEBUG_OPTIONS: (&[&str], &[&str]) = (
     &[],
@@ -56,6 +61,7 @@ const DEBUG_OPTIONS: (&[&str], &[&str]) = (
         "no_connection",
         "selected_target",
         "json_output",
+        "verbose",
     ],
 );
 
@@ -167,7 +173,16 @@ fn providers(discovered_inputs: &Bound<'_, PyAny>) -> PyResult<Vec<DebugProvider
     let mut providers: Vec<DebugProvider> = Vec::new();
     for provider in native_field(discovered_inputs, "providers")?.try_iter()? {
         let provider: Bound<'_, PyAny> = provider?;
+        let provider_class: Bound<'_, PyAny> = native_field(&provider, "provider_class")?;
+        let missing: Vec<String> = missing_secrets(&provider_class)?;
         providers.push(DebugProvider {
+            secrets: secret_variables(&provider_class)?
+                .into_iter()
+                .map(|variable| {
+                    let set: bool = !missing.contains(&variable);
+                    (variable, set)
+                })
+                .collect(),
             name: native_field(&provider, "name")?.str()?.extract()?,
             relative_path: native_field(&provider, "relative_path")?.str()?.extract()?,
             class_name: native_field(&provider, "provider_class")?
@@ -262,17 +277,12 @@ fn effective_connection<'py>(
 fn build_report(
     py: Python<'_>,
     project_dir: &PathBuf,
-    (selected_target, check_connection): (Bound<'_, PyAny>, bool),
+    (selected_target, check_connection, verbose): (Bound<'_, PyAny>, bool, bool),
 ) -> PyResult<DebugReport> {
     let project_dir_object: Bound<'_, PyAny> =
         imported(py, "pathlib", "Path")?.call1((project_dir,))?;
-    let discovered_inputs: Bound<'_, PyAny> = discover_project_inputs(
-        py,
-        Some(keywords(
-            py,
-            &[("project_dir", project_dir_object.clone())],
-        )?),
-    )?;
+    let discovered_inputs: Bound<'_, PyAny> =
+        discover_configured_providers(py, &project_dir_object, SecretPolicy::Defer)?;
     let files: DebugConfigFiles = debug_config_files(project_dir);
     let adapter_name: Bound<'_, PyAny> = resolve_effective_adapter_name(
         &native_field(&discovered_inputs, "project_config")?,
@@ -359,6 +369,7 @@ fn build_report(
     };
     let warehouses: Vec<WarehouseCheck> =
         warehouse_checks(&context, (&command_scope, &base_connection))?;
+    let providers: Vec<DebugProvider> = providers(&context.discovered_inputs)?;
     let check: ConnectionCheck = if check_connection {
         connection_check(&context.adapter, &connection_config)?
     } else {
@@ -368,7 +379,12 @@ fn build_report(
         local_files: local_database_files(&facts.adapter_name, &connection_config)?,
         runtime: debug_runtime_lines(&runtime(py)?),
         configuration: debug_configuration_lines(&facts, &warehouses),
-        providers: debug_provider_lines(&providers(&context.discovered_inputs)?),
+        missing_secrets: providers
+            .iter()
+            .flat_map(|provider| &provider.secrets)
+            .filter(|(_, set)| !set)
+            .count(),
+        providers: debug_provider_lines(&providers, verbose),
         connection: debug_connection_lines(&connection_settings(&connection_config)?, &check),
     })
 }
@@ -398,6 +414,7 @@ pub(crate) fn run_debug_command(
             (
                 arguments.value("selected_target")?,
                 !arguments.flag("no_connection")?,
+                arguments.passed("verbose")? && arguments.flag("verbose")?,
             ),
         )
     };

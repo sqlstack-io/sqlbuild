@@ -1,5 +1,6 @@
 //! Custom-rule import closures, implementation fingerprints and statically found test cases.
 
+use sqlbuild_python_base::positional_record;
 use std::path::{Path, PathBuf};
 
 use pyo3::prelude::{
@@ -16,10 +17,10 @@ use sqlbuild_pysource::rule_evidence::models::{
     DisallowedImport, RuleTestEvidence, UnparsedSource,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const PATHLIB_MODULE: &str = "pathlib";
 const INSPECT_MODULE: &str = "inspect";

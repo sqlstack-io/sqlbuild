@@ -12,10 +12,10 @@ use sqlbuild_analysis::compiler::models::{SqlTestExtractionFailure, SqlTestReque
 use sqlbuild_analysis::sql_test_attachment::main::authored_test_offset::authored_test_offset;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const MODEL_MODE: &str = "model";
 

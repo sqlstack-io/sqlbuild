@@ -6,8 +6,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods};
 use sqlbuild_analysis::graph::errors::SelectorError;
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const PRIVATE_USE: std::ops::Range<u32> = 0xF0000..0xFFFFE;
 

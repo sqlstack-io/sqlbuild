@@ -111,3 +111,31 @@ class SqlOnlySelectorParityTestCase:
     description: str
     selector: str
     expected_sql_names: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PythonIdentitySharingTestCase:
+    """Identities built node by node or in one shared pass must match the recorded identities."""
+
+    description: str
+    shared_pass: bool
+    expected_summaries: dict[str, tuple[tuple[str, ...], str]]
+
+
+@dataclass(frozen=True)
+class PythonIdentityWorkTestCase:
+    """Discovery of `node_counts` nodes sharing helpers processes each file and object once."""
+
+    description: str
+    node_counts: tuple[int, int]
+    expected_most_per_unit: int
+
+
+@dataclass(frozen=True)
+class PythonClassSourceTestCase:
+    """Class shapes whose shared-pass source must equal `inspect.getsource`."""
+
+    description: str
+    shapes_path: str
+    object_paths: tuple[str, ...]
+    expected_sources_like_inspect: int

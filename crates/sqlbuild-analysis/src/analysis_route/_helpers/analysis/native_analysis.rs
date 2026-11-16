@@ -5,7 +5,7 @@ use sqlquack_semantics::lineage::models::{
     LineageContext, NameFinding, Nullability, OutputLineage, QueryLineage, SourceColumn,
     TransformKind,
 };
-use sqlquack_semantics::{statement_lineage, statement_name_findings};
+use sqlquack_semantics::statement_lineage_and_findings;
 use sqlquack_syntax::Expression;
 
 use crate::analysis_route::constants::{
@@ -37,7 +37,8 @@ pub(crate) fn native_analysis<D: NativeDialect + ?Sized>(
         schema: input.schema,
         sql: Some(input.sql),
     };
-    let lineage: QueryLineage = statement_lineage(statement, context);
+    let (lineage, findings): (QueryLineage, Vec<NameFinding>) =
+        statement_lineage_and_findings(statement, context);
     NativeAnalysis {
         columns: lineage
             .outputs
@@ -56,11 +57,7 @@ pub(crate) fn native_analysis<D: NativeDialect + ?Sized>(
             .collect(),
         has_star: lineage.projects_star,
         star_resolved: !lineage.open_star,
-        diagnostics: diagnostics(
-            dialect.name(),
-            input,
-            statement_name_findings(statement, context),
-        ),
+        diagnostics: diagnostics(dialect.name(), input, findings),
     }
 }
 

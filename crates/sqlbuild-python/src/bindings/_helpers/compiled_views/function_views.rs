@@ -5,6 +5,7 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{FromPyObject, IntoPyObjectExt, pyclass, pymethods};
+use sqlbuild_python_base::positional_record;
 
 use sqlbuild_project::models as project_models;
 use sqlbuild_project::types::{NamedTypeRow, ObjectKeyRow};
@@ -18,9 +19,9 @@ use crate::bindings::_helpers::compiled_views::model_input_view::{
 };
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::models::DestinationFact;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const SQL_LANGUAGE: &str = "sql";
 const PYTHON_LANGUAGE: &str = "python";

@@ -10,12 +10,15 @@ use sqlbuild_model_config::templates::main::deferred_target_segments::deferred_t
 use sqlbuild_model_config::templates::models::DeferredSegment;
 
 use crate::bindings::_helpers::authored_values::project_vars::render_project_var_text;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_values;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PRESERVE_TARGET_VALUE: &str = "preserve";
 /// `sorted(DEFERRED_TARGET_CONTEXT_KEYS)`.

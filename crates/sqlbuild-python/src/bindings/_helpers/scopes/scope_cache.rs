@@ -12,12 +12,12 @@ use sqlbuild_scopes::scope_cache::main::scope_fingerprint::scope_fingerprint;
 use sqlbuild_scopes::scope_cache::main::write_scope_cache::write_scope_cache;
 use sqlbuild_scopes::scope_cache::models::{CachedIndex, Fingerprint, FingerprintInputs};
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::scopes::scope_objects::{
     ScopeClasses, index_object, read_completeness, read_index,
 };
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const METADATA_MODULE: &str = "importlib.metadata";
 const DISTRIBUTION_NAME: &str = "sqlbuild";

@@ -18,3 +18,12 @@ class DebugJsonCliTestCase:
     command: tuple[str, ...]
     expected_success: bool
     expected_check_tail: list[dict[str, str]]
+
+
+@dataclass(frozen=True)
+class DebugConfigurationErrorTestCase:
+    description: str
+    project_toml: str
+    local_toml: str
+    expected_returncode: int
+    expected_stderr_fragment: str

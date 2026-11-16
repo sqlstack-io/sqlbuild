@@ -1,5 +1,6 @@
 //! The compile-input model loop: each model's steps run in the attachment's order, natively.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -30,7 +31,6 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::cache::native_parse_store::NativeParseStore;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AttachedSqlTests;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
@@ -96,7 +96,6 @@ use crate::bindings::_helpers::model_config::config_classes::ConfigClasses;
 use crate::bindings::_helpers::model_config::config_errors::raised_config_exception;
 use crate::bindings::_helpers::model_config::header_metadata::ContractClasses;
 use crate::bindings::_helpers::model_config::model_validator::NativeModelValidator;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::declaration_expansion::{
     DeclarationExpansion, ExpandedDeclarations, ExpansionClasses, ExpansionConsumer,
     expand_declarations,
@@ -110,8 +109,10 @@ use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use crate::bindings::_helpers::sqltext::static_sql::{
     InterpolationRow as SqlInterpolationRow, InterpolationSources, interpolation_batch,
 };
-use crate::bindings::types::CompilerDetach;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const MATERIALIZED_KEY: &str = "materialized";
 const CURSOR_KEY: &str = "cursor";

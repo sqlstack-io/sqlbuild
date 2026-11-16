@@ -16,18 +16,20 @@ use sqlbuild_core::cost_allocation::main::query_history_sql::query_history_sql;
 use sqlbuild_core::cost_allocation::models::{QueryHistoryWindow, RunAllocation};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported, within};
 use crate::bindings::_helpers::cost_telemetry::allocation::{
     SummaryState, allocate_observations, priced, summary_object,
 };
 use crate::bindings::_helpers::cost_telemetry::health::consume_ledger_failure;
 use crate::bindings::_helpers::cost_telemetry::ledger::read_ledger;
 use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Default budget of one collection, which the at-exit collection keeps short.
 const DEADLINE_SECONDS: f64 = 30.0;
@@ -115,7 +117,7 @@ fn with_timeout_retry<'py, T>(
                 .contains(STATEMENT_TIMEOUT_CODE))
         },
     )?;
-    let scope: Bound<'py, PyAny> = host::entry(py, ExecutorHost::StatementLifecycle)?
+    let scope: Bound<'py, PyAny> = host_entry(py, ExecutorHost::StatementLifecycle)?
         .call_method1("handled_failure_scope", (is_timeout,))?;
     within(&scope, |_| execute())
 }

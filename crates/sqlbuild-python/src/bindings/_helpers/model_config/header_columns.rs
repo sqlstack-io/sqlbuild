@@ -9,14 +9,14 @@ use sqlbuild_model_config::errors::{ConfigError, ErrorClass};
 use sqlbuild_model_config::header_metadata::main::parse_schema_columns::parse_schema_columns as parse_columns;
 use sqlbuild_model_config::header_metadata::models::ColumnRequest;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
 use crate::bindings::_helpers::model_config::config_errors::config_exception;
 use crate::bindings::_helpers::model_config::config_errors::native_config_error;
 use crate::bindings::_helpers::model_config::contract_classes::contract_classes;
 use crate::bindings::_helpers::model_config::header_metadata::{ContractClasses, column_tuple};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// `(file_path, label)`: the path and label every message names.
 pub(crate) type ColumnSite<'a> = (&'a str, &'a str);

@@ -7,18 +7,19 @@ use pyo3::types::{PyBool, PyDict};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::{
     ExpansionSources, ExpansionVars, present, sql_expansion_inputs,
 };
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const COMPILE_FIRST_MESSAGE: &str = "compiler-integrated Rules check the SQL your project \
     actually produces, so the project must compile first";
@@ -103,7 +104,7 @@ fn expansion_inputs(sources: LintExpansionSources<'_>) -> PyResult<SqlExpansionI
                 &native_field(&discovered, "local_config")?,
             )?;
             call_with(
-                &host::entry(py, AdapterHost::ResolveAdapter)?,
+                &host_entry(py, AdapterHost::ResolveAdapter)?,
                 &[
                     ("adapter_name", adapter_name),
                     ("project_dir", project_dir.clone()),
@@ -124,7 +125,7 @@ fn expansion_inputs(sources: LintExpansionSources<'_>) -> PyResult<SqlExpansionI
 /// Adapter, compile and discovery errors as `ProjectCompileError`; any other error unchanged.
 fn compile_first_error(py: Python<'_>, error: PyErr) -> PyResult<PyErr> {
     let value: Bound<'_, PyAny> = error.value(py).clone().into_any();
-    let reported: bool = value.is_instance(&host::entry(py, AdapterHost::AdapterUserError)?)?
+    let reported: bool = value.is_instance(&host_entry(py, AdapterHost::AdapterUserError)?)?
         || value.is_instance(&error_class(py, ErrorId::CompileInput)?)?
         || value.is_instance(&error_class(py, ErrorId::Discovery)?)?;
     if !reported {

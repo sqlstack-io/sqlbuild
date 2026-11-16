@@ -458,6 +458,16 @@ rule = 2
 note = "Identity hashing over live user functions (source and globals)."
 
 [[stays]]
+path = "compiler/python_nodes/_helpers/object_source.py"
+rule = 2
+note = "Identity hashing over live user functions (source and globals)."
+
+[[stays]]
+path = "compiler/python_nodes/classes/identity_pass.py"
+rule = 2
+note = "Identity hashing over live user functions (source and globals)."
+
+[[stays]]
 path = "compiler/macro_bridge/_helpers/store_environment.py"
 rule = 2
 note = "Fingerprints the installed packages, import path and live module files that project macros import from; the macro call store cache key. The interpreter stamp it shares with compile reuse is native (interpreter_identity)."

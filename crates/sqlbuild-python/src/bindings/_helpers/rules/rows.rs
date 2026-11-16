@@ -25,18 +25,12 @@ use sqlbuild_rules::models::{
     RowsEvaluation, RowsRequest, RulesConfig,
 };
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::panics::{compiler_guard, value_error};
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cache::native_store::current_code_identity;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::compiled_views::audit_views::NativeCompiledAudit;
 use crate::bindings::_helpers::compiled_views::records::compiled_project_facts;
 use crate::bindings::_helpers::compiled_views::records::declaration_rows;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::rules::config_json::asdict_json;
 use crate::bindings::_helpers::rules::early_builtin_rules::EarlyBuiltinRules;
 use crate::bindings::_helpers::rules::fact_replay::{project_attribute, project_models};
@@ -46,7 +40,14 @@ use crate::bindings::_helpers::rules::selection::rules_error;
 use crate::bindings::_helpers::rules::sql_test_objects::{scenario_fact, sql_test_fact};
 use crate::bindings::_helpers::scopes::scope_reports::metadata_projection_value;
 use crate::bindings::_helpers::type_system::equality::types_equal;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const NATIVE_RULES_CACHE_FILE: &str = "native.json";

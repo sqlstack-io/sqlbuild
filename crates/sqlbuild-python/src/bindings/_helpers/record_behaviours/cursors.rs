@@ -4,12 +4,13 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyString, PyTuple};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cursor::scalars::parse_value;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{enum_from_value, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// One cursor value conversion.
 type Conversion = for<'py> fn(&Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>;
@@ -55,7 +56,7 @@ pub(crate) fn optional_inferred<'py>(raw: &Bound<'py, PyAny>) -> PyResult<Bound<
 
 /// A cursor bound: a sentinel or its token text as the sentinel, else an inferred scalar.
 fn bound<'py>(raw: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let sentinel: Bound<'py, PyAny> = host::entry(raw.py(), ExecutorHost::BoundSentinel)?;
+    let sentinel: Bound<'py, PyAny> = host_entry(raw.py(), ExecutorHost::BoundSentinel)?;
     if raw.is_instance(&sentinel)? {
         return Ok(raw.clone());
     }

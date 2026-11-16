@@ -5,7 +5,6 @@ use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, keywords};
 use crate::bindings::_helpers::build_command::support::{boolean, keyword_relay, none};
 use crate::bindings::_helpers::command_runtime::connection::{
     anchor_local_database_path, with_dbt_profile,
@@ -14,14 +13,19 @@ use crate::bindings::_helpers::command_runtime::warehouses::apply_command_wareho
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
 use crate::bindings::_helpers::compile_driver::deferral::resolve_model_deferral_inputs;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_entries::display_plan::build_display_only_sqlbuild_plan;
 use crate::bindings::_helpers::planner_entries::execution_plan::build_execution_plan;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const BUILD_OPTIONS: (&[&str], &[&str]) = (&["environment", "request", "hooks"], &[]);
 const ATTACH_OPTIONS: (&[&str], &[&str]) = (
@@ -105,7 +109,7 @@ pub(crate) fn connection_hooks<'py>(
             ));
         }
     }
-    call_with(&host::entry(py, ExecutorHost::ConnectionHooks)?, &pairs)
+    call_with(&host_entry(py, ExecutorHost::ConnectionHooks)?, &pairs)
 }
 
 /// Open through the shared adapter boundary while retaining keyword-only timing callbacks.
@@ -130,7 +134,7 @@ fn open_connection<'py>(
             },
         ));
     }
-    let relayed = call_with(&host::entry(py, ExecutorHost::ConnectionHooks)?, &pairs)?;
+    let relayed = call_with(&host_entry(py, ExecutorHost::ConnectionHooks)?, &pairs)?;
     connection_with_hooks(&native_field(environment, "adapter")?, &config, &relayed)
 }
 

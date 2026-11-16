@@ -6,14 +6,14 @@ use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, keywords, within,
-};
 use crate::bindings::_helpers::compile_driver::config_validation::{
     ProjectConfiguration, reject_invalid_project_configuration,
 };
 use crate::bindings::_helpers::compile_driver::integration_loaders::integration_loader_functions;
 use crate::bindings::_helpers::compile_driver::stage_work::{PROJECT_DISCOVERIES, count_stage};
+use crate::bindings::_helpers::discovery::constants::{
+    ALLOW_MISSING_SECRETS_ENV, ALLOW_MISSING_SECRETS_SETTING, TRUE_ENV_VALUES,
+};
 use crate::bindings::_helpers::discovery::declaration_records::{
     discover_adapter_file, discover_audit_files, discover_constant_files, discover_enum_files,
     discover_macro_files, discover_model_schema_files, discover_seed_files,
@@ -31,6 +31,9 @@ use crate::bindings::_helpers::discovery::model_records::{
 use crate::bindings::_helpers::discovery::project_config::{
     load_local_config_file, load_project_config_file, warn_deprecated_settings,
 };
+use crate::bindings::_helpers::discovery::provider_secrets::{
+    SecretPolicy, invocation_allows_missing_secrets,
+};
 use crate::bindings::_helpers::discovery::python_function_files::discover_python_function_files;
 use crate::bindings::_helpers::discovery::python_paths::reject_unsupported_python_paths;
 use crate::bindings::_helpers::discovery::snapshot::in_snapshot;
@@ -42,11 +45,15 @@ use crate::bindings::_helpers::discovery::yaml_records::{
 };
 use crate::bindings::_helpers::event_exporting::scope::configure_discovered_event_exporters;
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, produced};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::IntoPyObjectExt;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SQL_ANALYSIS_SETTING_KEY: &str = "sql_analysis";
 /// The setting that turns delta compiles, and the project image they read, off.
@@ -157,7 +164,7 @@ impl Discoverer {
         match self {
             Self::Native(discover) => discover(project_dir.clone(), Some(providers.clone())),
             Self::Host(entry) => call_with(
-                &host::entry(project_dir.py(), entry)?,
+                &host_entry(project_dir.py(), entry)?,
                 &[
                     ("project_dir", project_dir.clone()),
                     ("providers", providers.clone()),
@@ -173,7 +180,7 @@ const PYTHON_NODE_GROUPS: [&str; 5] = ["loaders", "tasks", "assets", "checks", "
 /// `OperationLifecycle(operation_kind="project", operation_name=name)`.
 fn lifecycle<'py>(py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(py, ExecutorHost::OperationLifecycle)?,
+        &host_entry(py, ExecutorHost::OperationLifecycle)?,
         &[
             ("operation_kind", "project".into_pyobject(py)?.into_any()),
             ("operation_name", name.into_pyobject(py)?.into_any()),
@@ -186,6 +193,27 @@ struct DiscoveryRequest {
     project_dir: Py<PyAny>,
     sql_analysis_enabled_override: Py<PyAny>,
     extract_output_column_locations: bool,
+    secret_policy: SecretPolicy,
+}
+
+/// Whether `--allow-missing-secrets`, `SQLBUILD_ALLOW_MISSING_SECRETS` or the local `allow_missing_secrets` setting lets a static command run without provider secrets.
+fn missing_secrets_allowed(local_config: &Bound<'_, PyAny>) -> PyResult<bool> {
+    if invocation_allows_missing_secrets() {
+        return Ok(true);
+    }
+    if std::env::var(ALLOW_MISSING_SECRETS_ENV)
+        .is_ok_and(|value| TRUE_ENV_VALUES.contains(&value.trim().to_ascii_lowercase().as_str()))
+    {
+        return Ok(true);
+    }
+    Ok(
+        native_field(local_config, "setting_overrides")?.contains(ALLOW_MISSING_SECRETS_SETTING)?
+            && native_field(
+                &native_field(local_config, "settings")?,
+                ALLOW_MISSING_SECRETS_SETTING,
+            )?
+            .is_truthy()?,
+    )
 }
 
 /// Load all raw project inputs from disk before semantic resolution.
@@ -204,15 +232,22 @@ pub(crate) fn discover_project_inputs<'py>(
             &[
                 "sql_analysis_enabled_override",
                 "extract_output_column_locations",
+                "secret_policy",
             ],
         ),
     )?;
     count_stage(py, PROJECT_DISCOVERIES, 1)?;
+    let secret_policy: SecretPolicy = if arguments.passed("secret_policy")? {
+        SecretPolicy::parse(&arguments.value("secret_policy")?.extract::<String>()?)?
+    } else {
+        SecretPolicy::Require
+    };
     let request: DiscoveryRequest = DiscoveryRequest {
         project_dir: arguments.value("project_dir")?.unbind(),
         sql_analysis_enabled_override: arguments.value("sql_analysis_enabled_override")?.unbind(),
         extract_output_column_locations: !arguments.passed("extract_output_column_locations")?
             || arguments.flag("extract_output_column_locations")?,
+        secret_policy,
     };
     within(&lifecycle(py, "project_discovery")?, |_| {
         let assembled: Bound<'py, PyAny> =
@@ -263,6 +298,13 @@ fn assembled_inputs<'py>(
     } else {
         native_field(&project_config, "settings")?.getattr("sql_analysis")?
     };
+    let secret_policy: SecretPolicy = if request.secret_policy == SecretPolicy::Require
+        && missing_secrets_allowed(&local_config)?
+    {
+        SecretPolicy::Allow
+    } else {
+        request.secret_policy
+    };
     let discovered: Bound<'py, PyAny> = discovered_inputs(
         py,
         (project_dir, &project_config, &local_config),
@@ -270,8 +312,9 @@ fn assembled_inputs<'py>(
             sql_analysis_enabled.is_truthy()?,
             request.extract_output_column_locations,
         ),
+        secret_policy,
     )?;
-    host::entry(py, UserCodeHost::ValidateDiscoveredInputs)?.call1((&discovered,))?;
+    host_entry(py, UserCodeHost::ValidateDiscoveredInputs)?.call1((&discovered,))?;
     configure_discovered_event_exporters(&discovered)?;
     Ok(discovered)
 }
@@ -309,6 +352,7 @@ fn build_discovered_project_inputs<'py>(
             !arguments.passed("extract_output_column_locations")?
                 || arguments.flag("extract_output_column_locations")?,
         ),
+        SecretPolicy::Require,
     )
 }
 
@@ -321,6 +365,7 @@ fn discovered_inputs<'py>(
         &Bound<'py, PyAny>,
     ),
     flags: (bool, bool),
+    secret_policy: SecretPolicy,
 ) -> PyResult<Bound<'py, PyAny>> {
     let declarations: Bound<'py, PyDict> = within(
         &lifecycle(py, "discovery_declaration_parse")?,
@@ -338,7 +383,7 @@ fn discovered_inputs<'py>(
     let python: Bound<'py, PyDict> = within(
         &lifecycle(py, "discovery_python_import")?,
         |python_lifecycle| {
-            let python: Bound<'py, PyDict> = imported_python(project_dir)?;
+            let python: Bound<'py, PyDict> = imported_python(project_dir, secret_policy)?;
             completed(python_lifecycle, imported_python_paths(&python)?)?;
             Ok(python)
         },
@@ -392,10 +437,14 @@ fn declaration_files<'py>(
 }
 
 /// Providers, then every kind of imported project Python that may use them.
-fn imported_python<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+fn imported_python<'py>(
+    project_dir: &Bound<'py, PyAny>,
+    secret_policy: SecretPolicy,
+) -> PyResult<Bound<'py, PyDict>> {
     let py: Python<'py> = project_dir.py();
-    let providers: Bound<'py, PyAny> = discover_provider_classes(project_dir.clone())
-        .and_then(|value| value.into_bound_py_any(py))?;
+    let providers: Bound<'py, PyAny> =
+        discover_provider_classes(project_dir.clone(), secret_policy.name())
+            .and_then(|value| value.into_bound_py_any(py))?;
     let python: Bound<'py, PyDict> = PyDict::new(py);
     python.set_item("providers", &providers)?;
     for (field, discoverer) in PYTHON_DISCOVERERS {

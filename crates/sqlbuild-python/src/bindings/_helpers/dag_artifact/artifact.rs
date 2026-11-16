@@ -8,11 +8,11 @@ use sqlbuild_analysis::dag_artifact::main::build_dag_json::build_dag_json as bui
 use sqlbuild_analysis::dag_artifact::models::{DagProjectInput, DagPythonGraphInput};
 use sqlbuild_core::json::errors::JsonEmitError;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::dag_artifact::rows::{project_input, python_graph_input};
 use crate::bindings::_helpers::graph::project_graph::CompiledProjectGraph;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 fn python_error(error: DagArtifactError, py: pyo3::Python<'_>) -> PyErr {
     match error {

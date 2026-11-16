@@ -4,19 +4,21 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyFrozenSet};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_driver::deferral::{
     build_deferred_locations, resolve_deferred_target_config,
 };
 use crate::bindings::_helpers::compile_driver::pipeline::compile_project_phase;
+use crate::bindings::_helpers::compile_driver::pipeline_entries::build_project_graph_from_compiled_project;
 use crate::bindings::_helpers::compile_driver::selection_phases::unit_test_selectors_applied;
+use crate::bindings::_helpers::graph::python_node_graph::run_selection_from_inputs;
 use crate::bindings::_helpers::planner_entries::command_plans::{
     resolve_static_command_scope, resolve_static_relation_context,
 };
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Locations of the deferred target's relations, when the options defer to one.
 fn deferred_locations<'py>(
@@ -104,6 +106,26 @@ pub(crate) fn compile_static_command_context<'py>(
         )?),
     )?;
     let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
+    let selective: bool = native_field(&options, "select")?.is_truthy()?
+        || native_field(&options, "exclude")?.is_truthy()?;
+    if selected_keys.is_none()
+        && selective
+        && native_field(&options, "resolve_python_run_selectors")?.is_truthy()?
+    {
+        let graph: Bound<'py, PyAny> = build_project_graph_from_compiled_project(
+            py,
+            Some(keywords(py, &[("project", project.clone())])?),
+        )?;
+        let selection: Bound<'py, PyAny> = run_selection_from_inputs(
+            (
+                native_field(&options, "select")?.extract()?,
+                native_field(&options, "exclude")?.extract()?,
+            ),
+            &graph,
+            &discovered,
+        )?;
+        selected_keys = native_field(&selection, "sql_keys")?;
+    }
     let deferred: Bound<'py, PyAny> =
         deferred_locations((&discovered, &adapter), &options, &project)?;
     let scope: Bound<'py, PyAny> = resolve_static_command_scope(

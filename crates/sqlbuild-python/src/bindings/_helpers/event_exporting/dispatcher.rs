@@ -26,7 +26,6 @@ use sqlbuild_core::event_export::models::{
 };
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::event_exporting::constants::{
     DISPATCHER_THREAD_NAME, EXIT_JOIN_SECONDS, HEALTH_THREAD_NAME, IDLE_WAIT_SECONDS,
     JOIN_GRACE_SECONDS, NO_SECONDS, NOTIFIER_THREAD_NAME, OUTPUT_SINK_THREAD_NAME, POLL_SECONDS,
@@ -39,12 +38,15 @@ use crate::bindings::_helpers::event_exporting::values::{
     export_policy, input_error, severity_from, state_error,
 };
 use crate::bindings::_helpers::event_exporting::workers::{DispatcherWorker, Lane, WorkerRole};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_threads::constants::OUTPUT_SUPPRESSED_ATTRIBUTE;
 use crate::bindings::_helpers::native_threads::exit_signal::{
     interpreter_exiting, signal_interpreter_exit,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// One bound lifecycle-event sink.
 pub(crate) struct Exporter {
@@ -140,6 +142,8 @@ pub(crate) struct Shared {
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct EventExporterDispatcher {
     shared: Arc<Shared>,
+    /// Event kinds this command never exports, such as compile's phase operations.
+    withheld_kinds: Vec<String>,
     thread: Py<PyAny>,
     notification_thread: Option<Py<PyAny>>,
     health_thread: Option<Py<PyAny>>,
@@ -550,7 +554,7 @@ impl Shared {
             &[
                 (
                     "target",
-                    host::entry(py, UserCodeHost::RunCommandOutputSinks)?,
+                    host_entry(py, UserCodeHost::RunCommandOutputSinks)?,
                 ),
                 ("kwargs", arguments.into_any()),
                 (
@@ -664,9 +668,16 @@ impl EventExporterDispatcher {
                     "health_interval_seconds",
                     "failure_callback",
                     "summary_callback",
+                    "withheld_kinds",
                 ],
             ),
         )?;
+        let withheld: Bound<'_, PyAny> = options.value("withheld_kinds")?;
+        let withheld_kinds: Vec<String> = if withheld.is_none() {
+            Vec::new()
+        } else {
+            withheld.extract()?
+        };
         let limits: Limits = limits(&options)?;
         let exporters: Bound<'_, PyAny> = options.value("exporters")?;
         let (bound_exporters, filters) = if exporters.is_none() {
@@ -755,6 +766,7 @@ impl EventExporterDispatcher {
         thread.call_method0("start")?;
         Ok(Self {
             shared,
+            withheld_kinds,
             thread: thread.unbind(),
             notification_thread: notification_thread.map(Bound::unbind),
             health_thread: health_thread.map(Bound::unbind),
@@ -777,6 +789,9 @@ impl EventExporterDispatcher {
     fn enqueue(&self, py: Python<'_>, event: &Bound<'_, PyAny>) -> PyResult<()> {
         let event_type: String = native_field(event, "event_type")?.extract()?;
         let policy: ExportPolicy = export_policy(py, &event_type)?;
+        if self.withheld_kinds.contains(&policy.kind) {
+            return Ok(());
+        }
         let shared = &self.shared;
         let _held = shared.hold(py)?;
         let mut state = shared.locked()?;

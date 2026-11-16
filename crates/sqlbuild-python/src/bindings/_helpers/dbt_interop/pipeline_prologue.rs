@@ -1,7 +1,5 @@
 //! Discover, compile and resolve the combined dbt pipeline through its existing boundaries.
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
@@ -12,20 +10,24 @@ use crate::bindings::_helpers::dbt_interop::manifest::load_dbt_manifest_index;
 use crate::bindings::_helpers::dbt_interop::orchestration::plan_dbt_interop_command;
 use crate::bindings::_helpers::dbt_interop::plan_output::dbt_failure_detail;
 use crate::bindings::_helpers::dbt_interop::runner::DbtRunner;
-use crate::bindings::_helpers::records::construct::new_record_with;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
 use pyo3::types::PyDict;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 
 use crate::bindings::_helpers::dbt_interop::reference_resolver::DbtCompileReferenceResolver;
 use crate::bindings::_helpers::dbt_interop::runtime_config::{
     interop_adapter, manifest_path, parse_dbt_execution_args, plan_options, vars_mapping,
 };
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 use std::time::Instant;
 
 const COMPILE_OPTIONS: (&[&str], &[&str]) = (

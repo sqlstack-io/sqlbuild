@@ -12,14 +12,15 @@ use sqlbuild_scopes::scope_index::models::{
     ResourceKind, ResourceRecord,
 };
 
-use crate::bindings::_helpers::records::construct::{new_record, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::scopes::placement::{
     DeclarationRow, IdentityRow, QualifiedRow, RootRow, declaration_identity, declaration_record,
     ownership_root, qualified_identity, resource_identity,
 };
 use crate::bindings::_helpers::scopes::scope_lookup::grant_kind;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const ENUM_MODULE: &str = "enum";
 

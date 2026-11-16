@@ -4,8 +4,8 @@ use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// Python's `substitute_placeholder_defaults`: each `@@@name` becomes its default.
 #[pyfunction]

@@ -26,11 +26,12 @@ use crate::bindings::_helpers::model_config::header_audits::{
     AuditInstance, HeaderAudits, authored_audit,
 };
 use crate::bindings::_helpers::model_config::typed_config::node_text;
-use crate::bindings::_helpers::records::construct::{new_record, record_class};
-use crate::bindings::_helpers::records::fields::all_specs;
-use crate::bindings::_helpers::records::fields::field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sqltext::authored_values::authored_value_to_python;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::all_specs::all_specs;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// `SchemaColumn` fields in declaration order, the order its objects are built positionally in.
 const SCHEMA_COLUMN_FIELDS: [&str; 8] = [

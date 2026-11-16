@@ -19,9 +19,9 @@ use sqlbuild_host::models::{
 };
 
 use crate::bindings::_helpers::analysis::sql_test_comparisons::single_comparison_sql;
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::native_host::results::ReadResult;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const RUN_DIR: &str = "run";
 const TESTS_DIR: &str = "tests";

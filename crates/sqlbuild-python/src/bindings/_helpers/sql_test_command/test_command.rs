@@ -1,4 +1,4 @@
-//! `sqb test`: compile the selected SQL unit tests, inspect or run them, and report.
+//! `sqb test`: compile the selected SQL unit tests, inspect or run them, and report; locally, then run the Python tests.
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
@@ -24,8 +24,6 @@ use sqlbuild_host::models::{SqlTestExecutionResult, SqlTestOutcome};
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::build_progress::nested_progress::NestedCommandProgressCallbacks;
 use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
@@ -47,21 +45,31 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use crate::bindings::_helpers::result_output::resource_ids::sql_test_identity;
+use crate::bindings::_helpers::sql_test_command::python_tests::{
+    PYTHON_TESTS_INPUT_CODE, names_python_node, python_test_modules, run_python_tests,
+    selected_python_tests, selective, with_python_section,
+};
 use crate::bindings::_helpers::sql_test_command::timeouts::{
     RunTimeout, TimeoutKind, resolve_run_timeout,
 };
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Why `--since` selected each test, by inspection label.
 type SelectionReasons = HashMap<String, Vec<String>>;
@@ -304,6 +312,7 @@ fn unknown_case(py: Python<'_>, message: String) -> PyErr {
 fn compile_tests<'py>(
     request: &Bound<'py, PyAny>,
     invocation: &Bound<'py, PyAny>,
+    python_selectors: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = request.py();
     let discovered: Bound<'py, PyAny> = invocation.getattr("discovered_inputs")?;
@@ -327,6 +336,10 @@ fn compile_tests<'py>(
             (
                 "accepts_unit_test_selectors",
                 PyBool::new(py, true).to_owned().into_any(),
+            ),
+            (
+                "resolve_python_run_selectors",
+                PyBool::new(py, python_selectors).to_owned().into_any(),
             ),
             (
                 "connection_config",
@@ -587,7 +600,7 @@ fn run_tests<'py>(
     )?;
     let executed: PyResult<Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>> = (|| {
         let callbacks: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::TestPipelineCallbacks)?,
+            &host_entry(py, ExecutorHost::TestPipelineCallbacks)?,
             &[
                 (
                     "on_connection_start",
@@ -607,7 +620,7 @@ fn run_tests<'py>(
             ],
         )?;
         call_with(
-            &host::entry(py, ExecutorHost::RunTestPipeline)?,
+            &host_entry(py, ExecutorHost::RunTestPipeline)?,
             &[
                 ("plan", plan_output),
                 (
@@ -636,16 +649,15 @@ pub(crate) fn timeout_record<'py>(
     py: Python<'py>,
     timeout: &RunTimeout,
 ) -> PyResult<Bound<'py, PyAny>> {
-    host::entry(py, ExecutorHost::RunItemTimeouts)?.call((), Some(&timeout.keywords(py)?))
+    host_entry(py, ExecutorHost::RunItemTimeouts)?.call((), Some(&timeout.keywords(py)?))
 }
 
-/// Write the summary, failures and JSON output; returns the exit code.
+/// Write the summary and failures; returns the exit code and the `--json` document.
 fn complete(
-    request: &Bound<'_, PyAny>,
     invocation: &Bound<'_, PyAny>,
     (results, since_json): (&[SqlTestExecutionResult<Bound<'_, PyAny>>], Option<&str>),
-) -> PyResult<i32> {
-    let py: Python<'_> = request.py();
+) -> PyResult<(i32, String)> {
+    let py: Python<'_> = invocation.py();
     let mut failures: Vec<TestFailure> = Vec::new();
     for result in results {
         if result.outcome == SqlTestOutcome::Pass {
@@ -672,18 +684,10 @@ fn complete(
         ),),
     )?;
     stream.call_method0("flush")?;
-    let payload: Bound<'_, PyAny> = PyString::new(
-        py,
-        &with_since_section(test_execution_json(py, results)?, since_json)?,
-    )
-    .into_any();
-    write_execution_json_output(
-        py,
-        payload,
-        request.getattr("json_output")?.extract()?,
-        request.getattr("json_output_path")?,
-    )?;
-    Ok(test_exit_code(passed, results.len()))
+    Ok((
+        test_exit_code(passed, results.len()),
+        with_since_section(test_execution_json(py, results)?, since_json)?,
+    ))
 }
 
 /// Run one `sqb test` request.
@@ -700,14 +704,105 @@ pub(crate) fn run_test<'py>(
     verified: Option<VerifiedRun<'_, 'py>>,
 ) -> PyResult<i32> {
     let (worker, discovered) = verified.unzip();
-    let inspect_only: bool = request.getattr("inspect")?.is_truthy()?;
+    let inspect_only: bool = native_field(request, "inspect")?.is_truthy()?;
+    if native_field(request, "python_only")?.is_truthy()? && worker.is_some() {
+        return Err(new_helped_error(
+            py,
+            ErrorId::PlannerInput,
+            (
+                "--python cannot run on a server location".to_owned(),
+                PYTHON_TESTS_INPUT_CODE,
+            ),
+            Some("runs on a server location run SQL tests only; run `sqb test --python` locally"),
+        ));
+    }
+    if native_field(request, "python_only")?.is_truthy()?
+        && (inspect_only || !native_field(request, "since")?.is_none())
+    {
+        return Err(new_helped_error(
+            py,
+            ErrorId::PlannerInput,
+            (
+                "--python cannot be combined with --inspect or --since".to_owned(),
+                PYTHON_TESTS_INPUT_CODE,
+            ),
+            Some(
+                "--inspect and --since apply to SQL tests only; run `sqb test --python` without them",
+            ),
+        ));
+    }
     let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
         request,
         &record_class(py, RecordId::TestInvocation)?,
         (!inspect_only, discovered),
     )?;
+    let python: bool = worker.is_none()
+        && !inspect_only
+        && !native_field(request, "sql_only")?.is_truthy()?
+        && native_field(request, "since")?.is_none();
+    let modules: Option<Vec<String>> = if python {
+        Some(python_test_modules(&invocation)?)
+    } else {
+        None
+    };
+    let resolve: bool = match &modules {
+        Some(modules) if !modules.is_empty() => {
+            names_python_node(request, &native_field(&invocation, "discovered_inputs")?)?
+        }
+        _ => false,
+    };
+    let (sql_code, python_tests, payload): (i32, Vec<String>, Option<String>) = match modules {
+        Some(modules)
+            if native_field(request, "python_only")?.is_truthy()? && !selective(request)? =>
+        {
+            (
+                0,
+                selected_python_tests(request, &invocation, (None, modules))?,
+                Some(test_execution_json(py, &[])?),
+            )
+        }
+        modules => run_sql_tests(request, &invocation, worker, (modules, resolve))?,
+    };
+    if python_tests.is_empty() {
+        write_json(request, payload)?;
+        return Ok(sql_code);
+    }
+    let python_code: i32 = run_python_tests(request, &invocation, &python_tests)?;
+    write_json(
+        request,
+        payload
+            .map(|payload| with_python_section(&payload, &python_tests, python_code))
+            .transpose()?,
+    )?;
+    Ok(i32::from(sql_code != 0 || python_code != 0))
+}
+
+/// Write a `--json` document to stdout or `--json-output`, when there is one.
+fn write_json(request: &Bound<'_, PyAny>, payload: Option<String>) -> PyResult<()> {
+    let Some(payload) = payload else {
+        return Ok(());
+    };
+    let py: Python<'_> = request.py();
+    write_execution_json_output(
+        py,
+        PyString::new(py, &payload).into_any(),
+        native_field(request, "json_output")?.extract()?,
+        native_field(request, "json_output_path")?,
+    )?;
+    Ok(())
+}
+
+/// Compile, inspect or run the selected SQL tests and pick the Python test `modules` to run after.
+fn run_sql_tests<'py>(
+    request: &Bound<'py, PyAny>,
+    invocation: &Bound<'py, PyAny>,
+    worker: Option<Arc<WorkerBuild>>,
+    (modules, resolve): (Option<Vec<String>>, bool),
+) -> PyResult<(i32, Vec<String>, Option<String>)> {
+    let py: Python<'py> = request.py();
+    let inspect_only: bool = native_field(request, "inspect")?.is_truthy()?;
     let stream: Bound<'_, PyAny> = invocation.getattr("progress_stream")?;
-    let project_dir: Bound<'_, PyAny> = native_field(&invocation, "effective_project_dir")?;
+    let project_dir: Bound<'_, PyAny> = native_field(invocation, "effective_project_dir")?;
     let since: Option<String> = native_field(request, "since")?.extract()?;
     let base: Option<BaseComparison> = match since.as_deref() {
         Some(since) => Some(base_comparison(
@@ -720,7 +815,14 @@ pub(crate) fn run_test<'py>(
         )?),
         None => None,
     };
-    let mut pipeline: Bound<'_, PyAny> = compile_tests(request, &invocation)?;
+    let mut pipeline: Bound<'_, PyAny> = compile_tests(request, invocation, resolve)?;
+    let python_tests: Vec<String> = match modules {
+        Some(modules) => selected_python_tests(request, invocation, (Some(&pipeline), modules))?,
+        None => Vec::new(),
+    };
+    if native_field(request, "python_only")?.is_truthy()? {
+        return Ok((0, python_tests, Some(test_execution_json(py, &[])?)));
+    }
     let mut reasons: HashMap<String, Vec<String>> = HashMap::new();
     let mut since_json: Option<String> = None;
     if let Some(base) = base {
@@ -729,7 +831,7 @@ pub(crate) fn run_test<'py>(
             (
                 &pipeline,
                 &stream,
-                &native_field(&invocation, "discovered_inputs")?,
+                &native_field(invocation, "discovered_inputs")?,
             ),
             &project_dir.extract::<PathBuf>()?,
             base,
@@ -738,11 +840,30 @@ pub(crate) fn run_test<'py>(
         since_json = Some(json);
     }
     if inspect_only {
-        return inspect(&stream, &pipeline.getattr("plan_output")?, &reasons);
+        return Ok((
+            inspect(&stream, &pipeline.getattr("plan_output")?, &reasons)?,
+            python_tests,
+            None,
+        ));
+    }
+    if !python_tests.is_empty()
+        && !pipeline
+            .getattr("plan_output")?
+            .getattr("test_entries")?
+            .is_truthy()?
+    {
+        return Ok((
+            0,
+            python_tests,
+            Some(with_since_section(
+                test_execution_json(py, &[])?,
+                since_json.as_deref(),
+            )?),
+        ));
     }
     let concurrency: i64 = resolve_concurrency(
         &request.getattr("concurrency")?,
-        &native_field(&invocation, "discovered_inputs")?,
+        &native_field(invocation, "discovered_inputs")?,
         &request.getattr("selected_target")?,
     )?
     .limit;
@@ -763,17 +884,18 @@ pub(crate) fn run_test<'py>(
         TimeoutKind::Test,
     )?;
     let results: Vec<SqlTestExecutionResult<Bound<'_, PyAny>>> =
-        run_tests(&invocation, &pipeline, (concurrency, &timeout, worker))?;
+        run_tests(invocation, &pipeline, (concurrency, &timeout, worker))?;
     write_test_runtime_target(
         (
-            &native_field(&invocation, "effective_project_dir")?
+            &native_field(invocation, "effective_project_dir")?
                 .call_method1("__truediv__", ("target",))?,
             &invocation.getattr("adapter")?,
         ),
         &pipeline.getattr("plan_output")?,
         &results,
     )?;
-    complete(request, &invocation, (&results, since_json.as_deref()))
+    let (code, payload): (i32, String) = complete(invocation, (&results, since_json.as_deref()))?;
+    Ok((code, python_tests, Some(payload)))
 }
 
 /// Add source and safe typed values only for parameterized test rows.

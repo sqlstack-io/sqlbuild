@@ -1,7 +1,5 @@
 //! Relation locations and source metadata for plan entry construction.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
@@ -22,13 +20,15 @@ use crate::bindings::_helpers::planner_warehouse::semantic_sources::semantic_sou
 use crate::bindings::_helpers::planner_warehouse::source_columns::gather_source_inspection;
 use crate::bindings::_helpers::planner_warehouse::source_deferral::build_source_read_map;
 use crate::bindings::_helpers::planner_warehouse::source_deferral::with_declared_source_reads;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_values;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
+use sqlbuild_python_base::records::types::RecordId;
 use std::collections::HashSet;
 
 /// Relation keys needed to render selected audits without selecting those relations.

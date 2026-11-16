@@ -17,16 +17,19 @@ use sqlbuild_core::dbt_process::main::run_dbt_process::run_dbt_process;
 use sqlbuild_core::dbt_process::models::DbtProcessOutput;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::dbt_interop::cli::{
     argv, ls_nodes, resolve_dbt_executable, sequence,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const LAUNCH_FAILURE: &str = "failed to execute dbt";
 const POISONED_CACHE: &str = "dbt ls cache is poisoned";
@@ -225,7 +228,7 @@ pub(crate) fn dbt_command_lifecycle(py: Python<'_>) -> PyResult<Bound<'_, PyAny>
     options.set_item("operation_kind", "subprocess")?;
     options.set_item("operation_name", "dbt_command")?;
     options.set_item("auto_fail_base_exceptions", false)?;
-    host::entry(py, ExecutorHost::OperationLifecycle)?.call((), Some(&options))
+    host_entry(py, ExecutorHost::OperationLifecycle)?.call((), Some(&options))
 }
 
 /// Complete a zero exit, or fail with the exit code and any signal number.

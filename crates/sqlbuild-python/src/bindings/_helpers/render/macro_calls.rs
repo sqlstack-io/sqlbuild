@@ -9,15 +9,15 @@ use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_s
 use sqlbuild_render::macro_calls::main::splice_macro_calls::splice_macro_calls as splice_calls;
 use sqlbuild_render::macro_calls::models::{MacroCallScan, MacroScanFailure};
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::render::macro_call_memo::MacroCallMemo;
 use crate::bindings::_helpers::render::macro_call_rows::{
     SiteRow, SpanTuple, site_row, span_row, span_tuple,
 };
 use crate::bindings::_helpers::render::macro_expansion::raised;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 const DECLARATION_CALLS: [&str; 2] = ["enum", "const"];

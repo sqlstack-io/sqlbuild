@@ -6,16 +6,17 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::discovery::locations::project_relative_path;
 use crate::bindings::_helpers::discovery::python_module_files::discover_python_module_files;
 use crate::bindings::_helpers::event_exporting::scope::current_scope;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use pyo3::IntoPyObjectExt;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// One project directory under discovery.
 pub(crate) struct ProjectDir<'py> {
@@ -88,7 +89,7 @@ impl<'py> ProjectDir<'py> {
 
 /// `project_modules.<name>`.
 pub(crate) fn shim<'py>(py: Python<'py>, name: UserCodeHost) -> PyResult<Bound<'py, PyAny>> {
-    host::entry(py, name)
+    host_entry(py, name)
 }
 
 /// Functions defined in one loaded module.
@@ -170,6 +171,6 @@ pub(crate) fn definition<'py>(
     function: &Bound<'py, PyAny>,
     reader: UserCodeHost,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let read: Bound<'py, PyAny> = host::entry(function.py(), reader)?.call1((function,))?;
+    let read: Bound<'py, PyAny> = host_entry(function.py(), reader)?.call1((function,))?;
     Ok((!read.is_none()).then_some(read))
 }

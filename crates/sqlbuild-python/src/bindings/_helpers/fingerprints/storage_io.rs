@@ -14,20 +14,20 @@ use sqlbuild_analysis::fingerprint_storage::models::RelevantRead;
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::fingerprints::latest_rows::{
     fingerprint_input_error, fingerprint_set_from_rows,
 };
 use crate::bindings::_helpers::fingerprints::storage_sql::{
     fingerprint_insert_batches, fingerprint_insert_sql,
 };
-use crate::bindings::_helpers::records::construct::new_record;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
 
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::state_column_evolution::ensure_event_id_column;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 const TIME_MODULE: &str = "time";
 const LOGGING_MODULE: &str = "logging";
 const LOGGER_NAME: &str = "sqlbuild.fingerprints";
@@ -84,7 +84,7 @@ fn create_sql(
     render_framework_type: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
     let py: Python<'_> = render_framework_type.py();
-    let framework: Bound<'_, PyAny> = host::entry(py, AdapterHost::FrameworkType)?;
+    let framework: Bound<'_, PyAny> = host_entry(py, AdapterHost::FrameworkType)?;
     let string_type: String = render_framework_type
         .call1((native_field(&framework, "STRING")?,))?
         .extract()?;

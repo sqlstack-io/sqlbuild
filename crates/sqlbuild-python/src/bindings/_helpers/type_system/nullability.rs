@@ -6,8 +6,9 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::nullability_rules::main::conditional_result_nullability::conditional_result_nullability;
 use sqlbuild_analysis::nullability_rules::main::safe_cast_nullability::safe_cast_nullability;
 
-use crate::bindings::_helpers::records::construct::{enum_from_value, enum_member};
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::types::RecordId;
 
 const UNKNOWN_MEMBER: &str = "UNKNOWN";
 

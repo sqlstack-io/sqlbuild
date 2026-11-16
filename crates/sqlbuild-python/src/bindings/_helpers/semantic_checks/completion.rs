@@ -8,11 +8,9 @@ use sqlbuild_analysis::semantic_checks::models::{
     CompletedDiagnostic, CompletionModel, CompletionRequest, SemanticDiagnostic, SemanticLocation,
 };
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::LineageInput;
 use crate::bindings::_helpers::compiled_views::model_reads::{inferred_names, lineage_inputs};
 use crate::bindings::_helpers::compiled_views::records::with_binding_diagnostics;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::semantic_checks::failures::semantic_error;
 use crate::bindings::_helpers::semantic_checks::metadata::{ShapeRows, shape_rows};
 use crate::bindings::_helpers::semantic_checks::session_facts::{
@@ -23,7 +21,9 @@ use crate::bindings::_helpers::semantic_checks::type_recovery::{
     StageShared, diagnostic_ids, id_of, items, lineage_outputs,
 };
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const RECOVERED_CODE: &str = "B002";
 

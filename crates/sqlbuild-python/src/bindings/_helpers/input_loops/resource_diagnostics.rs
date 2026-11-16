@@ -32,8 +32,8 @@ use crate::bindings::_helpers::compiled_project::attachment_inputs::{
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::seed_views::{SeedParts, SeedViews};
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MISSING_DESCRIPTION_CODE: &str = "P010";
 const DESCRIPTION_LENGTH_CODE: &str = "P027";

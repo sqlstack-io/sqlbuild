@@ -8,8 +8,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::dbt_cli::main::dbt_debug_args::dbt_debug_args;
 use std::time::Instant;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::build_command::support::{boolean, none, text};
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
@@ -22,11 +20,18 @@ use crate::bindings::_helpers::dbt_interop::pipeline_phases::run_dbt_sqlbuild_wo
 use crate::bindings::_helpers::dbt_interop::pipeline_prologue::progress;
 use crate::bindings::_helpers::dbt_interop::runner::DbtRunner;
 use crate::bindings::_helpers::dbt_interop::runtime_config::config_overrides;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PLAN_OPTIONS: (&[&str], &[&str]) = (
     &["project_dir", "args"],
@@ -50,7 +55,7 @@ fn native<'py>(
     name: NativeAttr,
     pairs: &[(&str, Bound<'py, PyAny>)],
 ) -> PyResult<Bound<'py, PyAny>> {
-    call_with(&registry::native(py, name)?, pairs)
+    call_with(&native_attr(py, name)?, pairs)
 }
 
 fn prepare<'py>(
@@ -58,9 +63,9 @@ fn prepare<'py>(
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let py = request.py();
     let invocation =
-        registry::native(py, NativeAttr::ResolveDbtExecutionInvocation)?.call1((request,))?;
+        native_attr(py, NativeAttr::ResolveDbtExecutionInvocation)?.call1((request,))?;
     let manifest = call_with(
-        &registry::native(py, NativeAttr::LoadCompiledDbtManifest)?,
+        &native_attr(py, NativeAttr::LoadCompiledDbtManifest)?,
         &[
             ("runner", native_field(&invocation, "runner")?),
             ("dbt_options", native_field(&invocation, "dbt_options")?),
@@ -69,7 +74,7 @@ fn prepare<'py>(
         ],
     )?;
     let compiled = call_with(
-        &registry::native(py, NativeAttr::CompileDbtInteropProject)?,
+        &native_attr(py, NativeAttr::CompileDbtInteropProject)?,
         &[
             ("project_dir", native_field(request, "project_dir")?),
             (
@@ -145,7 +150,7 @@ fn execute_dbt_interop_from_project(request: &Bound<'_, PyAny>) -> PyResult<i64>
     )
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
     call_with(
-        &registry::native(py, NativeAttr::WriteDbtExecutionPlanText)?,
+        &native_attr(py, NativeAttr::WriteDbtExecutionPlanText)?,
         &[
             ("request", request.clone()),
             ("invocation", invocation.clone()),
@@ -154,7 +159,7 @@ fn execute_dbt_interop_from_project(request: &Bound<'_, PyAny>) -> PyResult<i64>
         ],
     )?;
     let execution = call_with(
-        &registry::native(py, NativeAttr::ExecuteDbtWithoutStateTracking)?,
+        &native_attr(py, NativeAttr::ExecuteDbtWithoutStateTracking)?,
         &[
             ("request", request.clone()),
             ("invocation", invocation.clone()),
@@ -162,7 +167,7 @@ fn execute_dbt_interop_from_project(request: &Bound<'_, PyAny>) -> PyResult<i64>
         ],
     )?;
     call_with(
-        &registry::native(py, NativeAttr::WriteDbtExecutionSummary)?,
+        &native_attr(py, NativeAttr::WriteDbtExecutionSummary)?,
         &[
             ("request", request.clone()),
             ("invocation", invocation.clone()),
@@ -181,7 +186,7 @@ fn execute_dbt_interop_from_project(request: &Bound<'_, PyAny>) -> PyResult<i64>
         return Ok(code);
     }
     let output = call_with(
-        &registry::native(py, NativeAttr::ResolveSqlbuildExecutionPlanOutput)?,
+        &native_attr(py, NativeAttr::ResolveSqlbuildExecutionPlanOutput)?,
         &[
             ("request", request.clone()),
             ("invocation", invocation.clone()),
@@ -206,7 +211,7 @@ fn execute_dbt_interop_from_project(request: &Bound<'_, PyAny>) -> PyResult<i64>
     };
     if let Some(message) = skip {
         call_with(
-            &registry::native(py, NativeAttr::WriteSqlbuildSkipNotice)?,
+            &native_attr(py, NativeAttr::WriteSqlbuildSkipNotice)?,
             &[
                 ("request", request.clone()),
                 ("invocation", invocation),
@@ -301,7 +306,7 @@ pub(crate) fn plan_dbt_interop_from_project<'py>(
     let start = Instant::now();
     let resolution = resolve_plan(&request, &invocation, &compiled, &manifest)?;
     let plan = call_with(
-        &registry::native(py, NativeAttr::AttachSqlbuildPlanOutput)?,
+        &native_attr(py, NativeAttr::AttachSqlbuildPlanOutput)?,
         &[
             ("plan", native_field(&resolution, "plan")?),
             ("project_dir", args.value("project_dir")?),

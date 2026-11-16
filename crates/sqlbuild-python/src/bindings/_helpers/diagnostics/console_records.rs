@@ -1,6 +1,5 @@
 //! The `--debug` stderr line of one Python log record.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::exceptions::PyOverflowError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::{PyInt, PyString};
@@ -9,6 +8,7 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::diagnostic_routing::constants::SQL_TEXT_FIELD;
 use sqlbuild_core::diagnostic_text::main::format_diagnostic_record::format_diagnostic_record;
 use sqlbuild_core::diagnostic_text::models::DiagnosticRecordText;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The record field holding an operation's duration in milliseconds.
 const DURATION_FIELD: &str = "sqlbuild_duration_ms";

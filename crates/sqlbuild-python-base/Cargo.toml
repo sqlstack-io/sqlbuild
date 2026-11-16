@@ -1,0 +1,22 @@
+[package]
+name = "sqlbuild-python-base"
+description = "The shared base of the sqlbuild._native bindings: native records, Python calls and host entries."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+mimalloc.workspace = true
+pyo3.workspace = true
+serde_json.workspace = true
+sqlbuild-analysis.workspace = true
+sqlbuild-config.workspace = true
+sqlbuild-core.workspace = true
+sqlbuild-discovery.workspace = true
+sqlbuild-host.workspace = true
+sqlbuild-rules.workspace = true
+
+[lints]
+workspace = true

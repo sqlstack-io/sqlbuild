@@ -13,8 +13,8 @@ use sqlbuild_core::cli_text::main::resolve_name_column_width::resolve_name_colum
 use sqlbuild_core::cli_text::main::split_count_header::split_count_header;
 use sqlbuild_core::cli_text::models::{AlignedRow, CliStyle, CompletionState, SummaryCount};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const ALIGNED_OPTIONS: (&[&str], &[&str]) = (
     &["plain_name", "styled_name", "value", "name_column_width"],

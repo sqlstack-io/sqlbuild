@@ -1,10 +1,10 @@
 //! Python methods of authored binding positions.
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::models::{BindingPositions, PositionInput};
 use pyo3::exceptions::PyValueError;
 use pyo3::{PyResult, pymethods};
 use sqlbuild_analysis::semantic_validation::models as validation;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 
 #[pymethods]
 impl BindingPositions {

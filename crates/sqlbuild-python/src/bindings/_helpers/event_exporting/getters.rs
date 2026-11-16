@@ -9,8 +9,8 @@ use crate::bindings::_helpers::event_exporting::models::{
     EventExporterFailure,
 };
 use crate::bindings::_helpers::event_exporting::scope::EventExporterCommandScope;
-use crate::bindings::_helpers::records::getters::class_of;
-use crate::bindings::_helpers::records::models::GetterEntry;
+use sqlbuild_python_base::records::main::registry::class_of::class_of;
+use sqlbuild_python_base::records::models::GetterEntry;
 
 /// The getter readers of this module's native pyclasses.
 pub(crate) const GETTERS: &[GetterEntry] = &[

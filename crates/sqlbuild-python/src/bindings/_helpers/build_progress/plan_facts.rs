@@ -11,7 +11,7 @@ use sqlbuild_core::plan_display::models::ModelLabelFacts;
 
 use crate::bindings::_helpers::build_progress::result_text::text;
 use crate::bindings::_helpers::plan_output::display::optional_facts;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const SOURCE_TYPE: &str = "source";
 const SQL_TEST_TYPE: &str = "sql_test";

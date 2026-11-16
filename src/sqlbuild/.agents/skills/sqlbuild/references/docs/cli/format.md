@@ -27,6 +27,7 @@ sqb format [flags]
 | `--fix` | Also apply compiler-verified, meaning-preserving Rule fixes before layout formatting |
 | `--json` | Print structured results |
 | `--no-cache` | Format every file instead of skipping files a previous run found clean |
+| `--allow-missing-secrets` | Run without provider secrets; see [Secrets](../concepts/python-nodes/providers.md#secrets) |
 | `--select`, `-s` | Format selected models |
 | `--select-file` | Read selectors from a file |
 | `--exclude` | Exclude models from the selected scope |

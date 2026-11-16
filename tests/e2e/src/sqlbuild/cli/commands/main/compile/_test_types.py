@@ -287,7 +287,6 @@ class DenseDeltaEditLoopGuardTestCase:
     edited_model_index: int
     full_pairs: int
     expected_max_full_seconds: float
-    expected_max_delta_seconds: float
     expected_max_delta_cpu_ratio: float
     expected_max_fallback_cpu_ratio: float
     expected_max_rss_bytes: int
@@ -744,7 +743,7 @@ class CompileReuseRedirectTestCase:
 
 @dataclass(frozen=True)
 class CompileReuseEventTestCase:
-    """A lifecycle sink that must still receive invocation events on a reuse hit."""
+    """A lifecycle sink and the compile events it must receive."""
 
     description: str
     sink_name: str

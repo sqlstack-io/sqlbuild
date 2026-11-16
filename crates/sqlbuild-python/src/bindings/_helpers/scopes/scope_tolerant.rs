@@ -8,12 +8,12 @@ use sqlbuild_scopes::scope_index::models::{
     OwnershipRoot, OwnershipRootKind, ResourceIdentity, ResourceKind, ResourceRecord,
 };
 
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::scopes::scope_objects::{
     ScopeClasses, enum_text, field, optional_item, read_resource, root_object, tuple_attribute,
 };
 use crate::bindings::_helpers::scopes::scope_validation::replace;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Each authored resource root, in the order a prospective path is matched against them.
 const PROSPECTIVE_ROOTS: [(ResourceKind, &str); 5] = [

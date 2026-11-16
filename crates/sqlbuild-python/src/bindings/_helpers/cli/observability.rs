@@ -7,7 +7,7 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{PyBool, PyString, PyTuple, PyTupleMethods};
+use pyo3::types::{PyBool, PyList, PyString, PyTuple, PyTupleMethods};
 use pyo3::{IntoPyObjectExt, pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_cli::dispatch::main::closing_status::closing_status;
 use sqlbuild_cli::dispatch::main::event_export_warning::event_export_warning;
@@ -15,23 +15,30 @@ use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
 use crate::bindings::_helpers::build_progress::progress::NativeProgressProjector;
 use crate::bindings::_helpers::build_progress::progress::machine_output_mode;
 use crate::bindings::_helpers::cli::launch_state::withhold_launch_record;
 use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
 use crate::bindings::_helpers::event_exporting::scope::EventExporterCommandScope;
 use crate::bindings::_helpers::event_exporting::scope::event_exporter_command_scope;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::terminal_index::TerminalEventIndex;
 use crate::bindings::_helpers::result_output::terminal_index::terminal_event_index_scope;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const OBSERVABILITY_LOGGER: &str = "sqlbuild.cli.observability";
 const DEBUG_COMMAND: &str = "debug";
 const LINEAGE_COMMAND: &str = "lineage";
+/// Compile's phase operations stay out of project lifecycle sinks; its invocation events do not.
+const COMPILE_COMMAND: &str = "compile";
+const COMPILE_WITHHELD_KINDS: &[&str] = &["operation"];
 const INVOCATION_COMPLETED: &str = "invocation_completed";
 const INVOCATION_FAILED: &str = "invocation_failed";
 /// What an incomplete-export notice says is the only thing affected.
@@ -52,7 +59,7 @@ fn log_debug<'py>(
         ("message", PyString::new(py, message).into_any()),
     ];
     pairs.extend(fields.iter().cloned());
-    call_with(&host::entry(py, ExecutorHost::LogDebugEvent)?, &pairs)?;
+    call_with(&host_entry(py, ExecutorHost::LogDebugEvent)?, &pairs)?;
     Ok(())
 }
 
@@ -339,12 +346,12 @@ impl Observed {
         if native_field(args, "command")?.ne(LINEAGE_COMMAND)? {
             let discover = || {
                 call_with(
-                    &host::entry(py, UserCodeHost::DiscoverRuntimeExtensions)?,
+                    &host_entry(py, UserCodeHost::DiscoverRuntimeExtensions)?,
                     &[("project_dir", project_dir.clone())],
                 )
             };
             let extensions: Bound<'_, PyAny> = if machine_output_mode(args)? {
-                within(&host::redirect_stdout_to_stderr(py)?, |_| discover())?
+                within(&redirect_stdout_to_stderr(py)?, |_| discover())?
             } else {
                 discover()?
             };
@@ -369,12 +376,18 @@ impl Observed {
                     timeout.extract::<f64>()?
                 };
                 let timeout: Bound<'_, PyAny> = timeout.into_bound_py_any(py)?;
+                let withheld: &[&str] = if native_field(args, "command")?.eq(COMPILE_COMMAND)? {
+                    COMPILE_WITHHELD_KINDS
+                } else {
+                    &[]
+                };
                 let delivery: Bound<'_, PyAny> = EventExporterDispatcher::new(
                     py,
                     Some(keywords(
                         py,
                         &[
                             ("shutdown_timeout_seconds", timeout),
+                            ("withheld_kinds", PyList::new(py, withheld)?.into_any()),
                             (
                                 "failure_callback",
                                 wrap_pyfunction!(log_exporter_failure, py)?.into_any(),
@@ -411,7 +424,7 @@ impl Observed {
             }
         }
         self.enter(
-            host::entry(py, ExecutorHost::DispatcherScope)?.call1((self.dispatcher.bind(py),))?,
+            host_entry(py, ExecutorHost::DispatcherScope)?.call1((self.dispatcher.bind(py),))?,
         )?;
         self.enter(pyo3::IntoPyObjectExt::into_bound_py_any(
             terminal_event_index_scope(terminal_index.extract::<Py<TerminalEventIndex>>()?),
@@ -429,10 +442,10 @@ impl Observed {
             py,
         )?)?;
         let identity: Bound<'_, PyAny> =
-            host::entry(py, ExecutorHost::CurrentExecutionIdentity)?.call0()?;
+            host_entry(py, ExecutorHost::CurrentExecutionIdentity)?.call0()?;
         if !identity.is_none() && command_output_sinks {
             self.enter(call_with(
-                &host::entry(py, ExecutorHost::ConfiguredOutputCaptureScope)?,
+                &host_entry(py, ExecutorHost::ConfiguredOutputCaptureScope)?,
                 &[
                     ("exporter_scope", scope),
                     ("identity", identity),
@@ -485,7 +498,7 @@ impl CliObservabilityScope {
     fn __enter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let args: &Bound<'_, PyAny> = self.args.bind(py);
         let dispatcher: Bound<'_, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::EventDispatcher)?,
+            &host_entry(py, ExecutorHost::EventDispatcher)?,
             &[(
                 "health_callback",
                 wrap_pyfunction!(log_dispatch_failure, py)?.into_any(),

@@ -4,7 +4,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
 use crate::bindings::_helpers::build_command::support::{boolean, emit, none, text, tuple};
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
@@ -16,10 +15,13 @@ use crate::bindings::_helpers::dbt_interop::plan_output::build_sqlbuild_plan_out
 use crate::bindings::_helpers::dbt_interop::plan_output::{connection_config, connection_hooks};
 use crate::bindings::_helpers::dbt_interop::runtime_execution::execute_dbt_commands;
 use crate::bindings::_helpers::dbt_interop::sqlbuild_work::execute_dbt_sqlbuild_work;
-use crate::bindings::_helpers::records::construct::{new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 const OPTIONS: (&[&str], &[&str]) = (
     &["request", "invocation"],

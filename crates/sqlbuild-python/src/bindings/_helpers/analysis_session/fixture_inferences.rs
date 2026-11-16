@@ -1,11 +1,11 @@
 //! Fixture column inference computed once per fixture body and inference profile.
 
 use crate::bindings::_helpers::analysis_session::fixture_columns::infer_fixture_column_facts;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyclass, pymethods};
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::sync::Mutex;
 
 /// Reuse inference for identical fixture SQL under an equal, catalog-free profile.

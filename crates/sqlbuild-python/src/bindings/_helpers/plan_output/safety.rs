@@ -6,7 +6,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::plan_output::values::{dict, enum_value, items};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// `render(value=value)`.
 fn render<'py>(value: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {

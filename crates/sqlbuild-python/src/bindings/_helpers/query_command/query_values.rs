@@ -9,7 +9,7 @@ use pyo3::types::{
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 const NULL_TEXT: &str = "NULL";
 const FIXED_POINT_FORMAT: &str = "f";

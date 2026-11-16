@@ -7,11 +7,13 @@ use pyo3::types::{PyDict, PyDictMethods, PySet, PySetMethods, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::{AdapterHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 const SHARED_EXCEPTIONS_MODULE: &str = "sqlbuild.errors.contracts.exceptions";
 
@@ -24,7 +26,7 @@ struct RefKinds<'py> {
 
 impl<'py> RefKinds<'py> {
     fn load(py: Python<'py>) -> PyResult<Self> {
-        let kinds: Bound<'py, PyAny> = host::entry(py, UserCodeHost::SqlResourceRefKind)?;
+        let kinds: Bound<'py, PyAny> = host_entry(py, UserCodeHost::SqlResourceRefKind)?;
         Ok(Self {
             model: native_field(&kinds, "MODEL")?,
             seed: native_field(&kinds, "SEED")?,
@@ -113,7 +115,7 @@ fn planned_relation_refs<'py>(
     kinds: &RefKinds<'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = plan_output.py();
-    let reference: Bound<'py, PyAny> = host::entry(py, UserCodeHost::SqlResourceRef)?;
+    let reference: Bound<'py, PyAny> = host_entry(py, UserCodeHost::SqlResourceRef)?;
     let refs: Bound<'py, PySet> = PySet::empty(py)?;
     for (attribute, kind) in [
         ("model_locations", &kinds.model),
@@ -184,7 +186,7 @@ fn qualified_name<'py>(
     location: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(
+        &host_entry(
             adapter.py(),
             AdapterHost::ResolveRelationLocationQualifiedName,
         )?,

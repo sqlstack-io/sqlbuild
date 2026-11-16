@@ -1,5 +1,6 @@
 //! The Python model validators, run natively up to the first error they raise.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::HashSet;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -12,12 +13,12 @@ use sqlbuild_model_config::model_validation::models::{
     ModelReference, ModelValidationFacts, ProjectValidationFacts, ValidationStop,
 };
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::discovery::project_facts::{column_name, each, stem};
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
 use crate::bindings::_helpers::model_config::config_errors::native_config_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 const FILE_PATH_ATTRIBUTE: &str = "file_path";
 const RETURNS_KEY: &str = "returns";

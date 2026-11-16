@@ -14,7 +14,6 @@ use sqlbuild_analysis::janitor_planning::main::query_diff_artifact_parts::query_
 use sqlbuild_analysis::review_command::constants::LEFTOVER_REVIEW_SCHEMA_AGE_DAYS;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, within};
 use crate::bindings::_helpers::janitor::janitor_classification::{
     Candidate, Policy, Protection, SchemaClassification, classify_target_schemas, plan_archives,
 };
@@ -29,10 +28,13 @@ use crate::bindings::_helpers::janitor::janitor_keys::{
 use crate::bindings::_helpers::janitor::janitor_old_names::{
     OldNamePlanning, pending_migration_origins, plan_old_name_views,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::relation_naming::fitting::shared_error;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const LIFECYCLE: ExecutorHost = ExecutorHost::OperationLifecycle;
 
@@ -142,7 +144,7 @@ fn review_schema_candidates<'py>(
     };
     let max_age: Bound<'py, PyAny> = days(py, LEFTOVER_REVIEW_SCHEMA_AGE_DAYS)?;
     let leftovers: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::LeftoverReviewSchemas)?,
+        &host_entry(py, ExecutorHost::LeftoverReviewSchemas)?,
         &[
             ("adapter", warehouse.adapter.clone()),
             ("connection", warehouse.connection.clone()),
@@ -234,7 +236,7 @@ pub(crate) fn build_plan<'py>(
             (review_schemas, &now),
         );
     }
-    let lifecycle: Bound<'py, PyAny> = host::entry(py, LIFECYCLE)?;
+    let lifecycle: Bound<'py, PyAny> = host_entry(py, LIFECYCLE)?;
     let options: Bound<'py, PyDict> = PyDict::new(py);
     options.set_item("operation_kind", "janitor")?;
     options.set_item("operation_name", "janitor_warehouse_inspection")?;

@@ -4,7 +4,6 @@ use crate::bindings::_helpers::plan_output::plan_text::display_limit;
 use crate::bindings::_helpers::plan_output::values::{
     iso, items, optional_text, relation_name, text, texts,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::cli_text::models::{
@@ -14,6 +13,7 @@ use sqlbuild_core::cli_text::models::{
 use sqlbuild_core::plan_display::main::{
     format_model_migrations, format_pre_build_work, old_name_rows,
 };
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::BTreeMap;
 
 const MANUAL_RENAME_HINT: &str = "matched by unchanged definition; sqb rename <old> <new> rewrites references and declares migrate_from so the move does not depend on discovery";

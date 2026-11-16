@@ -6,10 +6,10 @@ use std::path::Path;
 use crate::constants::PYTHON_FILE_SUFFIX;
 use crate::python_paths::constants::{HIDDEN_PREFIX, IGNORED_ROOTS, PYTHON_CACHE_DIRECTORY};
 
-/// The relative parts of every Python file below `project_dir`, sorted part by part.
-pub(crate) fn python_files(project_dir: &Path) -> Vec<Vec<String>> {
+/// The relative parts of every Python file in the `start` folder below `project_dir`, sorted part by part.
+pub(crate) fn python_files(project_dir: &Path, start: &[&str]) -> Vec<Vec<String>> {
     let mut files: Vec<Vec<String>> = Vec::new();
-    let mut pending: Vec<Vec<String>> = vec![Vec::new()];
+    let mut pending: Vec<Vec<String>> = vec![start.iter().map(|part| (*part).to_owned()).collect()];
     while let Some(parts) = pending.pop() {
         let directory = parts
             .iter()

@@ -7,7 +7,7 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_config::command_connection::main::check_preview_target::check_preview_target;
 
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 fn target_names(config: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     native_field(config, "targets")?

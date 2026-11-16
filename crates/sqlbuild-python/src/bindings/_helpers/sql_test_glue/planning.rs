@@ -1,5 +1,6 @@
 //! Plan compiled SQL tests from the compiled project's own objects, without a JSON request.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::{BTreeMap, HashMap};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -11,11 +12,11 @@ use sqlbuild_analysis::compiler::models::{
     SqlTestPlanFunction, SqlTestPlanModel, SqlTestPlanPayload, SqlTestPlanTest,
 };
 
-use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const MODEL_RESOURCE_TYPE: &str = "model";
 const PLANNING_WORKERS: usize = 4;

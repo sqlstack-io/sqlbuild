@@ -13,7 +13,6 @@ use sqlbuild_analysis::required_columns::models::ColumnRead;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use std::collections::{HashMap, HashSet};
 
-use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::model_reads::{
     LineageFactRow, lineage_facts, proven_inputs, star_flags,
@@ -22,8 +21,9 @@ use crate::bindings::_helpers::planner_strategy::constants::HIGH_CONFIDENCE;
 use crate::bindings::_helpers::planner_strategy::fixture_context::work_counts;
 use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// The columns each fixture must supply for the chain's models, and the fixtures read through a star.
 pub(crate) fn required_fixture_columns(

@@ -8,13 +8,13 @@ use sqlbuild_rules::lint_text::models::{
     AuthoredDiagnostic, ExpansionSpan, LintSqlBody, LintSqlOptions,
 };
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::rules::lint_pipeline::{
     LintViolationRow, ViolationClasses, relation_names as sentinel_relation_names,
 };
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::types::CompilerDetach;
 
 fn spans(passes: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<ExpansionSpan>>> {
     passes.try_iter()?.map(|pass| pass_spans(&pass?)).collect()

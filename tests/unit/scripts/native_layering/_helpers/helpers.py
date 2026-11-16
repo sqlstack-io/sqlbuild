@@ -19,7 +19,7 @@ def write_workspace(root: Path, test_case: NativeLayeringTestCase) -> None:
         f"[workspace]\nmembers = [{members}]\n\n"
         "[workspace.metadata.native-layers]\n"
         f"order = [{order}]\n"
-        'python-boundary = "sqlbuild-python"\n'
+        'python-boundary = ["sqlbuild-python-base", "sqlbuild-python"]\n'
         'polyglot-floor = "sqlbuild-analysis"\n\n'
         f"[workspace.dependencies]\n{aliases}",
         encoding="utf-8",

@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::PyBool;
 use serde_json::Value;
 use sqlbuild_analysis::review_command::constants::{
     CLONE_START, FULL_REFRESH_START, SEED_KIND, UNIT_TEST_LABEL,
@@ -16,12 +17,12 @@ use crate::bindings::_helpers::build_command::support::{boolean, text};
 use crate::bindings::_helpers::clone::clone_command::run_clone_command;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::dagster_invocation::access::string_tuple as texts;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::review_command::planning::ReviewSettings;
 use crate::bindings::_helpers::review_command::support::{quietly, review_error};
 use crate::bindings::_helpers::sql_test_command::test_command::run_test_command;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const FAILED_STATUS: &str = "failed";
 const AUDIT_KIND: &str = "audit";
@@ -289,6 +290,7 @@ pub(crate) fn run_changed_tests(
             ("json_output_path", path_object(py, &output)?),
             ("concurrency", native_field(inputs.request, "concurrency")?),
             ("since", text(py, &settings.since)),
+            ("sql_only", PyBool::new(py, true).to_owned().into_any()),
         ],
     )?;
     let ran: PyResult<i32> = quietly(inputs.output, || run_test_command(py, &request));

@@ -3,16 +3,18 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyList, PyTuple, PyTupleMethods};
 
-use crate::bindings::_helpers::boundary::panics::NativeCompilerError;
-use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
 use crate::bindings::_helpers::compile_context::diagnostic_collector::report_compile_diagnostic;
 use crate::bindings::_helpers::compile_driver::assembly_checks::test_model_query_overrides;
 use crate::bindings::_helpers::compile_driver::stage_work::{SQL_TEST_ASSEMBLY, count_stage};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::sql_test_glue::compiled_tests::assemble_native_sql_tests;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DECIMAL_MODULE: &str = "decimal";
 const DATACLASSES_MODULE: &str = "dataclasses";
@@ -34,7 +36,7 @@ pub(crate) fn assembled_sql_tests<'py>(
         .try_iter()?
         .collect::<PyResult<_>>()?;
     if assemblies.len() != test_inputs.len() {
-        return Err(NativeCompilerError::new_err(
+        return Err(native_compiler_error(
             "native SQL test assembly returned a different number of tests",
         ));
     }
@@ -90,7 +92,7 @@ fn assembly_error(
         let error: Bound<'_, PyAny> = error_class(py, ErrorId::CompileInput)?.call1((message,))?;
         return Ok(PyErr::from_value(error));
     }
-    Ok(NativeCompilerError::new_err(message))
+    Ok(native_compiler_error(message))
 }
 
 /// `test` with its model payload's query overrides set to `queries`.

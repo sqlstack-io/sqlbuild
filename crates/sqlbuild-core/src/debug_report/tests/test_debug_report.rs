@@ -1,14 +1,15 @@
 use crate::cli_text::models::CliStyle;
 use crate::debug_report::main::debug_connection_lines::debug_connection_lines;
 use crate::debug_report::main::debug_failure::debug_failure;
+use crate::debug_report::main::debug_provider_lines::debug_provider_lines;
 use crate::debug_report::main::format_debug_json::format_debug_json;
 use crate::debug_report::main::format_debug_text::format_debug_text;
 use crate::debug_report::models::{
     ConnectionCheck, ConnectionValue, DebugFailure, DebugLine, DebugReport, DebugStatus,
 };
-use crate::debug_report::tests::helpers::{line_summary, sample_report, text};
+use crate::debug_report::tests::helpers::{line_summary, provider, sample_report, text};
 use crate::debug_report::tests::test_types::{
-    ConnectionLinesTestCase, DebugFailureTestCase, FormatTestCase,
+    ConnectionLinesTestCase, DebugFailureTestCase, FormatTestCase, ProviderLinesTestCase,
 };
 
 /// Expectations recorded from the retired Python formatter.
@@ -18,7 +19,7 @@ fn given_debug_report_when_formatting_then_matches_python_outputs() {
         description: "renders diagnostics sections and json sections",
         report: sample_report(),
         expected_text: "\nSQLBuild Diagnostics\n\nRuntime:\n  sqlbuild version: 0.2.1\n\nConfiguration:\n  project file: /repo/sqlbuild_project.toml [OK found and valid]\n\nProviders:\n  providers: 1 [OK discovered]\n  marker_provider: providers/marker.py:MarkerProvider [OK valid settings]\n\nConnection:\n  token: ****\n  connection test: [ERROR authentication failed]\n  query test: [SKIP connection failed]\n\n",
-        expected_json: r#"{"configuration": [{"label": "project file", "message": "/repo/sqlbuild_project.toml", "status": "OK", "status_message": "found and valid"}], "connection": [{"label": "token", "message": "****"}, {"label": "connection test", "message": "", "status": "ERROR", "status_message": "authentication failed"}, {"label": "query test", "message": "", "status": "SKIP", "status_message": "connection failed"}], "local_files": ["/repo/warehouse.db"], "providers": [{"label": "providers", "message": "1", "status": "OK", "status_message": "discovered"}, {"label": "marker_provider", "message": "providers/marker.py:MarkerProvider", "status": "OK", "status_message": "valid settings"}], "runtime": [{"label": "sqlbuild version", "message": "0.2.1"}], "success": false}"#,
+        expected_json: r#"{"configuration": [{"label": "project file", "message": "/repo/sqlbuild_project.toml", "status": "OK", "status_message": "found and valid"}], "connection": [{"label": "token", "message": "****"}, {"label": "connection test", "message": "", "status": "ERROR", "status_message": "authentication failed"}, {"label": "query test", "message": "", "status": "SKIP", "status_message": "connection failed"}], "local_files": ["/repo/warehouse.db"], "missing_secrets": 0, "providers": [{"label": "providers", "message": "1", "status": "OK", "status_message": "discovered"}, {"label": "marker_provider", "message": "providers/marker.py:MarkerProvider", "status": "OK", "status_message": "valid settings"}], "runtime": [{"label": "sqlbuild version", "message": "0.2.1"}], "success": false}"#,
         expected_color_fragments: &[
             "\x1b[34m\x1b[1mSQLBuild Diagnostics\x1b[0m",
             "\x1b[1mRuntime:\x1b[0m",
@@ -151,6 +152,60 @@ fn given_a_debug_report_when_its_failure_is_read_then_the_first_failed_check_is_
         assert_eq!(
             debug_failure(&test_case.report),
             test_case.expected_failure,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_providers_with_and_without_secrets_when_listing_then_missing_secrets_lead_and_verbose_lists_all()
+ {
+    let providers = vec![
+        provider("slack_alerts", &[("SLACK_WEBHOOK_URL", false)]),
+        provider(
+            "partner_sftp",
+            &[("PARTNER_SFTP_PASSWORD", true), ("PARTNER_SFTP_KEY", false)],
+        ),
+        provider("storefront_api", &[]),
+    ];
+    let test_cases = [
+        ProviderLinesTestCase {
+            description: "default lists only the missing secrets, then a hint",
+            providers: providers.clone(),
+            verbose: false,
+            expected_lines: vec![
+                ("providers", "1 of 3 ready", Some("missing secrets")),
+                ("slack_alerts", "SLACK_WEBHOOK_URL", Some("missing")),
+                ("partner_sftp", "PARTNER_SFTP_KEY", Some("missing")),
+                ("more", "sqb debug --verbose lists every provider", None),
+            ],
+        },
+        ProviderLinesTestCase {
+            description: "verbose lists every provider and secret",
+            providers,
+            verbose: true,
+            expected_lines: vec![
+                ("providers", "1 of 3 ready", Some("missing secrets")),
+                ("slack_alerts", "SLACK_WEBHOOK_URL", Some("missing")),
+                ("partner_sftp", "PARTNER_SFTP_PASSWORD", Some("set")),
+                ("partner_sftp", "PARTNER_SFTP_KEY", Some("missing")),
+                ("storefront_api", "(no secrets)", Some("ok")),
+            ],
+        },
+        ProviderLinesTestCase {
+            description: "every secret set prints one line",
+            providers: vec![provider("partner_sftp", &[("PARTNER_SFTP_PASSWORD", true)])],
+            verbose: false,
+            expected_lines: vec![("providers", "1 of 1 ready", Some("secrets set"))],
+        },
+    ];
+    for test_case in test_cases {
+        let lines = debug_provider_lines(&test_case.providers, test_case.verbose);
+
+        assert_eq!(
+            lines.iter().map(line_summary).collect::<Vec<_>>(),
+            test_case.expected_lines,
             "{}",
             test_case.description
         );

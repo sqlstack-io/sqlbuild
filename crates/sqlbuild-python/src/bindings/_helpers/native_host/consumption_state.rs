@@ -21,11 +21,11 @@ use sqlbuild_state::consumption::models::{
 use sqlbuild_state::freshness::constants::STRING_STATE_VALUE_TYPE;
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
 use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Rows per `INSERT`; SQL Server accepts at most 1,000 rows in one `VALUES` list.
 pub(crate) const ROWS_PER_STATEMENT: usize = 500;

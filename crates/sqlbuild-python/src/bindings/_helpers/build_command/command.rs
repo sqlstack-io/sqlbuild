@@ -8,7 +8,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cli::person_login::main::sync_after_build::sync_after_build;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::build_command::completion::{
     complete_direct_build, finalize_exceptional_cost, finalize_no_work_with_timings,
     record_pending_cost, write_partial_timings,
@@ -19,19 +18,27 @@ use crate::bindings::_helpers::build_command::planning::{
     compile_build_plan, enforce_build_plan_policies, run_defer_clone_prephase,
     write_compile_target, write_plan_text,
 };
+use crate::bindings::_helpers::build_command::support::{frozenset, tuple};
+use crate::bindings::_helpers::check::check_core::relevant_check_functions;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::diagnostics::trackers::BuildPhaseTimingTracker;
-use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::discovery::provider_secrets::{
+    consumer_uses, provider_uses, require_used_secrets, sink_uses,
+};
+use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::observations::source_capture::{
     arm_source_capture, take_source_capture,
 };
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 fn run_with_providers(context: &BuildContext<'_>) -> PyResult<i32> {
     let py: Python<'_> = context.py();
     let session: Bound<'_, PyAny> = call_with(
-        &host::entry(py, UserCodeHost::BuildProviderSession)?,
+        &host_entry(py, UserCodeHost::BuildProviderSession)?,
         &[(
             "discovered_providers",
             context.get("discovered_inputs")?.getattr("providers")?,
@@ -55,7 +62,7 @@ fn run_planned_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -
     }
     run_defer_clone_prephase(context)?;
     let cache_scope: Bound<'_, PyAny> = call_with(
-        &host::entry(context.py(), AdapterHost::RelationMetadataCacheScope)?,
+        &host_entry(context.py(), AdapterHost::RelationMetadataCacheScope)?,
         &[("adapter", context.get("adapter")?)],
     )?;
     within(&cache_scope, |_| run_cached_build(context, providers))
@@ -69,9 +76,61 @@ fn run_cached_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) ->
     built
 }
 
+/// The post-build check functions that run if every planned node succeeds.
+fn planned_check_functions<'py>(
+    context: &BuildContext<'py>,
+    pipeline: &Bound<'py, PyAny>,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    if !native_field(&context.request, "run_audits")?.extract::<bool>()? {
+        return Ok(Vec::new());
+    }
+    let py: Python<'py> = context.py();
+    let plan: Bound<'py, PyAny> = native_field(pipeline, "plan_output")?;
+    let mut dependencies: Vec<Bound<'py, PyAny>> = Vec::new();
+    for entry in native_field(pipeline, "python_plan_entries")?.try_iter()? {
+        dependencies.push(native_field(&entry?, "name")?);
+    }
+    let mut completed: Vec<Bound<'py, PyAny>> = Vec::new();
+    for entries in ["model_entries", "seed_entries", "source_load_entries"] {
+        for entry in native_field(&plan, entries)?.try_iter()? {
+            completed.push(native_field(&entry?, "name")?);
+        }
+    }
+    for load in native_field(&plan, "source_load_entries")?.try_iter()? {
+        dependencies.push(native_field(&load?, "loader")?);
+    }
+    let discovered: Bound<'py, PyAny> = context.get("discovered_inputs")?;
+    relevant_check_functions(
+        &discovered,
+        &python_node_graph(&discovered)?,
+        native_field(&context.request, "exclude")?,
+        (&frozenset(py, &dependencies)?, &frozenset(py, &completed)?),
+    )
+}
+
+/// Fail before anything runs when planned nodes, their post-build checks or sinks lack provider secrets.
+fn require_plan_secrets(context: &BuildContext<'_>, pipeline: &Bound<'_, PyAny>) -> PyResult<()> {
+    let discovered: Bound<'_, PyAny> = context.get("discovered_inputs")?;
+    let mut uses: Vec<(String, String)> = provider_uses(
+        &native_field(&native_field(pipeline, "plan_output")?, "provider_usages")?,
+        None,
+    )?;
+    uses.extend(consumer_uses(&native_field(
+        pipeline,
+        "python_plan_entries",
+    )?)?);
+    uses.extend(consumer_uses(&tuple(
+        context.py(),
+        &planned_check_functions(context, pipeline)?,
+    )?)?);
+    uses.extend(sink_uses(&discovered)?);
+    require_used_secrets(&discovered, &uses)
+}
+
 /// Plan and run the build, sharing one relation metadata cache from planning to the run's end.
 fn run_captured_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -> PyResult<i32> {
     let pipeline: Bound<'_, PyAny> = compile_build_plan(context)?;
+    require_plan_secrets(context, &pipeline)?;
     if let Some(worker) = &context.worker {
         worker.enforce_plan_writers(&pipeline)?;
     }
@@ -107,7 +166,7 @@ fn run_within_limits(
     context.worker = worker;
     let limits: Bound<'_, PyAny> = context.get("execution_limits")?;
     let deadline: Bound<'_, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::ExecutionDeadlineScope)?,
+        &host_entry(py, ExecutorHost::ExecutionDeadlineScope)?,
         &[
             (
                 "max_duration_seconds",
@@ -157,7 +216,7 @@ pub(crate) fn run_build(
         .and_then(|value| pyo3::Bound::new(py, value))
         .map(pyo3::Bound::into_any)?;
     let reporting: Bound<'_, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::ProcessResourceReporting)?,
+        &host_entry(py, ExecutorHost::ProcessResourceReporting)?,
         &[("enabled", native_field(request, "debug")?)],
     )?;
     within(&reporting, |_| {

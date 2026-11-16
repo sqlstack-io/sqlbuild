@@ -1,10 +1,12 @@
 //! Microbatch limits applied to planned model entries in CLI, project and model precedence.
 
 use crate::bindings::_helpers::planner_changes::results::native_enum;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with, record_class};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
 
 use sqlbuild_analysis::planner_strategy::constants::MICROBATCH_LIMIT_WARNING_CODE;
 use sqlbuild_analysis::planner_strategy::main::microbatch_limit_warning::microbatch_limit_warning;
@@ -18,8 +20,9 @@ use crate::bindings::_helpers::planner_strategy::microbatches::{
     CAP_ACTIONS, capped_microbatch_bounds, count_microbatches,
 };
 use crate::bindings::_helpers::planner_strategy::values::{input_error, optional_string, text};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const ERROR_ACTION: &str = "error";
 const SKIP_ACTION: &str = "skip";

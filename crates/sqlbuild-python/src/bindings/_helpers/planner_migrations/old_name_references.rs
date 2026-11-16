@@ -2,18 +2,19 @@
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_migrations::column_objects::{native, text};
 use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::references::explicit_references::hard_coded_relation_remedy;
 use crate::bindings::_helpers::references::explicit_references::old_name_reference_message;
 use crate::bindings::_helpers::references::relations::match_project_relation;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyStringMethods, PyTuple};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn old_relation<'py>(
     old: &Bound<'py, PyAny>,
@@ -21,11 +22,11 @@ fn old_relation<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = old.py();
     let reference = call_with(
-        &host::entry(py, UserCodeHost::SqlResourceRef)?,
+        &host_entry(py, UserCodeHost::SqlResourceRef)?,
         &[
             (
                 "kind",
-                host::entry(py, UserCodeHost::SqlResourceRefKind)?.getattr("MODEL")?,
+                host_entry(py, UserCodeHost::SqlResourceRefKind)?.getattr("MODEL")?,
             ),
             ("name", name.clone()),
         ],

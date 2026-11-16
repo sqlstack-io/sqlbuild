@@ -7,7 +7,7 @@ use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::planner_scope::retained::ScopeData;
-use crate::bindings::_helpers::records::fields::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 /// Native compiled views stay typed; caller-authored protocol implementations remain public values.
 #[derive(Debug)]

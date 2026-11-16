@@ -2,10 +2,8 @@
 
 use crate::bindings::_helpers::analysis::conversions;
 use crate::bindings::_helpers::analysis::normalization_results::normalization_results;
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::models::Positional;
 use crate::bindings::models::{CatalogInput, CompactAnalysisJob, ProjectCatalog};
-use crate::bindings::types::CompilerDetach;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::pymethods;
@@ -15,6 +13,8 @@ use sqlbuild_analysis::semantic_validation::models::DiagnosticRow;
 use sqlbuild_analysis::semantic_validation::types::{
     BindingRequest, NormalizationRequest, Relations,
 };
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::types::CompilerDetach;
 use std::collections::HashMap;
 
 #[pymethods]

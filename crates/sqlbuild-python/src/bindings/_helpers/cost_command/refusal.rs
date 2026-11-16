@@ -4,8 +4,8 @@ use pyo3::prelude::{Bound, PyAnyMethods, PyErr, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_core::cost_command::errors::CostCommandError;
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// The `CliUserError` for a refused cost request.
 pub(crate) fn cost_error(py: Python<'_>, error: &CostCommandError) -> PyErr {

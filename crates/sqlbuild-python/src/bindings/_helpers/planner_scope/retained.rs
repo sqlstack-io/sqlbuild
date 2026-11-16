@@ -14,10 +14,11 @@ use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::native_host::model_lookup::ModelHandle;
 use crate::bindings::_helpers::planner_scope::values::{edges, keys};
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::{field, mapping_items};
-use crate::bindings::_helpers::records::ids::RecordId;
-use crate::bindings::_helpers::records::models::NativeRecord;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::models::NativeRecord;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The graph and selection used throughout planning; model values remain compiled-resource views.
 #[derive(Debug)]

@@ -9,10 +9,10 @@ use crate::bindings::_helpers::planner_migrations::models::{
 };
 use crate::bindings::_helpers::planner_migrations::projections::parse_query_shape;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(super) fn candidates<'py>(
     (phase, columns): (&MigrationPhase<'py>, &ColumnMigrationInputs<'py>),

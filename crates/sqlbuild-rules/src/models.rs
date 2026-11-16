@@ -773,6 +773,8 @@ pub struct EvaluateRequest {
     pub python_version: (u8, u8),
     /// The supported project Python files, filled from disk only when a Python rule is selected.
     pub python_sources: Vec<PythonSource>,
+    /// The project's Python tests, filled from disk only when a Python test rule is selected.
+    pub python_test_sources: Vec<PythonSource>,
     /// The job and sensor selections, filled from disk only when an orchestration rule is selected.
     pub orchestration: OrchestrationFacts,
 }
@@ -825,6 +827,7 @@ impl Default for EvaluateRequest {
             rules_cache_path: String::new(),
             python_version: (3, 12),
             python_sources: vec![],
+            python_test_sources: vec![],
             orchestration: OrchestrationFacts::default(),
         }
     }

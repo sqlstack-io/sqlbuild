@@ -3,13 +3,14 @@
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::compiled_views::records::project_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{enum_member, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString};
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 const COMPILE_TYPES_MODULE: &str = "sqlbuild.compiler.compile.types";
 
@@ -51,7 +52,7 @@ impl<'py> StageClasses<'py> {
             source_resource: native_field(&resource, "SOURCE")?,
             sql_test_resource: native_field(&resource, "SQL_TEST")?,
             opt_out_code: PyString::new(py, UNNEEDED_SQL_ANALYSIS_OPT_OUT_CODE).into_any(),
-            normalize_type: host::entry(py, AdapterHost::NormalizeType)?,
+            normalize_type: host_entry(py, AdapterHost::NormalizeType)?,
             sql_analysis_key: PyString::new(py, SQL_ANALYSIS_CONFIG_KEY).into_any(),
             udf_kind: native_field(&kinds, "UDF")?,
             table_function_kind: native_field(&kinds, "TABLE_FUNCTION")?,

@@ -10,8 +10,8 @@ use crate::bindings::_helpers::model_config::typed_config::{config_value, model_
 use crate::bindings::_helpers::planner_strategy::constants::ENFORCED_CONTRACT;
 use crate::bindings::_helpers::planner_strategy::fixture_values::{columns, folded_name};
 use crate::bindings::_helpers::planner_strategy::models::FixtureRelation;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::types::InferredRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const CONTRACT_KEY: &str = "contract";
 

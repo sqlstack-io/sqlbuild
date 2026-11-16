@@ -2,14 +2,14 @@
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The SQL analysis dialect whose engines read replacing tables with `FINAL`.
 const FINAL_READ_DIALECT: &str = "clickhouse";
@@ -107,7 +107,7 @@ pub(crate) fn render_source_read<'py>(
 
 /// The coded error for a `final` source on an adapter that cannot read with `FINAL`.
 fn final_unsupported(py: Python<'_>, adapter_name: &str) -> PyErr {
-    match host::entry(py, AdapterHost::AdapterUserError).and_then(|class| {
+    match host_entry(py, AdapterHost::AdapterUserError).and_then(|class| {
         call_with(
             &class,
             &[

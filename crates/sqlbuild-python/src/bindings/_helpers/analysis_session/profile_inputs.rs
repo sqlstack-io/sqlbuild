@@ -8,11 +8,11 @@ use sqlbuild_host::entries::models::AdapterHost;
 use crate::bindings::_helpers::analysis::binding_catalog::{
     BindingCatalog, CASE_SENSITIVE_BINDING_DIALECTS, CatalogKey, NATIVE_DIALECT_ALIASES,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::RecordId;
 
 const GENERIC_DIALECT: &str = "generic";
 pub(crate) const ADAPTER_RULE_ID: &str = "python";
@@ -34,7 +34,7 @@ pub(crate) fn nullability_rules(profile: &Bound<'_, PyAny>) -> PyResult<(Pairs, 
     let py: Python<'_> = profile.py();
     let known: Bound<'_, PyDict> = PyDict::new(py);
     for (rule, id) in KNOWN_RULES {
-        known.set_item(host::entry(py, rule)?, id)?;
+        known.set_item(host_entry(py, rule)?, id)?;
     }
     let adapter: Bound<'_, PyDict> = PyDict::new(py);
     let mut rows: Pairs = Vec::new();

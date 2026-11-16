@@ -16,8 +16,8 @@ use sqlbuild_model_config::config_values::types::HostObject;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
 
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The typed hook entry classes, which the config build checks hook lists against.
 const HOOK_ENTRY_CLASSES: [RecordId; 3] = [

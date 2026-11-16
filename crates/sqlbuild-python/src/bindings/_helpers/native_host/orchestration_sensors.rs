@@ -11,16 +11,19 @@ use sqlbuild_orchestration::sensors::models::{
     CustomSensorOutcome, SensorCondition, SensorEvaluationRequest,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::python_declarations;
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
 use crate::bindings::_helpers::discovery::orchestration_files::orchestration_declarations;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::native_host::constants::SENSOR_CONTEXT_PARAMETER;
-use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_environment::{
     callback_code_hash, orchestration_code_hash,
 };
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 
 pub(crate) fn evaluate_sensor(
     py: Python<'_>,
@@ -70,8 +73,10 @@ pub(crate) fn evaluate_sensor(
         .import("sqlbuild.orchestration")?
         .getattr("SensorContext")?
         .call((), Some(&fields))?;
-    let providers =
-        discover_provider_classes(imported(py, "pathlib", "Path")?.call1((project_dir,))?)?;
+    let providers = discover_provider_classes(
+        imported(py, "pathlib", "Path")?.call1((project_dir,))?,
+        SecretPolicy::Defer.name(),
+    )?;
     let by_name = provider_by_name(&providers)?;
     let session = call_with(
         &entry(py, UserCodeHost::BuildProviderSession)?,

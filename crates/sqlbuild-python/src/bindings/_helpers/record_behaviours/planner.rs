@@ -9,13 +9,15 @@ use sqlbuild_core::migration_values::main::model_migration_blocks_build::model_m
 use sqlbuild_core::migration_values::main::storage_transition::storage_transition;
 use sqlbuild_core::migration_values::models::{DecisionTraits, ModelMigrationFacts};
 
-use crate::bindings::_helpers::boundary::call_arguments::call_argument;
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cursor::scalars::parse_value;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{enum_from_value, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_argument::call_argument;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DECREASING_DIRECTIONS: [&str; 2] = ["decrease", "mixed"];
 const STEP_ACTIONS: [&str; 2] = ["archive_and_view", "view_only"];

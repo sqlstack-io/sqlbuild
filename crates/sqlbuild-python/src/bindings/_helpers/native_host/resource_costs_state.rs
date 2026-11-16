@@ -17,13 +17,14 @@ use sqlbuild_state::resource_costs::main::prune_resource_costs_sql::prune_resour
 use sqlbuild_state::resource_costs::models::{ResourceCostKey, RunCostAttempt};
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::execution_history::conversion::{parsed_iso, utc};
 use crate::bindings::_helpers::native_host::consumption_state::{
     Location, ROWS_PER_STATEMENT, execute, fixed_state_table_sql, integer_literal, literal,
     optional_text, state_table_name,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Rate source of a price the project configured, the only one shown as USD.
 const CONFIGURED_RATE_SOURCE: &str = "configured";

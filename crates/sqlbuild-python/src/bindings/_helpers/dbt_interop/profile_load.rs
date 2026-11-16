@@ -11,12 +11,13 @@ use sqlbuild_config::dbt_profile::models::{
 };
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::dbt_interop::profile::raised;
 use crate::bindings::_helpers::dbt_interop::profile_connection::profile_error;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DBT_PROJECT_FILE: &str = "dbt_project.yml";
 const PROFILES_FILE: &str = "profiles.yml";
@@ -66,7 +67,7 @@ fn yaml_mapping<'py>(file: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyD
         ));
     }
     let document: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ThirdPartyHost::LoadDbtYaml)?,
+        &host_entry(py, ThirdPartyHost::LoadDbtYaml)?,
         &[("file_path", file.clone())],
     )?;
     dbt_yaml_mapping(&display, &yaml_value(Some(&document))?).map_err(|error| raised(py, error))?;

@@ -1,13 +1,13 @@
 //! Map offsets in expanded SQL back onto the authored text that produced them.
 
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::compiled_project::main::map_expanded_offset::map_expanded_offset as mapped;
 use sqlbuild_analysis::compiled_project::models::SplicedSpan;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// `map_expanded_offset(*, offset, passes)`: a `MappedOffset` in the first pass's source.
 #[pyfunction]

@@ -13,11 +13,11 @@ use sqlbuild_analysis::manifest::models::{
 use sqlbuild_analysis::python_values::models::PythonValue;
 
 use crate::bindings::_helpers::python_values::values::python_value;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DECIMAL_KIND: &str = "decimal";
 const MACRO_KIND: &str = "macro";

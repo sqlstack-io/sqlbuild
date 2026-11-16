@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.232.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.232.0...v0.232.1) (2026-11-15)
+
+
+### Performance Improvements
+
+* **analysis:** check SQL-macro arguments on the analysis pool and drop duplicate work ([#1506](https://github.com/sqlstack-io/sqlbuild/issues/1506)) ([d94e5b7](https://github.com/sqlstack-io/sqlbuild/commit/d94e5b73efdf72783c7dc2430364c04f96355f78))
+
+## [0.232.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.231.0...v0.232.0) (2026-11-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* share Python identity work per discovery pass and keep compile phases out of sinks ([#1501](https://github.com/sqlstack-io/sqlbuild/issues/1501))
+
+### Performance Improvements
+
+* share Python identity work per discovery pass and keep compile phases out of sinks ([#1501](https://github.com/sqlstack-io/sqlbuild/issues/1501)) ([d15ee25](https://github.com/sqlstack-io/sqlbuild/commit/d15ee25919dedb6abde6e1b1c6ad8b5a46cf322b))
+
+## [0.231.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.230.1...v0.231.0) (2026-11-15)
+
+
+### Features
+
+* add SQBRPYTHON rules for orchestration sensors and calendars ([f5bab28](https://github.com/sqlstack-io/sqlbuild/commit/f5bab28d245338a8a474ec13bdf15fcc2d18a280))
+* add SQBRPYTHON022 compile-time purity rule ([f5bab28](https://github.com/sqlstack-io/sqlbuild/commit/f5bab28d245338a8a474ec13bdf15fcc2d18a280))
+* run commands without provider secrets they don't need ([f5bab28](https://github.com/sqlstack-io/sqlbuild/commit/f5bab28d245338a8a474ec13bdf15fcc2d18a280))
+* run project Python tests with sqb test and check them with SQBRPYTHON rules ([f5bab28](https://github.com/sqlstack-io/sqlbuild/commit/f5bab28d245338a8a474ec13bdf15fcc2d18a280))
+
+
+### Bug Fixes
+
+* keep strings and comments intact when re-indenting expression macro bodies ([#1496](https://github.com/sqlstack-io/sqlbuild/issues/1496)) ([755b468](https://github.com/sqlstack-io/sqlbuild/commit/755b468b24a547e38d622be0bdb3c0f4cff35c4c))
+
 ## [0.230.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.230.0...v0.230.1) (2026-11-15)
 
 

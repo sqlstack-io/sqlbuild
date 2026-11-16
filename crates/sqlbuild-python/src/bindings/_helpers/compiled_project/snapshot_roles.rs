@@ -9,7 +9,7 @@ use sqlbuild_orchestration::authorization::main::compile_roles::compile_roles;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
-use crate::bindings::_helpers::native_host::host::write_console;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
 
 /// The project-root file that defines project roles.
 pub(crate) const ROLES_FILE: &str = "roles.toml";

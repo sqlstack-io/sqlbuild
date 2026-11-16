@@ -17,8 +17,6 @@ use sqlbuild_host::types::ResultEnum;
 use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::plan_output::safety::{future_cursor_safety, maximum_start_safety};
 use crate::bindings::_helpers::plan_output::values::any;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::result_output::assets::microbatch_summary;
 use crate::bindings::_helpers::result_output::checks::{
     measured_value, measurement_thresholds, python_check_status,
@@ -29,6 +27,8 @@ use crate::bindings::_helpers::result_output::integration_values::{
 use crate::bindings::_helpers::result_output::projection::{
     ResultIdentity, ResultKind, result_kind,
 };
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 const FAILED_EVENT: &str = "resource_attempt_failed";
 const SKIPPED_EVENT: &str = "resource_attempt_skipped";

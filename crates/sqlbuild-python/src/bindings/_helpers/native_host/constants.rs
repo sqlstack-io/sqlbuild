@@ -19,3 +19,7 @@ pub(crate) const SENSOR_CLASS: &str = "Sensor";
 
 /// Pages one bounded state-history SELECT streams before the scan continues from its cursor.
 pub(crate) const HISTORY_STREAM_PAGES: usize = 50;
+
+/// `env_prefix_target` values under which pydantic-settings prefixes alias names too.
+pub(crate) const ALIAS_PREFIX_TARGET: &str = "alias";
+pub(crate) const ALL_PREFIX_TARGET: &str = "all";

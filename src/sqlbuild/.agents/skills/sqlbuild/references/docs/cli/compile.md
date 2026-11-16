@@ -66,6 +66,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--exclude` | Remove resources from the selected scope |
 | `--no-sql-analysis` | Turn off SQL syntax, binding, type inference and semantic checks (`--no-sql-validation` is an alias) |
 | `--no-cache` | Compile in full, without reusing earlier compiles or the Rules cache; see [Forcing a fresh compile](#forcing-a-fresh-compile) |
+| `--allow-missing-secrets` | Run without provider secrets; see [Secrets](../concepts/python-nodes/providers.md#secrets) |
 | `--defer-to` | Resolve unselected model references against another target |
 | `--json` | Print the full compile report as JSON |
 | `--manifest` | Also write `target/manifest.json` with project metadata |
@@ -276,12 +277,11 @@ inputs give the same output. See
 [Macros must be deterministic](../concepts/macros/python-macros.md#macros-must-be-deterministic). A
 compile whose templates read `run.id` is never reused.
 
-A replay differs from a full compile in three ways:
+A replay differs from a full compile in two ways:
 
 - In JSON, only `compile_timings` differs. It holds `project_reuse_hits`, `project_reuse_misses`,
   `project_reuse_bypasses`, `project_reuse_check_ms` and `total_ms`.
 - In text mode, the per-phase progress lines are not printed.
-- Lifecycle sinks receive only the invocation events, because no compile phase runs.
 
 When storing a result for reuse takes noticeable time, for example in a project with very many
 files, compile prints `Recording compile for reuse...` and a completion line on stderr before the

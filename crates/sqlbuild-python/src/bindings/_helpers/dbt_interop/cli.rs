@@ -18,13 +18,16 @@ use sqlbuild_core::dbt_cli::models::{
 use sqlbuild_core::text::main::python_splitlines::python_splitlines;
 use sqlbuild_core::text::main::python_strip::python_strip;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{
-    enum_from_value, new_record_with, record_class,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DBT_EXECUTABLE_ENV_VAR: &str = "DBT_EXECUTABLE";
 const COMMAND_ARGV_OPTIONS: (&[&str], &[&str]) =

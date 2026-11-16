@@ -1,17 +1,17 @@
 //! Fingerprint cache callbacks around native one-to-one migration matching.
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::models::{
     FingerprintInputs, ModelMigrationRequest,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_migrations::main::match_migrations::match_migrations;
 use sqlbuild_analysis::planner_migrations::models::MigrationCandidate;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn variants<'py>(

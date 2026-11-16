@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+import ast
+import hashlib
+import importlib
 import importlib.util
+import linecache
 import sys
-from collections.abc import Callable
+import textwrap
+from collections import Counter
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from functools import partial
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import MappingProxyType, ModuleType
-from typing import Any, cast
+from typing import Any, NamedTuple, TypeGuard, cast
+
+import pytest
 
 from sqlbuild._native import (
     CompiledModel,
@@ -22,6 +32,7 @@ from sqlbuild._native import (
     DiscoveredCheckFunction,
     DiscoveredLoaderFunction,
     DiscoveredProjectInputs,
+    DiscoveredPythonNodeFunctions,
     DiscoveredSourceFile,
     DiscoveredTaskFunction,
     LoaderConnectionMode,
@@ -29,11 +40,13 @@ from sqlbuild._native import (
     ProjectConfig,
     ProjectGraph,
     PythonNodeGraph,
+    PythonNodeIdentity,
     PythonSqlRunSelection,
     SourceColumnEntry,
     SourceEntry,
     build_python_node_graph,
     compiled_graph_keys,
+    discover_python_node_functions,
     resolve_python_sql_run_selection,
 )
 from sqlbuild.compiler.compile.types import (
@@ -41,6 +54,7 @@ from sqlbuild.compiler.compile.types import (
     CompiledProjectView,
     CompiledSourceView,
 )
+from sqlbuild.compiler.python_nodes._helpers.user_inventory import python_node_identity
 from sqlbuild.providers import Provider
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import PythonCheckSeverity
@@ -583,4 +597,282 @@ def resolve_run_selection(
     )
     return PythonSqlRunSelection(
         sql_keys=compiled_graph_keys(sql_keys), python_node_names=frozenset(python_node_names)
+    )
+
+
+@contextmanager
+def imported_identity_nodes(
+    *, project_dir: Path, package: str, files: dict[str, bytes], nodes: dict[str, str]
+) -> Iterator[dict[str, tuple[Callable[..., object], Path]]]:
+    """Write `files` under `project_dir/package` and import each node function from its folder."""
+
+    package_dir: Path = project_dir / package
+    for relative_path, contents in files.items():
+        file_path: Path = package_dir / relative_path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_bytes(contents)
+    (project_dir / ".git").mkdir()
+    try:
+        with pytest.MonkeyPatch.context() as patch:
+            patch.syspath_prepend(str(project_dir))
+            yield {
+                name: (
+                    getattr(importlib.import_module(f"{package}.{folder}.node"), name),
+                    package_dir / folder / "node.py",
+                )
+                for name, folder in nodes.items()
+            }
+    finally:
+        _forget_modules(package)
+
+
+def identity_summary(
+    *, name: str, node: tuple[Callable[..., object], Path]
+) -> tuple[tuple[str, ...], str]:
+    """A task node's dependency paths and qualnames, and a digest of every identity field."""
+
+    function, file_path = node
+    identity: PythonNodeIdentity = python_node_identity(
+        kind="task",
+        name=name,
+        function=function,
+        file_path=file_path,
+        decorator_config={"description": f"{name} node"},
+    )
+    fields: tuple[str, ...] = (
+        identity.source_path,
+        identity.source_hash,
+        identity.definition_hash,
+        identity.version_hash,
+        identity.definition_json,
+        identity.metadata_json,
+    )
+    return (
+        tuple(f"{item.source_path}:{item.qualname}" for item in identity.dependencies),
+        hashlib.sha256("\n".join(fields).encode()).hexdigest(),
+    )
+
+
+_DOMAINS: tuple[str, ...] = ("orders", "customers", "inventory", "fulfillment", "support")
+
+_SHARED_PROJECT_FILES: dict[str, str] = {
+    "providers/warehouse_api/provider.py": '''"""Warehouse API client."""
+
+from sqlbuild.providers import Provider
+
+
+class WarehouseApi(Provider):
+    """Client for the warehouse API."""
+
+    def page_size(self) -> int:
+        return 100
+''',
+    "python/shared/text.py": '''"""Text helpers."""
+
+
+def normalize_text(value: str) -> str:
+    return value.strip().lower()
+
+
+def clean_status(value: str) -> str:
+    return normalize_text(value).replace("-", "_")
+''',
+    "python/shared/money.py": '''"""Money helpers."""
+
+from python.shared.text import normalize_text
+
+
+class Money:
+    def __init__(self, cents: int, currency: str) -> None:
+        self.cents = cents
+        self.currency = normalize_text(currency)
+
+    def to_units(self) -> float:
+        return to_units(self.cents)
+
+
+class Ledger:
+    def total(self, amounts: list[Money]) -> float:
+        return sum(amount.to_units() for amount in amounts)
+
+
+def to_units(cents: int) -> float:
+    return cents / 100
+''',
+}
+
+
+def _domain_rows(domain: str) -> str:
+    return f'''"""{domain.title()} row helpers."""
+
+from python.shared.money import Ledger, Money
+from python.shared.text import clean_status
+
+
+class RowBatch:
+    def __init__(self, rows: list[dict[str, str]]) -> None:
+        self.domain = "{domain}"
+        self.rows = [map_row(row) for row in rows]
+        self.total = Ledger().total([Money(1, "usd")])
+
+
+def map_row(raw: dict[str, str]) -> dict[str, object]:
+    status: str = clean_status(raw["status"])
+    return {{"domain": "{domain}", "status": status, "amount": Money(1, "usd").to_units()}}
+'''
+
+
+def _node_files(domain: str, index: int) -> dict[str, str]:
+    name: str = f"{domain}_sync_{index:03d}"
+    folder: str = f"python/{domain}/{name}"
+    return {
+        f"{folder}/node.py": f'''"""Sync {domain} batch {index}."""
+
+from providers.warehouse_api.provider import WarehouseApi
+from python.{domain}._helpers.rows import RowBatch
+from python.{domain}.{name}.main import main
+from sqlbuild.tasks import task
+
+
+@task(description="Sync {domain} batch {index}.")
+def {name}(ctx, warehouse_api: WarehouseApi):
+    RowBatch([])
+    return main(ctx=ctx, warehouse_api=warehouse_api)
+''',
+        f"{folder}/main.py": f'''"""Sync {domain} batch {index}."""
+
+from python.{domain}._helpers.rows import RowBatch
+
+
+def main(*, ctx, warehouse_api):
+    return {{"node": "{name}", "rows": len(RowBatch([]).rows), "size": warehouse_api.page_size()}}
+''',
+    }
+
+
+def _write_shared_project(
+    project_dir: Path, node_count: int
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Write the project; return its shared files and its node files, by resolved path."""
+
+    shared: dict[str, str] = dict(_SHARED_PROJECT_FILES)
+    for domain in _DOMAINS:
+        shared[f"python/{domain}/_helpers/rows.py"] = _domain_rows(domain)
+    nodes: dict[str, str] = {}
+    for index in range(node_count):
+        nodes.update(_node_files(_DOMAINS[index % len(_DOMAINS)], index))
+    for relative_path, contents in (shared | nodes).items():
+        file_path: Path = project_dir / relative_path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(contents, encoding="utf-8")
+    (project_dir / ".git").mkdir()
+    return (
+        {str((project_dir / path).resolve()): text for path, text in shared.items()},
+        {str((project_dir / path).resolve()): text for path, text in nodes.items()},
+    )
+
+
+def _is_definition(
+    node: ast.AST,
+) -> TypeGuard[ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef]:
+    return isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
+
+
+def _object_sources(files: dict[str, str]) -> tuple[str, ...]:
+    """Each function's and class's dedented source, as `inspect.getsource` reads it."""
+
+    sources: list[str] = []
+    for text in files.values():
+        lines: list[str] = text.splitlines(keepends=True)
+        for definition in filter(_is_definition, ast.walk(ast.parse(text))):
+            start: int = [*definition.decorator_list, definition][0].lineno
+            sources.append(
+                textwrap.dedent("".join(lines[start - 1 : definition.end_lineno])).strip()
+            )
+    return tuple(sources)
+
+
+def _unit_work(
+    work: Counter[tuple[str, object]], files: dict[str, str]
+) -> dict[tuple[str, str], int]:
+    """Reads and parses of each file, and parses and hashes of each object source in it."""
+
+    sources: tuple[str, ...] = _object_sources(files)
+    return (
+        {("read", path): work[("read", path)] for path in files}
+        | {("file parse", path): work[("parse", text)] for path, text in files.items()}
+        | {("object parse", source): work[("parse", source)] for source in sources}
+        | {("object hash", source): work[("hash", source.encode())] for source in sources}
+    )
+
+
+def _work_by_kind(units: dict[tuple[str, str], int]) -> Counter[str]:
+    by_kind: Counter[str] = Counter()
+    for (kind, _unit), count in units.items():
+        by_kind[kind] += count
+    return by_kind
+
+
+def _forget_modules(package: str) -> None:
+    """Remove `package` and its submodules from `sys.modules`."""
+
+    for module_name in tuple(filter(partial(_in_package, package), sys.modules)):
+        del sys.modules[module_name]
+
+
+def _in_package(package: str, module_name: str) -> bool:
+    return module_name.split(".")[0] == package
+
+
+class DiscoveryWork(NamedTuple):
+    """Reads, parses and hashes counted while discovering a generated project."""
+
+    tasks: int
+    most_per_unit: int
+    shared: Counter[str]
+    per_node: float
+
+
+def discovery_work(
+    *, project_dir: Path, node_count: int, monkeypatch: pytest.MonkeyPatch
+) -> DiscoveryWork:
+    """Count reads, parses and hashes of each project file and object while discovering it."""
+
+    shared, nodes = _write_shared_project(project_dir, node_count)
+    work: Counter[tuple[str, object]] = Counter()
+    update_cache: Callable[..., list[str]] = linecache.updatecache
+    parse: Callable[..., ast.Module] = ast.parse
+    sha256: Callable[..., Any] = hashlib.sha256
+
+    def counted_update_cache(
+        filename: str, module_globals: dict[str, Any] | None = None
+    ) -> list[str]:
+        work[("read", filename)] += 1
+        return update_cache(filename, module_globals)
+
+    def counted_parse(source: str | bytes, *args: Any, **kwargs: Any) -> ast.Module:
+        work[("parse", source)] += 1
+        return parse(source, *args, **kwargs)
+
+    def counted_sha256(data: bytes = b"", *args: Any, **kwargs: Any) -> Any:
+        work[("hash", bytes(data))] += 1
+        return sha256(data, *args, **kwargs)
+
+    linecache.clearcache()
+    with monkeypatch.context() as patch:
+        patch.setattr(linecache, "updatecache", counted_update_cache)
+        patch.setattr(ast, "parse", counted_parse)
+        patch.setattr(hashlib, "sha256", counted_sha256)
+        patch.syspath_prepend(str(project_dir))
+        discovered: DiscoveredPythonNodeFunctions = discover_python_node_functions(
+            project_dir=project_dir
+        )
+    _forget_modules("providers")
+    shared_units: dict[tuple[str, str], int] = _unit_work(work, shared)
+    node_units: dict[tuple[str, str], int] = _unit_work(work, nodes)
+    return DiscoveryWork(
+        tasks=len(discovered.tasks),
+        most_per_unit=max((shared_units | node_units).values()),
+        shared=_work_by_kind(shared_units),
+        per_node=sum(node_units.values()) / node_count,
     )

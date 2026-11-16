@@ -44,12 +44,6 @@ use sqlbuild_rules::project_tree::main::project_real_path::project_real_path;
 use sqlbuild_rules::project_tree::main::project_real_paths::project_real_paths;
 use sqlclean::sql_lint::main::fill_finding_path::fill_finding_path;
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as record_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::render::authored_sql::{AuthoredExpansion, expand_with_inputs};
 use crate::bindings::_helpers::render::macro_call_rows::SpanRow;
@@ -57,7 +51,15 @@ use crate::bindings::_helpers::rules::dsl_headers::header_violations;
 use crate::bindings::_helpers::rules::native_header_parser::{
     FUNCTION_KIND, HeaderFailure, NativeHeaderParser, external_identifiers,
 };
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as record_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 pub(crate) const NATIVE_ENGINE: &str = "native";
 const HEADER_ENGINE: &str = "sqlbuild";

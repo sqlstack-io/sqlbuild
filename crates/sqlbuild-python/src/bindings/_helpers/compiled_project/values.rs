@@ -7,9 +7,9 @@ use pyo3::types::{
 };
 use serde_json::{Map, Number, Value};
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::models::NativeRecord;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::models::NativeRecord;
 
 const DATACLASS_FIELDS: &str = "__dataclass_fields__";
 const INSTANCE_DICT: &str = "__dict__";

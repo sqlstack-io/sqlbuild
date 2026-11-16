@@ -5,9 +5,9 @@ use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::pymethods;
 use pyo3::types::{PyDict, PyTuple};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::build_command::support::utc_now;
 use crate::bindings::_helpers::planner_phases::models::{PlannerRuntime, PlannerWarehouseState};
+use sqlbuild_python_base::boundary::models::KeywordArguments;
 
 #[pymethods]
 impl PlannerRuntime {

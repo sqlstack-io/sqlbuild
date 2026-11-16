@@ -4,20 +4,21 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple};
 
 use crate::bindings::_helpers::attachments::cursor_intrinsics::validated_model_cursor_sql;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::records::construct::{
-    enum_member, new_record, new_record_with, record_class,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::render::declaration_values::declaration_scope_resolver;
 use crate::bindings::_helpers::render::macro_expansion_result::{
     ExpansionRequest, expansion_result,
 };
 use crate::bindings::_helpers::render::sql_macro_mocks::with_sql_macro_mocks;
 use pyo3::IntoPyObjectExt;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The `CompiledSqlScenario` fields copied from its input, in Python's keyword order.
 const SCENARIO_FIELDS: [&str; 12] = [

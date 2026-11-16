@@ -9,26 +9,28 @@ use sqlbuild_analysis::janitor_planning::constants::UNTRACKED_QUERY_DIFF_REASON;
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use crate::bindings::_helpers::janitor::janitor_keys::{
     Folded, Key, SchemaKey, dedupe_schema_keys, folded_schema, integer, optional, record,
     sorted_schemas, text, tuple,
 };
-use crate::bindings::_helpers::records::fields::replaced;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
 
 const QUERY_ARTIFACT_LIFECYCLE: ExecutorHost = ExecutorHost::QueryDiffArtifactLifecycle;
 const INSPECTION_LIST: AdapterHost = AdapterHost::ListRelationsForInspection;
 const ACTIVE_CATALOG: AdapterHost = AdapterHost::ActiveInspectionCatalog;
 const LOG_DEBUG_EVENT: ExecutorHost = ExecutorHost::LogDebugEvent;
 const EXECUTION_LOGGER: &str = "sqlbuild.execution";
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_core::constants::{
     AUDIT_RESULTS_TABLE_NAME, CONSUMPTION_TABLE_NAME, OBSERVATIONS_TABLE_NAME,
     RESOURCE_COSTS_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
 };
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The adapter and its open connection.
 pub(crate) struct Warehouse<'py> {
@@ -67,7 +69,7 @@ impl<'py> Warehouse<'py> {
             }
         };
         call_with(
-            &host::entry(py, INSPECTION_LIST)?,
+            &host_entry(py, INSPECTION_LIST)?,
             &[
                 ("adapter", self.adapter.clone()),
                 ("connection", self.connection.clone()),
@@ -81,7 +83,7 @@ impl<'py> Warehouse<'py> {
     /// The inspection catalog open on this connection, or none.
     fn catalog(&self) -> PyResult<Option<Bound<'py, PyAny>>> {
         let catalog: Bound<'py, PyAny> = call_with(
-            &host::entry(self.py(), ACTIVE_CATALOG)?,
+            &host_entry(self.py(), ACTIVE_CATALOG)?,
             &[
                 ("adapter", self.adapter.clone()),
                 ("connection", self.connection.clone()),
@@ -401,7 +403,7 @@ fn tracked_relation_keys(
             Ok(set) => set,
             Err(error) if error.is_instance_of::<PyException>(py) => {
                 call_with(
-                    &host::entry(py, LOG_DEBUG_EVENT)?,
+                    &host_entry(py, LOG_DEBUG_EVENT)?,
                     &[
                         (
                             "logger",
@@ -570,7 +572,7 @@ pub(crate) fn query_diff_artifact_candidates<'py>(
     now: &Bound<'py, PyAny>,
 ) -> PyResult<ArtifactCandidates<'py>> {
     let py: Python<'py> = warehouse.py();
-    let lifecycle: Bound<'py, PyAny> = host::entry(py, QUERY_ARTIFACT_LIFECYCLE)?;
+    let lifecycle: Bound<'py, PyAny> = host_entry(py, QUERY_ARTIFACT_LIFECYCLE)?;
     let mut sorted: Vec<(Option<String>, String)> = schemas.to_vec();
     sorted.sort_by(|left, right| {
         (left.0.as_deref().unwrap_or(""), left.1.as_str())

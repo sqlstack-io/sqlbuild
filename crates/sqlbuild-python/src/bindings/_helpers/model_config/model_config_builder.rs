@@ -24,7 +24,6 @@ use sqlbuild_model_config::path_defaults::models::PathDefaultChoice;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
 use crate::bindings::_helpers::authored_values::project_vars::project_var_text;
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::model_config::config_classes::{ConfigClasses, built_config};
 use crate::bindings::_helpers::model_config::config_errors::config_exception;
 use crate::bindings::_helpers::model_config::config_errors::native_config_error;
@@ -35,6 +34,7 @@ use crate::bindings::_helpers::model_config::config_nodes::{
 use crate::bindings::_helpers::model_config::errors::NativeConfigError;
 use crate::bindings::_helpers::model_config::project_defaults::project_defaults_mapping;
 use crate::bindings::_helpers::model_config::typed_config::{BuiltConfigValues, built_values};
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 
 /// The config keys a model's context values read.
 const CONTEXT_KEYS: [&str; 3] = ["database", "schema", "alias"];

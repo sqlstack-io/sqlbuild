@@ -63,7 +63,7 @@
 												{#if f.description}<div class="cell-desc">{f.description}</div>{/if}
 											</td>
 											<td class="muted"><code>{f.type}</code></td>
-											<td><code>{f.env}</code></td>
+											<td><code>{f.env}</code>{#if f.missing}<span class="missing" title="Unset in the location's environment; runs that use this provider fail">missing</span>{/if}</td>
 											<td class="muted">{f.required ? 'Required' : 'Optional'}</td>
 										</tr>
 									{/each}
@@ -126,6 +126,11 @@
 		align-items: center;
 		gap: 3px;
 		color: var(--muted-foreground);
+		font-size: 11px;
+	}
+	.missing {
+		margin-left: 6px;
+		color: var(--sb-error);
 		font-size: 11px;
 	}
 </style>

@@ -3,9 +3,9 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_cursor::algebra::models::LocalDateTime;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cursor::values::{DATETIME_MODULE, local_date_time};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Whether `value` is a `datetime`.
 pub(crate) fn date_time_typed(value: &Bound<'_, PyAny>) -> PyResult<bool> {

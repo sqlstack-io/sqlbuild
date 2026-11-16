@@ -8,9 +8,11 @@ use crate::bindings::_helpers::compile_attachment::storage_policies::inherited_s
 use crate::bindings::_helpers::input_loops::loop_classes::table_backed;
 use crate::bindings::_helpers::model_config::model_config_builder::NativeModelConfigBuilder;
 use crate::bindings::_helpers::model_config::unicode_environment::unicode_environment;
-use crate::bindings::_helpers::records::construct::{new_record, new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Capture the project inputs every model's native config build and validation read.
 #[pyfunction]

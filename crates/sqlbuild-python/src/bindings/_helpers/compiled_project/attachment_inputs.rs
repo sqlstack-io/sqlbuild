@@ -1,5 +1,6 @@
 //! The resource rows and settings the compile attaches into the project, and the installed runs.
 
+use sqlbuild_python_base::positional_record;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 

@@ -16,10 +16,10 @@ use sqlbuild_core::build_command::models::{
     TableTypeFact,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const SNAPSHOT_VALUE: &str = "snapshot";
 const FULL_REFRESH_REASON: &str = "full_refresh";

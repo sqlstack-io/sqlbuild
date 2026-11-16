@@ -13,7 +13,7 @@ use crate::bindings::_helpers::compile_context::delta::guarded;
 use crate::bindings::_helpers::compile_context::delta::{
     ModelShape, capture, capturing, delta_unsupported, injection,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The partial-check reasons of the `fresh` models, merged in a delta with the stored models'.
 pub(crate) fn semantic_reasons(

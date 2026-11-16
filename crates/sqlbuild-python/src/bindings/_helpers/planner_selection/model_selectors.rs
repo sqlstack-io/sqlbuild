@@ -12,13 +12,13 @@ use sqlbuild_analysis::planner_selection::models::{
     ModelSelectorNames, SelectableModel, SelectorExpansion,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_selection::carrier::Carrier;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const TAGS_KEY: &str = "tags";
 

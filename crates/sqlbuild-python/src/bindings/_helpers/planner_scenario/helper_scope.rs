@@ -6,9 +6,9 @@ use sqlbuild_analysis::compiler::models::{ScenarioHelperScope, ScenarioScopeInpu
 
 use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_INTERNAL;
 use crate::bindings::_helpers::planner_scenario::{models::SqlContext, values::error};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 const FIXTURE_LOCATIONS: [(&str, &str); 4] = [
     ("__source__", "source_fixture_locations"),

@@ -2,12 +2,13 @@
 
 use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::planner_resolution::values::string;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::{PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const FUTURE_CAPPED_CODE: &str = "FUTURE_CURSOR_CAPPED";
 const START_CAPPED_CODE: &str = "AUTOMATIC_START_CAPPED";

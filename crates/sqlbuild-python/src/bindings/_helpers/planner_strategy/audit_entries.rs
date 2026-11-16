@@ -7,7 +7,6 @@ use std::collections::HashSet;
 
 use crate::bindings::_helpers::attachments::reference_markers::assert_no_unresolved_sql_markers;
 use crate::bindings::_helpers::auditing::render::render_audit_sql;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
@@ -18,22 +17,23 @@ use crate::bindings::_helpers::planner_scope::values::edges;
 use crate::bindings::_helpers::planner_strategy::audits::{
     attachment, outside_target_lineage, resolve_effective_run_scope,
 };
-use crate::bindings::_helpers::records::construct::new_record;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyListMethods, PyString};
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::imported;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::Request;
 
 use crate::bindings::_helpers::planner_strategy::constants::{
     AUDIT_TYPES_MODULE, COMPILE_TYPES_MODULE, MODEL_ATTACHMENT, SOURCE_ATTACHMENT,
 };
 use crate::bindings::_helpers::planner_strategy::models::AuditPlanning;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// One attribute read of a compiled audit.
 type AuditRead<'py> = fn(&Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>;

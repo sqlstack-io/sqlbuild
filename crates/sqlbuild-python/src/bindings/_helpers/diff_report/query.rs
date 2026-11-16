@@ -1,5 +1,6 @@
 //! Raw-query `sqb diff`: preparation, artifact materialization, comparison and cleanup.
 
+use sqlbuild_python_base::positional_record;
 use std::time::Instant;
 
 use pyo3::exceptions::PyException;
@@ -14,8 +15,6 @@ use sqlbuild_cli::diff_report::types::PhaseSeconds;
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_runtime_config;
@@ -25,14 +24,18 @@ use crate::bindings::_helpers::diff_report::support::{
     call, cli_error, error_text, none, object, progress_line,
 };
 use crate::bindings::_helpers::diff_report::tolerances::cli_tolerance_overrides;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
-use crate::bindings::types::CompilerDetach;
 use sqlbuild_analysis::diff_selection::main::raw_query_shape::raw_query_shape;
 use sqlbuild_analysis::diff_selection::models::RawQueryShape;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const GENERIC_DIALECT: &str = "generic";
 pub(crate) const NAMESPACELESS_ADAPTERS: [&str; 2] = ["duckdb", "motherduck"];
@@ -317,7 +320,7 @@ pub(crate) fn execution_options<'py>(
     let py: Python<'py> = request.py();
     let attribute = |name: &str| native_field(request, name);
     let sampling: Bound<'py, PyAny> = call(
-        &host::entry(py, ExecutorHost::RowDiffSamplingOverride)?,
+        &host_entry(py, ExecutorHost::RowDiffSamplingOverride)?,
         &[
             ("row_limit", &attribute("sample_rows")?),
             ("seed", &attribute("sample_seed")?),
@@ -345,10 +348,7 @@ pub(crate) fn execution_options<'py>(
         ("tolerance_overrides", &tolerances),
     ]);
     pairs.extend_from_slice(extra);
-    call(
-        &host::entry(py, ExecutorHost::DiffExecutionOptions)?,
-        &pairs,
-    )
+    call(&host_entry(py, ExecutorHost::DiffExecutionOptions)?, &pairs)
 }
 
 /// Materialize, compare and clean one raw-query pair; the result and per-phase seconds.
@@ -387,7 +387,7 @@ pub(crate) fn execute_query_diff<'py>(
         py,
         &format!("Query diff connection  OK  ({:.2}s)", phases[0].1),
     )?;
-    let lifecycle: Bound<'py, PyAny> = host::entry(py, ExecutorHost::QueryDiffArtifactLifecycle)?;
+    let lifecycle: Bound<'py, PyAny> = host_entry(py, ExecutorHost::QueryDiffArtifactLifecycle)?;
     let artifact = |side: &str| -> PyResult<Bound<'py, PyAny>> {
         call(
             &native_field(&lifecycle, "build")?,
@@ -470,7 +470,7 @@ pub(crate) fn execute_query_diff<'py>(
         ));
     }
     let result: Bound<'py, PyAny> = call(
-        &host::entry(py, ExecutorHost::DiffExecutionResult)?,
+        &host_entry(py, ExecutorHost::DiffExecutionResult)?,
         &[("model_results", &PyTuple::new(py, [model])?.into_any())],
     )?;
     Ok((result, phases))
@@ -548,7 +548,7 @@ fn compare_artifacts<'py>(
     let compared: PyResult<Bound<'py, PyAny>> =
         execution_options(request, &extra).and_then(|options| {
             call(
-                &host::entry(py, ExecutorHost::ExecuteQueryDiff)?,
+                &host_entry(py, ExecutorHost::ExecuteQueryDiff)?,
                 &[
                     ("adapter", &adapter),
                     ("connection", connection),
@@ -680,7 +680,7 @@ fn inspect_inputs<'py>(
     };
     let locations: Bound<'py, PyTuple> = PyTuple::new(py, [location(left)?, location(right)?])?;
     let lookup: Bound<'py, PyAny> = call(
-        &host::entry(py, AdapterHost::BuildRelationLookup)?,
+        &host_entry(py, AdapterHost::BuildRelationLookup)?,
         &[
             ("adapter", &adapter),
             ("connection", connection),

@@ -8,8 +8,8 @@ use sqlbuild_analysis::sql_macros::main::parse_sql_macro::parse_sql_macro;
 use sqlbuild_analysis::sql_macros::main::sql_macro_cycle::sql_macro_cycle;
 use sqlbuild_analysis::sql_macros::models::{SqlMacroDefinition, SqlMacroLocation};
 
-use crate::bindings::_helpers::records::construct::new_helped_error;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// `(name, relative path, contents)` of one SQL macro file.
 type SourceRow = (String, String, String);

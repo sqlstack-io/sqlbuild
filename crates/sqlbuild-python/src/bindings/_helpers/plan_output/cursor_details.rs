@@ -4,14 +4,14 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::cursor::conversion::GRAIN_NAMES;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::plan_output::display::{
     aligned_timestamp_bounds, resolve_effective_microbatch_batch_size,
 };
 use crate::bindings::_helpers::plan_output::values::{optional_text, text};
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const MICROBATCH_MODE: &str = "microbatch";
 const TIMESTAMP_CURSOR: &str = "timestamp";
@@ -151,7 +151,7 @@ pub(crate) fn cursor_details<'py>(
         let bounds: Bound<'py, PyAny> = native_field(entry, "cursor_bounds")?;
         (!bounds.is_none()).then_some(bounds)
     };
-    let sentinel: Bound<'py, PyAny> = host::entry(py, ExecutorHost::BoundSentinel)?;
+    let sentinel: Bound<'py, PyAny> = host_entry(py, ExecutorHost::BoundSentinel)?;
     if let Some(bounds) = &resolved_bounds
         && (native_field(bounds, "start")?.is_instance(&sentinel)?
             || native_field(bounds, "end")?.is_instance(&sentinel)?)

@@ -7,10 +7,11 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::NativeAttr;
-use crate::bindings::_helpers::records::registry;
+use crate::bindings::_helpers::discovery::provider_secrets::invocation_allows_missing_secrets;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
 
 /// The version of the runtime identity a stored compile records.
 const REUSE_FORMAT_VERSION: &str = "1";
@@ -50,7 +51,7 @@ fn interpreter_identity(py: Python<'_>) -> PyResult<Bound<'_, PyTuple>> {
 /// The interpreter and native build identity that produced a compile.
 pub(crate) fn runtime_identity(py: Python<'_>) -> PyResult<BTreeMap<String, OsString>> {
     let [version, executable, platform, cache_tag] = interpreter_values(py)?;
-    let native_build: String = registry::native(py, NativeAttr::BuildIdentity)?
+    let native_build: String = native_attr(py, NativeAttr::BuildIdentity)?
         .str()?
         .extract()?;
     Ok(BTreeMap::from([
@@ -86,6 +87,7 @@ pub(crate) fn invocation_identity<'py>(
     for field in REQUEST_CHOICES {
         payload.set_item(field, native_field(request, field)?)?;
     }
+    payload.set_item("allow_missing_secrets", invocation_allows_missing_secrets())?;
     payload.set_item("cwd", py.import("os")?.getattr("getcwd")?.call0()?)?;
     payload.set_item("use_color", use_color)?;
     payload.set_item("select", listed(native_field(request, "select")?)?)?;

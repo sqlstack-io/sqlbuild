@@ -6,17 +6,19 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python_node_graph_indexes as graph_indexes;
 use sqlbuild_analysis::python_selection::models::{InventoryIndexes, InventoryNode};
 use sqlbuild_host::entries::models::UserCodeHost;
+use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::discovery::imported_modules::provider_usages;
 use crate::bindings::_helpers::discovery::imported_python_nodes::node_identity;
 use crate::bindings::_helpers::graph::python_selection::resolve_python_sql_run_selection;
 use crate::bindings::_helpers::graph::views::compiled_graph_keys;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const NAME_KEY: &str = "name";
 
@@ -149,7 +151,7 @@ fn upstream_names(
             name,
         )?;
     }
-    let dependency_key: Bound<'_, PyAny> = host::entry(py, UserCodeHost::PythonNodeDependencyKey)?;
+    let dependency_key: Bound<'_, PyAny> = host_entry(py, UserCodeHost::PythonNodeDependencyKey)?;
     nodes
         .iter()
         .map(|node| {
@@ -192,16 +194,19 @@ pub(crate) fn python_node_graph<'py>(
     }
     let vocabulary: Vocabulary<'py> = Vocabulary {
         node: record_class(py, RecordId::DiscoveredPythonNode)?,
-        kinds: host::entry(py, UserCodeHost::PythonNodeKind)?,
-        sql_ref: host::entry(py, UserCodeHost::SqlResourceRef)?,
+        kinds: host_entry(py, UserCodeHost::PythonNodeKind)?,
+        sql_ref: host_entry(py, UserCodeHost::SqlResourceRef)?,
         providers,
     };
     let mut nodes: Vec<Bound<'py, PyAny>> = Vec::new();
-    for (collection, kind, documented) in KINDS {
-        for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
-            nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
+    within_identity_pass(py, || {
+        for (collection, kind, documented) in KINDS {
+            for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
+                nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
+            }
         }
-    }
+        Ok(())
+    })?;
     let inventory: Vec<InventoryNode> = nodes
         .iter()
         .zip(upstream_names(py, &nodes, &vocabulary.sql_ref)?)

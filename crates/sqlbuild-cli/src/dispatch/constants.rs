@@ -213,7 +213,7 @@ pub(crate) const FRESHNESS_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const TEST_FIELDS: [Field; 15] = [
+const TEST_FIELDS: [Field; 17] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     NO_COLOR,
@@ -229,6 +229,8 @@ const TEST_FIELDS: [Field; 15] = [
     same("test_timeout"),
     same("since"),
     same("explain"),
+    same("sql_only"),
+    same("python_only"),
 ];
 const TEST_ARGUMENTS: [Field; 1] = [request(class("TestCommandRequest"), &TEST_FIELDS)];
 pub(crate) const TEST_ROUTE: Route = routed(
@@ -504,12 +506,13 @@ pub(crate) const COST_ROUTE: Route = routed(
     REQUEST_SHAPE,
 );
 
-const DEBUG_ARGUMENTS: [Field; 5] = [
+const DEBUG_ARGUMENTS: [Field; 6] = [
     PROJECT_DIR,
     NO_COLOR,
     same("no_connection"),
     SELECTED_TARGET,
     JSON_OUTPUT,
+    same("verbose"),
 ];
 pub(crate) const DEBUG_ROUTE: Route = routed(
     "run_debug",

@@ -17,7 +17,8 @@ use crate::bindings::_helpers::compiled_project::snapshot::{destination, insert_
 use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::compiled_views::seed_views::{NativeCompiledSeed, SeedViews};
-use crate::bindings::_helpers::records::fields::{field, path_posix};
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
 
 /// Read only declared metadata fields, never callable attributes or connection settings.
 pub(crate) fn metadata(value: &Bound<'_, PyAny>, names: &[&str]) -> PyResult<Value> {

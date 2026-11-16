@@ -21,12 +21,12 @@ use sqlbuild_cursor::algebra::models::{DurationDigits, DurationSpan};
 use crate::bindings::_helpers::cursor::durations::shifted_moment;
 use crate::bindings::_helpers::plan_output::display::aligned_timestamp_bounds;
 use crate::bindings::_helpers::planner_strategy::values::text;
-use crate::bindings::_helpers::records::construct::{
-    enum_from_value, new_record_with, record_class,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 const INTEGER_CURSOR: &str = "integer";
 const TIMESTAMP_CURSOR: &str = "timestamp";

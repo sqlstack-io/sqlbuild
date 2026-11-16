@@ -6,17 +6,20 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::dbt_command::main::dbt_output_options::dbt_output_options;
 use sqlbuild_core::dbt_command::models::DbtOutputOptions;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, keywords};
 use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
 use crate::bindings::_helpers::dbt_command::auto_init::{args_tuple, ensure_twin_project};
 use crate::bindings::_helpers::dbt_command::debug::run_dbt_debug;
 use crate::bindings::_helpers::dbt_command::support::{color_enabled, effective_dir, flag, stream};
 use crate::bindings::_helpers::dbt_interop::plan::render_dbt_interop_plan;
 use crate::bindings::_helpers::dbt_interop::runtime_config::validate_dbt_execution_args;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PLAN_COMMAND: &str = "plan";
 const DEBUG_COMMAND: &str = "debug";
@@ -70,7 +73,7 @@ fn run_plan(project_dir: &Bound<'_, PyAny>, args: &[String], no_color: bool) -> 
         progress.blank_line()?;
     }
     let plan: Bound<'_, PyAny> = call_with(
-        &registry::native(py, NativeAttr::PlanDbtInteropFromProject)?,
+        &native_attr(py, NativeAttr::PlanDbtInteropFromProject)?,
         &[
             ("project_dir", project_dir.clone()),
             ("args", args_tuple(py, &options.routed_args)?),
@@ -141,7 +144,7 @@ fn run_execution(
             ("json_output", flag(py, options.json_output)),
         ],
     )?;
-    registry::native(py, NativeAttr::ExecuteDbtInteropFromProject)?
+    native_attr(py, NativeAttr::ExecuteDbtInteropFromProject)?
         .call1((request,))?
         .extract()
 }

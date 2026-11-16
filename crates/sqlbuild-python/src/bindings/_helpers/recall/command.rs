@@ -25,7 +25,6 @@ use sqlbuild_recall::store::main::read_output_transcript::read_output_transcript
 use sqlbuild_recall::store::main::resolve_invocation::resolve_invocation;
 use sqlbuild_recall::store::models::{OpenMode, SqliteStore};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::query_command::query::run_query_command;
 use crate::bindings::_helpers::recall::clickhouse_store::{ClickHouseLocation, ClickHouseReader};
 use crate::bindings::_helpers::recall::console::{write_stderr, write_stdout_bytes};
@@ -36,8 +35,9 @@ use crate::bindings::_helpers::recall::constants::{
     WAREHOUSE_STATE_RELATIONS_SQL,
 };
 use crate::bindings::_helpers::recall::rendering::{QueryContext, render_result, render_schema};
-use crate::bindings::_helpers::records::construct::new_error;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
+use sqlbuild_python_base::records::types::ErrorId;
 
 fn user_error(py: Python<'_>, message: &str, code: &str) -> PyErr {
     new_error(py, ErrorId::CliUser, message.to_owned(), code)

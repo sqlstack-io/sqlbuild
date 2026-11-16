@@ -1,6 +1,7 @@
+use crate::semantic_validation::_helpers::normalization::normalize_native_sql_mapped;
 use crate::semantic_validation::models::BindingPositions;
 use crate::semantic_validation::tests::test_types::{
-    UniqueWordOffsetTestCase, UniqueWordScalingTestCase,
+    MappedNormalizationTestCase, UniqueWordOffsetTestCase, UniqueWordScalingTestCase,
 };
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
@@ -108,4 +109,53 @@ fn given_many_unique_identifiers_when_locating_each_then_work_stays_linear() {
             started.elapsed()
         );
     }
+}
+
+#[test]
+fn given_non_ascii_text_around_several_edits_when_normalizing_then_copied_characters_map_to_their_source()
+-> Result<(), String> {
+    let test_cases = [
+        MappedNormalizationTestCase {
+            description: "references between strings in other scripts",
+            dialect: "duckdb",
+            sql: "SELECT '\u{e9}' AS a, '\u{20ac}' AS b FROM __ref(\"orders\") AS o, \
+                  __ref(\"customers\") AS c WHERE o.note = '\u{fc}' AND c.n = '\u{1f600}'",
+            expected_fragment: "FROM orders AS o",
+        },
+        MappedNormalizationTestCase {
+            description: "Snowflake variant paths with computed keys holding other scripts",
+            dialect: "snowflake",
+            sql: "SELECT '\u{e9}' AS a, v:a['x' || '\u{20ac}'] AS b, w:b['\u{df}' || 'k'] AS c \
+                  FROM __ref(\"orders\") AS o WHERE o.n = '\u{fc}' || '\u{1f600}'",
+            expected_fragment: "GET(",
+        },
+    ];
+    for test_case in test_cases {
+        let source: Vec<char> = test_case.sql.chars().collect();
+        let (normalized, offsets) =
+            normalize_native_sql_mapped(test_case.sql, test_case.dialect, "__stub_", &[])?;
+        let output: Vec<char> = normalized.chars().collect();
+        assert!(
+            normalized.contains(test_case.expected_fragment),
+            "{}: {normalized}",
+            test_case.description
+        );
+
+        assert_eq!(offsets.len(), output.len() + 1, "{}", test_case.description);
+        let copied: Vec<(char, Option<char>)> = output
+            .iter()
+            .zip(&offsets)
+            .filter(|(character, _)| !character.is_ascii())
+            .map(|(character, offset)| (*character, source.get(*offset).copied()))
+            .collect();
+        let authored: usize = source
+            .iter()
+            .filter(|character| !character.is_ascii())
+            .count();
+        assert_eq!(copied.len(), authored, "{}", test_case.description);
+        for (character, mapped) in copied {
+            assert_eq!(Some(character), mapped, "{}", test_case.description);
+        }
+    }
+    Ok(())
 }

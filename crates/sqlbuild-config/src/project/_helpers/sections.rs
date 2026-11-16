@@ -11,6 +11,11 @@ use crate::project::_helpers::keys::{Place, reject_removed_virtual_keys, validat
 use crate::project::_helpers::targets::seconds_value;
 use crate::project::_helpers::values::{int_below, python_equal};
 use crate::project::constants::{
+    ALLOW_MISSING_SECRETS_KEY, DEFAULT_TEST_TIMEOUT, DEFAULT_UNIT_TEST_MAX_REAL_MODELS,
+    DELTA_COMPILE_KEY, DISABLED_VALUE, SCENARIO_TIMEOUT_KEY, TEST_TIMEOUT_KEY,
+    UNIT_TEST_MAX_REAL_MODELS_KEY,
+};
+use crate::project::constants::{
     AUDIT_SEVERITIES, CHECK_DECLARED_COLUMNS_KEY, COLLECTION_RENDERINGS, COLUMN_CONTRACT_MODES,
     CONCURRENCY_KEY, DBT_DEFER_CLONE_KEY, DBT_KEYS, DBT_REMOVED_KEYS, DBT_REUSE_KEYS,
     DEFAULT_IN_USE_WINDOW, DEFAULT_QUERY_ARTIFACT_TTL, FUTURE_CURSOR_ACTIONS,
@@ -25,10 +30,6 @@ use crate::project::constants::{
 use crate::project::constants::{
     CHANGE_COUNTS, CHANGE_REACHES, CHANGES_KEYS, CONTROL_KEYS, MIN_SYNC_INTERVAL_SECONDS,
     SYNC_INTERVAL_HELP, SYNC_INTERVAL_OFF,
-};
-use crate::project::constants::{
-    DEFAULT_TEST_TIMEOUT, DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE,
-    SCENARIO_TIMEOUT_KEY, TEST_TIMEOUT_KEY, UNIT_TEST_MAX_REAL_MODELS_KEY,
 };
 use crate::project::errors::ConfigFailure;
 use crate::project::models::{Built, ChangesConfig, ConfigFile, ControlConfig, ReviewConfig};
@@ -274,6 +275,14 @@ pub(crate) fn load_settings(payload: Option<&ConfigValue>, file: ConfigFile) -> 
                 mapping,
                 DELTA_COMPILE_KEY,
                 true,
+            )?)),
+        ),
+        (
+            ALLOW_MISSING_SECRETS_KEY,
+            Built::Value(ConfigValue::Bool(optional_bool(
+                mapping,
+                ALLOW_MISSING_SECRETS_KEY,
+                false,
             )?)),
         ),
     ];

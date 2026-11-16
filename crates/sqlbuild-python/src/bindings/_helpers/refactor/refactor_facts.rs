@@ -13,11 +13,11 @@ use sqlbuild_refactor::refactoring::models::{
 use sqlbuild_scopes::scope_index::models::{ResourceIdentity, ResourceKind};
 
 use crate::bindings::_helpers::model_config::config_values::config_str;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::refactor::python_strings::find_python_string_locations;
 use crate::bindings::_helpers::scopes::scope_lookup::build_scope_lookup;
 use crate::bindings::_helpers::scopes::scope_reports::{scope_move_preview, scope_rebound_usages};
 use crate::bindings::_helpers::scopes::scope_validation::relocated_declarations;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const SQL_SUFFIX: &str = ".sql";
 const GENERIC_DIALECT: &str = "generic";

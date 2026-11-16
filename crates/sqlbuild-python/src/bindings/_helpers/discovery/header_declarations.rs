@@ -18,9 +18,11 @@ use sqlbuild_model_config::sql_values::models::RawSqlValue;
 use crate::bindings::_helpers::authored_values::sql_values::{
     SqlValueClasses, raw_value, sql_value, sql_value_error,
 };
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record};
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn declaration_error(py: Python<'_>, failure: DeclarationFailure) -> PyResult<PyErr> {
     Ok(match failure {

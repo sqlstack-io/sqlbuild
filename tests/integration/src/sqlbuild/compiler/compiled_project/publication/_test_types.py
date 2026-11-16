@@ -283,6 +283,12 @@ class DevelopmentTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentDiscoveryTestCase:
+    description: str
+    expected_imports: int
+
+
+@dataclass(frozen=True)
 class ComposeDeploymentTestCase:
     description: str
     expected_warehouse_rows: list[list[int]]
@@ -309,6 +315,13 @@ class CatalogInspectionTestCase:
 class CatalogBoundaryTestCase:
     description: str
     expected_page_delivered: bool
+
+
+@dataclass(frozen=True)
+class ReadFailureTestCase:
+    description: str
+    table: str
+    expected_stderr: str
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,6 @@
 
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::graph::python_selection::resolve_python_check_excludes;
 use crate::bindings::_helpers::planner_phases::objects::object;
@@ -12,16 +11,18 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyFrozenSetMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::boundary::main::keywords::keywords;
 
 use sqlbuild_core::build_command::errors::BuildCommandError;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::build_command::policies::build_command_error;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const MISSING_RELATION_CODE: &str = "C682";
 const MODEL_KIND: &str = "model";
@@ -57,8 +58,8 @@ fn load_result_as_python_result<'py>(
     result: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = name.py();
-    let execution: Bound<'py, PyAny> = host::entry(py, ExecutorHost::ExecutionStatus)?;
-    let node_status: Bound<'py, PyAny> = host::entry(py, UserCodeHost::PythonNodeStatus)?;
+    let execution: Bound<'py, PyAny> = host_entry(py, ExecutorHost::ExecutionStatus)?;
+    let node_status: Bound<'py, PyAny> = host_entry(py, UserCodeHost::PythonNodeStatus)?;
     let status: Bound<'py, PyAny> = native_field(result, "status")?;
     let mapped: Bound<'py, PyAny> = if status.eq(native_field(&execution, "SUCCESS")?)? {
         native_field(&node_status, "SUCCESS")?
@@ -68,12 +69,12 @@ fn load_result_as_python_result<'py>(
         native_field(&node_status, "FAILED")?
     };
     call_with(
-        &host::entry(py, ExecutorHost::PythonNodeExecutionResult)?,
+        &host_entry(py, ExecutorHost::PythonNodeExecutionResult)?,
         &[
             ("node_name", name.clone()),
             (
                 "kind",
-                host::entry(py, UserCodeHost::PythonNodeKind)?.getattr("LOADER")?,
+                host_entry(py, UserCodeHost::PythonNodeKind)?.getattr("LOADER")?,
             ),
             ("status", mapped),
             ("payload", result.clone()),
@@ -208,7 +209,7 @@ pub(crate) fn relevant_check_functions<'py>(
         resolve_python_check_excludes(python_graph, exclude.extract::<Vec<String>>()?)?,
     )?;
     let check_kind: Bound<'py, PyAny> =
-        host::entry(py, UserCodeHost::PythonNodeKind)?.getattr("CHECK")?;
+        host_entry(py, UserCodeHost::PythonNodeKind)?.getattr("CHECK")?;
     let upstream_deps: Bound<'py, PyAny> = native_field(python_graph, "upstream_deps")?;
     let mut check_names: Vec<Bound<'py, PyAny>> = Vec::new();
     for node in native_field(python_graph, "nodes")?.try_iter()? {
@@ -377,7 +378,7 @@ fn validate_reference_exists(
                 ),
             )?;
             let relation: Bound<'_, PyAny> = call_with(
-                &host::entry(py, AdapterHost::ResolveRelationLocationQualifiedName)?,
+                &host_entry(py, AdapterHost::ResolveRelationLocationQualifiedName)?,
                 &[("adapter", inputs.adapter.clone()), ("location", location)],
             )?;
             (exists, relation)
@@ -444,7 +445,7 @@ fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>
     let py: Python<'py> = inputs.adapter.py();
     let project: Bound<'py, PyAny> = native_field(&inputs.pipeline_result, "project")?;
     call_with(
-        &host::entry(py, ExecutorHost::PythonNodeRuntime)?,
+        &host_entry(py, ExecutorHost::PythonNodeRuntime)?,
         &[
             ("adapter", inputs.adapter.clone()),
             ("connection_config", inputs.connection_config.clone()),
@@ -489,7 +490,7 @@ pub(crate) fn run_read_side_dependencies<'py>(
         }
     }
     let lookup: Bound<'py, PyAny> = call_with(
-        &host::entry(py, AdapterHost::BuildRelationLookup)?,
+        &host_entry(py, AdapterHost::BuildRelationLookup)?,
         &[
             ("adapter", inputs.adapter.clone()),
             ("connection", inputs.connection.clone()),
@@ -503,7 +504,7 @@ pub(crate) fn run_read_side_dependencies<'py>(
         return Ok(PyTuple::empty(py).into_any());
     }
     let tracker: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::CreateReadSidePythonExecutionTracker)?,
+        &host_entry(py, ExecutorHost::CreateReadSidePythonExecutionTracker)?,
         &[
             ("python_graph", inputs.python_graph.clone()),
             ("selected_python_names", read_side_names),

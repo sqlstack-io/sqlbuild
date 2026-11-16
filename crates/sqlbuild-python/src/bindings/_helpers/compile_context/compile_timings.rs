@@ -4,7 +4,7 @@ use pyo3::PyErr;
 use pyo3::prelude::{PyAnyMethods, PyResult, Python};
 use sqlbuild_host::compile_context::types::ProcessClock;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 /// The process CPU clock of one interpreter, including its worker threads.
 #[derive(Clone, Copy)]

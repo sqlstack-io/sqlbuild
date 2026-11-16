@@ -9,12 +9,12 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_rules::rules::main::selected_codes::selected_codes_json;
 use sqlbuild_rules::rules::main::selected_sql_codes::selected_sql_codes;
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as record_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::rules::config_json::{asdict_json, dumped_json};
 use crate::bindings::_helpers::rules::constants::RULES_NATIVE_API_VERSION;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as record_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const JSON_MODULE: &str = "json";

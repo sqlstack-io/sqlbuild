@@ -11,11 +11,11 @@ use sqlbuild_host::models::{
 };
 use sqlbuild_host::types::ResultEnum;
 
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::plan_output::values::text;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::resource_ids::{audit_identity, sql_test_identity};
 use crate::bindings::_helpers::result_output::terminal_index::{TerminalEventIndex, current_index};
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The executor result types that result output distinguishes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,7 +53,7 @@ pub(crate) fn result_kind(result: &Bound<'_, PyAny>) -> PyResult<ResultKind> {
         (ExecutorHost::CloneItemResult, ResultKind::CloneItem),
     ];
     for (class, kind) in kinds {
-        if result.is_instance(&host::entry(py, class)?)? {
+        if result.is_instance(&host_entry(py, class)?)? {
             return Ok(kind);
         }
     }

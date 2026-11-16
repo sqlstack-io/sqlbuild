@@ -3,18 +3,20 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyBool;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The project directory, discovered inputs, adapter context, colour and progress stream.
 struct InvocationContext<'py> {
@@ -81,7 +83,16 @@ fn invocation_context<'py>(
         Some(discovered) => discovered.clone(),
         None => discover_project_inputs(
             py,
-            Some(keywords(py, &[("project_dir", project_dir.clone())])?),
+            Some(keywords(
+                py,
+                &[
+                    ("project_dir", project_dir.clone()),
+                    (
+                        "secret_policy",
+                        pyo3::types::PyString::new(py, SecretPolicy::Defer.name()).into_any(),
+                    ),
+                ],
+            )?),
         )?,
     };
     let adapter_context: Bound<'py, PyAny> = resolve_adapter_connection_context(

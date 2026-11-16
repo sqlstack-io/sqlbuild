@@ -21,6 +21,7 @@ sqb --project-dir <path> dag [flags]
 |------|-------------|
 | `--json` | Print the full DAG artifact as JSON to stdout |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
+| `--allow-missing-secrets` | Run without provider secrets; see [Secrets](/docs/concepts/python-nodes/providers#secrets) |
 | `--vars` | JSON object of project variable overrides |
 
 Without `--json`, the command prints a summary:

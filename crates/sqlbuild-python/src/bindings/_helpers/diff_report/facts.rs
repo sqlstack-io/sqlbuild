@@ -13,8 +13,8 @@ use sqlbuild_cli::diff_report::types::DiffNamedValue;
 use sqlbuild_core::json::main::python_float_repr::python_float_repr;
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 fn text_of(value: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(value.str()?.to_string_lossy().into_owned())

@@ -19,10 +19,6 @@ use crate::bindings::_helpers::compiled_views::function_views::NativeCompiledFun
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
 use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as record_field_or_attribute;
-use crate::bindings::_helpers::records::fields::record_spec;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::rules::fact_encoder::{
     Encoded, FactEncoder, FactFailure, error_digest, value_digest,
 };
@@ -31,6 +27,10 @@ use crate::bindings::_helpers::rules::fact_tree::{
     selected_nodes, tree_nodes,
 };
 use sqlbuild_project::types::InferredRow;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as record_field_or_attribute;
+use sqlbuild_python_base::records::main::fields::record_spec::record_spec;
+use sqlbuild_python_base::records::types::RecordId;
 
 const MODEL_RECORD: &str = "sqlbuild._native.Model";
 const MATERIALIZED: &str = "materialized";

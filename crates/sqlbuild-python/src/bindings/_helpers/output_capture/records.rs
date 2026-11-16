@@ -16,13 +16,14 @@ use sqlbuild_core::json::main::dumps::dumps;
 use sqlbuild_core::json::models::{JsonDialect, JsonValue, StdlibJsonOptions};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::output_capture::values::{
     freeze, json_value, object, output_error, plain_int, validation_error,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 
 const ENVELOPE_FIELDS: [&str; 16] = [
     "record_id",
@@ -99,14 +100,14 @@ fn record_shape(record: &Bound<'_, PyAny>) -> PyResult<RecordShape> {
         sequence: plain_int(&field("sequence")?),
         occurred_at_is_utc: utc_aware(&field("occurred_at")?)?,
         stream_is_known: field("stream")?
-            .is_instance(&host::entry(py, ExecutorHost::CommandOutputStream)?)?,
+            .is_instance(&host_entry(py, ExecutorHost::CommandOutputStream)?)?,
         message_is_text: field("message")?.is_instance_of::<PyString>(),
         data_is_bytes: field("data")?.is_instance_of::<PyBytes>(),
         chunk_index: plain_int(&field("chunk_index")?),
         chunk_count: plain_int(&field("chunk_count")?),
         dropped_records: plain_int(&field("dropped_records")?),
         priority_is_known: field("priority")?
-            .is_instance(&host::entry(py, ExecutorHost::OutputRecordPriority)?)?,
+            .is_instance(&host_entry(py, ExecutorHost::OutputRecordPriority)?)?,
         record_type: optional_text(&field("record_type")?)?,
         schema_version: plain_int(&field("schema_version")?),
     })
@@ -186,19 +187,16 @@ fn record_from_fields<'py>(data: &Bound<'py, PyDict>) -> PyResult<Bound<'py, PyA
         let converted = match name {
             "occurred_at" => occurred_at(&value(name)?)?,
             "stream" => {
-                host::entry(py, ExecutorHost::CommandOutputStream)?.call1((value(name)?,))?
+                host_entry(py, ExecutorHost::CommandOutputStream)?.call1((value(name)?,))?
             }
             "priority" => {
-                host::entry(py, ExecutorHost::OutputRecordPriority)?.call1((value(name)?,))?
+                host_entry(py, ExecutorHost::OutputRecordPriority)?.call1((value(name)?,))?
             }
             _ => value(name)?,
         };
         fields.push((name, converted));
     }
-    call_with(
-        &host::entry(py, ExecutorHost::CommandOutputRecord)?,
-        &fields,
-    )
+    call_with(&host_entry(py, ExecutorHost::CommandOutputRecord)?, &fields)
 }
 
 /// Deserialize one known command-output record strictly.
@@ -256,7 +254,7 @@ pub(crate) fn command_output_from_json<'py>(
             "command output external_context must be an object",
         ));
     }
-    let validation_class = host::entry(py, ExecutorHost::CommandOutputValidationError)?;
+    let validation_class = host_entry(py, ExecutorHost::CommandOutputValidationError)?;
     let record = record_from_fields(data).map_err(|error| {
         let typed =
             error.is_instance_of::<PyTypeError>(py) || error.is_instance_of::<PyValueError>(py);

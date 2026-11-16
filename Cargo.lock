@@ -1408,9 +1408,9 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "fensu-facts"
-version = "0.30.0"
+version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cebbb33fa7353b9e6d12ad9c62481d9d672da2fd5e9d50429a968b4279d448b2"
+checksum = "bbaaeb4fa29af8fa378ebd826e8a28655dfd13ed7acb98919dbe64f882681fef"
 dependencies = [
  "dunce",
  "get-size2",
@@ -1426,9 +1426,9 @@ dependencies = [
 
 [[package]]
 name = "fensu-native"
-version = "0.30.0"
+version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "385879149037e2b959b21e677c1cd8b302926f3d252b46c014d17cf88a9300cc"
+checksum = "8053936f5ea33f32a301649d2178fad69cee1fe8aff7f17b35d56ba88d85024b"
 dependencies = [
  "fensu-facts",
  "globset",
@@ -4262,7 +4262,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.230.1"
+version = "0.232.1"
 dependencies = [
  "blake3",
  "chrono",
@@ -4425,12 +4425,11 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.230.1"
+version = "0.232.1"
 dependencies = [
  "chrono",
  "chrono-tz",
  "fensu-policy",
- "mimalloc",
  "pyo3",
  "rayon",
  "rusqlite",
@@ -4452,6 +4451,7 @@ dependencies = [
  "sqlbuild-orchestration",
  "sqlbuild-project",
  "sqlbuild-pysource",
+ "sqlbuild-python-base",
  "sqlbuild-recall",
  "sqlbuild-refactor",
  "sqlbuild-render",
@@ -4463,6 +4463,21 @@ dependencies = [
  "stacker",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "sqlbuild-python-base"
+version = "0.0.0"
+dependencies = [
+ "mimalloc",
+ "pyo3",
+ "serde_json",
+ "sqlbuild-analysis",
+ "sqlbuild-config",
+ "sqlbuild-core",
+ "sqlbuild-discovery",
+ "sqlbuild-host",
+ "sqlbuild-rules",
 ]
 
 [[package]]

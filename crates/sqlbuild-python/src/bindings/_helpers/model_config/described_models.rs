@@ -16,7 +16,7 @@ use crate::bindings::_helpers::model_config::config_nodes::{
 };
 use crate::bindings::_helpers::model_config::model_config_builder::raised_config_error;
 use crate::bindings::_helpers::model_config::project_defaults::project_defaults_mapping;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DESCRIPTION_KEY: &str = "description";
 const MODEL_SCHEMA_KEY: &str = "model_schema";

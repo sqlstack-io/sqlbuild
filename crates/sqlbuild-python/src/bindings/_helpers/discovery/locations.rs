@@ -1,10 +1,10 @@
 //! Authored locations Python consumers read: YAML entry lines and project-relative paths.
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::{PyTuple, PyTupleMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_discovery::yaml_files::main::yaml_entry_lines::yaml_entry_lines;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The 1-based line of the outermost `- name: <name>` entry, if present.
 #[pyfunction]

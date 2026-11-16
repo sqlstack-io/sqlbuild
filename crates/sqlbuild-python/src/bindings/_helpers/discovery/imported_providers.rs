@@ -3,30 +3,35 @@
 use std::collections::HashSet;
 
 use pyo3::exceptions::PyRuntimeError;
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyType};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::compile_context::input_reads::record_settings_class_read;
 use crate::bindings::_helpers::contracts::resource_identities::validate_resource_identity;
+use crate::bindings::_helpers::discovery::constants::ALLOW_MISSING_SECRETS_FLAG;
 use crate::bindings::_helpers::discovery::imported_modules::{
     ProjectDir, discovered, discovery_error, discovery_error_from, module_functions,
     provider_by_name, provider_usages, shim, tuple_of,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
+use crate::bindings::_helpers::native_host::provider_settings::{ProviderState, provider_state};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PROVIDER_ERROR: ErrorId = ErrorId::ProviderDiscovery;
 const SINK_ERROR: ErrorId = ErrorId::EventExporterDiscovery;
 /// The provider name kept free so a sink's `RecallWriter` parameter can never be mistaken for a provider.
 const RESERVED_PROVIDER_NAME: &str = "recall_writer";
 const PROVIDER_INPUT_ERROR: UserCodeHost = UserCodeHost::ProviderInputError;
-const VALIDATION_ERROR: (&str, &str) = ("pydantic", "ValidationError");
 const SINK_DEFINITION: UserCodeHost = UserCodeHost::GetLifecycleEventSinkDefinition;
 const ROOT_LOCATION: &str = "<root>";
 const DEFAULT_MESSAGE: &str = "invalid value";
@@ -56,7 +61,7 @@ fn provider_name<'py>(
     let name: Bound<'py, PyAny> = match provider_class.call_method0("name") {
         Ok(name) => name,
         Err(error) => {
-            let input_error: Bound<'py, PyAny> = host::entry(py, PROVIDER_INPUT_ERROR)?;
+            let input_error: Bound<'py, PyAny> = host_entry(py, PROVIDER_INPUT_ERROR)?;
             if !error.value(py).is_instance(&input_error)? {
                 return Err(error);
             }
@@ -108,41 +113,82 @@ fn validation_details(error: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(details.join("\n"))
 }
 
-/// An instance of the provider class, reporting invalid settings with each field's error.
+/// An instance of the provider class, with missing secrets an error unless `policy` defers or allows them.
 fn provider_instance<'py>(
     provider_class: &Bound<'py, PyAny>,
     (provider_name, relative_path): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-) -> PyResult<Bound<'py, PyAny>> {
+    policy: SecretPolicy,
+) -> PyResult<(Bound<'py, PyAny>, Vec<String>)> {
     let py: Python<'py> = provider_class.py();
-    provider_class.call0().or_else(|error| {
-        let validation_error: Bound<'py, PyAny> =
-            imported(py, VALIDATION_ERROR.0, VALIDATION_ERROR.1)?;
-        if !error.value(py).is_instance(&validation_error)? {
-            return Err(error);
+    let missing: Vec<String> = match provider_state(provider_class)? {
+        ProviderState::Ready(instance) => return Ok((instance, Vec::new())),
+        ProviderState::MissingSecrets(missing) => missing,
+        ProviderState::Invalid(error) => {
+            let message: String = format!(
+                "Provider '{}' in {} has invalid settings:\n{}",
+                provider_name.str()?,
+                relative_path.str()?,
+                validation_details(error.value(py))?
+            );
+            return Err(discovery_error_from(py, (PROVIDER_ERROR, message), error));
         }
-        let message: String = format!(
-            "Provider '{}' in {} has invalid settings:\n{}",
-            provider_name.str()?,
-            relative_path.str()?,
-            validation_details(error.value(py))?
+    };
+    if policy == SecretPolicy::Require {
+        let variables: String = missing.join(", ");
+        let noun: &str = if missing.len() == 1 {
+            "secret"
+        } else {
+            "secrets"
+        };
+        let error: PyErr = discovery_error(
+            py,
+            PROVIDER_ERROR,
+            format!(
+                "provider '{}' ({}) is missing {noun} {variables}",
+                provider_name.str()?,
+                relative_path.str()?
+            ),
         );
-        Err(discovery_error_from(py, (PROVIDER_ERROR, message), error))
-    })
+        error.value(py).setattr(
+            "help",
+            format!("set {variables}, or pass {ALLOW_MISSING_SECRETS_FLAG} where secrets aren't available"),
+        )?;
+        return Err(error);
+    }
+    Ok((provider_class.call_method0("model_construct")?, missing))
 }
 
 /// Provider classes under providers/.
 #[pyfunction]
-#[pyo3(signature = (*, project_dir))]
+#[pyo3(signature = (*, project_dir, secret_policy = SecretPolicy::Require.name()))]
 pub(crate) fn discover_provider_classes<'py>(
     project_dir: Bound<'py, PyAny>,
+    secret_policy: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project_dir.py();
+    let policy: SecretPolicy = SecretPolicy::parse(secret_policy)?;
+    let mut allowed: Vec<String> = Vec::new();
     let project = ProjectDir { path: project_dir };
     if let Some(cached) = project.cached_extensions()? {
         let providers: Bound<'py, PyAny> = cached.get_item(0)?;
         for provider in providers.try_iter()? {
-            record_settings_class_read(&native_field(&provider?, "provider_class")?)?;
+            let provider: Bound<'py, PyAny> = provider?;
+            let provider_class: Bound<'py, PyAny> = native_field(&provider, "provider_class")?;
+            record_settings_class_read(&provider_class)?;
+            if policy == SecretPolicy::Defer {
+                continue;
+            }
+            let name: Bound<'py, PyAny> = native_field(&provider, "name")?;
+            let (_, missing) = provider_instance(
+                &provider_class,
+                (&name, &native_field(&provider, "relative_path")?),
+                policy,
+            )?;
+            if !missing.is_empty() {
+                allowed.push(name.extract()?);
+            }
         }
+        report_allowed(py, policy, &allowed)?;
         return Ok(providers);
     }
     if !project
@@ -188,8 +234,11 @@ pub(crate) fn discover_provider_classes<'py>(
             }
             seen.push((name_text, file_path.clone()));
             record_settings_class_read(&provider_class)?;
-            let settings: Bound<'py, PyAny> =
-                provider_instance(&provider_class, (&name, &relative_path))?;
+            let (settings, missing) =
+                provider_instance(&provider_class, (&name, &relative_path), policy)?;
+            if !missing.is_empty() {
+                allowed.push(name.extract()?);
+            }
             providers.push(discovered(
                 py,
                 RecordId::DiscoveredProvider,
@@ -203,7 +252,29 @@ pub(crate) fn discover_provider_classes<'py>(
             )?);
         }
     }
+    report_allowed(py, policy, &allowed)?;
     tuple_of(py, providers)
+}
+
+/// Note on stderr which providers run with missing secrets because the command allows them.
+fn report_allowed(py: Python<'_>, policy: SecretPolicy, allowed: &[String]) -> PyResult<()> {
+    if policy != SecretPolicy::Allow || allowed.is_empty() {
+        return Ok(());
+    }
+    let noun: &str = if allowed.len() == 1 {
+        "provider has"
+    } else {
+        "providers have"
+    };
+    write_console(
+        py,
+        "stderr",
+        &format!(
+            "{} {noun} missing secrets (allowed): {}\n",
+            allowed.len(),
+            allowed.join(", ")
+        ),
+    )
 }
 
 /// Sink modules imported and their lifecycle declarations collected, without providers.
@@ -232,7 +303,7 @@ pub(crate) fn discover_event_exporter_declarations<'py>(
     {
         return tuple_of(py, Vec::new());
     }
-    let read_definition: Bound<'py, PyAny> = host::entry(py, SINK_DEFINITION)?;
+    let read_definition: Bound<'py, PyAny> = host_entry(py, SINK_DEFINITION)?;
     let mut declarations: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut seen: Vec<(String, Bound<'py, PyAny>)> = Vec::new();
     for file_path in project.module_files("sinks", true)? {

@@ -8,8 +8,8 @@ use crate::bindings::_helpers::compile_command::prepared_artifacts::PreparedComp
 use crate::bindings::_helpers::compile_command::reuse_recording::{
     CompileArtifactWrites, RecordedCompileOutput,
 };
-use crate::bindings::_helpers::records::getters::class_of;
-use crate::bindings::_helpers::records::models::GetterEntry;
+use sqlbuild_python_base::records::main::registry::class_of::class_of;
+use sqlbuild_python_base::records::models::GetterEntry;
 
 /// The getter readers of this module's native pyclasses.
 pub(crate) const GETTERS: &[GetterEntry] = &[

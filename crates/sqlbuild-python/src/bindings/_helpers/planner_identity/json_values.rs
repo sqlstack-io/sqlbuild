@@ -7,10 +7,10 @@ use pyo3::types::{
     PyTypeMethods,
 };
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_core::json::main::dumps::dumps;
 use sqlbuild_core::json::main::python_float_repr::python_float_repr;
 use sqlbuild_core::json::models::{JsonDialect, JsonInteger, JsonValue, StdlibJsonOptions};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const BUILTINS_MODULE: &str = "builtins";
 
