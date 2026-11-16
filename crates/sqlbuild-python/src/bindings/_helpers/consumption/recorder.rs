@@ -23,10 +23,10 @@ use uuid::Uuid;
 use crate::bindings::_helpers::consumption::facts::{
     BuildFacts, MODEL, SEED, build_facts, enum_text,
 };
-use crate::bindings::_helpers::native_host::consumption_state::{
-    ConsumptionConnection, Location, NodeCompleteHook,
-};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::native_host::models::ConsumptionConnection;
+use sqlbuild_python_front::native_host::models::Location;
+use sqlbuild_python_front::native_host::models::NodeCompleteHook;
 
 /// Succeeded rows are flushed once this many executions are pending.
 const FLUSH_EXECUTIONS: usize = 100;

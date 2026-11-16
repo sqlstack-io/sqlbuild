@@ -10,7 +10,6 @@ use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_e
 use sqlbuild_model_config::templates::main::deferred_target_segments::deferred_target_segments;
 use sqlbuild_model_config::templates::models::DeferredSegment;
 
-use crate::bindings::_helpers::authored_values::project_vars::render_project_var_text;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
@@ -19,6 +18,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::authored_values::main::render_project_var_text::render_project_var_text;
 
 const PRESERVE_TARGET_VALUE: &str = "preserve";
 /// `sorted(DEFERRED_TARGET_CONTEXT_KEYS)`.

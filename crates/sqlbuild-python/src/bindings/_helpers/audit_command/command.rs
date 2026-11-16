@@ -19,7 +19,6 @@ use sqlbuild_orchestration::runs::models::NodeOutcome;
 use crate::bindings::_helpers::build_progress::audit_progress::AuditProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
-use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
@@ -43,6 +42,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 
 const EXECUTION_COMMAND: &str = "sqb audit";
 

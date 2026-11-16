@@ -12,8 +12,8 @@ use sqlbuild_host::types::ResultEnum;
 use crate::bindings::_helpers::plan_output::values::{any, dict, items, text};
 use crate::bindings::_helpers::result_output::assets::{or_none, without_none};
 use crate::bindings::_helpers::result_output::projection::{Projection, ResultIdentity, rounded};
-use crate::bindings::_helpers::scopes::scope_report_objects::json_to_python;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::scopes::main::reports::json_to_python::json_to_python;
 
 const DECIMAL_KIND: &str = "decimal";
 const SCALAR_KINDS: [&str; 5] = ["string", "integer", "boolean", "float", "null"];

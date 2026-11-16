@@ -29,7 +29,6 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 
 use crate::bindings::_helpers::analysis_session::query_columns::query_columns_error;
-use crate::bindings::_helpers::attachments::function_headers::parsed_header;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::{
     FunctionRow, FunctionSettings,
 };
@@ -44,12 +43,13 @@ use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_row;
 use crate::bindings::_helpers::input_loops::source_loop::{
     AuthoredExpansion, expanded_authored_sql, expanded_template, parse_checked, scoped_declarations,
 };
-use crate::bindings::_helpers::model_config::model_validator::NativeModelValidator;
 use sqlbuild_project::models::DestinationFact;
 use sqlbuild_project::models::PythonRuntime;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_project::types::NamedTypeRow;
 use sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads;
+use sqlbuild_python_front::attachments::main::parsed_header::parsed_header;
+use sqlbuild_python_front::model_config::models::NativeModelValidator;
 
 const PRESERVE_TARGET_VALUE: &str = "preserve";
 const GENERIC_DIALECT: &str = "generic";

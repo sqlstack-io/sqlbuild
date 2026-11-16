@@ -1,7 +1,6 @@
 //! Boundary conversions for the column migration planner.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::model_config::typed_config::{config_text_object, model_values};
 use crate::bindings::_helpers::planner_identity::hashing::model_definition_hash;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -10,6 +9,8 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 pub(super) fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()

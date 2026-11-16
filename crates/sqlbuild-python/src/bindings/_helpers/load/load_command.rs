@@ -20,16 +20,8 @@ use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
-use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_runtime_config;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_target_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::cursor::overrides::{cursor_integer, cursor_timestamp};
-use crate::bindings::_helpers::discovery::provider_secrets::{
-    SecretPolicy, consumer_uses, require_used_secrets, sink_uses,
-};
 use crate::bindings::_helpers::load::load_progress::{
     LoadCallbackRelay, LoadProgressReporter, load_result_text,
 };
@@ -52,6 +44,16 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
+use sqlbuild_python_front::compile_attachment::main::build_effective_target_config::build_effective_target_config;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::cursor::main::overrides::cursor_integer::cursor_integer;
+use sqlbuild_python_front::cursor::main::overrides::cursor_timestamp::cursor_timestamp;
+use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
+use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
+use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
+use sqlbuild_python_front::discovery::models::SecretPolicy;
 
 const LOADER_NODE_KEY: &str = "sqlbuild_loader_node";
 const EXECUTION_COMMAND: &str = "sqb load";

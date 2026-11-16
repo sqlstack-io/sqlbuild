@@ -12,7 +12,6 @@ use crate::bindings::_helpers::planner_migrations::constants::{AUTOMATIC, DONE};
 use crate::bindings::_helpers::planner_migrations::models::{CheckedColumns, ColumnCandidate};
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
-use crate::bindings::_helpers::state_rows::migration_projections::newest_column;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PyTuple};
 use sqlbuild_analysis::planner_migrations::main::column_decision::column_decision;
@@ -23,6 +22,7 @@ use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_v
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::state_rows::main::migrations::newest_column::newest_column;
 
 pub(super) fn decide<'py>(
     runtime: &Bound<'py, PyAny>,

@@ -2,7 +2,6 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
-use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_changes::detect::detect_model_changes;
 use crate::bindings::_helpers::planner_migrations::models::{
     CompatibilityCheck, MigrationCompatibilityResult,
@@ -19,6 +18,8 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 fn config(model: &Bound<'_, PyAny>, key: &str) -> PyResult<Option<String>> {
     config_value(model.py(), &model_values(model)?, key)?.extract()

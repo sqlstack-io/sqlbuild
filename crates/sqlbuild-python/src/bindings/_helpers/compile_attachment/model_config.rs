@@ -6,13 +6,13 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 
 use crate::bindings::_helpers::compile_attachment::storage_policies::inherited_storage;
 use crate::bindings::_helpers::input_loops::loop_classes::table_backed;
-use crate::bindings::_helpers::model_config::model_config_builder::NativeModelConfigBuilder;
-use crate::bindings::_helpers::model_config::unicode_environment::unicode_environment;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::model_nodes::unicode_environment::unicode_environment;
+use sqlbuild_python_front::model_config::models::NativeModelConfigBuilder;
 
 /// Capture the project inputs every model's native config build and validation read.
 #[pyfunction]

@@ -11,8 +11,6 @@ use crate::bindings::_helpers::compile_attachment::sql_expansion_context::{
     ExpansionSources, ExpansionVars, present, sql_expansion_inputs,
 };
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -20,6 +18,8 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::render::models::SqlExpansionInputs;
 
 const COMPILE_FIRST_MESSAGE: &str = "compiler-integrated Rules check the SQL your project \
     actually produces, so the project must compile first";

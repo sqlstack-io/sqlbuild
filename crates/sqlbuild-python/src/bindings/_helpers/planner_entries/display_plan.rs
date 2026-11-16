@@ -4,7 +4,6 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::graph::views::edge_dict;
-use crate::bindings::_helpers::model_config::typed_config::{config_text_object, model_values};
 use crate::bindings::_helpers::planner_entries::values::{
     boolean, native, none, planner_model, planner_type, string,
 };
@@ -18,6 +17,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::graph::main::downstream_edges::downstream_edges;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 const VIEW: &str = "view";
 const INCREMENTAL: &str = "incremental";

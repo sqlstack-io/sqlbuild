@@ -17,7 +17,6 @@ use sqlbuild_core::json::models::{JsonDialect, JsonInteger, JsonValue, StdlibJso
 
 use crate::bindings::_helpers::cost_telemetry::health::mark_ledger_failure;
 use crate::bindings::_helpers::cost_telemetry::values::process_object;
-use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -27,6 +26,7 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
 use sqlbuild_python_base::records::types::NativeAttr;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::constants::DATETIME_MODULE;
 
 static LEDGER_LOCK: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 

@@ -5,7 +5,6 @@ use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyTuple};
 use sqlbuild_rules::lint_text::models::{ExpansionSpan, LintSqlBody};
 
-use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::rules::lint_pipeline::{
     BodyRole, SingleBody, SingleBodyRequest, prepare_single_body,
 };
@@ -14,6 +13,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::render::models::SqlExpansionInputs;
 
 /// `ExpansionSpan` objects of one pass.
 fn span_objects<'py>(

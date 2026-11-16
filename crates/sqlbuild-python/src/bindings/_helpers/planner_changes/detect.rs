@@ -6,13 +6,14 @@ use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::contracts::spec_resolution::matching_dynamic_families;
-use crate::bindings::_helpers::model_config::typed_config::{config_text, model_values};
 use crate::bindings::_helpers::planner_changes::results::native_enum;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_front::contracts::main::matching_dynamic_families::matching_dynamic_families;
+use sqlbuild_python_front::model_config::main::config::config_text::config_text;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 use sqlbuild_analysis::planner_changes::constants::{
     CASE_FOLDING_DIALECT, EMPTY_FINGERPRINT_METADATA_JSON,

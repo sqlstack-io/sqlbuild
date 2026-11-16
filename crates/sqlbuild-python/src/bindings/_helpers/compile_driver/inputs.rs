@@ -6,19 +6,18 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::compile_attachment::declaration_scope::build_declaration_scope;
-use crate::bindings::_helpers::compile_attachment::effective_config::{
-    build_effective_connection, build_effective_settings, build_effective_vars,
-};
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection::build_effective_connection;
+use sqlbuild_python_front::compile_attachment::main::build_effective_settings::build_effective_settings;
+use sqlbuild_python_front::compile_attachment::main::build_effective_vars::build_effective_vars;
 use crate::bindings::_helpers::compile_attachment::model_inputs::build_model_inputs;
 use sqlbuild_python_base::compile_context::main::diagnostic_collector::collect_compile_diagnostics::collect_compile_diagnostics;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::records::{compile_inputs_view, inputs_with};
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use crate::bindings::_helpers::input_loops::attachment::{attach_checks, attach_resources};
-use crate::bindings::_helpers::model_config::template_data::run_id;
-use crate::bindings::_helpers::render::declaration_indexes::{
-    public_declaration_indexes, public_model_schema_index,
-};
+use sqlbuild_python_front::model_config::main::config::run_id::run_id;
+use sqlbuild_python_front::render::main::declarations::public_declaration_indexes::public_declaration_indexes;
+use sqlbuild_python_front::render::main::declarations::public_model_schema_index::public_model_schema_index;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;

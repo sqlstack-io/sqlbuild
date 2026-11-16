@@ -12,7 +12,6 @@ use sqlbuild_core::cli_text::models::{
 };
 use sqlbuild_core::plan_display::main::format_query_diff::format_query_diff;
 
-use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
 use crate::bindings::_helpers::plan_output::cursor_details::{
     CursorDetails, DEFERRED, RESOLVED, cursor_details, runtime_inputs_clause,
 };
@@ -31,6 +30,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
 
 const SKIP_ACTION: &str = "skip";
 const QUERY_CHANGED: &str = "query_changed";

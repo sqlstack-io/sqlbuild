@@ -18,7 +18,6 @@ use sqlbuild_attachments::cursor_intrinsics::models::IntrinsicCheck;
 use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_references;
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 
-use crate::bindings::_helpers::attachments::argument_values::argument_pairs;
 use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, NativeModelLoop, VisibleDeclarations, compile_error, record_reads,
     validation_outcome,
@@ -35,15 +34,18 @@ use crate::bindings::_helpers::input_loops::model_loop_named::{
     SQL_HOOK_DECLARATION, named_usages,
 };
 use crate::bindings::_helpers::input_loops::model_loop_visibility::ModelVisibility;
-use crate::bindings::_helpers::render::declaration_expansion::{
-    DeclarationExpansion, ExpandedDeclarations, ExpansionClasses, ExpansionConsumer,
-    expand_declarations,
-};
-use crate::bindings::_helpers::render::sql_macro_host::SqlMacroSource;
-use crate::bindings::_helpers::sqltext::declaration_references::declaration_scan;
-use crate::bindings::_helpers::sqltext::static_sql::{InterpolationSources, interpolated};
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::attachments::main::argument_pairs::argument_pairs;
+use sqlbuild_python_front::render::main::declarations::expand_declarations::expand_declarations;
+use sqlbuild_python_front::render::models::DeclarationExpansion;
+use sqlbuild_python_front::render::models::DeclarationExpansionClasses;
+use sqlbuild_python_front::render::models::ExpandedDeclarations;
+use sqlbuild_python_front::render::models::ExpansionConsumer;
+use sqlbuild_python_front::render::models::SqlMacroSource;
+use sqlbuild_python_front::sqltext::main::declaration_scan::declaration_scan;
+use sqlbuild_python_front::sqltext::main::interpolated::interpolated;
+use sqlbuild_python_front::sqltext::models::InterpolationSources;
 
 const REFERENCES_METHOD: &str = "references";
 const STATEMENT_ATTRIBUTE: &str = "statement";
@@ -489,7 +491,7 @@ impl<'py> HookRun<'_, '_, 'py> {
         scope: &Scope<'_, 'py>,
     ) -> PyResult<ExpandedDeclarations<'py>> {
         let (references, stop) = declaration_scan(sql, Some(&self.model_loop.syntax));
-        let classes: ExpansionClasses<'py> = ExpansionClasses {
+        let classes: DeclarationExpansionClasses<'py> = DeclarationExpansionClasses {
             usage_record: self.context.classes.usage_record.clone(),
             compile_error: self.context.classes.compile_error.clone(),
         };
