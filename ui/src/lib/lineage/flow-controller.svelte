@@ -38,18 +38,23 @@
 		const top = all.filter((n) => !n.parentId && !n.hidden);
 		if (!width || !height || !top.length) return false;
 		const boxes = new Set(all.flatMap((n) => (n.parentId ? [n.parentId] : [])));
-		const rects: (Rect & { box: boolean })[] = [];
+		const rects: (Rect & { box: boolean; id: string })[] = [];
 		for (const n of top) {
 			const internal = flow.getInternalNode(n.id);
 			const w = internal?.measured.width ?? n.width;
 			const h = internal?.measured.height ?? n.height;
 			if (!internal || !w || !h) return false;
-			rects.push({ x: internal.internals.positionAbsolute.x, y: internal.internals.positionAbsolute.y, width: w, height: h, box: boxes.has(n.id) });
+			rects.push({ id: n.id, x: internal.internals.positionAbsolute.x, y: internal.internals.positionAbsolute.y, width: w, height: h, box: boxes.has(n.id) });
 		}
 		const left = Math.min(...rects.map((r) => r.x));
 		const topY = Math.min(...rects.map((r) => r.y));
 		const bounds = { x: left, y: topY, width: Math.max(...rects.map((r) => r.x + r.width)) - left, height: Math.max(...rects.map((r) => r.y + r.height)) - topY };
-		void flow.setViewport(fitViewport(bounds, width, height, { minZoom: fitFloor, focus: largestBox(rects), start: firstCard(rects) }), { duration });
+		const focus = largestBox(rects);
+		const start = firstCard(rects);
+		// Named on the canvas, so the layout test can check the view starts with it wholly in view.
+		const anchorId = focus ? rects.find((r) => r.box && r.x === focus.x && r.y === focus.y)?.id : start?.id;
+		store.domNode?.setAttribute('data-fit-anchor', anchorId ?? '');
+		void flow.setViewport(fitViewport(bounds, width, height, { minZoom: fitFloor, focus, start }), { duration });
 		return true;
 	}
 

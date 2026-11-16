@@ -7,6 +7,9 @@ export type Viewport = { x: number; y: number; zoom: number };
 export const CARD_TITLE_PX = 12.5;
 export const MIN_TITLE_PX = 11;
 
+/** Space kept between the card a large graph's view starts on and the edge of the view. */
+export const ANCHOR_MARGIN = 24;
+
 /**
  * The smallest zoom an automatic fit goes to, where card titles are still at least `MIN_TITLE_PX` on
  * screen. Zooming out by hand can go further.
@@ -49,11 +52,19 @@ export function fitViewport(bounds: Rect, width: number, height: number, { paddi
 		const least = view - pad - (start + size) * zoom; // the graph's end at the view's end
 		return Math.min(most, Math.max(least, wanted));
 	};
-	return {
-		zoom,
-		x: axis(bounds.x, bounds.width, width, padX, focus ? focus.x + focus.width / 2 : null, start?.x ?? null),
-		y: axis(bounds.y, bounds.height, height, padY, focus ? focus.y + focus.height / 2 : null, start?.y ?? null)
+	// The card the view starts on (the focus, else the start card) stays wholly in view, `ANCHOR_MARGIN`
+	// from the edges; one larger than the view shows its top-left.
+	const anchor = focus ?? start;
+	const keep = (offset: number, from: number, size: number, view: number) => {
+		const [lo, hi] = [from * zoom + offset, (from + size) * zoom + offset];
+		if (hi - lo > view - 2 * ANCHOR_MARGIN) return ANCHOR_MARGIN - from * zoom;
+		if (lo < ANCHOR_MARGIN) return offset + ANCHOR_MARGIN - lo;
+		if (hi > view - ANCHOR_MARGIN) return offset - (hi - (view - ANCHOR_MARGIN));
+		return offset;
 	};
+	const x = axis(bounds.x, bounds.width, width, padX, focus ? focus.x + focus.width / 2 : null, start?.x ?? null);
+	const y = axis(bounds.y, bounds.height, height, padY, focus ? focus.y + focus.height / 2 : null, start?.y ?? null);
+	return anchor ? { zoom, x: keep(x, anchor.x, anchor.width, width), y: keep(y, anchor.y, anchor.height, height) } : { zoom, x, y };
 }
 
 /** The largest box among `items`, the cluster a large graph's view starts on; null when there is no box. */
@@ -64,13 +75,14 @@ export function largestBox(items: readonly (Rect & { box: boolean })[]): Rect | 
 }
 
 /** The card nearest the top-left of `items`' bounds, where a large graph's view starts without a box to centre on. */
-export function firstCard(items: readonly Rect[]): Rect | null {
+export function firstCard<R extends Rect>(items: readonly R[]): R | null {
 	if (!items.length) return null;
+	// The leftmost column: cards starting within half a card of the leftmost edge. Its top card, not the
+	// card nearest the corner, which can sit in a later column and leave the first one off screen.
 	const left = Math.min(...items.map((r) => r.x));
-	const top = Math.min(...items.map((r) => r.y));
-	let best = items[0];
-	for (const r of items) if (Math.hypot(r.x - left, r.y - top) < Math.hypot(best.x - left, best.y - top)) best = r;
-	return { x: best.x, y: best.y, width: best.width, height: best.height };
+	const reach = Math.min(...items.map((r) => r.width)) / 2;
+	const column = items.filter((r) => r.x <= left + reach);
+	return column.reduce((best, r) => (r.y < best.y ? r : best));
 }
 
 type Placed = { id: string; position: { x: number; y: number }; parentId?: string };

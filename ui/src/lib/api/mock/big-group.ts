@@ -5,7 +5,10 @@
 export const BIG_GROUP = 'warehouse_nightly';
 
 const STAGES = ['load', 'stage', 'clean', 'join', 'enrich', 'aggregate', 'publish'];
-const SIZES = [4, 5, 5, 5, 5, 5, 5];
+// One loader feeds ten staging jobs, so the first column's card sits halfway down beside a second
+// column that starts at the top: the shape where a fit starting from the card nearest the corner left
+// the first column off screen.
+const SIZES = [1, 10, 5, 5, 5, 5, 5];
 const ALONE = 6;
 
 export type BigGroupShape = {

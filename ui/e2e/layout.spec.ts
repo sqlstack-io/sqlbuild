@@ -51,6 +51,27 @@ async function settle(page: Page) {
 	await page.waitForFunction(() => !document.querySelector('.graph-canvas.unfitted'), null, { timeout: 10_000 }).catch(() => {});
 }
 
+/** In the page: each fitted graph's start card (`data-fit-anchor`) not wholly inside its canvas, as problems. */
+function anchorOutside(): string[] {
+	const found: string[] = [];
+	for (const flow of document.querySelectorAll<HTMLElement>('.svelte-flow[data-fit-anchor]')) {
+		const id = flow.dataset.fitAnchor;
+		const card = id ? [...flow.querySelectorAll<HTMLElement>('.svelte-flow__node')].find((n) => n.dataset.id === id) : null;
+		if (!card) continue;
+		const [pane, box] = [flow.getBoundingClientRect(), card.getBoundingClientRect()];
+		if (box.left < pane.left || box.right > pane.right || box.top < pane.top || box.bottom > pane.bottom) {
+			found.push(`the card the graph opens on (${id}) is cut off: ${Math.round(box.left - pane.left)}px from the left, ${Math.round(box.top - pane.top)}px from the top`);
+		}
+		// Unless it centres on an open box, it starts on the leftmost column, so that column is shown whole.
+		if (card.classList.contains('svelte-flow__node-folderBox') || card.classList.contains('svelte-flow__node-memberBox')) continue;
+		// Nodes are siblings in the page; a box's contents start right of the box, so any node starting
+		// further left than half a card is a column left of the start card.
+		const further = [...flow.querySelectorAll<HTMLElement>('.svelte-flow__node')].find((n) => n.getBoundingClientRect().left < box.left - box.width / 2);
+		if (further) found.push(`the graph opens beside its first column: ${further.dataset.id} starts ${Math.round(box.left - further.getBoundingClientRect().left)}px left of ${id}`);
+	}
+	return found;
+}
+
 async function checkLayout(page: Page, label: string) {
 	const found = await page.evaluate((maxRows) => {
 		const problems: string[] = [];
@@ -107,6 +128,8 @@ async function checkLayout(page: Page, label: string) {
 		}
 		return problems;
 	}, MAX_ROWS);
+	// A graph larger than its view opens with the card it starts on wholly inside the canvas.
+	found.push(...((await page.evaluate(`(${anchorOutside.toString()})()`)) as string[]));
 	expect(found, label).toEqual([]);
 }
 
@@ -210,6 +233,10 @@ for (const width of WIDTHS) {
 			await expect.poll(async () => (await drawn()).members).toBeGreaterThanOrEqual(40);
 			found = await drawn();
 			expect(found.edges, 'lines drawn').toBeLessThanOrEqual(2 * found.members);
+			// Larger than the view now: the refit starts on a card wholly in view.
+			await page.waitForTimeout(500);
+			expect(await page.evaluate(`(${anchorOutside.toString()})()`), 'start card after Folders off').toEqual([]);
+			expect(await page.locator('.svelte-flow[data-fit-anchor]').getAttribute('data-fit-anchor')).toMatch(/^member:/);
 			// The shared toolbar: Expand all opens members in place, Reset closes them and brings folders back.
 			const boxes = () => page.locator('.svelte-flow__node-memberBox').count();
 			await page.getByRole('button', { name: 'Expand all' }).click();
