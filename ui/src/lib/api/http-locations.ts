@@ -153,7 +153,9 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 			elapsedMs: health.elapsed_millis,
 			failure: health.failure ? syncProblemOf(health.failure) : null,
 			waiting: health.failure === 'busy',
-			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null
+			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null,
+			// The server reports only the rows each sync sent, not the table's mirrored total.
+			mirroredTotal: null
 		}))
 		.sort((a, b) => a.table.localeCompare(b.table));
 	const state = syncs[0]?.report.health.location;
@@ -161,8 +163,11 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 		id: location.id,
 		location: location.name,
 		target: location.target.name,
+		// Locations publish no connection settings or sync schedule yet.
+		details: null,
 		stateLocation: state ? { database: state.database ?? null, schema: state.schema } : null,
 		lastTest: connectionTestOf(observations),
+		nextSyncAt: null,
 		tables
 	};
 }

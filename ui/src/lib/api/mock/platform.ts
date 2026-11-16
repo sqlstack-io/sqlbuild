@@ -15,6 +15,7 @@ import type {
 	AuditQuery,
 	BuiltInRole,
 	Capability,
+	ConnectionDetails,
 	ConnectionTest,
 	EffectiveAccess,
 	IssuedToken,
@@ -59,6 +60,25 @@ type MockWarehouse = {
 	values: Record<string, string | number | boolean>;
 	lastTest: ConnectionTest | null;
 };
+
+/** The non-secret settings a mock connection would publish: values as set, defaults otherwise, and the sign-in method by name. */
+function mockConnectionDetails(c: MockWarehouse): ConnectionDetails {
+	const value = (key: string): string | null => {
+		const v = c.values[key] ?? c.settings.find((f) => f.key === key)?.default;
+		return v === undefined ? null : String(v);
+	};
+	const secret = c.settings.find((f) => f.type === 'secret')?.key;
+	return {
+		adapter: c.adapter,
+		account: value('account'),
+		host: value('host') ?? value('path'),
+		user: value('user'),
+		role: value('role'),
+		warehouse: value('warehouse'),
+		database: value('database') ?? value('dbname'),
+		authMethod: secret === 'private_key' ? 'key_pair' : secret === 'password' ? 'password' : 'none'
+	};
+}
 import {
 	ADMIN_ONLY,
 	baseGrantsOf,
@@ -718,9 +738,12 @@ export class MockPlatformApi implements PlatformApi {
 					id: l.id,
 					location: l.name,
 					target: c.target,
+					// Shows the page as it will look once locations publish their settings and the sync schedule.
+					details: mockConnectionDetails(c),
 					stateLocation: { database: typeof c.values.database === 'string' ? c.values.database : null, schema: 'sqlbuild' },
 					lastTest: this.#connectionTests.get(`${l.id}/${c.name}`) ?? c.lastTest,
-					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, waiting: false, lastSyncedAt: synced }))
+					nextSyncAt: new Date(Date.now() + 26 * 60_000).toISOString(),
+					tables: ['audit_results', 'catalog', 'fingerprints', 'statistics'].map((table, i) => ({ table, at: synced, recordsSent: 12 * (i + 1), elapsedMs: 180 + 40 * i, failure: null, waiting: false, lastSyncedAt: synced, mirroredTotal: 4_800 * (i + 1) }))
 				}))
 		);
 		return this.#ctx.reply(structuredClone(connections));

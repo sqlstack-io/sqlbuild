@@ -114,7 +114,7 @@
 							<span title="{test.message} ({formatStamp(test.at)})">
 								<StatusLabel tone={testTone[test.outcome]} label={test.outcome === 'ok' ? 'Connected' : 'Couldn’t connect'} />
 							</span>
-							<div class="cell-desc" title={test.message}>{test.trigger === 'manual' ? `tested ${formatAgo(test.at, Math.max(app.now, Date.parse(test.at)))} by you` : `tested ${formatAgo(test.at, app.now)} after deploying`}</div>
+							<div class="cell-desc" title={test.message}>{test.trigger === 'manual' ? `tested ${formatAgo(test.at, Math.max(app.now, Date.parse(test.at)))} by you` : `tested ${formatAgo(test.at, app.now)} ${test.trigger === 'startup' ? 'on startup' : 'after deploying'}`}</div>
 						{:else if l.health === null}
 							<span class="muted" title={partialTitle}>—</span>
 						{:else}
