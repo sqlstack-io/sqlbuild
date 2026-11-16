@@ -10,12 +10,13 @@ use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
-    WarehouseStateLocation,
+    MetadataBatch, StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind,
+    WarehouseHistoryPage, WarehouseStateLocation,
 };
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
+use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
 use crate::native_commands::types::LocationPublication;
 
 /// Privileged local operations require direct ownership of the control database.
@@ -152,6 +153,16 @@ pub(crate) struct LocationServe {
     pub(crate) metadata_reconcile_seconds: u32,
     /// Seconds between safety syncs of an idle location; `0` turns them off.
     pub(crate) safety_sync_seconds: u64,
+    /// `sqb dev` reads events on stdout and sends control lines on stdin.
+    pub(crate) dev_events: bool,
+}
+
+/// What `sqb dev` last asked its location: the foreground warehouse verdict and how many recompiles.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct DevControlState {
+    /// `None` until `sqb dev` reports its foreground connection; outside `sqb dev`, always connected.
+    pub(crate) warehouse: Option<bool>,
+    pub(crate) recompiles: u64,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -218,8 +229,10 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) safety_seconds: u64,
     /// When an idle location syncs even though no run ended and nobody asked.
     pub(crate) safety_at: tokio::time::Instant,
-    /// The last read found the warehouse file held by another process, such as a DuckDB build.
-    pub(crate) busy: bool,
+    /// Failed reads in a row that did not shrink the page; a delivered page resets it.
+    pub(crate) failed_reads: u32,
+    /// Failed reads in a row stopped the synchronization until a sync request or a new publication.
+    pub(crate) halted: bool,
     /// Per scan index: the table's change token after its last complete read.
     pub(crate) change_tokens: HashMap<usize, ScanToken>,
     /// The token read before the current scan's first page, recorded once the scan completes.
@@ -235,8 +248,9 @@ pub(crate) struct LocationMetadataSync {
 /// The metadata reader's answer to one read.
 #[derive(Debug)]
 pub(crate) enum MetadataReply {
-    /// A page, or `None` when the read failed.
-    Page(Option<WarehouseHistoryPage>),
+    Page(WarehouseHistoryPage),
+    /// The read failed and delivered nothing; never an empty table.
+    Failed(WarehouseHistoryFailure),
     /// Another process holds the warehouse file; nothing was read.
     Busy,
 }
@@ -255,7 +269,8 @@ impl LocationMetadataSync {
     /// A person asked for a sync: start one now when idle, or one more after the current one.
     pub(crate) fn request_sync(&mut self) {
         self.cycle_started_at = None;
-        if self.idle {
+        let backing_off = std::mem::take(&mut self.failed_reads) > 0;
+        if std::mem::take(&mut self.halted) || backing_off || self.idle {
             self.next_at = tokio::time::Instant::now();
         }
     }
@@ -277,26 +292,55 @@ impl LocationMetadataSync {
         self.next_at = tokio::time::Instant::now();
     }
 
-    /// Failed samples revisit catalog before retrying; no frozen delivery is discarded.
-    pub(crate) fn retry_read(&mut self) {
+    /// Statistics revisit catalog; a page-size failure halves the page, any other backs off; `None` once stopped.
+    pub(crate) fn fail_read(&mut self, page_size: bool) -> Option<std::time::Duration> {
         self.statistics = None;
-        if self.kind() == WarehouseHistoryKind::Statistics {
-            self.statistics_limit = (self.statistics_limit / 2).max(1);
+        let statistics = self.kind() == WarehouseHistoryKind::Statistics;
+        if statistics {
             self.index -= 1;
             self.source_after = None;
             self.scan_id = Uuid::now_v7();
             self.observed_since = None;
             self.watermark_loaded = false;
-        } else {
-            self.limit = (self.limit / 2).max(1);
         }
-        self.next_at = tokio::time::Instant::now()
-            + std::time::Duration::from_secs(super::constants::METADATA_POLL_SECONDS);
+        let limit = if statistics {
+            &mut self.statistics_limit
+        } else {
+            &mut self.limit
+        };
+        let seconds = if page_size && *limit > 1 {
+            *limit /= 2;
+            METADATA_POLL_SECONDS
+        } else {
+            self.failed_reads += 1;
+            if self.failed_reads >= METADATA_FAILURE_LIMIT {
+                self.halted = true;
+                self.safety_at = tokio::time::Instant::now()
+                    + std::time::Duration::from_secs(self.safety_seconds);
+                return None;
+            }
+            METADATA_POLL_SECONDS << (self.failed_reads - 1)
+        };
+        let wait = std::time::Duration::from_secs(seconds);
+        self.next_at = tokio::time::Instant::now() + wait;
+        Some(wait)
+    }
+
+    /// A stopped sync tries once more when its safety sync is due; one more failure stops it again.
+    pub(crate) fn resume_after_safety_wait(&mut self) -> bool {
+        let now = tokio::time::Instant::now();
+        let due: bool = self.halted && self.safety_seconds > 0 && now >= self.safety_at;
+        if due {
+            self.halted = false;
+            self.failed_reads = METADATA_FAILURE_LIMIT - 1;
+            self.next_at = now;
+        }
+        due
     }
 
     /// A synchronization is mid-flight and its next page is due, so the loop need not wait a tick.
     pub(crate) fn paging(&self) -> bool {
-        !self.idle && tokio::time::Instant::now() >= self.next_at
+        !self.idle && !self.halted && tokio::time::Instant::now() >= self.next_at
     }
 
     pub(crate) fn reconciling(&self) -> bool {

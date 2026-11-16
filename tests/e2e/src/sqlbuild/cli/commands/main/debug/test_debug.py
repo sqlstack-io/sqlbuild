@@ -453,3 +453,63 @@ def test_given_invalid_project_configuration_when_debugging_then_reports_the_com
 
     assert result.returncode == test_case.expected_returncode, result.stdout
     assert test_case.expected_stderr_fragment in result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DebugCliTestCase(
+            description="broken models and Python nodes are never read",
+            command=("debug",),
+            expected_stdout_fragment=(
+                "  connection test: [OK connected]\n  query test: [OK SELECT 1]\n"
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_broken_project_nodes_when_debugging_then_only_configuration_and_providers_are_read(
+    tmp_path: Path,
+    test_case: DebugCliTestCase,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="debug_broken_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "debug_broken_project"\nadapter = "duckdb"\n\n'
+                '[connection]\ndatabase = "debug_broken.duckdb"\n'
+            ),
+            "providers/marker.py": dedent(
+                """
+                from sqlbuild.providers import Provider
+
+
+                class MarkerProvider(Provider):
+                    '''Test provider MarkerProvider.'''
+                    label: str = "debug"
+                """
+            ).strip()
+            + "\n",
+            "models/orders.sql": "MODEL (materialized table; SELECT FROM WHERE\n",
+            "python/customers.py": dedent(
+                """
+                from pathlib import Path
+
+                Path(__file__).with_name("imported.marker").write_text("imported")
+                raise AssertionError("debug must not import project nodes")
+                """
+            ).strip()
+            + "\n",
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=test_case.command,
+        project_dir=project_dir,
+    )
+
+    assert result.returncode == test_case.expected_returncode, result.stderr
+    assert "Providers:\n  providers: 1 of 1 ready [OK secrets set]\n" in result.stdout
+    assert test_case.expected_stdout_fragment in result.stdout
+    assert not (project_dir / "python/imported.marker").exists()

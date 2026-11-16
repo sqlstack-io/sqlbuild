@@ -11,8 +11,8 @@ use tokio::time::Instant;
 use crate::native_commands::_helpers::execution::{metadata_sync, safety_sync_seconds};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
-    MetadataRetryTestCase, SafetySyncIdleTestCase, SafetySyncSettingTestCase,
-    SyncCoalescingTestCase, UnchangedScanTestCase,
+    MetadataBackoffTestCase, MetadataRetryTestCase, SafetyResumeTestCase, SafetySyncIdleTestCase,
+    SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
 
 #[test]
@@ -20,20 +20,30 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
     let test_cases = [
         MetadataRetryTestCase {
             description: "a timed-out statistics page is retried smaller after catalog is revisited",
+            page_size: true,
             failed_kind: WarehouseHistoryKind::Statistics,
             acknowledged_pages: 1,
             expected_statistics_limit: MAX_HISTORY_RECORDS / 2,
         },
         MetadataRetryTestCase {
             description: "a failed catalog page leaves the statistics page size alone",
+            page_size: true,
             failed_kind: WarehouseHistoryKind::Catalog,
             acknowledged_pages: 1,
             expected_statistics_limit: MAX_HISTORY_RECORDS,
         },
         MetadataRetryTestCase {
             description: "a completed statistics scan restores the full statistics page",
+            page_size: true,
             failed_kind: WarehouseHistoryKind::Statistics,
             acknowledged_pages: 1 + WarehouseHistoryKind::ALL.len(),
+            expected_statistics_limit: MAX_HISTORY_RECORDS,
+        },
+        MetadataRetryTestCase {
+            description: "a relation dropped while sampling revisits catalog without shrinking the page",
+            page_size: false,
+            failed_kind: WarehouseHistoryKind::Statistics,
+            acknowledged_pages: 1,
             expected_statistics_limit: MAX_HISTORY_RECORDS,
         },
     ];
@@ -47,7 +57,8 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             .iter()
             .position(|kind| *kind == test_case.failed_kind)
             .expect("kind is listed");
-        state.retry_read();
+        let wait = state.fail_read(test_case.page_size);
+        assert!(wait.is_some(), "{}", test_case.description);
         let state = acknowledge_complete_pages(state, test_case.acknowledged_pages);
         assert_eq!(
             (state.kind(), state.statistics_limit, state.limit),
@@ -58,6 +69,132 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             ),
             "{description}",
             description = test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_and_failures_in_a_row_stop()
+ {
+    let test_cases = [
+        MetadataBackoffTestCase {
+            description: "a permission or missing-table error never shrinks the page, and a request ends its wait",
+            failures: vec![false, false, false],
+            failures_after_request: vec![],
+            expected_waits: vec![Some(30), Some(60), Some(120)],
+            expected_limit: MAX_HISTORY_RECORDS,
+            expected_halted: false,
+            expected_paging: (true, true),
+        },
+        MetadataBackoffTestCase {
+            description: "the fifth failure in a row stops the sync, which then never pages",
+            failures: vec![],
+            failures_after_request: vec![false, false, false, false, false],
+            expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None],
+            expected_limit: MAX_HISTORY_RECORDS,
+            expected_halted: true,
+            expected_paging: (true, false),
+        },
+        MetadataBackoffTestCase {
+            description: "a page-size error halves the page and retries after one poll",
+            failures: vec![true, true],
+            failures_after_request: vec![],
+            expected_waits: vec![Some(30), Some(30)],
+            expected_limit: MAX_HISTORY_RECORDS / 4,
+            expected_halted: false,
+            expected_paging: (false, false),
+        },
+        MetadataBackoffTestCase {
+            description: "a sync request resumes a stopped sync with a fresh count",
+            failures: vec![false, false, false, false, false],
+            failures_after_request: vec![false],
+            expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None, Some(30)],
+            expected_limit: MAX_HISTORY_RECORDS,
+            expected_halted: false,
+            expected_paging: (true, false),
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.index = WarehouseHistoryKind::ALL
+            .iter()
+            .position(|kind| *kind == WarehouseHistoryKind::Fingerprints)
+            .expect("kind is listed");
+        state.begin_sync(Utc::now());
+        let mut waits: Vec<Option<u64>> = test_case
+            .failures
+            .into_iter()
+            .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs()))
+            .collect();
+        state.request_sync();
+        let paging_after_request = state.paging();
+        waits.extend(
+            test_case
+                .failures_after_request
+                .into_iter()
+                .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs())),
+        );
+        assert_eq!(
+            (
+                waits,
+                state.limit,
+                state.halted,
+                (paging_after_request, state.paging())
+            ),
+            (
+                test_case.expected_waits,
+                test_case.expected_limit,
+                test_case.expected_halted,
+                test_case.expected_paging,
+            ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_stopped_sync_when_its_safety_sync_is_due_then_it_makes_one_attempt() {
+    let test_cases = [
+        SafetyResumeTestCase {
+            description: "before the safety sync is due the sync stays stopped",
+            safety_seconds: 1800,
+            due_in: Duration::from_secs(600),
+            expected_outcome: (false, false, None, true),
+        },
+        SafetyResumeTestCase {
+            description: "a due safety sync resumes it, and one more failure stops it for another interval",
+            safety_seconds: 1800,
+            due_in: Duration::ZERO,
+            expected_outcome: (true, true, None, true),
+        },
+        SafetyResumeTestCase {
+            description: "with safety syncs off only a request or a publication resumes it",
+            safety_seconds: 0,
+            due_in: Duration::ZERO,
+            expected_outcome: (false, false, None, true),
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, test_case.safety_seconds));
+        state.begin_sync(Utc::now());
+        let stopped: Vec<Option<Duration>> = (0..5).map(|_| state.fail_read(false)).collect();
+        state.safety_at = Instant::now() + test_case.due_in;
+        let resumed: bool = state.resume_after_safety_wait();
+        let paging: bool = state.paging();
+        let wait: Option<Duration> = state.fail_read(false);
+        assert_eq!(
+            (
+                stopped[4],
+                (resumed, paging, wait, state.halted),
+                (state.safety_at.saturating_duration_since(Instant::now())
+                    + Duration::from_secs(1))
+                .as_secs()
+                    >= test_case.safety_seconds,
+            ),
+            (None, test_case.expected_outcome, true),
+            "{}",
+            test_case.description
         );
     }
 }

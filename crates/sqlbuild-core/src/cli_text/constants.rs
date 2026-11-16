@@ -6,6 +6,7 @@ pub(crate) const RED: &str = "\x1b[38;5;167m";
 pub(crate) const GREEN: &str = "\x1b[32m";
 pub(crate) const YELLOW: &str = "\x1b[33m";
 pub(crate) const BLUE: &str = "\x1b[34m";
+pub(crate) const CYAN: &str = "\x1b[36m";
 pub(crate) const ORANGE: &str = "\x1b[38;5;208m";
 pub(crate) const RESET: &str = "\x1b[0m";
 pub(crate) const SUCCESS_STATUS_LABELS: [&str; 3] = ["OK", "PASS", "SUCCESS"];

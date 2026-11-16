@@ -46,6 +46,7 @@
 										<span title={formatStamp(t.at)}>
 											{#if t.failure}<StatusLabel tone={t.waiting ? 'var(--sb-warning)' : 'var(--sb-error)'} label={t.failure} />{:else}<StatusLabel tone="var(--sb-success)" label="synced {formatAgo(t.at, app.now)}" />{/if}
 										</span>
+										{#if t.error}<p class="sync-error">{t.error}</p>{/if}
 									</td>
 									<td>{formatNumber(t.recordsSent)}</td>
 									<td>{formatMs(t.elapsedMs)}</td>
@@ -77,6 +78,14 @@
 	.muted {
 		color: var(--muted-foreground);
 		font-size: 12.5px;
+	}
+	.sync-error {
+		max-width: 60ch;
+		margin: 4px 0 0 15px;
+		color: var(--muted-foreground);
+		font-size: 12px;
+		white-space: normal;
+		overflow-wrap: anywhere;
 	}
 	.connection {
 		display: flex;
