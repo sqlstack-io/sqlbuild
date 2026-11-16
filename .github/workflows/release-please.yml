@@ -246,7 +246,14 @@ jobs:
               fail_verify "${context} did not start"
             fi
             run_url="$(gh run view "${run_id}" --json url --jq .url)"
-            if gh run watch "${run_id}" --exit-status --interval 30; then
+            # gh run watch exits non-zero for a run that finished before it started, so only
+            # watch a run still in progress and decide from the conclusion either way.
+            if [[ "$(gh run view "${run_id}" --json status --jq .status)" != "completed" ]]; then
+              gh run watch "${run_id}" --interval 30 >/dev/null || true
+            fi
+            conclusion="$(gh run view "${run_id}" --json status,conclusion \
+              --jq 'if .status == "completed" then .conclusion else "" end')"
+            if [[ "${conclusion}" == "success" ]]; then
               post_status success "${context}" "Trusted release check passed" "${run_url}"
             else
               post_status failure "${context}" "Trusted release check failed" "${run_url}"
