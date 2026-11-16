@@ -3,7 +3,7 @@
 
 import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode } from '$lib/api';
-import { cardData, folderOf, groupCard, type GroupCard } from './catalog-graph';
+import { GROUPED_ABOVE, catalogGraph, cardData, folderOf, groupCard, type GroupCard } from './catalog-graph';
 import { layoutLayer, type LayoutItem } from './job-graph';
 
 /**
@@ -113,10 +113,13 @@ export type FolderBoxData = { folder: string; label: string; nodeCount: number; 
  */
 export function folderGraph(
 	nodes: CatalogNode[],
-	open: ReadonlySet<string>,
-	{ tree = folderTree(nodes), onclose }: { tree?: FolderTree; onclose?: (folder: string) => void } = {}
+	given: ReadonlySet<string>,
+	{ tree = folderTree(nodes), onclose, scope = [] }: { tree?: FolderTree; onclose?: (folder: string) => void; scope?: readonly string[] } = {}
 ): { nodes: Node[]; edges: Edge[] } {
 	const byKey = new Map(nodes.map((n) => [n.key, n]));
+	const top = scopeTop(tree, scope);
+	// The scope's own folders, and every folder around them, are open: the scope is what is drawn.
+	const open = new Set([...given, ...top.opened]);
 	const drawn: Node[] = [];
 	const place = (folder: string, box: string | null) => {
 		const inside = box ? { parentId: folderBoxId(box), extent: 'parent' as const } : {};
@@ -134,7 +137,8 @@ export function folderGraph(
 			drawn.push({ id: key, type: 'asset', position: { x: 0, y: 0 }, parentId: folderBoxId(folder), extent: 'parent', data: cardData(byKey.get(key)!) });
 		}
 	};
-	for (const root of tree.roots) place(root, null);
+	for (const folder of top.folders) place(folder, null);
+	for (const key of top.nodes) drawn.push({ id: key, type: 'asset', position: { x: 0, y: 0 }, data: cardData(byKey.get(key)!) });
 
 	const standIn = standInOf(tree, open);
 	const pairs = new Map<string, Edge>();
@@ -148,6 +152,98 @@ export function folderGraph(
 		}
 	}
 	return { nodes: drawn, edges: [...pairs.values()] };
+}
+
+/**
+ * What a scope draws at its top level. No scope: the project's top folders. One folder: its
+ * subfolders and its own nodes, as the project's top level is drawn, without a box around them.
+ * Several folders: a box for each, holding its subfolders and nodes. A folder the tree doesn't know
+ * is left out. `opened` are the folders open for the scope to be drawn: the scope's folders and
+ * every folder around them.
+ */
+export function scopeTop(tree: FolderTree, scope: readonly string[]): { folders: string[]; nodes: string[]; opened: string[] } {
+	const known = scope.filter((f) => tree.folders.has(f));
+	const around = (f: string) => {
+		const chain: string[] = [];
+		for (let at: string | null = f; at !== null; at = tree.folders.get(at)?.parent ?? null) chain.push(at);
+		return chain;
+	};
+	if (!known.length) return { folders: tree.roots, nodes: [], opened: [] };
+	const opened = known.flatMap(around);
+	if (known.length === 1) {
+		const f = tree.folders.get(known[0])!;
+		return { folders: f.folders, nodes: f.nodes, opened };
+	}
+	// Each folder's box hangs from the top level, not from the folders around it.
+	return { folders: known, nodes: [], opened };
+}
+
+/** How many cards and boxes a folder graph of the scope draws with `open` folders open. */
+export function drawnCount(tree: FolderTree, open: ReadonlySet<string>, scope: readonly string[] = []): number {
+	const top = scopeTop(tree, scope);
+	const all = new Set([...open, ...top.opened]);
+	const count = (folder: string): number => {
+		if (!all.has(folder)) return 1;
+		const f = tree.folders.get(folder)!;
+		return 1 + f.nodes.length + f.folders.reduce((sum, sub) => sum + count(sub), 0);
+	};
+	return top.nodes.length + top.folders.reduce((sum, f) => sum + count(f), 0);
+}
+
+/**
+ * Every folder in the scope opened, outermost first, until opening the next would draw more than
+ * `cap` cards and boxes. `complete` says whether every folder opened; `opened` and `total` count the
+ * scope's folders open and in all, for saying where it stopped.
+ */
+export function expandAll(tree: FolderTree, open: ReadonlySet<string>, scope: readonly string[] = [], cap = MAX_DRAWN): { open: Set<string>; complete: boolean; opened: number; total: number } {
+	const next = new Set(open);
+	const queue = [...scopeTop(tree, scope).folders];
+	const inScope: string[] = [];
+	for (let i = 0; i < queue.length; i++) {
+		inScope.push(queue[i]);
+		queue.push(...tree.folders.get(queue[i])!.folders);
+	}
+	let complete = true;
+	for (const folder of inScope) {
+		if (next.has(folder)) continue;
+		next.add(folder);
+		if (drawnCount(tree, next, scope) > cap) {
+			next.delete(folder);
+			complete = false;
+			break;
+		}
+	}
+	return { open: next, complete, opened: inScope.filter((f) => next.has(f)).length, total: inScope.length };
+}
+
+export type ScopeGraphOptions = {
+	/** Folders open below the scope, when drawing by folder. */
+	open: ReadonlySet<string>;
+	/** The folders the graph is scoped to; empty for the whole of `nodes`. */
+	scope?: readonly string[];
+	tree?: FolderTree;
+	/** Draw by folder; by default when the scope holds more nodes than Lineage draws one by one. */
+	grouped?: boolean;
+	onclose?: (folder: string) => void;
+};
+
+/** Whether a scope of this many nodes opens by folder. */
+export const opensByFolder = (count: number) => count > GROUPED_ABOVE;
+
+/**
+ * What is drawn at the current scope, the one rule for Lineage's default view, its folder filter
+ * and a group's expanded member: a scope larger than `GROUPED_ABOVE` is drawn by folder, its top
+ * level's folders as closed cards (or `open` boxes) and its own nodes as cards; a smaller one node
+ * by node. `nodes` are the scope's nodes; lineage to nodes outside them is left out.
+ */
+export function scopeGraph(nodes: CatalogNode[], { open, scope = [], tree = folderTree(nodes), grouped = opensByFolder(nodes.length), onclose }: ScopeGraphOptions): { nodes: Node[]; edges: Edge[]; grouped: boolean; standIn: (key: string) => string } {
+	if (grouped) {
+		const graph = folderGraph(nodes, open, { tree, onclose, scope });
+		return { ...graph, grouped, standIn: standInOf(tree, new Set([...open, ...scopeTop(tree, scope).opened])) };
+	}
+	const keys = new Set(nodes.map((n) => n.key));
+	const graph = catalogGraph(nodes);
+	return { nodes: graph.nodes, edges: graph.edges.filter((e) => keys.has(e.source)), grouped, standIn: (key) => key };
 }
 
 /**

@@ -4,8 +4,7 @@
 
 import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode, JobGroupMember, RunRef } from '$lib/api';
-import { GROUPED_ABOVE, cardData } from './catalog-graph';
-import { folderGraph, folderTree, standInOf, type FolderTree } from './folder-graph';
+import { folderTree, scopeGraph, type FolderTree } from './folder-graph';
 import { needsBuilding, type NeedsBuilding } from './view-summary';
 
 export { needsBuilding };
@@ -123,8 +122,6 @@ export type MemberGraphOptions = {
 	oncloseFolder?: (jobKey: string, folder: string) => void;
 };
 
-/** Whether an expanded member draws its nodes by folder, as Lineage does past the same size. */
-export const drawsByFolder = (nodeCount: number) => nodeCount > GROUPED_ABOVE;
 
 /**
  * Cards for the members, with each expanded member a box around its nodes (by folder when it has
@@ -164,22 +161,12 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 		drawn.push({ id, type: 'memberBox', position: { x: 0, y: 0 }, width: MEMBER_WIDTH, height: MEMBER_HEIGHT, data });
 		const nodes = keys.map((k) => byKey.get(k)!);
 		const inside = (inner: string) => innerId(jobKey, inner);
-		if (drawsByFolder(nodes.length)) {
-			const tree: FolderTree = folderTree(nodes);
-			const folders = openFolders.get(jobKey) ?? new Set<string>();
-			const sub = folderGraph(nodes, folders, { tree, onclose: oncloseFolder && ((folder) => oncloseFolder(jobKey, folder)) });
-			for (const n of sub.nodes) drawn.push({ ...n, id: inside(n.id), parentId: n.parentId ? inside(n.parentId) : id, extent: 'parent', data: { ...n.data, member: jobKey } });
-			for (const e of sub.edges) internal.push({ ...e, id: inside(e.id), source: inside(e.source), target: inside(e.target), style: edgeStyle });
-			const standIn = standInOf(tree, folders);
-			standIns.set(jobKey, (key) => inside(standIn(key)));
-		} else {
-			const own = new Set(keys);
-			for (const n of nodes) drawn.push({ id: inside(n.key), type: 'asset', position: { x: 0, y: 0 }, parentId: id, extent: 'parent', data: { ...cardData(n), member: jobKey } });
-			for (const n of nodes)
-				for (const up of n.upstream)
-					if (own.has(up)) internal.push({ id: inside(`${up}-${n.key}`), source: inside(up), target: inside(n.key), type: 'bezier', style: edgeStyle });
-			standIns.set(jobKey, inside);
-		}
+		// The member is a scope of its own, drawn by the same rule as Lineage: by folder when large.
+		const tree: FolderTree = folderTree(nodes);
+		const sub = scopeGraph(nodes, { open: openFolders.get(jobKey) ?? new Set<string>(), tree, onclose: oncloseFolder && ((folder) => oncloseFolder(jobKey, folder)) });
+		for (const n of sub.nodes) drawn.push({ ...n, id: inside(n.id), parentId: n.parentId ? inside(n.parentId) : id, extent: 'parent', data: { ...n.data, member: jobKey } });
+		for (const e of sub.edges) internal.push({ ...e, id: inside(e.id), source: inside(e.source), target: inside(e.target), style: edgeStyle });
+		standIns.set(jobKey, (key) => inside(sub.standIn(key)));
 	}
 
 	const at = (jobKey: string, key: string) => standIns.get(jobKey)?.(key) ?? memberNodeId(jobKey);

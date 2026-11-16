@@ -58,7 +58,9 @@
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
-	import { MAX_DRAWN, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
+	import { MAX_DRAWN, expandAll, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
+	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
+	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
 	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
 	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
 
@@ -139,10 +141,10 @@
 						const focus = latest.find((n) => n.key === initialFocus) ?? null;
 						const latestTree = folderTree(latest);
 						pickedNodes = parseNodes(page.url.searchParams.get(NODES_PARAM), new Set(latest.map((n) => n.key)));
-						grouped = (pickedNodes.length || latest.length) > GROUPED_ABOVE;
 						selectedFolders = pickedNodes.length ? [] : parseFolders(page.url.searchParams.get(FOLDERS_PARAM), latestTree);
+						// The same rule at every scope: drawn by folder when the scope is large.
+						grouped = opensByFolder(shownNodes(latest, { selected: selectedFolders, picked: new Set(pickedNodes), tree: latestTree }).length);
 						if (selectedFolders.length) {
-							expanded = new Set([...expanded, ...foldersToOpen(latestTree, selectedFolders)]);
 							treeOpen = new Set(selectedFolders.flatMap((f) => foldersToOpen(latestTree, [f]).filter((open) => open !== f)));
 						}
 						if (focus) {
@@ -197,13 +199,35 @@
 		selectedFolders = next;
 		pickedNodes = [];
 		pickHighlight = false;
+		expandNote = '';
 		const url = new URL(page.url);
 		const param = foldersParam(next);
 		if (param) url.searchParams.set(FOLDERS_PARAM, param);
 		else url.searchParams.delete(FOLDERS_PARAM);
 		url.searchParams.delete(NODES_PARAM);
 		if (url.search !== page.url.search) void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
-		regroup({ expanded: new Set([...expanded, ...foldersToOpen(tree, next)]) });
+		// A folder filter is the default view scoped to the folders: their subfolders start closed.
+		regroup({ grouped: scopeOpensByFolder(next), expanded: new Set() });
+	}
+	/** Whether the scope draws by folder, as the default view decides for the whole project. */
+	function scopeOpensByFolder(selected: string[] = selectedFolders): boolean {
+		return opensByFolder(shownNodes(catalogNodes, { selected, picked: new Set(pickedNodes), staleOnly, tree }).length);
+	}
+	// "Expand all" opens every folder in the scope up to the drawing cap; this says where it stopped.
+	let expandNote = $state('');
+	function expandEverything() {
+		const result = expandAll(scopeTree(), expanded, pickedNodes.length ? [] : selectedFolders);
+		expandNote = result.complete ? '' : `Opened ${result.opened} of ${result.total} folders; opening more would draw over ${MAX_DRAWN.toLocaleString('en')} cards`;
+		regroup({ expanded: result.open });
+	}
+	function collapseEverything() {
+		expandNote = '';
+		regroup({ expanded: new Set() });
+	}
+	/** The folder tree of what the scope draws, as the graph builds it. */
+	function scopeTree(): FolderTree {
+		const shown = shownNodes(catalogNodes, { selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree });
+		return shown.length === catalogNodes.length ? tree : folderTree(shown);
 	}
 	/** Draws the picked nodes and keeps them in the URL. */
 	function setPickedNodes(next: string[]) {
@@ -232,7 +256,7 @@
 	}
 	function showOutOfDate() {
 		staleOnly = true;
-		regroup({});
+		regroup({ grouped: scopeOpensByFolder(), expanded: new Set() });
 	}
 	function pickFolders() {
 		browserOpen = true;
@@ -761,7 +785,7 @@
 			fitScaleGraph();
 			return;
 		}
-		if (grouped && expanded.size) regroup({ expanded: new Set(foldersToOpen(tree, selectedFolders)) });
+		if (grouped && expanded.size) regroup({ expanded: new Set() });
 		nodes = nodes.map((node) => ({ ...node, hidden: false }));
 		edges = edges.map((edge) => ({ ...edge, hidden: false }));
 		nodes = layout(nodes, edges);
@@ -819,11 +843,16 @@
 		<Button
 			variant="ghost"
 			aria-pressed={grouped}
-			onclick={() => regroup({ grouped: !grouped, expanded: new Set(foldersToOpen(tree, selectedFolders)) })}
+			onclick={() => regroup({ grouped: !grouped, expanded: new Set() })}
 			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
 		>
 			<FolderIcon />Folders
 		</Button>
+		{#if grouped && !tooMany}
+			<Button variant="ghost" onclick={expandEverything} title="Open every folder in view, up to {MAX_DRAWN.toLocaleString('en')} cards"><ChevronsUpDownIcon />Expand all</Button>
+			<Button variant="ghost" onclick={collapseEverything} disabled={!expanded.size} title="Close every folder in view"><ChevronsDownUpIcon />Collapse all</Button>
+			{#if expandNote}<span class="expand-note" role="status">{expandNote}</span>{/if}
+		{/if}
 		{#if selectionLabel}
 			<span class="selection-chip" title="Showing {selectionLabel}">
 				<span>Showing: {selectionLabel}</span>
@@ -921,7 +950,7 @@
 					<strong>Too many nodes to draw at once</strong>
 					<p>This view has {tooManyCount.toLocaleString('en')} cards; the graph draws at most {MAX_DRAWN.toLocaleString('en')}.</p>
 					<div class="too-many-actions">
-						{#if !grouped}<Button variant="outline" size="bar" onclick={() => regroup({ grouped: true, expanded: new Set(foldersToOpen(tree, selectedFolders)) })}><FolderIcon size={13} />Show folders</Button>{/if}
+						{#if !grouped}<Button variant="outline" size="bar" onclick={() => regroup({ grouped: true, expanded: new Set() })}><FolderIcon size={13} />Show folders</Button>{/if}
 						{#if !staleOnly && outOfDateCount > 0 && outOfDateCount <= MAX_DRAWN}<Button variant="outline" size="bar" onclick={showOutOfDate}>Show the {outOfDateCount.toLocaleString('en')} out of date</Button>{/if}
 						<Button variant="outline" size="bar" onclick={pickFolders}>Pick folders</Button>
 					</div>
@@ -1539,6 +1568,10 @@
 	}
 	.browser-row strong {
 		font: 500 12.5px var(--font-sans);
+	}
+	.expand-note {
+		color: var(--muted-foreground);
+		font-size: 12px;
 	}
 	.check-row {
 		display: flex;

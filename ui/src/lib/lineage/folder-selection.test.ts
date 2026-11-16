@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogNode } from '$lib/api';
-import { folderTree } from './folder-graph';
+import { drawnCount, expandAll, folderTree, scopeGraph } from './folder-graph';
 import {
 	foldersParam,
 	foldersToOpen,
@@ -88,9 +88,10 @@ describe('lineage graph', () => {
 		expect(graph.edges.map((e) => e.id).sort()).toEqual(['model:orders-model:order_totals', 'model:orders-stub:downstream:inventory', 'stub:upstream:staging-model:orders']);
 	});
 
-	it('joins stubs to a closed folder card when drawing by folder', () => {
+	it('joins stubs to what stands for a node at the scope when drawing by folder', () => {
+		// The selected folder is the scope: its own nodes are cards, and stubs join them.
 		const graph = lineageGraph(nodes, { grouped: true, open: new Set(), selected: ['marts'], tree });
-		expect(graph.edges.map((e) => e.id).sort()).toEqual(['group:marts-stub:downstream:inventory', 'stub:upstream:staging-group:marts']);
+		expect(graph.edges.map((e) => e.id).sort()).toEqual(['model:orders-model:order_totals', 'model:orders-stub:downstream:inventory', 'stub:upstream:staging-model:orders']);
 	});
 
 	it('narrows to out-of-date nodes without stubs', () => {
@@ -122,5 +123,43 @@ describe('picked nodes', () => {
 			'model:orders-stub:downstream:marts',
 			'stub:upstream:staging-model:orders'
 		]);
+	});
+});
+
+describe('one rule at every scope', () => {
+	const flat = (n: number, folder: string) => Array.from({ length: n }, (_, i) => node(`model:${folder.replace(/\//g, '_')}_${i}`, `models/${folder}/m${i}.sql`));
+	// The same shape twice: once as a whole project, once inside a `marts` folder of a larger project.
+	const shape = (prefix: string) => [...flat(90, `${prefix}core`), ...flat(70, `${prefix}finance`)];
+	const project = [...shape('marts/'), node('model:marts_top', 'models/marts/top.sql'), ...flat(40, 'staging')];
+	const ids = (g: { nodes: { id: string; type?: string; parentId?: string }[] }) =>
+		g.nodes.filter((n) => n.type !== 'stub').map((n) => `${n.type}:${n.id.replace('marts/', '').replace('model:marts_', 'model:').replace('model:martstop', 'model:top')}`).sort();
+
+	it('draws a folder filter as the default view draws the same nodes: subfolders closed, own nodes as cards', () => {
+		const alone = shape('');
+		const defaultView = lineageGraph(alone, { grouped: alone.length > 150, open: new Set(), selected: [] });
+		const filtered = lineageGraph(project, { grouped: true, open: new Set(), selected: ['marts'], tree: folderTree(project) });
+		// The folder's own node is a card at the top of the scope.
+		expect(ids(filtered)).toEqual(['asset:model:top', ...ids(defaultView)]);
+		expect(ids(defaultView)).toEqual(['folder:group:core', 'folder:group:finance']);
+	});
+
+	it('draws a small scope node by node and a large one by folder', () => {
+		expect(scopeGraph(flat(150, 'orders'), { open: new Set() }).grouped).toBe(false);
+		expect(scopeGraph(flat(151, 'orders'), { open: new Set() }).grouped).toBe(true);
+	});
+
+	it('expands every folder in scope up to the drawing cap, and says where it stopped', () => {
+		const t = folderTree(project);
+		const all = expandAll(t, new Set(), ['marts']);
+		expect(all).toMatchObject({ complete: true, opened: 2, total: 2 });
+		expect(drawnCount(t, all.open, ['marts'])).toBe(1 + 2 + 160);
+		const capped = expandAll(t, new Set(), ['marts'], 100);
+		expect(capped).toMatchObject({ complete: false, opened: 1, total: 2 });
+		expect(drawnCount(t, capped.open, ['marts'])).toBeLessThanOrEqual(100);
+	});
+
+	it('draws several selected folders as a box each, with their contents closed', () => {
+		const g = lineageGraph(project, { grouped: true, open: new Set(), selected: ['marts/core', 'staging'], tree: folderTree(project) });
+		expect(g.nodes.filter((n) => n.type === 'folderBox').map((n) => n.id).sort()).toEqual(['folder:marts/core', 'folder:staging']);
 	});
 });

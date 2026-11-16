@@ -3,8 +3,7 @@
 
 import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode } from '$lib/api';
-import { catalogGraph } from './catalog-graph';
-import { folderGraph, folderTree, standInOf, type FolderTree } from './folder-graph';
+import { folderTree, scopeGraph, type FolderTree } from './folder-graph';
 
 /** The URL parameter holding the selected folders, comma-separated. */
 export const FOLDERS_PARAM = 'folders';
@@ -154,19 +153,10 @@ export function lineageGraph(data: CatalogNode[], { grouped, open, selected, pic
 	const shown = shownNodes(data, { selected, picked, staleOnly, tree });
 	const picking = !!picked?.size;
 	const narrowed = shown.length !== data.length;
-	const shownTree = narrowed ? folderTree(shown) : tree;
-	let graph: { nodes: Node[]; edges: Edge[] };
-	let standIn: (key: string) => string = (key) => key;
-	if (grouped) {
-		graph = folderGraph(shown, open, { tree: shownTree, onclose });
-		standIn = standInOf(shownTree, open);
-	} else {
-		graph = catalogGraph(shown);
-		if (narrowed) {
-			const keys = new Set(shown.map((n) => n.key));
-			graph = { nodes: graph.nodes, edges: graph.edges.filter((e) => keys.has(e.source)) };
-		}
-	}
+	// The same rule as the default view, scoped to the selected folders: their subfolders closed, their nodes as cards.
+	const scoped = scopeGraph(shown, { open, scope: picking ? [] : selected, tree: narrowed ? folderTree(shown) : tree, grouped, onclose });
+	const graph = { nodes: scoped.nodes, edges: scoped.edges };
+	const standIn = scoped.standIn;
 	if ((!selected.length && !picking) || staleOnly) return graph;
 	const stubs = picking ? selectionStubs(data, tree, [], picked) : selectionStubs(data, tree, selected);
 	const stubNodes: Node[] = stubs.map((s) => ({
