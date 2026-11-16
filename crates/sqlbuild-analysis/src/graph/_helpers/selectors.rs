@@ -38,12 +38,12 @@ pub(crate) fn resolve(
     select: &[String],
     exclude: &[String],
 ) -> Result<Vec<ObjectKey>, SelectorError> {
-    let all: Keys = graph.names.iter().map(|(_, key)| key.clone()).collect();
+    let all = || -> Keys { graph.names.iter().map(|(_, key)| key.clone()).collect() };
     if select.is_empty() && exclude.is_empty() {
-        return Ok(all.into_iter().collect());
+        return Ok(all().into_iter().collect());
     }
     let selected: Keys = if select.is_empty() {
-        all
+        all()
     } else {
         tokens(graph, select)?
     };
