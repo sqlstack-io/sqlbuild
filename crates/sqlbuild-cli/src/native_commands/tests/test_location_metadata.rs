@@ -20,20 +20,30 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
     let test_cases = [
         MetadataRetryTestCase {
             description: "a timed-out statistics page is retried smaller after catalog is revisited",
+            page_size: true,
             failed_kind: WarehouseHistoryKind::Statistics,
             acknowledged_pages: 1,
             expected_statistics_limit: MAX_HISTORY_RECORDS / 2,
         },
         MetadataRetryTestCase {
             description: "a failed catalog page leaves the statistics page size alone",
+            page_size: true,
             failed_kind: WarehouseHistoryKind::Catalog,
             acknowledged_pages: 1,
             expected_statistics_limit: MAX_HISTORY_RECORDS,
         },
         MetadataRetryTestCase {
             description: "a completed statistics scan restores the full statistics page",
+            page_size: true,
             failed_kind: WarehouseHistoryKind::Statistics,
             acknowledged_pages: 1 + WarehouseHistoryKind::ALL.len(),
+            expected_statistics_limit: MAX_HISTORY_RECORDS,
+        },
+        MetadataRetryTestCase {
+            description: "a relation dropped while sampling revisits catalog without shrinking the page",
+            page_size: false,
+            failed_kind: WarehouseHistoryKind::Statistics,
+            acknowledged_pages: 1,
             expected_statistics_limit: MAX_HISTORY_RECORDS,
         },
     ];
@@ -47,7 +57,7 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             .iter()
             .position(|kind| *kind == test_case.failed_kind)
             .expect("kind is listed");
-        let wait = state.fail_read(true);
+        let wait = state.fail_read(test_case.page_size);
         assert!(wait.is_some(), "{}", test_case.description);
         let state = acknowledge_complete_pages(state, test_case.acknowledged_pages);
         assert_eq!(

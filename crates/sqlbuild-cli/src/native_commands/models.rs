@@ -292,10 +292,17 @@ impl LocationMetadataSync {
         self.next_at = tokio::time::Instant::now();
     }
 
-    /// Halve the page after a page-size failure, else back off; the wait, or `None` once stopped.
+    /// Statistics revisit catalog; a page-size failure halves the page, any other backs off; `None` once stopped.
     pub(crate) fn fail_read(&mut self, page_size: bool) -> Option<std::time::Duration> {
         self.statistics = None;
         let statistics = self.kind() == WarehouseHistoryKind::Statistics;
+        if statistics {
+            self.index -= 1;
+            self.source_after = None;
+            self.scan_id = Uuid::now_v7();
+            self.observed_since = None;
+            self.watermark_loaded = false;
+        }
         let limit = if statistics {
             &mut self.statistics_limit
         } else {
@@ -303,13 +310,6 @@ impl LocationMetadataSync {
         };
         let seconds = if page_size && *limit > 1 {
             *limit /= 2;
-            if statistics {
-                self.index -= 1;
-                self.source_after = None;
-                self.scan_id = Uuid::now_v7();
-                self.observed_since = None;
-                self.watermark_loaded = false;
-            }
             METADATA_POLL_SECONDS
         } else {
             self.failed_reads += 1;

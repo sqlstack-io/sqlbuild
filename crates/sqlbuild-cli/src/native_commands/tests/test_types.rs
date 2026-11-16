@@ -92,9 +92,10 @@ pub(super) struct PlanDocumentTestCase {
     pub(super) expected_first_model: serde_json::Value,
 }
 
-/// One failed metadata read and the statistics page size the sync uses afterwards.
+/// One failed metadata read, whether it was a page-size failure, and the statistics page size afterwards.
 pub(super) struct MetadataRetryTestCase {
     pub(super) description: &'static str,
+    pub(super) page_size: bool,
     pub(super) failed_kind: WarehouseHistoryKind,
     pub(super) acknowledged_pages: usize,
     pub(super) expected_statistics_limit: usize,
