@@ -8,6 +8,9 @@ import { folderTree, layoutFolderGraph, scopeGraph, type FolderTree } from './fo
 import { needsBuilding, type NeedsBuilding } from './view-summary';
 import { edgeStyle, edgesTouching, edgeWidth, visibleEdges, type NodeLink } from './visible-edges';
 import { plural } from '$lib/format/plural';
+import { membersIn, memberStandIn, type MemberFolderTree } from './member-folders';
+import type { FolderBoxData } from './folder-graph';
+import type { GroupCard } from './catalog-graph';
 
 export { needsBuilding };
 
@@ -21,6 +24,8 @@ export type MemberInfo = {
 	description?: string;
 	/** The member's nodes, by catalog key. */
 	nodes?: string[] | null;
+	/** Where the member is declared, such as `jobs/orders/daily.py:12`; its folder groups it on the graph. */
+	sourceFile?: string | null;
 };
 
 export type MemberCardData = {
@@ -51,6 +56,8 @@ export type MemberEdgeData = {
 	to: string;
 	/** The tooltip. */
 	title: string;
+	/** Every member wait the edge stands for, when a closed folder of members stands at an end. */
+	pairs?: { from: string; to: string }[];
 };
 
 
@@ -151,7 +158,9 @@ export function litEdges(focus: string, edges: readonly Edge[], nodes: readonly 
 	for (const e of edges) {
 		const d = e.data as Partial<MemberEdgeData> | undefined;
 		if (!d?.from || !d.to) continue;
-		if ((up.has(d.from) && (d.to === member || up.has(d.to))) || (down.has(d.to) && (d.from === member || down.has(d.from)))) lit.add(e.id);
+		for (const { from, to } of d.pairs ?? [{ from: d.from, to: d.to }]) {
+			if ((up.has(from) && (to === member || up.has(to))) || (down.has(to) && (from === member || down.has(from)))) lit.add(e.id);
+		}
 	}
 	return lit;
 }
@@ -211,7 +220,13 @@ export type MemberGraphOptions = {
 	openFolders?: ReadonlyMap<string, ReadonlySet<string>>;
 	ontoggle?: (jobKey: string) => void;
 	oncloseFolder?: (jobKey: string, folder: string) => void;
+	/** Members drawn by the folder of their declaration: closed folders as cards, open ones as boxes. */
+	folders?: { tree: MemberFolderTree; open: ReadonlySet<string>; onclose?: (folder: string) => void };
 };
+
+/** A closed folder of members, and an open one's box. */
+export const memberFolderCardId = (folder: string) => `jobfolder:${folder}`;
+export const memberFolderBoxId = (folder: string) => `jobfolderbox:${folder}`;
 
 
 /**
@@ -222,7 +237,7 @@ export type MemberGraphOptions = {
  * Positions are left for `layoutFolderGraph`.
  */
 export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMap<string, MemberInfo>, opts: MemberGraphOptions = {}): { nodes: Node[]; edges: Edge[] } {
-	const { catalog = [], links = new Map(), expanded = new Set(), openFolders = new Map(), ontoggle, oncloseFolder } = opts;
+	const { catalog = [], links = new Map(), expanded = new Set(), openFolders = new Map(), ontoggle, oncloseFolder, folders } = opts;
 	const byKey = new Map(catalog.map((n) => [n.key, n]));
 	const waits = directWaits(members).direct;
 	const drawn: Node[] = [];
@@ -230,8 +245,9 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 	/** For each expanded member, what stands for one of its nodes. */
 	const standIns = new Map<string, (key: string) => string>();
 
-	for (const m of members) {
+	const drawMember = (m: JobGroupMember, box: string | null) => {
 		const jobKey = m.jobKey;
+		const placed = box ? { parentId: box, extent: 'parent' as const } : {};
 		const keys = (info.get(jobKey)?.nodes ?? []).filter((k) => byKey.has(k));
 		const open = expanded.has(jobKey) && keys.length > 0;
 		const data: MemberCardData = {
@@ -246,10 +262,10 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 		};
 		const id = memberNodeId(jobKey);
 		if (!open) {
-			drawn.push({ id, type: 'member', position: { x: 0, y: 0 }, width: MEMBER_WIDTH, height: MEMBER_HEIGHT, data });
-			continue;
+			drawn.push({ id, type: 'member', position: { x: 0, y: 0 }, width: MEMBER_WIDTH, height: MEMBER_HEIGHT, ...placed, data });
+			return;
 		}
-		drawn.push({ id, type: 'memberBox', position: { x: 0, y: 0 }, width: MEMBER_WIDTH, height: MEMBER_HEIGHT, data });
+		drawn.push({ id, type: 'memberBox', position: { x: 0, y: 0 }, width: MEMBER_WIDTH, height: MEMBER_HEIGHT, ...placed, data });
 		const nodes = keys.map((k) => byKey.get(k)!);
 		const inside = (inner: string) => innerId(jobKey, inner);
 		// The member is a scope of its own, drawn by the same rule as Lineage: by folder when large.
@@ -258,15 +274,59 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 		for (const n of sub.nodes) drawn.push({ ...n, id: inside(n.id), parentId: n.parentId ? inside(n.parentId) : id, extent: 'parent', data: { ...n.data, member: jobKey } });
 		for (const e of sub.edges) internal.push({ ...e, id: inside(e.id), source: inside(e.source), target: inside(e.target), style: e.style ?? edgeStyle(1) });
 		standIns.set(jobKey, (key) => inside(sub.standIn(key)));
+	};
+
+	// By folder: each closed folder a card, each open one a box around its subfolders and members.
+	const byMember = new Map(members.map((m) => [m.jobKey, m]));
+	const folderStandIn = folders ? memberStandIn(folders.tree, folders.open) : () => null;
+	if (folders) {
+		const { tree, open, onclose } = folders;
+		const facts = (folder: string) => {
+			const inside = membersIn(tree, folder).filter((k) => byMember.has(k));
+			const status = (k: string) => info.get(k)?.lastRun?.status;
+			const needs = (k: string) => needsBuilding(info.get(k)?.nodes ?? [], byKey);
+			return {
+				count: inside.length,
+				ok: inside.filter((k) => status(k) === 'success').length,
+				stale: inside.filter((k) => needs(k).changed + needs(k).behind > 0).length,
+				failed: inside.filter((k) => status(k) === 'failed' || status(k) === 'partial').length
+			};
+		};
+		const place = (folder: string, box: string | null) => {
+			const f = tree.folders.get(folder)!;
+			const placed = box ? { parentId: box, extent: 'parent' as const } : {};
+			const fact = facts(folder);
+			if (!fact.count) return;
+			if (!open.has(folder)) {
+				const data: GroupCard & { memberFolder: string } = { group: folder, label: f.label, ...fact, noun: 'job', empty: 'No runs', memberFolder: folder };
+				drawn.push({ id: memberFolderCardId(folder), type: 'folder', position: { x: 0, y: 0 }, selectable: false, ...placed, data });
+				return;
+			}
+			const data: FolderBoxData = { folder, label: f.label, nodeCount: fact.count, stale: fact.stale, failed: fact.failed, noun: 'job', ontoggle: onclose };
+			const id = memberFolderBoxId(folder);
+			drawn.push({ id, type: 'folderBox', position: { x: 0, y: 0 }, width: MEMBER_WIDTH, height: MEMBER_HEIGHT, selectable: false, ...placed, data });
+			for (const sub of f.folders) place(sub, folder);
+			for (const k of f.members) if (byMember.has(k)) drawMember(byMember.get(k)!, id);
+		};
+		for (const folder of tree.roots) place(folder, null);
+		const inTree = new Set(tree.chains.keys());
+		for (const m of members) if (!inTree.has(m.jobKey) || !(tree.chains.get(m.jobKey) ?? []).length) drawMember(m, null);
+	} else {
+		for (const m of members) drawMember(m, null);
 	}
 
-	const at = (jobKey: string, key: string) => standIns.get(jobKey)?.(key) ?? memberNodeId(jobKey);
+	/** What stands for a member's node: the member's closed folder, its card, or what is drawn of the node inside it. */
+	const memberAt = (jobKey: string) => {
+		const folder = folderStandIn(jobKey);
+		return folder === null ? memberNodeId(jobKey) : memberFolderCardId(folder);
+	};
+	const at = (jobKey: string, key: string) => (folderStandIn(jobKey) === null ? (standIns.get(jobKey)?.(key) ?? memberNodeId(jobKey)) : memberAt(jobKey));
 	const crossing: Edge[] = [];
 	for (const m of members) {
 		for (const upstream of waits.get(m.jobKey)!) {
 			const found = links.get(pairKey(upstream, m.jobKey)) ?? [];
 			if (!found.length) {
-				const [source, target] = [memberNodeId(upstream), memberNodeId(m.jobKey)];
+				const [source, target] = [memberAt(upstream), memberAt(m.jobKey)];
 				const data: MemberEdgeData = { count: 0, from: upstream, to: m.jobKey, title: '' };
 				crossing.push({ id: `wait:${source}-${target}`, source, target, type: 'count', style: edgeStyle(1, 'neutral', true), data: { ...data, title: edgeTitle(data) } });
 				continue;
@@ -279,12 +339,31 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 			for (const e of visibleEdges(pairLinks, (k) => at(...split(k)), { title })) crossing.push({ ...e, data: { ...e.data, from: upstream, to: m.jobKey } satisfies MemberEdgeData });
 		}
 	}
+	// Waits whose ends a closed folder stands in for are one edge per pair of what is drawn, as Lineage's
+	// folders are; a wait inside one closed folder isn't drawn.
+	const merged = new Map<string, Edge>();
+	for (const e of crossing) {
+		if (e.source === e.target) continue;
+		const key = `${e.source}>${e.target}`;
+		const d = e.data as MemberEdgeData;
+		const had = merged.get(key);
+		if (!had) {
+			merged.set(key, { ...e, data: { ...d, pairs: [{ from: d.from, to: d.to }] } });
+			continue;
+		}
+		const h = had.data as MemberEdgeData;
+		const pairs = h.pairs!.some((p) => p.from === d.from && p.to === d.to) ? h.pairs! : [...h.pairs!, { from: d.from, to: d.to }];
+		const count = h.count + d.count;
+		const data: MemberEdgeData = { ...h, count, pairs, title: pairs.length > 1 ? `${plural(pairs.length, 'wait')}, ${plural(count, 'node link')}` : h.title };
+		merged.set(key, { ...had, id: `${had.source}-${had.target}`, style: edgeStyle(Math.max(1, count), 'neutral', count === 0), data });
+	}
+	const visible = [...merged.values()];
 	// A wait implied by a path of other drawn edges isn't drawn either, now that hidden nodes stand
 	// in for their member or folder; lineage between two open members' nodes always is.
-	const atMember = (id: string) => id.startsWith(memberNodeId(''));
-	const between = new Set(crossing);
-	const reduced = new Set(transitiveReduction([...crossing, ...internal], (e) => between.has(e) && (atMember(e.source) || atMember(e.target))));
-	return { nodes: drawn, edges: [...crossing.filter((e) => reduced.has(e)), ...internal] };
+	const collapsed = (id: string) => id.startsWith(memberNodeId('')) || id.startsWith(memberFolderCardId(''));
+	const between = new Set(visible);
+	const reduced = new Set(transitiveReduction([...visible, ...internal], (e) => between.has(e) && (collapsed(e.source) || collapsed(e.target))));
+	return { nodes: drawn, edges: [...visible.filter((e) => reduced.has(e)), ...internal] };
 }
 
 /** Space between the cards of the block of members that wait for nothing and that nothing waits for. */

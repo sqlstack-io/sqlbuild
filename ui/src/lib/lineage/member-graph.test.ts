@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogNode, JobGroupMember, StaleReason } from '$lib/api';
 import { layoutFolderGraph } from './folder-graph';
 import { toggled, withOpen } from './member-expand';
-import { bigGroupShape } from '$lib/api/mock/big-group';
+import { bigGroupFile, bigGroupShape } from '$lib/api/mock/big-group';
+import { declarationFolder, memberFolderTree } from './member-folders';
 import {
 	directWaits,
 	edgeTitle,
@@ -10,6 +11,8 @@ import {
 	innerId,
 	layoutMemberGraph,
 	litEdges,
+	memberFolderBoxId,
+	memberFolderCardId,
 	memberGraph,
 	memberLinks,
 	memberNodeId,
@@ -219,5 +222,36 @@ describe('transitive reduction', () => {
 		expect(transitiveReduction([e('a', 'b'), e('c', 'b')])).toHaveLength(2);
 		expect(transitiveReduction([e('a', 'b'), e('b', 'a'), e('a', 'c'), e('b', 'c')])).toHaveLength(3);
 		expect(transitiveReduction([e('a', 'c'), e('a', 'b'), e('b', 'c')], (x) => x.source !== 'a' || x.target !== 'c')).toHaveLength(3);
+	});
+});
+
+describe('a large group drawn by the folders its members are declared in', () => {
+	const shape = bigGroupShape();
+	const big = shape.members.map((m) => member(m, 0, shape.waits.get(m)));
+	const tree = memberFolderTree(shape.members, (m) => declarationFolder(bigGroupFile(m)));
+	const stages = ['load', 'stage', 'clean', 'join', 'enrich', 'aggregate', 'publish', 'housekeeping'].map((s) => `jobs/warehouse/${s}`);
+
+	it('draws each closed folder as one card, a lone member as its own card, and one line per pair of cards', () => {
+		const { nodes, edges } = memberGraph(big, new Map(), { folders: { tree, open: new Set() } });
+		expect(nodes.filter((n) => n.type === 'folder').map((n) => n.id).sort()).toEqual(stages.map(memberFolderCardId).sort());
+		// publish_e is alone in its folder, so it is drawn as itself.
+		expect(nodes.filter((n) => n.type === 'member').map((n) => n.id)).toEqual([memberNodeId('publish_e')]);
+		const pairs = edges.map((e) => `${e.source} > ${e.target}`).sort();
+		const card = (s: string) => memberFolderCardId(`jobs/warehouse/${s}`);
+		expect(pairs).toEqual(
+			[
+				...['load', 'stage', 'clean', 'join', 'enrich', 'aggregate'].map((s, i, all) => `${card(s)} > ${card(all[i + 1] ?? 'publish')}`),
+				`${card('aggregate')} > ${memberNodeId('publish_e')}`
+			].sort()
+		);
+		// The line between two folders stands for every wait between their members, and lights with them.
+		const stageToClean = edges.find((e) => e.source === card('stage') && e.target === card('clean'))!;
+		expect((stageToClean.data as MemberEdgeData).pairs).toHaveLength(10);
+	});
+
+	it('draws an open folder as a box around its members, with the lines between members again', () => {
+		const { nodes, edges } = memberGraph(big, new Map(), { folders: { tree, open: new Set(tree.folders.keys()) } });
+		expect(nodes.filter((n) => n.parentId === memberFolderBoxId('jobs/warehouse/load')).map((n) => n.id)).toEqual(['load_a', 'load_b', 'load_c', 'load_d'].map(memberNodeId));
+		expect(edges).toHaveLength([...shape.direct.values()].reduce((n, w) => n + w.length, 0));
 	});
 });

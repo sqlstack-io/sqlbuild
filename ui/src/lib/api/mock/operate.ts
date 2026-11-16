@@ -21,7 +21,7 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import { CI_ACCOUNT, DEMO_USER, OPS_USER, SCHEDULER, SENSOR_DAEMON } from './principals';
-import { BIG_GROUP, bigGroupSelect, bigGroupShape } from './big-group';
+import { BIG_GROUP, bigGroupFile, bigGroupSelect, bigGroupShape } from './big-group';
 import { resolveSelection, writeSetOf } from './operate-graph';
 import type { RunEnd, RunRecord, RunScript } from './run-detail';
 
@@ -326,12 +326,12 @@ JOB_DEFS.push(
 			onFailure: null,
 			concurrencyGroups: [],
 			priority: 0,
-			sourceFile: 'orchestration/warehouse.py',
+			sourceFile: bigGroupFile(key),
 			settings: {},
 			targets: null,
 			owner: 'data-platform',
 			criticalNodes: [],
-			declaration: decl('orchestration/warehouse.py', 1, `${key} = job("${key}", select="${bigGroupSelect(key)}")`)
+			declaration: decl(bigGroupFile(key), 1, `${key} = job("${key}", select="${bigGroupSelect(key)}")`)
 		})
 	),
 	{

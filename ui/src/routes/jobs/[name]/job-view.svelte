@@ -41,7 +41,7 @@
 	const memberJobs = createResource(async (client, scope) => {
 		if (job.data?.kind !== 'group') return null;
 		const jobs = await client.listJobs(scope);
-		return new Map<string, MemberInfo>(jobs.map((j) => [j.key, { nodeCount: j.nodeCount, lastRun: j.lastRun, description: j.description, nodes: j.nodes }]));
+		return new Map<string, MemberInfo>(jobs.map((j) => [j.key, { nodeCount: j.nodeCount, lastRun: j.lastRun, description: j.description, nodes: j.nodes, sourceFile: j.sourceFile }]));
 	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
@@ -174,6 +174,9 @@
 				<div class="canvas">
 					{#if def.kind === 'group' && !def.groupMembers?.length}
 						<p class="faint graph-wait">{def.groupMembers ? 'This group has no member jobs.' : "The server doesn't report this group's member jobs."}</p>
+					{:else if def.kind === 'group' && !memberJobs.data}
+						<!-- Members are drawn once the jobs list says where each is declared, so the graph opens by folder rather than redrawing. -->
+						<div class="graph-wait">{#if memberJobs.error}<p class="msg err">Couldn't load the member jobs: {memberJobs.error}</p>{:else}<Loading />{/if}</div>
 					{:else if def.kind === 'group'}
 						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
 						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} bind:selection={memberSelection} details={{ open: details.open, toggle: details.toggle }} />

@@ -10,8 +10,9 @@
 	import GraphToolbar from '$lib/components/graph/graph-toolbar.svelte';
 	import { MAX_DRAWN, folderBoxId, folderCardId, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { absolutePosition as positionOn, anchoredViewport } from '$lib/lineage/fit';
-	import { innerId, layoutMemberGraph, litEdges, memberGraph, memberNodeId, memberReach, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
+	import { innerId, layoutMemberGraph, litEdges, memberFolderBoxId, memberFolderCardId, memberGraph, memberNodeId, memberReach, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
 	import { toggled } from '$lib/lineage/member-expand';
+	import { MEMBER_FOLDERS_CLOSED_ABOVE, declarationFolder, memberFolderTree } from '$lib/lineage/member-folders';
 	import JobBoxNode from './job-box-node.svelte';
 	import MemberNode from './member-node.svelte';
 	import MemberBoxNode from './member-box-node.svelte';
@@ -77,15 +78,39 @@
 	function toggleFocus() {
 		focusOn = focusOn ? null : (selection?.member ?? null);
 	}
+	// Members by the folder they are declared in, as Lineage draws folders: a large group opens with its
+	// folders closed, a small one with them open.
+	const tree = $derived(memberFolderTree(shownMembers.map((m) => m.jobKey), (k) => declarationFolder(info.get(k)?.sourceFile)));
+	const hasFolders = $derived(tree.folders.size > 0);
+	let foldersOn = $state(true);
+	let openMemberFolders = $state<ReadonlySet<string>>(new Set());
+	let foldersReady = false;
+	const initialFolders = () => (members.length > MEMBER_FOLDERS_CLOSED_ABOVE ? new Set<string>() : new Set(tree.folders.keys()));
+	$effect(() => {
+		if (foldersReady || !hasFolders) return;
+		foldersReady = true;
+		openMemberFolders = untrack(initialFolders);
+	});
+	function openMemberFolder(folder: string) {
+		anchorOn(memberFolderCardId(folder), memberFolderBoxId(folder));
+		openMemberFolders = new Set([...openMemberFolders, folder]);
+	}
+	function closeMemberFolder(folder: string) {
+		anchorOn(memberFolderBoxId(folder), memberFolderCardId(folder));
+		openMemberFolders = new Set([...openMemberFolders].filter((f) => f !== folder && !f.startsWith(`${folder}/`)));
+	}
+	const folderOption = $derived(foldersOn && hasFolders ? { tree, open: openMemberFolders, onclose: closeMemberFolder } : undefined);
+
 	let expandNote = $state('');
-	/** Opens every member whose nodes are known, in order, stopping before the graph draws too many cards. */
+	/** Opens every folder, then every member whose nodes are known, in order, stopping before the graph draws too many cards. */
 	function expandEverything() {
+		openMemberFolders = new Set(tree.folders.keys());
 		let next = new Set(expanded);
 		const openable = shownMembers.filter((m) => (info.get(m.jobKey)?.nodes?.length ?? 0) > 0 && !next.has(m.jobKey));
 		let opened = 0;
 		for (const m of openable) {
 			const trial = new Set([...next, m.jobKey]);
-			if (memberGraph(shownMembers, info, { catalog, links, expanded: trial, openFolders }).nodes.length > MAX_DRAWN) break;
+			if (memberGraph(shownMembers, info, { catalog, links, expanded: trial, openFolders, folders: folderOption && { ...folderOption, open: openMemberFolders } }).nodes.length > MAX_DRAWN) break;
 			next = trial;
 			opened++;
 		}
@@ -95,19 +120,22 @@
 	function collapseEverything() {
 		expanded = new Set();
 		openFolders = new Map();
+		openMemberFolders = new Set();
 		expandNote = '';
 	}
-	/** Back to how the graph opened: every member closed, no focus, fitted again. */
+	/** Back to how the graph opened: every member closed, folders as they opened, no focus, fitted again. */
 	async function reset() {
 		focusOn = null;
 		collapseEverything();
+		foldersOn = true;
+		openMemberFolders = initialFolders();
 		await tick();
 		if (nodes.length) nodes = layoutMemberGraph(nodes, edges);
 		await tick();
 		requestAnimationFrame(() => fit?.());
 	}
 
-	const graph = $derived(memberGraph(shownMembers, info, { catalog, links, expanded, openFolders, ontoggle: toggle, oncloseFolder: closeFolder }));
+	const graph = $derived(memberGraph(shownMembers, info, { catalog, links, expanded, openFolders, ontoggle: toggle, oncloseFolder: closeFolder, folders: folderOption }));
 	const tooMany = $derived(tooManyToDraw(graph));
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
@@ -214,6 +242,7 @@
 			if (node.data.expandable) toggle(String(node.data.jobKey));
 			else selection = { member: String(node.data.jobKey) };
 		} else if (node.type === 'memberBox') selection = { member: String(node.data.jobKey) };
+		else if (node.type === 'folder' && node.data.memberFolder) openMemberFolder(String(node.data.memberFolder));
 		else if (node.type === 'folder') openFolder(String(node.data.member), String(node.data.group));
 		else if (node.type === 'asset') selection = { member: String(node.data.member), node: String(node.data.name) };
 	}
@@ -221,7 +250,8 @@
 
 <div class="member-graph">
 	<GraphToolbar
-		expand={{ all: expandEverything, collapse: collapseEverything, canCollapse: expanded.size > 0, allTitle: 'Open every job in place, up to the graph’s card limit', collapseTitle: 'Close every job', note: expandNote }}
+		folders={hasFolders ? { on: foldersOn, toggle: () => (foldersOn = !foldersOn) } : undefined}
+		expand={{ all: expandEverything, collapse: collapseEverything, canCollapse: expanded.size > 0 || (foldersOn && openMemberFolders.size > 0), allTitle: 'Open every job in place, up to the graph’s card limit', collapseTitle: 'Close every job', note: expandNote }}
 		focus={{ on: !!focusOn, can: !!selection, toggle: toggleFocus, title: 'Show only the selected job and the jobs it waits for or that wait for it' }}
 		onreset={reset}
 		{details}

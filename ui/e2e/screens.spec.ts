@@ -16,7 +16,8 @@ test.describe('screenshots', () => {
 		test(name, async ({ page }) => {
 			await page.goto(path);
 			await page.waitForLoadState('networkidle');
-			await page.waitForFunction(() => !document.querySelector('.graph-canvas.unfitted'), null, { timeout: 10_000 }).catch(() => {});
+			// Each page here draws a graph: wait for it to be drawn and fitted.
+			await page.locator('.graph-canvas:not(.unfitted)').first().waitFor({ timeout: 15_000 });
 			await page.waitForTimeout(1000);
 			await page.screenshot({ path: `${dir}/${name}.png` });
 		});

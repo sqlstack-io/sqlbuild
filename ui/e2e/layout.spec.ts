@@ -182,22 +182,31 @@ for (const width of WIDTHS) {
 			await page.goto(awkward(`/jobs/${BIG_GROUP}`));
 			await settle(page);
 			await checkLayout(page, BIG_GROUP);
-			const found = await page.evaluate(() => {
-				const pane = document.querySelector('.svelte-flow')!.getBoundingClientRect();
-				const cards = [...document.querySelectorAll<HTMLElement>('.svelte-flow__node[data-id^="member:"]')].map((n) => n.getBoundingClientRect());
-				const inside = cards.filter((c) => c.width && c.left >= pane.left && c.right <= pane.right && c.top >= pane.top && c.bottom <= pane.bottom);
-				return { members: cards.length, edges: document.querySelectorAll('.svelte-flow__edge').length, inside: inside.length };
-			});
-			expect(found.members, 'member cards drawn').toBeGreaterThanOrEqual(40);
-			// Waits implied by others aren't drawn: at most two lines per member.
+			const drawn = () =>
+				page.evaluate(() => {
+					const pane = document.querySelector('.svelte-flow')!.getBoundingClientRect();
+					const rect = (s: string) => [...document.querySelectorAll<HTMLElement>(s)].map((n) => n.getBoundingClientRect());
+					const cards = rect('.svelte-flow__node[data-id^="member:"], .svelte-flow__node[data-id^="jobfolder:"]');
+					const inside = cards.filter((c) => c.width && c.left >= pane.left && c.right <= pane.right && c.top >= pane.top && c.bottom <= pane.bottom);
+					return { members: rect('.svelte-flow__node[data-id^="member:"]').length, folders: rect('.svelte-flow__node[data-id^="jobfolder:"]').length, cards: cards.length, edges: document.querySelectorAll('.svelte-flow__edge').length, inside: inside.length };
+				});
+			// A group this large opens by folder, closed, with a line per pair of folders.
+			let found = await drawn();
+			expect(found.folders, 'closed folders drawn').toBeGreaterThan(1);
+			expect(found.edges, 'lines between folders').toBeLessThanOrEqual(2 * found.cards);
+			expect(found.inside, 'cards wholly in view after load').toBeGreaterThan(0);
+			// Without folders: every member, and only the waits no other wait implies, at most two lines per member.
+			await page.getByRole('button', { name: 'Folders' }).click();
+			await expect.poll(async () => (await drawn()).members).toBeGreaterThanOrEqual(40);
+			found = await drawn();
 			expect(found.edges, 'lines drawn').toBeLessThanOrEqual(2 * found.members);
-			expect(found.inside, 'member cards wholly in view after load').toBeGreaterThan(0);
-			// The shared toolbar: Expand all opens members in place, Reset closes them again.
+			// The shared toolbar: Expand all opens members in place, Reset closes them and brings folders back.
 			const boxes = () => page.locator('.svelte-flow__node-memberBox').count();
 			await page.getByRole('button', { name: 'Expand all' }).click();
 			await expect.poll(boxes).toBeGreaterThan(0);
 			await page.getByRole('button', { name: 'Reset' }).click();
 			await expect.poll(boxes).toBe(0);
+			await expect.poll(async () => (await drawn()).folders).toBeGreaterThan(1);
 		});
 
 		for (const { list, link } of ITEMS) {

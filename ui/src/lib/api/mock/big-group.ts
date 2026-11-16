@@ -35,6 +35,12 @@ const NODES: Record<string, string> = {
 	housekeeping: 'country_codes'
 };
 
+/**
+ * Where a member is declared: a folder per stage under `jobs/warehouse/`, and one export job alone in
+ * its own folder, which the group page draws as the job's card rather than a folder.
+ */
+export const bigGroupFile = (member: string): string => `jobs/warehouse/${member === 'publish_e' ? 'exports' : member.split('_')[0]}/${member}.py`;
+
 /** The node a member builds, as a selector. */
 export const bigGroupSelect = (member: string): string => NODES[member.split('_')[0]];
 
