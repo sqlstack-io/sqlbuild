@@ -7,6 +7,7 @@ use chrono::Utc;
 use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
+use crate::native_commands::_helpers::terminal::open_browser;
 use crate::person_login::constants::{LOGIN_SECONDS, POLL_SECONDS, SECRET_BYTES};
 use crate::person_login::models::{LoginFlow, PersonClient, PersonCredential};
 
@@ -89,29 +90,3 @@ pub(crate) async fn login(
     ))
 }
 
-fn open_browser(url: &str) -> bool {
-    #[cfg(target_os = "macos")]
-    let mut command = std::process::Command::new("open");
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let mut command = std::process::Command::new("xdg-open");
-    #[cfg(windows)]
-    let mut command = {
-        let mut command = std::process::Command::new("rundll32");
-        command.arg("url.dll,FileProtocolHandler");
-        command
-    };
-    command
-        .arg(url)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    match command.spawn() {
-        Ok(mut child) => {
-            std::thread::spawn(move || {
-                let _ = child.wait();
-            });
-            true
-        }
-        Err(_) => false,
-    }
-}

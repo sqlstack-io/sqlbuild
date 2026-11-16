@@ -6,6 +6,10 @@ pub(crate) const POSITIVE_INTEGER_CONVERTER: &str = "_positive_integer";
 pub(crate) const POSITIVE_INTEGER_MESSAGE: &str = "value must be a positive integer";
 pub(crate) const NO_COLOR_OPTION: &str = "--no-color";
 pub(crate) const NO_COLOR_VARIABLE: &str = "NO_COLOR";
+/// Set by CI systems; `sqb dev` then prints plain lines.
+pub(crate) const CI_VARIABLE: &str = "CI";
+/// Turns live progress off; `sqb dev` then prints plain lines.
+pub(crate) const NO_PROGRESS_VARIABLE: &str = "SQLBUILD_NO_PROGRESS";
 pub(crate) const COLUMNS_VARIABLE: &str = "COLUMNS";
 /// `shutil.get_terminal_size`'s fallback width.
 pub(crate) const FALLBACK_COLUMNS: i64 = 80;
@@ -118,3 +122,5 @@ pub(crate) const PLAN_OUTPUT_BYTES: usize =
     8 * sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
 /// `sqb dev` names at most this many changed inputs per change event.
 pub(crate) const CHANGED_PATHS_SHOWN: usize = 3;
+/// The spaces every `sqb dev` screen row starts with.
+pub(crate) const SCREEN_INDENT: usize = 2;

@@ -1,7 +1,13 @@
 //! The state of the `sqb dev` screen and the messages that change it.
 
 use std::collections::VecDeque;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
+
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 
 use sqlbuild_core::screen_text::models::{DevHeader, PhaseState, ScreenFacts, WarehouseState};
 use sqlbuild_orchestration::dev_events::models::DevEvent;
@@ -126,4 +132,39 @@ pub(crate) struct DevScreen {
     pub(crate) frame: usize,
     /// Rows drawn below the last permanent line, redrawn by the next message.
     pub(crate) drawn: usize,
+}
+
+/// Who may read stdin: the hotkey thread, or a foreground child while the gate is closed.
+#[derive(Debug, Default)]
+pub(crate) struct KeyGate {
+    pub(crate) closed: AtomicBool,
+    /// Whether stdin is in raw mode and the thread reads it.
+    pub(crate) reading: AtomicBool,
+    pub(crate) stop: AtomicBool,
+}
+
+impl KeyGate {
+    /// Restore the terminal and stop reading keys; returns once the thread has let go of stdin.
+    pub(crate) async fn close(&self) {
+        self.closed.store(true, Ordering::SeqCst);
+        while self.reading.load(Ordering::SeqCst) {
+            tokio::time::sleep(crate::dev_screen::constants::KEY_POLL).await;
+        }
+    }
+
+    /// Read keys again.
+    pub(crate) fn open(&self) {
+        self.closed.store(false, Ordering::SeqCst);
+    }
+}
+
+/// A running screen: where to send messages, the actions its keys ask for, and how to stop it.
+#[derive(Debug)]
+pub(crate) struct DevScreenHandle {
+    pub(crate) messages: UnboundedSender<ScreenMessage>,
+    pub(crate) actions: UnboundedReceiver<ScreenAction>,
+    /// Closed while a foreground child owns the terminal's input; `None` without hotkeys.
+    pub(crate) keys: Option<Arc<KeyGate>>,
+    pub(crate) finish: oneshot::Sender<bool>,
+    pub(crate) task: JoinHandle<()>,
 }

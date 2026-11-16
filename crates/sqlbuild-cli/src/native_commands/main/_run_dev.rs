@@ -13,11 +13,17 @@ use sqlbuild_orchestration::store::main::{migrate_store::migrate_store, open_sto
 use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
-use crate::argv::models::{Namespace, Stream};
+use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
+
+use crate::argv::models::Namespace;
+use crate::dev_screen::main::start_dev_screen::start_dev_screen;
+use crate::dev_screen::models::{DevScreenHandle, DevStep, ScreenMessage, ScreenSetup};
 use crate::native_commands::_helpers::decision::{control_address, flag, text};
 use crate::native_commands::_helpers::execution::run_development_roles;
-use crate::native_commands::_helpers::project_facts::development_target;
-use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::_helpers::project_facts::{development_target, project_directory_name, project_name};
+use crate::native_commands::constants::SCREEN_INDENT;
+use crate::native_commands::_helpers::terminal::{capture_stderr, live_screen, stderr_columns};
 use crate::server_config::models::ServerSection;
 
 pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
@@ -32,39 +38,82 @@ pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
         ));
     }
     let executable = std::env::current_exe()?;
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Starting development control store...\n",
-    )]));
-    let (store, scope) = development_store(namespace, &project, &target).await?;
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Development control store ready\nStarting development API...\n",
-    )]));
-    let listener = tokio::net::TcpListener::bind(address).await?;
-    run_development_roles(
-        (store, scope),
-        (project, executable),
-        listener,
-        !flag(namespace, "control_no_scheduler"),
-    )
-    .await
+    let DevScreenHandle {
+        messages,
+        actions,
+        keys,
+        finish,
+        task,
+    } = start_dev_screen(screen_setup(&project, &target));
+    let capture = messages.clone();
+    capture_stderr(Some(Box::new(move |line| {
+        drop(capture.send(ScreenMessage::Log(line)));
+    })));
+    let result: Result<(), ControlError> = async {
+        drop(messages.send(ScreenMessage::Started {
+            step: DevStep::ControlStore,
+            detail: String::new(),
+        }));
+        let database: String = text(namespace, "development_store_url").unwrap_or_else(|| {
+            project
+                .join(".sqlbuild/control.sqlite3")
+                .to_string_lossy()
+                .into_owned()
+        });
+        let (store, scope) = development_store(namespace, (&project, &target), &database).await?;
+        drop(messages.send(ScreenMessage::Finished {
+            step: DevStep::ControlStore,
+            detail: database,
+        }));
+        drop(messages.send(ScreenMessage::Location(scope.location_id.to_string())));
+        let listener = tokio::net::TcpListener::bind(address).await?;
+        run_development_roles(
+            (store, scope),
+            (project.clone(), executable),
+            listener,
+            (
+                !flag(namespace, "control_no_scheduler"),
+                (messages.clone(), actions, keys),
+            ),
+        )
+        .await
+    }
+    .await;
+    capture_stderr(None);
+    let _ = finish.send(result.is_err());
+    drop(task.await);
+    result
+}
+
+/// The header, width and paths the screen starts with.
+fn screen_setup(project: &Path, target: &str) -> ScreenSetup {
+    let live: bool = live_screen();
+    ScreenSetup {
+        live,
+        facts: ScreenFacts {
+            columns: stderr_columns(),
+            style: CliStyle { use_color: live },
+            links: live,
+            indent: SCREEN_INDENT,
+        },
+        header: DevHeader {
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+            project: project_name(project),
+            target: target.to_owned(),
+        },
+        watching: format!("{}/", project_directory_name(project)),
+        project_root: project.to_string_lossy().into_owned(),
+    }
 }
 
 /// Complete retained identity and startup pauses before starting any scheduling roles.
 async fn development_store(
     namespace: &Namespace,
-    project: &Path,
-    target: &str,
+    (project, target): (&Path, &str),
+    database: &str,
 ) -> Result<(ControlStore, DevelopmentScope), ControlError> {
-    let database = text(namespace, "development_store_url").unwrap_or_else(|| {
-        project
-            .join(".sqlbuild/control.sqlite3")
-            .to_string_lossy()
-            .into_owned()
-    });
     set_release_version(env!("CARGO_PKG_VERSION"));
-    let store = open_store(&database).await?;
+    let store = open_store(database).await?;
     migrate_store(&store).await?;
     let context = AuditContext {
         actor: "local-development".into(),

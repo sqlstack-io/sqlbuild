@@ -22,7 +22,7 @@ use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
-use sqlbuild_orchestration::dev_events::constants::DEV_EVENTS_VARIABLE;
+use sqlbuild_orchestration::dev_events::constants::{DEV_EVENTS_ON, DEV_EVENTS_VARIABLE};
 use sqlbuild_orchestration::dev_events::main::dev_event_line::dev_event_line;
 use sqlbuild_orchestration::dev_events::main::dev_events_enabled::dev_events_enabled;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
@@ -103,19 +103,22 @@ use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
 use crate::workers::main::terminate_child::terminate_child;
 use crate::workers::models::{Launchers, Workers};
+use crate::dev_screen::models::{DevStep, ScreenMessage};
+use crate::dev_screen::types::DevScreenParts;
+use crate::dev_session::main::run_dev_session::run_dev_session;
+use crate::dev_session::models::{DevProject, LocationPipes};
 
-/// Own the API, scheduler and outbound location as one development process tree.
+/// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`.
 pub(crate) async fn run_development_roles(
     (store, scope): (ControlStore, DevelopmentScope),
     (project, executable): (PathBuf, PathBuf),
     listener: tokio::net::TcpListener,
-    scheduler: bool,
+    (scheduler, (messages, actions, keys)): (bool, DevScreenParts),
 ) -> Result<(), ControlError> {
     let address = listener.local_addr()?;
     let url = format!("http://{address}");
     let location_id = scope.location_id;
     let target = scope.target.clone();
-    let triggers = scope.triggers;
     let workers = open_development_workers(
         (location_id, target.clone()),
         project.clone(),
@@ -124,6 +127,11 @@ pub(crate) async fn run_development_roles(
     )?;
     let (stop, shutdown) = watch::channel(false);
     let mut tasks = JoinSet::new();
+    drop(messages.send(ScreenMessage::Started {
+        step: DevStep::Api,
+        detail: String::new(),
+    }));
+    let api_ready = messages.clone();
     tasks.spawn(serve_api(
         store.clone(),
         listener,
@@ -136,24 +144,38 @@ pub(crate) async fn run_development_roles(
             ..ServerFacts::default()
         }),
         (move || {
-            drop(write_output(&[(Stream::Stderr, &format!(
-                "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",
-                if triggers { "follow code defaults and operator overrides" } else { "start paused" }
-            ))]));
+            drop(api_ready.send(ScreenMessage::Finished {
+                step: DevStep::Api,
+                detail: address.to_string(),
+            }));
         }, development_stopped(shutdown.clone())),
     ));
     start_platform_roles(&mut tasks, (&store, &shutdown), Default::default())?;
-    tasks.spawn(development_location_role(
+    let (location, pipes) = development_location_role(
         (&project, &executable),
         (location_id, &target),
         (&url, &store),
         shutdown.clone(),
-    )?);
+    )?;
+    tasks.spawn(location);
+    tasks.spawn(run_dev_session(
+        (messages.clone(), actions, keys),
+        (
+            pipes,
+            DevProject {
+                executable: executable.clone(),
+                project: project.clone(),
+                target: target.clone(),
+            },
+        ),
+        (store.clone(), location_id, url),
+        shutdown.clone(),
+    ));
+    drop(messages.send(ScreenMessage::Started {
+        step: DevStep::Scheduler,
+        detail: String::new(),
+    }));
     if scheduler {
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Starting development scheduler...\n",
-        )]));
         let scheduler_store = store.clone();
         tasks.spawn(async move {
             run_scheduler(
@@ -164,11 +186,11 @@ pub(crate) async fn run_development_roles(
             )
             .await
         });
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Development scheduler started\n",
-        )]));
     }
+    drop(messages.send(ScreenMessage::Finished {
+        step: DevStep::Scheduler,
+        detail: if scheduler { "started" } else { "off" }.to_owned(),
+    }));
     supervise_control_roles(tasks, stop).await
 }
 
@@ -186,7 +208,13 @@ fn development_location_role(
     (location_id, target): (Uuid, &str),
     (url, store): (&str, &ControlStore),
     shutdown: watch::Receiver<bool>,
-) -> Result<impl Future<Output = Result<(), ControlError>> + Send + 'static, ControlError> {
+) -> Result<
+    (
+        impl Future<Output = Result<(), ControlError>> + Send + 'static,
+        LocationPipes,
+    ),
+    ControlError,
+> {
     let mut command = Command::new(executable);
     command
         .args(["--project-dir"])
@@ -207,7 +235,10 @@ fn development_location_role(
         .env_remove(SECURITY_AUDIT_WEBHOOK_VARIABLE)
         .env_remove("SQLBUILD_RUN_TOKEN")
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
-        .stdin(Stdio::null())
+        .env(DEV_EVENTS_VARIABLE, DEV_EVENTS_ON)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .kill_on_drop(true);
     if let ControlStore::Sqlite(path) = store {
         command.env(
@@ -216,7 +247,19 @@ fn development_location_role(
         );
     }
     let mut child = command.spawn()?;
-    Ok(async move {
+    let (Some(stdin), Some(stdout), Some(stderr)) =
+        (child.stdin.take(), child.stdout.take(), child.stderr.take())
+    else {
+        return Err(ControlError::Invalid(
+            "development code location pipes are unavailable".into(),
+        ));
+    };
+    let pipes = LocationPipes {
+        stdin,
+        stdout,
+        stderr,
+    };
+    Ok((async move {
         tokio::select! {
             result = child.wait() => {
                 result?;
@@ -231,7 +274,7 @@ fn development_location_role(
                 Ok(())
             },
         }
-    })
+    }, pipes))
 }
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
@@ -836,7 +879,7 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
         command.args(["--image-id", image]);
     }
     if options.dev_events {
-        command.env(DEV_EVENTS_VARIABLE, "1");
+        command.env(DEV_EVENTS_VARIABLE, DEV_EVENTS_ON);
     }
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
 }

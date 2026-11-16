@@ -25,7 +25,7 @@ use crate::bindings::_helpers::compile_driver::pipeline::compiled_phase;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::NodeKeys;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
+use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, MODEL_NODE_KIND, PUBLISH_ACTION};
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
 use crate::bindings::_helpers::location_command::snapshot::{
     build_orchestration_snapshot, orchestration_snapshot,
@@ -166,7 +166,7 @@ fn compile_location<'py>(
         .values()
         .filter(|node| node.python_source.is_some())
         .count();
-    let models: usize = nodes.values().filter(|node| node.kind == "model").count();
+    let models: usize = nodes.values().filter(|node| node.kind == MODEL_NODE_KIND).count();
     step(
         py,
         (DevPhase::Compile, DevStepState::Finished),
