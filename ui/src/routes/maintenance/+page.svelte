@@ -46,13 +46,14 @@
 	const liveViews = $derived(views.filter((v) => oldNameStatus(v, app.now) === 'live').length);
 	const expiredViews = $derived(views.filter((v) => oldNameStatus(v, app.now) === 'expired').length);
 
-	function viewDetail(v: OldNameView): string {
+	/** An old name's state as a short fact, and what it means for the tooltip. */
+	function viewDetail(v: OldNameView): { text: string; help?: string } {
 		const status = oldNameStatus(v, app.now);
-		if (status === 'live') return v.expiresAt ? `Removed ${formatIn(v.expiresAt, app.now)}` : 'Kept until removed by hand';
-		if (status === 'expired') return `Ended ${formatAgo(v.expiresAt, app.now)}; the next clean-up removes it`;
-		if (status === 'dropped') return v.dropReason ?? 'Removed';
-		if (status === 'not_kept') return 'Set not to keep the old name; clean-up removes the old table';
-		return 'Waiting for the move to finish';
+		if (status === 'live') return v.expiresAt ? { text: `Removed ${formatIn(v.expiresAt, app.now)}`, help: `Expires ${formatStamp(v.expiresAt)}` } : { text: 'No expiry', help: 'Kept until removed by hand' };
+		if (status === 'expired') return { text: `Expired ${formatAgo(v.expiresAt, app.now)}`, help: 'Removed by the next clean-up' };
+		if (status === 'dropped') return { text: v.dropReason ?? 'Removed' };
+		if (status === 'not_kept') return { text: 'Not kept', help: 'Clean-up removes the old table' };
+		return { text: 'Pending', help: 'Waiting for the move to finish' };
 	}
 
 	const total = $derived(tab === 'migrations' ? `${shownMigrations.length} of ${migrations.length} renames and moves` : tab === 'views' ? `${shownViews.length} of ${views.length} old names` : `${shownJanitor.length} of ${janitor.length} clean-ups`);
@@ -61,7 +62,7 @@
 		{ id: 'what', label: 'What', width: '150px' },
 		{ id: 'from', label: 'From', minWidth: 200 },
 		{ id: 'to', label: 'To', minWidth: 200 },
-		{ id: 'data', label: 'What happened to the data', width: '22%' },
+		{ id: 'data', label: 'Result', width: '22%' },
 		{ id: 'run', label: 'Run', width: '110px' }
 	];
 	const viewColumns: TableColumn[] = [
@@ -90,7 +91,7 @@
 	bind:value={tab}
 	tabs={[
 		{ value: 'migrations', label: 'Renames & moves', count: migrations.length },
-		{ value: 'views', label: 'Old names kept working', count: views.length },
+		{ value: 'views', label: 'Old names', count: views.length },
 		{ value: 'janitor', label: 'Clean-up', count: janitor.length }
 	]}
 />
@@ -115,7 +116,7 @@
 						<td><RelativeTime value={formatAgo(m.createdAt, app.now)} exact={formatStamp(m.createdAt)} /></td>
 						<td>
 							<span class="sb-tag">{migrationKind(m) === 'move' ? 'Move' : 'Rename'}</span>
-							<div class="cell-desc" title={m.discovery === 'automatic' ? undefined : 'Declared with migrate_from'}>{m.discovery === 'automatic' ? 'Spotted automatically' : 'Set in the code'}</div>
+							<div class="cell-desc" title={m.discovery === 'automatic' ? undefined : 'Declared with migrate_from'}>{m.discovery === 'automatic' ? 'Automatic' : 'Declared'}</div>
 						</td>
 						<td>
 							<span class="model">{m.originModel ?? formatRelation(m.origin)}</span>
@@ -131,7 +132,7 @@
 		{/snippet}
 	</DataTable>
 	{:else if tab === 'views'}
-	<DataTable class="static" columns={viewColumns} rows={shownViews} key={(v) => v.migrationEventId} resource={history} empty={views.length ? 'Nothing matches the search.' : 'No old names are being kept working in this location.'}>
+	<DataTable class="static" columns={viewColumns} rows={shownViews} key={(v) => v.migrationEventId} resource={history} empty={views.length ? 'Nothing matches the search.' : 'No old names.'}>
 		{#snippet row(v)}
 					{@const status = oldNameStatus(v, app.now)}
 					<tr class:sb-row-off={status === 'dropped' || status === 'not_kept'}>
@@ -145,7 +146,7 @@
 						</td>
 						<td>
 							<StatusLabel tone={oldNameStatusTone[status]} label={oldNameStatusLabel[status]} />
-							<div class="cell-desc" title={v.expiresAt ? `Expires ${formatStamp(v.expiresAt)}` : undefined}>{viewDetail(v)}</div>
+							<div class="cell-desc" title={viewDetail(v).help}>{viewDetail(v).text}</div>
 						</td>
 						<td class="muted">
 							{#each v.columnAliases as a (a.old)}
@@ -166,7 +167,7 @@
 		{/snippet}
 	</DataTable>
 	{:else}
-	<DataTable class="static" columns={janitorColumns} rows={shownJanitor} key={(j) => j.eventId} resource={history} empty={janitor.length ? 'Nothing matches the search.' : 'Nothing has been archived or deleted by clean-up in this location.'}>
+	<DataTable class="static" columns={janitorColumns} rows={shownJanitor} key={(j) => j.eventId} resource={history} empty={janitor.length ? 'Nothing matches the search.' : 'No clean-ups yet.'}>
 		{#snippet row(j)}
 					<tr>
 						<td><RelativeTime value={formatAgo(j.occurredAt, app.now)} exact={formatStamp(j.occurredAt)} /></td>

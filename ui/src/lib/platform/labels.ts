@@ -107,7 +107,7 @@ export const tokenLabel: Record<TokenState, string> = { active: 'Active', revoke
 
 export const accountSourceLabel: Record<AccountSource, string> = {
 	oidc: 'Single sign-on',
-	trusted_proxy: 'Company proxy sign-in',
+	trusted_proxy: 'Trusted proxy',
 	password: 'Password'
 };
 

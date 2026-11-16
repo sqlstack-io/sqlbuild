@@ -22,9 +22,9 @@
 
 	const authLabel: Record<AuthMode, string> = {
 		oidc: 'Single sign-on (OIDC)',
-		trusted_proxy: 'Company proxy sign-in',
+		trusted_proxy: 'Trusted proxy',
 		password: 'Password',
-		disabled: 'Off: only reachable from this machine'
+		disabled: 'Off (local only)'
 	};
 </script>
 
@@ -46,7 +46,8 @@
 							{ label: 'Authentication', value: authLabel[s.authMode] },
 							{
 								label: 'Scheduler',
-								value: s.schedulerEnabled ? 'Runs on this server' : 'Runs elsewhere (this server started with --no-scheduler)',
+								value: s.schedulerEnabled ? 'This server' : 'Elsewhere',
+								help: s.schedulerEnabled ? undefined : 'This server started with --no-scheduler',
 								tone: s.schedulerEnabled ? undefined : 'var(--sb-warning)'
 							}
 						]}
@@ -56,7 +57,7 @@
 				{/if}
 			</Panel>
 
-			<Panel title="How long things are kept">
+			<Panel title="Retention">
 				<!-- raw-table: label and value pairs without a header, as a key/value list, not a list of records -->
 				<table class="sb-list static framed">
 					<tbody>
@@ -75,7 +76,7 @@
 		</div>{/if}
 
 		<div>
-			<Panel title="Your access" help="What your roles allow; the server checks every action. On the command line, sign in with sqb login: it opens this browser and keeps a short-lived session, so you don't need an API token." docs={LOGIN_DOCS}>
+			<Panel title="Your access" help="What your roles allow." docs={LOGIN_DOCS}>
 				{#if app.user}
 					<KeyValues
 						rows={[
