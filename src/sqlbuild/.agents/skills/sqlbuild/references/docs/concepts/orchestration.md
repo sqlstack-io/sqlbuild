@@ -156,8 +156,8 @@ on_failure = "skip"
   wait for its final attempt before `on_failure` applies. A group's `[retry]` reruns the whole
   group's failures once the group run ends; see
   [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures).
-- `wait_for = "node"`, which would start each node as soon as the nodes it reads are built, is not
-  available yet; `sqb compile` refuses it.
+- `wait_for = "node"`, which will start each node as soon as the nodes it reads are built, is
+  planned but not available yet; `sqb compile` refuses it, so use `"job"` for now.
 
 ## Schedule a job
 

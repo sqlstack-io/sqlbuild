@@ -390,7 +390,7 @@ fn given_group_dependencies_when_reading_then_types_defaults_and_member_override
             description: "waiting node by node is not available yet",
             dependencies: "[dependencies]\nwait_for = \"node\"\n",
             expected: Err((
-                "wait_for = \"node\" is not supported yet; use \"job\"",
+                "wait_for = \"node\" is not supported yet; it is planned, so use \"job\" for now",
                 at(6, 12),
             )),
         },

@@ -96,7 +96,8 @@ fn setting(
             return Err(error_at(
                 text,
                 value.span().start,
-                "wait_for = \"node\" is not supported yet; use \"job\"".to_owned(),
+                "wait_for = \"node\" is not supported yet; it is planned, so use \"job\" for now"
+                    .to_owned(),
             ));
         }
         "job" => settings.wait_for = Some(WaitFor::Job),
