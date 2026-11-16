@@ -2434,6 +2434,38 @@ class PostgresAdapter(
                 f"WHERE {schema_filter} AND relation.relname = {_quote_sql_string(name)}"
             ),
         ).fetchone()
+        return self._row_count_estimate(row=row, metadata_only=metadata_only)
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Read every named relation's ``reltuples`` and size with one catalog query."""
+
+        del database
+        if not names:
+            return ()
+        listed: str = ", ".join(_quote_sql_string(name) for name in names)
+        rows: list[tuple[Any, ...]] = self.execute(
+            connection=connection,
+            sql=(
+                "SELECT relation.relname, relation.relkind, relation.reltuples, "
+                "pg_relation_size(relation.oid) FROM pg_class AS relation "
+                "JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace "
+                f"WHERE namespace.nspname = {_quote_sql_string(schema)} "
+                f"AND relation.relname IN ({listed})"
+            ),
+        ).fetchall()
+        by_name: dict[str, tuple[Any, ...]] = {str(row[0]): tuple(row[1:]) for row in rows}
+        return tuple(
+            self._row_count_estimate(row=by_name.get(name), metadata_only=True) for name in names
+        )
+
+    @staticmethod
+    def _row_count_estimate(
+        *, row: tuple[Any, ...] | None, metadata_only: bool
+    ) -> RelationRowCountEstimate:
+        """The estimate of one ``(relkind, reltuples, size)`` catalog row, or of no row."""
+
         if row is None:
             return RelationRowCountEstimate(row_count=None, detail="relation not found")
         if str(row[0]) not in ROW_COUNT_RELATION_KINDS:

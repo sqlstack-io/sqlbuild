@@ -414,7 +414,7 @@ A location syncs when it starts, after each run ends, when someone asks, and on 
 
 | Adapter | Reads that need running compute | Interval sync while idle |
 | --- | --- | --- |
-| Snowflake | Reading a state table that changed since the last sync. Change checks, the catalog (`SHOW TABLES`, `SHOW VIEWS`, `SHOW COLUMNS`), statistics (`SHOW OBJECTS`) and existence checks run in cloud services | Every 30 minutes. A sync with nothing new resumes no warehouse; one after another writer changed a state table resumes it once |
+| Snowflake | Reading a state table that changed since the last sync. Change checks, the catalog (`SHOW TABLES`, `SHOW VIEWS`, `SHOW COLUMNS`), statistics (one `SHOW OBJECTS` per schema) and existence checks run in cloud services | Every 30 minutes. A sync with nothing new resumes no warehouse; one after another writer changed a state table resumes it once |
 | BigQuery | None to resume, but every sync queries each state table and is billed for the bytes it reads | Every 30 minutes |
 | Databricks | Every read, including the catalog and existence checks, runs on the SQL warehouse | Off: a stopped warehouse would start each time |
 | ClickHouse | Every read is a query, which wakes an idle ClickHouse Cloud service | Off |

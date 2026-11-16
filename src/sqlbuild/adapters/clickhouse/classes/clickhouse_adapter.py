@@ -496,14 +496,25 @@ class ClickHouseAdapter(
             + _database_filter(schema)
             + f" AND name = {quote_string(name)}",
         ).fetchone()
-        if row is None:
-            return RelationRowCountEstimate(row_count=None, detail="relation not found")
-        byte_count: int | None = int(row[2]) if metadata_only and row[2] is not None else None
-        return RelationRowCountEstimate(
-            row_count=int(row[1]) if row[1] is not None else None,
-            detail=f"engine {row[0]} does not report row counts" if row[1] is None else None,
-            byte_count=byte_count,
-            byte_count_basis="system_tables_total_bytes" if byte_count is not None else None,
+        return _row_count_estimate(row=row, metadata_only=metadata_only)
+
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Read every named table's rows and bytes from ``system.tables`` in one query."""
+
+        del database
+        if not names:
+            return ()
+        rows: list[Any] = self.execute(
+            connection=connection,
+            sql="SELECT name, engine, total_rows, total_bytes FROM system.tables WHERE "
+            + _database_filter(schema)
+            + f" AND name IN ({', '.join(quote_string(name) for name in names)})",
+        ).fetchall()
+        by_name: dict[str, tuple[Any, ...]] = {str(row[0]): tuple(row[1:]) for row in rows}
+        return tuple(
+            _row_count_estimate(row=by_name.get(name), metadata_only=True) for name in names
         )
 
     def read_view_definition(
@@ -2825,4 +2836,18 @@ def _prune_history_sql(
         f"SELECT {identity} FROM (SELECT {identity}, row_number() OVER ("
         f"PARTITION BY {partition} ORDER BY {order}) AS __sqlbuild_history_rank FROM {table}) "
         f"WHERE __sqlbuild_history_rank > {retain_versions}) SETTINGS transform_null_in = 1"
+    )
+
+
+def _row_count_estimate(*, row: Any, metadata_only: bool) -> RelationRowCountEstimate:
+    """The estimate of one ``(engine, total_rows[, total_bytes])`` row, or of no row."""
+
+    if row is None:
+        return RelationRowCountEstimate(row_count=None, detail="relation not found")
+    byte_count: int | None = int(row[2]) if metadata_only and row[2] is not None else None
+    return RelationRowCountEstimate(
+        row_count=int(row[1]) if row[1] is not None else None,
+        detail=f"engine {row[0]} does not report row counts" if row[1] is None else None,
+        byte_count=byte_count,
+        byte_count_basis="system_tables_total_bytes" if byte_count is not None else None,
     )
