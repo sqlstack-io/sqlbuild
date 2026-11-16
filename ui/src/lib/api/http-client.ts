@@ -688,11 +688,9 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const locations = (await bootstrapLocations()).filter((l) => !healthRefused.has(l.id));
 			const read = await Promise.all(
 				locations.map(async (location) => {
-					const { locationId, target } = parseLocationKey(location.id);
-					const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
-					if (response.status === 401) onUnauthorized();
+					const [{ data, response }, snapshot] = await locationHealth(location.id);
 					if (response.status === 403) healthRefused.add(location.id);
-					return data ? [toWarehouseConnection(location, data)] : [];
+					return data ? [toWarehouseConnection(location, data, snapshot)] : [];
 				})
 			);
 			return read.flat();

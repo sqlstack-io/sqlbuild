@@ -144,6 +144,25 @@ pub struct PublishedSnapshot {
     pub published_at: DateTime<Utc>,
     /// Added, changed and removed nodes and roles, in publication order.
     pub changes: Vec<PublishedChange>,
+    /// The target's non-secret connection settings; null when the location published none.
+    pub connection: Option<ConnectionDetails>,
+}
+
+/// A target's connection settings as its location publishes them: names only, never a secret.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ConnectionDetails {
+    /// The adapter, such as `snowflake`, `postgres` or `duckdb`.
+    pub adapter: String,
+    pub account: Option<String>,
+    /// The server host, or for a file database its path.
+    pub host: Option<String>,
+    pub user: Option<String>,
+    pub role: Option<String>,
+    pub warehouse: Option<String>,
+    /// The database the connection opens by default.
+    pub database: Option<String>,
+    /// How the location signs in, by name only, such as `key_pair`, `password` or `oauth`.
+    pub auth_method: Option<String>,
 }
 
 /// A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles).

@@ -250,7 +250,7 @@ export type WarehouseConnection = {
 	id: string;
 	location: string;
 	target: string;
-	/** Published connection settings; null until the location publishes them (not reported by the server yet). */
+	/** Published connection settings; null until the location publishes them with a snapshot. */
 	details: ConnectionDetails | null;
 	/** Where SQLBuild's own tables are read back from; null before a sync reports it. */
 	stateLocation: { database: string | null; schema: string } | null;

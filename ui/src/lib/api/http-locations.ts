@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
 import type { Location, LocationHealth, Snapshot, WarehouseSync } from './types';
-import type { ConnectionTest, LocationDetail, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
+import type { ConnectionDetails, ConnectionTest, LocationDetail, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -142,8 +142,19 @@ function syncsOf(observations: Wire['LocationHealthObservation'][]): { syncs: Sy
 	return { syncs, newest };
 }
 
-/** A location target's connection from its health reports: the newest connection check, where its state tables are read from, and each table's newest sync. */
-export function toWarehouseConnection(location: Location, observations: Wire['LocationHealthObservation'][]): WarehouseConnection {
+/** The non-secret connection settings the location published with its snapshot; null when it published none. */
+export function connectionDetailsOf(published: Wire['PublishedSnapshot'] | null): ConnectionDetails | null {
+	const c = published?.connection;
+	return c
+		? { adapter: c.adapter, account: c.account ?? null, host: c.host ?? null, user: c.user ?? null, role: c.role ?? null, warehouse: c.warehouse ?? null, database: c.database ?? null, authMethod: c.auth_method ?? null }
+		: null;
+}
+
+/**
+ * A location target's connection from its health reports and newest snapshot: the settings it published,
+ * the newest connection check, where its state tables are read from, and each table's newest sync.
+ */
+export function toWarehouseConnection(location: Location, observations: Wire['LocationHealthObservation'][], published: Wire['PublishedSnapshot'] | null = null): WarehouseConnection {
 	const { syncs, newest } = syncsOf(observations);
 	const tables: WarehouseTableSync[] = [...newest.values()]
 		.map(({ received_at, report: { health } }) => ({
@@ -163,8 +174,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 		id: location.id,
 		location: location.name,
 		target: location.target.name,
-		// Locations publish no connection settings or sync schedule yet.
-		details: null,
+		details: connectionDetailsOf(published),
 		stateLocation: state ? { database: state.database ?? null, schema: state.schema } : null,
 		lastTest: connectionTestOf(observations),
 		nextSyncAt: null,

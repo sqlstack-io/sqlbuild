@@ -26,6 +26,7 @@ use crate::bindings::_helpers::location_command::runtime::run_runtime;
 use crate::bindings::_helpers::location_command::snapshot::{
     build_orchestration_snapshot, orchestration_snapshot,
 };
+use crate::bindings::_helpers::location_command::snapshot_connection::add_connection;
 use crate::bindings::_helpers::location_command::worker::{blocked_nodes, execute_worker};
 use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
@@ -218,7 +219,11 @@ pub(super) fn publish_location(
         .value("project_dir")?
         .extract::<std::path::PathBuf>()?;
     let input = metadata(py, arguments, &directory)?;
-    let (snapshot, _, _) = compile_location(py, arguments, &input)?;
+    let (mut snapshot, project, _) = compile_location(py, arguments, &input)?;
+    add_connection(
+        &mut snapshot.input,
+        (&project, &arguments.value("selected_target")?),
+    )?;
     let locations: BTreeSet<_> = snapshot
         .input
         .nodes

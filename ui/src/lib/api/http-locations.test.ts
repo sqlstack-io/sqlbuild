@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionTestOf, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { connectionDetailsOf, connectionTestOf, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -96,6 +96,32 @@ describe('warehouseSyncOf', () => {
 			['catalog', '2026-11-08T12:02:00Z', null, '2026-11-08T12:02:00Z'],
 			['statistics', '2026-11-08T12:03:00Z', 'Failed while reading the warehouse', '2026-11-08T12:01:00Z']
 		]);
+	});
+
+	it('shows the connection settings published with the newest snapshot, and none before it publishes them', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const published = {
+			snapshot_id: 'snap-1',
+			generation: 3,
+			git_dirty: false,
+			environment_hash: 'env',
+			sqb_version: '1.0.0',
+			published_at: '2026-11-08T12:00:00Z',
+			changes: [],
+			connection: { adapter: 'snowflake', account: 'orders-account', user: 'orders_loader', role: 'LOADER', warehouse: 'ORDERS_WH', database: 'ORDERS', auth_method: 'key_pair' }
+		};
+		expect(toWarehouseConnection(location, [], published).details).toEqual({
+			adapter: 'snowflake',
+			account: 'orders-account',
+			host: null,
+			user: 'orders_loader',
+			role: 'LOADER',
+			warehouse: 'ORDERS_WH',
+			database: 'ORDERS',
+			authMethod: 'key_pair'
+		});
+		expect(connectionDetailsOf({ ...published, connection: null })).toBeNull();
+		expect(toWarehouseConnection(location, []).details).toBeNull();
 	});
 
 	it('shows a build holding the warehouse file as a wait, not a failure', () => {

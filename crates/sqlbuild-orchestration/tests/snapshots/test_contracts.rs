@@ -1,5 +1,7 @@
 //! Snapshot contracts compiled within the snapshot owner.
 
+#[path = "test_connection_details.rs"]
+mod connection_details;
 #[path = "test_contract.rs"]
 mod contract;
 #[path = "helpers.rs"]

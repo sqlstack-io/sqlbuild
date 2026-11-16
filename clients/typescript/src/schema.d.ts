@@ -1692,6 +1692,21 @@ export interface components {
             rejected_sha256: string;
             table: components["schemas"]["Table"];
         };
+        /** @description A target's connection settings as its location publishes them: names only, never a secret. */
+        ConnectionDetails: {
+            account?: string | null;
+            /** @description The adapter, such as `snowflake`, `postgres` or `duckdb`. */
+            adapter: string;
+            /** @description How the location signs in, by name only, such as `key_pair`, `password` or `oauth`. */
+            auth_method?: string | null;
+            /** @description The database the connection opens by default. */
+            database?: string | null;
+            /** @description The server host, or for a file database its path. */
+            host?: string | null;
+            role?: string | null;
+            user?: string | null;
+            warehouse?: string | null;
+        };
         /** @description What the UI needs first: how people sign in, and what this person may see and do. */
         ControlBootstrap: {
             access: components["schemas"]["PersonAccess"];
@@ -2655,6 +2670,7 @@ export interface components {
         PublishedSnapshot: {
             /** @description Added, changed and removed nodes and roles, in publication order. */
             changes: components["schemas"]["PublishedChange"][];
+            connection?: null | components["schemas"]["ConnectionDetails"];
             /** @description Digest of the lock file, Python and `sqb` versions; a change means dependencies changed. */
             environment_hash: string;
             /** Format: int64 */
