@@ -7,4 +7,3 @@ pub(crate) mod lifecycle;
 pub(crate) mod planning;
 pub(crate) mod policies;
 pub(crate) mod registration;
-pub(crate) mod support;

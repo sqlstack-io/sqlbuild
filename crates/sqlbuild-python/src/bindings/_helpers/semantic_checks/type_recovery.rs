@@ -18,7 +18,6 @@ use sqlbuild_analysis::semantic_validation::models as validation;
 
 use crate::bindings::_helpers::analysis::binding_catalog::schema_validations;
 use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
-use crate::bindings::_helpers::compile_driver::stage_work::count_stage;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::LineageInput;
 use crate::bindings::_helpers::compiled_views::model_reads::{inferred_names, lineage_inputs};
 use crate::bindings::_helpers::compiled_views::records::with_type_recovery;
@@ -31,6 +30,7 @@ use crate::bindings::_helpers::semantic_checks::session_facts::{
 use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;

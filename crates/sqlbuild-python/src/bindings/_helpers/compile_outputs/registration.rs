@@ -2,10 +2,11 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::compile_outputs::{json_report, reuse, runtime_target};
+use crate::bindings::_helpers::compile_outputs::{reuse, runtime_target};
+use sqlbuild_python_base::compile_outputs::main::register_json_report::register_json_report;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    json_report::register(module)?;
+    register_json_report(module)?;
     reuse::register(module)?;
     runtime_target::register(module)
 }

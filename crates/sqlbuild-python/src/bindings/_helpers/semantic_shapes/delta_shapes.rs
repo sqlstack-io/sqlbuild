@@ -5,14 +5,16 @@ use std::collections::HashSet;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 
-use crate::bindings::_helpers::compile_context::coverage::{
-    coverage_reasons, merged_coverage, merged_order,
-};
-use crate::bindings::_helpers::compile_context::delta::ModelCoverage;
-use crate::bindings::_helpers::compile_context::delta::guarded;
-use crate::bindings::_helpers::compile_context::delta::{
-    ModelShape, capture, capturing, delta_unsupported, injection,
-};
+use sqlbuild_python_base::compile_context::main::coverage::coverage_reasons::coverage_reasons;
+use sqlbuild_python_base::compile_context::main::coverage::merged_coverage::merged_coverage;
+use sqlbuild_python_base::compile_context::main::coverage::merged_order::merged_order;
+use sqlbuild_python_base::compile_context::main::delta::capture::capture;
+use sqlbuild_python_base::compile_context::main::delta::capturing::capturing;
+use sqlbuild_python_base::compile_context::main::delta::delta_unsupported::delta_unsupported;
+use sqlbuild_python_base::compile_context::main::delta::guarded::guarded;
+use sqlbuild_python_base::compile_context::main::delta::injection::injection;
+use sqlbuild_python_base::compile_context::models::ModelCoverage;
+use sqlbuild_python_base::compile_context::types::ModelShape;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The partial-check reasons of the `fresh` models, merged in a delta with the stored models'.

@@ -36,15 +36,15 @@ use sqlbuild_refactor::refactoring::models::{
 };
 use sqlbuild_refactor::refactoring::types::Originals;
 
-use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::lineage::lineage_index::lineage_key;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::refactor::offline_compile::{OfflineCompile, compile_for_refactor};
 use crate::bindings::_helpers::refactor::refactor_facts::{
     declaration_placement, model_facts, refactor_facts, unit_test_rebindings,
 };
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;

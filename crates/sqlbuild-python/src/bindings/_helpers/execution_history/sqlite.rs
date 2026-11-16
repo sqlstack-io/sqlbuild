@@ -50,13 +50,13 @@ use crate::bindings::_helpers::execution_history::conversion::{
 use crate::bindings::_helpers::execution_history::statements::{
     column, execute, execute_plain, execute_query, fetch_one, tuple_of,
 };
-use crate::bindings::_helpers::native_host::sqlite_connection::{
-    SqliteConnection, SqliteCursor, sqlite_params,
-};
-use crate::bindings::_helpers::native_threads::reentrant_lock::ReentrantLock;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_threads::models::ReentrantLock;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::warehouse_access::main::sqlite_params::sqlite_params;
+use sqlbuild_python_base::warehouse_access::models::SqliteConnection;
+use sqlbuild_python_base::warehouse_access::models::SqliteCursor;
 
 const SQLITE_MODULE: &str = "sqlite3";
 const PATHLIB_MODULE: &str = "pathlib";

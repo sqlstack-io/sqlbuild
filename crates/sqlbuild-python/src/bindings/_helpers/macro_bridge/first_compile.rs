@@ -5,7 +5,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::compile_context::delta::injection;
+use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 
 /// Whether a compile claimed the first-compile slot, and whether a delta compile only borrowed it.
 #[derive(Debug)]

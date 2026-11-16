@@ -5,10 +5,11 @@ use std::path::{Path, PathBuf};
 
 use pyo3::PyResult;
 
-use crate::bindings::_helpers::compile_context::delta::{
-    capture, capturing, delta_unsupported, injection,
-};
 use sqlbuild_core::format_command::constants::LINT_DIRECTORY_NAMES;
+use sqlbuild_python_base::compile_context::main::delta::capture::capture;
+use sqlbuild_python_base::compile_context::main::delta::capturing::capturing;
+use sqlbuild_python_base::compile_context::main::delta::delta_unsupported::delta_unsupported;
+use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 
 use crate::bindings::_helpers::rules::lint_pipeline::LintFile;
 

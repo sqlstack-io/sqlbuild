@@ -13,7 +13,7 @@ use sqlbuild_analysis::dag_artifact::types::DagValue;
 
 use sqlbuild_analysis::dag_artifact::types::DagColumnLineage;
 
-use crate::bindings::_helpers::python_values::values::python_value;
+use sqlbuild_python_base::python_values::main::python_value::python_value;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 

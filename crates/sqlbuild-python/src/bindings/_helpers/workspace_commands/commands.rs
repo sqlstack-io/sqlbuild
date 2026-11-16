@@ -20,11 +20,11 @@ use sqlbuild_config::workspace::models::{PlaygroundRequest, SkillInstallRequest}
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::FacadeHost;
 
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

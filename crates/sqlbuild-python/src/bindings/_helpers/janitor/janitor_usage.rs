@@ -10,12 +10,12 @@ use sqlbuild_cli::diff_report::errors::DiffUserError;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_model_config::model_validation::main::fixed_duration_seconds::fixed_duration_seconds;
 
-use crate::bindings::_helpers::build_progress::transient_status::TransientStatusReporter;
 use crate::bindings::_helpers::diff_report::support::cli_error;
 use crate::bindings::_helpers::janitor::janitor_keys::{Folded, Key, record, tuple};
 use crate::bindings::_helpers::janitor::janitor_planning::completed;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::build_progress::models::TransientStatusReporter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;

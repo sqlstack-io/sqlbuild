@@ -14,5 +14,3 @@ mod since_cache;
 mod splice;
 #[path = "tests/test_types.rs"]
 mod test_types;
-#[path = "tests/test_yaml_cache.rs"]
-mod yaml_cache;

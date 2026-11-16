@@ -17,12 +17,19 @@ use sqlbuild_core::nested_progress::main::render_group_header::render_group_head
 use sqlbuild_core::nested_progress::models::AuditAggregate;
 
 use crate::bindings::_helpers::build_progress::result_text::{audit_text, optional, text};
-use crate::bindings::_helpers::build_progress::terminal::{
-    CLEAR_LINE, HIDE_CURSOR, SHOW_CURSOR, claim, consume_terminal, flush, projector, release,
-    shared_lines, tty_flag, write,
-};
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_progress::constants::CLEAR_LINE;
+use sqlbuild_python_base::build_progress::constants::HIDE_CURSOR;
+use sqlbuild_python_base::build_progress::constants::SHOW_CURSOR;
+use sqlbuild_python_base::build_progress::main::terminal::claim::claim;
+use sqlbuild_python_base::build_progress::main::terminal::consume_terminal::consume_terminal;
+use sqlbuild_python_base::build_progress::main::terminal::flush::flush;
+use sqlbuild_python_base::build_progress::main::terminal::projector::projector;
+use sqlbuild_python_base::build_progress::main::terminal::release::release;
+use sqlbuild_python_base::build_progress::main::terminal::shared_lines::shared_lines;
+use sqlbuild_python_base::build_progress::main::terminal::tty_flag::tty_flag;
+use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The identity an audit plan entry or result reports to the progress projector.

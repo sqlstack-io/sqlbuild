@@ -34,11 +34,11 @@ use crate::bindings::_helpers::diff_report::support::{
     request_facts, user_error_parts,
 };
 use crate::bindings::_helpers::discovery::configuration::discover_project_configuration;
-use crate::bindings::_helpers::frontier::encoder::emit_error;
-use crate::bindings::_helpers::native_host::connections::connection_failure;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::frontier::main::emit_error::emit_error;
+use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

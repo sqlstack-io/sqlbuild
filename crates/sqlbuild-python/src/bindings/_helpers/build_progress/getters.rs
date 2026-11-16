@@ -4,7 +4,7 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 use crate::bindings::_helpers::build_progress::build_callbacks::BuildProgressCallbacks;
-use crate::bindings::_helpers::build_progress::transient_lines::TransientLineCoordinator;
+use sqlbuild_python_base::build_progress::models::TransientLineCoordinator;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 

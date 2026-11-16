@@ -14,7 +14,6 @@ use crate::bindings::_helpers::analysis::schema_request::{
 };
 use crate::bindings::_helpers::analysis_session::stage_functions::infer_native_query_columns;
 use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_sql;
-use crate::bindings::_helpers::compile_driver::stage_work::count_stage;
 use crate::bindings::_helpers::semantic_shapes::constants::SOURCE_REBINDING_ANALYSES;
 use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
 use crate::bindings::_helpers::semantic_shapes::shapes::{
@@ -23,6 +22,7 @@ use crate::bindings::_helpers::semantic_shapes::shapes::{
 use crate::bindings::models::BindingPositions;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;

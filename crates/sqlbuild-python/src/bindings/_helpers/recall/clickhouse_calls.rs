@@ -9,10 +9,10 @@ use sqlbuild_recall::records::models::RecallValue;
 use sqlbuild_recall::store::errors::{StoreError, StoreErrorKind};
 use sqlbuild_recall::store::models::QueryResult;
 
-use crate::bindings::_helpers::native_threads::constants::OUTPUT_SUPPRESSED_ATTRIBUTE;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::config_value_to_python::config_value_to_python;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_threads::constants::OUTPUT_SUPPRESSED_ATTRIBUTE;
 
 /// What `sqb recall query` reports about a ClickHouse query besides its rows.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

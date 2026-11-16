@@ -5,7 +5,6 @@ use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::build_command::support::{boolean, keyword_relay, none};
 use crate::bindings::_helpers::command_runtime::connection::{
     anchor_local_database_path, with_dbt_profile,
 };
@@ -18,6 +17,9 @@ use crate::bindings::_helpers::planner_entries::execution_plan::build_execution_
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_command::main::boolean::boolean;
+use sqlbuild_python_base::build_command::main::keyword_relay::keyword_relay;
+use sqlbuild_python_base::build_command::main::none::none;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;

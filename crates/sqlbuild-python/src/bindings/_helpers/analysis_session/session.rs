@@ -38,10 +38,11 @@ use std::path::PathBuf;
 use crate::bindings::_helpers::analysis_session::nullability_rules::{
     RuleFailure, nullability_callback, raised,
 };
-use crate::bindings::_helpers::cache::native_store::{open_store, save_store};
 use crate::bindings::models::Positional;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::cache::main::open_store::open_store;
+use sqlbuild_python_base::cache::main::save_store::save_store;
 use sqlbuild_python_base::types::CompilerDetach;
 
 /// `(name, type, nullability)`.
@@ -370,9 +371,9 @@ pub(crate) fn start_model_analysis_session(
 ) -> PyResult<NativeModelAnalysisSession> {
     let py: Python<'_> = catalog.py();
     let mut request: SessionRequest =
-        crate::bindings::_helpers::compile_context::delta::inject_relations(session_request(
-            request,
-        ))?;
+        sqlbuild_python_base::compile_context::main::delta::inject_relations::inject_relations(
+            session_request(request),
+        )?;
     let rule_failure: RuleFailure = RuleFailure::default();
     let dialect: String = request.dialect.clone();
     request.nullability_callback = adapter_rules
@@ -381,8 +382,9 @@ pub(crate) fn start_model_analysis_session(
     let mut session: AnalysisSession = py
         .compiler_detach(|| start_analysis_session(request, catalog))
         .map_err(|reason| internal_error(&reason))?;
-    let cache: Option<(PathBuf, String)> =
-        cache.filter(|_| crate::bindings::_helpers::compile_context::delta::injection().is_none());
+    let cache: Option<(PathBuf, String)> = cache.filter(|_| {
+        sqlbuild_python_base::compile_context::main::delta::injection::injection().is_none()
+    });
     let mut cache_path: Option<PathBuf> = None;
     let mut cache_stats: Option<CacheStatsRow> = None;
     if let Some((path, environment)) = cache {
@@ -487,7 +489,8 @@ fn session_request(request: RequestRow) -> SessionRequest {
         dynamic_families_by_table: families_by_table(dynamic_families_by_table),
         models: models.into_iter().map(model_request).collect(),
         forced_order: None,
-        retain_relations: crate::bindings::_helpers::compile_context::delta::capturing(),
+        retain_relations: sqlbuild_python_base::compile_context::main::delta::capturing::capturing(
+        ),
     }
 }
 

@@ -14,9 +14,7 @@ use sqlbuild_core::query_command::main::render_query_json::render_query_json;
 use sqlbuild_core::query_command::models::QueryDisplay;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::build_progress::transient_status::delayed_status;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::native_host::connections::connection_failure;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
@@ -27,6 +25,8 @@ use crate::bindings::_helpers::query_command::text_output::{LONG_FORMAT, render_
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_progress::main::transient_status::delayed_status::delayed_status;
+use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

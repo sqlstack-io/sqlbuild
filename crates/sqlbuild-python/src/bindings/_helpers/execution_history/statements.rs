@@ -5,9 +5,10 @@ use pyo3::types::PyTuple;
 use sqlbuild_state::execution_history::models::{Query, SqlParam};
 
 use crate::bindings::_helpers::execution_history::conversion::python_params;
-use crate::bindings::_helpers::native_host::sqlite_connection::{
-    SqliteConnection, SqliteCursor, SqliteRow, sqlite_params,
-};
+use sqlbuild_python_base::warehouse_access::main::sqlite_params::sqlite_params;
+use sqlbuild_python_base::warehouse_access::models::SqliteConnection;
+use sqlbuild_python_base::warehouse_access::models::SqliteCursor;
+use sqlbuild_python_base::warehouse_access::models::SqliteRow;
 
 /// `target.execute(sql, params)`.
 pub(crate) fn execute<'py>(

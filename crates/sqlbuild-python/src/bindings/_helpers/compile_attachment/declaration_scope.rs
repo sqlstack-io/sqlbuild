@@ -4,8 +4,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyTuple;
 
-use crate::bindings::_helpers::cache::sql_test_scan_store::SqlTestScanCache;
-use crate::bindings::_helpers::compile_driver::stage_work::{DECLARATION_SCOPES, count_stage};
 use crate::bindings::_helpers::render::declaration_values::declaration_scope_resolver;
 use crate::bindings::_helpers::scopes::scope_index::open_native_scope_index;
 use crate::bindings::_helpers::scopes::scope_lookup::build_scope_lookup;
@@ -15,6 +13,9 @@ use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_EXPECTED_MODEL
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::cache::models::SqlTestScanCache;
+use sqlbuild_python_base::compile_driver::constants::DECLARATION_SCOPES;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

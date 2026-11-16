@@ -500,6 +500,6 @@ SYNCED_COPY_ALLOWED_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
 )
 SYNCED_COPY_PATTERN: str = (
     r"\b(?:SyncedCopyAdapter|SyncedCopyConnection|PLAN_SYNCED_COPY_ENV|"
-    r"WarehouseAccessRefusedError)\b"
+    r"WarehouseAccessRefusedError|is_warehouse_access_refused|register_synced_copy)\b"
 )
 RUST_LINE_COMMENT: str = "//"

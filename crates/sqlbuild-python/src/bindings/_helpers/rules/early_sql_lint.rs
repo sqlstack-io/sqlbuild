@@ -26,7 +26,6 @@ use crate::bindings::_helpers::compiled_views::relation_keys::model_key_row;
 use crate::bindings::_helpers::compiled_views::relation_keys::{
     RelationKeyRow, RelationKeys, one_row_seed_names, relation_keys, source_key_input,
 };
-use crate::bindings::_helpers::native_threads::interruptible_join::{Joined, join_interruptibly};
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::rules::lint_expansion::{
     LintExpansionSources, lint_expansion_inputs,
@@ -38,6 +37,8 @@ use crate::bindings::_helpers::rules::lint_pipeline::{
 use crate::bindings::_helpers::rules::rule_cache::stored_entries;
 use crate::bindings::_helpers::rules::rules_config::rules_config_of;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::native_threads::main::join_interruptibly::join_interruptibly;
+use sqlbuild_python_base::native_threads::models::Joined;
 use sqlbuild_python_base::records::main::fields::field::field as record_field;
 
 /// The lint thresholds used when the project leaves them unset.

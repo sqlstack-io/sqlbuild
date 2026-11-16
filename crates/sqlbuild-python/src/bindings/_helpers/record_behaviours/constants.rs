@@ -73,10 +73,10 @@ use crate::bindings::_helpers::record_behaviours::values::{
     finish_fingerprint_set, logical_type_display_name, sql_value_kind,
 };
 use crate::bindings::_helpers::{
-    analysis, analysis_session, build_progress, compile_command, compile_context, compiled_views,
-    compute_logs, dbt_events, dbt_interop, diagnostics, discovery, event_exporting,
-    execution_history, graph, model_config, planner_entries, planner_migrations, planner_phases,
-    presentation_text, project_assembly, result_output, rules, scopes,
+    analysis, analysis_session, build_progress, compile_command, compiled_views, compute_logs,
+    dbt_events, dbt_interop, discovery, event_exporting, execution_history, graph, model_config,
+    planner_entries, planner_migrations, planner_phases, project_assembly, result_output, rules,
+    scopes,
 };
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
@@ -359,12 +359,12 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     analysis_session::getters::GETTERS,
     build_progress::getters::GETTERS,
     compile_command::getters::GETTERS,
-    compile_context::getters::GETTERS,
+    sqlbuild_python_base::compile_context::constants::GETTERS,
     compiled_views::getters::GETTERS,
     compute_logs::getters::GETTERS,
     dbt_events::getters::GETTERS,
     dbt_interop::getters::GETTERS,
-    diagnostics::getters::GETTERS,
+    sqlbuild_python_base::diagnostics::constants::GETTERS,
     discovery::getters::GETTERS,
     event_exporting::getters::GETTERS,
     execution_history::getters::GETTERS,
@@ -373,7 +373,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     planner_entries::getters::GETTERS,
     planner_migrations::getters::GETTERS,
     planner_phases::getters::GETTERS,
-    presentation_text::getters::GETTERS,
+    sqlbuild_python_base::presentation_text::constants::GETTERS,
     project_assembly::getters::GETTERS,
     result_output::getters::GETTERS,
     rules::getters::GETTERS,

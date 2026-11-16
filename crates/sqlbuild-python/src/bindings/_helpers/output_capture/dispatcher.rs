@@ -23,14 +23,14 @@ use sqlbuild_core::command_output::models::{
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::native_threads::constants::OUTPUT_SUPPRESSED_ATTRIBUTE;
-use crate::bindings::_helpers::native_threads::exit_signal::signal_interpreter_exit;
 use crate::bindings::_helpers::output_capture::values::{
     freeze, object, output_error, pass_text, python_text, unencodable,
 };
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_threads::constants::OUTPUT_SUPPRESSED_ATTRIBUTE;
+use sqlbuild_python_base::native_threads::main::signal_interpreter_exit::signal_interpreter_exit;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const THREAD_NAME: &str = "sqlbuild-output-exporter";

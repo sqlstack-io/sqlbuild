@@ -7,13 +7,17 @@ use sqlbuild_analysis::assembly::analysis_session::types::Shapes;
 use sqlbuild_cache::project_reuse::types::ImageSections;
 use sqlbuild_rules::models::RetainedRows;
 
-use crate::bindings::_helpers::compile_context::delta::ModelCoverage;
-use crate::bindings::_helpers::compile_context::delta::{BaseRules, PendingRules};
-use crate::bindings::_helpers::compile_context::delta::{
-    CapturedDiagnostic, CapturedModel, CapturedTest, ImageCapture, ModelShape,
-};
-use crate::bindings::_helpers::compile_context::image_codec::{Decoder, Encoder};
 use sqlbuild_discovery::header_changes::types::HeaderKeys;
+use sqlbuild_python_base::compile_context::models::BaseRules;
+use sqlbuild_python_base::compile_context::models::CapturedDiagnostic;
+use sqlbuild_python_base::compile_context::models::CapturedModel;
+use sqlbuild_python_base::compile_context::models::CapturedTest;
+use sqlbuild_python_base::compile_context::models::Decoder;
+use sqlbuild_python_base::compile_context::models::Encoder;
+use sqlbuild_python_base::compile_context::models::ImageCapture;
+use sqlbuild_python_base::compile_context::models::ModelCoverage;
+use sqlbuild_python_base::compile_context::models::PendingRules;
+use sqlbuild_python_base::compile_context::types::ModelShape;
 
 /// Changes whenever the image's meaning changes, so an older image is never read.
 pub(crate) const IMAGE_FORMAT: &str = "sqlbuild-project-image-v9";

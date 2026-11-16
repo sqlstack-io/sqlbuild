@@ -1,6 +1,7 @@
 //! Plan-entry cursor windows: overrides, planner-owned bounds and microbatch ranges.
 
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::cursor::conversion::CursorSession;
@@ -39,7 +40,6 @@ use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -522,10 +522,7 @@ pub(crate) fn cursor_safety_configs<'py>(
 }
 
 fn compile_input_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::CompileInput).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::CompileInput, &message)
 }
 
 /// Resolve typed cursor overrides to generic start/end for one model.

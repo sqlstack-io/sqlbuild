@@ -16,10 +16,6 @@ use sqlbuild_rules::custom_host_pool::types::{FactKey, HostPlan};
 use sqlbuild_rules::custom_rule_cache::models::CustomEvaluation;
 use sqlbuild_rules::custom_rule_cache::types::ReadSet;
 
-use crate::bindings::_helpers::cache::native_store::current_code_identity;
-use crate::bindings::_helpers::compile_context::delta::{
-    DeltaInjection, delta_unsupported, injection,
-};
 use crate::bindings::_helpers::rules::constants::{
     CUSTOM_HOST_RUNTIME_VERSION, CUSTOM_RULES_CACHE_FILE,
 };
@@ -40,6 +36,10 @@ use crate::bindings::_helpers::rules::fact_replay::{
 use crate::bindings::_helpers::rules::rule_run::{bulk_cache_file, rules_bulk_cache_path};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::cache::main::current_code_identity::current_code_identity;
+use sqlbuild_python_base::compile_context::main::delta::delta_unsupported::delta_unsupported;
+use sqlbuild_python_base::compile_context::main::delta::injection::injection;
+use sqlbuild_python_base::compile_context::models::DeltaInjection;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
@@ -114,11 +114,11 @@ pub(crate) fn evaluate_custom_rules_cached<'py>(
     let project_dir: PathBuf = run.project_dir.extract()?;
     let mut digests: FactDigests<'py> = FactDigests::new(run.project, &project_dir)?;
     let models: Vec<(String, String, Option<String>)> =
-        match crate::bindings::_helpers::compile_context::delta::injection() {
+        match sqlbuild_python_base::compile_context::main::delta::injection::injection() {
             Some(injection) => {
                 let Some(mut rows) = injection.model_subjects.clone() else {
                     return Err(
-                        crate::bindings::_helpers::compile_context::delta::delta_unsupported(
+                        sqlbuild_python_base::compile_context::main::delta::delta_unsupported::delta_unsupported(
                             "the custom rules' subjects were not recorded",
                         ),
                     );
@@ -133,7 +133,7 @@ pub(crate) fn evaluate_custom_rules_cached<'py>(
             }
             None => {
                 let rows: Vec<(String, String, Option<String>)> = digests.replay.model_rows()?;
-                crate::bindings::_helpers::compile_context::delta::capture(|capture| {
+                sqlbuild_python_base::compile_context::main::delta::capture::capture(|capture| {
                     capture.model_subjects = Some(rows.clone());
                 });
                 rows
@@ -191,7 +191,7 @@ pub(crate) fn evaluate_custom_rules_cached<'py>(
         }
         cache.record(py, evaluations)?;
     }
-    crate::bindings::_helpers::compile_context::delta::capture(|capture| {
+    sqlbuild_python_base::compile_context::main::delta::capture::capture(|capture| {
         capture.fact_digests.extend(
             digests
                 .digests
@@ -378,7 +378,7 @@ impl<'py> FactDigests<'py> {
             return Ok(cached.clone());
         }
         if let Some(injected) =
-            crate::bindings::_helpers::compile_context::delta::injected_fact_digest(key)
+            sqlbuild_python_base::compile_context::main::delta::injected_fact_digest::injected_fact_digest(key)
         {
             self.digests.insert(key.clone(), injected.clone());
             return Ok(injected);
