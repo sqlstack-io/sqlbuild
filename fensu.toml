@@ -3618,5 +3618,9 @@ paths = ["crates/sqlbuild-python-project/src/analysis_session/_helpers/session.r
 reason = "Each converts its own input into its own native or Python value; only the conversion shape is alike."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-front/src/render/models.rs", "crates/sqlbuild-python-project/src/analysis_session/models.rs", "crates/sqlbuild-python-project/src/compiled_project/models.rs"]
+reason = "Each positional record converts its own fields; models.rs holds only records, so these are the conversions positional_record! writes, written out once per record."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-rules/src/python_rules/_helpers/units/orchestration.rs", "crates/sqlbuild-rules/src/python_rules/_helpers/units/providers.rs"]
 reason = "Each is one rule family's entry point: return early when no rule is selected, then run its own layout, module and import checks. Parsing, project modules and import resolution share files_naming, project_modules and rejected_import_faults."
