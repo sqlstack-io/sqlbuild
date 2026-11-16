@@ -42,6 +42,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     AutomaticHistoryTestCase,
     CatalogConnectionTestCase,
     FingerprintHistoryTestCase,
+    NewestVersionsTestCase,
     StateEventsTestCase,
     SyncPacingTestCase,
     WarehouseHistoryTestCase,
@@ -1614,3 +1615,74 @@ def test_given_a_served_location_when_a_sync_has_many_pages_then_pages_run_back_
                 f"{test_case.description}: an idle location ran git {len(idle_calls)} times "
                 f"in {test_case.idle_seconds} s"
             )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NewestVersionsTestCase(
+            "DuckDB first read keeps each node's newest two builds",
+            "duckdb",
+            "database",
+            2,
+            {
+                "customers": ["customers-run-3", "customers-run-4"],
+                "orders": ["orders-run-3", "orders-run-4"],
+            },
+        ),
+        NewestVersionsTestCase(
+            "SQLite first read keeps each node's newest build",
+            "sqlite",
+            "path",
+            1,
+            {"customers": ["customers-run-4"], "orders": ["orders-run-4"]},
+        ),
+        NewestVersionsTestCase(
+            "a read without a limit delivers every build",
+            "duckdb",
+            "database",
+            None,
+            {
+                "customers": [f"customers-run-{build}" for build in range(5)],
+                "orders": ["legacy-run"] + [f"orders-run-{build}" for build in range(5)],
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_many_builds_per_node_when_a_full_read_has_a_version_limit_then_only_the_newest_arrive(
+    test_case: NewestVersionsTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    for node in ("orders", "customers"):
+        for build in range(5):
+            _ = adapter.execute(
+                connection=connection,
+                sql=(
+                    "INSERT INTO main._sqlbuild_fingerprints SELECT node_type,"
+                    f"'{node}',target_database,target_schema,'{node}','{node}-run-{build}',"
+                    "definition_hash,version_hash,schema_fingerprint,definition_b64,"
+                    f"metadata_json_b64,'2026-03-0{build + 1} 00:00:00' "
+                    "FROM main._sqlbuild_fingerprints WHERE run_id='legacy-run'"
+                ),
+            )
+    adapter.close(connection)
+
+    runs: dict[str, list[str]] = {}
+    after: list[str | None] | None = None
+    while True:
+        page: dict[str, Any] = warehouse_history_page(
+            project, "fingerprints", after, newest_versions=test_case.newest_versions
+        )
+        for record in page["records"]:
+            runs.setdefault(record["node_name"], []).append(record["run_id"])
+        after = page["next_after"]
+        if after is None:
+            break
+
+    assert {node: sorted(found) for node, found in runs.items()} == test_case.expected_runs

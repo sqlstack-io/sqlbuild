@@ -8,11 +8,13 @@ use sqlbuild_config::project::models::ControlConfig;
 use std::time::Duration;
 use tokio::time::Instant;
 
-use crate::native_commands::_helpers::execution::{metadata_sync, safety_sync_seconds};
+use crate::native_commands::_helpers::execution::{
+    history_request, metadata_sync, safety_sync_seconds,
+};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
-    MetadataRetryTestCase, SafetySyncIdleTestCase, SafetySyncSettingTestCase,
-    SyncCoalescingTestCase, UnchangedScanTestCase,
+    MetadataRetryTestCase, NewestVersionsTestCase, SafetySyncIdleTestCase,
+    SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
 
 #[test]
@@ -353,6 +355,69 @@ fn given_safety_sync_settings_when_resolving_then_flag_beats_environment_beats_p
         assert_eq!(
             resolved,
             test_case.expected_seconds.map_err(str::to_owned),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_state_history_limit_when_requesting_history_then_only_full_reads_of_builds_and_checks_carry_it()
+ {
+    let test_cases = [
+        NewestVersionsTestCase {
+            description: "a first read of builds stops at the limit",
+            kind: WarehouseHistoryKind::Fingerprints,
+            incremental: false,
+            server_limit: Some(5),
+            expected: Some(5),
+        },
+        NewestVersionsTestCase {
+            description: "a first read of check results stops at the limit",
+            kind: WarehouseHistoryKind::AuditResults,
+            incremental: false,
+            server_limit: Some(20),
+            expected: Some(20),
+        },
+        NewestVersionsTestCase {
+            description: "an incremental read delivers every new build; pruning bounds the store",
+            kind: WarehouseHistoryKind::Fingerprints,
+            incremental: true,
+            server_limit: Some(5),
+            expected: None,
+        },
+        NewestVersionsTestCase {
+            description: "other tables are never limited",
+            kind: WarehouseHistoryKind::NodeResults,
+            incremental: false,
+            server_limit: Some(5),
+            expected: None,
+        },
+        NewestVersionsTestCase {
+            description: "a server without the setting gets the full history",
+            kind: WarehouseHistoryKind::Fingerprints,
+            incremental: false,
+            server_limit: None,
+            expected: None,
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.index = WarehouseHistoryKind::ALL
+            .iter()
+            .position(|kind| *kind == test_case.kind)
+            .expect("kind is listed");
+        state.state_history_versions = test_case.server_limit;
+        if test_case.incremental {
+            state.observed_since = Some(Utc::now());
+        }
+        let request: serde_json::Value =
+            serde_json::from_slice(&history_request(&state).expect("request")).expect("JSON");
+        assert_eq!(
+            request[test_case.kind.as_str()]
+                .get("newest_versions")
+                .and_then(serde_json::Value::as_u64),
+            test_case.expected.map(u64::from),
             "{}",
             test_case.description
         );

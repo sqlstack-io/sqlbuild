@@ -220,6 +220,15 @@ class WarehouseHistoryTestCase:
 
 
 @dataclass(frozen=True)
+class NewestVersionsTestCase:
+    description: str
+    adapter_name: str
+    connection_key: str
+    newest_versions: int | None
+    expected_runs: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
 class CatalogConnectionTestCase:
     description: str
     adapter_name: str

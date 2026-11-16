@@ -103,6 +103,7 @@ use crate::api::_helpers::resources::{
     warehouse_metadata::report,
     warehouse_metadata::preview_copy,
     warehouse_metadata::statistics_due,
+    warehouse_metadata::retention,
     warehouse_metadata::sync_due,
     warehouse_metadata::watermark
 ))]
@@ -548,6 +549,7 @@ pub struct ServerFacts {
     pub statistics: crate::warehouse_metadata::models::StatisticsRetention,
     pub snapshots: crate::snapshots::models::SnapshotRetention,
     pub run_logs: crate::runs::models::RunLogRetention,
+    pub state_history: crate::warehouse_metadata::models::StateHistoryRetention,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.
@@ -572,6 +574,8 @@ pub struct ServerRetention {
     pub run_log_days: i64,
     /// Finished runs per location target that keep their logs.
     pub run_logs_kept: i64,
+    /// Builds of each node, and results of each check, the store mirrors from the warehouse.
+    pub state_history_versions: i64,
     pub platform_alert_days: i64,
     pub heartbeat_days: i64,
     pub location_health_days: i64,

@@ -1106,6 +1106,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How much state history a full read delivers; older servers answer 404 and the location reads it all. */
+        get: operations["read_metadata_retention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/statistics-due": {
         parameters: {
             query?: never;
@@ -3253,6 +3270,11 @@ export interface components {
              * @description Publications kept per location target.
              */
             snapshots_kept: number;
+            /**
+             * Format: int64
+             * @description Builds of each node, and results of each check, the store mirrors from the warehouse.
+             */
+            state_history_versions: number;
             /** Format: int64 */
             statistics_days: number;
         };
@@ -3605,6 +3627,11 @@ export interface components {
             warehouse_name: string;
             warehouse_size: string;
             warehouse_type?: string | null;
+        };
+        /** @description The newest versions per node or check a full read of state history needs to deliver. */
+        WarehouseRetention: {
+            /** Format: int32 */
+            state_history_versions: number;
         };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
@@ -6651,6 +6678,42 @@ export interface operations {
             };
             /** @description Reader generation fenced */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_metadata_retention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseRetention"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

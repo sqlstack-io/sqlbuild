@@ -230,6 +230,8 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) mirror_holds_rows: bool,
     /// One warm runtime interpreter and warehouse session serve every page of a synchronization.
     pub(crate) reader: Option<LocationCompiler>,
+    /// The server's state-history limit, read as each synchronization begins; `None` from older servers.
+    pub(crate) state_history_versions: Option<u16>,
 }
 
 /// The metadata reader's answer to one read.
@@ -310,6 +312,17 @@ impl LocationMetadataSync {
         ((recorded.reconciled || !self.reconciling())
             && (self.mirror_holds_rows || !recorded.delivered))
             .then_some(recorded.token.as_str())
+    }
+
+    /// The newest versions a full read of builds or check results delivers; incremental reads take all.
+    pub(crate) fn newest_versions(&self) -> Option<u16> {
+        (self.observed_since.is_none()
+            && matches!(
+                self.kind(),
+                WarehouseHistoryKind::Fingerprints | WarehouseHistoryKind::AuditResults
+            ))
+        .then_some(self.state_history_versions)
+        .flatten()
     }
 
     pub(crate) fn kind(&self) -> WarehouseHistoryKind {

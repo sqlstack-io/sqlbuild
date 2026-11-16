@@ -94,6 +94,8 @@ mod test_resource_costs;
 mod test_run_ids;
 #[path = "test_server_errors.rs"]
 mod test_server_errors;
+#[path = "test_state_history_retention.rs"]
+mod test_state_history_retention;
 #[path = "test_statistics_recovery.rs"]
 mod test_statistics_recovery;
 #[path = "test_trigger_upcoming.rs"]

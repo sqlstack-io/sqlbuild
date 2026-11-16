@@ -12,4 +12,5 @@ pub mod ingest_old_name_views;
 pub mod ingest_resource_costs;
 pub mod ingest_source_freshness;
 pub mod ingest_statistics;
+pub(crate) mod prune_state_history;
 pub(crate) mod prune_statistics;

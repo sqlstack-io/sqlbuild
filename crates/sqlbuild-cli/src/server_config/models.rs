@@ -31,7 +31,7 @@ pub(crate) struct ServerSection {
     pub(crate) scheduler: Option<bool>,
 }
 
-/// How long the server keeps statistics, audit records, snapshots and run logs.
+/// How long the server keeps statistics, audit records, snapshots, run logs and state history.
 #[derive(Debug, Default, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RetentionSection {
@@ -40,4 +40,5 @@ pub(crate) struct RetentionSection {
     pub(crate) snapshot_count: Option<u16>,
     pub(crate) run_log_days: Option<u16>,
     pub(crate) run_log_count: Option<u16>,
+    pub(crate) state_history_versions: Option<u16>,
 }

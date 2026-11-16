@@ -442,8 +442,16 @@ def warehouse_history_page(
     table: str,
     after: list[str | None] | None = None,
     observed_since: str | None = None,
+    newest_versions: int | None = None,
 ) -> Any:
     """Exercise the real isolated reader without a server, state database or declaration import."""
+    read: dict[str, Any] = {
+        "location": {"database": None, "schema": "main"},
+        "after": after,
+        "observed_since": observed_since,
+    }
+    if newest_versions is not None:
+        read["newest_versions"] = newest_versions
     result: subprocess.CompletedProcess[str] = subprocess.run(
         [
             str(Path(sys.executable).with_name("sqb")),
@@ -458,16 +466,7 @@ def warehouse_history_page(
             "--target",
             "development",
         ],
-        input=json.dumps(
-            {
-                table: {
-                    "location": {"database": None, "schema": "main"},
-                    "after": after,
-                    "observed_since": observed_since,
-                }
-            }
-        )
-        + "\n",
+        input=json.dumps({table: read}) + "\n",
         text=True,
         capture_output=True,
         timeout=20,

@@ -30,7 +30,7 @@ use sqlbuild_state::freshness::constants::{
 use sqlbuild_state::observations::constants::OBSERVATION_COLUMN_TYPES;
 use sqlbuild_state::resource_costs::constants::RESOURCE_COST_COLUMN_TYPES;
 use sqlbuild_state::state_tables::main::read_history_sql::read_history_sql;
-use sqlbuild_state::state_tables::models::HistoryRead;
+use sqlbuild_state::state_tables::models::{HistoryRead, NewestVersions};
 
 use crate::bindings::_helpers::authored_values::sql_values::{SqlValueClasses, sql_value};
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
@@ -47,6 +47,15 @@ use crate::bindings::_helpers::query_command::project::{
 };
 use crate::bindings::_helpers::records::fields::field;
 use crate::bindings::_helpers::records::{construct::record_class, ids::RecordId};
+
+/// A node's builds share these columns, as the control store groups them.
+const FINGERPRINT_IDENTITY_COLUMNS: [&str; 5] = [
+    "node_type",
+    "node_name",
+    "target_database",
+    "target_schema",
+    "target_name",
+];
 
 /// One read-only adapter session serves every page of one synchronization.
 pub(crate) struct HistorySession<'py> {
@@ -500,6 +509,12 @@ fn read_page<'py>(
         })
         .collect();
     let projection: Vec<&str> = projection.iter().map(String::as_str).collect();
+    let newest =
+        newest_versions(request).map(|(partition, tie_breakers, versions)| NewestVersions {
+            partition,
+            tie_breakers,
+            versions,
+        });
     let window = if session.local {
         limit
     } else {
@@ -516,6 +531,7 @@ fn read_page<'py>(
             adapter: &adapter_name,
             has_event_id,
             limit: window,
+            newest,
         },
     )
     .map_err(PyValueError::new_err)?;
@@ -653,6 +669,35 @@ fn discard_stream(
         stream.cursor.call_method0("close")?;
     }
     Ok(())
+}
+
+/// A full read of builds or check results keeps each node's or check's newest rows only.
+///
+/// Returns the identity columns, the columns ordering rows with one timestamp, and the count.
+fn newest_versions(
+    request: &WarehouseHistoryRead,
+) -> Option<(&'static [&'static str], &'static [&'static str], u16)> {
+    match request {
+        WarehouseHistoryRead::Fingerprints(read) if read.observed_since.is_none() => {
+            read.newest_versions.map(|versions| {
+                (
+                    FINGERPRINT_IDENTITY_COLUMNS.as_slice(),
+                    ["run_id"].as_slice(),
+                    versions,
+                )
+            })
+        }
+        WarehouseHistoryRead::AuditResults(read) if read.observed_since.is_none() => {
+            read.newest_versions.map(|versions| {
+                (
+                    ["binding_key"].as_slice(),
+                    ["result_id"].as_slice(),
+                    versions,
+                )
+            })
+        }
+        _ => None,
+    }
 }
 
 /// The token a complete earlier read recorded; only state-table scans carry one.

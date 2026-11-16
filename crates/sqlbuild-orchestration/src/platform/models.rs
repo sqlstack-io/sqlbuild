@@ -11,7 +11,7 @@ use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use crate::snapshots::models::SnapshotRetention;
 use crate::warehouse_metadata::models::{
-    StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
+    StateHistoryRetention, StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
 };
 
 /// Every retention horizon one server's maintenance role enforces.
@@ -21,6 +21,7 @@ pub struct RetentionPolicies {
     pub statistics: StatisticsRetention,
     pub snapshots: SnapshotRetention,
     pub run_logs: RunLogRetention,
+    pub state_history: StateHistoryRetention,
 }
 
 /// One pooled outbound connection; the location never receives a store handle.

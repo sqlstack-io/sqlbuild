@@ -12,7 +12,11 @@ use sqlbuild_core::constants::{
 };
 
 use crate::store::errors::ControlError;
-use crate::warehouse_metadata::constants::DEFAULT_STATISTICS_RETENTION_DAYS;
+use crate::store::models::ControlStore;
+use crate::warehouse_metadata::constants::{
+    DEFAULT_POSTGRES_STATE_HISTORY_VERSIONS, DEFAULT_SQLITE_STATE_HISTORY_VERSIONS,
+    DEFAULT_STATISTICS_RETENTION_DAYS,
+};
 
 /// Preserve observations, not an inferred latest version, age status or run outcome.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -591,6 +595,9 @@ pub struct FingerprintRead {
     /// The table's change token after the last complete read; an equal token skips this read.
     #[serde(default)]
     pub unchanged_token: Option<String>,
+    /// A full read delivers only each node's newest builds; incremental reads ignore it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub newest_versions: Option<u16>,
 }
 
 /// Node results carry no event identity, so the cursor holds the row's identity columns.
@@ -630,6 +637,9 @@ pub struct StateEventsRead {
     /// The table's change token after the last complete read; an equal token skips this read.
     #[serde(default)]
     pub unchanged_token: Option<String>,
+    /// A full read of check results delivers only each check's newest; other tables ignore it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub newest_versions: Option<u16>,
 }
 
 /// The private interpreter accepts only known state tables, never arbitrary SQL.
@@ -904,6 +914,43 @@ impl Default for StatisticsRetention {
             days: DEFAULT_STATISTICS_RETENTION_DAYS,
         }
     }
+}
+
+/// Installation configuration: builds and check results the store mirrors per node or check.
+///
+/// Unset, the limit follows the store: SQLite keeps fewer versions than PostgreSQL.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StateHistoryRetention {
+    versions: Option<u16>,
+}
+
+impl StateHistoryRetention {
+    pub fn versions(versions: u16) -> Result<Self, ControlError> {
+        if versions == 0 {
+            return Err(ControlError::Invalid(
+                "state history retention must keep at least one version".into(),
+            ));
+        }
+        Ok(Self {
+            versions: Some(versions),
+        })
+    }
+
+    /// The configured limit, or the store's default; never zero, so a node's latest version stays.
+    #[must_use]
+    pub fn kept_versions(self, store: &ControlStore) -> u16 {
+        self.versions.unwrap_or(match store {
+            ControlStore::Sqlite(_) => DEFAULT_SQLITE_STATE_HISTORY_VERSIONS,
+            ControlStore::Postgres(_) => DEFAULT_POSTGRES_STATE_HISTORY_VERSIONS,
+        })
+    }
+}
+
+/// The newest versions per node or check a full read of state history needs to deliver.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseRetention {
+    pub state_history_versions: u16,
 }
 
 /// A current snapshot node's declared metadata and latest build, without SQL, source or config.

@@ -5,6 +5,18 @@ use crate::warehouse_metadata::models::WarehouseHistoryKind;
 pub const MAX_HISTORY_RECORDS: usize = 100;
 pub(crate) const CATALOG_MIRROR: &str = "sqb_warehouse_catalog";
 pub(crate) const DEFAULT_STATISTICS_RETENTION_DAYS: u16 = 90;
+/// Builds and check results a SQLite store keeps per node or check unless configured.
+pub const DEFAULT_SQLITE_STATE_HISTORY_VERSIONS: u16 = 5;
+/// The PostgreSQL default matches the janitor's `direct_state_history_versions` default.
+pub const DEFAULT_POSTGRES_STATE_HISTORY_VERSIONS: u16 = 20;
+/// Mirrored state-history rows one pruning transaction deletes, so writers never wait long.
+pub(crate) const STATE_HISTORY_PRUNE_BATCH: usize = 500;
+/// Free pages, as a share of the SQLite file, above which pruning returns the space to the disk.
+pub(crate) const SQLITE_RECLAIM_FREE_SHARE: f64 = 0.25;
+/// Free pages below this are not worth reclaiming, whatever their share.
+pub(crate) const SQLITE_RECLAIM_MIN_FREE_PAGES: i64 = 1024;
+/// Free pages one incremental vacuum step returns to the disk.
+pub(crate) const SQLITE_RECLAIM_STEP_PAGES: i64 = 4096;
 /// Column-lineage node definitions read per query, well under every backend's bound parameter limit.
 pub(crate) const LINEAGE_DEFINITION_BATCH: usize = 1000;
 /// Mirrored tables a plan preview needs synced cleanly; observations only refine it into knowns.

@@ -201,6 +201,7 @@ audit_days = 730
 snapshot_count = 20
 run_log_days = 7
 run_log_count = 100
+state_history_versions = 10
 ```
 
 | Data | `[retention]` key | Option | Default | Range |
@@ -210,6 +211,7 @@ run_log_count = 100
 | Published snapshots per location and target | `snapshot_count` | `--snapshot-retention-count` | `10` | `1`–`65535` |
 | Logs of finished runs | `run_log_days` | `--run-log-retention-days` | `14` | `1`–`65535` |
 | Finished runs per location and target that keep their logs | `run_log_count` | `--run-log-retention-count` | `200` | `1`–`65535` |
+| Builds and check results kept for each node | `state_history_versions` | `--state-history-retention-versions` | `5` on SQLite, `20` on PostgreSQL | `1`–`65535` |
 | Skipped and covered schedule ticks | None | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
@@ -236,6 +238,24 @@ is older than `run_log_days` or when more than `run_log_count` newer runs
 have finished in its location and target, whichever comes first. The run itself, its node results,
 and the run history the scheduler recorded stay, so run lists, node status and history are
 unchanged; only the run's log, statements and SQL are no longer shown. A running run keeps its log.
+
+Locations copy the builds and check results recorded in the warehouse's
+`_sqlbuild_fingerprints` and `_sqlbuild_audit_results` tables into the control database. The
+server keeps the newest `state_history_versions` builds of each node and results of each check,
+and always keeps the latest one:
+
+- A location's first read of a table, and its periodic full re-read, take only the newest
+  `state_history_versions` rows of each node or check from the warehouse.
+- Builds and results that arrive later are added, and older ones are deleted in small batches about
+  once a minute.
+- A SQLite control database gives the freed space back to the disk, so the file shrinks. A file
+  created by an older release is vacuumed once, when at least a quarter of it is free; after that,
+  space is freed a little at a time.
+
+The PostgreSQL default matches the janitor's
+[`direct_state_history_versions`](janitor.md#state-history-pruning), so with the janitor
+running the server keeps what the warehouse keeps. [`sqb dev`](dev.md) has no
+`server.toml` and uses the SQLite default.
 
 The **Server** panel on the **Settings** page shows the control database's size on disk and both
 run log limits, and each `heartbeat` [platform event](#receive-platform-events) carries the size as

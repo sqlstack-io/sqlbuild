@@ -140,3 +140,11 @@ pub(super) struct SafetySyncIdleTestCase {
     pub(super) safety_due_after_seconds: u64,
     pub(super) expected_sync_due: bool,
 }
+
+pub(crate) struct NewestVersionsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) kind: WarehouseHistoryKind,
+    pub(crate) incremental: bool,
+    pub(crate) server_limit: Option<u16>,
+    pub(crate) expected: Option<u16>,
+}

@@ -367,6 +367,7 @@ pub(crate) fn metadata_sync(
         scan_delivered: false,
         mirror_holds_rows: false,
         reader: None,
+        state_history_versions: None,
     }
 }
 
@@ -385,10 +386,14 @@ pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, C
             "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
         }})
     } else {
-        json!({(kind): {
+        let mut read = json!({
             "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit,
             "unchanged_token":state.unchanged_token()
-        }})
+        });
+        if let Some(versions) = state.newest_versions() {
+            read["newest_versions"] = json!(versions);
+        }
+        json!({(kind): read})
     };
     serde_json::to_vec(&request).map_err(|error| ControlError::Invalid(error.to_string()))
 }
@@ -492,6 +497,10 @@ pub(crate) async fn begin_after_run(
     };
     let ran = state.sync_due(due.runs_ended_at);
     if ran {
+        state.state_history_versions = match client.metadata_retention(target).await {
+            Ok(retention) => retention.map(|retention| retention.state_history_versions),
+            Err(error) => return (state, Err(error)),
+        };
         state.begin_sync(due.now);
     }
     (state, Ok(ran))

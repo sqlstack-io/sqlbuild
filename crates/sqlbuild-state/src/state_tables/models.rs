@@ -19,4 +19,15 @@ pub struct HistoryRead<'a> {
     pub adapter: &'a str,
     pub has_event_id: bool,
     pub limit: usize,
+    /// Deliver only each identity's newest rows, so a capped mirror never copies older ones.
+    pub newest: Option<NewestVersions<'a>>,
+}
+
+/// The identity a version count applies to, and how many of its newest rows a read keeps.
+#[derive(Clone, Copy, Debug)]
+pub struct NewestVersions<'a> {
+    pub partition: &'a [&'a str],
+    /// Columns after the timestamp that order rows sharing it, newest first.
+    pub tie_breakers: &'a [&'a str],
+    pub versions: u16,
 }
