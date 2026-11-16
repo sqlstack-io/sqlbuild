@@ -1,7 +1,12 @@
 """A location plans from the server's synced copy and never opens the warehouse to do it."""
 
 import json
+import os
+import sqlite3
 import subprocess
+import sys
+import time
+from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
@@ -11,13 +16,24 @@ import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ChangedPlanPreviewTestCase,
+    HeldPlanTestCase,
     PlanPreviewTestCase,
+)
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
+    request_plan,
+    request_warehouse_sync,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     changed_build_and_plan_from_copy,
+    changed_runs,
     live_plan,
+    location_process,
     plan_from_copy,
+    plans_from_copy,
     run_sqb,
+    snapshot_api,
+    wait_for_generation,
+    wait_for_location_work,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
@@ -118,6 +134,7 @@ _UNKNOWN: list[str] = [
     "column rename support",
     "sources outside mirrored schemas",
 ]
+_HELD: str = "Planning from the published compiled project."
 _REPLAYED: str = (
     "cursor window of daily_orders (the run starts it away from the last build's cursor)"
 )
@@ -292,3 +309,128 @@ def test_given_an_edited_model_when_the_location_plans_what_changed_then_it_publ
         "downstream": [run["node"] for run in runs if run["downstream_of"] is not None],
     }, (tmp_path / "location.log").read_text()
     assert published == {"changed": ["model:order_count"], "downstream": ["model:order_summary"]}
+
+
+_SYNCED: str = "Warehouse history synchronization completed"
+_PLANNED: str = "Planned what changed"
+
+
+def _logged(log: Path, text: str, count: int, process: subprocess.Popen[bytes]) -> str:
+    """Wait until `text` has been logged `count` times; returns the log."""
+    deadline: float = time.monotonic() + 45
+    while (logged := log.read_text()).count(text) < count:
+        assert process.poll() is None, logged
+        assert time.monotonic() < deadline, logged
+        time.sleep(0.05)
+    return logged
+
+
+def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_publication_or_an_applied_change(
+    tmp_path: Path,
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(project_dir=project, files=_PROJECT_FILES)
+    built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
+    assert built.returncode == 0, built.stderr
+    edited: str = _PROJECT_FILES["models/order_count.sql"].replace(
+        "AS order_count", "AS order_count, 1 AS batch"
+    )
+    write_files(project_dir=project, files={"models/order_count.sql": edited})
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+
+    def changed_build() -> dict[str, list[str]] | None:
+        with closing(sqlite3.connect(control)) as database:
+            row: tuple[str] | None = database.execute(
+                "SELECT report_json FROM sqb_changed_builds"
+            ).fetchone()
+        return None if row is None else json.loads(row[0])
+
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "development", 1, location, log)
+        first: str = _logged(log, _PLANNED, 1, location)
+        assert first.index(_SYNCED) < first.index(_PLANNED), (
+            "a publication plans what changed once its sync completes, not from the old copy"
+        )
+        assert changed_build() == {"changed": ["model:order_count"], "downstream": []}
+
+        _ = wait_for_location_work(api, request_warehouse_sync(control), location, log)
+        _ = _logged(log, _SYNCED, 2, location)
+        # A later plan request runs on a later turn, after any plan the completed sync started.
+        _ = wait_for_location_work(api, request_plan(control, ["model:orders"]), location, log)
+        assert log.read_text().count(_PLANNED) == 1, "a sync that applied nothing keeps the count"
+
+        rebuilt: subprocess.CompletedProcess[str] = run_sqb(
+            project, "build", "--target", "development"
+        )
+        assert rebuilt.returncode == 0, rebuilt.stderr
+        _ = wait_for_location_work(api, request_warehouse_sync(control), location, log)
+        _ = _logged(log, _PLANNED, 2, location)
+        assert changed_build() == {"changed": [], "downstream": []}, (
+            "a sync that mirrored the new build plans again"
+        )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        HeldPlanTestCase(
+            description=(
+                "only the plan that sets variables compiles the project again; the other two "
+                "and the changed-build count plan from the published project"
+            ),
+            settings=(
+                {"changed": True},
+                {"changed": True, "vars": {"batch": "2"}},
+                {"changed": True},
+            ),
+            expected_runs=((), ("model:order_count",), ()),
+            expected_compiles=1,
+            expected_held_plans=3,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_plan_requests_when_the_location_plans_them_then_only_variables_compile_the_project_again(
+    test_case: HeldPlanTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    files: dict[str, str] = _PROJECT_FILES | {
+        "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"] + '[vars]\nbatch = "1"\n',
+        "models/order_count.sql": _PROJECT_FILES["models/order_count.sql"].replace(
+            "AS order_count", "AS order_count, @@batch AS batch"
+        ),
+    }
+    write_files(project_dir=project, files=files)
+    built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
+    assert built.returncode == 0, built.stderr
+    requests: list[tuple[list[str], dict[str, object]]] = [
+        (["model:order_count"], settings) for settings in test_case.settings
+    ]
+
+    plans: list[dict[str, Any]] = plans_from_copy(tmp_path, project, requests)
+
+    log: str = (tmp_path / "location.log").read_text()
+    assert tuple(map(changed_runs, plans)) == test_case.expected_runs, log
+    assert log.count("Compiling project...") == test_case.expected_compiles, log
+    assert log.count(_HELD) == test_case.expected_held_plans, log

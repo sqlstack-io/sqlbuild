@@ -7,7 +7,7 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods};
 use pyo3::wrap_pyfunction;
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_core::plan_display::constants::{
-    PLAN_SYNCED_COPY_ENV, SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY,
+    SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY,
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
@@ -23,7 +23,7 @@ use crate::bindings::_helpers::command_runtime::preview_target::validate_preview
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
+use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
 use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
 use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, preview_changed};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
@@ -87,13 +87,24 @@ struct PlanInvocation<'py> {
     synced_copy: Option<Bound<'py, SyncedCopyAdapter>>,
 }
 
-/// The synced-copy adapter when a location asked for a preview; a preview never defers.
+/// A plan's project: compiled for the request, or the discovered inputs and compiled phase a location holds.
+#[derive(Clone, Copy)]
+pub(crate) enum PlanProject<'a, 'py> {
+    Compiled,
+    Held {
+        discovered: &'a Bound<'py, PyAny>,
+        compiled: &'a Bound<'py, PyAny>,
+    },
+}
+
+/// The synced-copy adapter for a location's plan preview, read from `copy`; a preview never defers.
 fn synced_copy<'py>(
     request: &Bound<'py, PyAny>,
     adapter: Bound<'py, PyAny>,
+    copy: Option<&str>,
 ) -> PyResult<Option<Bound<'py, SyncedCopyAdapter>>> {
     let py: Python<'py> = request.py();
-    let Ok(path) = std::env::var(PLAN_SYNCED_COPY_ENV) else {
+    let Some(path) = copy else {
         return Ok(None);
     };
     if native_field(request, "defer_to")?.is_truthy()? {
@@ -108,11 +119,14 @@ fn synced_copy<'py>(
     }
     Ok(Some(Bound::new(
         py,
-        SyncedCopyAdapter::load(py, adapter, &path)?,
+        SyncedCopyAdapter::load(py, adapter, path)?,
     )?))
 }
 
-fn resolve_invocation<'py>(request: &Bound<'py, PyAny>) -> PyResult<PlanInvocation<'py>> {
+fn resolve_invocation<'py>(
+    request: &Bound<'py, PyAny>,
+    (project, copy): (PlanProject<'_, 'py>, Option<&str>),
+) -> PyResult<PlanInvocation<'py>> {
     let py: Python<'py> = request.py();
     let requested_dir: Bound<'py, PyAny> = native_field(request, "project_dir")?;
     let project_dir: Bound<'py, PyAny> = if requested_dir.is_none() {
@@ -120,16 +134,19 @@ fn resolve_invocation<'py>(request: &Bound<'py, PyAny>) -> PyResult<PlanInvocati
     } else {
         requested_dir
     };
-    let discovered: Bound<'py, PyAny> = discover_project_inputs(
-        py,
-        Some(keywords(
+    let discovered: Bound<'py, PyAny> = match project {
+        PlanProject::Held { discovered, .. } => discovered.clone(),
+        PlanProject::Compiled => discover_project_inputs(
             py,
-            &[
-                ("project_dir", project_dir.clone()),
-                ("extract_output_column_locations", flag(py, false)),
-            ],
-        )?),
-    )?;
+            Some(keywords(
+                py,
+                &[
+                    ("project_dir", project_dir.clone()),
+                    ("extract_output_column_locations", flag(py, false)),
+                ],
+            )?),
+        )?,
+    };
     validate_preview_target(
         py,
         discovered.clone(),
@@ -179,7 +196,7 @@ fn resolve_invocation<'py>(request: &Bound<'py, PyAny>) -> PyResult<PlanInvocati
         requested_load
     };
     let synced_copy: Option<Bound<'py, SyncedCopyAdapter>> =
-        synced_copy(request, native_field(&context, "adapter")?)?;
+        synced_copy(request, native_field(&context, "adapter")?, copy)?;
     Ok(PlanInvocation {
         project_dir,
         discovered,
@@ -229,6 +246,7 @@ fn connection_hooks<'py>(invocation: &PlanInvocation<'py>) -> PyResult<Bound<'py
 fn compile_pipeline<'py>(
     request: &Bound<'py, PyAny>,
     invocation: &PlanInvocation<'py>,
+    project: PlanProject<'_, 'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = request.py();
     let resolver: Bound<'py, PyAny> = resolve_external_sql_reference_resolver(
@@ -270,23 +288,17 @@ fn compile_pipeline<'py>(
     options.set_item("record_migration_fingerprints", false)?;
     let pipeline_options: Bound<'py, PyAny> =
         new_record(py, RecordId::CompilePipelineOptions, (), Some(&options))?;
-    run_compile_pipeline(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("discovered_inputs", invocation.discovered.clone()),
-                (
-                    "adapter",
-                    match &invocation.synced_copy {
-                        Some(facade) => facade.clone().into_any(),
-                        None => native_field(&invocation.context, "adapter")?,
-                    },
-                ),
-                ("options", pipeline_options),
-                ("hooks", connection_hooks(invocation)?),
-            ],
-        )?),
+    let adapter: Bound<'py, PyAny> = match &invocation.synced_copy {
+        Some(facade) => facade.clone().into_any(),
+        None => native_field(&invocation.context, "adapter")?,
+    };
+    planned_project(
+        (&invocation.discovered, &adapter),
+        (&pipeline_options, connection_hooks(invocation)?),
+        match project {
+            PlanProject::Held { compiled, .. } => Some(compiled),
+            PlanProject::Compiled => None,
+        },
     )
 }
 
@@ -318,12 +330,13 @@ fn changed_preview(
     Ok(Some(decision))
 }
 
+/// Print the plan; the JSON plan is returned instead when `captured`.
 fn write_output(
     request: &Bound<'_, PyAny>,
-    invocation: &PlanInvocation<'_>,
+    (invocation, captured): (&PlanInvocation<'_>, bool),
     pipeline: &Bound<'_, PyAny>,
     changed: Option<&ChangedDecision>,
-) -> PyResult<()> {
+) -> PyResult<Option<String>> {
     let py: Python<'_> = request.py();
     let plan: Bound<'_, PyAny> = native_field(pipeline, "plan_output")?;
     let python_entries: Bound<'_, PyAny> = native_field(pipeline, "python_plan_entries")?;
@@ -340,8 +353,11 @@ fn write_output(
             options.push((CHANGED_KEY, changed_json(py, decision)?.into_any()));
         }
         let text: String = format_plan_json(py, Some(keywords(py, &options)?))?;
+        if captured {
+            return Ok(Some(text));
+        }
         imported(py, "builtins", "print")?.call1((text,))?;
-        return Ok(());
+        return Ok(None);
     }
     let display: Bound<'_, PyDict> = PyDict::new(py);
     display.set_item(
@@ -377,7 +393,7 @@ fn write_output(
     if let Some(facade) = &invocation.synced_copy {
         print_line(py, &synced_copy_text(facade.get()))?;
     }
-    Ok(())
+    Ok(None)
 }
 
 /// The plan JSON's account of the synced copy: when it synced, window starts and unknowns.
@@ -424,20 +440,56 @@ fn synced_copy_text(facade: &SyncedCopyAdapter) -> String {
 #[pyfunction]
 #[pyo3(signature = (*, request))]
 pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
-    let py: Python<'_> = request.py();
-    let invocation: PlanInvocation<'_> = resolve_invocation(request)?;
+    Ok(plan(request, (PlanProject::Compiled, None))?.0)
+}
+
+/// A location's preview from the synced copy at `copy`; variables or an external dbt manifest compile again.
+pub(crate) fn location_plan<'py>(
+    request: &Bound<'py, PyAny>,
+    (held, copy): (PlanProject<'_, 'py>, &str),
+) -> PyResult<(i32, Option<String>)> {
+    let external_manifest: bool = match held {
+        PlanProject::Held { discovered, .. } => !native_field(
+            &native_field(&native_field(discovered, "project_config")?, "dbt")?,
+            "target_path",
+        )?
+        .is_none(),
+        PlanProject::Compiled => false,
+    };
+    let project: PlanProject<'_, 'py> =
+        if external_manifest || native_field(request, "cli_vars")?.is_truthy()? {
+            PlanProject::Compiled
+        } else {
+            held
+        };
+    plan(request, (project, Some(copy)))
+}
+
+/// One plan: printed, or with a synced copy, the JSON plan returned.
+fn plan<'py>(
+    request: &Bound<'py, PyAny>,
+    (project, copy): (PlanProject<'_, 'py>, Option<&str>),
+) -> PyResult<(i32, Option<String>)> {
+    let py: Python<'py> = request.py();
+    let invocation: PlanInvocation<'py> = resolve_invocation(request, (project, copy))?;
     if !native_field(request, "json_output")?.is_truthy()? {
         write_progress(&invocation.stream, "\n")?;
     }
     let verbose: bool = native_field(request, "verbose")?.is_truthy()?;
-    let pipeline: Bound<'_, PyAny> =
-        with_verbose_inspection(py, verbose, || compile_pipeline(request, &invocation))?;
+    let pipeline: Bound<'py, PyAny> = with_verbose_inspection(py, verbose, || {
+        compile_pipeline(request, &invocation, project)
+    })?;
     let changed: Option<ChangedDecision> = changed_preview(request, &invocation, &pipeline)?;
-    write_output(request, &invocation, &pipeline, changed.as_ref())?;
-    Ok(i32::from(plan_has_errors(&native_field(
+    let output: Option<String> = write_output(
+        request,
+        (&invocation, copy.is_some()),
         &pipeline,
-        "plan_output",
-    )?)?))
+        changed.as_ref(),
+    )?;
+    Ok((
+        i32::from(plan_has_errors(&native_field(&pipeline, "plan_output")?)?),
+        output,
+    ))
 }
 
 /// Whether any plan finding has error severity, which `sqb build` refuses.

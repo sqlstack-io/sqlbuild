@@ -36,3 +36,5 @@ pub(crate) const SQL_TEST_NODE_KIND: &str = "sql_test";
 pub(crate) const SNAPSHOT_HIDDEN_SETTING: &str = "alias";
 /// Characters of a failed metadata read's message the reader returns; the location prints it.
 pub(crate) const METADATA_ERROR_CHARS: usize = 2000;
+/// The runtime request key of a plan preview: `{"plan": {"argv", "copy"}}`.
+pub(crate) const PLAN_REQUEST: &str = "plan";

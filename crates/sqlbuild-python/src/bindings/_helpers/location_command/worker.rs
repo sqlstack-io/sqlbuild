@@ -322,7 +322,7 @@ fn record_compiled_vars<'py>(
     };
     write_stderr(py, "Compiling with the run's variables...\n")?;
     let vars = json_value_to_python(py, vars)?;
-    let (compiled, _) = compile_snapshot(py, arguments, (input, project), Some(&vars))?;
+    let (compiled, _, _) = compile_snapshot(py, arguments, (input, project), Some(&vars))?;
     let node_hashes: BTreeMap<String, String> = node_hashes(&compiled.input)
         .map_err(|error| PyValueError::new_err(error.to_string()))?
         .into_iter()

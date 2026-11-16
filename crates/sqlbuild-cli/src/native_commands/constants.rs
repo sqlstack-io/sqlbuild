@@ -122,3 +122,7 @@ pub(crate) const CHANGED_BUILD_COMMAND: [&str; 2] = ["build", "--changed"];
 /// How much `sqb plan --json` output a location reads; model diffs over the server's cap are dropped.
 pub(crate) const PLAN_OUTPUT_BYTES: usize =
     8 * sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
+
+/// What a location reports when `sqb plan` produced no plan.
+pub(crate) const PLAN_NOT_PRODUCED: &str =
+    "sqb plan did not produce a plan; see the location's log";

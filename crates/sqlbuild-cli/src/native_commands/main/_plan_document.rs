@@ -4,7 +4,7 @@ use serde_json::Value;
 use sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
 
 use crate::native_commands::_helpers::execution::plan_failure;
-use crate::native_commands::constants::PLAN_OUTPUT_BYTES;
+use crate::native_commands::constants::{PLAN_NOT_PRODUCED, PLAN_OUTPUT_BYTES};
 
 /// The plan `sqb plan --json` printed, without model diffs when they would put it over the server's cap.
 pub(in crate::native_commands) fn plan_document(output: &[u8], planned: bool) -> Value {
@@ -13,7 +13,7 @@ pub(in crate::native_commands) fn plan_document(output: &[u8], planned: bool) ->
     }
     let mut document = match serde_json::from_slice::<Value>(output) {
         Ok(document) if document.is_object() && planned => document,
-        _ => return plan_failure("sqb plan did not produce a plan; see the location's log"),
+        _ => return plan_failure(PLAN_NOT_PRODUCED),
     };
     if output.len() <= PLAN_DOCUMENT_BYTES {
         return document;

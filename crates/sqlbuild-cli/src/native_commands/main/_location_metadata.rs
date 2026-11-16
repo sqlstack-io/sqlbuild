@@ -112,13 +112,17 @@ pub(super) async fn sync_location_metadata(
         result = &mut stopped => { result?; return Ok(None); },
         response = client.sync_metadata(&options.target, &pending.batch) => response,
     };
-    if let Err(error) = response {
-        tokio::select! {
+    let response = match response {
+        Ok(response) => response,
+        Err(error) => {
+            tokio::select! {
             result = &mut stopped => { result?; return Ok(None); },
             () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
+            }
+            return retry_metadata(state, error);
         }
-        return retry_metadata(state, error);
-    }
+    };
+    state.applied |= response.applied;
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         () = metadata_health(&state, (client, poll), (started, None)) => {},

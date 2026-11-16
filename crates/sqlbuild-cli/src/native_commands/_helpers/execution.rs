@@ -89,9 +89,9 @@ use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
-    LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
-    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ReadFailure, ScanToken,
-    SyncProgress,
+    LocationMetadataPage, LocationMetadataSync, LocationRuntimeRequest, LocationServe,
+    LocationWatch, LostStdout, MetadataReply, NativeCommand, NativeInvocation, ProjectLocation,
+    ReadFailure, ScanToken, SyncProgress,
 };
 use crate::native_commands::types::LocationPublication;
 use crate::server_config::models::ServerSection;
@@ -233,14 +233,14 @@ fn development_location_role(
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
 pub(crate) async fn compile_generation(
-    requests: &mpsc::Sender<LocationCompileRequest>,
+    requests: &mpsc::Sender<LocationRuntimeRequest>,
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(bool, Option<Instant>, Vec<WarehouseStateLocation>)>, ControlError> {
     let (reply, publication) = oneshot::channel();
     requests
-        .send(LocationCompileRequest {
+        .send(LocationRuntimeRequest::Publish(LocationCompileRequest {
             generation,
             python_sources: sources
                 .iter()
@@ -248,7 +248,7 @@ pub(crate) async fn compile_generation(
                 .cloned()
                 .collect(),
             reply,
-        })
+        }))
         .await
         .map_err(|_| ControlError::Invalid("location compiler stopped".into()))?;
     tokio::pin!(stopped);
@@ -285,6 +285,25 @@ pub(crate) async fn compile_generation(
         }
     }
     Ok(Some((published, refresh_at, locations)))
+}
+
+/// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
+pub(crate) async fn exchange_location_plan(
+    compiler: &mut LocationCompiler,
+    request: &serde_json::Value,
+) -> Result<serde_json::Value, ControlError> {
+    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
+    line.push(b'\n');
+    compiler.stdin.write_all(&line).await?;
+    compiler.stdin.flush().await?;
+    let mut reply = String::new();
+    if compiler.stdout.read_line(&mut reply).await? == 0 {
+        return Err(ControlError::Invalid(
+            "location interpreter exited before replying".into(),
+        ));
+    }
+    serde_json::from_str(&reply)
+        .map_err(|_| ControlError::Invalid("location interpreter returned an invalid plan".into()))
 }
 
 /// The child is retained by its owning task while this exchange can be cancelled.
@@ -363,6 +382,8 @@ pub(crate) fn metadata_sync(
         pending: None,
         next_at: Instant::now(),
         idle: true,
+        applied: false,
+        replan: true,
         cycle_started_at: None,
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),

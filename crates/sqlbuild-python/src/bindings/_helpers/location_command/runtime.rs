@@ -13,8 +13,10 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 use crate::bindings::_helpers::boundary::python_calls::within;
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
 use crate::bindings::_helpers::location_command::constants::{
-    DUCKDB_LOCK_CONFLICT, METADATA_ERROR_CHARS,
+    DUCKDB_LOCK_CONFLICT, METADATA_ERROR_CHARS, PLAN_REQUEST,
 };
+use crate::bindings::_helpers::location_command::runtime_plan::runtime_plan;
+use crate::bindings::_helpers::location_command::types::HeldProject;
 use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::{
@@ -28,6 +30,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
     within(&redirect, |_| {
         let mut session = None;
         let mut stream = None;
+        let mut held: Option<HeldProject<'_>> = None;
         let mut reported_busy = false;
         let mut serve = || -> PyResult<i32> {
             loop {
@@ -46,8 +49,12 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                 let output = if let Some(generation) = request.as_i64() {
                     options.set_item("generation", generation)?;
                     let arguments = location_arguments(py, Some(options.clone()))?;
+                    held = None;
                     let record = match publish_location(py, &arguments) {
-                        Ok(record) => Some(record),
+                        Ok((published, project)) => {
+                            held = Some(project);
+                            Some(published)
+                        }
                         Err(error) => {
                             write_stderr(
                                 py,
@@ -57,6 +64,8 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         }
                     };
                     serde_json::to_string(&record)
+                } else if let Some(plan) = request.get(PLAN_REQUEST) {
+                    serde_json::to_string(&runtime_plan(py, held.as_ref(), plan)?)
                 } else if WarehouseHistoryKind::ALL
                     .iter()
                     .any(|kind| request.get(kind.as_str()).is_some())
