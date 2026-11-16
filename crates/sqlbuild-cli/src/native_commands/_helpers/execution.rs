@@ -74,7 +74,7 @@ use crate::native_commands::_helpers::project_facts::has_no_runtime_extensions;
 use crate::native_commands::_helpers::rules::run_rules;
 use crate::native_commands::_helpers::skills::{run_skills, skill_freshness_notice};
 use crate::native_commands::_helpers::terminal::{
-    finish_lost_stdout, terminal_columns, write_output,
+    finish_lost_stdout, share_terminal, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
@@ -333,6 +333,7 @@ pub(crate) fn location_result<T: serde::de::DeserializeOwned>(
     (request, maximum_bytes): (Vec<u8>, u64),
 ) -> Result<(Child, impl Future<Output = Result<T, ControlError>>), ControlError> {
     let mut child = location_runtime_child(options, script)?;
+    share_terminal();
     let mut stdin = child
         .stdin
         .take()

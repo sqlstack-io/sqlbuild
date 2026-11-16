@@ -104,7 +104,11 @@ impl TransientLineCoordinator {
 
     /// Write lasting text, clearing and then redrawing any live transient line.
     #[pyo3(signature = (*, stream, text))]
-    fn write_persistent(&self, stream: &Bound<'_, PyAny>, text: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub(crate) fn write_persistent(
+        &self,
+        stream: &Bound<'_, PyAny>,
+        text: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
         self.locked(stream.py(), || {
             let owner: Option<Bound<'_, PyAny>> = self.interrupted_owner(stream)?;
             if let Some(owner) = &owner {

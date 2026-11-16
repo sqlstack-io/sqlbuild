@@ -181,3 +181,10 @@ pub(super) struct ChangedBuildNodesTestCase {
     pub(super) document: serde_json::Value,
     pub(super) expected: Result<(Vec<&'static str>, Vec<&'static str>), &'static str>,
 }
+
+pub(super) struct LineResetTestCase {
+    pub(super) description: &'static str,
+    pub(super) shared: bool,
+    pub(super) terminal: bool,
+    pub(super) expected_reset: &'static [u8],
+}
