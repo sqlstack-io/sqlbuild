@@ -6,10 +6,22 @@ use crate::templates::errors::TemplateError;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expression {
     Text(String),
+    /// A quoted argument holding `${...}` templates, joined as text.
+    Interpolated(Vec<TextPart>),
     Reference(String),
     Function {
         name: String,
         arguments: Vec<Expression>,
+    },
+}
+
+/// One piece of a quoted argument: literal text, or a template rendered as text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TextPart {
+    Text(String),
+    Template {
+        body: String,
+        expression: Expression,
     },
 }
 
