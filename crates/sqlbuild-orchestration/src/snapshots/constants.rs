@@ -6,6 +6,8 @@ pub(crate) const CONTENT_HASH_CHUNK: usize = 500;
 
 /// `{node_key: {column: {"expression_range": [start, end]}}}`; readers skip unknown column keys.
 pub(crate) const COLUMNS_DOCUMENT: &str = "columns";
+/// How long a publication waits for the server, which stores a large snapshot well past 30 s.
+pub(crate) const PUBLISH_TIMEOUT_SECONDS: u64 = 300;
 /// The target's non-secret connection settings, a `ConnectionDetails`.
 pub const CONNECTION_DOCUMENT: &str = "connection";
 /// Snapshot document kinds: per-snapshot metadata that never changes a node hash or node change.

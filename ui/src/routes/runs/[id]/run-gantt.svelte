@@ -456,8 +456,4 @@
 	.note {
 		left: 8px;
 	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
-	}
 </style>

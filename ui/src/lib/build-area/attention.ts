@@ -109,7 +109,7 @@ export function attentionView(item: AttentionItem, now: number, changedBuild: Ch
 				build: item.changed.length
 					? (() => {
 							const counts = changedBuildCounts(new Set(item.changed).size, changedBuild);
-							return { ...changedBuildLabel(counts.changed, counts.downstream, 'banner'), href: CHANGED_PLAN_HREF, variant: 'stale' as const };
+							return { ...changedBuildLabel(counts.changed, counts.downstream, 'banner', counts.failing), href: CHANGED_PLAN_HREF, variant: 'stale' as const };
 						})()
 					: { label: `Rebuild ${all.length}`, extra: null, tooltip: null, href: planHref(all), variant: 'stale-outline' }
 			};

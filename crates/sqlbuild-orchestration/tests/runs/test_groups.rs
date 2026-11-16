@@ -61,12 +61,12 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
             input.nodes.get_mut("orders").expect("orders").definition["deps"] =
                 json!(["customers"]);
             input.documents.insert("jobs".into(), json!({
-                "staging": {"description": "Stage customers", "selection": ["customers"], "concurrency_groups": ["warehouse"]},
-                "marts": {"description": "Build orders", "selection": ["orders"], "concurrency_groups": ["warehouse"]}
+                "staging": {"description": "Stage customers", "selection": ["customers"], "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 100}},
+                "marts": {"description": "Build orders", "selection": ["orders"], "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 100}}
             }));
             input.documents.insert("groups".into(), json!({"daily_orders": {
                 "description": "Stage then build orders", "selection": ["customers", "orders"],
-                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["staging"]}
+                "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 100}, "jobs": {"staging": [], "marts": ["staging"]}
             }}));
             let published = publish_snapshot(store, &input)
                 .await
@@ -340,12 +340,12 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
             };
             let mut input = snapshot(location);
             input.documents.insert("jobs".into(), json!({
-                "orders_job": {"description": "Build orders", "selection": ["orders"], "concurrency_groups": ["inventory_limit"]},
-                "inventory_job": {"description": "Build inventory", "selection": ["customers"], "concurrency_groups": ["orders_limit"]}
+                "orders_job": {"description": "Build orders", "selection": ["orders"], "concurrency_groups": ["inventory_limit"], "concurrency_limits": {"inventory_limit": 100}},
+                "inventory_job": {"description": "Build inventory", "selection": ["customers"], "concurrency_groups": ["orders_limit"], "concurrency_limits": {"orders_limit": 100}}
             }));
             input.documents.insert("groups".into(), json!({
-                "orders_group": {"description": "Orders group", "selection": ["orders"], "concurrency_groups": ["orders_limit"], "jobs": {"orders_job": []}},
-                "inventory_group": {"description": "Inventory group", "selection": ["customers"], "concurrency_groups": ["inventory_limit"], "jobs": {"inventory_job": []}}
+                "orders_group": {"description": "Orders group", "selection": ["orders"], "concurrency_groups": ["orders_limit"], "concurrency_limits": {"orders_limit": 100}, "jobs": {"orders_job": []}},
+                "inventory_group": {"description": "Inventory group", "selection": ["customers"], "concurrency_groups": ["inventory_limit"], "concurrency_limits": {"inventory_limit": 100}, "jobs": {"inventory_job": []}}
             }));
             publish_snapshot(store, &input)
                 .await

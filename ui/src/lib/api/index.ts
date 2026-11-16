@@ -1,6 +1,7 @@
 import type { ApiClient } from './client';
 import { createHttpClient } from './http-client';
 import { MockApiClient, type MockOptions } from './mock/mock-client';
+import { largeProject } from './mock/large-project';
 import { awkward } from './mock/awkward';
 import { replayFetch, type Recording } from './replay';
 import { LocalChangeBus } from './signals';
@@ -33,8 +34,8 @@ async function loadRecording(): Promise<Recording> {
 /**
  * The client the app uses: the server, or the mock with `?mock` or `VITE_SQB_MOCK=1`.
  * With the mock, `?as=<role>`, `?events=none|all` and `?live=reconnecting|offline`
- * adjust it for demos, and `?awkward` stretches every list to thousands of rows with very long
- * names, for the layout test.
+ * adjust it for demos, `?awkward` stretches every list to thousands of rows with very long
+ * names, for the layout test, and `?large` swaps in a catalog the size of a real project.
  */
 export function createClient(search: URLSearchParams, onUnauthorized: () => void = () => {}): ApiClient {
 	if (DEMO) return createHttpClient({ onUnauthorized, fetch: replayFetch(loadRecording), changes: new LocalChangeBus() });
@@ -47,5 +48,6 @@ export function createClient(search: URLSearchParams, onUnauthorized: () => void
 		events: EVENTS.find((e) => e === events),
 		connection: LIVE.find((l) => l === live)
 	});
-	return search.has('awkward') ? awkward(mock) : mock;
+	const sized = search.has('large') ? largeProject(mock) : mock;
+	return search.has('awkward') ? awkward(sized) : sized;
 }

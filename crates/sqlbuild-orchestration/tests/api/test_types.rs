@@ -27,6 +27,8 @@ pub(crate) struct DevelopmentTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_status: crate::declarations::models::TriggerStatus,
+    /// The names of the first target's location and of a second target's location.
+    pub(crate) expected_names: [&'static str; 2],
 }
 
 pub(crate) struct OlderServerReportTestCase {
@@ -290,4 +292,11 @@ pub(crate) struct ProvidersTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_jobs: Vec<&'static str>,
+}
+
+pub(crate) struct IngestionTurnTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) pages: usize,
+    pub(crate) relations_per_page: usize,
+    pub(crate) expected_writer_first: bool,
 }

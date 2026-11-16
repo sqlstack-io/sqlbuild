@@ -1721,6 +1721,12 @@ path = "crates/sqlbuild-python/src/bindings/_helpers/native_threads/exit_signal.
 symbols = ["signal_interpreter_exit"]
 reason = "The existing interpreter-exit signal is process-wide and monotonic: every native daemon wait must observe any exit hook before Python finalization. The atomic replaces the same global threading.Event, not per-command lifecycle state."
 
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
+path = "crates/sqlbuild-cli/src/native_commands/_helpers/terminal.rs"
+symbols = ["share_terminal"]
+reason = "Whether a location's interpreter shares the terminal is process-wide and monotonic: once the supervisor starts it, every later write from any location task must first clear its spinner line."
+
 [targets.rust.rule_options.FPRSR311]
 allowed_entries = [
     "Cargo.toml",

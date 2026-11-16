@@ -53,3 +53,10 @@ pub(super) struct GroupDependenciesTestCase {
     pub(super) dependencies: &'static str,
     pub(super) expected: Result<GroupDependencies, (&'static str, FilePosition)>,
 }
+
+pub(super) struct ConcurrencyGroupCheckTestCase {
+    pub(super) description: &'static str,
+    pub(super) files: Vec<(&'static str, &'static str)>,
+    pub(super) declared: &'static [(&'static str, u32)],
+    pub(super) expected_failure: Option<(&'static str, &'static str)>,
+}

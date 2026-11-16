@@ -15,9 +15,9 @@ const boxes = [
 	{ jobKey: 'reports', nodes: ['model:report'] }
 ];
 const members = [
-	{ jobKey: 'staging', upstream: [], stage: 0 },
-	{ jobKey: 'orders', upstream: [{ jobKey: 'staging', source: 'lineage' as const }], stage: 1 },
-	{ jobKey: 'reports', upstream: [{ jobKey: 'orders', source: null }, { jobKey: 'staging', source: 'lineage' as const }], stage: 2 }
+	{ jobKey: 'staging', upstream: [], stage: 0, reasons: [] },
+	{ jobKey: 'orders', upstream: [{ jobKey: 'staging', source: 'lineage' as const }], stage: 1, reasons: [] },
+	{ jobKey: 'reports', upstream: [{ jobKey: 'orders', source: null }, { jobKey: 'staging', source: 'lineage' as const }], stage: 2, reasons: [] }
 ];
 
 describe('job graph', () => {
@@ -106,8 +106,8 @@ describe('job graph', () => {
 			{ jobKey: 'b', nodes: wide.slice(30).map((n) => n.key) },
 			{ jobKey: 'empty', nodes: [] }
 		];
-		const waiting = (jobKey: string) => ({ jobKey, upstream: [{ jobKey: 'a', source: null }], stage: 1 });
-		const { nodes, edges } = jobGraph(wide.map((n) => n.key), wide, groupBoxes, [{ jobKey: 'a', upstream: [], stage: 0 }, waiting('b'), waiting('empty')]);
+		const waiting = (jobKey: string) => ({ jobKey, upstream: [{ jobKey: 'a', source: null }], stage: 1, reasons: [] });
+		const { nodes, edges } = jobGraph(wide.map((n) => n.key), wide, groupBoxes, [{ jobKey: 'a', upstream: [], stage: 0, reasons: [] }, waiting('b'), waiting('empty')]);
 		const laid = layoutJobGraph(measured(nodes), edges);
 		const box = (k: string) => laid.find((n) => n.id === boxId(k))!;
 		expect(box('a').height).toBeLessThan(15 * (61 + 24) + 60);

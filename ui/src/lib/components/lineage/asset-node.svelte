@@ -20,6 +20,7 @@
 	import { nodeFields } from '$lib/lineage/node-fields.svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
+	import CompactFace from '$lib/components/graph/compact-face.svelte';
 
 	type AssetData = {
 		name: string;
@@ -88,6 +89,12 @@
 	const kindShort = $derived(d.kind.split(' · ')[0]);
 	const when = $derived(d.lastBuiltAt ? (d.status === 'src' ? `loaded ${formatAgo(d.lastBuiltAt, app.now)}` : formatAgo(d.lastBuiltAt, app.now)) : '');
 
+	// Zoomed out, the card's state is its colour: a failure or a run first, then staleness, then the outcome.
+	const faceTone = $derived(
+		d.status === 'fail' || d.status === 'run' ? tone : d.stale === 'behind' ? 'var(--sb-behind)' : d.stale ? 'var(--sb-stale)' : tone
+	);
+	const showStatus = $derived(f.status || (f.checks && d.checks) || (f.lastBuilt && when) || d.stale);
+
 	const hasDetail = $derived(
 		!!(
 			(f.description && d.description) ||
@@ -114,7 +121,7 @@
 		</div>
 	{/if}
 
-	{#if f.status || (f.checks && d.checks) || (f.lastBuilt && when) || d.stale}
+	{#if showStatus}
 		<div class="status" style:--tone={tone}>
 			{#if f.status}
 				<i></i>
@@ -130,11 +137,14 @@
 		</div>
 	{/if}
 
+	<!-- The card's inner height without its optional detail lines; a taller card centres the title. -->
+	<CompactFace title={d.label ?? d.name} tone={faceTone} height={showStatus ? 60 : 34} />
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
 
 <style>
 	.node {
+		position: relative;
 		width: 236px;
 		overflow: hidden;
 		border: 1px solid var(--node-border);

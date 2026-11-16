@@ -699,6 +699,43 @@ critical_tags = ["critical"]
 | `schema_prefix` | `"review"` | Prefix of the schema each review creates and drops; the schema name is lowercase |
 | `critical_tags` | `["critical"]` | Model tags that make a model critical, in addition to `critical true` in its `MODEL` header |
 
+## Concurrency groups
+
+Jobs that must not run together share a concurrency group. Declare each group with the most runs
+it allows at once, and change a group's limit for one target:
+
+```toml
+[concurrency_groups]
+nightly_window = 1
+warehouse_heavy = 3
+
+[targets.prod.concurrency_groups]
+warehouse_heavy = 2
+```
+
+A job or job group takes a group by listing it in `concurrency_groups`; see
+[Declare a job](/docs/concepts/orchestration#declare-a-job). Here, at most one run in
+`nightly_window` and two in `warehouse_heavy` run at once on `prod`, and three on every other
+target.
+
+| Field | Value |
+|-------|-------|
+| `[concurrency_groups]` | Each group's most runs at once, a whole number from `1` to `10000` |
+| `[targets.<name>.concurrency_groups]` | The target's limit for groups `[concurrency_groups]` declares |
+
+Details:
+
+- A job or job group naming a group the project doesn't declare fails `sqb compile` with `D017`,
+  naming the job and the declared groups.
+- A target can change only the limit of a declared group. Naming another group fails with
+  `D001`, such as `targets.prod.concurrency_groups.nightly_windw overrides a group
+  [concurrency_groups] does not declare`.
+- Limits are project policy, so `sqlbuild_local.toml` can't set them.
+- A group belongs to its project and target: runs of another location or target never take its
+  slots.
+- The server can lower a limit for one launcher, never raise it; see
+  [Cap concurrency groups](/docs/cli/server#cap-concurrency-groups).
+
 ## dbt
 
 `[dbt]` points SQLBuild at an existing dbt project. See
@@ -747,7 +784,7 @@ Compilation rejects Python anywhere else with `D016`, so indirectly importable m
 an unofficial project structure.
 
 The project's `tests/` directory holds SQL tests and scenarios, and pytest tests of project Python
-under `tests/python/` and `tests/providers/`, which `sqb test` runs; see
+under `tests/python/`, `tests/providers/` and `tests/orchestration/`, which `sqb test` runs; see
 [Python tests](/docs/cli/test#python-tests). Orchestrator code such as Dagster or Rivers definitions
 lives outside the SQLBuild project directory and points at it; see
 [Dagster](/docs/integrations/dagster) and [Rivers](/docs/integrations/rivers).

@@ -1,5 +1,7 @@
 //! A code location sends retained compiled data over HTTP and never opens the control store.
 
+use std::time::Duration;
+
 use reqwest::StatusCode;
 use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
 
@@ -7,6 +9,7 @@ use crate::api::constants::{BODY_BYTES, GZIP_ENCODING, JSON_MEDIA_TYPE};
 use crate::api::errors::ClientError;
 use crate::api::main::client_response::client_response;
 use crate::api::main::connect_client::connect_client;
+use crate::snapshots::constants::PUBLISH_TIMEOUT_SECONDS;
 use crate::snapshots::models::{SnapshotInput, SnapshotRecord};
 use crate::store::main::compress::compress;
 
@@ -33,6 +36,7 @@ pub async fn publish_remote_snapshot(
         connection
             .client
             .post(url.clone())
+            .timeout(Duration::from_secs(PUBLISH_TIMEOUT_SECONDS))
             .header(CONTENT_TYPE, JSON_MEDIA_TYPE)
             .body(body)
     };

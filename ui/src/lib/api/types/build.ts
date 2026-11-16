@@ -94,8 +94,9 @@ export type NodeState = {
 /**
  * What `sqb build --changed` with default options runs, as the location planned it from the synced copy
  * after its last publication or sync: nodes changed themselves, and nodes downstream of them, as keys.
+ * `failing` is why that plan failed, with both lists empty; a failed plan is never shown as a count.
  */
-export type ChangedBuild = { generation: number; changed: string[]; downstream: string[] };
+export type ChangedBuild = { generation: number; changed: string[]; downstream: string[]; failing: string | null };
 
 /** `changedBuild` is null until the location plans the current snapshot, and from an older server. */
 export type NodeStates = { snapshotId: string | null; version: number; states: Record<string, NodeState>; changedBuild: ChangedBuild | null };

@@ -18,6 +18,8 @@ mod test_coalesce;
 mod test_faults;
 #[path = "test_group_admission.rs"]
 mod test_group_admission;
+#[path = "test_group_declarations.rs"]
+mod test_group_declarations;
 #[path = "test_group_dependencies.rs"]
 mod test_group_dependencies;
 #[path = "test_group_retries.rs"]
@@ -38,6 +40,8 @@ mod test_monitor;
 mod test_node_errors;
 #[path = "test_permissions.rs"]
 mod test_permissions;
+#[path = "test_project_limits.rs"]
+mod test_project_limits;
 #[path = "test_publication_cache.rs"]
 mod test_publication_cache;
 #[path = "test_requests.rs"]

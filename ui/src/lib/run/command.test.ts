@@ -111,8 +111,14 @@ describe('changed build label', () => {
 
 describe('changed build counts', () => {
 	it('shows the location\'s plan when it names a change, else the definition changes with the downstream unknown', () => {
-		expect(changedBuildCounts(4, { generation: 3, changed: ['model:orders', 'model:customers'], downstream: ['model:revenue'] })).toEqual({ changed: 2, downstream: 1 });
-		expect(changedBuildCounts(4, { generation: 3, changed: [], downstream: [] })).toEqual({ changed: 4, downstream: null });
-		expect(changedBuildCounts(4, null)).toEqual({ changed: 4, downstream: null });
+		expect(changedBuildCounts(4, { generation: 3, changed: ['model:orders', 'model:customers'], downstream: ['model:revenue'], failing: null })).toEqual({ changed: 2, downstream: 1, failing: null });
+		expect(changedBuildCounts(4, { generation: 3, changed: [], downstream: [], failing: null })).toEqual({ changed: 4, downstream: null, failing: null });
+		expect(changedBuildCounts(4, null)).toEqual({ changed: 4, downstream: null, failing: null });
+	});
+
+	it('shows no planned count while the location\'s plan is failing, and gives the reason as the tooltip', () => {
+		const counts = changedBuildCounts(4, { generation: 3, changed: [], downstream: [], failing: 'Model orders cannot plan a full rebuild' });
+		expect(counts).toEqual({ changed: 4, downstream: null, failing: 'Model orders cannot plan a full rebuild' });
+		expect(changedBuildLabel(counts.changed, counts.downstream, 'bar', counts.failing)).toEqual({ label: 'Build 4 changed', extra: null, tooltip: 'Plan failing: Model orders cannot plan a full rebuild' });
 	});
 });

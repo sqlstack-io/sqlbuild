@@ -83,6 +83,7 @@ async fn changed_build(
             reported_at: serde_json::from_value(row["reported_at"].clone()).map_err(invalid)?,
             changed: report.changed,
             downstream: report.downstream,
+            failing: report.failing,
         }),
     ))
 }

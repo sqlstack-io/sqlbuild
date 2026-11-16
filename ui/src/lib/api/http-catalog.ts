@@ -74,7 +74,7 @@ export function toNodeStates(wire: Wire['NodeStatesRecord']): NodeStates {
 		snapshotId: wire.snapshot_id ?? null,
 		version: wire.version,
 		states: Object.fromEntries(Object.entries(wire.states).map(([key, state]) => [key, toNodeState(state)])),
-		changedBuild: build ? { generation: build.generation, changed: build.changed, downstream: build.downstream } : null
+		changedBuild: build ? { generation: build.generation, changed: build.changed, downstream: build.downstream, failing: build.failing ?? null } : null
 	};
 }
 

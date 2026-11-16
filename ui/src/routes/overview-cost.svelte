@@ -8,6 +8,7 @@
 	import SyncingNote from '$lib/components/platform/syncing-note.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { folderCatalogHref, folderSelections } from '$lib/selection/folders';
 	import { CREDIT_PRICE_HINT, costByFolder, formatQueryCost } from '$lib/operate/cost';
 
 	// Estimated query cost of the target's recent runs. Hidden until any run has cost, so
@@ -26,6 +27,7 @@
 		return cost;
 	}, ['runs', 'warehouse_sync', 'snapshot']);
 	const catalog = useCatalogNodes();
+	const folderSelection = $derived(folderSelections(catalog.data ?? []));
 	const data = $derived(summary.data && catalog.data ? { cost: summary.data, folders: costByFolder(summary.data.byNode, catalog.data) } : null);
 	const cost = $derived(data?.cost ?? null);
 	type Row = { key: string; label: string; title?: string; credits: number; usd: number | null; detail: string; href?: string };
@@ -38,7 +40,7 @@
 					},
 					{
 						title: 'By folder',
-						rows: data.folders.map((f) => ({ key: f.key, label: f.key, credits: f.credits, usd: f.usd, detail: plural(f.nodes, 'node'), href: f.key === 'other' ? undefined : to(`/catalog?group=${f.key}`) }))
+						rows: data.folders.map((f) => ({ key: f.key, label: f.key, credits: f.credits, usd: f.usd, detail: plural(f.nodes, 'node'), href: f.key === 'other' || !folderSelection.has(f.key) ? undefined : to(folderCatalogHref(folderSelection.get(f.key)!)) }))
 					},
 					{
 						title: 'By warehouse size',

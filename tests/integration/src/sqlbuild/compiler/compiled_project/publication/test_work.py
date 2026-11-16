@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 
-from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import TYPE_PROOF_FILES
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import PUBLISHABLE_FILES
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     LocationWorkTestCase,
 )
@@ -51,9 +51,9 @@ def test_given_a_published_location_when_an_owner_requests_work_then_results_ret
     child_pid: Path = tmp_path / "debug.pid"
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
             + '\n[targets."preview #1"]\nschema = "main"\n',
             "adapters/slow.py": (
@@ -152,7 +152,7 @@ def test_given_a_published_location_when_an_owner_requests_work_then_results_ret
             )
             _ = wait_for_interpreter(process, child_pid, log)
             _ = (project / "models/stg_orders.sql").write_text(
-                TYPE_PROOF_FILES["models/stg_orders.sql"].replace(
+                PUBLISHABLE_FILES["models/stg_orders.sql"].replace(
                     "CAST(5 AS INTEGER)", "CAST(17 AS INTEGER)"
                 )
             )
@@ -182,9 +182,9 @@ def test_given_person_roles_when_requesting_connection_tests_then_live_scope_and
     project: Path = tmp_path / "project"
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
             + '\n[targets.development]\nschema = "main"\n',
         },

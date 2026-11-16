@@ -132,7 +132,7 @@ class WorkerExecutionTestCase:
     files_after_publication: dict[str, str] = field(default_factory=dict)
     store_setup: str = ""
     store_edit: Callable[[sqlite3.Connection], None] = lambda _: None
-    concurrency_limits: dict[str, int] = field(default_factory=dict)
+    concurrency_groups: dict[str, int] = field(default_factory=dict)
     launcher: Literal["native", "uncooperative", "docker"] = "native"
     # A Docker launcher's [launchers.docker.run] settings and the worker HostConfig they produce.
     launcher_settings: dict[str, Any] = field(default_factory=dict)
@@ -503,3 +503,31 @@ class HeldPlanTestCase:
     expected_runs: tuple[tuple[str, ...], ...]
     expected_compiles: int
     expected_held_plans: int
+
+
+@dataclass(frozen=True)
+class RulesAtLoadTestCase:
+    description: str
+    model_sql: str
+    expected_health: dict[str, Any] = field(default_factory=dict)
+    expected_terminal: str = ""
+    expected_rule_evaluations: int = 0
+
+
+@dataclass(frozen=True)
+class SyncedFreshnessTestCase:
+    description: str
+    files: dict[str, str]
+    expected_absent: str
+    expected_line: str
+
+
+@dataclass(frozen=True)
+class FailedPlanTestCase:
+    description: str
+    files: dict[str, str]
+    edited_file: str
+    edit: tuple[str, str]
+    selection: list[str]
+    expected_code: str
+    expected_reason: str

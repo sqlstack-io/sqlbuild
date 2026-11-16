@@ -14,9 +14,10 @@ use crate::project::_helpers::help::{
 };
 use crate::project::_helpers::keys::Place;
 use crate::project::_helpers::sections::{
-    load_changes, load_constants, load_control, load_cost, load_cursors, load_dbt, load_diff,
-    load_git, load_janitor, load_local_dbt, load_microbatches, load_migrations, load_policy_flag,
-    load_review, load_scenario, load_settings, load_snapshots, setting_overrides,
+    load_changes, load_concurrency_groups, load_constants, load_control, load_cost, load_cursors,
+    load_dbt, load_diff, load_git, load_janitor, load_local_dbt, load_microbatches,
+    load_migrations, load_policy_flag, load_review, load_scenario, load_settings, load_snapshots,
+    setting_overrides,
 };
 use crate::project::_helpers::sinks::load_sinks;
 use crate::project::_helpers::targets::{
@@ -24,9 +25,9 @@ use crate::project::_helpers::targets::{
 };
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
-    ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, LEGACY_COLUMN_CONTRACT_MODE_KEY,
-    LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, QUERY_CHANGE_TRACKING_KEY,
-    REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
+    ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, CONCURRENCY_GROUPS_KEY,
+    LEGACY_COLUMN_CONTRACT_MODE_KEY, LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME,
+    QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{
@@ -38,6 +39,7 @@ use crate::recall::main::recall_section::recall_section;
 use crate::toml::main::load_toml::load_toml;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_core::constants::SETTINGS_SECTION;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 const PROJECT_FILE: ConfigFile = ConfigFile::Project;
@@ -298,6 +300,7 @@ fn project_fields(payload: &Entries) -> Loaded<Fields> {
     load_review(get(payload, "review"), PROJECT_FILE)?;
     load_control(get(payload, "control"), PROJECT_FILE)?;
     load_changes(get(payload, "changes"), PROJECT_FILE)?;
+    concurrency_groups(payload, None)?;
     let mut fields = identity(payload)?;
     fields.extend(sections(payload)?);
     fields.push(("targets", targets(payload)?));
@@ -459,6 +462,65 @@ fn project_section<T>(
     let table = load_toml_mapping(paths, file)?;
     let payload = table.as_map().unwrap_or_default();
     Ok(load(get(payload, section), PROJECT_FILE)?)
+}
+
+/// `[concurrency_groups]`, with `target`'s overrides; a target may only override a declared group.
+fn concurrency_groups(payload: &Entries, target: Option<&str>) -> Loaded<BTreeMap<String, u32>> {
+    let mut groups = load_concurrency_groups(
+        get(payload, CONCURRENCY_GROUPS_KEY),
+        (CONCURRENCY_GROUPS_KEY, PROJECT_FILE),
+    )?;
+    let targets = coerce_mapping(
+        get(payload, "targets"),
+        Place {
+            file: PROJECT_FILE,
+            label: "targets",
+        },
+    )?;
+    let mut chosen: BTreeMap<String, u32> = BTreeMap::new();
+    for (key, value) in targets {
+        let name = crate::project::_helpers::fields::key_name(key);
+        let table = format!("targets.{name}");
+        let mapping = coerce_mapping(
+            Some(value),
+            Place {
+                file: PROJECT_FILE,
+                label: &table,
+            },
+        )?;
+        let label = format!("{table}.{CONCURRENCY_GROUPS_KEY}");
+        let overrides =
+            load_concurrency_groups(get(mapping, CONCURRENCY_GROUPS_KEY), (&label, PROJECT_FILE))?;
+        if let Some(group) = overrides.keys().find(|group| !groups.contains_key(*group)) {
+            return Err(ConfigFailure::at(
+                PROJECT_FILE,
+                format!(
+                    "{label}.{group} overrides a group [{CONCURRENCY_GROUPS_KEY}] does not declare"
+                ),
+            )
+            .with_help(format!(
+                "declare it first, such as [{CONCURRENCY_GROUPS_KEY}] {group} = 1"
+            )));
+        }
+        if target == Some(name) {
+            chosen = overrides;
+        }
+    }
+    groups.extend(chosen);
+    Ok(groups)
+}
+
+/// `[concurrency_groups]` of `sqlbuild_project.toml`, with `target`'s overrides when one is named.
+pub(crate) fn concurrency_groups_config(
+    paths: &ConfigPaths,
+    target: Option<&str>,
+) -> Result<BTreeMap<String, u32>, LoadFailure> {
+    let file = resolve(paths, false)?;
+    let table = load_toml_mapping(paths, file)?;
+    Ok(concurrency_groups(
+        table.as_map().unwrap_or_default(),
+        target,
+    )?)
 }
 
 /// `[git] base_ref` of `sqlbuild_project.toml`.

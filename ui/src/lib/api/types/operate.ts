@@ -477,8 +477,8 @@ export type RunDetail = {
 /** Why the scheduler can't claim a queued run yet; a run in another location or target is never named (`runId` null). */
 export type QueueWait =
 	| { kind: 'write_claim'; runId: string | null; nodeKey: string; otherNodes: number }
-	/** Running runs hold slots of a concurrency limit this run takes; `elsewhere` counts holders in other locations or targets. */
-	| { kind: 'concurrency_limit'; limit: string; holders: string[]; elsewhere: number }
+	/** Running runs of the same location and target hold the slots of a concurrency group this run takes. */
+	| { kind: 'concurrency_limit'; limit: string; holders: string[] }
 	/** An earlier queued run takes the same limit, so it goes first. */
 	| { kind: 'earlier_run'; runId: string | null; limit: string }
 	| { kind: 'job_running'; runId: string }
@@ -566,6 +566,11 @@ export type SelectionProblem = {
 	location: SelectionLocation | null;
 	/** Whole-token replacements, closest first. */
 	suggestions: string[];
+	/**
+	 * The comma part of the located token `sqb` refuses: its selector type (`null` for a bare name or
+	 * folder) and value, as typed. The server does not report it yet, so it is null from the server.
+	 */
+	refused: { part: number; type: string | null; value: string } | null;
 };
 
 /** What `sqb build --select … --exclude …` selects in the current publication: one page of keys and the total. */
@@ -731,12 +736,25 @@ export type Job = {
 	overlap: OverlapPolicy | null;
 	onFailure: OnFailure | null;
 	concurrencyGroups: string[];
+	/** Each group's project limit and the other jobs and groups sharing it, as published. */
+	concurrencyRules: ConcurrencyRule[];
 	priority: number | null;
 	owner: string | null;
 	sourceFile: string | null;
 	triggerIds: string[];
 	lastRun: RunRef | null;
 };
+
+/** A job's concurrency group as the project declares it: "One run at a time, shared with X". */
+export type ConcurrencyRule = {
+	group: string;
+	/** Null for a snapshot published before limits were part of it. */
+	limit: number | null;
+	sharedWith: string[];
+};
+
+/** One reason a member waits: `fromNode` of `upstreamJob` feeds its `toNode`, directly or through nodes no member selects. */
+export type WaitReason = { upstreamJob: string; fromNode: string; toNode: string };
 
 export type ConcurrencyGroup = {
 	key: string;
@@ -751,6 +769,8 @@ export type JobGroupMember = {
 	upstream: { jobKey: string; source: 'lineage' | null }[];
 	/** Position in the derived order; members in the same stage run side by side. */
 	stage: number;
+	/** Node-level reasons for its waits, as the snapshot records them; empty from a mock or older server. */
+	reasons: WaitReason[];
 };
 
 export type JobDetail = Job & {

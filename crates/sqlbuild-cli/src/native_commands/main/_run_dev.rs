@@ -16,7 +16,9 @@ use uuid::Uuid;
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::decision::{control_address, flag, text};
 use crate::native_commands::_helpers::execution::run_development_roles;
-use crate::native_commands::_helpers::project_facts::development_target;
+use crate::native_commands::_helpers::project_facts::{
+    development_project_name, development_target,
+};
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::server_config::models::ServerSection;
 
@@ -72,8 +74,16 @@ async fn development_store(
         request_id: Uuid::now_v7(),
         ip_address: None,
     };
-    let location_id =
-        development_location(&store, &project.to_string_lossy(), target, &context).await?;
+    let location_id = development_location(
+        &store,
+        (
+            &project.to_string_lossy(),
+            &development_project_name(project)?,
+        ),
+        target,
+        &context,
+    )
+    .await?;
     let scope = DevelopmentScope {
         location_id,
         target: target.into(),

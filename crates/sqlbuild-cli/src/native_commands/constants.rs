@@ -126,3 +126,5 @@ pub(crate) const PLAN_OUTPUT_BYTES: usize =
 /// What a location reports when `sqb plan` produced no plan.
 pub(crate) const PLAN_NOT_PRODUCED: &str =
     "sqb plan did not produce a plan; see the location's log";
+/// Return to the start of the line and erase it: a child's spinner may be drawn there.
+pub(crate) const CLEAR_TERMINAL_LINE: &str = "\r\u{1b}[K";

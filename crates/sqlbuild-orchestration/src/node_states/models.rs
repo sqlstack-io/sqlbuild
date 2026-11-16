@@ -46,13 +46,18 @@ pub struct ChangedBuild {
     pub changed: Vec<String>,
     /// Nodes that run only because an upstream they read runs.
     pub downstream: Vec<String>,
+    /// Why the location's plan failed, with both lists empty; absent when it planned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failing: Option<String>,
 }
 
-/// The stored node lists of a changed build.
+/// The stored node lists of a changed build, or why its plan failed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct ChangedBuildNodes {
     pub(crate) changed: Vec<String>,
     pub(crate) downstream: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) failing: Option<String>,
 }
 
 /// A location's plan of the default `sqb build --changed`, fenced to its reader session and generation.
@@ -63,6 +68,9 @@ pub struct ChangedBuildReport {
     pub generation: i64,
     pub changed: Vec<String>,
     pub downstream: Vec<String>,
+    /// Why the plan failed, sent with empty lists; only newer servers accept it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failing: Option<String>,
 }
 
 /// A serialized response and the entity tag naming its snapshot and state version.

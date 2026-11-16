@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::declarations::models::DependencyFailure;
 use crate::runs::_helpers::groups::admission::{
-    admission_limits, earlier_waiter_blocks, limit_waiters,
+    admission_limits, admitted, earlier_waiter_blocks, limit_waiters,
 };
 use crate::runs::_helpers::groups::context::load_group;
 use crate::runs::_helpers::groups::selection::{failed_upstream, member_dependencies};
@@ -15,7 +15,7 @@ use crate::runs::_helpers::lifecycle::claims::reserve_claims;
 use crate::runs::_helpers::lifecycle::publish_change::publish_change;
 use crate::runs::models::{
     ChangingRun, GroupContext, NodeOutcome, QueueCandidate, RunChange, RunChangeRequest,
-    RunNodeRecord, RunOutcome, RunRequest, RunStatus,
+    RunNodeRecord, RunOutcome, RunStatus,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
@@ -87,20 +87,21 @@ pub(crate) async fn advance_group(
     } else if parent.state.status == RunStatus::Running {
         transaction = skip_blocked_members(transaction, &group).await?;
     } else if parent.state.status == RunStatus::Queued && parent.request_json.due(transaction.now) {
-        let admission = RunRequest {
-            concurrency_groups: admission_limits(
-                &parent.request_json,
-                children.iter().map(|child| &child.request_json),
-            ),
-            ..parent.request_json.clone()
-        };
+        let admission = admitted(
+            &parent.request_json,
+            children.iter().map(|child| &child.request_json),
+        );
+        let wanted = admission_limits(
+            &parent.request_json,
+            children.iter().map(|child| &child.request_json),
+        );
         let waiters;
         (transaction, waiters) = limit_waiters(transaction, eligible).await?;
         let candidate = QueueCandidate {
             request_json: parent.request_json.clone(),
             queued_at: parent.queued_at,
         };
-        if earlier_waiter_blocks(&waiters, &candidate, &admission.concurrency_groups) {
+        if earlier_waiter_blocks(&waiters, &candidate, &wanted) {
             return Ok(transaction);
         }
         (transaction, _) = query(transaction, "SAVEPOINT group_claim", vec![]).await?;

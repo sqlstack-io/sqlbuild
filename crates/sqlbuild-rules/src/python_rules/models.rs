@@ -7,7 +7,7 @@ pub enum PythonFiles {
     Package,
     /// Every supported project Python file, including hooks, UDFs and orchestration modules.
     All,
-    /// Only the project's Python tests under `tests/python/` and `tests/providers/`.
+    /// Only the project's Python tests under `tests/python/`, `tests/providers/` and `tests/orchestration/`.
     Tests,
 }
 

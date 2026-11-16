@@ -67,6 +67,12 @@ describe('toLocationDetail', () => {
 		expect([detail.health, detail.failedDeploy, detail.lastLoadError, detail.snapshot]).toEqual(['falling_back', null, null, null]);
 	});
 
+	it('lists the rule findings that failed the load, as sqb compile prints them', () => {
+		const rules = { finding_count: 3, findings: [{ code: 'SQBRMODEL102', message: 'SELECT * is allowed only inside dependency import CTEs', path: 'models/orders.sql', line: 2 }] };
+		const detail = toLocationDetail(location, [seen(20, { kind: 'compile_failed', generation: 3, rules })], null, now);
+		expect(detail.lastLoadError).toBe('Compile failed: 3 rule findings\nmodels/orders.sql:2 [SQBRMODEL102] SELECT * is allowed only inside dependency import CTEs\n… and 2 more');
+	});
+
 	it('is healthy again once a newer generation connects', () => {
 		const detail = toLocationDetail(location, [seen(5, { kind: 'connection', generation: 4, healthy: true }), seen(20, { kind: 'compile_failed', generation: 3 })], null, now);
 		expect([detail.health, detail.connectionTest?.outcome]).toEqual(['healthy', 'ok']);

@@ -68,6 +68,7 @@ pub(crate) async fn persist_ticks(
                 settings: trigger.job_json.settings.clone(),
                 window: None,
                 concurrency_groups: trigger.job_json.concurrency_groups.clone(),
+                concurrency_limits: trigger.job_json.concurrency_limits.clone(),
                 narrowing: None,
                 retry: None,
                 member_attempt: None,

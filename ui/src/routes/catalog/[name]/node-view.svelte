@@ -121,7 +121,7 @@
 				<StaleBadges reasons={n.stale} />
 			{/if}
 			<div class="header-actions">
-				<a class="btn-ghost" href={to(`/lineage?select=${name}`)}>View in lineage</a>
+				<a class="btn-ghost" href={to(`/lineage?focus=${encodeURIComponent(name)}`)}>View in lineage</a>
 			</div>
 		</div>
 		{#if n}

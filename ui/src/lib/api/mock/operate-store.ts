@@ -57,9 +57,11 @@ import {
 	CONCURRENCY_LIMITS,
 	IMAGE_ID,
 	JOB_DEFS,
+	DECLARED_WAITS,
 	SNAPSHOT_GENERATION,
 	TRIGGER_DEFS,
 	concurrencyGroupsOf,
+	concurrencyRulesOf,
 	createOperateFixtures,
 	jobDef,
 	jobNodes,
@@ -998,7 +1000,7 @@ export class MockOperate {
 				const inGroup = holders.filter((h) => h.script.concurrencyGroups.includes(group)).map((h) => h.run.id);
 				const limit = CONCURRENCY_LIMITS[group] ?? 1;
 				if (inGroup.length >= limit) {
-					waits.push({ kind: 'concurrency_limit', limit: group, holders: inGroup, elsewhere: 0 });
+					waits.push({ kind: 'concurrency_limit', limit: group, holders: inGroup });
 					fullGroups.push(group);
 				}
 			}
@@ -1183,7 +1185,8 @@ export class MockOperate {
 		if (!job || job.kind !== 'group') return [];
 		const nodesOf = new Map(job.members.map((m) => [m, new Set(jobNodes(m))]));
 		const upstream = new Map<string, JobGroupMember['upstream']>();
-		for (const b of job.members) {
+		const declared = DECLARED_WAITS[key];
+		for (const b of declared ? [] : job.members) {
 			const ups: JobGroupMember['upstream'] = [];
 			const needs = new Set([...nodesOf.get(b)!].flatMap((n) => [...ancestors(n)]));
 			for (const a of job.members) {
@@ -1192,6 +1195,7 @@ export class MockOperate {
 			}
 			upstream.set(b, ups);
 		}
+		for (const [b, ups] of declared ?? []) upstream.set(b, ups.map((a) => ({ jobKey: a, source: 'lineage' as const })));
 		const stage = new Map<string, number>();
 		const stageOf = (m: string): number => {
 			if (stage.has(m)) return stage.get(m)!;
@@ -1199,7 +1203,7 @@ export class MockOperate {
 			stage.set(m, s);
 			return s;
 		};
-		return job.members.map((m) => ({ jobKey: m, upstream: upstream.get(m) ?? [], stage: stageOf(m) }));
+		return job.members.map((m) => ({ jobKey: m, upstream: upstream.get(m) ?? [], stage: stageOf(m), reasons: [] }));
 	}
 
 	#jobView(key: string, scope: Scope): JobDetail {
@@ -1217,6 +1221,7 @@ export class MockOperate {
 			resolvedNodes: resolved,
 			lastRun: view ? { id: view.id, status: view.status, startedAt: view.startedAt, endedAt: view.endedAt } : null,
 			triggerIds: TRIGGER_DEFS.filter((t) => t.jobKey === key).map((t) => triggerId(t.name)),
+			concurrencyRules: concurrencyRulesOf(job),
 			concurrency: concurrencyGroupsOf(job).map((g) => ({ ...g, holders: holders.filter((h) => h.script.concurrencyGroups.includes(g.key)).map((h) => h.run.id) })),
 			memberOf: JOB_DEFS.filter((g) => g.members.includes(key)).map((g) => g.key),
 			cursorType: resolved.map((n) => snapshotNode(n)?.cursor).find((c) => c) ?? null,

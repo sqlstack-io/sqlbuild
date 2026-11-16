@@ -1688,6 +1688,22 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
             detail=f"adapter '{self.adapter_name}' does not report row counts from metadata",
         )
 
+    def estimate_relation_row_counts(
+        self, *, connection: Any, database: str | None, schema: str, names: tuple[str, ...]
+    ) -> tuple[RelationRowCountEstimate, ...]:
+        """Metadata-only rows and bytes of `names` in one schema, one relation at a time."""
+
+        return tuple(
+            self.estimate_relation_row_count(
+                connection=connection,
+                database=database,
+                schema=schema,
+                name=name,
+                metadata_only=True,
+            )
+            for name in names
+        )
+
     def _build_row_diff_relation_ctes(
         self,
         *,

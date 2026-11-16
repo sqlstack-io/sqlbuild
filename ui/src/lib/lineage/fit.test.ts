@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { READABLE_ZOOM, absolutePosition, anchoredViewport, fitViewport, largestBox } from './fit';
+import { ANCHOR_MARGIN, CARD_TITLE_PX, COMPACT_LEVELS, COMPACT_ZOOM, LABEL_MIN_ZOOM, MIN_TITLE_PX, READABLE_ZOOM, compactLevel, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
 
 describe('fitting a graph to the view', () => {
 	it('centres a graph that fits, never closer than full size', () => {
@@ -7,8 +7,8 @@ describe('fitting a graph to the view', () => {
 	});
 
 	it('shrinks a larger graph to fit while it stays readable', () => {
-		const v = fitViewport({ x: 0, y: 0, width: 1500, height: 300 }, 1000, 500, { padding: 0 });
-		expect(v.zoom).toBeCloseTo(1000 / 1500);
+		const v = fitViewport({ x: 0, y: 0, width: 1100, height: 300 }, 1000, 500, { padding: 0 });
+		expect(v.zoom).toBeCloseTo(1000 / 1100);
 		expect(v.x).toBeCloseTo(0);
 	});
 
@@ -21,9 +21,9 @@ describe('fitting a graph to the view', () => {
 		const bounds = { x: 0, y: 0, width: 10_000, height: 4000 };
 		const middle = fitViewport(bounds, 1000, 500, { padding: 0, focus: { x: 5000, y: 2000, width: 400, height: 200 } });
 		expect(middle).toEqual({ zoom: READABLE_ZOOM, x: 500 - 5200 * READABLE_ZOOM, y: 250 - 2100 * READABLE_ZOOM });
-		// A cluster in the corner keeps the graph's corner at the view's corner, not empty space.
+		// A cluster in the corner keeps the graph's corner near the view's corner, the cluster a margin inside.
 		const corner = fitViewport(bounds, 1000, 500, { padding: 0, focus: { x: 0, y: 0, width: 100, height: 100 } });
-		expect(corner).toEqual({ zoom: READABLE_ZOOM, x: 0, y: 0 });
+		expect(corner).toEqual({ zoom: READABLE_ZOOM, x: ANCHOR_MARGIN, y: ANCHOR_MARGIN });
 	});
 
 	it('centres the axis along which a too-large graph still fits', () => {
@@ -61,5 +61,72 @@ describe('keeping the view steady when a folder opens or closes', () => {
 		];
 		expect(absolutePosition(nodes, 'model:orders')).toEqual({ x: 128, y: 138 });
 		expect(absolutePosition(nodes, 'group:missing')).toBeNull();
+	});
+});
+
+describe('a large graph without a box', () => {
+	it('starts on the card nearest its top-left, not on an empty corner', () => {
+		// A layered layout: the first column centred low, a later column reaching the top.
+		const cards = [
+			{ x: 0, y: 1800, width: 236, height: 82 },
+			{ x: 0, y: 1900, width: 236, height: 82 },
+			{ x: 3000, y: 0, width: 236, height: 82 }
+		];
+		const bounds = { x: 0, y: 0, width: 3236, height: 1982 };
+		const inside = (r: (typeof cards)[number], view: { x: number; y: number; zoom: number }) =>
+			r.x * view.zoom + view.x >= 0 && (r.x + r.width) * view.zoom + view.x <= 1000 && r.y * view.zoom + view.y >= 0 && (r.y + r.height) * view.zoom + view.y <= 500;
+		const start = firstCard(cards)!;
+		expect(start).toEqual(cards[0]);
+		const v = fitViewport(bounds, 1000, 500, { padding: 0, minZoom: 0.6, start });
+		// The start card's left edge is a margin inside the view's left.
+		expect(v.x + start.x * v.zoom).toBe(ANCHOR_MARGIN);
+		expect(inside(start, v)).toBe(true);
+		// The bare corner would have shown no card at all.
+		const corner = fitViewport(bounds, 1000, 500, { padding: 0, minZoom: 0.6 });
+		expect(cards.some((c) => inside(c, corner))).toBe(false);
+	});
+});
+
+describe('the readable zoom', () => {
+	it('keeps card titles at least 11 px on screen', () => {
+		expect(MIN_TITLE_PX).toBeGreaterThanOrEqual(11);
+		expect(CARD_TITLE_PX * READABLE_ZOOM).toBeGreaterThanOrEqual(MIN_TITLE_PX - 1e-9);
+	});
+});
+
+describe('the card a large graph opens on', () => {
+	it('is the top of the leftmost column, wholly in view with a margin, even when a later column starts higher', () => {
+		// Folder cards: the leftmost column sits lower than a card in the second column.
+		const cards = [
+			{ x: 0, y: 900, width: 236, height: 61 },
+			{ x: 0, y: 1000, width: 236, height: 61 },
+			{ x: 300, y: 0, width: 236, height: 61 },
+			{ x: 3000, y: 500, width: 236, height: 61 }
+		];
+		const start = firstCard(cards)!;
+		expect(start).toBe(cards[0]);
+		const view = { width: 1376, height: 723 };
+		const v = fitViewport({ x: 0, y: 0, width: 3236, height: 1061 }, view.width, view.height, { start });
+		const [left, top] = [start.x * v.zoom + v.x, start.y * v.zoom + v.y];
+		expect(left).toBeGreaterThanOrEqual(ANCHOR_MARGIN);
+		expect(top).toBeGreaterThanOrEqual(ANCHOR_MARGIN);
+		expect(left + start.width * v.zoom).toBeLessThanOrEqual(view.width - ANCHOR_MARGIN);
+		expect(top + start.height * v.zoom).toBeLessThanOrEqual(view.height - ANCHOR_MARGIN);
+	});
+});
+
+describe('semantic zoom', () => {
+	it('draws cards in full down to the compact zoom, well below the readable fit zoom', () => {
+		expect(compactLevel(1)).toBe(0);
+		expect(compactLevel(COMPACT_ZOOM)).toBe(0);
+		expect(compactLevel(COMPACT_ZOOM - 0.01)).toBe(1);
+		expect(compactLevel(0.6)).toBe(1);
+		expect(compactLevel(0.59)).toBe(2);
+		expect(compactLevel(0.44)).toBe(3);
+		expect(compactLevel(0.1)).toBe(3);
+	});
+	it('switches where full cards still show their 11 px lines at 9 px', () => {
+		expect(11 * COMPACT_ZOOM).toBeGreaterThanOrEqual(9);
+		expect(COMPACT_LEVELS.at(-1)).toBe(LABEL_MIN_ZOOM);
 	});
 });

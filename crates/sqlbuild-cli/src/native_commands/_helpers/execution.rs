@@ -18,6 +18,7 @@ use sqlbuild_config::project::main::load_control_config::load_control_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
 use sqlbuild_config::project::models::ControlConfig;
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, HumanLogin, ServerFacts,
 };
@@ -74,26 +75,26 @@ use crate::native_commands::_helpers::project_facts::has_no_runtime_extensions;
 use crate::native_commands::_helpers::rules::run_rules;
 use crate::native_commands::_helpers::skills::{run_skills, skill_freshness_notice};
 use crate::native_commands::_helpers::terminal::{
-    finish_lost_stdout, terminal_columns, write_output,
+    finish_lost_stdout, share_terminal, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
     METADATA_PAGE_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
     METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
-    METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, STATISTICS_RELATION_SECONDS,
-    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    METADATA_SYNC_CHECK_SECONDS, PLAN_NOT_PRODUCED, SAFETY_SYNC_ENV, SCHEDULER_COMMAND,
+    STATISTICS_RELATION_SECONDS, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
+    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationLoad,
     LocationMetadataPage, LocationMetadataSync, LocationRuntimeRequest, LocationServe,
     LocationWatch, LostStdout, MetadataReply, NativeCommand, NativeInvocation, ProjectLocation,
     ReadFailure, ScanToken, SyncProgress,
 };
-use crate::native_commands::types::LocationPublication;
+use crate::native_commands::types::LoadOutcome;
 use crate::server_config::models::ServerSection;
 use crate::workers::main::docker_image_sources::docker_image_sources;
 use crate::workers::main::open_development_workers::open_development_workers;
@@ -237,7 +238,7 @@ pub(crate) async fn compile_generation(
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(bool, Option<Instant>, Vec<WarehouseStateLocation>)>, ControlError> {
+) -> Result<Option<LoadOutcome>, ControlError> {
     let (reply, publication) = oneshot::channel();
     requests
         .send(LocationRuntimeRequest::Publish(LocationCompileRequest {
@@ -256,8 +257,8 @@ pub(crate) async fn compile_generation(
         result = &mut stopped => { result?; return Ok(None); },
         result = publication => result.map_err(|_| ControlError::Invalid("location compiler stopped before replying".into()))?,
     };
-    let record = match result {
-        Ok(record) => record,
+    let load = match result {
+        Ok(load) => load,
         Err(error) => {
             drop(write_output(&[(
                 Stream::Stderr,
@@ -265,26 +266,26 @@ pub(crate) async fn compile_generation(
                     "Location compiler failed; generation {generation} may already be published: {error}\n"
                 ),
             )]));
-            None
+            LocationLoad {
+                published: None,
+                rules: None,
+            }
         }
     };
-    let published = record.is_some();
-    let mut refresh_at = None;
-    let mut locations: Vec<WarehouseStateLocation> = Vec::new();
-    if let Some((record, refresh, state_locations)) = record {
-        refresh_at = refresh
-            .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
-        locations = state_locations;
-        let output = serde_json::to_string(&record)
-            .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
-            return Err(ControlError::Invalid(format!(
-                "Snapshot {} was published, but result delivery failed",
-                record.snapshot_id
-            )));
-        }
+    let Some((record, refresh, locations)) = load.published else {
+        return Ok(Some(Err(load.rules)));
+    };
+    let refresh_at = refresh
+        .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
+    let output =
+        serde_json::to_string(&record).map_err(|error| ControlError::Invalid(error.to_string()))?;
+    if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
+        return Err(ControlError::Invalid(format!(
+            "Snapshot {} was published, but result delivery failed",
+            record.snapshot_id
+        )));
     }
-    Ok(Some((published, refresh_at, locations)))
+    Ok(Some(Ok((refresh_at, locations))))
 }
 
 /// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
@@ -310,7 +311,7 @@ pub(crate) async fn exchange_location_plan(
 pub(crate) async fn exchange_location_generation(
     compiler: &mut LocationCompiler,
     generation: i64,
-) -> Result<Option<LocationPublication>, ControlError> {
+) -> Result<LocationLoad, ControlError> {
     compiler
         .stdin
         .write_all(format!("{generation}\n").as_bytes())
@@ -333,6 +334,7 @@ pub(crate) fn location_result<T: serde::de::DeserializeOwned>(
     (request, maximum_bytes): (Vec<u8>, u64),
 ) -> Result<(Child, impl Future<Output = Result<T, ControlError>>), ControlError> {
     let mut child = location_runtime_child(options, script)?;
+    share_terminal();
     let mut stdin = child
         .stdin
         .take()
@@ -1326,6 +1328,16 @@ pub(crate) fn run_command(
 /// The `{"error": ...}` report a location sends when it has no plan to show.
 pub(crate) fn plan_failure(message: &str) -> serde_json::Value {
     json!({"error": {"code": "plan_failed", "message": message, "help": null}})
+}
+
+/// The plan document of a plan that failed with its own coded error, its texts redacted and bounded.
+pub(crate) fn plan_error(failed: &serde_json::Value) -> serde_json::Value {
+    let text = |name: &str| failed[name].as_str().map(redact_error_text);
+    json!({"error": {
+        "code": text("code").unwrap_or_else(|| "plan_failed".to_owned()),
+        "message": text("message").unwrap_or_else(|| PLAN_NOT_PRODUCED.to_owned()),
+        "help": text("help"),
+    }})
 }
 
 pub(crate) fn open_location_runtime(

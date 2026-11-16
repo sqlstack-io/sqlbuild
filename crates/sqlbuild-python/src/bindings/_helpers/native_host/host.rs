@@ -11,6 +11,8 @@ use sqlbuild_host::entries::constants::{HOST_ENTRIES, HOST_MODULE, HOST_TARGETS_
 use sqlbuild_host::entries::models::HostId;
 use sqlbuild_host::entries::types::HostEntries;
 
+use crate::bindings::_helpers::build_progress::transient_lines::shared_coordinator;
+
 /// One entry's target module path and attribute name.
 type Target = (Py<PyString>, Py<PyString>);
 
@@ -67,12 +69,12 @@ pub(crate) fn entry<'py>(py: Python<'py>, id: impl Into<HostId>) -> PyResult<Bou
     PythonHost(py).entry(id.into())
 }
 
-/// Write through the interpreter's live console, respecting redirection and surfacing delivery errors.
+/// Write through the live console, clearing then redrawing any spinner line; errors surface.
 pub(crate) fn write_console(py: Python<'_>, stream: &str, text: &str) -> PyResult<()> {
     let stream = py.import("sys")?.getattr(stream)?;
-    stream.call_method1("write", (text,))?;
-    stream.call_method0("flush")?;
-    Ok(())
+    shared_coordinator(py)?
+        .get()
+        .write_persistent(&stream, PyString::new(py, text).as_any())
 }
 
 /// Flush the interpreter's live console `stream` so text written before a child process appears first.

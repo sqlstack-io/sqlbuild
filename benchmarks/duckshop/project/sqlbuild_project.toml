@@ -60,6 +60,11 @@ database = "DUCKSHOP"
 schema = "EDGE"
 # <<< edge-case area
 
+# The edge-case job groups each take the other's limit, so admission must hold both.
+[concurrency_groups]
+edge_inventory_limit = 1
+edge_products_limit = 1
+
 [settings]
 default_audit_severity = "error"
 unit_test_max_real_models = 6

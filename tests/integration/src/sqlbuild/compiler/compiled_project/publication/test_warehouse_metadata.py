@@ -36,7 +36,7 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     METADATA,
-    TYPE_PROOF_FILES,
+    PUBLISHABLE_FILES,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     AutomaticHistoryTestCase,
@@ -792,7 +792,7 @@ def test_given_external_warehouse_retention_when_a_complete_scan_arrives_then_mi
         )
     adapter.close(connection)
     declarations: Path = tmp_path / "declarations"
-    write_files(project_dir=declarations, files=TYPE_PROOF_FILES)
+    write_files(project_dir=declarations, files=PUBLISHABLE_FILES)
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=declarations)
     compiled: CompiledProjectView = build_compiled_project(
         discovered_inputs=discovered,

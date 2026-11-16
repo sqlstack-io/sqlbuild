@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import { openRow, to } from '$lib/paths';
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
@@ -50,6 +51,7 @@
 	const matchesLastRun = (j: (typeof all)[number], f: LastRun) =>
 		f === 'problems' ? !!j.lastRun && isProblemRun(j.lastRun.status) : f === 'active' ? !!j.lastRun && isActiveRun(j.lastRun.status) : !j.lastRun;
 	const all = $derived(jobs.data ?? []);
+	const byKind = $derived(countBy(all, (j) => j.kind));
 	const filtered = $derived(
 		all.filter((j) => {
 			if (kind !== 'all' && j.kind !== kind) return false;
@@ -94,8 +96,8 @@
 			bind:value={kind}
 			options={[
 				{ value: 'all', label: 'All', count: all.length },
-				{ value: 'job', label: 'Jobs', count: all.filter((j) => j.kind === 'job').length },
-				{ value: 'group', label: 'Groups', count: all.filter((j) => j.kind === 'group').length }
+				{ value: 'job', label: 'Jobs', count: byKind.get('job') ?? 0 },
+				{ value: 'group', label: 'Groups', count: byKind.get('group') ?? 0 }
 			]}
 		/>
 		<ChoiceFilter

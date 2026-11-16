@@ -125,7 +125,7 @@ describe('run queue', () => {
 	it('keeps claim order, drops runs that started meanwhile and never names a run elsewhere', () => {
 		const entries = queueEntriesOf(
 			[
-				wire('urgent', { status: 'queued', queue: { position: 1, waits: [{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'], elsewhere: 2 }] } }),
+				wire('urgent', { status: 'queued', queue: { position: 1, waits: [{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'] }] } }),
 				wire('started', { status: 'queued' }),
 				wire('blocked', {
 					status: 'queued',
@@ -148,7 +148,7 @@ describe('run queue', () => {
 			['urgent', 1],
 			['blocked', 2]
 		]);
-		expect(entries[0].waits).toEqual([{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'], elsewhere: 2 }]);
+		expect(entries[0].waits).toEqual([{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'] }]);
 		expect(entries[1].waits).toEqual([
 			{ kind: 'write_claim', runId: null, nodeKey: 'model.orders', otherNodes: 3 },
 			{ kind: 'earlier_run', runId: 'urgent', limit: 'warehouse' },

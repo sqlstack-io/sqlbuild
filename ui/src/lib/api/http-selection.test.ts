@@ -31,7 +31,8 @@ describe('selection mapping', () => {
 			message: "no SQL resources or Python nodes found with tag 'ordrs'",
 			help: null,
 			location: { field: 'select', token: 'tag:ordrs', start: 10, end: 19 },
-			suggestions: ['tag:orders']
+			suggestions: ['tag:orders'],
+			refused: null
 		});
 	});
 

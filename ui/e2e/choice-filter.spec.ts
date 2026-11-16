@@ -1,22 +1,33 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// The toolbar's choice filter with thousands of options: the Checks page with awkward mock data has
-// 5,000 checks on about 2,000 long-named nodes. Opening Node shows a search box, draws a bounded
-// number of rows, keeps every label inside its row and every count inside the panel, and ticking two
-// options narrows the list to them. Set CHOICE_FILTER_SHOT to a path to save a screenshot.
+// The choice filter's list with thousands of options: the Checks page with awkward mock data has
+// 5,000 checks on about 2,000 long-named nodes, picked from the selection bar's Node chip. Its picker
+// shows a search box, draws a bounded number of rows, keeps every label inside its row and every
+// count inside the panel, and ticking options adds them to the selection, which narrows the list.
+// Set CHOICE_FILTER_SHOT to a path to save a screenshot.
 
 test.use({ viewport: { width: 1440, height: 1000 } });
 
 const FRAGMENT = 'enough_to_show_17';
+/** A node of the mock project with checks; the awkward copies keep the originals' names. */
+const ORIGINAL = 'fact_orders';
 
-async function openChecks(page: Page) {
-	await page.goto('/checks?mock&awkward');
-	await page.waitForLoadState('networkidle');
-	await expect(page.locator('table.sb-table tbody tr').first()).toBeVisible();
+/**
+ * The list's drawn data rows: not the spacers, and not the loading row shown until the checks arrive.
+ * The mock answers after a delay, which `networkidle` doesn't wait for (it makes no requests), so tests
+ * wait for these rows rather than for the network.
+ */
+const DATA_ROWS = 'table.sb-table tbody tr:not(.spacer):not(.load-row)';
+
+/** Opens Checks, `query` added to the URL, once its checks are drawn. */
+async function openChecks(page: Page, query = '') {
+	await page.goto(`/checks?mock&awkward${query}`);
+	// Thousands of awkward checks can take a while to arrive on a busy machine.
+	await expect(page.locator(DATA_ROWS).first()).toBeVisible({ timeout: 20_000 });
 }
 
 /** The "Attached to" cell's full text (`node` or `node.column`) of each drawn row. */
-const nodeCells = (page: Page) => page.locator('table.sb-table tbody tr:not(.spacer) td:nth-child(3)').evaluateAll((cells) => cells.map((c) => (c as HTMLElement).title));
+const nodeCells = (page: Page) => page.locator(`${DATA_ROWS} td:nth-child(3)`).evaluateAll((cells) => cells.map((c) => (c as HTMLElement).title));
 const onNode = (cell: string, node: string) => cell === node || cell.startsWith(`${node}.`);
 
 /** Problems with the open panel's rows: labels spilling out of their row, counts outside the panel. */
@@ -45,10 +56,10 @@ async function panelProblems(page: Page) {
 	});
 }
 
-test('a filter with thousands of options searches, windows and takes several values', async ({ page }) => {
-	await openChecks(page);
-	const trigger = page.getByRole('button', { name: /^Node/ });
-	await trigger.click();
+test('a picker with thousands of options searches, windows and takes several values', async ({ page }) => {
+	// The Node chip's picker on Checks is the same list as the toolbar's filters, with every node.
+	await openChecks(page, `&select=${ORIGINAL}`);
+	await page.locator('.selection-bar .sel-chip .chip-face').first().click();
 
 	const search = page.getByRole('textbox', { name: 'Search Node' });
 	await expect(search).toBeFocused();
@@ -66,14 +77,14 @@ test('a filter with thousands of options searches, windows and takes several val
 
 	await rows.nth(0).click();
 	await rows.nth(1).click();
-	const picked = titles.slice(0, 2);
 	await expect(search, 'focus stays in the search box').toBeFocused();
-	await expect(trigger).toContainText('Node:2 selected');
 	await expect(rows.nth(0).locator('input')).toBeChecked();
+	// Each ticked name joins the selection as another node, which sqb unions.
+	await expect(page.locator('.selection-bar .sel-chip')).toHaveCount(3);
 
 	if (process.env.CHOICE_FILTER_SHOT) {
-		// The toolbar and the open filter, with some of the page around them.
-		const [a, b] = [await page.locator('.list-toolbar').boundingBox(), await page.locator('.choice-panel').boundingBox()];
+		// The bar and the open picker, with some of the page around them.
+		const [a, b] = [await page.locator('.selection-bar').boundingBox(), await page.locator('.choice-panel').boundingBox()];
 		const top = Math.max(0, Math.min(a!.y, b!.y) - 24);
 		const bottom = Math.min(1000, Math.max(a!.y + a!.height, b!.y + b!.height) + 24);
 		await page.screenshot({ path: process.env.CHOICE_FILTER_SHOT, clip: { x: 0, y: top, width: 1440, height: bottom - top } });
@@ -81,14 +92,7 @@ test('a filter with thousands of options searches, windows and takes several val
 
 	await page.keyboard.press('Escape');
 	await expect(page.locator('.choice-panel')).toHaveCount(0);
-	expect(new URL(page.url()).searchParams.getAll('node').sort()).toEqual([...picked].sort());
-
-	const cells = await nodeCells(page);
-	expect(cells.length).toBeGreaterThan(0);
-	for (const c of cells) expect(picked.some((p) => onNode(c, p)), c).toBe(true);
-
-	await page.getByRole('button', { name: 'Clear Node filter' }).click();
-	await expect(trigger).toHaveText(/^\s*Node\s*$/);
+	expect(new URL(page.url()).searchParams.get('select')?.split(' ')).toEqual([ORIGINAL, ...titles.slice(0, 2)]);
 });
 
 test('a filter with few options has no search box and works from the keyboard', async ({ page }) => {
@@ -102,15 +106,22 @@ test('a filter with few options has no search box and works from the keyboard', 
 	await expect(page.getByRole('button', { name: /^Attached to/ })).toContainText('Attached to:');
 });
 
-test('an old single-node link still filters to that node', async ({ page }) => {
-	await openChecks(page);
-	await page.getByRole('button', { name: /^Node/ }).click();
-	const node = await page.locator('.choice-panel .cf-row').nth(3).getAttribute('title');
+test('an old single-node link still filters to that node, and a second node joins it', async ({ page }) => {
+	await page.goto(`/checks?mock&node=${ORIGINAL}`);
+	await expect(page.locator(DATA_ROWS).first()).toBeVisible({ timeout: 20_000 });
+	await expect(page.locator('.selection-bar .sel-chip')).toHaveText([new RegExp(ORIGINAL)]);
+	const url = new URL(page.url());
+	expect([url.searchParams.get('select'), url.searchParams.get('node')]).toEqual([ORIGINAL, null]);
+	await expect.poll(async () => (await nodeCells(page)).every((c) => onNode(c, ORIGINAL))).toBe(true);
+
+	// Tick a second node in the chip's picker: the list shows both.
+	await page.locator('.selection-bar .sel-chip .chip-face').click();
+	const other = page.locator('.choice-panel .cf-row[aria-selected="false"]').first();
+	const second = (await other.getAttribute('title'))!;
+	await other.click();
 	await page.keyboard.press('Escape');
-	await page.goto(`/checks?mock&awkward&node=${encodeURIComponent(node!)}`);
-	await page.waitForLoadState('networkidle');
-	await expect(page.getByRole('button', { name: /^Node/ })).toContainText(`Node:${node!.slice(0, 20)}`);
-	const cells = await nodeCells(page);
-	expect(cells.length).toBeGreaterThan(0);
-	for (const c of cells) expect(onNode(c, node!), c).toBe(true);
+	await expect.poll(async () => {
+		const cells = await nodeCells(page);
+		return cells.length > 0 && cells.every((c) => onNode(c, ORIGINAL) || onNode(c, second)) && cells.some((c) => onNode(c, second));
+	}).toBe(true);
 });

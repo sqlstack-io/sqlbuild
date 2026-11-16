@@ -23,7 +23,10 @@
 	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel } from '$lib/build-area/labels';
 	import { checkValue, kindLabel, outcomeOf, parseOutcomeFilter, type OutcomeFilter } from './utils';
 	import { countBy } from '$lib/list/count-by';
-	import { matchesAny, readValues, writeValues } from '$lib/list/choice';
+	import { matchesAny, readValues } from '$lib/list/choice';
+	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
+	import { createSelection } from '$lib/state/selection.svelte';
+	import { readSelectionParams } from '$lib/selection/command';
 
 	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
 	const all = $derived(checks.data ?? []);
@@ -31,17 +34,11 @@
 	let query = $state(page.url.searchParams.get('q') ?? '');
 	let outcomeFilter = $state<OutcomeFilter>(parseOutcomeFilter(page.url.searchParams.get('outcome')));
 	let attachment = $state<CheckAttachment[]>([]);
-	// Several nodes are `?node=a&node=b`; a link with one, as before, still works.
-	let nodeFilter = $state(readValues(page.url.searchParams, 'node'));
+	// The nodes checked: a selection, as `sqb` reads one. Older links name nodes with `?node=a&node=b`;
+	// a bare name selects that node, so they become the selection.
+	const linked = readSelectionParams(page.url.searchParams);
+	const selection = createSelection({ url: true, initial: linked.select || linked.exclude ? linked : { select: readValues(page.url.searchParams, 'node').join(' '), exclude: '' }, replaces: ['node'] });
 	const attachmentSet = $derived(new Set(attachment));
-	const nodeSet = $derived(new Set(nodeFilter));
-	$effect(() => {
-		const params = writeValues(page.url.searchParams, 'node', nodeFilter);
-		if (params.toString() === page.url.searchParams.toString()) return;
-		const url = new URL(page.url);
-		url.search = params.toString();
-		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
-	});
 
 	const bucket = (c: Check): Exclude<OutcomeFilter, 'all'> => {
 		const o = outcomeOf(c);
@@ -52,7 +49,7 @@
 		all.filter((c) => {
 			if (outcomeFilter !== 'all' && bucket(c) !== outcomeFilter) return false;
 			if (!matchesAny(attachmentSet, c.attachment)) return false;
-			if (!matchesAny(nodeSet, c.node)) return false;
+			if (!selection.hasName(c.node)) return false;
 			const q = query.trim().toLowerCase();
 			return !q || [c.name, c.node ?? '', c.column ?? '', kindLabel(c)].some((s) => s.toLowerCase().includes(q));
 		})
@@ -101,6 +98,7 @@
 </AppTopbar>
 
 
+<SelectionBar {selection} names={nodes.map((n) => ({ value: n, hint: '', count: byNode.get(n) ?? 0 }))} total={nodes.length} build={false} />
 <ListToolbar
 	loading={checks.data === undefined}
 	bind:query
@@ -114,7 +112,6 @@
 	{#snippet filters()}
 		<SegmentedFilter loading={checks.data === undefined} bind:value={outcomeFilter} options={outcomeOptions.map((o) => ({ ...o, count: counts[o.value] }))} />
 		<ChoiceFilter multiple label="Attached to" bind:values={attachment} options={(['model', 'source', 'seed', 'end'] as CheckAttachment[]).map((a) => ({ value: a, label: attachmentLabel[a], count: byAttachment.get(a) ?? 0 }))} />
-		<ChoiceFilter multiple label="Node" bind:values={nodeFilter} options={nodes.map((n) => ({ value: n, label: n, count: byNode.get(n) ?? 0 }))} />
 	{/snippet}
 </ListToolbar>
 

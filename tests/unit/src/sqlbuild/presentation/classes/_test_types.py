@@ -60,3 +60,10 @@ class StatusReporterExitTestCase:
     description: str
     script: str
     expected_returncode: int
+
+
+@dataclass(frozen=True)
+class ConsoleLineTestCase:
+    description: str
+    project_toml: str
+    expected_events: tuple[str, ...]

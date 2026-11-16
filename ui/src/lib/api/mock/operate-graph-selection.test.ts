@@ -12,8 +12,13 @@ describe('mock selection evaluation', () => {
 			message: "unknown selector name 'tag:fin'",
 			help: null,
 			location: { field: 'exclude', token: 'tag:fin', start: 0, end: 7 },
-			suggestions: ['tag:finance']
+			suggestions: ['tag:finance'],
+			refused: { part: 0, type: 'tag', value: 'fin' }
 		});
+	});
+
+	it('keeps the + of the part it fixes in a suggestion', () => {
+		expect(evaluateMockSelection('+tag:finanse,kind:model', '').error?.suggestions).toEqual(['+tag:finance,kind:model']);
 	});
 
 	it('counts models of every materialization as one kind', () => {

@@ -2,6 +2,8 @@
 
 #[path = "helpers.rs"]
 mod helpers;
+#[path = "test_compile_failure.rs"]
+mod test_compile_failure;
 #[path = "test_installation.rs"]
 mod test_installation;
 #[path = "test_problems.rs"]

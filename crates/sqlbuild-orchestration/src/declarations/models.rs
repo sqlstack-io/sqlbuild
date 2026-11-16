@@ -1,6 +1,7 @@
 //! Resolved, serializable declarations; Python objects never enter scheduler state.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU32;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -35,6 +36,9 @@ pub struct JobDefinition {
     pub settings: BTreeMap<String, serde_json::Value>,
     #[serde(default)]
     pub concurrency_groups: BTreeSet<String>,
+    /// Each of `concurrency_groups` with its most runs at once, as the project declares it for the target.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub concurrency_limits: BTreeMap<String, NonZeroU32>,
     /// The selectors as written, for display; `selection` is what runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub select: Option<String>,
@@ -147,6 +151,9 @@ pub struct GroupDefinition {
     #[serde(flatten)]
     pub job: JobDefinition,
     pub jobs: BTreeMap<String, BTreeSet<String>>,
+    /// Each member's node-level reasons to wait for the members in `jobs`; members without one are left out.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub wait_reasons: BTreeMap<String, Vec<WaitReason>>,
     /// Each member whose `[dependencies] on_failure` is not `partial`, with its policy.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub dependency_failure: BTreeMap<String, DependencyFailure>,
@@ -161,6 +168,24 @@ impl GroupDefinition {
             .copied()
             .unwrap_or_default()
     }
+}
+
+/// One reason a member waits: `from_node` of `upstream_job` feeds its `to_node`, directly or through nodes no member selects.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WaitReason {
+    pub upstream_job: String,
+    pub from_node: String,
+    pub to_node: String,
+}
+
+/// A job's concurrency group: its most runs at once and the other jobs and groups that share it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ConcurrencyRule {
+    pub group: String,
+    /// Absent for a snapshot published before limits were part of it.
+    pub limit: Option<u32>,
+    pub shared_with: BTreeSet<String>,
 }
 
 /// What a group member does when a job it depends on failed.
@@ -232,6 +257,8 @@ pub struct JobRecord {
     pub description: String,
     pub selection: BTreeSet<String>,
     pub concurrency_groups: BTreeSet<String>,
+    /// Each concurrency group's limit and the other jobs sharing it, by group name.
+    pub concurrency: Vec<ConcurrencyRule>,
     pub snapshot_id: uuid::Uuid,
     /// A job's selectors as written; absent for a group and for snapshots published before they were recorded.
     pub select: Option<String>,
@@ -259,6 +286,8 @@ pub struct JobDetailRecord {
     pub snapshot_id: uuid::Uuid,
     pub selection: BTreeSet<String>,
     pub concurrency_groups: BTreeSet<String>,
+    /// Each concurrency group's limit and the other jobs sharing it, by group name.
+    pub concurrency: Vec<ConcurrencyRule>,
     /// Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction.
     pub settings: BTreeMap<String, serde_json::Value>,
     /// A group's member jobs in run order; empty for a job.
@@ -285,6 +314,8 @@ pub struct JobMember {
     pub job_key: String,
     /// Members this one waits for, from the lineage between their nodes.
     pub waits_for: BTreeSet<String>,
+    /// Node by node, why it waits for each of `waits_for`; a wait with none follows lineage through another member.
+    pub reasons: Vec<WaitReason>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]

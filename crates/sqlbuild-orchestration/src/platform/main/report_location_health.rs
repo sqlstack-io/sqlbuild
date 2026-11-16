@@ -4,6 +4,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::platform::_helpers::location_heartbeat::location_heartbeat;
+use crate::platform::constants::{MAX_REPORTED_RULE_FINDINGS, MAX_RULE_FINDING_CHARS};
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
@@ -24,7 +25,7 @@ pub async fn report_location_health(
     }
     let generation = match report.health {
         LocationHealth::Heartbeat {} => None,
-        LocationHealth::CompileFailed { generation }
+        LocationHealth::CompileFailed { generation, .. }
         | LocationHealth::Connection { generation, .. }
         | LocationHealth::ProviderSecrets { generation, .. }
         | LocationHealth::WarehouseSync { generation, .. } => Some(generation),
@@ -33,6 +34,24 @@ pub async fn report_location_health(
         return Err(ControlError::Invalid(
             "location health generation must be positive".into(),
         ));
+    }
+    if let LocationHealth::CompileFailed {
+        rules: Some(rules), ..
+    } = &report.health
+    {
+        let oversized = |text: &str| text.chars().count() > MAX_RULE_FINDING_CHARS;
+        if rules.findings.len() > MAX_REPORTED_RULE_FINDINGS
+            || rules.finding_count < rules.findings.len() as u64
+            || rules.findings.iter().any(|finding| {
+                oversized(&finding.code)
+                    || oversized(&finding.message)
+                    || finding.path.as_deref().is_some_and(oversized)
+            })
+        {
+            return Err(ControlError::Invalid(
+                "location rule findings exceed the reported bounds".into(),
+            ));
+        }
     }
     let transaction = begin(store, TransactionMode::Write).await?;
     if generation.is_none() {

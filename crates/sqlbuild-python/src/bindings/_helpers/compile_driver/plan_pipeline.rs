@@ -16,6 +16,7 @@ use crate::bindings::_helpers::compile_driver::pipeline_entries::project_graph;
 use crate::bindings::_helpers::compile_driver::plan_result::{
     PlanningInputs, connection_with_hooks, pipeline_result,
 };
+use crate::bindings::_helpers::compile_driver::rules_at_load::rules_ran_at_load;
 use crate::bindings::_helpers::compile_driver::selection_phases::{
     apply_unit_test_selectors, resolve_configured_rule_selection,
 };
@@ -57,7 +58,7 @@ pub(crate) fn run_compile_pipeline<'py>(
     )
 }
 
-/// Compile unless `held` is a `CompiledProjectPhaseResult` for these inputs, then gate on rules and plan.
+/// Compile unless `held` is a `CompiledProjectPhaseResult`, gate on rules unless they ran at load, and plan.
 pub(crate) fn planned_project<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
@@ -97,15 +98,20 @@ pub(crate) fn planned_project<'py>(
             )?
         }
     };
-    let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
-    let graph: Bound<'py, PyAny> = project_graph(&project)?;
-    run_rules_gate(
-        (discovered, adapter, expansion_reuse.as_any()),
-        (&options, &on_progress),
-        (&project, &graph),
-    )?;
+    if !rules_ran_at_load() {
+        let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
+        let graph: Bound<'py, PyAny> = project_graph(&project)?;
+        run_rules_gate(
+            (discovered, adapter, expansion_reuse.as_any()),
+            (&options, &on_progress),
+            (&project, &graph),
+        )?;
+    }
     planned((discovered, adapter), (&options, &hooks), &compiled)
 }
+
+/// The failing findings' `RulesResult`, their rendered text and the default-rules notice.
+pub(crate) type RuleFailures<'py> = (Bound<'py, PyAny>, String, Option<String>);
 
 /// Run the configured rules and stop the command when any of them finds a fault.
 fn run_rules_gate<'py>(
@@ -117,6 +123,36 @@ fn run_rules_gate<'py>(
     (options, on_progress): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (project, graph): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<()> {
+    let Some((_, rendered, notice)) = configured_rule_failures(
+        (discovered, adapter, expansion_reuse),
+        (options, on_progress),
+        (project, graph),
+    )?
+    else {
+        return Ok(());
+    };
+    let notice: Vec<(&str, String)> = notice
+        .map(|notice| (DEFAULT_RULES_NOTICE_ATTR, notice))
+        .into_iter()
+        .collect();
+    Err(new_annotated_error(
+        discovered.py(),
+        ErrorId::Rules,
+        format!("configured compiler rules failed:\n{rendered}"),
+        &notice,
+    ))
+}
+
+/// Evaluate the configured rules; the failing findings, or `None` when none fails.
+pub(crate) fn configured_rule_failures<'py>(
+    (discovered, adapter, expansion_reuse): (
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+    ),
+    (options, on_progress): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (project, graph): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Option<RuleFailures<'py>>> {
     let py: Python<'py> = discovered.py();
     let rules_error: Bound<'py, PyAny> = error_class(py, ErrorId::Rules)?;
     let project_dir: Bound<'py, PyAny> = native_field(discovered, "project_dir")?;
@@ -173,7 +209,7 @@ fn run_rules_gate<'py>(
         }
     }
     if failing.is_empty() {
-        return Ok(());
+        return Ok(None);
     }
     let findings: Bound<'py, PyAny> = PyTuple::new(py, failing)?.into_any();
     let summary: Bound<'py, PyAny> = new_record_with(
@@ -199,17 +235,9 @@ fn run_rules_gate<'py>(
         .map(|finding| native_field(&finding?, "code")?.extract())
         .collect::<PyResult<_>>()?;
     let select_omitted: bool = native_field(&config, "select")?.is_none();
-    let notice: Vec<(&str, String)> =
-        default_rules_notice(select_omitted, codes.iter().map(String::as_str))
-            .map(|notice| (DEFAULT_RULES_NOTICE_ATTR, notice))
-            .into_iter()
-            .collect();
-    Err(new_annotated_error(
-        py,
-        ErrorId::Rules,
-        format!("configured compiler rules failed:\n{rendered}"),
-        &notice,
-    ))
+    let notice: Option<String> =
+        default_rules_notice(select_omitted, codes.iter().map(String::as_str));
+    Ok(Some((summary, rendered, notice)))
 }
 
 /// Open the planning connection, plan, and record the compile and planning times.

@@ -10,7 +10,37 @@ use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
 use crate::store::models::ControlTransaction;
 
-/// Limits a run takes on admission; group children share their parent's, one child per limit at a time.
+/// A group's slots in its run's location and target: groups belong to their project.
+pub(crate) fn slot_key(request: &RunRequest, group: &str) -> String {
+    format!("{}/{}/{group}", request.location_id, request.target)
+}
+
+/// The group name of a slot key.
+pub(crate) fn slot_group(key: &str) -> &str {
+    key.rsplit_once('/').map_or(key, |(_, group)| group)
+}
+
+/// The request a group is admitted with: its own and every child's groups, with their limits.
+pub(crate) fn admitted<'a>(
+    request: &RunRequest,
+    children: impl IntoIterator<Item = &'a RunRequest>,
+) -> RunRequest {
+    let mut admitted = request.clone();
+    for child in children {
+        admitted
+            .concurrency_groups
+            .extend(child.concurrency_groups.iter().cloned());
+        for (group, limit) in &child.concurrency_limits {
+            admitted
+                .concurrency_limits
+                .entry(group.clone())
+                .or_insert(*limit);
+        }
+    }
+    admitted
+}
+
+/// Slots a run takes on admission; group children share their parent's, one child per limit at a time.
 pub(crate) fn admission_limits<'a>(
     request: &RunRequest,
     children: impl IntoIterator<Item = &'a RunRequest>,
@@ -18,11 +48,11 @@ pub(crate) fn admission_limits<'a>(
     if request.parent_run_id.is_some() {
         return BTreeSet::new();
     }
-    let mut limits = request.concurrency_groups.clone();
-    for child in children {
-        limits.extend(child.concurrency_groups.iter().cloned());
-    }
-    limits
+    admitted(request, children)
+        .concurrency_groups
+        .iter()
+        .map(|group| slot_key(request, group))
+        .collect()
 }
 
 /// Queued top-level runs in dispatchable scopes, with the limits each will take.

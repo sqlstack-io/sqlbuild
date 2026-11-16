@@ -106,6 +106,12 @@ TYPE_PROOF_FILES: dict[str, str] = {
         'SELECT order_id, amount\nFROM __ref("stg_orders")\n'
     ),
 }
+# The type-proof project with its contract finding fixed, so a location's load passes its rules.
+PUBLISHABLE_FILES: dict[str, str] = TYPE_PROOF_FILES | {
+    "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+        "SELECT order_id, amount", "SELECT order_id, CAST(amount AS BIGINT) AS amount"
+    ),
+}
 
 
 _FACTS_CONSUMERS: tuple[ModuleType, ...] = (_native,)

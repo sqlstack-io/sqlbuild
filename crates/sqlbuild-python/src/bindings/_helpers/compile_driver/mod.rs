@@ -22,6 +22,7 @@ pub(crate) mod project;
 pub(crate) mod python_plan_entries;
 pub(crate) mod registration;
 pub(crate) mod relation_targets;
+pub(crate) mod rules_at_load;
 pub(crate) mod selection_phases;
 pub(crate) mod stage_work;
 pub(crate) mod static_context;

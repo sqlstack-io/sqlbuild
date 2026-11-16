@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::_helpers::job_detail::{
-    critical_nodes, cursor_type, groups_running, members_in_order, shown_settings,
+    critical_nodes, cursor_type, members_in_order, shown_settings, snapshot_relations,
 };
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::declarations::main::published_job::published_job;
@@ -49,6 +49,7 @@ pub async fn read_person_job(
             ));
         }
     };
+    let (member_of, concurrency) = snapshot_relations(&definitions, (job_key, &job));
     let (transaction, nodes) =
         read_snapshot_nodes(transaction, snapshot_id, Some(&job.selection)).await?;
     commit(transaction).await?;
@@ -59,11 +60,12 @@ pub async fn read_person_job(
         snapshot_id,
         settings: shown_settings(&job.settings),
         members,
-        member_of: groups_running(&definitions, job_key),
+        member_of,
         critical_nodes: critical_nodes(&nodes),
         cursor_type: cursor_type(&nodes),
         selection: job.selection,
         concurrency_groups: job.concurrency_groups,
+        concurrency,
         select: job.select,
         exclude: job.exclude,
         targets: job.targets,

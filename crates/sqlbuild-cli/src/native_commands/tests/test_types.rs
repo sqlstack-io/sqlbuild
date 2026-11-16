@@ -50,6 +50,12 @@ pub(super) struct ProjectFactsTestCase {
     pub(super) expected_native: bool,
 }
 
+pub(super) struct ProjectNameTestCase {
+    pub(super) description: &'static str,
+    pub(super) project_file: &'static str,
+    pub(super) expected_name: Option<&'static str>,
+}
+
 /// One `rules` inspection over a project and the start of what it prints.
 pub(super) struct RulesTestCase {
     pub(super) description: &'static str,
@@ -174,4 +180,11 @@ pub(super) struct ChangedBuildNodesTestCase {
     pub(super) description: &'static str,
     pub(super) document: serde_json::Value,
     pub(super) expected: Result<(Vec<&'static str>, Vec<&'static str>), &'static str>,
+}
+
+pub(super) struct LineResetTestCase {
+    pub(super) description: &'static str,
+    pub(super) shared: bool,
+    pub(super) terminal: bool,
+    pub(super) expected_reset: &'static [u8],
 }

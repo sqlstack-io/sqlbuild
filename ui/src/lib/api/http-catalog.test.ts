@@ -184,7 +184,7 @@ describe('catalog node detail', () => {
 
 describe('catalog node runs and jobs', () => {
 	const snapshot = '01a1b000-0000-7000-8000-000000000001';
-	const job = (key: string, kind: 'job' | 'group', selection: string[]): W['JobRecord'] => ({ job_key: key, kind, description: key, selection, concurrency_groups: [], snapshot_id: snapshot, overlap: 'queue' });
+	const job = (key: string, kind: 'job' | 'group', selection: string[]): W['JobRecord'] => ({ job_key: key, kind, description: key, selection, concurrency_groups: [], concurrency: [], snapshot_id: snapshot, overlap: 'queue' });
 	const trigger = (id: string, jobKey: string) => ({ trigger_id: id, job_key: jobKey }) as W['TriggerRecord'];
 	const run = (id: string, status: string, extra: Partial<W['NodeRunRecord']> = {}): W['NodeRunRecord'] => ({ run_id: id, job_key: 'orders', queued_at: '2026-11-08T05:59:00Z', status, ...extra });
 
@@ -256,7 +256,9 @@ describe('node states mapping', () => {
 	it('carries the changed build planned for the current snapshot, and none from an older server', () => {
 		const record = { snapshot_id: 'snap-1', version: 3, states: {} };
 		const build = { generation: 2, reported_at: '2026-11-08T12:00:00Z', changed: ['model:orders'], downstream: ['model:customers'] };
-		expect(toNodeStates({ ...record, changed_build: build }).changedBuild).toEqual({ generation: 2, changed: ['model:orders'], downstream: ['model:customers'] });
+		expect(toNodeStates({ ...record, changed_build: build }).changedBuild).toEqual({ generation: 2, changed: ['model:orders'], downstream: ['model:customers'], failing: null });
+		const failed = { ...build, changed: [], downstream: [], failing: 'Model orders cannot plan a full rebuild' };
+		expect(toNodeStates({ ...record, changed_build: failed }).changedBuild?.failing).toBe('Model orders cannot plan a full rebuild');
 		expect(toNodeStates(record).changedBuild).toBeNull();
 	});
 });

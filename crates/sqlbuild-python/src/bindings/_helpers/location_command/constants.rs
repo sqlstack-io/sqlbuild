@@ -38,3 +38,5 @@ pub(crate) const SNAPSHOT_HIDDEN_SETTING: &str = "alias";
 pub(crate) const METADATA_ERROR_CHARS: usize = 2000;
 /// The runtime request key of a plan preview: `{"plan": {"argv", "copy"}}`.
 pub(crate) const PLAN_REQUEST: &str = "plan";
+/// The code of a failed plan preview whose error names none.
+pub(crate) const PLAN_FAILED_CODE: &str = "plan_failed";

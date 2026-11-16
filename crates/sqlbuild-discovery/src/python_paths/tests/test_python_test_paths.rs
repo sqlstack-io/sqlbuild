@@ -6,8 +6,9 @@ use crate::python_paths::tests::test_types::TestPathsTestCase;
 fn given_project_tests_when_listing_python_test_paths_then_only_mirrored_test_roots_remain() {
     let test_cases = [
         TestPathsTestCase {
-            description: "tests/python and tests/providers, skipping SQL test folders, caches and hidden folders",
+            description: "tests/python, tests/providers and tests/orchestration, skipping SQL test folders, caches and hidden folders",
             files: &[
+                "tests/orchestration/sensors/orders/test_restock.py",
                 "tests/python/orders/import/test_main.py",
                 "tests/providers/storefront/test_provider.py",
                 "tests/python/orders/_test_types.py",
@@ -18,6 +19,7 @@ fn given_project_tests_when_listing_python_test_paths_then_only_mirrored_test_ro
                 "python/orders/import/main.py",
             ],
             expected_tests: &[
+                "tests/orchestration/sensors/orders/test_restock.py",
                 "tests/providers/storefront/test_provider.py",
                 "tests/python/orders/_test_types.py",
                 "tests/python/orders/import/test_main.py",

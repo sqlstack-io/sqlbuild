@@ -40,3 +40,7 @@ pub(crate) const LOCATION_SILENCE_SECONDS: i64 = 90;
 
 /// A SQLite WAL reset waits this long for readers while holding the write lock, then retries later.
 pub(crate) const CHECKPOINT_READER_WAIT_MS: u64 = 200;
+/// How many rule findings a location's health report lists; the count covers the rest.
+pub const MAX_REPORTED_RULE_FINDINGS: usize = 50;
+/// The longest code, message or path of a reported rule finding, in characters.
+pub const MAX_RULE_FINDING_CHARS: usize = 500;

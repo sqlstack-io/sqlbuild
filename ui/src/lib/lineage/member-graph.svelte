@@ -1,23 +1,23 @@
 <script lang="ts">
-	import '@xyflow/svelte/dist/style.css';
-	import { Background, SvelteFlow, type Edge, type Node, type Viewport } from '@xyflow/svelte';
+	import type { Edge, Node, Viewport } from '@xyflow/svelte';
 	import { tick, untrack } from 'svelte';
 	import type { CatalogNode, JobGroupMember } from '$lib/api';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FolderNode from '$lib/components/lineage/folder-node.svelte';
 	import TooManyCard from '$lib/components/lineage/too-many-card.svelte';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
-	import FitControls from '$lib/lineage/fit-controls.svelte';
-	import { folderBoxId, folderCardId, layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import GraphToolbar from '$lib/components/graph/graph-toolbar.svelte';
+	import { MAX_DRAWN, folderBoxId, folderCardId, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { absolutePosition as positionOn, anchoredViewport } from '$lib/lineage/fit';
-	import { innerId, memberGraph, memberNodeId, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
+	import { innerId, layoutMemberGraph, litEdges, memberFolderBoxId, memberFolderCardId, memberGraph, memberNodeId, memberReach, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
 	import { toggled } from '$lib/lineage/member-expand';
+	import { MEMBER_FOLDERS_CLOSED_ABOVE, declarationFolder, memberFolderTree } from '$lib/lineage/member-folders';
 	import JobBoxNode from './job-box-node.svelte';
 	import MemberNode from './member-node.svelte';
 	import MemberBoxNode from './member-box-node.svelte';
 	import CountEdge from './count-edge.svelte';
-	import { edgeStyle, edgesTouching } from '$lib/lineage/visible-edges';
+	import { edgeStyle } from '$lib/lineage/visible-edges';
 
 	// A job group's member jobs, one card each. Clicking a card selects it and opens the member in
 	// place, a box around its nodes, as a folder opens on Lineage; edges follow what is visible at
@@ -27,13 +27,16 @@
 		info,
 		catalog = [],
 		links = new Map(),
-		selection = $bindable(null)
+		selection = $bindable(null),
+		details
 	}: {
 		members: JobGroupMember[];
 		info: ReadonlyMap<string, MemberInfo>;
 		catalog?: readonly CatalogNode[];
 		links?: ReadonlyMap<string, NodeLink[]>;
 		selection?: MemberSelection | null;
+		/** The page's details panel, toggled from the toolbar as on Lineage. */
+		details?: { open: boolean; toggle: () => void };
 	} = $props();
 
 	const nodeTypes = { member: MemberNode, memberBox: MemberBoxNode, asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode };
@@ -65,7 +68,86 @@
 		setFolders(jobKey, new Set([...(openFolders.get(jobKey) ?? []), folder]));
 	}
 
-	const graph = $derived(memberGraph(members, info, { catalog, links, expanded, openFolders, ontoggle: toggle, oncloseFolder: closeFolder }));
+	// Focus: only the selected member and the members it waits for or that wait for it.
+	let focusOn = $state<string | null>(null);
+	const shownMembers = $derived.by(() => {
+		if (!focusOn) return members;
+		const keep = new Set([focusOn, ...(reach.up.get(focusOn) ?? []), ...(reach.down.get(focusOn) ?? [])]);
+		return members.filter((m) => keep.has(m.jobKey));
+	});
+	function toggleFocus() {
+		focusOn = focusOn ? null : (selection?.member ?? null);
+	}
+	// Members by the folder they are declared in, as Lineage draws folders: a large group opens with its
+	// folders closed, a small one with them open.
+	const tree = $derived(memberFolderTree(shownMembers.map((m) => m.jobKey), (k) => declarationFolder(info.get(k)?.sourceFile)));
+	const hasFolders = $derived(tree.folders.size > 0);
+	let foldersOn = $state(true);
+	/** Drawing by folder or not changes the whole graph, so the view fits it again, as Lineage's Folders does. */
+	let refitNext = false;
+	function toggleFolders() {
+		foldersOn = !foldersOn;
+		refitNext = true;
+	}
+	let openMemberFolders = $state<ReadonlySet<string>>(new Set());
+	let foldersReady = false;
+	const initialFolders = () => (members.length > MEMBER_FOLDERS_CLOSED_ABOVE ? new Set<string>() : new Set(tree.folders.keys()));
+	$effect(() => {
+		if (foldersReady || !hasFolders) return;
+		foldersReady = true;
+		openMemberFolders = untrack(initialFolders);
+	});
+	function openMemberFolder(folder: string) {
+		anchorOn(memberFolderCardId(folder), memberFolderBoxId(folder));
+		openMemberFolders = new Set([...openMemberFolders, folder]);
+	}
+	function closeMemberFolder(folder: string) {
+		anchorOn(memberFolderBoxId(folder), memberFolderCardId(folder));
+		openMemberFolders = new Set([...openMemberFolders].filter((f) => f !== folder && !f.startsWith(`${folder}/`)));
+	}
+	const folderOption = $derived(foldersOn && hasFolders ? { tree, open: openMemberFolders, onclose: closeMemberFolder } : undefined);
+
+	let expandNote = $state('');
+	/** Opens every folder, then every member whose nodes are known, in order, stopping before the graph draws too many cards. */
+	function expandEverything() {
+		openMemberFolders = new Set(tree.folders.keys());
+		let next = new Set(expanded);
+		const openable = shownMembers.filter((m) => (info.get(m.jobKey)?.nodes?.length ?? 0) > 0 && !next.has(m.jobKey));
+		let opened = 0;
+		for (const m of openable) {
+			const trial = new Set([...next, m.jobKey]);
+			if (memberGraph(shownMembers, info, { catalog, links, expanded: trial, openFolders, folders: folderOption && { ...folderOption, open: openMemberFolders } }).nodes.length > MAX_DRAWN) break;
+			next = trial;
+			opened++;
+		}
+		expandNote = opened < openable.length ? `Opened ${opened} of ${openable.length} jobs: the graph draws at most ${MAX_DRAWN.toLocaleString('en')} cards` : '';
+		expanded = next;
+	}
+	function collapseEverything() {
+		expanded = new Set();
+		openFolders = new Map();
+		openMemberFolders = new Set();
+		expandNote = '';
+	}
+	/** Back to how the graph opened: every member closed, folders as they opened, no focus, fitted again. */
+	async function reset() {
+		focusOn = null;
+		collapseEverything();
+		foldersOn = true;
+		openMemberFolders = initialFolders();
+		await tick();
+		// When the reset changed what is drawn, the new cards are measured and laid out first, and the
+		// layout fits them; fitting now would fit the cards being replaced.
+		if (laidOut !== shape) {
+			refitNext = true;
+			return;
+		}
+		if (nodes.length) nodes = layoutMemberGraph(nodes, edges);
+		await tick();
+		requestAnimationFrame(() => fit?.());
+	}
+
+	const graph = $derived(memberGraph(shownMembers, info, { catalog, links, expanded, openFolders, ontoggle: toggle, oncloseFolder: closeFolder, folders: folderOption }));
 	const tooMany = $derived(tooManyToDraw(graph));
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
@@ -104,14 +186,16 @@
 	let shape = '';
 	let laidOut = '';
 	const selectedId = $derived(selection ? (selection.node ? innerId(selection.member, selection.node) : memberNodeId(selection.member)) : null);
-	// Hovering or selecting a card or box lights its edges and dims the rest, as on Lineage.
+	// Hovering or selecting a card or box lights its edges and dims the rest, as on Lineage; a member
+	// lights its whole upstream and downstream, including the waits the drawing leaves implied.
 	let hoveredId = $state<string | null>(null);
+	const reach = $derived(memberReach(members));
 	const focusId = $derived(hoveredId ?? selectedId);
 	$effect(() => {
 		const id = focusId;
 		// Tracks the edges too, so a redrawn graph is lit again; it writes only when a style changes.
 		const current = edges;
-		const lit = id ? edgesTouching(id, current, untrack(() => nodes)) : null;
+		const lit = id ? litEdges(id, current, untrack(() => nodes), reach) : null;
 		const styled = current.map((e) => {
 			const count = (e.data as { count?: number } | undefined)?.count ?? 1;
 			const style = edgeStyle(Math.max(1, count), !lit ? 'neutral' : lit.has(e.id) ? 'on' : 'dim', count === 0);
@@ -152,14 +236,17 @@
 		const cards = nodes.filter((n) => n.type === 'asset' || n.type === 'folder');
 		if (laidOut === shape || !nodes.length || !cards.every((n) => n.measured?.width && n.measured?.height)) return;
 		laidOut = shape;
-		nodes = layoutFolderGraph(nodes, edges);
+		nodes = layoutMemberGraph(nodes, edges);
 		const held = anchor;
 		anchor = null;
 		tick().then(() =>
 			requestAnimationFrame(() => {
 				const after = held && positionOn(nodes, held.id);
 				if (held && after && setViewport && fitted) setViewport(anchoredViewport(held.view, held.before, after));
-				else if (!fitted) fit?.();
+				else if (!fitted || refitNext) {
+					refitNext = false;
+					fit?.();
+				}
 			})
 		);
 	});
@@ -170,49 +257,60 @@
 			if (node.data.expandable) toggle(String(node.data.jobKey));
 			else selection = { member: String(node.data.jobKey) };
 		} else if (node.type === 'memberBox') selection = { member: String(node.data.jobKey) };
+		else if (node.type === 'folder' && node.data.memberFolder) openMemberFolder(String(node.data.memberFolder));
 		else if (node.type === 'folder') openFolder(String(node.data.member), String(node.data.group));
 		else if (node.type === 'asset') selection = { member: String(node.data.member), node: String(node.data.name) };
 	}
 </script>
 
-<div class="graph sb-flow" bind:this={panel} class:unfitted={!fitted && nodes.length > 0}>
-	<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {onnodeclick} onpaneclick={() => (selection = null)} onnodepointerenter={({ node }) => (hoveredId = node.id)} onnodepointerleave={() => (hoveredId = null)}>
-		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport readable />
-		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-		<FitControls onfit={() => fit?.()} />
-	</SvelteFlow>
+<div class="member-graph">
+	<GraphToolbar
+		folders={hasFolders ? { on: foldersOn, toggle: toggleFolders } : undefined}
+		expand={{ all: expandEverything, collapse: collapseEverything, canCollapse: expanded.size > 0 || (foldersOn && openMemberFolders.size > 0), allTitle: 'Open every job in place, up to the graph’s card limit', collapseTitle: 'Close every job', note: expandNote }}
+		focus={{ on: !!focusOn, can: !!selection, toggle: toggleFocus, title: 'Show only the selected job and the jobs it waits for or that wait for it' }}
+		onreset={reset}
+		{details}
+	/>
+	<GraphCanvas
+		bind:nodes
+		bind:edges
+		bind:fit
+		bind:fitted
+		bind:viewport
+		bind:setViewport
+		bind:element={panel}
+		{nodeTypes}
+		{edgeTypes}
+		nodesDraggable={false}
+		nodesConnectable={false}
+		elementsSelectable={false}
+		{onnodeclick}
+		onpaneclick={() => (selection = null)}
+		onnodepointerenter={({ node }) => (hoveredId = node.id)}
+		onnodepointerleave={() => (hoveredId = null)}
+	/>
 	{#if tooMany}
 		<TooManyCard count={graph.nodes.length}>
 			{#snippet actions()}
-				{#if expanded.size}<Button variant="outline" size="bar" onclick={() => (expanded = new Set())}>Close every job</Button>{/if}
+				{#if expanded.size}<Button variant="outline" size="bar" onclick={collapseEverything}>Close every job</Button>{/if}
 			{/snippet}
 		</TooManyCard>
 	{/if}
 </div>
 
 <style>
-	.graph {
+	.member-graph {
 		position: relative;
+		display: flex;
 		height: 100%;
+		flex-direction: column;
 		overflow: hidden;
 		border: 1px solid var(--border);
 		border-radius: 2px;
 		background: var(--sb-inset);
 	}
-	.unfitted :global(.svelte-flow__viewport),
-	.unfitted :global(.svelte-flow__controls) {
-		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
-		opacity: 0;
-	}
-	.graph :global(.svelte-flow__node-folder),
-	.graph :global(.svelte-flow__node-asset) {
+	.member-graph :global(.svelte-flow__node-folder),
+	.member-graph :global(.svelte-flow__node-asset) {
 		cursor: pointer;
-	}
-	.graph :global(.svelte-flow__controls-button) {
-		background: var(--card);
-		border-bottom: 1px solid var(--border);
-	}
-	.graph :global(.svelte-flow__controls-button svg) {
-		fill: var(--muted-foreground);
 	}
 </style>

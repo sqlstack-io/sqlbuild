@@ -1684,6 +1684,8 @@ export interface components {
             changed: string[];
             /** @description Nodes that run only because an upstream they read runs. */
             downstream: string[];
+            /** @description Why the location's plan failed, with both lists empty; absent when it planned. */
+            failing?: string | null;
             /**
              * Format: int64
              * @description The publication generation it was planned for.
@@ -1699,6 +1701,8 @@ export interface components {
         ChangedBuildReport: {
             changed: string[];
             downstream: string[];
+            /** @description Why the plan failed, sent with empty lists; only newer servers accept it. */
+            failing?: string | null;
             /** Format: int64 */
             generation: number;
             /** Format: uuid */
@@ -1791,6 +1795,16 @@ export interface components {
             nodes: components["schemas"]["LineageNodeColumns"][];
             /** Format: uuid */
             snapshot_id?: string | null;
+        };
+        /** @description A job's concurrency group: its most runs at once and the other jobs and groups that share it. */
+        ConcurrencyRule: {
+            group: string;
+            /**
+             * Format: int32
+             * @description Absent for a snapshot published before limits were part of it.
+             */
+            limit?: number | null;
+            shared_with: string[];
         };
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
@@ -1983,6 +1997,8 @@ export interface components {
         };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
+            /** @description Each concurrency group's limit and the other jobs sharing it, by group name. */
+            concurrency: components["schemas"]["ConcurrencyRule"][];
             concurrency_groups: string[];
             /** @description Selected nodes whose failure stops a group. */
             critical_nodes: string[];
@@ -2013,11 +2029,15 @@ export interface components {
         };
         JobMember: {
             job_key: string;
+            /** @description Node by node, why it waits for each of `waits_for`; a wait with none follows lineage through another member. */
+            reasons: components["schemas"]["WaitReason"][];
             /** @description Members this one waits for, from the lineage between their nodes. */
             waits_for: string[];
         };
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
+            /** @description Each concurrency group's limit and the other jobs sharing it, by group name. */
+            concurrency: components["schemas"]["ConcurrencyRule"][];
             concurrency_groups: string[];
             declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
@@ -2082,6 +2102,7 @@ export interface components {
             generation: number;
             /** @enum {string} */
             kind: "compile_failed";
+            rules?: null | components["schemas"]["LocationRuleFailure"];
         } | {
             /**
              * Format: int64
@@ -2139,6 +2160,21 @@ export interface components {
             /** Format: uuid */
             session_id: string;
             target: string;
+        };
+        /** @description Configured rules that failed a location's load: how many findings, and the first of them. */
+        LocationRuleFailure: {
+            /** Format: int64 */
+            finding_count: number;
+            /** @description At most `MAX_REPORTED_RULE_FINDINGS`, in the rules' order. */
+            findings: components["schemas"]["LocationRuleFinding"][];
+        };
+        /** @description One rule finding as `sqb compile` prints it. */
+        LocationRuleFinding: {
+            code: string;
+            /** Format: int64 */
+            line?: number | null;
+            message: string;
+            path?: string | null;
         };
         /** @description Only named location operations cross this boundary, never arbitrary SQL or Python. */
         LocationWork: {
@@ -2852,8 +2888,6 @@ export interface components {
             /** Format: uuid */
             run_id?: string | null;
         } | {
-            /** Format: int32 */
-            elsewhere: number;
             holders: string[];
             /** @enum {string} */
             kind: "concurrency_limit";
@@ -3229,6 +3263,10 @@ export interface components {
         RunRequest: {
             command?: components["schemas"]["RunCommand"];
             concurrency_groups: string[];
+            /** @description The project's limit of each of `concurrency_groups`, frozen with the run; the server's cap may lower it. */
+            concurrency_limits?: {
+                [key: string]: number;
+            };
             image_id?: string | null;
             job_key?: string | null;
             kind: components["schemas"]["RunKind"];
@@ -3697,6 +3735,12 @@ export interface components {
             /** Format: int64 */
             count: number;
             value: string;
+        };
+        /** @description One reason a member waits: `from_node` of `upstream_job` feeds its `to_node`, directly or through nodes no member selects. */
+        WaitReason: {
+            from_node: string;
+            to_node: string;
+            upstream_job: string;
         };
         WarehouseCatalogColumn: {
             data_type: string;

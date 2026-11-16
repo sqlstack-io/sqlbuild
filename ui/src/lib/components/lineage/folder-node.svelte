@@ -4,13 +4,16 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import type { GroupCard } from '$lib/lineage/catalog-graph';
+	import CompactFace from '$lib/components/graph/compact-face.svelte';
 
 	let { data }: NodeProps = $props();
 	const d = $derived(data as GroupCard);
+	// Zoomed out, the folder's colour is its worst state: any failure, then any stale node, then ok.
+	const tone = $derived(d.failed ? 'var(--sb-error)' : d.stale ? 'var(--sb-stale)' : d.ok ? 'var(--sb-success)' : 'var(--sb-text-faint)');
 </script>
 
 <!-- A closed folder; clicking it opens the folder into a box around its folders and nodes. -->
-<div class="group" class:dimmed={d.dimmed} title="Open {d.group}: {plural(d.count, 'node')}">
+<div class="group" class:dimmed={d.dimmed} title="Open {d.group}: {plural(d.count, d.noun ?? 'node')}">
 	<Handle type="target" position={Position.Left} class="node-handle" />
 	<div class="head">
 		<FolderIcon size={14} strokeWidth={1.75} class="glyph" />
@@ -22,13 +25,15 @@
 		{#if d.ok}<span><i style:background="var(--sb-success)"></i>{d.ok} ok</span>{/if}
 		{#if d.stale}<span><i style:background="var(--sb-stale)"></i>{d.stale} stale</span>{/if}
 		{#if d.failed}<span><i style:background="var(--sb-error)"></i>{d.failed} failed</span>{/if}
-		{#if !d.ok && !d.stale && !d.failed}<span class="faint">No builds</span>{/if}
+		{#if !d.ok && !d.stale && !d.failed}<span class="faint">{d.empty ?? 'No builds'}</span>{/if}
 	</div>
+	<CompactFace title={d.label ?? d.group} {tone} height={59} badge={d.count} />
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
 
 <style>
 	.group {
+		position: relative;
 		width: 236px;
 		border: 1px solid var(--node-border);
 		border-radius: 2px;

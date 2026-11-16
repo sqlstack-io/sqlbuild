@@ -16,8 +16,10 @@ import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ChangedPlanPreviewTestCase,
+    FailedPlanTestCase,
     HeldPlanTestCase,
     PlanPreviewTestCase,
+    SyncedFreshnessTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
     request_plan,
@@ -28,6 +30,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     changed_runs,
     live_plan,
     location_process,
+    plan_before_sync,
     plan_from_copy,
     plans_from_copy,
     run_sqb,
@@ -135,9 +138,37 @@ _UNKNOWN: list[str] = [
     "sources outside mirrored schemas",
 ]
 _HELD: str = "Planning from the published compiled project."
+_SYNCED_READING: str = "Reading the synced warehouse state..."
 _REPLAYED: str = (
     "cursor window of daily_orders (the run starts it away from the last build's cursor)"
 )
+
+
+_FUNCTION_CALLER_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "orders"\nadapter = "duckdb"\n[connections.local]\ndatabase = "warehouse.db"\n'
+        '[targets.development]\nschema = "main"\n'
+    ),
+    "seeds/orders.csv": "id,ordered_at,amount\n1,2026-09-01,10\n2,2026-09-02,20\n",
+    "seeds/orders.yml": (
+        "seeds:\n- name: orders\n  description: Orders.\n  columns:\n"
+        "  - name: id\n    type: INTEGER\n  - name: ordered_at\n    type: DATE\n"
+        "  - name: amount\n    type: INTEGER\n"
+    ),
+    "functions/sql/udf__adjust_amount.sql": (
+        "FUNCTION (description 'Adjusted amount.',\n  arguments (amount INTEGER),\n"
+        "  returns INTEGER,\n);\n\namount + 1\n"
+    ),
+    "models/order_amounts.sql": (
+        "MODEL (description 'Adjusted order amounts.',\n  materialized incremental,\n"
+        "  incremental_strategy merge,\n  unique_key [id],\n  cursor ordered_at,\n"
+        "  cursor_type timestamp,\n  cursor_grain day,\n"
+        "  cursor_inputs (\n    orders ordered_at,\n  ),\n"
+        "  replay_on_change full,\n  full_refresh false,\n);\n\n"
+        "SELECT id, CAST(ordered_at AS DATE) AS ordered_at,\n"
+        '  __udf("udf__adjust_amount")(amount) AS adjusted_amount\nFROM __seed("orders")\n'
+    ),
+}
 
 
 @pytest.mark.parametrize(
@@ -434,3 +465,91 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
     assert tuple(map(changed_runs, plans)) == test_case.expected_runs, log
     assert log.count("Compiling project...") == test_case.expected_compiles, log
     assert log.count(_HELD) == test_case.expected_held_plans, log
+    assert log.count(_SYNCED_READING) == test_case.expected_held_plans + 1, log
+    assert "Warehouse connected" not in log, "a synced copy opens no warehouse connection"
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SyncedFreshnessTestCase(
+            description="a warehouse source's metadata freshness is unknown, not a failed lookup",
+            files={
+                "sqlbuild_project.toml": (
+                    'name = "orders"\nadapter = "snowflake"\ndefault_target = "dev"\n'
+                    '[connections.warehouse]\naccount = "example-account"\nuser = "example_user"\n'
+                    '[targets.dev]\nconnection = "warehouse"\ndatabase = "ANALYTICS"\n'
+                    'schema = "DEV"\n'
+                ),
+                "sources/raw.yml": dedent(
+                    """
+                    sources:
+                      - name: raw_orders
+                        description: Raw orders.
+                        database: RAW
+                        schema: SHOP
+                        table: ORDERS
+                        columns:
+                          - name: order_id
+                            type: VARCHAR
+                    """
+                ).strip()
+                + "\n",
+                "models/orders.sql": (
+                    "MODEL (description 'Orders.', materialized table);\n"
+                    'SELECT order_id FROM __source("raw_orders")\n'
+                ),
+            },
+            expected_absent="Freshness metadata  FAIL",
+            expected_line="Freshness metadata  OK (1 source, 1 unknown)",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_synced_copy_when_a_preview_reads_source_freshness_then_it_is_unknown_without_a_failure(
+    test_case: SyncedFreshnessTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(project_dir=project, files=test_case.files)
+
+    outcome, log = plan_before_sync(tmp_path, project, {"changed": True})
+
+    assert outcome["kind"] == "plan", log
+    assert "error" not in outcome["document"], outcome
+    assert test_case.expected_absent not in log, log
+    assert test_case.expected_line in log, log
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        FailedPlanTestCase(
+            description="a full_refresh false caller of a changed function cannot rebuild",
+            files=_FUNCTION_CALLER_FILES,
+            edited_file="functions/sql/udf__adjust_amount.sql",
+            edit=("amount + 1", "amount + 100"),
+            selection=["model:order_amounts"],
+            expected_code="S203",
+            expected_reason="model 'order_amounts' sets full_refresh false",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_plan_that_fails_when_the_location_plans_it_then_its_own_error_is_stored(
+    test_case: FailedPlanTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(project_dir=project, files=test_case.files)
+    built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
+    assert built.returncode == 0, built.stderr
+    edited: Path = project / test_case.edited_file
+    _ = edited.write_text(
+        edited.read_text(encoding="utf-8").replace(*test_case.edit), encoding="utf-8"
+    )
+
+    published, plan = changed_build_and_plan_from_copy(tmp_path, project, test_case.selection)
+
+    assert plan["error"]["code"] == test_case.expected_code, plan
+    assert test_case.expected_reason in plan["error"]["message"], plan
+    assert published["changed"] == [] and published["downstream"] == [], published
+    assert published["failing"] == plan["error"]["message"], published

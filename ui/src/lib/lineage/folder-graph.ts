@@ -105,7 +105,7 @@ function members(tree: FolderTree, folder: string, byKey: Map<string, CatalogNod
 	return [...f.nodes.map((k) => byKey.get(k)!), ...f.folders.flatMap((sub) => members(tree, sub, byKey))];
 }
 
-export type FolderBoxData = { folder: string; label: string; nodeCount: number; stale: number; failed: number; ontoggle?: (folder: string) => void };
+export type FolderBoxData = { folder: string; label: string; nodeCount: number; stale: number; failed: number; noun?: string; ontoggle?: (folder: string) => void };
 
 /**
  * The lineage with each closed folder as one card and each open folder as a box around its

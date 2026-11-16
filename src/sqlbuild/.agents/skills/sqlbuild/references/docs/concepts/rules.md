@@ -209,6 +209,11 @@ Rules run in every `sqb compile`, `sqb plan` and `sqb build`, after SQLBuild's o
 Rule fails, nothing runs in the warehouse. See
 [Execution and caching](rules/execution-and-caching.md).
 
+A code location, including the one `sqb dev` starts, runs the Rules when it loads the project, as
+part of its compile. A finding fails the load, so the snapshot is not published and runs keep using
+the last good one. Scheduled runs and plan previews on a published snapshot don't run the Rules
+again. See [Check a location's health](../cli/location.md#check-a-locations-health).
+
 ## Rules compared with tests, audits, and contracts
 
 Rules do not replace every form of validation:

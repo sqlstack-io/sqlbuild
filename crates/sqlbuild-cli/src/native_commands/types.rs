@@ -1,6 +1,7 @@
 //! Private interpreter protocol shapes owned by the location supervisor.
 
 use chrono::{DateTime, Utc};
+use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
@@ -10,3 +11,9 @@ pub(crate) type LocationPublication = (
     Option<DateTime<Utc>>,
     Vec<WarehouseStateLocation>,
 );
+
+/// A published generation's refresh deadline and state locations, or the rule findings that failed it.
+pub(crate) type LoadOutcome = Result<
+    (Option<tokio::time::Instant>, Vec<WarehouseStateLocation>),
+    Option<LocationRuleFailure>,
+>;

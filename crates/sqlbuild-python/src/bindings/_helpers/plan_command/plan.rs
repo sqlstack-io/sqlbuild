@@ -1,13 +1,13 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
 use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
+    Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
 };
-use pyo3::types::{PyBool, PyDict, PyDictMethods};
+use pyo3::types::{PyBool, PyCFunction, PyDict, PyDictMethods};
 use pyo3::wrap_pyfunction;
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_core::plan_display::constants::{
-    SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY,
+    SYNCED_COPY_DEFER_HELP, SYNCED_COPY_DEFER_REFUSAL, SYNCED_COPY_KEY, SYNCED_COPY_READING,
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
@@ -24,6 +24,7 @@ use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
+use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
 use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, preview_changed};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
@@ -210,17 +211,35 @@ fn resolve_invocation<'py>(
     })
 }
 
-/// A `ConnectionHooks` forwarding to the plan's progress reporters.
+/// A `ConnectionHooks` forwarding to the plan's progress reporters; a synced copy opens no connection.
 fn connection_hooks<'py>(invocation: &PlanInvocation<'py>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = invocation.stream.py();
+    let on_progress: Bound<'py, PyAny> =
+        native_field(&invocation.planning_progress, "on_progress")?;
+    if invocation.synced_copy.is_some() {
+        let progress: Py<PlanningProgressReporter> = invocation
+            .planning_progress
+            .downcast::<PlanningProgressReporter>()?
+            .clone()
+            .unbind();
+        let reading = PyCFunction::new_closure(py, None, None, move |arguments, _keywords| {
+            progress
+                .get()
+                .on_progress(arguments.py(), SYNCED_COPY_READING)
+        })?;
+        return call_with(
+            &host::entry(py, ExecutorHost::ConnectionHooks)?,
+            &[
+                ("on_progress", on_progress),
+                ("on_connection_start", reading.into_any()),
+            ],
+        );
+    }
     let connection: &Bound<'py, PyAny> = &invocation.connection_progress;
     call_with(
         &host::entry(py, ExecutorHost::ConnectionHooks)?,
         &[
-            (
-                "on_progress",
-                native_field(&invocation.planning_progress, "on_progress")?,
-            ),
+            ("on_progress", on_progress),
             (
                 "on_connection_start",
                 native_field(connection, "on_connection_start")?,
@@ -443,7 +462,7 @@ pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
     Ok(plan(request, (PlanProject::Compiled, None))?.0)
 }
 
-/// A location's preview from the synced copy at `copy`; variables or an external dbt manifest compile again.
+/// A location's preview from the copy at `copy`, without rules, which ran at load; vars or a dbt manifest recompile.
 pub(crate) fn location_plan<'py>(
     request: &Bound<'py, PyAny>,
     (held, copy): (PlanProject<'_, 'py>, &str),
@@ -456,6 +475,7 @@ pub(crate) fn location_plan<'py>(
         .is_none(),
         PlanProject::Compiled => false,
     };
+    let _rules = RulesAtLoadScope::enter();
     let project: PlanProject<'_, 'py> =
         if external_manifest || native_field(request, "cli_vars")?.is_truthy()? {
             PlanProject::Compiled

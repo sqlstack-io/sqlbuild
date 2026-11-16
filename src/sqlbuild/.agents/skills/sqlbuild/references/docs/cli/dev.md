@@ -19,9 +19,11 @@ Development location: 01a1d7ff-0b3a-7631-ba35-e44d44d072f2
 Authentication disabled on loopback; triggers start paused
 ```
 
-The location compiles the project and publishes it to the server. When you save a model,
-orchestration file or other project input, it compiles and publishes again, so the UI and the
-next run use the new version.
+The location compiles the project, runs its [Rules](../concepts/rules.md), and publishes it to
+the server. When you save a model, orchestration file or other project input, it compiles and
+publishes again, so the UI and the next run use the new version. A compile error or a Rule finding
+leaves the previous version published and prints, for example, `Compile failed: 1 rule finding`
+with the findings.
 
 ## Options
 
@@ -48,6 +50,10 @@ sqb dev --triggers
   for a server other people or machines connect to.
 - The control store keeps runs, trigger changes and history between sessions. Delete
   `.sqlbuild/control.sqlite3` to start again from nothing.
+- The location is named after the project, the `name` in `sqlbuild_project.toml`. When the
+  control store already has a location with that name, for example from another target of the
+  same project, it gets ` (2)`, then ` (3)`, and so on. A location created by an earlier version
+  keeps its name until you recreate the control store.
 - The UI is ready once the project compiles and publishes. The location then reads SQLBuild's
   history from the warehouse and prints a line per kind; plan previews, history and costs show
   **Syncing warehouse history…** until that first sync completes. See

@@ -174,7 +174,14 @@ pub(crate) struct LocationWatch {
 pub(crate) struct LocationCompileRequest {
     pub(crate) generation: i64,
     pub(crate) python_sources: Vec<PathStamp>,
-    pub(crate) reply: tokio::sync::oneshot::Sender<Result<Option<LocationPublication>, String>>,
+    pub(crate) reply: tokio::sync::oneshot::Sender<Result<LocationLoad, String>>,
+}
+
+/// The runtime's reply to a generation: its publication, or the rule findings that failed its compile.
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct LocationLoad {
+    pub(crate) published: Option<LocationPublication>,
+    pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
 }
 
 /// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.

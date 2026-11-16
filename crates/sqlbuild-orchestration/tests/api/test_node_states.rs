@@ -365,6 +365,14 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
                 generation,
                 changed: changed.iter().map(|key| (*key).to_owned()).collect(),
                 downstream: vec!["model:customers".into()],
+                failing: None,
+            };
+            let failing = |reason: String| ChangedBuildReport {
+                session_id,
+                generation: 2,
+                changed: Vec::new(),
+                downstream: Vec::new(),
+                failing: Some(reason),
             };
             report_changed_build(
                 store,
@@ -383,6 +391,33 @@ fn given_changed_build_reports_when_people_read_node_states_then_only_the_curren
                 changed_build().await,
                 json!({"generation": 2, "changed": ["model:orders"], "downstream": ["model:customers"]}),
                 "{}: served with the node states",
+                test_case.description
+            );
+            report_changed_build(
+                store,
+                (location, "development"),
+                &failing("Model orders cannot plan a full rebuild".into()),
+            )
+            .await
+            .expect("failing changed build");
+            next_notice(&mut feed).await.expect("node status");
+            assert_eq!(
+                changed_build().await,
+                json!({"generation": 2, "changed": [], "downstream": [], "failing": "Model orders cannot plan a full rebuild"}),
+                "{}: a failed plan replaces the count with its reason",
+                test_case.description
+            );
+            assert!(
+                matches!(
+                    report_changed_build(
+                        store,
+                        (location, "development"),
+                        &failing("x".repeat(2_001))
+                    )
+                    .await,
+                    Err(ControlError::Invalid(_))
+                ),
+                "{}: an unbounded reason is refused",
                 test_case.description
             );
             let refused = [

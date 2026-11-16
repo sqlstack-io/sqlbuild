@@ -14,7 +14,7 @@ import duckdb
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
-    TYPE_PROOF_FILES,
+    PUBLISHABLE_FILES,
     duckshop_orchestration,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
@@ -71,9 +71,9 @@ def test_given_invalid_calendar_results_when_publishing_through_the_cli_then_val
     project: Path = tmp_path / "project"
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
             "orchestration/jobs/order_reporting_job.toml": (
@@ -139,9 +139,9 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
     monkeypatch.setenv("SQLBUILD_CALENDAR_EVALUATIONS", str(evaluations))
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
             **{
@@ -254,7 +254,7 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
             assert [row["phase"] for row in observations] == ["setup", "evaluate", "teardown"] * 3
             data.write_text(json.dumps({"offsets": [1]}))
             (project / "models/stg_orders.sql").write_text(
-                TYPE_PROOF_FILES["models/stg_orders.sql"].replace(
+                PUBLISHABLE_FILES["models/stg_orders.sql"].replace(
                     "CAST(5 AS INTEGER)", "CAST(19 AS INTEGER)"
                 )
             )

@@ -183,7 +183,7 @@ export class MockApiClient implements ApiClient {
 		const nodes = await this.#build.listCatalogNodes(scope);
 		const changed = nodes.filter((n) => states[n.key]?.definitionChanged).map((n) => n.key);
 		const downstream = nodes.filter((n) => !changed.includes(n.key) && n.upstream.some((u) => changed.includes(u))).map((n) => n.key);
-		return { snapshotId: location.snapshot?.id ?? 'unpublished', version, states, changedBuild: { generation: 1, changed, downstream } };
+		return { snapshotId: location.snapshot?.id ?? 'unpublished', version, states, changedBuild: { generation: 1, changed, downstream, failing: null } };
 	}
 	getCatalogNode(...args: Parameters<ApiClient['getCatalogNode']>) {
 		this.#location(args[0]);

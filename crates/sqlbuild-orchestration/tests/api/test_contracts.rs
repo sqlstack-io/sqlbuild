@@ -56,6 +56,8 @@ mod test_denials;
 mod test_development;
 #[path = "test_external_sessions.rs"]
 mod test_external_sessions;
+#[path = "test_ingestion_turns.rs"]
+mod test_ingestion_turns;
 #[path = "test_location_health.rs"]
 mod test_location_health;
 #[path = "test_location_work.rs"]

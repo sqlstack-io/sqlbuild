@@ -13,7 +13,7 @@ from typing import Any
 import duckdb
 import pytest
 
-from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import TYPE_PROOF_FILES
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import PUBLISHABLE_FILES
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     LocationDatabaseTestCase,
     LocationReloadTestCase,
@@ -100,8 +100,8 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             'name = "daily_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
         ),
     }
-    files: dict[str, str] = TYPE_PROOF_FILES | {
-        "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+    files: dict[str, str] = PUBLISHABLE_FILES | {
+        "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
         + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
         + f'\n[targets.{json.dumps(test_case.target)}]\nschema = "main"\n',
         **orchestration,
@@ -277,9 +277,9 @@ def test_given_a_busy_location_when_stopped_then_its_interpreter_is_reaped(
     child_pid: Path = tmp_path / "interpreter.pid"
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
             "adapters/slow.py": (
@@ -346,9 +346,9 @@ def test_given_a_location_using_a_local_database_when_it_is_created_and_written_
     project: Path = tmp_path / "project"
     write_files(
         project_dir=project,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + f"\n[connections.local]\n{test_case.connection_toml}\n"
             + '\n[targets.development]\nschema = "main"\n',
         },
