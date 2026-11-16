@@ -2,6 +2,7 @@
 // resolves selectors against the real snapshot; this stands in for it.
 
 import type { NodeKind, SnapshotNode } from '../types';
+import type { SelectionProblem, SelectionVocabulary, VocabularyEntry } from '../types/operate';
 
 function node(
 	key: string,
@@ -135,4 +136,79 @@ export function resolveSelection(select: readonly string[], exclude: readonly st
 /** Selected nodes a run would execute and write. */
 export function writeSetOf(select: readonly string[], exclude: readonly string[] = []): string[] {
 	return resolveSelection(select, exclude).nodes.filter(isWritable);
+}
+
+const MODEL_KINDS: ReadonlySet<string> = new Set(['view', 'table', 'incremental']);
+
+/** The kind `kind:` matches: models of every materialization are `model`, as the server names them. */
+function selectorKind(n: SnapshotNode): string {
+	return MODEL_KINDS.has(n.kind) ? 'model' : n.kind;
+}
+
+/** The folder a node's file is in, such as `models/marts`. */
+function folderOf(n: SnapshotNode): string {
+	return n.path.includes('/') ? n.path.slice(0, n.path.lastIndexOf('/')) : '';
+}
+
+/** One comma part of a selector, with its own `+`; `null` when it matches nothing. */
+function matchPart(part: string): Set<string> | null {
+	const up = part.startsWith('+');
+	const down = part.endsWith('+') && part.length > 1;
+	const body = part.replace(/^\+/, '').replace(/\+$/, '');
+	const [type, value] = body.includes(':') ? [body.slice(0, body.indexOf(':')), body.slice(body.indexOf(':') + 1)] : ['name', body];
+	const base = SNAPSHOT_NODES.filter((n) =>
+		type === 'tag' ? n.tags.includes(value) : type === 'kind' ? selectorKind(n) === value : type === 'path' ? folderOf(n) === value || folderOf(n).startsWith(`${value}/`) : n.key === value
+	);
+	if (!base.length) return null;
+	const out = new Set(base.map((n) => n.key));
+	for (const n of base) {
+		if (up) for (const a of ancestors(n.key)) out.add(a);
+		if (down) for (const d of descendants(n.key)) out.add(d);
+	}
+	return out;
+}
+
+/** The mock's stand-in for the server's evaluation: tokens are unioned, comma parts intersected, `+` expands its own part. */
+export function evaluateMockSelection(select: string, exclude: string): { keys: string[]; error: SelectionProblem | null } {
+	const resolve = (field: 'select' | 'exclude', text: string): Set<string> | SelectionProblem => {
+		const chosen = new Set<string>();
+		for (const match of text.matchAll(/\S+/g)) {
+			const token = match[0];
+			let hits = null as Set<string> | null;
+			for (const part of token.split(',')) {
+				const found = matchPart(part);
+				if (!found) {
+					const suggestions = [...new Set(SNAPSHOT_NODES.flatMap((n) => n.tags))].filter((tag) => part.startsWith('tag:') && tag.startsWith(part.slice(4, 6))).map((tag) => token.replace(part, `tag:${tag}`));
+					return { code: 'S007', message: `unknown selector name '${part}'`, help: null, location: { field, token, start: match.index, end: match.index + token.length }, suggestions };
+				}
+				hits = hits ? new Set([...hits].filter((key) => found.has(key))) : found;
+			}
+			for (const key of hits ?? []) chosen.add(key);
+		}
+		return chosen;
+	};
+	const selected = select.trim() ? resolve('select', select) : new Set(SNAPSHOT_NODES.map((n) => n.key));
+	if (!(selected instanceof Set)) return { keys: [], error: selected };
+	const excluded = resolve('exclude', exclude);
+	if (!(excluded instanceof Set)) return { keys: [], error: excluded };
+	const keys = [...selected].filter((key) => !excluded.has(key)).sort();
+	if (!keys.length) return { keys, error: { code: null, message: 'the selectors match no nodes in the current publication', help: null, location: null, suggestions: [] } };
+	return { keys, error: null };
+}
+
+/** Tags, folders, sources, seeds and kinds of the mock project, with node counts. */
+export function mockVocabulary(): Omit<SelectionVocabulary, 'snapshotId' | 'jobs'> {
+	const counted = (values: string[]): VocabularyEntry[] => {
+		const counts = new Map<string, number>();
+		for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+		return [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([value, count]) => ({ value, count }));
+	};
+	const folders = (n: SnapshotNode) => folderOf(n).split('/').filter(Boolean).map((_, i, parts) => parts.slice(0, i + 1).join('/'));
+	return {
+		tags: counted(SNAPSHOT_NODES.flatMap((n) => n.tags)),
+		paths: counted(SNAPSHOT_NODES.filter((n) => n.kind !== 'source' && n.kind !== 'seed').flatMap(folders)),
+		sources: counted(SNAPSHOT_NODES.filter((n) => n.kind === 'source').map((n) => n.key)),
+		seeds: counted(SNAPSHOT_NODES.filter((n) => n.kind === 'seed').map((n) => n.key)),
+		kinds: counted(SNAPSHOT_NODES.map(selectorKind))
+	};
 }
