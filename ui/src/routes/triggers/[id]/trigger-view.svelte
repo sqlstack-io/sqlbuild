@@ -49,7 +49,7 @@
 	{#if t}
 		{#if app.can('trigger.toggle')}<input class="reason" bind:value={reason} placeholder="Why? (saved in the history)" aria-label="Reason for the change" />{/if}
 		{#if t.state !== t.defaultState}
-			<GatedButton size="bar" requires="trigger.toggle" {busy} onclick={resetDefault}>Set back to the code ({t.defaultState === 'running' ? 'on' : 'paused'})</GatedButton>
+			<GatedButton size="bar" requires="trigger.toggle" {busy} onclick={resetDefault}>Reset to the code's setting ({t.defaultState === 'running' ? 'on' : 'paused'})</GatedButton>
 		{/if}
 		{#if t.state === 'running'}
 			<GatedButton size="bar" requires="trigger.toggle" {busy} onclick={() => setState('paused')}>Pause</GatedButton>
@@ -65,7 +65,7 @@
 		<span class="font-display text-[17px] font-semibold">{t?.name ?? id}</span>
 		{#if t}
 			<span class="sb-status" style:--tone={t.state === 'running' ? 'var(--sb-success)' : 'var(--sb-text-faint)'}><span></span>{t.state === 'running' ? 'on' : 'paused'}</span>
-			<span class="faint">{t.state === t.defaultState ? 'as in the code' : `switched here; the code says ${t.defaultState === 'running' ? 'on' : 'paused'}`}</span>
+			<span class="faint">{t.state === t.defaultState ? 'as in the code' : `set in UI; the code sets this to ${t.defaultState === 'running' ? 'on' : 'paused'}`}</span>
 			<span class="faint" title={triggerKindHelp[t.kind]}>· {triggerKindLabel[t.kind]} · {t.cadence}</span>
 		{/if}
 	</div>

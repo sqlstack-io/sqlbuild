@@ -6,6 +6,7 @@
 	import RadioIcon from '@lucide/svelte/icons/radio';
 	import CodeIcon from '@lucide/svelte/icons/code';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import PinIcon from '@lucide/svelte/icons/pin';
 	import type { Trigger, TriggerKind, TriggerState } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
@@ -19,6 +20,8 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
+	import SetInUiPin from './set-in-ui-pin.svelte';
+	import { setInUi, setInUiCount } from './utils';
 	import { shortRunId, tickOutcomeHelp, tickOutcomeText, tickOutcomeTone, triggerKindHelp, triggerKindLabel } from '$lib/operate/labels';
 
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks', 'runs']);
@@ -29,13 +32,13 @@
 	let query = $state('');
 	let type = $state<'all' | 'schedule' | 'sensor'>('all');
 	let kind = $state<TriggerKind | ''>('');
-	let stateFilter = $state<TriggerState | 'overridden' | ''>('');
+	let stateFilter = $state<TriggerState | 'set_in_ui' | ''>('');
 	const all = $derived(triggers.data ?? []);
 	const filtered = $derived(
 		all.filter((t) => {
 			if (type !== 'all' && t.type !== type) return false;
 			if (kind && t.kind !== kind) return false;
-			if (stateFilter === 'overridden' ? t.state === t.defaultState : stateFilter && t.state !== stateFilter) return false;
+			if (stateFilter === 'set_in_ui' ? !setInUi(t) : stateFilter && t.state !== stateFilter) return false;
 			const q = query.trim().toLowerCase();
 			return !q || `${t.name} ${t.jobKey ?? ''} ${t.cadence} ${t.description}`.toLowerCase().includes(q);
 		})
@@ -84,11 +87,11 @@
 	}
 
 	const runningCount = $derived(all.filter((t) => t.state === 'running').length);
-	const overriddenCount = $derived(all.filter((t) => t.state !== t.defaultState).length);
+	const setInUiTotal = $derived(setInUiCount(all));
 
 	function nextDue(t: Trigger): string {
-		if (t.type === 'sensor') return t.state === 'paused' ? 'Paused' : 'When its condition is met';
-		if (t.state === 'paused') return 'Paused';
+		if (t.state === 'paused') return '—';
+		if (t.type === 'sensor') return 'When its condition is met';
 		if (!t.nextDueAt) return '—';
 		if (Date.parse(t.nextDueAt) < app.now) return `Late: was due ${formatAgo(t.nextDueAt, app.now)}`;
 		return formatIn(t.nextDueAt, app.now);
@@ -107,7 +110,14 @@
 	counts={[
 		{ tone: 'var(--sb-success)', count: runningCount, label: 'on', reserve: true },
 		{ tone: 'var(--sb-text-faint)', count: all.length - runningCount, label: 'paused', reserve: true },
-		{ tone: 'var(--sb-warning)', count: overriddenCount, label: 'switched from what the code says', reserve: true }
+		{
+			count: setInUiTotal,
+			label: 'set in UI',
+			reserve: true,
+			icon: PinIcon,
+			pressed: stateFilter === 'set_in_ui',
+			onclick: () => (stateFilter = stateFilter === 'set_in_ui' ? '' : 'set_in_ui')
+		}
 	]}
 >
 	{#snippet filters()}
@@ -126,7 +136,7 @@
 			options={[
 				{ value: 'running', label: 'On' },
 				{ value: 'paused', label: 'Paused' },
-				{ value: 'overridden', label: 'Switched from what the code says' }
+				{ value: 'set_in_ui', label: 'Set in UI' }
 			]}
 		/>
 	{/snippet}
@@ -159,7 +169,7 @@
 		</thead>
 		<tbody>
 			{#each filtered as t (t.id)}
-				<tr class:sb-row-off={t.state === 'paused'} onclick={(e) => openRow(e, `/triggers/${t.id}`)}>
+				<tr onclick={(e) => openRow(e, `/triggers/${t.id}`)}>
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<td class="check-col" onclick={(e) => e.stopPropagation()} title={canToggle ? undefined : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
@@ -196,28 +206,19 @@
 						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Runs its own code</span>{/if}
 					</td>
 					<td class="status-col">
-						<span class:muted={t.state === 'paused'}>{t.state === 'running' ? 'On' : 'Paused'}</span>
-						{#if t.state !== t.defaultState}
-							<div class="cell-desc override" title="Someone switched it here; the code says {t.defaultState}">
-								code says {t.defaultState === 'running' ? 'on' : 'paused'} ·
-								{#if canToggle}
-									<Button variant="link" size="inline" onclick={(e: MouseEvent) => (e.stopPropagation(), resetDefault(t))}>reset</Button>
-								{:else}
-									<span title="You don't have permission to pause or turn on schedules and sensors (trigger.toggle)">reset</span>
-								{/if}
-							</div>
-						{:else}
-							<div class="cell-desc">as in the code</div>
-						{/if}
+						<span class="status-cell">
+							<StatusLabel tone={t.state === 'running' ? 'var(--sb-success)' : 'var(--sb-text-faint)'} label={t.state === 'running' ? 'On' : 'Paused'} />
+							{#if setInUi(t)}<SetInUiPin trigger={t} canReset={canToggle} onreset={() => resetDefault(t)} />{/if}
+						</span>
 					</td>
-					<td class="muted next-col" title={t.nextDueAt ? formatStamp(t.nextDueAt) : undefined}>{nextDue(t)}</td>
+					<td class="muted next-col" title={t.state === 'running' && t.nextDueAt ? formatStamp(t.nextDueAt) : undefined}>{nextDue(t)}</td>
 					<td class="muted" title={t.lastTick ? `${tickOutcomeHelp[t.lastTick.outcome]}${t.lastTick.reason ? `\n${t.lastTick.reason}` : ''}` : undefined}>
 						{#if t.lastTick}
 							<StatusLabel muted tone={tickOutcomeTone[t.lastTick.outcome]} label={tickOutcomeText[t.lastTick.outcome]} />
 							{#if t.lastTick.coveredByRunId}into run <a class="link code" href={to(`/runs/${t.lastTick.coveredByRunId}`)}>{shortRunId(t.lastTick.coveredByRunId)}</a>{/if}
 							<div class="cell-desc">{formatAgo(t.lastTick.scheduledFor, app.now)}</div>
 						{:else}
-							{t.type === 'sensor' ? 'See its checks' : 'Not due yet'}
+							{t.type === 'sensor' ? '—' : 'Not due yet'}
 						{/if}
 					</td>
 					<td>
@@ -245,9 +246,15 @@
 	/* Switching a trigger changes what these two cells say. Their widths fit every variant and they never
 	   wrap, so a switch can't resize the columns or change the row's height and move the page. */
 	.status-col {
-		width: 200px;
-		min-width: 200px;
+		width: 130px;
+		min-width: 130px;
 		white-space: nowrap;
+	}
+	/* A fixed height, so the pin coming and going never changes the row's height. */
+	.status-cell {
+		display: inline-flex;
+		height: 20px;
+		align-items: center;
 	}
 	.next-col {
 		width: 190px;
@@ -265,9 +272,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 10px;
-	}
-	.override {
-		color: var(--sb-warning) !important;
 	}
 	.warn-icon {
 		color: var(--sb-warning);

@@ -223,7 +223,7 @@ export const triggerKindHelp: Record<TriggerKind, string> = {
 export const stateEventLabel: Record<TriggerStateEventKind, string> = {
 	enabled: 'Turned on',
 	paused: 'Paused',
-	reset_to_default: 'Set back to what the code says',
+	reset_to_default: "Reset to the code's setting",
 	cursor_set: 'Position set',
 	cursor_reset: 'Started over'
 };
