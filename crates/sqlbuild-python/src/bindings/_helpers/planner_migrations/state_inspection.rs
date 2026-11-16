@@ -44,6 +44,8 @@ pub(crate) struct MigrationStateInspection {
     read_schemas: HashSet<String>,
     /// Model fingerprints per lowercased schema, in first-read order.
     fingerprints: Vec<(String, Vec<Py<PyAny>>)>,
+    /// Positions in `fingerprints` (schema, fingerprint) by node name, in the order `fingerprints` lists them.
+    fingerprints_by_name: HashMap<String, Vec<(usize, usize)>>,
     events: Vec<Py<PyAny>>,
     event_schemas: HashSet<String>,
     relations: HashMap<RelationKey, Py<PyAny>>,
@@ -165,6 +167,18 @@ impl MigrationStateInspection {
         .collect()
     }
 
+    /// Every inspected schema's model fingerprint positions by node name, in the order `fingerprints` lists them.
+    fn by_name(&self, py: Python<'_>) -> PyResult<HashMap<String, Vec<(usize, usize)>>> {
+        let mut by_name: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
+        for (schema, (_, fingerprints)) in self.fingerprints.iter().enumerate() {
+            for (position, fingerprint) in fingerprints.iter().enumerate() {
+                let name: String = native_field(fingerprint.bind(py), "node_name")?.extract()?;
+                by_name.entry(name).or_default().push((schema, position));
+            }
+        }
+        Ok(by_name)
+    }
+
     fn model_fingerprints<'py>(
         &self,
         py: Python<'py>,
@@ -240,6 +254,7 @@ impl MigrationStateInspection {
             known_fingerprints: known.unbind(),
             read_schemas: HashSet::new(),
             fingerprints: Vec::new(),
+            fingerprints_by_name: HashMap::new(),
             events: Vec::new(),
             event_schemas: HashSet::new(),
             relations: HashMap::new(),
@@ -418,6 +433,7 @@ impl MigrationStateInspection {
         )?;
         let state_tables: HashSet<RelationKey> =
             listed.iter().map(relation_key).collect::<PyResult<_>>()?;
+        let mut read_fingerprints: bool = false;
         for (schema, key) in pending {
             if state_tables.contains(&(key.clone(), MIGRATION_TABLE_NAME.to_owned())) {
                 let single = PyTuple::new(py, [schema.clone()])?;
@@ -434,7 +450,12 @@ impl MigrationStateInspection {
                     Some((_, stored)) => *stored = models,
                     None => this.fingerprints.push((key, models)),
                 }
+                read_fingerprints = true;
             }
+        }
+        if read_fingerprints {
+            let by_name: HashMap<String, Vec<(usize, usize)>> = slf.borrow().by_name(py)?;
+            slf.borrow_mut().fingerprints_by_name = by_name;
         }
         Ok(())
     }
@@ -555,11 +576,19 @@ impl MigrationStateInspection {
         py: Python<'py>,
         model_name: &str,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
-        let mut all: Vec<Py<PyAny>> = Vec::new();
-        for (_, fingerprints) in &self.fingerprints {
-            all.extend(fingerprints.iter().map(|item| item.clone_ref(py)));
-        }
-        newest(py, &all, (None, Some(model_name)))
+        let named: Vec<Py<PyAny>> = self
+            .fingerprints_by_name
+            .get(model_name)
+            .into_iter()
+            .flatten()
+            .filter_map(|(schema, position)| {
+                self.fingerprints
+                    .get(*schema)
+                    .and_then(|(_, fingerprints)| fingerprints.get(*position))
+            })
+            .map(|fingerprint| fingerprint.clone_ref(py))
+            .collect();
+        newest(py, &named, (None, Some(model_name)))
     }
 
     /// Latest model fingerprints whose names are no longer in the project.
