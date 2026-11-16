@@ -11,8 +11,9 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::freshness::validate_batch;
 use crate::warehouse_metadata::_helpers::ingestion::{
-    batch_records, begin_ingestion, commit_ingestion, scoped_event_id,
+    batch_records, begin_ingestion, commit_ingestion, next_ingestion_chunk, scoped_event_id,
 };
+use crate::warehouse_metadata::constants::INGESTION_CHUNK_RECORDS;
 use crate::warehouse_metadata::models::{
     MetadataBatch, WarehouseFreshnessRecord, WarehouseSyncResponse,
 };
@@ -32,7 +33,12 @@ pub async fn ingest_source_freshness(
     .await?;
     let mut applied = false;
     let mut keys: Vec<Uuid> = Vec::new();
-    for record in &records {
+    for (index, record) in records.iter().enumerate() {
+        if index > 0 && index % INGESTION_CHUNK_RECORDS == 0 {
+            transaction =
+                next_ingestion_chunk(transaction, (store, location_id, target), batch, applied)
+                    .await?;
+        }
         let source_event_id = record.event_id.clone().unwrap_or_else(|| {
             legacy_event_id(&FreshnessEventIdentity {
                 source_name: &record.source_name,

@@ -57,6 +57,27 @@ pub(crate) fn scoped_event_id(
     Ok(Uuid::new_v5(&location_id, &identity))
 }
 
+/// Commit the records a page applied so far and open its next transaction behind the same fence.
+pub(crate) async fn next_ingestion_chunk(
+    mut transaction: ControlTransaction,
+    (store, location_id, target): (&ControlStore, Uuid, &str),
+    batch: &MetadataBatch,
+    applied: bool,
+) -> Result<ControlTransaction, ControlError> {
+    if applied {
+        transaction
+            .changes
+            .insert(Change::NodeStatus(location_id, target.into()));
+    }
+    commit(transaction).await?;
+    begin_ingestion(
+        store,
+        (location_id, target),
+        (batch.session_id, batch.generation),
+    )
+    .await
+}
+
 /// Delivered rows take the scan's id; a complete scan deletes every row it did not deliver.
 pub(crate) async fn commit_ingestion(
     mut transaction: ControlTransaction,

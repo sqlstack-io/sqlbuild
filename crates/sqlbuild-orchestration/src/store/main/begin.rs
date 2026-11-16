@@ -7,6 +7,7 @@ use rusqlite::OpenFlags;
 use rusqlite::config::DbConfig;
 
 use crate::store::_helpers::changes::sqlite_changes;
+use crate::store::_helpers::writer_gate::writer_turn;
 use crate::store::errors::ControlError;
 use crate::store::main::refresh_clock::refresh_clock;
 use crate::store::models::{Connection, ControlStore, ControlTransaction, TransactionMode};
@@ -15,8 +16,12 @@ pub(crate) async fn begin(
     store: &ControlStore,
     mode: TransactionMode,
 ) -> Result<ControlTransaction, ControlError> {
+    let mut writer = None;
     let (connection, notifications) = match store {
         ControlStore::Sqlite(path) => {
+            if mode == TransactionMode::Write {
+                writer = Some(writer_turn(path).await?);
+            }
             let path = path.clone();
             tokio::task::spawn_blocking(move || {
                 let connection = rusqlite::Connection::open_with_flags(
@@ -62,6 +67,7 @@ pub(crate) async fn begin(
         now: Utc::now(),
         changes: Default::default(),
         notifications,
+        _writer: writer,
     };
     refresh_clock(transaction).await
 }

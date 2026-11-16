@@ -293,3 +293,10 @@ pub(crate) struct ProvidersTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_jobs: Vec<&'static str>,
 }
+
+pub(crate) struct IngestionTurnTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) pages: usize,
+    pub(crate) relations_per_page: usize,
+    pub(crate) expected_writer_first: bool,
+}

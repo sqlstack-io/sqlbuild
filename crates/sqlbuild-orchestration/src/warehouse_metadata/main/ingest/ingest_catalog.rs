@@ -8,9 +8,10 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::catalog::{project_catalog_record, validate_catalog};
 use crate::warehouse_metadata::_helpers::ingestion::{
-    batch_records, begin_ingestion, commit_ingestion, scoped_event_id,
+    batch_records, begin_ingestion, commit_ingestion, next_ingestion_chunk, scoped_event_id,
 };
 use crate::warehouse_metadata::constants::CATALOG_MIRROR;
+use crate::warehouse_metadata::constants::INGESTION_CHUNK_RECORDS;
 use crate::warehouse_metadata::models::{
     MetadataBatch, WarehouseCatalogRecord, WarehouseSyncResponse,
 };
@@ -26,7 +27,12 @@ pub async fn ingest_catalog(
         begin_ingestion(store, scope, (batch.session_id, batch.generation)).await?;
     let mut keys: Vec<Uuid> = Vec::new();
     let mut applied = false;
-    for record in &records {
+    for (index, record) in records.iter().enumerate() {
+        if index > 0 && index % INGESTION_CHUNK_RECORDS == 0 {
+            transaction =
+                next_ingestion_chunk(transaction, (store, scope.0, scope.1), batch, applied)
+                    .await?;
+        }
         let relation_id = scoped_event_id(
             scope,
             (
