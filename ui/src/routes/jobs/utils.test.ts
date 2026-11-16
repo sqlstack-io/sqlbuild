@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capItems, capLines } from './utils';
+import { capItems, capLines, ownerChip, selectionTokens } from './utils';
 
 describe('capLines', () => {
 	it('shows every item when they fit in the lines', () => {
@@ -22,5 +22,55 @@ describe('capItems', () => {
 
 	it('hides nothing when the list is short', () => {
 		expect(capItems(['orders'], 3)).toEqual({ shown: ['orders'], hidden: [] });
+	});
+});
+
+describe('selectionTokens', () => {
+	it('splits on whitespace and separates the method prefix', () => {
+		expect(selectionTokens('tag:orders  source:shop__customers')).toEqual([
+			{ token: 'tag:orders', prefix: 'tag:', name: 'orders' },
+			{ token: 'source:shop__customers', prefix: 'source:', name: 'shop__customers' }
+		]);
+	});
+
+	it('keeps graph operators with the prefix and leaves bare names and paths whole', () => {
+		expect(selectionTokens('+tag:inventory+ orders_daily models/orders')).toEqual([
+			{ token: '+tag:inventory+', prefix: '+tag:', name: 'inventory+' },
+			{ token: 'orders_daily', prefix: '', name: 'orders_daily' },
+			{ token: 'models/orders', prefix: '', name: 'models/orders' }
+		]);
+	});
+
+	it('returns nothing for an empty or missing selection', () => {
+		expect(selectionTokens('')).toEqual([]);
+		expect(selectionTokens(null)).toEqual([]);
+	});
+
+	it('caps at four pills with the rest hidden', () => {
+		const capped = capItems(selectionTokens('tag:a tag:b tag:c tag:d source:e'), 4);
+		expect(capped.shown.map((t) => t.token)).toEqual(['tag:a', 'tag:b', 'tag:c', 'tag:d']);
+		expect(capped.hidden.map((t) => t.token)).toEqual(['source:e']);
+	});
+});
+
+describe('ownerChip', () => {
+	it('uses the name part of an email', () => {
+		const chip = ownerChip('jane.doe@example.com');
+		expect(chip).toMatchObject({ initials: 'JD', name: 'Jane Doe', full: 'jane.doe@example.com' });
+	});
+
+	it('takes the first two letters of a single-word name', () => {
+		expect(ownerChip('orders@example.com')).toMatchObject({ initials: 'OR', name: 'Orders' });
+		expect(ownerChip('inventory-team')).toMatchObject({ initials: 'IT', name: 'Inventory Team' });
+	});
+
+	it('gives the same colour to the same person', () => {
+		expect(ownerChip('jane.doe@example.com')?.colour).toBe(ownerChip('jane.doe@example.org')?.colour);
+		expect(ownerChip('jane.doe@example.com')?.colour).toMatch(/^#[0-9a-f]{6}$/);
+	});
+
+	it('is null when there is no owner', () => {
+		expect(ownerChip(null)).toBeNull();
+		expect(ownerChip('  ')).toBeNull();
 	});
 });

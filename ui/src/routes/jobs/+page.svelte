@@ -16,10 +16,12 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { isActiveRun, isProblemRun, runStatusLabel, runStatusTone } from '$lib/status';
 	import { jobPolicyText, overlapHelp } from '$lib/operate/labels';
-	import { capItems, capLines } from './utils';
+	import { capItems, capLines, ownerChip, selectionTokens } from './utils';
 
 	/** Group members drawn on the first line; the rest fold into "+N more" on the second. */
 	const MEMBERS_SHOWN = 3;
+	/** Selection tokens drawn as pills; the rest fold into "+N more". */
+	const TOKENS_SHOWN = 4;
 
 	const jobs = createResource((client, scope) => client.listJobs(scope), ['jobs', 'runs', 'snapshot']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
@@ -135,15 +137,23 @@
 									<a class="more" href={to(`/jobs/${j.key}`)} title={members.hidden.join(', ')} onclick={(e) => e.stopPropagation()}>+{members.hidden.length} more</a>
 								{/if}
 							{:else}
-								<code class="selection" title={j.select}>{j.select}</code>
+								{@const tokens = capItems(selectionTokens(j.select), TOKENS_SHOWN)}
+								<div class="pills">
+									{#each tokens.shown as tok, i (i)}
+										<span class="sb-tag pill" title={tok.token}>{#if tok.prefix}<span class="pfx">{tok.prefix}</span>{/if}{tok.name}</span>
+									{/each}
+									{#if tokens.hidden.length}
+										<span class="more" title={tokens.hidden.map((t) => t.token).join('\n')}>+{tokens.hidden.length} more</span>
+									{/if}
+								</div>
 							{/if}
 						</td>
 					{/if}
-					<td class="num muted">{j.nodeCount}</td>
+					<td class="num muted nowrap">{j.nodeCount}</td>
 					{#if showPolicy}<td class="muted nowrap" title={[j.overlap ? `overlap = ${j.overlap}: ${overlapHelp[j.overlap]}` : '', j.onFailure ? `on_failure: retries = ${j.onFailure.retries}, retry_delay = ${j.onFailure.retryDelaySeconds}s` : '', j.priority ? 'Higher priority runs go first when they wait for the same slot' : ''].filter(Boolean).join('\n') || undefined}>{jobPolicyText(j) || '—'}</td>{/if}
 					<td>
 						{#if jobTriggers.length === 0}
-							<span class="muted" title="No schedule or sensor starts it; start it from its page">Only by hand</span>
+							<span class="muted nowrap" title="No schedule or sensor starts it; start it from its page">Only by hand</span>
 						{:else}
 							{@const capped = capLines(jobTriggers)}
 							<div class="flex flex-col gap-1">
@@ -170,7 +180,16 @@
 							</div>
 						{/if}
 					</td>
-					{#if showOwner}<td class="muted">{j.owner ?? '—'}</td>{/if}
+					{#if showOwner}
+						{@const owner = ownerChip(j.owner)}
+						<td>
+							{#if owner}
+								<span class="person" title={owner.full}><span class="initials" style:background={owner.colour} aria-hidden="true">{owner.initials}</span>{owner.name}</span>
+							{:else}
+								<span class="muted">—</span>
+							{/if}
+						</td>
+					{/if}
 					<td>
 						{#if j.lastRun}
 							<a class="last-run" href={to(`/runs/${j.lastRun.id}`)}>
@@ -178,7 +197,7 @@
 								{#if j.lastRun.startedAt}<RelativeTime value={formatAgo(j.lastRun.startedAt, app.now)} exact={formatStamp(j.lastRun.startedAt)} />{/if}
 							</a>
 						{:else}
-							<span class="muted">Never run</span>
+							<span class="muted nowrap">Never run</span>
 						{/if}
 					</td>
 				</tr>
@@ -195,14 +214,45 @@
 	.job-name {
 		max-width: 420px;
 	}
-	.selection {
-		display: -webkit-box;
-		max-width: 520px;
+	.pills {
+		display: flex;
+		max-width: 460px;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px;
+	}
+	/* The shared tag, in mono, with the name standing out from its dimmed `tag:` prefix. */
+	.pill {
+		max-width: 100%;
 		overflow: hidden;
-		-webkit-box-orient: vertical;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
-		overflow-wrap: anywhere;
+		gap: 0;
+		color: var(--foreground);
+		font-family: var(--font-mono);
+		text-overflow: ellipsis;
+	}
+	.pills .more:hover {
+		color: var(--muted-foreground);
+		text-decoration: none;
+	}
+	.pill .pfx {
+		color: var(--sb-text-faint);
+	}
+	.person {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		white-space: nowrap;
+	}
+	.initials {
+		display: inline-grid;
+		width: 20px;
+		height: 20px;
+		flex: 0 0 20px;
+		place-items: center;
+		border-radius: 50%;
+		color: #0d0f12;
+		font-size: 10px;
+		font-weight: 600;
 	}
 	.one-line {
 		display: block;
