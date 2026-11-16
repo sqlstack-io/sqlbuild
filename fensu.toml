@@ -1177,10 +1177,8 @@ max_positional_args = 1
 
 [[targets.python.threshold_overrides]]
 paths = ["src/sqlbuild/__init__.py"]
-# Raised from 89,457 for the shared Python identity pass (identity_pass.py, object_source.py).
-# Raised from 89,626 for helper-class anchors in Python identity (object_source.py, identity.py).
-thresholds = { max_crate_code_lines = 89643 }
-reason = "The runtime package is above the code-line limit; this caps it at its current size until it is split into packages by area. Lower the cap as code moves out."
+thresholds = { max_crate_code_lines = 100000 }
+reason = "The runtime package is above Fensu's default code-line limit. Kevin set 100,000 on 16 Nov to avoid per-PR raises while the crate split and UI work land; reducing it is parked (backlog)."
 
 [targets.python.rule_options.XSB074]
 pending_budgets = [
