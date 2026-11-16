@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Scope } from '$lib/api';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
+	import { liveSyncOf } from '$lib/api/http-locations';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { errorMessage } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
@@ -22,6 +23,8 @@
 	const last = $derived(sync.data ?? null);
 	const reportOf = (report: typeof last) => `${report?.lastReportedAt ?? ''}|${report?.lastSyncedAt ?? ''}|${report?.lastError ?? ''}`;
 	const pending = $derived(requested !== null && reportOf(last) === requested.seen && app.now - requested.at < 5 * 60_000);
+	const running = $derived(liveSyncOf(last, app.now));
+	const summary = $derived(last?.completed ? ` Last full sync: ${last.completed.kinds} kinds, ${last.completed.rows.toLocaleString('en-US')} rows in ${(last.completed.elapsedMs / 1000).toFixed(1)} s.` : '');
 
 	async function request() {
 		requesting = true;
@@ -44,8 +47,10 @@
 		<span title="The location reads SQLBuild's state and catalog from the warehouse"><StatusLabel tone="var(--sb-running)" label="syncing…" /></span>
 	{:else if last?.lastError}
 		<span title={last.lastError}><StatusLabel tone="var(--sb-error)" label="failing{last.lastSyncedAt ? ` · last synced ${formatAgo(last.lastSyncedAt, app.now)}` : ''}" /></span>
+	{:else if running}
+		<span title="The location reads SQLBuild's state and catalog from the warehouse"><StatusLabel tone="var(--sb-running)" label="syncing history {running.position}/{running.kinds} · {running.table.replaceAll('_', ' ')} · {running.rows.toLocaleString('en-US')} rows" /></span>
 	{:else if last?.lastSyncedAt}
-		<span title="Synced {formatStamp(last.lastSyncedAt)}. A sync also follows every run that ends."><StatusLabel tone="var(--sb-success)" label="synced {formatAgo(last.lastSyncedAt, app.now)}" /></span>
+		<span title="Synced {formatStamp(last.lastSyncedAt)}. A sync also follows every run that ends.{summary}"><StatusLabel tone="var(--sb-success)" label="synced {formatAgo(last.lastSyncedAt, app.now)}" /></span>
 	{:else if last || sync.error}
 		<StatusLabel tone="var(--sb-text-faint)" label="not synced yet" muted />
 	{/if}

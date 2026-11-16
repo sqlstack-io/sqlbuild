@@ -2,6 +2,7 @@
 	import { to } from '$lib/paths';
 	import { ApiError, DEMO } from '$lib/api';
 	import { app } from '$lib/state/app.svelte';
+	import SyncingNote from '$lib/components/platform/syncing-note.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { CREDIT_PRICE_HINT, costByFolder, formatQueryCost } from '$lib/operate/cost';
@@ -59,6 +60,7 @@
 				{/each}
 			</div>
 		</div>
+		<SyncingNote what="Costs" />
 		{#if summary.error && !cost}
 			<p class="note err">Couldn't load cost: {summary.error}</p>
 		{:else if cost}

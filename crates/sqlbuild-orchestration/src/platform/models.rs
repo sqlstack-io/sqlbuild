@@ -62,6 +62,9 @@ pub enum LocationHealth {
         /// Rows, or statistics relations, the failed read asked for.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         page_limit: Option<u64>,
+        /// Where the synchronization this report belongs to has got to; absent from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        progress: Option<WarehouseSyncProgress>,
     },
 }
 
@@ -74,6 +77,22 @@ pub enum WarehouseSyncFailure {
     Delivery,
     /// Another process, such as a DuckDB build, holds the warehouse file; the sync waits for it.
     Busy,
+}
+
+/// How far one synchronization has got, so people see it running and when it completed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseSyncProgress {
+    /// The reported kind's position in the synchronization, from 1.
+    pub position: u64,
+    /// Kinds the synchronization reads: 14 for each state schema.
+    pub kinds: u64,
+    /// Rows the synchronization has delivered, this report's included.
+    pub rows: u64,
+    /// Milliseconds since the synchronization began.
+    pub elapsed_millis: u64,
+    /// This report's page was the synchronization's last, so it has completed.
+    pub completed: bool,
 }
 
 /// What went wrong reading one page, without the warehouse's message, which may name hosts or users.

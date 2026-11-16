@@ -414,7 +414,15 @@ Warehouse history read failed for statistics (100-relation page): no reply withi
 | The warehouse refused the connection or the query | The warehouse's message |
 | No reply in time | `no reply within N s`: 120 s for a page, or 30 s plus 1 s per relation for a statistics page |
 
-The location's page shows the same failure as **Warehouse sync failing**, with the kind, the cause
+The location's page shows a running sync, for example
+`syncing history 9/14 · catalog · 1,640 rows`, and the last full sync's kinds, rows and time.
+
+A location is ready as soon as it has compiled and published; nothing waits for the sync. Lineage,
+jobs, the catalog and code work at once. Plan previews, node history, check results and costs read
+the server's copy of the warehouse, so until the location's first sync completes they show
+**Syncing warehouse history…** and fill in when it does.
+
+The location's page shows a failure as **Warehouse sync failing**, with the kind, the cause
 and the page size. It leaves out the warehouse's message, which can name hosts or users; read it in
 the location's log.
 

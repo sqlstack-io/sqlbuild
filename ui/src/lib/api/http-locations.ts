@@ -183,9 +183,27 @@ export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][
 	const { syncs, newest } = syncsOf(observations);
 	if (!syncs.length) return null;
 	const failing = [...newest.values()].flatMap(({ report: { health } }) => (health.failure && health.failure !== 'busy' ? [`${health.table}: failed while ${SYNC_STAGE[health.failure]}${readCauseOf(health)}`] : []));
+	const running = syncs[0].report.health;
+	const done = syncs.find((s) => s.report.health.progress?.completed);
 	return {
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,
 		lastError: failing.length ? failing.sort().join('\n') : null,
-		lastReportedAt: syncs[0].received_at
+		lastReportedAt: syncs[0].received_at,
+		syncing: running.progress && !running.progress.completed ? { position: running.progress.position, kinds: running.progress.kinds, table: running.table, rows: running.progress.rows } : null,
+		completed: done?.report.health.progress ? { at: done.received_at, kinds: done.report.health.progress.kinds, rows: done.report.health.progress.rows, elapsedMs: done.report.health.progress.elapsed_millis } : null
 	};
+}
+
+/** Older than this, a sync report that left a sync running no longer shows it running: the location has stopped reporting. */
+export const SYNC_REPORT_STALE_MS = 10 * 60_000;
+
+/** The running sync, unless its newest report is stale. */
+export function liveSyncOf(sync: WarehouseSync | null | undefined, now: number) {
+	if (!sync?.syncing || !sync.lastReportedAt) return null;
+	return now - Date.parse(sync.lastReportedAt) < SYNC_REPORT_STALE_MS ? sync.syncing : null;
+}
+
+/** Plans, history and costs read the server's copy of the warehouse; until a first sync completes, it may be missing or partial. */
+export function firstSyncPending(sync: WarehouseSync | null | undefined, now: number): boolean {
+	return !!liveSyncOf(sync, now) && !sync?.completed;
 }

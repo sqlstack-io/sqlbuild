@@ -12,9 +12,10 @@ use tokio::time::Instant;
 
 use crate::native_commands::_helpers::execution::{
     history_request, metadata_sync, read_metadata_page, rows_text, safety_sync_seconds, scan_line,
+    sync_progress,
 };
 use crate::native_commands::main::_location_metadata::read_failure_line;
-use crate::native_commands::models::{LocationServe, ReadFailure};
+use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
     MetadataRetryTestCase, NewestVersionsTestCase, ReadFailureTestCase, SafetySyncIdleTestCase,
@@ -542,5 +543,50 @@ fn given_a_completed_table_when_reporting_progress_then_the_line_names_its_posit
             "1,234,567 rows"
         ]
         .map(String::from)
+    );
+}
+
+#[test]
+fn given_a_delivered_page_when_reporting_health_then_progress_completes_only_on_the_last_kinds_last_page()
+ {
+    let page = |more: bool| LocationMetadataPage {
+        batch: serde_json::from_value(serde_json::json!({
+            "kind": "statistics",
+            "session_id": uuid::Uuid::nil(),
+            "generation": 1,
+            "records": [{}, {}, {}],
+        }))
+        .expect("batch"),
+        next_source_after: more.then(|| vec![Some("inventory".into())]),
+    };
+    let mut state = metadata_sync((one_location(), 1), (3600, 0));
+    state.progress.sync_rows = 100;
+    state.progress.scan_rows = 20;
+    state.index = WarehouseHistoryKind::ALL.len() - 1;
+    state.pending = Some(page(true));
+    let progress = sync_progress(&state, true);
+    assert_eq!(
+        (
+            progress.position,
+            progress.kinds,
+            progress.rows,
+            progress.completed
+        ),
+        (14, 14, 123, false),
+        "a page with more to come leaves the sync running"
+    );
+    state.pending = Some(page(false));
+    assert!(
+        sync_progress(&state, true).completed,
+        "the last page completes the sync"
+    );
+    assert!(
+        !sync_progress(&state, false).completed,
+        "a failed report never completes it"
+    );
+    state.index = 2;
+    assert!(
+        !sync_progress(&state, true).completed,
+        "an earlier kind's last page does not"
     );
 }

@@ -26,7 +26,7 @@ use sqlbuild_orchestration::platform::main::report_remote_location_health::repor
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
-    WarehouseReadFailure, WarehouseSyncFailure,
+    WarehouseReadFailure, WarehouseSyncFailure, WarehouseSyncProgress,
 };
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
@@ -567,6 +567,25 @@ pub(crate) fn scan_line(state: &LocationMetadataSync, scans: usize) -> String {
     )
 }
 
+/// Where a synchronization has got to when a page is delivered or a table is found unchanged.
+///
+/// A clean report of the last table's last page completes the synchronization.
+pub(crate) fn sync_progress(state: &LocationMetadataSync, clean: bool) -> WarehouseSyncProgress {
+    let kinds = (state.locations.len() * WarehouseHistoryKind::ALL.len()) as u64;
+    let page = state.pending.as_ref();
+    let rows = state.progress.sync_rows
+        + state.progress.scan_rows
+        + page.map_or(0, |page| page.batch.records.len() as u64);
+    let scan_done = page.is_none_or(|page| page.next_source_after.is_none());
+    WarehouseSyncProgress {
+        position: state.index as u64 + 1,
+        kinds,
+        rows,
+        elapsed_millis: state.progress.sync_started.elapsed().as_millis() as u64,
+        completed: clean && scan_done && state.index as u64 + 1 == kinds,
+    }
+}
+
 /// A row count with thousands separators, e.g. `31,204 rows`.
 pub(crate) fn rows_text(rows: u64) -> String {
     let digits = rows.to_string();
@@ -698,6 +717,7 @@ pub(crate) async fn report_metadata_health(
             elapsed_millis: started.elapsed().as_millis() as u64,
             page_limit: read_failure.map(|_| page_limit(state) as u64),
             read_failure,
+            progress: Some(sync_progress(state, failure.is_none())),
         },
     };
     if let Err(error) = client.report_health(&report).await {

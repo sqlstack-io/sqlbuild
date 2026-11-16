@@ -11,6 +11,7 @@
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
 	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument, PlatformEvent } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import SyncingNote from '$lib/components/platform/syncing-note.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { kindLine } from '$lib/build-area/labels';
 	import { formatAgo } from '$lib/format/time';
@@ -280,6 +281,7 @@
 <AppTopbar title="Plan" events={affectsPlan} />
 
 <div class="flex min-h-0 flex-1 flex-col">
+	<div class="px-4 pt-3 empty:hidden"><SyncingNote what="Plan previews" /></div>
 	<div class="cmd">
 		{#if job}
 			<span class="jobchip" data-testid="plan-job">

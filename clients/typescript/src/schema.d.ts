@@ -1999,6 +1999,7 @@ export interface components {
              * @description Rows, or statistics relations, the failed read asked for.
              */
             page_limit?: number | null;
+            progress?: null | components["schemas"]["WarehouseSyncProgress"];
             read_failure?: null | components["schemas"]["WarehouseReadFailure"];
             /** Format: int64 */
             records_sent: number;
@@ -3690,6 +3691,31 @@ export interface components {
          * @enum {string}
          */
         WarehouseSyncFailure: "watermark" | "read" | "delivery" | "busy";
+        /** @description How far one synchronization has got, so people see it running and when it completed. */
+        WarehouseSyncProgress: {
+            /** @description This report's page was the synchronization's last, so it has completed. */
+            completed: boolean;
+            /**
+             * Format: int64
+             * @description Milliseconds since the synchronization began.
+             */
+            elapsed_millis: number;
+            /**
+             * Format: int64
+             * @description Kinds the synchronization reads: 14 for each state schema.
+             */
+            kinds: number;
+            /**
+             * Format: int64
+             * @description The reported kind's position in the synchronization, from 1.
+             */
+            position: number;
+            /**
+             * Format: int64
+             * @description Rows the synchronization has delivered, this report's included.
+             */
+            rows: number;
+        };
         WarehouseSyncResponse: {
             applied: boolean;
         };

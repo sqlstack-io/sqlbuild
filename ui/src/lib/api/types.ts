@@ -70,6 +70,10 @@ export type WarehouseSync = {
 	lastError: string | null;
 	/** When the newest sync report arrived, failed or not; a new one means a requested sync has finished. */
 	lastReportedAt?: Iso | null;
+	/** The sync now running: which kind of how many, and rows so far; null when none is. */
+	syncing?: { position: number; kinds: number; table: string; rows: number } | null;
+	/** The newest completed sync among recent reports; null when none completed in them. */
+	completed?: { at: Iso; kinds: number; rows: number; elapsedMs: number } | null;
 };
 
 /** The one target a location is deployed against, e.g. `prod` on Snowflake. */
