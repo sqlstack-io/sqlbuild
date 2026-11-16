@@ -65,7 +65,7 @@
 	const typed = $derived(field.text.replace(/^\+/, '').replace(/^[a-z_]+:/, '').toLowerCase());
 
 	// The values each type takes, for the chips' pickers: built once per vocabulary, not per chip.
-	const nameOptions = $derived<ChoiceOption[]>(names.map((n) => ({ value: n.value, label: n.value })));
+	const nameOptions = $derived<ChoiceOption[]>(names.map((n) => ({ value: n.value, label: n.value, count: n.count })));
 	const typeOptions = $derived.by(() => {
 		const out = new Map<string, ChoiceOption[]>();
 		for (const [type, list] of Object.entries(VALUES_OF)) out.set(type, (vocabulary?.[list] ?? []).map((e) => ({ value: e.value, label: e.value, count: e.count })));

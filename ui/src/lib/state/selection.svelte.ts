@@ -60,9 +60,10 @@ export type SelectionState = ReturnType<typeof createSelection>;
 
 /**
  * A selection bar's state. Must be created during component initialisation. With `url`, the
- * selection starts from (unless `initial` is given) and is kept in the page's `?select=…&exclude=…`.
+ * selection starts from (unless `initial` is given) and is kept in the page's `?select=…&exclude=…`;
+ * the older parameters in `replaces`, read into `initial` by the page, are dropped from the URL.
  */
-export function createSelection(options: { url?: boolean; initial?: Selection } = {}) {
+export function createSelection(options: { url?: boolean; initial?: Selection; replaces?: string[] } = {}) {
 	const start = options.initial ?? (options.url ? readSelectionParams(page.url.searchParams) : { select: '', exclude: '' });
 	let select = $state(start.select);
 	let exclude = $state(start.exclude);
@@ -76,6 +77,8 @@ export function createSelection(options: { url?: boolean; initial?: Selection } 
 	let asked = 0;
 
 	const active = $derived(!!(select.trim() || exclude.trim()));
+	/** The selected nodes' names, without their `kind:`, for lists that name nodes only by name. */
+	const names = $derived(keys && new Set([...keys].map((k) => k.slice(k.indexOf(':') + 1))));
 	const supported = $derived(app.client.supports('evaluateSelection'));
 
 	async function evaluate(scope: Scope, request: Selection, ticket: number) {
@@ -141,6 +144,7 @@ export function createSelection(options: { url?: boolean; initial?: Selection } 
 	if (options.url) {
 		$effect(() => {
 			const params = writeSelectionParams(page.url.searchParams, { select, exclude });
+			for (const old of options.replaces ?? []) params.delete(old);
 			if (params.toString() === page.url.searchParams.toString()) return;
 			const url = new URL(page.url);
 			url.search = params.toString();
@@ -194,6 +198,10 @@ export function createSelection(options: { url?: boolean; initial?: Selection } 
 		/** Whether a node is in the selection: every node is when nothing narrows or the answer is pending. */
 		has(key: string): boolean {
 			return !active || keys === null || keys.has(key);
+		},
+		/** Whether a node named `name` (any kind) is in the selection, as `has` does. */
+		hasName(name: string | null): boolean {
+			return !active || names === null || (name !== null && names.has(name));
 		},
 		/** Remembers the current selection among this browser's recent ones. */
 		remember() {

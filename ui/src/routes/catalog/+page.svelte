@@ -12,6 +12,8 @@
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
+	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
+	import { createSelection } from '$lib/state/selection.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -19,7 +21,7 @@
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
 	import { planHref } from '$lib/run/command';
-	import { topFolder } from '$lib/lineage/catalog-graph';
+	import { folderOf, topFolder } from '$lib/lineage/catalog-graph';
 	import { app } from '$lib/state/app.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
@@ -49,6 +51,9 @@
 		url.search = next.toString();
 		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
 	});
+	// What `sqb build -s … --exclude …` selects, kept in the URL; Status and Folder only change the view.
+	const selection = createSelection({ url: true });
+	const selectionNames = $derived(all.map((n) => ({ value: shortName(n.key), hint: folderOf(n) })));
 	// Nodes picked elsewhere, such as a provider's code from its Used by tab.
 	let picked = $state<ReadonlySet<string>>(new Set((params.get(NODES_PARAM) ?? '').split(',').filter(Boolean)));
 	function clearPicked() {
@@ -76,6 +81,7 @@
 	const filtered = $derived(
 		all.filter((n) => {
 			if (picked.size && !picked.has(n.key)) return false;
+			if (!selection.has(n.key)) return false;
 			if (kindFilter !== 'all' && kindTabOf(n.kind) !== kindFilter) return false;
 			// A filter whose control is hidden, for example from a shared link, never narrows the list.
 			if (groups.length > 1 && !matchesAny(groupSet, topFolder(n))) return false;
@@ -119,6 +125,12 @@
 </AppTopbar>
 
 
+<SelectionBar {selection} names={selectionNames} total={all.length}>
+	{#snippet view()}
+		{#if showBuildState}<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />{/if}
+		{#if groups.length > 1}<ChoiceFilter multiple label="Folder" bind:values={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: byFolder.get(g) ?? 0 }))} />{/if}
+	{/snippet}
+</SelectionBar>
 <ListToolbar
 	loading={catalog.data === undefined}
 	bind:query
@@ -138,8 +150,6 @@
 			bind:value={kindFilter}
 			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: kindTabLabel[k], count: byKindTab.get(k) ?? 0 }))]}
 		/>
-		{#if showBuildState}<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />{/if}
-		{#if groups.length > 1}<ChoiceFilter multiple label="Folder" bind:values={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: byFolder.get(g) ?? 0 }))} />{/if}
 	{/snippet}
 </ListToolbar>
 

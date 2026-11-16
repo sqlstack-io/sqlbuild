@@ -29,7 +29,7 @@ export const VALUES_OF: Record<string, keyof Omit<SelectionVocabulary, 'snapshot
 const GROUP_NAME: Record<string, string> = { tag: 'Tags', path: 'Folders', job: 'Jobs', kind: 'Kinds', source: 'Sources', seed: 'Seeds' };
 
 /** A node name to offer, with where it lives. */
-export type NameEntry = { value: string; hint: string };
+export type NameEntry = { value: string; hint: string; count?: number };
 
 export type SuggestionItem = {
 	/** The part's new text. */
