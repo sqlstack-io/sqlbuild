@@ -21,6 +21,11 @@ npm run check
 npm run build   # writes static assets to build/
 ```
 
+## Copy
+
+UI text follows the style guide in [COPY.md](COPY.md); a unit test checks it
+against a baseline that may only shrink.
+
 ## Generated files
 
 The run panel's verbs and flags come from the CLI's command table

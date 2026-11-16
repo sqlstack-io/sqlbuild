@@ -76,7 +76,7 @@
 		</div>{/if}
 
 		<div>
-			<Panel title="Your access" help="What your roles allow." docs={LOGIN_DOCS}>
+			<Panel title="Access" help="What your roles allow." docs={LOGIN_DOCS}>
 				{#if app.user}
 					<KeyValues
 						rows={[
@@ -101,7 +101,7 @@
 				{/if}
 			</Panel>
 			{#if app.client.supports('explainAccess')}
-				<Panel title="Why can or can't I?" help="Paste a denial ID from an error, or pick an action.">
+				<Panel title="Check access" help="Paste a denial ID from an error, or pick an action.">
 					<AccessChecker sampleDecision="dec-5r2w9j" />
 				</Panel>
 			{/if}

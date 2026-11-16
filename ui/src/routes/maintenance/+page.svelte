@@ -110,7 +110,7 @@
 </ListToolbar>
 
 {#if tab === 'migrations'}
-	<DataTable class="static" columns={migrationColumns} rows={shownMigrations} key={(m) => m.eventId} resource={history} empty={migrations.length ? 'Nothing matches the search.' : 'No models have been renamed or moved in this location.'}>
+	<DataTable class="static" columns={migrationColumns} rows={shownMigrations} key={(m) => m.eventId} resource={history} empty={migrations.length ? 'Nothing matches the search.' : 'No renames or moves.'}>
 		{#snippet row(m)}
 					<tr>
 						<td><RelativeTime value={formatAgo(m.createdAt, app.now)} exact={formatStamp(m.createdAt)} /></td>

@@ -55,7 +55,7 @@
 	</Panel>
 
 	{#if h.oldNameViews.length}
-		<Panel title="Views under the old name" help="Kept so queries that use the old name keep working.">
+		<Panel title="Old-name views" help="Kept so queries that use the old name keep working.">
 			<DataTable class="static" embedded columns={viewColumns} rows={h.oldNameViews} key={(v) => v.migrationEventId} empty="No old names kept working.">
 				{#snippet row(v)}
 						{@const status = oldNameStatus(v, app.now)}
