@@ -1,7 +1,7 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use crate::constants::NATIVE_BUILD_IDENTITY;
 use crate::engine::_helpers::evaluation::evaluate_json;
 use crate::engine::main::build_models::build_models;
 use crate::engine::tests::helpers;
@@ -13,6 +13,7 @@ use crate::query_facts::models::ModelSource;
 #[test]
 fn given_dependency_tokens_when_classifying_imports_then_preserves_dialect_and_original_sql()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         test_types::DependencyTokenTestCase {
             description: "comments and escaped literals retain canonical arguments",
@@ -122,6 +123,7 @@ fn given_dependency_tokens_when_classifying_imports_then_preserves_dialect_and_o
 #[test]
 fn given_conflicting_model_identity_when_evaluating_layer_rules_then_reports_independent_findings()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::ModelLayerRulesTestCase {
         description: "conflicting model metadata reports every independent boundary",
         expected_codes: &[
@@ -176,6 +178,7 @@ fn given_conflicting_model_identity_when_evaluating_layer_rules_then_reports_ind
 #[test]
 fn given_internal_dependency_edges_when_evaluating_graph_rule_then_only_exact_live_exceptions_apply()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let models = json!([
         {
@@ -274,6 +277,7 @@ fn given_internal_dependency_edges_when_evaluating_graph_rule_then_only_exact_li
 #[test]
 fn given_repeated_native_evaluation_when_faulting_then_returns_deterministic_complete_facts()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::NativeEvaluationTestCase {
         description: "repeated native evaluation preserves every fault fact",
         config: json!({
@@ -315,6 +319,7 @@ fn given_repeated_native_evaluation_when_faulting_then_returns_deterministic_com
 #[test]
 fn given_enforced_contract_when_column_type_is_missing_then_typed_contract_rule_faults()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         test_types::TypedContractColumnTestCase {
             description: "enforced contract has one untyped column",
@@ -387,6 +392,7 @@ fn given_enforced_contract_when_column_type_is_missing_then_typed_contract_rule_
 #[test]
 fn given_scoped_suppression_when_evaluating_native_fault_then_returns_no_faults()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::NativeEvaluationTestCase {
         description: "native evaluation applies a matching scoped suppression",
         config: json!({
@@ -419,6 +425,7 @@ fn given_scoped_suppression_when_evaluating_native_fault_then_returns_no_faults(
 #[test]
 fn given_declaration_only_project_when_evaluating_project_rule_then_rule_still_runs()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::NativeEvaluationTestCase {
         description: "duplicate enum rule runs without a model anchor",
         config: json!({
@@ -467,6 +474,7 @@ fn given_declaration_only_project_when_evaluating_project_rule_then_rule_still_r
 #[test]
 fn given_scoped_and_global_declarations_when_evaluating_domain_rule_then_only_global_is_checked()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         test_types::DeclarationScopeTestCase {
             description: "local test declaration is outside global domain policy",
@@ -509,6 +517,7 @@ fn given_scoped_and_global_declarations_when_evaluating_domain_rule_then_only_gl
 #[test]
 fn given_snowflake_expression_when_evaluating_rules_then_uses_project_dialect() -> Result<(), String>
 {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [
         test_types::DialectEvaluationTestCase {
@@ -568,6 +577,7 @@ fn given_snowflake_expression_when_evaluating_rules_then_uses_project_dialect() 
 #[test]
 fn given_dialect_quoting_around_table_functions_when_evaluating_rules_then_model_parses()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [
         test_types::DialectEvaluationTestCase {
@@ -621,6 +631,7 @@ fn given_dialect_quoting_around_table_functions_when_evaluating_rules_then_model
 
 #[test]
 fn given_unparseable_model_when_evaluating_then_retains_named_rule_fault() -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let deep_sql = format!("SELECT {}1 AS order_id FROM orders", "1 + ".repeat(50_000));
     let test_cases = [
@@ -680,6 +691,7 @@ fn given_unparseable_model_when_evaluating_then_retains_named_rule_fault() -> Re
 #[test]
 fn given_comment_apostrophes_when_generic_fallback_normalizes_rules_sql_then_model_parses()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [
         test_types::DialectEvaluationTestCase {
@@ -722,6 +734,7 @@ fn given_comment_apostrophes_when_generic_fallback_normalizes_rules_sql_then_mod
 #[test]
 fn given_enforced_contract_outputs_when_evaluating_explicit_type_rule_then_returns_expected_faults()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         test_types::ExplicitOutputTypeTestCase {
             description: "proven direct passthrough in final CTE",
@@ -990,6 +1003,7 @@ fn given_enforced_contract_outputs_when_evaluating_explicit_type_rule_then_retur
 #[test]
 fn given_compiler_proven_duckdb_dynamic_pivot_when_evaluating_contract_rules_then_skips_query_parse()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::DynamicPivotEvaluationTestCase {
         description: "compiler-proven bare DuckDB pivot",
         expected_faults: json!([]),
@@ -1036,6 +1050,7 @@ fn given_compiler_proven_duckdb_dynamic_pivot_when_evaluating_contract_rules_the
 #[test]
 fn given_contract_name_type_options_when_evaluating_then_accepts_configured_interfaces()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [
         test_types::ContractNameTypeOptionsTestCase {
@@ -1111,6 +1126,7 @@ fn given_contract_name_type_options_when_evaluating_then_accepts_configured_inte
 #[test]
 fn given_numeric_comparisons_when_evaluating_named_decisions_then_only_authored_decisions_fault()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [
         test_types::NumericDecisionTestCase {
@@ -1297,6 +1313,7 @@ fn given_model_sql_when_stubbing_shape_then_offsets_map_back_to_source_positions
 #[test]
 fn given_deep_valid_expression_when_evaluating_rules_then_parser_budget_is_sufficient()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [test_types::DeepExpressionTestCase {
         description: "deep valid expression remains within the parser budget",
@@ -1328,6 +1345,7 @@ fn given_deep_valid_expression_when_evaluating_rules_then_parser_budget_is_suffi
 #[test]
 fn given_path_threshold_overrides_when_evaluating_then_matches_in_authored_order()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [
         test_types::ThresholdEvaluationTestCase {
@@ -1441,6 +1459,7 @@ fn given_path_threshold_overrides_when_evaluating_then_matches_in_authored_order
 #[test]
 fn given_threshold_override_change_when_evaluating_then_ruleset_fingerprint_changes()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [test_types::ThresholdFingerprintTestCase {
         description: "path threshold changes the ruleset fingerprint",
@@ -1488,50 +1507,6 @@ fn given_threshold_override_change_when_evaluating_then_ruleset_fingerprint_chan
         );
     }
     Ok(())
-}
-
-#[test]
-fn given_native_build_when_reading_cache_identity_then_it_is_a_source_hash() {
-    let test_cases = [test_types::BuildIdentityTestCase {
-        description: "cache identity is a source content hash",
-        expected_hash_length: 16,
-    }];
-    for test_case in &test_cases {
-        let hash = NATIVE_BUILD_IDENTITY;
-
-        assert!(
-            hash.len() == test_case.expected_hash_length
-                && hash.bytes().all(|byte| byte.is_ascii_hexdigit()),
-            "{}",
-            test_case.description
-        );
-    }
-}
-
-#[test]
-fn given_workspace_checkout_when_deriving_build_identity_then_workspace_files_are_hashed() {
-    let test_cases = [
-        test_types::HashedWorkspaceFileTestCase {
-            description: "dependency features and build profiles change the identity",
-            workspace_file: "../../Cargo.toml",
-            expected_hashed: true,
-        },
-        test_types::HashedWorkspaceFileTestCase {
-            description: "resolved dependency versions change the identity",
-            workspace_file: "../../Cargo.lock",
-            expected_hashed: true,
-        },
-    ];
-    for test_case in &test_cases {
-        let hashed = env!("SQLBUILD_NATIVE_HASHED_WORKSPACE_FILES")
-            .split(',')
-            .any(|file| file == test_case.workspace_file);
-        assert_eq!(
-            hashed, test_case.expected_hashed,
-            "{}",
-            test_case.description
-        );
-    }
 }
 
 #[test]

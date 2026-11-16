@@ -1,11 +1,11 @@
 //! The fingerprint of one resolved ruleset that generated guidance records.
 
+use crate::build_identity::main::native_build_identity::native_build_identity;
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-use crate::constants::NATIVE_BUILD_IDENTITY;
 use crate::models::RulesConfig;
 use crate::rule_catalogue::models::FingerprintRule;
 
@@ -35,7 +35,7 @@ pub fn ruleset_fingerprint(
         }));
     }
     let rules_payload: Value = json!({
-        "engine": NATIVE_BUILD_IDENTITY,
+        "engine": native_build_identity(),
         "rules": payload,
         "thresholds": config.thresholds,
         "threshold_overrides": config.threshold_overrides,

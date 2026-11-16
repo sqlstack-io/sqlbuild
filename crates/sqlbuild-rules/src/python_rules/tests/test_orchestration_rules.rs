@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::python_rules::tests::helpers::{owned_faults, python_rule_faults};
@@ -14,6 +15,7 @@ const ORCHESTRATION_RULES: [&str; 5] = [
 #[test]
 fn given_sensor_and_calendar_modules_when_evaluating_orchestration_rules_then_reports_each_broken_convention()
  {
+    install_test_identity();
     let test_cases = [
         PythonRunTestCase {
             description: "domain folders with one declaration per module, private support and allowed imports report nothing",
