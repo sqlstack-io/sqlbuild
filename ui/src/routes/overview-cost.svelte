@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
 	import { ApiError, DEMO } from '$lib/api';
@@ -26,14 +28,13 @@
 	const catalog = useCatalogNodes();
 	const data = $derived(summary.data && catalog.data ? { cost: summary.data, folders: costByFolder(summary.data.byNode, catalog.data) } : null);
 	const cost = $derived(data?.cost ?? null);
-	type Row = { key: string; label: string; credits: number; usd: number | null; detail: string; href?: string };
-	const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+	type Row = { key: string; label: string; title?: string; credits: number; usd: number | null; detail: string; href?: string };
 	const columns = $derived<{ title: string; rows: Row[] }[]>(
 		cost && data
 			? [
 					{
 						title: 'By job',
-						rows: cost.byJob.map((g) => ({ key: g.key ?? '', label: g.key ?? 'Started by hand or from the command line', credits: g.credits, usd: g.usd, detail: plural(g.runs, 'run'), href: g.key ? to(`/jobs/${g.key}`) : undefined }))
+						rows: cost.byJob.map((g) => ({ key: g.key ?? '', label: g.key ?? 'Manual or CLI', title: g.key ? undefined : 'Runs started by hand or from the command line', credits: g.credits, usd: g.usd, detail: plural(g.runs, 'run'), href: g.key ? to(`/jobs/${g.key}`) : undefined }))
 					},
 					{
 						title: 'By folder',
@@ -52,8 +53,7 @@
 	<section class="surface-panel cost">
 		<div class="panel-heading">
 			<div>
-				<h2>Estimated query cost</h2>
-				<span>Warehouse time the runs' queries used, not billed warehouse time</span>
+				<h2>Estimated query cost <HelpTip text="Warehouse time the runs' queries used, not billed warehouse time" /></h2>
 			</div>
 			<SegmentedFilter label="Window" value={String(days)} options={WINDOWS.map((w) => ({ value: String(w), label: `${w} days` }))} onselect={(v) => (days = Number(v) as (typeof WINDOWS)[number])} />
 		</div>
@@ -63,7 +63,7 @@
 		{:else if cost}
 			<div class="total">
 				<strong>{formatQueryCost(cost)}</strong>
-				<span>{plural(cost.runs, 'run')} in the last {days} days{#if cost.incompleteRuns}&nbsp;· <b>{cost.incompleteRuns} still pending or partial</b>{/if}</span>
+				<span>{plural(cost.runs, 'run')} in the last {days} days{#if cost.incompleteRuns}&nbsp;· <b title="Cost still pending or partial for these runs">{cost.incompleteRuns} incomplete</b>{/if}</span>
 				{#if cost.usd === null}<span class="hint">{CREDIT_PRICE_HINT}</span>{/if}
 			</div>
 			<div class="columns">
@@ -73,7 +73,7 @@
 						<h3>{c.title}</h3>
 						{#each c.rows.slice(0, TOP) as r (r.key)}
 							<svelte:element this={r.href ? 'a' : 'div'} class="row" href={r.href}>
-								<span class="label" title={r.label}>{r.label}</span>
+								<span class="label" title={r.title ?? r.label}>{r.label}</span>
 								<span class="amount">{formatQueryCost(r)}</span>
 								<span class="bar"><i style:width="{(r.credits / top) * 100}%"></i></span>
 								<small>{r.detail}</small>
@@ -91,7 +91,6 @@
 	.surface-panel { box-shadow: var(--panel-shadow); border: 1px solid var(--panel-border); border-radius: 2px; background: var(--card); }
 	.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--inner-line); }
 	.panel-heading h2 { margin: 0; font-size: 13px; font-weight: 600; }
-	.panel-heading span { color: var(--muted-foreground); font-size: 12px; }
 	.panel-heading > div:first-child { display: flex; align-items: baseline; gap: 10px; }
 	.total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 14px 4px; }
 	.total strong { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }

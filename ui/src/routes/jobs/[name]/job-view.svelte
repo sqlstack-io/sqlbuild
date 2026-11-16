@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -193,7 +194,7 @@
 						<InspectorHead title={selectedMember} href={to(`/jobs/${selectedMember}`)} linkLabel="Open job ↗" linkTitle="Open the page of {selectedMember}">
 							{#snippet meta()}
 								<span>Job in {name}</span>
-								{#if memberFacts?.nodeCount !== null && memberFacts?.nodeCount !== undefined}<span>{memberFacts.nodeCount} node{memberFacts.nodeCount === 1 ? '' : 's'}</span>{/if}
+								{#if memberFacts?.nodeCount !== null && memberFacts?.nodeCount !== undefined}<span>{plural(memberFacts.nodeCount, 'node')}</span>{/if}
 							{/snippet}
 						</InspectorHead>
 						<InspectorSection title="Description">
@@ -274,7 +275,7 @@
 									{/each}
 								</dl>
 							{:else}
-								<p class="faint">Only when someone runs it.</p>
+								<p class="faint">Manual only</p>
 							{/if}
 						</InspectorSection>
 						<InspectorSection title="Definition">
@@ -291,8 +292,8 @@
 						{#if hasSettings}
 							<InspectorSection title="Settings">
 								<dl>
-									{#if def.overlap}<div><dt>If already running</dt><dd title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">{overlapPlain[def.overlap]}</dd></div>{/if}
-									{#if def.onFailure}<div><dt>If it fails</dt><dd title="[retry] attempts = {def.onFailure.retries + 1}, delay_seconds = {def.onFailure.retryDelaySeconds}{def.memberOf?.length ? '. Inside a group run, the group retries this job while the jobs that depend on it wait' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
+									{#if def.overlap}<div><dt>Overlap</dt><dd title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">{overlapPlain[def.overlap]}</dd></div>{/if}
+									{#if def.onFailure}<div><dt>Retries</dt><dd title="[retry] attempts = {def.onFailure.retries + 1}, delay_seconds = {def.onFailure.retryDelaySeconds}{def.memberOf?.length ? '. Inside a group run, the group retries this job while the jobs that depend on it wait' : ''}">{onFailureText(def.onFailure)}</dd></div>{/if}
 									{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
 									{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
 								</dl>
@@ -306,7 +307,7 @@
 									<p class="label">Shared slots</p>
 									{#each def.concurrency as g (g.key)}
 										<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
-											<span>{g.holders.length} of {g.limit} {slotLabel(g.key)} in use</span>
+											<span>{g.holders.length}/{g.limit} {slotLabel(g.key)}</span>
 											{#each g.holders as h (h)}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}
 										</p>
 									{/each}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
@@ -57,7 +58,7 @@
 {#if failed.length}
 	<section class="failures" aria-label="Failures">
 		<DisclosureButton tone="default" open={!collapsed} onclick={() => (collapsed = !collapsed)} class="w-full px-6 pt-2 pb-1">
-			<b>{failed.length} node{failed.length === 1 ? '' : 's'} failed</b>
+			<b>{plural(failed.length, 'node')} failed</b>
 			{#if skipped}<span class="faint">· {skipped} skipped because of {failed.length === 1 ? 'it' : 'them'}</span>{/if}
 		</DisclosureButton>
 		{#if !collapsed}

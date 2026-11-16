@@ -34,7 +34,7 @@
 	{#if costs.some((c) => c.usd === null)}<p class="hint">{CREDIT_PRICE_HINT}</p>{/if}
 {/if}
 
-<DataTable class="static" embedded columns={runColumns} rows={(node.runs ?? []).map((r, i) => ({ ...r, i }))} key={(r) => `${r.runId ?? r.fingerprintRunId}-${r.i}`} empty="No builds recorded in this location.">
+<DataTable class="static" embedded columns={runColumns} rows={(node.runs ?? []).map((r, i) => ({ ...r, i }))} key={(r) => `${r.runId ?? r.fingerprintRunId}-${r.i}`} empty="No builds yet.">
 	{#snippet row(r)}
 			<tr>
 				<td>
@@ -43,9 +43,9 @@
 				</td>
 				<td>
 					{#if r.runId}<a class="mono link" href={to(`/runs/${r.runId}`)}>{r.runId}</a>
-					{:else}<span class="muted" title="Built by sqb outside this server, e.g. from a laptop or CI (fingerprint run {r.fingerprintRunId})">from the command line · <code>{shortRunId(r.fingerprintRunId ?? '')}</code></span>{/if}
+					{:else}<span class="muted" title="Built by sqb outside this server, e.g. from a laptop or CI (fingerprint run {r.fingerprintRunId})">CLI · <code>{shortRunId(r.fingerprintRunId ?? '')}</code></span>{/if}
 				</td>
-				<td>{#if r.jobKey}<a class="link" href={to(`/jobs/${r.jobKey}`)}>{r.jobKey}</a>{:else}<span class="muted">{r.runId ? 'started by hand' : '—'}</span>{/if}</td>
+				<td>{#if r.jobKey}<a class="link" href={to(`/jobs/${r.jobKey}`)}>{r.jobKey}</a>{:else}<span class="muted">{r.runId ? 'Manual' : '—'}</span>{/if}</td>
 				<td class="num muted">{formatNumber(r.rows)}</td>
 				<td class="num muted">{formatMs(r.durationMs)}</td>
 				{#if costs.length}{@const c = costOf(r)}<td class="num muted" title={c?.status === 'partial' ? 'Partial: the warehouse has not reported every statement of this build' : undefined}>{costText(c)}{c?.status === 'partial' ? '*' : ''}</td>{/if}

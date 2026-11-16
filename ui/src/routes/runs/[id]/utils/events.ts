@@ -24,15 +24,15 @@ export function eventSummary(e: RunEvent): string {
 		case 'requested':
 			return e.message;
 		case 'queued':
-			return 'Waiting for its turn';
+			return 'Queued';
 		case 'claimed':
-			return 'Its turn came: the data it writes is reserved for this run';
+			return 'Claimed write lock';
 		case 'launched':
-			return 'Started a container for the run';
+			return 'Container started';
 		case 'cancel_requested':
 			return e.message;
 		case 'presumed_failed':
-			return 'Lost contact with the run; marked failed';
+			return 'Lost contact · failed';
 		case 'terminated':
 			return `Finished${e.message.match(/^Terminated: (\w+)/) ? `: ${e.message.match(/^Terminated: (\w+)/)![1].replace('_', ' ')}` : ''}`;
 		case 'invocation_started':

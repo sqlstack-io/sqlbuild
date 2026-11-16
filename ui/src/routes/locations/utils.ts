@@ -27,7 +27,7 @@ export function schedulerWords(scheduler: SchedulerStatus, now: number): StatusW
 }
 
 export function sinkWords(sink: SinkStatus | null, now: number): StatusWords {
-	if (!sink) return { text: 'not set up', tone: 'var(--sb-text-faint)', title: 'No event forwarding in the server config' };
+	if (!sink) return { text: 'Off', tone: 'var(--sb-text-faint)', title: 'No event forwarding in the server config' };
 	if (sink.lastError) {
 		return {
 			text: `failing · ${sink.pendingEvents} waiting`,

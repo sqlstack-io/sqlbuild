@@ -95,19 +95,38 @@ async function checkStickyHeaders(page: Page, label: string) {
 			if (body.scrollHeight <= body.clientHeight) continue;
 			const sticky = [...body.querySelectorAll<HTMLElement>('*')].filter((el) => getComputedStyle(el).position === 'sticky');
 			if (!sticky.length) continue;
-			body.scrollTop = body.scrollHeight;
-			await frame();
-			const top = body.getBoundingClientRect().top;
+			// Room below the page, so a header near its end can still scroll up to the top and stick.
+			const spacer = document.createElement('div');
+			spacer.style.height = `${body.clientHeight}px`;
+			body.firstElementChild?.appendChild(spacer);
 			for (const el of sticky) {
+				// Scroll the header's own section up under it, so the header is stuck at the top of the body
+				// with its section's content passing beneath; a header whose section is gone isn't stuck.
+				body.scrollTop = 0;
+				await frame();
+				const section = el.parentElement!.getBoundingClientRect();
+				const natural = el.getBoundingClientRect().top - body.getBoundingClientRect().top;
+				const room = section.height - el.getBoundingClientRect().height - 4;
+				if (room < 8) continue;
+				body.scrollTop = natural + Math.min(120, room);
+				await frame();
 				const box = el.getBoundingClientRect();
-				// Only headers stuck near the top of the scrolled body; others scrolled away with their section.
-				if (!box.width || !box.height || box.top < top - 1 || box.top > top + 48) continue;
-				const hit = document.elementFromPoint(box.left + Math.min(box.width / 2, 200), box.top - 1);
-				// Just above a stuck header is the top bar or a toolbar outside the body, or another sticky header.
-				if (hit && body.contains(hit) && !sticky.some((s) => s.contains(hit))) {
-					problems.push(`page content shows ${Math.round(box.top - top)}px above a sticky ${el.tagName.toLowerCase()}.${el.className.split(' ')[0]}`);
+				const top = body.getBoundingClientRect().top + body.clientTop;
+				if (!box.width || !box.height) continue;
+				// Not stuck (the body couldn't scroll that far, or it sticks in a scroller of its own): nothing to check.
+				const resting = top + natural - body.scrollTop;
+				if (box.top <= resting + 1) continue;
+				// Every point between the body's top edge and the stuck header must be the header itself or
+				// another sticky header: anything else is content showing through a gap above it.
+				for (let y = top; y < box.top; y += 2) {
+					const hit = document.elementFromPoint(box.left + Math.min(box.width / 2, 200), y);
+					if (hit && body.contains(hit) && !sticky.some((s) => s.contains(hit))) {
+						problems.push(`page content shows ${Math.round(box.top - top)}px above a sticky ${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}`);
+						break;
+					}
 				}
 			}
+			spacer.remove();
 			body.scrollTop = 0;
 		}
 		for (const scroller of document.querySelectorAll<HTMLElement>('.sb-table-scroll:not(.embedded)')) {

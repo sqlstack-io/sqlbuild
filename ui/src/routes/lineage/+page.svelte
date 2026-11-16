@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Loading from '$lib/components/loading.svelte';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import { to } from '$lib/paths';
@@ -58,7 +59,7 @@
 	import { catalogNodes as sharedCatalog, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
+	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
 	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
@@ -500,7 +501,7 @@
 	const outOfDateCount = $derived(catalogNodes.filter((c) => (c.stale?.length ?? 0) > 0).length);
 	/** The toolbar chip's text, e.g. "orders, inventory"; empty when every folder is drawn. */
 	const selectionLabel = $derived.by(() => {
-		if (pickedNodes.length) return `${pickedNodes.length.toLocaleString('en')} picked node${pickedNodes.length === 1 ? '' : 's'}`;
+		if (pickedNodes.length) return plural(pickedNodes.length, 'picked node');
 		const parts = selectedFolders.length > 3 ? [...selectedFolders.slice(0, 3), `${selectedFolders.length - 3} more`] : [...selectedFolders];
 		if (staleOnly) parts.push(`${outOfDateCount.toLocaleString('en')} out of date`);
 		return parts.join(', ');
@@ -519,7 +520,7 @@
 	const inView = $derived(viewSummary(shownNodes(catalogNodes, { selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree })));
 	const activeFilters = $derived(
 		[
-			pickedNodes.length ? `${pickedNodes.length.toLocaleString('en')} picked node${pickedNodes.length === 1 ? '' : 's'}` : '',
+			pickedNodes.length ? plural(pickedNodes.length, 'picked node') : '',
 			!pickedNodes.length && selectedFolders.length ? `Folders: ${selectedFolders.join(', ')}` : '',
 			staleOnly ? 'Only nodes out of date' : '',
 			kindFilter ? `Kind: ${nodeKindPlural[kindFilter as keyof typeof nodeKindPlural] ?? kindFilter} (others dimmed)` : '',
@@ -867,7 +868,7 @@
 			variant="ghost"
 			aria-pressed={grouped}
 			onclick={() => regroup({ grouped: !grouped, expanded: new Set(), fit: true })}
-			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
+			title={grouped ? 'Draw every node' : 'One card per folder'}
 		>
 			<FolderIcon />Folders
 		</Button>
@@ -972,7 +973,7 @@
 			<div class="graph-too-many">
 				<div class="too-many-card" role="status">
 					<strong>Too many nodes to draw at once</strong>
-					<p>This view has {tooManyCount.toLocaleString('en')} cards; the graph draws at most {MAX_DRAWN.toLocaleString('en')}.</p>
+					<p>{tooManyCount.toLocaleString('en')} cards · limit {MAX_DRAWN.toLocaleString('en')}</p>
 					<div class="too-many-actions">
 						{#if !grouped}<Button variant="outline" size="bar" onclick={() => regroup({ grouped: true, expanded: new Set(), fit: true })}><FolderIcon size={13} />Show folders</Button>{/if}
 						{#if !staleOnly && outOfDateCount > 0 && outOfDateCount <= MAX_DRAWN}<Button variant="outline" size="bar" onclick={showOutOfDate}>Show the {outOfDateCount.toLocaleString('en')} out of date</Button>{/if}
@@ -1126,7 +1127,7 @@
 					{#each d.checkResults as c (c.id)}
 						<a class="check-row" href={to(`/checks/${c.id}`)}>
 							<i style:background={checkOutcomeTone[c.latest?.outcome ?? 'skipped']}></i><code>{c.name}</code>
-							<span>{runScopePhaseLabel[c.runScopePhase]}</span>
+							<span title={runScopePhaseHelp[c.runScopePhase]}>{runScopePhaseLabel[c.runScopePhase]}</span>
 						</a>
 					{/each}
 				</InspectorSection>
@@ -1149,12 +1150,12 @@
 					{#each d.runs.slice(0, 3) as run, i (i)}
 						<a class="mini-run" href={run.runId ? to(`/runs/${run.runId}`) : undefined}>
 							<i style:background={nodeOutcomeTone[run.outcome]}></i>
-							<span class="mini-run-main"><b>{nodeOutcomeLabel[run.outcome]}</b><span>{run.jobKey ?? (run.runId ? 'started by hand' : `from the command line · ${shortRunId(run.fingerprintRunId ?? '')}`)}</span></span>
+							<span class="mini-run-main"><b>{nodeOutcomeLabel[run.outcome]}</b><span>{run.jobKey ?? (run.runId ? 'Manual' : `CLI · ${shortRunId(run.fingerprintRunId ?? '')}`)}</span></span>
 							<span class="mini-run-meta">{formatMs(run.durationMs)} · {formatAgo(run.startedAt, app.now)}</span>
 							{#if run.message}<em>{run.message}</em>{/if}
 						</a>
 					{:else}
-						<span class="section-meta">No builds recorded in this location.</span>
+						<span class="section-meta">No builds yet.</span>
 					{/each}
 				</InspectorSection>
 			{/if}

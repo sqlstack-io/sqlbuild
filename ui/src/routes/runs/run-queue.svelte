@@ -34,13 +34,13 @@
 		{ id: 'job', label: 'Job', width: '20%' },
 		{ id: 'priority', label: 'Priority', width: '80px', align: 'right', title: 'Higher priority runs go first; equal priority runs go in queue order' },
 		{ id: 'since', label: 'Waiting since', width: '130px' },
-		{ id: 'why', label: 'Why it waits', minWidth: 240, truncate: false },
+		{ id: 'why', label: 'Waiting on', minWidth: 240, truncate: false },
 		{ id: 'cancel', label: '', width: '100px', align: 'right' }
 	];
 </script>
 
 {#if error}<div class="queue-error">{error}</div>{/if}
-<DataTable columns={tableColumns} rows={entries} key={(q) => q.run.id} {resource} empty="Nothing is waiting. Runs wait here while another run is updating the same data, all slots are in use, or an earlier job hasn't finished.">
+<DataTable columns={tableColumns} rows={entries} key={(q) => q.run.id} {resource} empty="Nothing queued.">
 	{#snippet row(q)}
 				<tr onclick={(e) => openRow(e, `/runs/${q.run.id}`)}>
 					<td class="num muted">{q.position}</td>
@@ -60,7 +60,7 @@
 								{#each describeWait(w) as part, j (j)}{#if part.href}<a class="link" class:code={part.code} href={to(part.href)}>{part.text}</a>{:else if part.code}<code>{part.text}</code>{:else}{part.text}{/if}{/each}
 							</div>
 						{:else}
-							<span class="muted">Nothing in the way; it starts on the next scheduler pass</span>
+							<span class="muted" title="Nothing blocks it; starts on the next scheduler pass">Next pass</span>
 						{/each}
 					</td>
 					<td class="num">

@@ -130,7 +130,7 @@
 	{/snippet}
 </ListToolbar>
 
-<DataTable class="catalog" columns={tableColumns} rows={filtered} key={(n) => n.key} rowHeight={ROW_H} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet. Deploy the project to see its models, sources and seeds here.'}>
+<DataTable class="catalog" columns={tableColumns} rows={filtered} key={(n) => n.key} rowHeight={ROW_H} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet.'}>
 	{#snippet row(n)}
 				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
 				<tr onclick={(e) => linksNodes && openRow(e, `/catalog/${n.key}`)}>

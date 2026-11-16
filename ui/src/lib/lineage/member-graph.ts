@@ -7,6 +7,7 @@ import type { CatalogNode, JobGroupMember, RunRef } from '$lib/api';
 import { folderTree, scopeGraph, type FolderTree } from './folder-graph';
 import { needsBuilding, type NeedsBuilding } from './view-summary';
 import { edgeStyle, edgeWidth, visibleEdges, type NodeLink } from './visible-edges';
+import { plural } from '$lib/format/plural';
 
 export { needsBuilding };
 
@@ -194,7 +195,7 @@ export function memberGraph(members: readonly JobGroupMember[], info: ReadonlyMa
 /** "orders waits for customers: 12 node links", for an edge's tooltip. */
 export function edgeTitle(data: MemberEdgeData): string {
 	if (!data.count) return `${data.to} waits for ${data.from}, not through lineage between their nodes`;
-	return `${data.to} waits for ${data.from}: ${data.count} node link${data.count === 1 ? '' : 's'}`;
+	return `${data.to} waits for ${data.from}: ${plural(data.count, 'node link')}`;
 }
 
 /** A member's waits with their node-level reasons, capped at `max` reasons each; `more` counts the rest. */

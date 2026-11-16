@@ -1,18 +1,18 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import InspectorSection from './inspector-section.svelte';
 	import { nodeKindPlural } from '$lib/build-area/labels';
 	import type { ViewSummary } from '$lib/lineage/view-summary';
 
 	// A graph's sidebar with nothing selected: what is in view, the filters narrowing it, and what the colours mean.
 	let { summary, filters = [] }: { summary: ViewSummary; filters?: string[] } = $props();
-	const plural = (n: number, word: string) => `${n.toLocaleString('en')} ${word}${n === 1 ? '' : 's'}`;
 	const key = [
-		{ tone: 'var(--sb-success)', label: 'Last build succeeded' },
-		{ tone: 'var(--sb-error)', label: 'Last build failed' },
-		{ tone: 'var(--sb-warning)', label: 'Built with warnings' },
-		{ tone: 'var(--sb-stale)', label: 'Changed since its last build' },
-		{ tone: 'var(--sb-behind)', label: 'Behind an upstream rebuild' },
-		{ tone: 'var(--sb-text-faint)', label: 'Not built yet, or a source' }
+		{ tone: 'var(--sb-success)', label: 'Succeeded', title: 'Last build succeeded' },
+		{ tone: 'var(--sb-error)', label: 'Failed', title: 'Last build failed' },
+		{ tone: 'var(--sb-warning)', label: 'Warnings', title: 'Built with warnings' },
+		{ tone: 'var(--sb-stale)', label: 'Changed', title: 'Changed since its last build' },
+		{ tone: 'var(--sb-behind)', label: 'Behind', title: 'Behind an upstream rebuild' },
+		{ tone: 'var(--sb-text-faint)', label: 'Not built or source', title: 'Not built yet, or a source' }
 	];
 </script>
 
@@ -41,7 +41,7 @@
 {/if}
 <InspectorSection title="Colour key">
 	<ul class="key">
-		{#each key as k (k.label)}<li><i style:background={k.tone}></i>{k.label}</li>{/each}
+		{#each key as k (k.label)}<li title={k.title}><i style:background={k.tone}></i>{k.label}</li>{/each}
 	</ul>
 </InspectorSection>
 <p class="hint">Select a node to see its details.</p>

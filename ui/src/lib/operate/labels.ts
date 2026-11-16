@@ -70,8 +70,8 @@ export const overlapHelp: Record<OverlapPolicy, string> = {
 
 /** Short plain wording of an overlap policy; the policy name goes in a tooltip. */
 export const overlapPlain: Record<OverlapPolicy, string> = {
-	queue: 'Queue another run',
-	skip: 'Skip if running'
+	queue: 'Queue',
+	skip: 'Skip'
 };
 
 /** A whole delay in its largest exact unit, e.g. 300 → `5 min`, 5400 → `90 min`, 7200 → `2 h`. */
@@ -81,17 +81,14 @@ function delayText(seconds: number): string {
 	return `${seconds} s`;
 }
 
-/** A `[retry]` policy in words, e.g. "Retry twice, 5 min apart" or "Retry once after 15 min". */
+/** A `[retry]` policy as a fact beside the "Retries" key, e.g. "2 × 5 min", "1 × 15 min" or "3 × immediate". */
 export function onFailureText(policy: OnFailure): string {
-	const times = policy.retries === 1 ? 'once' : policy.retries === 2 ? 'twice' : `${policy.retries} times`;
-	if (!policy.retryDelaySeconds) return `Retry ${times} at once`;
-	const delay = delayText(policy.retryDelaySeconds);
-	return policy.retries === 1 ? `Retry once after ${delay}` : `Retry ${times}, ${delay} apart`;
+	return `${policy.retries} × ${policy.retryDelaySeconds ? delayText(policy.retryDelaySeconds) : 'immediate'}`;
 }
 
 /** A job's overlap, retries and priority for a list cell; empty when it uses the defaults. */
 export function jobPolicyText(job: { overlap: OverlapPolicy | null; onFailure: OnFailure | null; priority: number | null }): string {
-	return [job.overlap === 'skip' ? overlapPlain.skip : null, job.onFailure ? onFailureText(job.onFailure) : null, job.priority ? `priority ${job.priority}` : null].filter(Boolean).join(' · ');
+	return [job.overlap === 'skip' ? 'Skip if running' : null, job.onFailure ? `Retry ${onFailureText(job.onFailure)}` : null, job.priority ? `priority ${job.priority}` : null].filter(Boolean).join(' · ');
 }
 
 export type WaitPart = { text: string; href?: string; code?: boolean };
@@ -115,33 +112,36 @@ export function slotLabel(group: string): string {
 
 const runLink = (id: string): WaitPart => ({ text: `run ${shortRunId(id)}`, href: `/runs/${id}` });
 
-/** A queue wait as a plain sentence of linkable parts, e.g. "Waiting: run 7f3a is updating orders". */
+/**
+ * A queue wait as short linkable facts, e.g. "Writing orders · run 7f3a"; `waitTechnical` gives the
+ * scheduler's own wording for the tooltip.
+ */
 export function describeWait(wait: QueueWait): WaitPart[] {
 	switch (wait.kind) {
 		case 'write_claim':
 			return [
-				{ text: 'Waiting: ' },
-				wait.runId ? runLink(wait.runId) : { text: 'a run in another location' },
-				{ text: ' is updating ' },
+				{ text: 'Writing ' },
 				{ text: wait.nodeKey, href: `/catalog/${wait.nodeKey}` },
-				...(wait.otherNodes ? [{ text: ` and ${wait.otherNodes} more` }] : [])
+				...(wait.otherNodes ? [{ text: ` +${wait.otherNodes}` }] : []),
+				{ text: ' · ' },
+				wait.runId ? runLink(wait.runId) : { text: 'another location' }
 			];
 		case 'concurrency_limit':
 			return [
-				{ text: `Waiting: the ${slotLabel(wait.limit)} limit is in use by ` },
+				{ text: `${slotLabel(wait.limit)} limit full · ` },
 				...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)]),
-				...(wait.elsewhere ? [{ text: `${wait.holders.length ? ' and ' : ''}${wait.elsewhere} run${wait.elsewhere === 1 ? '' : 's'} elsewhere` }] : [])
+				...(wait.elsewhere ? [{ text: `${wait.holders.length ? ' +' : ''}${wait.elsewhere} elsewhere` }] : [])
 			];
 		case 'earlier_run':
-			return [{ text: 'Waiting: ' }, wait.runId ? runLink(wait.runId) : { text: 'an earlier run elsewhere' }, { text: ` goes first on the ${slotLabel(wait.limit)} limit` }];
+			return [{ text: 'Behind ' }, wait.runId ? runLink(wait.runId) : { text: 'a run elsewhere' }, { text: ` · ${slotLabel(wait.limit)} limit` }];
 		case 'job_running':
-			return [{ text: 'Waiting: ' }, runLink(wait.runId), { text: ' of the same job is running' }];
+			return [{ text: 'Job running · ' }, runLink(wait.runId)];
 		case 'upstream_job':
-			return [{ text: 'Waiting for ' }, { text: wait.jobKey || shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: wait.attempt ? ' (retrying)' : ' to finish first' }];
+			return [{ text: 'After ' }, { text: wait.jobKey || shortRunId(wait.runId), href: `/runs/${wait.runId}` }, ...(wait.attempt ? [{ text: ' · retrying' }] : [])];
 		case 'group_parent':
-			return [{ text: 'Waiting for its group run ' }, { text: shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' to start' }];
+			return [{ text: 'Group run ' }, { text: shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' not started' }];
 		case 'retry_delay':
-			return [{ text: `Waiting: retry ${wait.attempt} is due at ${formatStamp(wait.dueAt)}` }];
+			return [{ text: `Retry ${wait.attempt} at ${formatStamp(wait.dueAt)}` }];
 	}
 }
 
@@ -180,10 +180,10 @@ export const tickOutcomeTone: Record<TickOutcome, string> = {
 };
 
 export const tickOutcomeText: Record<TickOutcome, string> = {
-	requested: 'started a run',
-	skipped: 'skipped',
-	covered: 'merged',
-	failed: 'failed'
+	requested: 'Run started',
+	skipped: 'Skipped',
+	covered: 'Merged',
+	failed: 'Failed'
 };
 
 /** What each tick outcome means, with the scheduler's own name for debugging. */
@@ -205,9 +205,9 @@ export const evaluationTone: Record<SensorEvaluationOutcome, string> = {
 export const triggerKindLabel: Record<TriggerKind, string> = {
 	cron_schedule: 'Schedule',
 	calendar_schedule: 'Calendar schedule',
-	job_sensor: 'When a job finishes',
-	node_sensor: 'When data changes',
-	platform_sensor: 'When a problem happens',
+	job_sensor: 'Job sensor',
+	node_sensor: 'Data sensor',
+	platform_sensor: 'Problem sensor',
 	custom_sensor: 'Custom sensor'
 };
 
@@ -223,7 +223,7 @@ export const triggerKindHelp: Record<TriggerKind, string> = {
 export const stateEventLabel: Record<TriggerStateEventKind, string> = {
 	enabled: 'Turned on',
 	paused: 'Paused',
-	reset_to_default: "Reset to the code's setting",
+	reset_to_default: 'Reset to code',
 	cursor_set: 'Position set',
 	cursor_reset: 'Started over'
 };

@@ -9,13 +9,13 @@ describe('node change summaries', () => {
 	it('counts a first deploy by change and kind, largest first, in plain nouns', () => {
 		const nodes = [...many(3, 'model'), ...many(1200, 'audit'), change('udf:margin'), ...many(2, 'model', 'removed'), change('widget:x')];
 		expect(nodeChangeGroups(nodes)).toEqual([
-			{ op: 'added', prefix: 'audit', count: 1200, noun: 'checks' },
+			{ op: 'added', prefix: 'audit', count: 1200, noun: 'audits' },
 			{ op: 'added', prefix: 'model', count: 3, noun: 'models' },
 			{ op: 'removed', prefix: 'model', count: 2, noun: 'models' },
 			{ op: 'added', prefix: 'udf', count: 1, noun: 'function' },
 			{ op: 'added', prefix: 'widget', count: 1, noun: 'widget' }
 		]);
-		expect(nodeChangeLine(nodes)).toBe('added 1,200 checks · added 3 models · removed 2 models · 2 more kinds');
+		expect(nodeChangeLine(nodes)).toBe('added 1,200 audits · added 3 models · removed 2 models · 2 more kinds');
 	});
 
 	it('keeps SQL and Python hooks apart, so each kind is its own group', () => {

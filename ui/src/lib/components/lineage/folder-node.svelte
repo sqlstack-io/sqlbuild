@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
@@ -9,7 +10,7 @@
 </script>
 
 <!-- A closed folder; clicking it opens the folder into a box around its folders and nodes. -->
-<div class="group" class:dimmed={d.dimmed} title="Open {d.group}: {d.count} node{d.count === 1 ? '' : 's'}">
+<div class="group" class:dimmed={d.dimmed} title="Open {d.group}: {plural(d.count, 'node')}">
 	<Handle type="target" position={Position.Left} class="node-handle" />
 	<div class="head">
 		<FolderIcon size={14} strokeWidth={1.75} class="glyph" />

@@ -11,7 +11,8 @@
 	}: {
 		label: string;
 		value: T | '';
-		options: { value: T; label: string; count?: number }[];
+		/** `title` explains a short label on hover. */
+		options: { value: T; label: string; count?: number; title?: string }[];
 		all?: string;
 	} = $props();
 
@@ -28,7 +29,7 @@
 			<DropdownMenu.RadioItem value="__all">{all}</DropdownMenu.RadioItem>
 			{#each options as o (o.value)}
 				<DropdownMenu.RadioItem value={o.value}>
-					<span class="flex-1">{o.label}</span>
+					<span class="flex-1" title={o.title}>{o.label}</span>
 					{#if o.count != null}<span class="text-muted-foreground text-[11.5px] tabular-nums">{o.count}</span>{/if}
 				</DropdownMenu.RadioItem>
 			{/each}

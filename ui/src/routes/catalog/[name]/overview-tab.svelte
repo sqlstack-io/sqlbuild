@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
@@ -10,7 +11,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseLabel, shortName } from '$lib/build-area/labels';
+	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName } from '$lib/build-area/labels';
 	import { driftLabel, driftOf, type Tab } from './utils';
 
 	let { node, onTab, onSql }: { node: CatalogNodeDetail; onTab: (tab: Tab) => void; onSql: (mode: 'raw' | 'compiled' | 'drift') => void } = $props();
@@ -31,7 +32,7 @@
 			<section class="panel">
 				<div class="status-top">
 					<StatusLabel tone={freshnessTone} label={node.sourceFreshness ? `Freshness ${node.sourceFreshness.status}` : 'No freshness check'} />
-					{#if node.sourceFreshness}<span class="muted" title={formatStamp(node.sourceFreshness.loadedAt)}>newest data loaded {formatAgo(node.sourceFreshness.loadedAt, app.now)}</span>{/if}
+					{#if node.sourceFreshness}<span class="muted" title={formatStamp(node.sourceFreshness.loadedAt)}>Loaded {formatAgo(node.sourceFreshness.loadedAt, app.now)}</span>{/if}
 				</div>
 				{#if node.sourceFreshness}
 					<div class="stat-grid">
@@ -62,7 +63,7 @@
 					<!-- raw-button: a stale notice that is clickable as a whole, opening its lineage or drift -->
 					<button class="drift-hint {r.reason}" onclick={() => (r.reason === 'behind' ? onTab('lineage') : onSql('drift'))} disabled={r.reason !== 'behind' && !hasDrift}>
 						<GitCompareIcon size={14} />
-						<span><b>Stale · {staleReasonLabel(r)}</b> · {staleReasonDetail(r)}</span>
+						<span title={staleReasonDetail(r)}><b>Stale · {staleReasonLabel(r)}</b> · {r.reason === 'changed' ? r.detail : r.upstream.map(shortName).join(', ')}</span>
 						{#if r.reason === 'behind' || hasDrift}<em>{r.reason === 'behind' ? 'View lineage →' : 'View drift →'}</em>{/if}
 					</button>
 				{/each}
@@ -92,7 +93,7 @@
 				<div class="rows">
 					{#each node.checkResults as c (c.id)}
 						{@const o = c.latest?.outcome ?? 'skipped'}
-						<a class="row" href={to(`/checks/${c.id}`)}><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /><code>{c.name}</code><span class="muted ml-auto">{runScopePhaseLabel[c.runScopePhase]} · {c.severity}</span></a>
+						<a class="row" href={to(`/checks/${c.id}`)}><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /><code>{c.name}</code><span class="muted ml-auto" title={runScopePhaseHelp[c.runScopePhase]}>{runScopePhaseLabel[c.runScopePhase]} · {c.severity}</span></a>
 					{/each}
 				</div>
 			</section>
@@ -144,9 +145,9 @@
 			<section>
 				<h3>Jobs</h3>
 				{#each node.jobs as j (j.key)}
-					<a class="job-row" href={to(`/jobs/${j.key}`)}><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${j.triggerIds.length} ${j.triggerIds.length === 1 ? 'trigger' : 'triggers'}` : ' · manual'}</small></a>
+					<a class="job-row" href={to(`/jobs/${j.key}`)}><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${plural(j.triggerIds.length, 'trigger')}` : ' · manual'}</small></a>
 				{:else}
-					<p class="muted">No job selects this node.</p>
+					<p class="muted">No jobs.</p>
 				{/each}
 			</section>
 		{/if}

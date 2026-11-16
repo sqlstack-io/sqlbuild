@@ -30,7 +30,7 @@
 <ListToolbar loading={providers.data === undefined} bind:query placeholder="Search providers" total="{shown.length} of {all.length} providers">
 </ListToolbar>
 
-<DataTable columns={tableColumns} rows={shown} key={(p) => p.name} resource={providers} empty={all.length ? 'No providers match the search.' : 'This project declares no providers. Warehouse connections are under Connections.'}>
+<DataTable columns={tableColumns} rows={shown} key={(p) => p.name} resource={providers} empty={all.length ? 'No providers match the search.' : 'No providers.'}>
 	{#snippet row(p)}
 				<tr onclick={(e) => openRow(e, `/providers/${p.name}`)}>
 					<td>

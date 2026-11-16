@@ -122,7 +122,7 @@
 		<Controls showLock={false} />
 		{#if canGroup && keys.length > GROUPED_ABOVE && !tooMany}
 			<Panel position="top-left">
-				<Button variant={grouped ? 'default' : 'outline'} size="bar" onclick={() => (grouped = !grouped)} title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}><FolderIcon />Folders</Button>
+				<Button variant={grouped ? 'default' : 'outline'} size="bar" onclick={() => (grouped = !grouped)} title={grouped ? 'Draw every node' : 'One card per folder'}><FolderIcon />Folders</Button>
 			</Panel>
 		{/if}
 	</SvelteFlow>

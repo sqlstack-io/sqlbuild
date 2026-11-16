@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import MinusIcon from '@lucide/svelte/icons/minus';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -106,16 +107,16 @@
 			const across = n.skippedBecauseOf.runId !== n.runId;
 			return `skipped: ${n.skippedBecauseOf.nodeKey} failed${across ? ` in ${n.skippedBecauseOf.jobKey ?? n.skippedBecauseOf.runId}` : ''}`;
 		}
-		if (n.status === 'pending') return 'not started yet';
-		if (n.status === 'not_run') return 'not run: the run ended first';
-		if (n.status === 'cancelled') return 'not run: cancelled';
+		if (n.status === 'pending') return 'Pending';
+		if (n.status === 'not_run') return 'Not run';
+		if (n.status === 'cancelled') return 'Cancelled';
 		return n.status;
 	}
 </script>
 
 <div class="gantt">
 <div class="gantt-head">
-	<span class="count">{nodes.length} node{nodes.length === 1 ? '' : 's'}</span>
+	<span class="count">{plural(nodes.length, 'node')}</span>
 	<div class="zoom">
 		<Button variant="ghost" size="icon-sm" onclick={() => zoomBy(1 / 1.5)} disabled={zoom <= ZOOM_MIN} title="Zoom out" aria-label="Zoom out"><MinusIcon /></Button>
 		<input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.1" bind:value={zoom} title="Zoom" />

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import type { RunsState } from './state.svelte';
@@ -23,7 +24,7 @@
 	}
 
 	function label(action: BulkAction, count: number): string {
-		if (list.armed === action) return `Confirm: ${bulkLabel[action].toLowerCase()} ${count} run${count === 1 ? '' : 's'}`;
+		if (list.armed === action) return `Confirm: ${bulkLabel[action].toLowerCase()} ${plural(count, 'run')}`;
 		return `${bulkLabel[action]} ${count} of ${total}`;
 	}
 </script>

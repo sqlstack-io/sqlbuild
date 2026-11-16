@@ -3,6 +3,7 @@
 
 import type { AccessQuery, AssignmentSource, BuiltInRole, Capability, Location, RoleAssignment, RoleDefinition, RoleSource } from '$lib/api';
 import { locationName } from './labels';
+import { plural } from '$lib/format/plural';
 
 const BUILT_IN_LABEL: Record<BuiltInRole, string> = { viewer: 'Viewer', operator: 'Operator', developer: 'Developer', admin: 'Admin' };
 const RANK: Record<BuiltInRole, number> = { viewer: 0, operator: 1, developer: 2, admin: 3 };
@@ -20,22 +21,22 @@ export function additionCount(role: Pick<RoleDefinition, 'grants'>): number {
 export function roleSummary(role: Pick<RoleDefinition, 'source' | 'extends' | 'grants'>): string {
 	if (role.source === 'built_in') {
 		const n = new Set(role.grants.flatMap((g) => g.permissions)).size;
-		return `${n} ${n === 1 ? 'action' : 'actions'} on everything`;
+		return `${plural(n, 'action')} on everything`;
 	}
 	const n = additionCount(role);
-	const additions = `${n} ${n === 1 ? 'addition' : 'additions'}`;
+	const additions = `${plural(n, 'addition')}`;
 	return role.extends ? `${BUILT_IN_LABEL[role.extends]} + ${additions}` : `${additions} on chosen nodes`;
 }
 
 export const roleSourceLabel: Record<RoleSource, string> = { built_in: 'Built-in', server_config: 'Server config', project: 'Project' };
 
-export const assignmentSourceLabel: Record<AssignmentSource, string> = { manual: 'Manual', sso: 'SSO group', policy: 'Server config', built_in: 'Default for everyone' };
+export const assignmentSourceLabel: Record<AssignmentSource, string> = { manual: 'Manual', sso: 'SSO group', policy: 'Server config', built_in: 'Default' };
 
 /** Chip text, e.g. `SSO group "analytics-eng"`. */
 export function sourceChip(a: Pick<RoleAssignment, 'source' | 'ssoGroup' | 'definedIn'>): string {
 	if (a.source === 'sso') return `SSO group “${a.ssoGroup}”`;
 	if (a.source === 'policy') return 'Server config';
-	if (a.source === 'built_in') return 'Default for everyone';
+	if (a.source === 'built_in') return 'Default';
 	return 'Manual';
 }
 

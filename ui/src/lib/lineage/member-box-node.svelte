@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import { to } from '$lib/paths';
@@ -25,7 +26,7 @@
 		<button class="toggle nodrag" title="Close {d.jobKey}" aria-expanded="true" onclick={() => d.ontoggle?.(d.jobKey)}>
 			<ChevronDownIcon size={14} class="chevron" />
 			<span class="name">{d.jobKey}</span>
-			{#if d.nodeCount !== null}<span class="faint">· {d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>{/if}
+			{#if d.nodeCount !== null}<span class="faint">· {plural(d.nodeCount, 'node')}</span>{/if}
 		</button>
 		{#if d.lastRun}
 			<span class="last" title="Last run: {runStatusLabel[d.lastRun.status]}">
