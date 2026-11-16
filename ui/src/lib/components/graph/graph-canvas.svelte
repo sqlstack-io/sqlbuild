@@ -7,7 +7,7 @@
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
 	import CountEdge from '$lib/lineage/count-edge.svelte';
-	import { READABLE_ZOOM, compactAt, titleScale } from '$lib/lineage/fit';
+	import { READABLE_ZOOM, compactLevel } from '$lib/lineage/fit';
 
 	// Every graph in the UI is drawn here, so they share one canvas: the same background, fit controls
 	// and readable fit (a large graph opens on its cards at a zoom where they read, never as dots), and
@@ -115,17 +115,17 @@
 		}
 		press = null;
 	}
-	// Semantic zoom: zoomed out past the point where titles would show under 11 px, cards show just their
-	// header, scaled back up by one variable on the canvas so the title stays readable; the other lines
-	// keep their space, hidden, so cards keep their size and edges don't move. Card controls grow with
-	// `--sb-unzoom` so they keep their size on screen.
-	const compact = $derived(compactAt(settledZoom));
-	// In 5% steps, rounded up so titles stay at 11 px or more, so a small change of zoom doesn't restyle every card.
-	const scale = $derived(Math.ceil(titleScale(settledZoom) * 20) / 20);
+	// Semantic zoom: zoomed out past the point where the cards' lines would no longer read, each card
+	// shows its compact form instead (CompactFace: its title filling the card, on its state's colour), by
+	// one class on the canvas; `far` swaps in the larger title fit for the furthest zooms. Cards keep
+	// their size, so edges don't move. Card controls grow with `--sb-unzoom` so they keep their size.
+	const level = $derived(compactLevel(settledZoom));
+	const compact = $derived(level !== 'full');
+	const far = $derived(level === 'far');
 	const controlScale = $derived(unzoom(settledZoom));
 </script>
 
-<div class="graph-canvas sb-flow" class:framed class:compact class:moving class:unfitted={!fitted && nodes.length > 0} style:--sb-title-scale={scale} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
+<div class="graph-canvas sb-flow" class:framed class:compact class:far class:moving class:unfitted={!fitted && nodes.length > 0} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
 	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
 		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
 		<!-- The dot grid lives in the viewport, so it moves and scales with the graph's layer. -->
@@ -159,19 +159,9 @@
 	.graph-canvas :global(.svelte-flow__controls-button svg) {
 		fill: var(--muted-foreground);
 	}
-	/* Compact cards: the header alone, scaled up over the hidden lines below it. */
-	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.head)) {
+	/* Compact cards: the card's lines keep their room, hidden, under its compact face. */
+	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) > * > :not(.cface)) {
 		visibility: hidden;
-	}
-	/* The header keeps its title and a folder's count; the rest gives its room to the title. The header
-	   stays one line, so the card keeps its size. */
-	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) .head :is(.kind, .open, .hit)) {
-		display: none;
-	}
-	.compact :global(:is(.svelte-flow__node-asset, .svelte-flow__node-folder, .svelte-flow__node-member) .head) {
-		width: calc(100% / var(--sb-title-scale));
-		transform: scale(var(--sb-title-scale));
-		transform-origin: top left;
 	}
 	.moving :global(.svelte-flow__viewport) {
 		will-change: transform;

@@ -119,17 +119,17 @@ async function checkLayout(page: Page, label: string) {
 		}
 		// Every graph has finished its first fit: an unfitted graph stays hidden.
 		if (document.querySelector('.graph-canvas.unfitted')) problems.push('a graph never fitted');
-		// A graph opens with its card titles readable: at least 11 px on screen. (A graph with the library's
-		// own controls is drawn whole at any zoom, as Lineage's very large graphs are.)
+		// A graph opens with its card titles readable: compact titles at least 11 px on screen, full cards
+		// only down to the compact zoom, 0.6, where their 12.5 px titles show at 7.5 px. (A graph with the
+		// library's own controls is drawn whole at any zoom, as Lineage's very large graphs are.)
 		for (const canvas of document.querySelectorAll<HTMLElement>('.graph-canvas:not(.unfitted)')) {
 			if (!canvas.querySelector('.fit-control')) continue;
 			const scale = /scale\(([\d.]+)\)/.exec(canvas.querySelector<HTMLElement>('.svelte-flow__viewport')?.style.transform ?? '');
-			const title = canvas.querySelector('.svelte-flow__node .name');
+			const compact = canvas.classList.contains('compact');
+			const title = [...canvas.querySelectorAll<HTMLElement>(compact ? '.svelte-flow__node .cface .ctitle' : '.svelte-flow__node .name')].find((t) => t.offsetParent !== null);
 			if (!scale || !title) continue;
-			// Zoomed out, cards show their header alone, scaled up by --sb-title-scale.
-			const counter = canvas.classList.contains('compact') ? Number(getComputedStyle(canvas).getPropertyValue('--sb-title-scale')) || 1 : 1;
-			const px = parseFloat(getComputedStyle(title).fontSize) * Number(scale[1]) * counter;
-			if (px < 10.95) problems.push(`card titles show at ${px.toFixed(1)} px`);
+			const px = parseFloat(getComputedStyle(title).fontSize) * Number(scale[1]);
+			if (px < (compact ? 10.95 : 7.45)) problems.push(`${compact ? 'compact' : 'card'} titles show at ${px.toFixed(1)} px`);
 		}
 		// Every scroll area has the themed scrollbar, not the browser's default.
 		for (const el of [document.documentElement, ...document.querySelectorAll<HTMLElement>('body *')]) {

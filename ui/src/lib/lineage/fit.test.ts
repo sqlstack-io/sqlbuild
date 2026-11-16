@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANCHOR_MARGIN, CARD_TITLE_PX, LABEL_MIN_ZOOM, compactAt, titleScale, MIN_TITLE_PX, READABLE_ZOOM, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
+import { ANCHOR_MARGIN, CARD_TITLE_PX, COMPACT_FAR_ZOOM, COMPACT_MIN_FONT, COMPACT_ZOOM, LABEL_MIN_ZOOM, MIN_TITLE_PX, READABLE_ZOOM, compactLevel, absolutePosition, anchoredViewport, firstCard, fitViewport, largestBox } from './fit';
 
 describe('fitting a graph to the view', () => {
 	it('centres a graph that fits, never closer than full size', () => {
@@ -116,13 +116,15 @@ describe('the card a large graph opens on', () => {
 });
 
 describe('semantic zoom', () => {
-	it('scales titles back up to 11 px when zoomed out, down to the lowest label zoom, and goes compact there', () => {
-		expect(titleScale(1)).toBe(1);
-		expect(titleScale(READABLE_ZOOM)).toBeCloseTo(1);
-		expect(CARD_TITLE_PX * 0.5 * titleScale(0.5)).toBeCloseTo(MIN_TITLE_PX);
-		expect(titleScale(0.1)).toBeCloseTo(titleScale(LABEL_MIN_ZOOM));
-		expect(compactAt(1)).toBe(false);
-		expect(compactAt(READABLE_ZOOM)).toBe(false);
-		expect(compactAt(0.6)).toBe(true);
+	it('draws cards in full down to the compact zoom, well below the readable fit zoom', () => {
+		expect(compactLevel(1)).toBe('full');
+		expect(compactLevel(READABLE_ZOOM - 0.01)).toBe('full');
+		expect(compactLevel(COMPACT_ZOOM)).toBe('full');
+		expect(compactLevel(COMPACT_ZOOM - 0.01)).toBe('near');
+		expect(compactLevel(COMPACT_FAR_ZOOM - 0.01)).toBe('far');
+	});
+	it("keeps a compact title's smallest font at 11 px on screen at each level's lowest zoom", () => {
+		expect(COMPACT_MIN_FONT.near * COMPACT_FAR_ZOOM).toBeCloseTo(MIN_TITLE_PX);
+		expect(COMPACT_MIN_FONT.far * LABEL_MIN_ZOOM).toBeCloseTo(MIN_TITLE_PX);
 	});
 });

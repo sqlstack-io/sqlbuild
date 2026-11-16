@@ -6,6 +6,8 @@ export type Viewport = { x: number; y: number; zoom: number };
 /** A card's title size on the canvas (`.name` in the node cards), and the smallest it may appear on screen. */
 export const CARD_TITLE_PX = 12.5;
 export const MIN_TITLE_PX = 11;
+/** Every card's width on the canvas. */
+export const CARD_WIDTH = 236;
 
 /** Space kept between the card a large graph's view starts on and the edge of the view. */
 export const ANCHOR_MARGIN = 24;
@@ -18,21 +20,27 @@ export const READABLE_ZOOM = MIN_TITLE_PX / CARD_TITLE_PX;
 
 /**
  * A graph of up to this many cards opens, and resets, showing all of it; only a larger one opens at
- * `READABLE_ZOOM` on its start card. Cards stay readable either way: below `READABLE_ZOOM` they show
- * just their header, counter-scaled (`titleScale`).
+ * `READABLE_ZOOM` on its start card. Zoomed out further, cards take their compact form (`compactLevel`).
  */
 export const WHOLE_FIT_CARDS = 150;
 
 /** The lowest zoom down to which titles are counter-scaled to `MIN_TITLE_PX`, and the lowest a whole-graph fit goes. */
 export const LABEL_MIN_ZOOM = 0.35;
 
-/** How much a card's header is scaled up at `zoom` so its title shows at `MIN_TITLE_PX`: 1 at a readable zoom. */
-export function titleScale(zoom: number): number {
-	return Math.max(1, MIN_TITLE_PX / (CARD_TITLE_PX * Math.max(zoom, LABEL_MIN_ZOOM)));
-}
+/**
+ * Below this zoom cards take their compact form: the whole card is its title on its state's colour,
+ * since the cards' detail lines (11 px) would show under about 7 px. Above it cards are drawn in full.
+ */
+export const COMPACT_ZOOM = 0.6;
+/** Below this zoom the compact title's smallest font grows, so it still reads down to `LABEL_MIN_ZOOM`. */
+export const COMPACT_FAR_ZOOM = 0.5;
+/** A compact title's smallest font, in the card's px, at each compact level: `MIN_TITLE_PX` on screen at its lowest zoom. */
+export const COMPACT_MIN_FONT = { near: MIN_TITLE_PX / COMPACT_FAR_ZOOM, far: MIN_TITLE_PX / LABEL_MIN_ZOOM };
 
-/** Whether cards show only their header at `zoom`: where their title would otherwise show under `MIN_TITLE_PX`. */
-export const compactAt = (zoom: number) => zoom < READABLE_ZOOM - 1e-9;
+/** How cards are drawn at `zoom`: in full, or compact with the near or far title fit. */
+export function compactLevel(zoom: number): 'full' | 'near' | 'far' {
+	return zoom >= COMPACT_ZOOM ? 'full' : zoom >= COMPACT_FAR_ZOOM ? 'near' : 'far';
+}
 
 type FitOptions = {
 	/** Share of the view left empty on each side. */
