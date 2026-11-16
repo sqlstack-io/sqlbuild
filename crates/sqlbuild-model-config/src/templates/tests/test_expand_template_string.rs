@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::time::{Duration, Instant};
 
 use crate::templates::errors::TemplateError;
 use crate::templates::main::expand_template_string::expand_template_string;
@@ -229,9 +230,20 @@ fn given_template_strings_when_expanding_then_values_and_reads_match_python() {
             expected_reads: &[],
         },
         TemplateTestCase {
-            description: "an unclosed template in a quoted argument stays text",
+            description: "an unclosed template in a quoted argument keeps the outer one from closing",
             text: "${coalesce('a${b')}",
-            expected: value(Value::Text("a${b".to_owned())),
+            expected: Err(TemplateFailure::Invalid(
+                TemplateError::UnterminatedString {
+                    quote: "single",
+                    position: 1,
+                },
+            )),
+            expected_reads: &[],
+        },
+        TemplateTestCase {
+            description: "templates nested more than eight deep do not close",
+            text: "${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${coalesce('${env}')}')}')}')}')}')}')}')}')}",
+            expected: text("${coalesce('prod')}"),
             expected_reads: &[],
         },
         TemplateTestCase {
@@ -279,6 +291,44 @@ fn given_template_strings_when_expanding_then_values_and_reads_match_python() {
             ),
             "{}",
             test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_malformed_nested_templates_when_expanding_then_time_stays_linear() {
+    let test_cases: [(&str, String); 3] = [
+        (
+            "an unclosed chain of nested templates with alternating quotes",
+            format!("${{'{}", "${\"${'".repeat(4_000)),
+        ),
+        (
+            "many unclosed templates that each open a quote",
+            "${'a ".repeat(20_000),
+        ),
+        (
+            "many sibling templates inside one quoted argument",
+            format!("${{coalesce('{}')}}", "${env}".repeat(20_000)),
+        ),
+    ];
+    for (description, text) in test_cases {
+        let host = TestHost {
+            variables: vec![("env", Value::Text("prod".to_owned()))],
+            environment: Vec::new(),
+            context: Vec::new(),
+            reads: RefCell::new(Vec::new()),
+        };
+        let options = TemplateOptions {
+            allow_context: true,
+            preserve_context_tokens: false,
+            preserve_unknown_context: true,
+        };
+        let started = Instant::now();
+        let _ = expand_template_string(&host, &text, options);
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed < Duration::from_secs(1),
+            "{description}: took {elapsed:?}"
         );
     }
 }

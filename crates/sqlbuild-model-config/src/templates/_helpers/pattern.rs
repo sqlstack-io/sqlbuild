@@ -2,12 +2,15 @@
 
 const TEMPLATE_OPEN: &str = "${";
 const ESCAPE: char = '\\';
+/// How deep templates may nest inside quoted arguments; a deeper one does not close.
+const MAX_NESTING: usize = 8;
 
 /// Return the byte spans of every template match, including the `${` and `}`.
 ///
 /// A template ends at the first `}` outside its quoted arguments, which may hold braces and whole
-/// templates. A body that never closes that way, such as one with an unbalanced quote, ends at its
-/// first brace as Python's `\$\{([^{}]+)\}` does, so a malformed body still reports its error.
+/// templates. A body that never closes that way, such as one with an unbalanced quote or an
+/// unclosed nested template, ends at its first brace as Python's `\$\{([^{}]+)\}` does, so a
+/// malformed body still reports its error.
 pub(crate) fn template_spans(text: &str) -> Vec<(usize, usize)> {
     let mut spans: Vec<(usize, usize)> = Vec::new();
     let mut index = 0;
@@ -29,8 +32,16 @@ pub(crate) fn template_spans(text: &str) -> Vec<(usize, usize)> {
 /// The byte length of the non-empty template body at the start of `body`, up to its closing `}`.
 ///
 /// Quoted arguments may hold braces and whole `${...}` templates, and a backslash inside them
-/// escapes the next character. A `{` outside them, or no closing `}`, gives `None`.
+/// escapes the next character. A `{` outside them, a nested template that does not close, or no
+/// closing `}` gives `None`. Each character is scanned once per nesting level.
 pub(crate) fn template_body_length(body: &str) -> Option<usize> {
+    nested_body_length(body, 0)
+}
+
+fn nested_body_length(body: &str, depth: usize) -> Option<usize> {
+    if depth > MAX_NESTING {
+        return None;
+    }
     let mut quote: Option<char> = None;
     let mut index = 0;
     while let Some(character) = body[index..].chars().next() {
@@ -42,9 +53,7 @@ pub(crate) fn template_body_length(body: &str) -> Option<usize> {
             Some(open) if character == open => quote = None,
             Some(_) if body[index..].starts_with(TEMPLATE_OPEN) => {
                 let nested = index + TEMPLATE_OPEN.len();
-                if let Some(length) = template_body_length(&body[nested..]) {
-                    next = nested + length + 1;
-                }
+                next = nested + nested_body_length(&body[nested..], depth + 1)? + 1;
             }
             Some(_) => {}
             None if is_quote(character) => quote = Some(character),

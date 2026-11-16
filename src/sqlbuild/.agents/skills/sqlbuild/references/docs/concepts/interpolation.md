@@ -131,12 +131,14 @@ which render into it as text, as in `'DEV_${ENV:WAREHOUSE_USER}'`.
 
 Details:
 
-- An argument is false when it is `null`, `false`, empty, `0` or `false` in any case.
+- An argument is false when it is `null`, empty or blank, `0`, or `false` in any letter case.
 - A missing variable makes its argument missing, so `coalesce` moves on to the next argument. When
   every argument is missing, SQLBuild reports the missing variable in the last one.
 - A backslash in a quoted string keeps the next character as written, so `'\${ENV:USER}'` is the
-  text `${ENV:USER}`.
-- A template inside a quoted string can use the same quotes as the string around it.
+  text `${ENV:USER}`. Inside a TOML or YAML double-quoted value, write the backslash twice:
+  `"${coalesce('\\${ENV:USER}')}"`.
+- A template inside a quoted string can use the same quotes as the string around it, and templates
+  nest up to eight levels deep.
 
 ## Context variables
 

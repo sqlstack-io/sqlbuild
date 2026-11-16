@@ -44,6 +44,15 @@ const ESCAPE: char = '\\';
 /// Split one template expression into tokens.
 pub(crate) fn tokenize(expression: &str) -> Result<Vec<Token>, TemplateFailure> {
     let characters: Vec<char> = expression.chars().collect();
+    let text = QuotedSource {
+        expression,
+        offsets: expression
+            .char_indices()
+            .map(|(offset, _)| offset)
+            .chain([expression.len()])
+            .collect(),
+        characters: &characters,
+    };
     let mut tokens: Vec<Token> = Vec::new();
     let mut index = 0;
     while let Some(&character) = characters.get(index) {
@@ -56,7 +65,7 @@ pub(crate) fn tokenize(expression: &str) -> Result<Vec<Token>, TemplateFailure> 
             });
             index += 1;
         } else if is_quote(character) {
-            let (kind, next) = quoted_text(&characters, index)?;
+            let (kind, next) = quoted_text(&text, index)?;
             tokens.push(Token {
                 kind,
                 position: index,
@@ -83,10 +92,11 @@ pub(crate) fn tokenize(expression: &str) -> Result<Vec<Token>, TemplateFailure> 
     Ok(tokens)
 }
 
-fn quoted_text(characters: &[char], start: usize) -> Result<(TokenKind, usize), TemplateFailure> {
+fn quoted_text(text: &QuotedSource, start: usize) -> Result<(TokenKind, usize), TemplateFailure> {
+    let characters: &[char] = text.characters;
     let quote = characters[start];
     let mut parts: Vec<TextPart> = Vec::new();
-    let mut text = String::new();
+    let mut literal = String::new();
     let mut index = start + 1;
     while let Some(&character) = characters.get(index) {
         if character == ESCAPE {
@@ -95,28 +105,28 @@ fn quoted_text(characters: &[char], start: usize) -> Result<(TokenKind, usize), 
                     TemplateError::UnterminatedEscape { position: index },
                 ));
             };
-            text.push(escaped);
+            literal.push(escaped);
             index += 2;
         } else if character == quote {
             let kind = if parts.is_empty() {
-                TokenKind::Text(text)
+                TokenKind::Text(literal)
             } else {
-                parts.push(TextPart::Text(text));
+                parts.push(TextPart::Text(literal));
                 TokenKind::Interpolated {
                     written: characters[start + 1..index].iter().collect(),
                     parts,
                 }
             };
             return Ok((kind, index + 1));
-        } else if let Some((body, length)) = nested_template(characters, index) {
-            parts.push(TextPart::Text(std::mem::take(&mut text)));
+        } else if let Some((body, length)) = nested_template(text, index) {
+            parts.push(TextPart::Text(std::mem::take(&mut literal)));
             parts.push(TextPart::Template {
                 expression: parse_expression(&body)?,
                 body,
             });
             index += length;
         } else {
-            text.push(character);
+            literal.push(character);
             index += 1;
         }
     }
@@ -129,14 +139,20 @@ fn quoted_text(characters: &[char], start: usize) -> Result<(TokenKind, usize), 
     ))
 }
 
-/// The body of a complete `${...}` template at `index`, and its length in characters.
-fn nested_template(characters: &[char], index: usize) -> Option<(String, usize)> {
+/// The body of a complete `${...}` template at character `index`, and its length in characters.
+fn nested_template(text: &QuotedSource, index: usize) -> Option<(String, usize)> {
+    let characters: &[char] = text.characters;
     if characters.get(index) != Some(&'$') || characters.get(index + 1) != Some(&'{') {
         return None;
     }
-    let rest: String = characters[index + 2..].iter().collect();
-    let length: usize = template_body_length(&rest)?;
-    let body: String = rest[..length].to_owned();
-    let count: usize = body.chars().count();
-    Some((body, count + 3))
+    let rest: &str = &text.expression[text.offsets[index + 2]..];
+    let body: &str = &rest[..template_body_length(rest)?];
+    Some((body.to_owned(), body.chars().count() + 3))
+}
+
+/// One expression as characters, with each character's byte offset and the length at the end.
+struct QuotedSource<'t> {
+    expression: &'t str,
+    offsets: Vec<usize>,
+    characters: &'t [char],
 }
