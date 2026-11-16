@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -14,6 +15,7 @@ use crate::python_rules::tests::test_types::{
 #[test]
 fn given_many_modules_and_dense_findings_when_evaluating_python_rules_then_finishes_within_budget()
 {
+    install_test_identity();
     let _serial = serial_timing();
     let test_cases = [PythonScalingTestCase {
         description: "default rules over 4000 modules and 40 hooks of 300 findings each",
@@ -44,6 +46,7 @@ fn given_many_modules_and_dense_findings_when_evaluating_python_rules_then_finis
 #[test]
 fn given_four_times_the_modules_when_finding_unreachable_definitions_then_time_grows_near_linearly()
 {
+    install_test_identity();
     let _serial = serial_timing();
     let test_cases = [PythonGrowthTestCase {
         description: "unreachable definitions walking every import, 500 against 2000 modules",
@@ -83,6 +86,7 @@ fn given_four_times_the_modules_when_finding_unreachable_definitions_then_time_g
 #[test]
 fn given_many_linked_node_units_when_evaluating_unit_rules_then_finishes_within_budget_and_grows_near_linearly()
  {
+    install_test_identity();
     let _serial = serial_timing();
     let test_cases = [UnitScalingTestCase {
         description: "default rules over a chain of 2000 units of node, main and checks, and 200 undescribed units",
@@ -131,6 +135,7 @@ fn given_many_linked_node_units_when_evaluating_unit_rules_then_finishes_within_
 #[test]
 fn given_many_roots_sharing_deep_call_chains_when_checking_compile_time_purity_then_finishes_within_budget()
  {
+    install_test_identity();
     let _serial = serial_timing();
     let test_cases = [PurityScalingTestCase {
         description: "5000 module-scope roots into 10 helper chains of 400 calls each",

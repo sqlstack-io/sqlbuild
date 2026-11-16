@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
@@ -167,6 +168,7 @@ const REVIEWED_SCOPES: &[(&str, RuleScope)] = &[
 
 #[test]
 fn given_built_in_catalogue_when_reading_rule_scopes_then_every_rule_matches_reviewed_scope() {
+    install_test_identity();
     let test_cases = [test_types::RuleScopeTestCase {
         description: "every built-in rule declares its reviewed scope",
         expected_scopes: REVIEWED_SCOPES,
@@ -199,6 +201,7 @@ fn given_built_in_catalogue_when_reading_rule_scopes_then_every_rule_matches_rev
 #[test]
 fn given_every_built_in_rule_when_evaluating_then_findings_stay_inside_declared_scopes()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::ScopedEvaluationTestCase {
         description: "model and project findings come from scoped phases",
         expected_codes: &["SQBRCONTRACT101", "SQBRGRAPH102", "SQBRTEST202"],
@@ -233,6 +236,7 @@ fn given_every_built_in_rule_when_evaluating_then_findings_stay_inside_declared_
 #[test]
 fn given_split_model_payloads_when_evaluating_then_response_matches_single_request()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         test_types::IncrementalRulesTestCase {
             description: "uncached split request",
@@ -314,6 +318,7 @@ fn given_malformed_split_request_when_evaluating_then_request_is_rejected() -> R
 #[test]
 fn given_cached_models_when_editing_one_model_then_only_it_reevaluates_with_uncached_findings()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::ModelCacheReuseTestCase {
         description: "one edited model misses while the others hit",
         expected_hits: 2,
@@ -356,6 +361,7 @@ fn given_cached_models_when_editing_one_model_then_only_it_reevaluates_with_unca
 #[test]
 fn given_suppression_change_when_evaluating_then_cached_models_are_reused_with_uncached_findings()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::ModelCacheReuseTestCase {
         description: "a scoped ignore does not invalidate model findings",
         expected_hits: 3,
@@ -402,6 +408,7 @@ fn given_suppression_change_when_evaluating_then_cached_models_are_reused_with_u
 #[test]
 fn given_removed_model_file_when_cache_is_rewritten_then_only_its_entry_is_dropped()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::CachePruningTestCase {
         description: "deleted model is pruned while an unselected model is kept",
         expected_paths: &[
@@ -443,6 +450,7 @@ fn given_removed_model_file_when_cache_is_rewritten_then_only_its_entry_is_dropp
 
 #[test]
 fn given_configured_cache_path_when_evaluating_then_only_that_file_is_used() -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::ConfiguredCachePathTestCase {
         description: "an engine-owned cache file replaces the default bulk cache",
         cache_file: "target/rules-cache-native-v1/bulk/native.json",
@@ -484,6 +492,7 @@ fn given_configured_cache_path_when_evaluating_then_only_that_file_is_used() -> 
 
 #[test]
 fn given_corrupt_model_cache_when_evaluating_then_every_model_reevaluates() -> Result<(), String> {
+    install_test_identity();
     let test_cases = [test_types::ModelCacheReuseTestCase {
         description: "a truncated cache file is a miss for every model",
         expected_hits: 0,
