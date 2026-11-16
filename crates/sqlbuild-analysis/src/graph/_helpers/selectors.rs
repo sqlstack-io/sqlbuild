@@ -5,7 +5,7 @@ use std::convert::Infallible;
 
 use crate::assembly::project::types::ObjectKey;
 use crate::graph::constants::{
-    EMPTY_SELECTOR_CODE, EMPTY_VALUE_CODE, EXPANSION_MARKER, FOLDER_SEPARATOR,
+    EMPTY_SELECTOR_CODE, EMPTY_VALUE_CODE, EXPANSION_MARKER, FOLDER_SEPARATOR, FUNCTION_KIND_ALIAS,
     INTERSECTION_SEPARATOR, JOB_KIND, KIND_SEPARATOR, MISPLACED_MARKER_CODE, MISSING_NAME_CODE,
     MODEL_RESOURCE, MODEL_ROOT, MODEL_ROOT_PREFIX, NAME_KIND, NODE_KIND_KIND, PATH_KIND,
     PATH_ROOT_CODE, PATH_ROOT_ERROR, PATH_SELECTOR_CODE, PATH_SEPARATOR, PATTERN_CHARACTERS,
@@ -400,7 +400,7 @@ fn of_kind(graph: &ProjectGraph, value: &str) -> Resolved {
     let keys: Keys = graph
         .names
         .iter()
-        .filter(|(_, key)| key.0 == value)
+        .filter(|(_, key)| key.0 == value || (value == FUNCTION_KIND_ALIAS && is_function(key)))
         .map(|(_, key)| key.clone())
         .collect();
     if keys.is_empty() {

@@ -11,7 +11,10 @@ use sqlbuild_orchestration::runs::models::{
 
 use crate::adhoc::_helpers::planner::resolve_with_tests;
 use crate::adhoc::_helpers::publication::{IndexedPublication, is_sql_test, name_of};
-use crate::adhoc::constants::{BUILD_VERB, PROJECT_FOLDER, SUGGESTION_CUTOFF, SUGGESTION_LIMIT};
+use crate::adhoc::constants::{
+    BUILD_VERB, FUNCTION_KIND_ALIAS, FUNCTION_KINDS, PROJECT_FOLDER, SUGGESTION_CUTOFF,
+    SUGGESTION_LIMIT,
+};
 use crate::adhoc::models::Refusal;
 
 /// The sorted keys `sqb build --select <select> --exclude <exclude>` selects, or why and where it refuses them.
@@ -52,6 +55,13 @@ pub(crate) fn vocabulary(publication: &IndexedPublication) -> SelectionVocabular
         for folder in resource.folder.iter().flat_map(|folder| folders(folder)) {
             *paths.entry(folder).or_default() += 1;
         }
+    }
+    let functions: u64 = FUNCTION_KINDS
+        .iter()
+        .filter_map(|kind| kinds.get(*kind))
+        .sum();
+    if functions > 0 {
+        kinds.insert(FUNCTION_KIND_ALIAS.to_owned(), functions);
     }
     let jobs: BTreeMap<String, u64> = publication
         .jobs

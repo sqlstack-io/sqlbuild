@@ -1,7 +1,7 @@
 use crate::graph::main::parse_selector::parse_selector;
 use crate::graph::tests::helpers::{
-    DIAMOND_PROJECT, FOLDER_PROJECT, TABLE_FUNCTION_PROJECT, failure, kind, names, path,
-    resolved_names,
+    DIAMOND_PROJECT, FOLDER_PROJECT, FUNCTIONS_PROJECT, TABLE_FUNCTION_PROJECT, failure, kind,
+    names, path, resolved_names,
 };
 use crate::graph::tests::test_types::{
     ParseSelectorErrorTestCase, ParseSelectorTestCase, ProjectSelectorErrorTestCase,
@@ -212,6 +212,20 @@ fn given_selectors_when_resolving_then_selects_expected_names() {
             select: &["kind:source"],
             exclude: &[],
             expected_names: &["raw_customers", "raw_orders"],
+        },
+        SelectedNamesTestCase {
+            description: "kind:function selects scalar and table functions alike",
+            project: FUNCTIONS_PROJECT,
+            select: &["kind:function"],
+            exclude: &[],
+            expected_names: &["customer_orders", "tax"],
+        },
+        SelectedNamesTestCase {
+            description: "the precise function kinds still select one kind each",
+            project: FUNCTIONS_PROJECT,
+            select: &["kind:udf"],
+            exclude: &[],
+            expected_names: &["tax"],
         },
         SelectedNamesTestCase {
             description: "+ expands its own comma part before the kind narrows it",

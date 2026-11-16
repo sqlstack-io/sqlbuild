@@ -181,3 +181,7 @@ pub(crate) const SUGGESTION_CUTOFF: f64 = 0.6;
 
 /// The folder of a node at the project root, which no `path:` selector names.
 pub(crate) const PROJECT_FOLDER: &str = ".";
+
+/// `kind:function` selects both function kinds; the vocabulary lists it with their combined count.
+pub(crate) const FUNCTION_KIND_ALIAS: &str = "function";
+pub(crate) const FUNCTION_KINDS: [&str; 2] = ["udf", "table_fn"];
