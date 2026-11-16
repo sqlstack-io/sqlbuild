@@ -12,7 +12,11 @@
 	// folder opens on Lineage, and "Open job" goes to the job's own page.
 	let { data, selected }: NodeProps = $props();
 	const d = $derived(data as MemberCardData);
-	const tone = $derived(d.lastRun ? runStatusTone[d.lastRun.status] : 'var(--sb-text-faint)');
+	// Before the first run the dot says whether the member needs building, in Lineage's purple.
+	const tone = $derived(d.lastRun ? runStatusTone[d.lastRun.status] : d.needs.changed ? 'var(--sb-stale)' : d.needs.behind ? 'var(--sb-behind)' : 'var(--sb-text-faint)');
+	const needsTitle = $derived(
+		[d.needs.changed && `${d.needs.changed} changed since their last build`, d.needs.behind && `${d.needs.behind} behind an upstream rebuild`].filter(Boolean).join(', ')
+	);
 	const when = $derived(d.lastRun?.startedAt ? formatAgo(d.lastRun.startedAt, app.now) : '');
 </script>
 
@@ -27,6 +31,12 @@
 		{#if d.expandable}<ChevronRightIcon size={12} class="glyph" />{/if}
 		{#if d.nodeCount !== null}<span>{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>{/if}
 		{#if d.waitsFor}<span class="waits">waits for {d.waitsFor}</span>{/if}
+		{#if d.needs.changed || d.needs.behind}
+			<span class="needs" title="Needs building: {needsTitle}">
+				{#if d.needs.changed}<span class="changed">{d.needs.changed} changed</span>{/if}
+				{#if d.needs.behind}<span class="behind">{d.needs.changed ? '+' : ''}{d.needs.behind} behind</span>{/if}
+			</span>
+		{/if}
 	</div>
 	<div class="status" style:--tone={tone}>
 		<i></i>
@@ -104,6 +114,19 @@
 		flex: 0 0 auto;
 		margin-left: -2px;
 		color: var(--muted-foreground);
+	}
+	.needs {
+		display: inline-flex;
+		gap: 5px;
+		margin-left: auto;
+		font-weight: 500;
+	}
+	.changed {
+		color: var(--sb-stale);
+	}
+	.behind {
+		color: var(--sb-behind);
+		font-weight: 400;
 	}
 	.waits::before {
 		content: '·';
