@@ -54,7 +54,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
                     "    def record(self, value):\n"
                     "        with Path(os.environ['SQLBUILD_SENSOR_CALLS']).open('a') as out:\n"
                     "            out.write(json.dumps(value | {'pid': os.getpid()}) + '\\n')\n"
-                    "    def setup(self, ctx):\n        self.record({'phase': 'setup'})\n"
+                    "    def setup(self, ctx):\n"
+                    "        target = None if ctx is None else ctx.target_config\n"
+                    "        self.record({'phase': 'setup', 'target_config': target and [target.name, target.schema]})\n"
                     "    def teardown(self):\n        self.record({'phase': 'teardown'})\n"
                     "    def poll(self, ctx):\n"
                     "        mode = json.loads(Path(os.environ['SQLBUILD_FULFILLMENT_DATA']).read_text())['mode']\n"
@@ -180,6 +182,10 @@ def test_given_a_custom_polling_sensor_when_a_callback_fails_or_times_out_then_a
             assert skipped["outcome"]["cursor"]["custom"] == "orders/page-1"
             evaluated: list[dict[str, Any]] = sensor_calls(calls, {"phase": "evaluate"})
             assert {record["target"] for record in evaluated} == {"development"}
+            # The provider is set up with the settings of the target the sensor evaluates for.
+            assert [
+                record["target_config"] for record in sensor_calls(calls, {"phase": "setup"})
+            ][: len(evaluated)] == [["development", "main"]] * len(evaluated)
             assert len({record["pid"] for record in evaluated}) == len(evaluated)
             assert {
                 record["cursor"]

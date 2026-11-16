@@ -11,6 +11,7 @@ use sqlbuild_orchestration::sensors::models::{
     CustomSensorOutcome, SensorCondition, SensorEvaluationRequest,
 };
 
+use crate::bindings::_helpers::compile_driver::targets::project_setup_context;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -78,24 +79,40 @@ pub(crate) fn evaluate_sensor(
         SecretPolicy::Defer.name(),
     )?;
     let by_name = provider_by_name(&providers)?;
+    let mut usages: Vec<Bound<'_, PyAny>> = Vec::new();
+    for usage in provider_usages(&function, &by_name)?.try_iter()? {
+        let usage = usage?;
+        if usage.getattr("parameter_name")?.extract::<String>()? != SENSOR_CONTEXT_PARAMETER {
+            usages.push(usage);
+        }
+    }
+    let setup_context = if usages.is_empty() {
+        py.None().into_bound(py)
+    } else {
+        project_setup_context(
+            &imported(py, "pathlib", "Path")?.call1((project_dir,))?,
+            (
+                &evaluation.target.as_str().into_pyobject(py)?.into_any(),
+                &py.None().into_bound(py),
+            ),
+        )?
+    };
     let session = call_with(
         &entry(py, UserCodeHost::BuildProviderSession)?,
         &[
             ("discovered_providers", providers),
+            ("setup_context", setup_context),
             ("allow_shared", PyBool::new(py, false).to_owned().into_any()),
         ],
     )?;
     within(&session, |_| {
         let arguments = PyDict::new(py);
         arguments.set_item("ctx", &context)?;
-        for usage in provider_usages(&function, &by_name)?.try_iter()? {
-            let usage = usage?;
-            if usage.getattr("parameter_name")?.extract::<String>()? != SENSOR_CONTEXT_PARAMETER {
-                arguments.set_item(
-                    usage.getattr("parameter_name")?,
-                    session.call_method1("get", (usage.getattr("provider_name")?,))?,
-                )?;
-            }
+        for usage in &usages {
+            arguments.set_item(
+                usage.getattr("parameter_name")?,
+                session.call_method1("get", (usage.getattr("provider_name")?,))?,
+            )?;
         }
         let result = function.call((), Some(&arguments))?;
         if result.is_instance(&authoring.getattr("SkipReason")?)? {

@@ -1642,6 +1642,7 @@ class PythonTargetConfigBuildE2ETestCase:
     project_target_lines: str
     local_target_lines: str
     expected_settings: dict[str, object]
+    lifecycle_sink: bool = False
 
 
 @dataclass(frozen=True)

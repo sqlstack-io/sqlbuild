@@ -15,6 +15,7 @@ use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
+use crate::bindings::_helpers::compile_driver::targets::project_setup_context;
 use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::result_output::terminal_index::TerminalEventIndex;
@@ -407,13 +408,30 @@ impl Observed {
                 )
                 .map(pyo3::Bound::into_any)?;
                 self.exporter_scope = Some(scope.clone().unbind());
+                let providers: Bound<'_, PyAny> = native_field(&extensions, "providers")?;
+                let setup_context: Bound<'_, PyAny> = if providers.is_truthy()? {
+                    project_setup_context(
+                        project_dir,
+                        (
+                            &args
+                                .getattr("target")
+                                .unwrap_or_else(|_| py.None().into_bound(py)),
+                            &args
+                                .getattr("vars")
+                                .unwrap_or_else(|_| py.None().into_bound(py)),
+                        ),
+                    )?
+                } else {
+                    py.None().into_bound(py)
+                };
                 call_with(
                     &native_field(&scope, "configure_extensions")?,
                     &[
                         ("project_dir", project_dir.clone()),
-                        ("providers", native_field(&extensions, "providers")?),
+                        ("providers", providers),
                         ("event_exporters", event_exporters),
                         ("command_output_sinks", sinks),
+                        ("setup_context", setup_context),
                     ],
                 )?;
                 self.unsubscribe_exporters =

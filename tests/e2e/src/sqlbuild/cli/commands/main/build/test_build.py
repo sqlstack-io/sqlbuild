@@ -1836,6 +1836,20 @@ def test_given_loader_status_result_when_building_then_persists_loader_status_ro
             },
         ),
         PythonTargetConfigBuildE2ETestCase(
+            description="a lifecycle sink shares the provider and its target",
+            project_target_lines='schema = "dev"\nloader_schema = "raw_dev"\n',
+            local_target_lines='schema = "dev_local"\nloader_schema = "raw_local"\n',
+            expected_settings={
+                "name": "dev",
+                "database": None,
+                "schema": "dev_local",
+                "loader_schema": "raw_local",
+                "database_preserved": False,
+                "schema_preserved": False,
+            },
+            lifecycle_sink=True,
+        ),
+        PythonTargetConfigBuildE2ETestCase(
             description="loader_schema falls back to the target schema",
             project_target_lines='schema = "dev"\n',
             local_target_lines='schema = "dev_local"\n',
@@ -1921,6 +1935,16 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
     (project_dir / "sqlbuild_local.toml").write_text(
         "[targets.dev]\n" + test_case.local_target_lines, encoding="utf-8"
     )
+    if test_case.lifecycle_sink:
+        (project_dir / "sinks").mkdir()
+        (project_dir / "sinks" / "events.py").write_text(
+            "from providers.target_probe import TargetProbe\n"
+            "from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink\n\n"
+            "@lifecycle_event_sink\n"
+            "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
+            "    del event, target_probe\n",
+            encoding="utf-8",
+        )
 
     results: list[subprocess.CompletedProcess[str]] = [
         run_sqb(command=("--no-color", *command), project_dir=project_dir)
