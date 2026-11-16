@@ -93,8 +93,9 @@ const EMBEDDING_FUNCTIONS: [&str; 5] = [
 ];
 
 /// Conversions whose result is their first argument whole, in another type.
-const CONVERSION_FUNCTIONS: [&str; 5] = [
+const CONVERSION_FUNCTIONS: [&str; 6] = [
     "to_json",
+    "to_char",
     "to_variant",
     "to_object",
     "to_array",

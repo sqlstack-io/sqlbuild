@@ -390,7 +390,7 @@ fn given_dialect_sql_when_reading_query_facts_then_findings_match_the_authored_s
             description: "the parent serialized to JSON text is still a whole copy",
             dialect: "snowflake",
             query_sql: concat!(
-                "SELECT TO_JSON(o.value) AS line_text, TO_VARCHAR(OBJECT_DELETE(o.value, 'lines')) AS trimmed\n",
+                "SELECT TO_JSON(o.value) AS line_text, TO_CHAR(OBJECT_DELETE(o.value, 'lines')) AS trimmed\n",
                 orders_flattened!()
             ),
             select: FLATTEN_RULE,

@@ -39,8 +39,9 @@ error[SQBRPERFORMANCE101]: line_json copies o.value whole onto every row flatten
 ```
 
 The parent also counts as copied through a cast, a conversion such as `TO_JSON` or `TO_VARIANT`,
-or a constructor that embeds it: `OBJECT_CONSTRUCT`, `OBJECT_INSERT` or `ARRAY_CONSTRUCT`. Paths into it, such as `o.value:sku`, and other functions of it, such
-as `MD5(TO_VARCHAR(o.value))`, are not copies.
+or a constructor that embeds it: `OBJECT_CONSTRUCT`, `OBJECT_INSERT` or `ARRAY_CONSTRUCT`. Paths
+into it, such as `o.value:sku`, and other functions of it, such as `MD5(TO_VARCHAR(o.value))`, are
+not copies.
 
 Read the fields you need from the parent, such as `o.value:sku::string`, or remove the child array
 before copying the rest:
@@ -85,7 +86,7 @@ The Rule compares the unique keys SQLBuild knows from each relation's declaratio
 | An incremental model with `unique_key` and the `merge` strategy | The `unique_key` columns |
 | A seed whose file holds at most one data row | No columns |
 
-A model with another declared key that the input's key covers is not reported: that key already
+A model with another declared key that one of the input's keys covers is not reported: that key already
 proves one row per input row. An incremental model with `unique_key [order_id, order_date]` and a
 unique, not-null `order_id` column has one row per order.
 

@@ -73,6 +73,19 @@ fn given_grain_facts_when_evaluating_json_finer_grain_then_only_coarser_inputs_a
             expected_faults: &[],
         },
         JsonGrainTestCase {
+            description: "an input with two keys is not coarser when either covers a model key",
+            dialect: "snowflake",
+            name: "order_payload_dated",
+            select: RULE,
+            query_sql: LINES_SQL,
+            json_grain: json!({
+                "model_keys": [["order_number", "order_date"], ["order_id"]],
+                "columns": [{"name": "payload", "data_type": "VARIANT", "inputs": ["ref:orders"]}],
+                "input_keys": {"ref:orders": [["order_id"], ["order_number"]]},
+            }),
+            expected_faults: &[],
+        },
+        JsonGrainTestCase {
             description: "an input keyed by another column is not coarser",
             dialect: "snowflake",
             name: "order_lines_enriched",

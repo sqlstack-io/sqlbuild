@@ -45,22 +45,23 @@ pub(crate) fn evaluate(
 
 /// An input of `column` whose key is a strict subset of one of the model's keys.
 ///
-/// An input key that already covers another model key does not count: that model key proves
-/// the model has one row per input row.
+/// An input with any key that covers a model key does not count: that model key proves the
+/// model has one row per input row.
 fn coarser_input<'a>(
     column: &'a GrainColumn,
     grain: &'a JsonGrain,
 ) -> Option<(&'a str, &'a [String], &'a [String])> {
     column.inputs.iter().find_map(|input| {
         let keys = grain.input_keys.get(input)?;
-        keys.iter().find_map(|input_key| {
-            if grain
+        if keys.iter().any(|input_key| {
+            grain
                 .model_keys
                 .iter()
                 .any(|model_key| subset(model_key, input_key))
-            {
-                return None;
-            }
+        }) {
+            return None;
+        }
+        keys.iter().find_map(|input_key| {
             grain
                 .model_keys
                 .iter()
