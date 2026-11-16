@@ -22,7 +22,7 @@ use crate::bindings::_helpers::freshness::observation::{
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
 use crate::bindings::_helpers::freshness::support::text;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::synced_copy::{
+use crate::bindings::_helpers::native_host::preview_state::{
     PREVIEW_MESSAGE, WarehouseAccessRefusedError,
 };
 use crate::bindings::_helpers::planner_scope::retained::scope_data;

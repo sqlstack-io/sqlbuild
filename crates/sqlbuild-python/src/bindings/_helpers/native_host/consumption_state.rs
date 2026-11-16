@@ -23,7 +23,7 @@ use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
-use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
+use crate::bindings::_helpers::native_host::preview_state::{PreviewConnection, preview_of};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
 
@@ -435,6 +435,8 @@ pub(crate) struct ConsumptionConnection {
     adapter: Py<PyAny>,
     connection_config: Py<PyAny>,
     connection: Mutex<Option<Py<PyAny>>>,
+    /// Set for a plan preview, which reads consumption history from the synced state.
+    preview: Option<Py<PreviewConnection>>,
 }
 
 impl ConsumptionConnection {
@@ -443,6 +445,21 @@ impl ConsumptionConnection {
             adapter: adapter.clone().unbind(),
             connection_config: connection_config.clone().unbind(),
             connection: Mutex::new(None),
+            preview: None,
+        }
+    }
+
+    /// Consumption I/O of a plan through `connection`: a preview's synced state, or the warehouse.
+    pub(crate) fn planned_through(
+        adapter: &Bound<'_, PyAny>,
+        connection_config: &Bound<'_, PyAny>,
+        connection: Option<&Bound<'_, PyAny>>,
+    ) -> Self {
+        Self {
+            preview: connection
+                .and_then(preview_of)
+                .map(|preview| preview.unbind()),
+            ..Self::new(adapter, connection_config)
         }
     }
 
@@ -469,9 +486,9 @@ impl ConsumptionConnection {
         py: Python<'_>,
         location: &Location,
     ) -> PyResult<Vec<ConsumptionRow>> {
-        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
+        if let Some(preview) = &self.preview {
             return Ok(recent_executions(
-                &copy
+                &preview
                     .get()
                     .consumption((location.database.as_deref(), &location.schema)),
                 RECENT_EXECUTIONS,
@@ -486,8 +503,8 @@ impl ConsumptionConnection {
         location: &Location,
         execution_ids: &[&str],
     ) -> PyResult<Vec<ConsumptionRow>> {
-        if let Ok(copy) = self.adapter.bind(py).downcast::<SyncedCopyAdapter>() {
-            let mut rows: Vec<ConsumptionRow> = copy
+        if let Some(preview) = &self.preview {
+            let mut rows: Vec<ConsumptionRow> = preview
                 .get()
                 .consumption((location.database.as_deref(), &location.schema));
             rows.retain(|row| execution_ids.contains(&row.row.execution_id.as_str()));

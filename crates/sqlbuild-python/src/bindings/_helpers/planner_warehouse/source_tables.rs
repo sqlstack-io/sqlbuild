@@ -6,7 +6,7 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::discovery::locations::yaml_entry_line;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
+use crate::bindings::_helpers::native_host::preview_state::preview_of;
 use crate::bindings::_helpers::planner_phases::objects::{planner_error, tuple};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::{
@@ -121,7 +121,7 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
         sorted.sort();
         unlisted.push((source, entry, sorted));
     }
-    if unlisted.is_empty() || adapter.is_instance_of::<SyncedCopyAdapter>() {
+    if unlisted.is_empty() || preview_of(connection).is_some() {
         return Ok(());
     }
     let probe = native_field(adapter, "probe_relation_read")?;

@@ -8,7 +8,7 @@ use crate::bindings::_helpers::freshness::planning::{
     build_direct_source_freshness_planning_result, build_direct_source_freshness_propagation_result,
 };
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::synced_copy::{PREVIEW_MESSAGE, SyncedCopyAdapter};
+use crate::bindings::_helpers::native_host::preview_state::{PREVIEW_MESSAGE, preview_of};
 use crate::bindings::_helpers::planner_phases::objects::{native, replace, text, tuple};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_SCOPE;
@@ -145,7 +145,7 @@ pub(crate) fn build_planner_source_freshness_result<'py>(
             lowered_state.insert(schema?.extract()?);
         }
     }
-    let synced_copy = adapter.is_instance_of::<SyncedCopyAdapter>();
+    let synced_copy = preview_of(connection).is_some();
     let exists = PyDict::new(py);
     for schema in &schemas {
         exists.set_item(

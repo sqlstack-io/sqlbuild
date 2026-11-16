@@ -29,7 +29,7 @@ def write_observation_project(
     (crate / "src/lib.rs").write_text("mod observations;\nmod planner;\n")
     (crate / "src/observations/mod.rs").write_text(
         "pub fn table() -> &'static str { OBSERVATIONS_TABLE_NAME }\n"
-        "pub struct SyncedCopyAdapter;\n"
+        "pub struct PreviewConnection;\n"
     )
     (crate / "src/planner.rs").write_text(planner)
     entries: str = ", ".join(f'"{path}=Writes observations."' for path in allowed)

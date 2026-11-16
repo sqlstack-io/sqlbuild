@@ -13,6 +13,8 @@ use crate::bindings::_helpers::freshness::support::{
     text,
 };
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::preview_state::{preview_of, refused};
+use crate::bindings::_helpers::planner_warehouse::state_reads::preview_freshness_metadata;
 use crate::bindings::_helpers::records::constants::{DATA_VERSION_FIELD, OBSERVED_AT_FIELD};
 use crate::bindings::_helpers::records::construct::{
     enum_from_value, enum_member, new_record, new_record_with,
@@ -243,6 +245,9 @@ fn single_data_version<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = source_name.py();
     let name: String = source_name.str()?.extract()?;
+    if preview_of(&observer.connection).is_some() {
+        return Err(refused(&format!("freshness query of source {name}")));
+    }
     let result: Bound<'py, PyAny> = match call_with(
         &native_field(&observer.adapter, "query")?,
         &[
@@ -475,13 +480,18 @@ fn observe_adapter_batch_inner<'py>(
     for request in requests.values() {
         unique.set_item(request, py.None())?;
     }
-    let metadata_by_request: Bound<'py, PyAny> = call_with(
-        &native_field(&observer.adapter, "get_tables_freshness_metadata")?,
-        &[
-            ("connection", observer.connection.clone()),
-            ("requests", PyTuple::new(py, unique.keys())?.into_any()),
-        ],
-    )?;
+    let unique_requests: Bound<'py, PyAny> = PyTuple::new(py, unique.keys())?.into_any();
+    let metadata_by_request: Bound<'py, PyAny> = if preview_of(&observer.connection).is_some() {
+        preview_freshness_metadata(py, &unique_requests)?.into_any()
+    } else {
+        call_with(
+            &native_field(&observer.adapter, "get_tables_freshness_metadata")?,
+            &[
+                ("connection", observer.connection.clone()),
+                ("requests", unique_requests),
+            ],
+        )?
+    };
     let metadata_class: Bound<'py, PyAny> = host::entry(py, AdapterHost::TableFreshnessMetadata)?;
     let observations: Bound<'py, PyDict> = PyDict::new(py);
     for (name, request) in requests.iter() {

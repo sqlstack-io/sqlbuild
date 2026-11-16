@@ -8,7 +8,7 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, typed_values};
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
+use crate::bindings::_helpers::native_host::preview_state::preview_of;
 use crate::bindings::_helpers::planner_phases::constants::{
     BIGQUERY_ADAPTER, DECREASE_WARNING, DOWNGRADE_HISTORY_DAYS, PERMANENT_TABLE_TYPE,
     RETENTION_DECREASE, RETENTION_INCREASE, RETENTION_MATCH, SNOWFLAKE_ADAPTER,
@@ -114,11 +114,11 @@ pub(crate) fn plan_table_types<'py>(
     if !snowflake {
         return tuple(py, Vec::new());
     }
-    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
-    if let Ok(facade) = adapter.downcast::<SyncedCopyAdapter>() {
-        facade.get().mark_unknown("table types".to_owned());
+    if let Some(preview) = preview_of(&runtime_field(runtime, |runtime| &runtime.connection)?) {
+        preview.get().mark_unknown("table types".to_owned());
         return tuple(py, Vec::new());
     }
+    let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
     let target = effective_target_config(runtime)?;
     let relations = native_field(&native_field(warehouse, "snapshot")?, "existing_relations")?;
     let materialization = record_class(py, RecordId::MaterializationType)?;
@@ -606,7 +606,7 @@ pub(crate) fn plan_retention<'py>(
         }
     }
     if models.is_empty()
-        || runtime_field(runtime, |runtime| &runtime.adapter)?.is_instance_of::<SyncedCopyAdapter>()
+        || preview_of(&runtime_field(runtime, |runtime| &runtime.connection)?).is_some()
     {
         return tuple(py, Vec::new());
     }

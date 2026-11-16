@@ -54,15 +54,16 @@ pub(crate) fn run_compile_pipeline<'py>(
             &arguments.value("adapter")?,
         ),
         (&arguments.value("options")?, arguments.value("hooks")?),
-        None,
+        (None, None),
     )
 }
 
-/// Compile unless `held` is a `CompiledProjectPhaseResult`, gate on rules unless they ran at load, and plan.
+/// Compile unless `held` is a `CompiledProjectPhaseResult`, gate on rules unless they ran at load, and
+/// plan; a `planned_through` connection, such as a preview's synced state, is used instead of connecting.
 pub(crate) fn planned_project<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
-    held: Option<&Bound<'py, PyAny>>,
+    (held, planned_through): (Option<&Bound<'py, PyAny>>, Option<&Bound<'py, PyAny>>),
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
     let options: Bound<'py, PyAny> = apply_unit_test_selectors(options, discovered)?;
@@ -107,7 +108,11 @@ pub(crate) fn planned_project<'py>(
             (&project, &graph),
         )?;
     }
-    planned((discovered, adapter), (&options, &hooks), &compiled)
+    planned(
+        (discovered, adapter),
+        (&options, &hooks),
+        (&compiled, planned_through),
+    )
 }
 
 /// The failing findings' `RulesResult`, their rendered text and the default-rules notice.
@@ -244,19 +249,31 @@ pub(crate) fn configured_rule_failures<'py>(
 fn planned<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    compiled: &Bound<'py, PyAny>,
+    (compiled, planned_through): (&Bound<'py, PyAny>, Option<&Bound<'py, PyAny>>),
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
     let tracker: Bound<'py, PyAny> = timing_tracker(py)?;
     let started: f64 = monotonic(py)?;
     let mut connection: Option<Bound<'py, PyAny>> = None;
     let result: PyResult<Bound<'py, PyAny>> = (|| {
-        let opened: Bound<'py, PyAny> = connection_with_hooks(
-            adapter,
-            &native_field(compiled, "connection_config")?,
-            hooks,
-        )?;
-        connection = Some(opened.clone());
+        let opened: Bound<'py, PyAny> = match planned_through {
+            Some(through) => {
+                let on_start: Bound<'py, PyAny> = native_field(hooks, "on_connection_start")?;
+                if !on_start.is_none() {
+                    on_start.call1((1,))?;
+                }
+                through.clone()
+            }
+            None => {
+                let opened: Bound<'py, PyAny> = connection_with_hooks(
+                    adapter,
+                    &native_field(compiled, "connection_config")?,
+                    hooks,
+                )?;
+                connection = Some(opened.clone());
+                opened
+            }
+        };
         pipeline_result(
             &PlanningInputs {
                 discovered_inputs: discovered,

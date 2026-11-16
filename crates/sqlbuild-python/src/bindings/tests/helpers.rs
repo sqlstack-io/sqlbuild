@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use sqlbuild_analysis::assembly::analysis_session::models::DynamicFamily;
 use sqlbuild_cache::project_reuse::types::ImageSections;
 use sqlbuild_config::models::ConfigValue;
-use sqlbuild_orchestration::warehouse_metadata::models::WarehouseCatalogRecord;
 
 use crate::bindings::_helpers::change_selection::base_cache::cache_key_with;
 use sqlbuild_rules::models::{EvaluateRequest, RetainedRows};
@@ -312,19 +311,4 @@ pub(super) fn cache_key_under(project: &Path, values: &[(&str, &str)]) -> String
             .map(|(_, value)| (*value).to_owned())
     };
     cache_key_with(project, (None, "{}", ""), &lookup).expect("the project reads")
-}
-
-/// A copied table with no columns in `schema` of `database`.
-pub(crate) fn catalog_record(
-    database: Option<&str>,
-    schema: &str,
-    name: &str,
-) -> WarehouseCatalogRecord {
-    WarehouseCatalogRecord {
-        state_database: database.map(str::to_owned),
-        state_schema: schema.to_owned(),
-        name: name.to_owned(),
-        relation_type: "TABLE".to_owned(),
-        columns: Vec::new(),
-    }
 }

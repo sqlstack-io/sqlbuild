@@ -351,12 +351,16 @@ pub(crate) fn prepare<'py>(
 /// What `plan --changed` previews: what a build would run now, read without recording anything.
 pub(crate) fn preview_changed(
     (plan, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    (adapter, connection_config): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    (adapter, connection_config, connection): (
+        &Bound<'_, PyAny>,
+        &Bound<'_, PyAny>,
+        Option<&Bound<'_, PyAny>>,
+    ),
     (policy, full_refresh): (&ChangedPolicy, bool),
 ) -> PyResult<(ChangedDecision, Vec<String>)> {
     let py: Python<'_> = plan.py();
     let facts: BuildFacts = build_facts((plan, project), (true, full_refresh))?;
-    let connection = ConsumptionConnection::new(adapter, connection_config);
+    let connection = ConsumptionConnection::planned_through(adapter, connection_config, connection);
     let (history, warnings): (ConsumptionHistory, Vec<String>) =
         read_history(py, &connection, (&facts, Some(policy)));
     connection.close(py)?;

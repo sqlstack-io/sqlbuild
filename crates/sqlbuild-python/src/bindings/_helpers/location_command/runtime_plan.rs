@@ -1,10 +1,17 @@
-//! A location's plan previews run in its runtime interpreter from the project it last published.
+//! A location's plan previews run in its runtime interpreter from the project it last published, over
+//! the synced warehouse state it holds until the server's mirror version changes.
+
+use std::sync::{Arc, Mutex, PoisonError};
 
 use pyo3::PyErr;
 use pyo3::exceptions::{PyBaseException, PyException, PyValueError};
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyString;
 use serde_json::{Value, json};
+use sqlbuild_orchestration::warehouse_metadata::main::location_reads::preview_state_parts::preview_state_parts;
+use sqlbuild_orchestration::warehouse_metadata::models::PreviewCopy;
+use sqlbuild_state::warehouse_state::main::warehouse_state::warehouse_state;
+use sqlbuild_state::warehouse_state::models::WarehouseState;
 
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
 use crate::bindings::_helpers::cli::dispatch::with_routed_request;
@@ -14,6 +21,42 @@ use crate::bindings::_helpers::plan_command::plan::{PlanProject, location_plan};
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::records::fields::field;
 
+/// The synced state the runtime plans previews from, and the mirror version it was read at.
+struct HeldState {
+    version: String,
+    state: Arc<WarehouseState>,
+}
+
+/// One state for the runtime's life; a newer mirror version replaces it.
+static HELD_STATE: Mutex<Option<HeldState>> = Mutex::new(None);
+
+/// The state a request plans from: the held state when it is at the request's mirror version, else
+/// built from the copy file at `request["copy"]` and held under its version.
+fn requested_state(request: &Value) -> PyResult<Arc<WarehouseState>> {
+    let mut held = HELD_STATE.lock().unwrap_or_else(PoisonError::into_inner);
+    let version: Option<&str> = request["version"].as_str();
+    if let Some(current) = held
+        .as_ref()
+        .filter(|held| Some(held.version.as_str()) == version)
+    {
+        return Ok(Arc::clone(&current.state));
+    }
+    let path: &str = request["copy"].as_str().unwrap_or_default();
+    let text: String = std::fs::read_to_string(path)?;
+    let copy: PreviewCopy = serde_json::from_str(&text)
+        .map_err(|error| PyValueError::new_err(format!("invalid synced copy: {error}")))?;
+    let version: Option<String> = copy.version.clone();
+    let state: Arc<WarehouseState> = Arc::new(warehouse_state(preview_state_parts(
+        copy,
+        request["consumption"].as_bool().unwrap_or(false),
+    )));
+    *held = version.map(|version| HeldState {
+        version,
+        state: Arc::clone(&state),
+    });
+    Ok(state)
+}
+
 /// One plan request's reply: `sqb plan`'s exit code and JSON output, or why it failed.
 pub(super) fn runtime_plan<'py>(
     py: Python<'py>,
@@ -22,7 +65,7 @@ pub(super) fn runtime_plan<'py>(
 ) -> PyResult<Value> {
     let argv: Vec<String> = serde_json::from_value(request["argv"].clone())
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
-    let copy: &str = request["copy"].as_str().unwrap_or_default();
+    let state: Arc<WarehouseState> = requested_state(request)?;
     let planned = (|| -> PyResult<(i32, Option<String>)> {
         let argv: Vec<Bound<'_, PyString>> =
             argv.iter().map(|part| PyString::new(py, part)).collect();
@@ -37,7 +80,7 @@ pub(super) fn runtime_plan<'py>(
             },
             None => PlanProject::Compiled,
         };
-        with_routed_request(&args, |request| location_plan(request, (project, copy)))
+        with_routed_request(&args, |request| location_plan(request, (project, &state)))
     })();
     Ok(match planned {
         Ok((exit_code, Some(output))) => json!({"exit_code": exit_code, "output": output}),

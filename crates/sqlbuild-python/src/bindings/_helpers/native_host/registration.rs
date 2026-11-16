@@ -6,7 +6,7 @@ use pyo3::wrap_pyfunction;
 use sqlbuild_host::entries::main::host_entry_labels::host_entry_labels;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::declaration_site;
-use crate::bindings::_helpers::native_host::synced_copy::WarehouseAccessRefusedError;
+use crate::bindings::_helpers::native_host::preview_state::WarehouseAccessRefusedError;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add(

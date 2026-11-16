@@ -492,11 +492,11 @@ SYNCED_COPY_ALLOWED_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
     default=(),
     description=(
         "`path=reason` entries for the Rust files or directories that may name the plan "
-        "preview's synced-copy adapter."
+        "preview's synced warehouse state connection."
     ),
 )
 SYNCED_COPY_PATTERN: str = (
-    r"\b(?:SyncedCopyAdapter|SyncedCopyConnection|"
+    r"\b(?:PreviewConnection|PreviewScope|preview_of|"
     r"WarehouseAccessRefusedError)\b"
 )
 RUST_LINE_COMMENT: str = "//"

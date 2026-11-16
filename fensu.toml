@@ -1629,6 +1629,23 @@ allowed_paths = [
 
 [targets.rust.rule_options.XSB079]
 allowed_paths = [
+    "crates/sqlbuild-python/src/bindings/_helpers/freshness/observation.rs=Preview branch: table freshness stays unknown and freshness queries are refused.",
+    "crates/sqlbuild-python/src/bindings/_helpers/freshness/planning.rs=Preview branch: a refused freshness observation leaves the source unknown.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs=Preview branch: --changed reads consumption history from the synced state instead of the warehouse table.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/preview_state.rs=Defines the preview connection over the synced warehouse state.",
+    "crates/sqlbuild-python/src/bindings/_helpers/native_host/registration.rs=Registers the preview's refusal error with Python.",
+    "crates/sqlbuild-python/src/bindings/_helpers/plan_command/plan.rs=Only a location's plan preview plans through the synced state and reports what it could not know.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_migrations/state_inspection.rs=Preview branch: migration fingerprints from the synced state.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_phases/retention.rs=Preview branch: table types and retention stay unknown.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_resolution/orchestration.rs=Preview branch: cursor intrinsics bind to bounds the run resolves.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/cursors.rs=Preview branch: target MAX from the synced state, watermark inputs read when the run starts.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/snapshot.rs=Preview branch: relations, columns and fingerprints from the synced state, without an inspection catalog.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_columns.rs=Preview branch: expression columns from the synced state instead of DESCRIBE.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_freshness.rs=Preview branch: the synced state has no source freshness state to read.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/source_tables.rs=Preview branch: sources outside the synced state are not probed.",
+    "crates/sqlbuild-python/src/bindings/_helpers/planner_warehouse/state_reads.rs=Answers the planner's warehouse reads from the synced state.",
+]
+allowed_paths = [
     "crates/sqlbuild-python/src/bindings/_helpers/freshness/planning.rs=Preview branch: a refused freshness observation leaves the source unknown.",
     "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs=Preview branch: --changed reads consumption history from the copy instead of the warehouse table.",
     "crates/sqlbuild-python/src/bindings/_helpers/native_host/registration.rs=Registers the synced copy's refusal error with Python.",

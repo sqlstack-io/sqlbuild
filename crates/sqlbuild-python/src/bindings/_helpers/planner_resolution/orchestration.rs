@@ -10,7 +10,7 @@ use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
 use crate::bindings::_helpers::model_config::typed_config::{
     config_node_of, config_text_is, config_text_object, config_value, model_values,
 };
-use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
+use crate::bindings::_helpers::native_host::preview_state::PreviewScope;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_resolution::cursor_model::{
@@ -227,7 +227,7 @@ pub(crate) fn resolve_model_sql<'py>(
         let bounds = match bounds {
             bounds if !bounds.is_none() => bounds,
             _ if cause.is_none()
-                && resolution.adapter.is_instance_of::<SyncedCopyAdapter>()
+                && PreviewScope::active()
                 && native_field(&roles, "watermark_inputs")?.is_truthy()? =>
             {
                 unbounded(py)?

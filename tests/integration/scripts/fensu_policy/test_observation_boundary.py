@@ -51,20 +51,20 @@ from tests.integration.scripts.fensu_policy.helpers import check_rust, write_obs
             expected_faults=("allowed path crates/sqlbuild-python/src/planner.rs no longer names",),
         ),
         ObservationBoundaryTestCase(
-            description="live planner naming the synced copy only in a comment",
+            description="live planner naming the preview connection only in a comment",
             rule="XSB079",
             allowed=("crates/sqlbuild-python/src/observations",),
-            planner="// SyncedCopyAdapter serves plan previews only\npub fn plan() {}\n",
+            planner="// PreviewConnection serves plan previews only\npub fn plan() {}\n",
             expected_returncode=0,
             expected_faults=(),
         ),
         ObservationBoundaryTestCase(
-            description="live planner branching on the synced copy",
+            description="live planner branching on the preview connection",
             rule="XSB079",
             allowed=("crates/sqlbuild-python/src/observations",),
             planner=(
                 "pub fn plan() {}\n"
-                "pub fn preview(adapter: &Any) -> bool { adapter.is::<SyncedCopyAdapter>() }\n"
+                "pub fn preview(connection: &Any) -> bool { connection.is::<PreviewConnection>() }\n"
             ),
             expected_returncode=1,
             expected_faults=(" --> crates/sqlbuild-python/src/planner.rs:2:0",),

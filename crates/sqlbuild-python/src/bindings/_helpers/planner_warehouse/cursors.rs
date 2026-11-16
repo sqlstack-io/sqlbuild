@@ -13,7 +13,7 @@ use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::cursor::scalars::to_inclusive;
 use crate::bindings::_helpers::model_config::typed_config::{config_cursor_bound, model_values};
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
+use crate::bindings::_helpers::native_host::preview_state::{PreviewConnection, preview_of};
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
     by_name, config_str, model_key, native_member, optional_text, planner_error, planner_model,
@@ -1186,9 +1186,9 @@ fn assemble<'py>(
     Ok(snapshots)
 }
 
-/// Plan previews: target `MAX` values from the synced copy; inputs are read when the run starts.
-fn synced_copy_values<'py>(
-    facade: &SyncedCopyAdapter,
+/// Plan previews: target `MAX` values from the synced state; inputs are read when the run starts.
+fn preview_values<'py>(
+    facade: &PreviewConnection,
     models: &mut [CursorModel<'py>],
 ) -> PyResult<Values<'py>> {
     let mut values = Values::new();
@@ -1248,8 +1248,8 @@ pub(crate) fn cursor_snapshots<'py>(
     if models.is_empty() {
         return Ok(PyDict::new(py));
     }
-    if let Ok(facade) = request.adapter.downcast::<SyncedCopyAdapter>() {
-        let values = synced_copy_values(facade.get(), &mut models)?;
+    if let Some(preview) = preview_of(&request.connection) {
+        let values = preview_values(preview.get(), &mut models)?;
         return assemble(py, &models, (&values, &HashSet::new()));
     }
     let queries = physical_queries(&models);

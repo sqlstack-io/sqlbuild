@@ -1,11 +1,7 @@
-use sqlbuild_host::entries::models::AdapterHost;
 pub(super) const AUTOMATIC: &str = "automatic";
 pub(super) const DONE: &str = "done";
 pub(super) const PENDING_ARCHIVE: &str = "pending_archive";
 pub(super) const PENDING_VIEW: &str = "pending_view";
-pub(super) const LIST_RELATIONS_FOR_INSPECTION: AdapterHost =
-    AdapterHost::ListRelationsForInspection;
-pub(super) const GET_COLUMNS_FOR_INSPECTION: AdapterHost = AdapterHost::GetColumnsForInspection;
 pub(super) const QUALIFIED_RELATION_MAX_PARTS: usize = 3;
 pub(super) const MIGRATION_MODEL_NAME_METADATA_KEY: &str = "model_name";
 pub(super) const HIDDEN_ORIGIN_REMEDY: &str = "the connection may lack permission to see it, or it was dropped outside SQLBuild; restore access to it, or remove migrate_from to build the model fresh deliberately (missing_migration_origin does not apply)";

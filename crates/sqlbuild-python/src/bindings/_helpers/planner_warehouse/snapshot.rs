@@ -13,6 +13,7 @@ use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprint
 use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::preview_state::preview_of;
 use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
 use crate::bindings::_helpers::planner_phases::objects::object;
@@ -25,6 +26,9 @@ use crate::bindings::_helpers::planner_warehouse::constants::{
     RELATIONS_MAIN_COLUMNS, RELATIONS_MAIN_LIST,
 };
 use crate::bindings::_helpers::planner_warehouse::cursors::{CursorInputs, cursor_snapshots};
+use crate::bindings::_helpers::planner_warehouse::state_reads::{
+    preview_columns, preview_fingerprints, preview_relations,
+};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::records::fields::mapping_values;
@@ -42,6 +46,7 @@ use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_model_config::types::{AuthoredNode, NodeKind};
+use sqlbuild_state::warehouse_state::models::{RelationFilter, StateLocation};
 use std::collections::{BTreeSet, HashSet};
 
 /// Everything one snapshot gather needs.
@@ -247,10 +252,14 @@ fn metadata_name_filter(
     Ok(Some(names))
 }
 
-fn active_catalog<'py>(
+/// The inspection catalog open for this connection; a preview reads the synced state, never a catalog.
+pub(crate) fn active_catalog<'py>(
     adapter: &Bound<'py, PyAny>,
     connection: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
+    if preview_of(connection).is_some() {
+        return Ok(adapter.py().None().into_bound(adapter.py()));
+    }
     call_with(
         &host::entry(adapter.py(), ACTIVE_CATALOG)?,
         &[
@@ -324,6 +333,20 @@ pub(crate) fn list_relations<'py>(
     schemas: Bound<'py, PyAny>,
     names: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
+    if let Some(preview) = preview_of(connection) {
+        let database: Option<String> = database.extract()?;
+        let schemas: Option<Vec<String>> = schemas.extract()?;
+        let names: Option<Vec<String>> = names.extract()?;
+        return Ok(preview_relations(
+            &preview,
+            &RelationFilter {
+                database: database.as_deref(),
+                schemas: schemas.as_deref(),
+                names: names.as_deref(),
+            },
+        )?
+        .into_any());
+    }
     call_with(
         &host::entry(adapter.py(), RELATIONS_MAIN_LIST)?,
         &[
@@ -341,6 +364,9 @@ pub(crate) fn columns_for<'py>(
     (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     relations: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
+    if let Some(preview) = preview_of(connection) {
+        return Ok(preview_columns(&preview, &relations)?.into_any());
+    }
     call_with(
         &host::entry(adapter.py(), RELATIONS_MAIN_COLUMNS)?,
         &[
@@ -534,42 +560,67 @@ fn gather_fingerprints<'py>(
         .map(|name| text(py, name))
         .collect(),
     )?;
+    let preview = preview_of(&request.connection);
     for schema in schemas {
         let schema_lower = lower(&text(py, schema))?;
-        let mut set = read_latest_fingerprints(Some(&keywords(
-            py,
-            &[
-                ("connection", request.connection.clone()),
-                ("execute", request.execute.clone()),
-                (
-                    "table_exists",
-                    state_schemas
-                        .contains(&schema_lower)
-                        .into_pyobject(py)?
-                        .to_owned()
-                        .into_any(),
-                ),
-                ("database", database.clone()),
-                ("schema", text(py, schema)),
-                (
-                    "render_qualified_name",
-                    native_field(&request.adapter, "render_qualified_name")?,
-                ),
-                (
-                    "render_read_latest_sql",
-                    native_field(&request.adapter, "render_read_latest_fingerprints_sql")?,
-                ),
-                (
-                    "node_names",
-                    if read_unfiltered {
-                        py.None().into_bound(py)
-                    } else {
-                        node_names_value.clone()
-                    },
-                ),
-                ("filtered_node_types", filtered_types.clone()),
-            ],
-        )?))?;
+        let table_exists: bool = state_schemas.contains(&schema_lower);
+        let read_names: Option<Vec<String>> = if read_unfiltered {
+            None
+        } else {
+            node_names_value.extract()?
+        };
+        let mut set = match &preview {
+            Some(preview) if table_exists => preview_fingerprints(
+                preview,
+                &StateLocation {
+                    database: database.extract()?,
+                    schema: schema.clone(),
+                },
+                (read_names, filtered_types.extract()?),
+            )?,
+            Some(_) => native(
+                py,
+                RecordId::FingerprintSet,
+                &[
+                    ("schema", text(py, schema)),
+                    ("fingerprints", PyDict::new(py).into_any()),
+                ],
+            )?,
+            None => read_latest_fingerprints(Some(&keywords(
+                py,
+                &[
+                    ("connection", request.connection.clone()),
+                    ("execute", request.execute.clone()),
+                    (
+                        "table_exists",
+                        state_schemas
+                            .contains(&schema_lower)
+                            .into_pyobject(py)?
+                            .to_owned()
+                            .into_any(),
+                    ),
+                    ("database", database.clone()),
+                    ("schema", text(py, schema)),
+                    (
+                        "render_qualified_name",
+                        native_field(&request.adapter, "render_qualified_name")?,
+                    ),
+                    (
+                        "render_read_latest_sql",
+                        native_field(&request.adapter, "render_read_latest_fingerprints_sql")?,
+                    ),
+                    (
+                        "node_names",
+                        if read_unfiltered {
+                            py.None().into_bound(py)
+                        } else {
+                            node_names_value.clone()
+                        },
+                    ),
+                    ("filtered_node_types", filtered_types.clone()),
+                ],
+            )?))?,
+        };
         if read_unfiltered {
             let by_identity = native_field(&set, "fingerprints_by_identity")?;
             let values: Vec<Bound<'py, PyAny>> = if by_identity.is_none() {

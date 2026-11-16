@@ -3,11 +3,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::path::PathBuf;
+use std::sync::{Mutex, PoisonError};
 
 use serde_json::{Value, json};
 use sqlbuild_orchestration::platform::models::LocationWorkClient;
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::warehouse_metadata::models::PreviewCopyRead;
+use sqlbuild_orchestration::warehouse_metadata::models::{PreviewCopy, PreviewCopyRead};
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
@@ -30,16 +31,24 @@ pub(super) async fn plan_location(
         Ok(argv) => argv,
         Err(message) => return Ok(Some(plan_failure(&message))),
     };
-    let read = PreviewCopyRead {
-        session_id,
-        generation,
-        consumption: settings
-            .get("changed")
-            .is_some_and(|changed| !matches!(changed, Value::Null | Value::Bool(false))),
-        versioned: false,
-        known_version: None,
-    };
-    let copy = match client.preview_copy(&options.target, &read).await {
+    let consumption: bool = settings
+        .get("changed")
+        .is_some_and(|changed| !matches!(changed, Value::Null | Value::Bool(false)));
+    let held: Option<HeldCopy> = held_copy((&options.target, generation), consumption);
+    let read_consumption: bool = consumption || held.as_ref().is_some_and(|held| held.consumption);
+    let copy = match read_copy(
+        client,
+        &options.target,
+        PreviewCopyRead {
+            session_id,
+            generation,
+            consumption: read_consumption,
+            versioned: true,
+            known_version: held.as_ref().map(|held| held.version.clone()),
+        },
+    )
+    .await
+    {
         Ok(copy) => copy,
         Err(error) => {
             return Ok(Some(plan_failure(&format!(
@@ -47,19 +56,98 @@ pub(super) async fn plan_location(
             ))));
         }
     };
+    let planned: HeldCopy = match held {
+        Some(held) if copy.unchanged => held,
+        _ => hold_copy((&options.target, generation), (copy, read_consumption))?,
+    };
+    let request = json!({"plan": {
+        "argv": argv,
+        "copy": planned.path.to_string_lossy(),
+        "version": planned.version,
+        "consumption": planned.consumption,
+    }});
+    run_plan(runtime, request, stopped).await
+}
+
+/// The copy file the location last read, the mirror version it holds and whether it has consumption.
+#[derive(Clone)]
+struct HeldCopy {
+    target: String,
+    generation: i64,
+    version: String,
+    consumption: bool,
+    path: PathBuf,
+}
+
+/// The location's one held copy; the runtime holds the state built from it under the same version.
+static HELD_COPY: Mutex<Option<HeldCopy>> = Mutex::new(None);
+
+/// The held copy of this target and generation, when it also has consumption a plan needs.
+fn held_copy((target, generation): (&str, i64), consumption: bool) -> Option<HeldCopy> {
+    HELD_COPY
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone()
+        .filter(|held| {
+            held.target == target
+                && held.generation == generation
+                && (held.consumption || !consumption)
+        })
+}
+
+/// A versioned read; a server without mirror versions rejects the fields, so it is read unversioned.
+async fn read_copy(
+    client: &LocationWorkClient,
+    target: &str,
+    read: PreviewCopyRead,
+) -> Result<PreviewCopy, String> {
+    match client.preview_copy(target, &read).await {
+        Ok(copy) => Ok(copy),
+        Err(_) => client
+            .preview_copy(
+                target,
+                &PreviewCopyRead {
+                    versioned: false,
+                    known_version: None,
+                    ..read
+                },
+            )
+            .await
+            .map_err(|error| error.to_string()),
+    }
+}
+
+/// Write `copy` as the held copy file, replacing the previous one; a copy without a version gets a
+/// fresh one, so the runtime never reuses a state built from it.
+fn hold_copy(
+    (target, generation): (&str, i64),
+    (copy, consumption): (PreviewCopy, bool),
+) -> Result<HeldCopy, ControlError> {
     let path: PathBuf =
         std::env::temp_dir().join(format!("sqlbuild-plan-copy-{}.json", Uuid::now_v7()));
+    let version: String = copy
+        .version
+        .clone()
+        .unwrap_or_else(|| Uuid::now_v7().to_string());
     std::fs::write(
         &path,
         serde_json::to_vec(&copy).map_err(std::io::Error::other)?,
     )?;
-    let request = json!({"plan": {
-        "argv": argv,
-        "copy": path.to_string_lossy(),
-    }});
-    let planned = run_plan(runtime, request, stopped).await;
-    drop(std::fs::remove_file(&path));
-    planned
+    let held = HeldCopy {
+        target: target.to_owned(),
+        generation,
+        version,
+        consumption,
+        path,
+    };
+    let previous: Option<HeldCopy> = HELD_COPY
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .replace(held.clone());
+    if let Some(previous) = previous {
+        drop(std::fs::remove_file(previous.path));
+    }
+    Ok(held)
 }
 
 /// The `sqb plan` command line of a frozen request: JSON output, its flags and its node names.

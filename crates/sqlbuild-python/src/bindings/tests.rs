@@ -12,8 +12,6 @@ mod image;
 mod since_cache;
 #[path = "tests/test_splice.rs"]
 mod splice;
-#[path = "tests/test_synced_relations.rs"]
-mod synced_relations;
 #[path = "tests/test_types.rs"]
 mod test_types;
 #[path = "tests/test_yaml_cache.rs"]

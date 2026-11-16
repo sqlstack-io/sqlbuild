@@ -2,6 +2,10 @@
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
+use crate::bindings::_helpers::native_host::preview_state::preview_of;
+use crate::bindings::_helpers::planner_warehouse::snapshot::{columns_for, list_relations};
+use crate::bindings::_helpers::planner_warehouse::state_reads::preview_fingerprints;
+use sqlbuild_state::warehouse_state::models::StateLocation;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
@@ -14,11 +18,6 @@ use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_state::events::main::newest_fingerprint::newest_fingerprint;
 use sqlbuild_state::events::models::{EventRelation, FingerprintKey, FingerprintOrder};
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::planner_migrations::constants::{
-    GET_COLUMNS_FOR_INSPECTION, LIST_RELATIONS_FOR_INSPECTION,
-};
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -153,15 +152,11 @@ impl MigrationStateInspection {
         schemas: Vec<Bound<'py, PyAny>>,
         names: Bound<'py, PyAny>,
     ) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        call_with(
-            &host::entry(py, LIST_RELATIONS_FOR_INSPECTION)?,
-            &[
-                ("adapter", self.adapter.bind(py).clone()),
-                ("connection", self.connection.bind(py).clone()),
-                ("database", self.database.bind(py).clone()),
-                ("schemas", PyTuple::new(py, schemas)?.into_any()),
-                ("names", names),
-            ],
+        list_relations(
+            (self.adapter.bind(py), self.connection.bind(py)),
+            self.database.bind(py),
+            PyTuple::new(py, schemas)?.into_any(),
+            names,
         )?
         .try_iter()?
         .collect()
@@ -186,7 +181,18 @@ impl MigrationStateInspection {
         key: &str,
     ) -> PyResult<Vec<Py<PyAny>>> {
         let known: Bound<'py, PyAny> = mapping_get(self.known_fingerprints.bind(py), key)?;
-        let latest: Bound<'py, PyAny> = if known.is_none() {
+        let preview = preview_of(self.connection.bind(py));
+        let latest: Bound<'py, PyAny> = if let (true, Some(preview)) = (known.is_none(), &preview) {
+            let fingerprint_set: Bound<'py, PyAny> = preview_fingerprints(
+                preview,
+                &StateLocation {
+                    database: self.database.bind(py).extract()?,
+                    schema: schema.extract()?,
+                },
+                (None, Vec::new()),
+            )?;
+            native_field(&fingerprint_set, "fingerprints_by_identity")?.call_method0("values")?
+        } else if known.is_none() {
             let adapter: &Bound<'py, PyAny> = self.adapter.bind(py);
             let fingerprint_set: Bound<'py, PyAny> = read_latest_fingerprints(Some(&keywords(
                 py,
@@ -509,16 +515,9 @@ impl MigrationStateInspection {
             let adapter: Bound<'_, PyAny> = this.adapter.bind(py).clone();
             let connection: Bound<'_, PyAny> = this.connection.bind(py).clone();
             drop(this);
-            call_with(
-                &host::entry(py, GET_COLUMNS_FOR_INSPECTION)?,
-                &[
-                    ("adapter", adapter),
-                    ("connection", connection),
-                    (
-                        "relations",
-                        PyTuple::new(py, matched.iter().map(|(_, relation)| relation))?.into_any(),
-                    ),
-                ],
+            columns_for(
+                (&adapter, &connection),
+                PyTuple::new(py, matched.iter().map(|(_, relation)| relation))?.into_any(),
             )?
         };
         let empty: Bound<'_, PyTuple> = PyTuple::empty(py);

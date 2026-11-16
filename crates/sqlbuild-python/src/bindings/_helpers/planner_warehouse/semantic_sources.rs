@@ -1,13 +1,11 @@
 //! Complete missing source metadata in bounded, database-grouped batches.
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_phases::objects::{text, tuple};
-use crate::bindings::_helpers::planner_warehouse::constants::ACTIVE_CATALOG;
+use crate::bindings::_helpers::planner_warehouse::snapshot::active_catalog;
 use crate::bindings::_helpers::planner_warehouse::snapshot::{columns_for, list_relations};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -62,13 +60,7 @@ fn source_candidates<'py>(
     let py = adapter.py();
     let mut pending: Vec<Bound<'py, PyAny>> = entries.to_vec();
     let mut relations: Vec<Bound<'py, PyAny>> = Vec::new();
-    let catalog = call_with(
-        &host::entry(py, ACTIVE_CATALOG)?,
-        &[
-            ("adapter", adapter.clone()),
-            ("connection", connection.clone()),
-        ],
-    )?;
+    let catalog = active_catalog(adapter, connection)?;
     let mut scoped: Vec<_> = Vec::new();
     for entry in entries {
         if !native_field(entry, "schema")?.is_none() {

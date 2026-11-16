@@ -4,7 +4,7 @@ use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
+use crate::bindings::_helpers::native_host::preview_state::preview_of;
 use crate::bindings::_helpers::observations::source_capture::capture_source_columns;
 use crate::bindings::_helpers::planner_phases::objects::{frozenset, text, tuple};
 use crate::bindings::_helpers::planner_warehouse::constants::{
@@ -97,8 +97,8 @@ pub(crate) fn source_inspection<'py>(
                 let sql: String = expression.extract()?;
                 let source: Bound<'py, PyAny> = native_field(entry, "name")?;
                 let source_name: String = source.extract()?;
-                let described: Vec<String> = match adapter.downcast::<SyncedCopyAdapter>() {
-                    Ok(facade) => match facade.get().described_columns(&source_name, &sql)? {
+                let described: Vec<String> = match preview_of(connection) {
+                    Some(facade) => match facade.get().described_columns(&source_name, &sql)? {
                         Some(described) => described,
                         None => {
                             facade.get().mark_unknown(format!(
@@ -110,7 +110,7 @@ pub(crate) fn source_inspection<'py>(
                                 .collect::<PyResult<_>>()?
                         }
                     },
-                    Err(_) => {
+                    None => {
                         let names = call_with(
                             &native_field(adapter, "query_column_names")?,
                             &[("connection", connection.clone()), ("sql", expression)],
