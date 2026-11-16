@@ -675,6 +675,8 @@ export type Job = {
 	/** Member jobs for groups; null when the server doesn't say. */
 	members: string[] | null;
 	nodeCount: number;
+	/** The nodes the job selects, by catalog key; a group's are its members' together. */
+	nodes: string[];
 	/** Null where the server doesn't report it (also `onFailure`, `priority`, `sourceFile`). */
 	overlap: OverlapPolicy | null;
 	onFailure: OnFailure | null;

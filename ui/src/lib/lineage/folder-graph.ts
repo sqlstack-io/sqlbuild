@@ -153,6 +153,7 @@ export function folderGraph(
 /**
  * Lays out boxes from the inside out: each box's cards and inner boxes first, which sizes the box,
  * then the box among its siblings. Lineage between two boxes' contents orders the boxes themselves.
+ * Any node with children is a box; a card keeps its measured size, or the size it was given.
  * Positions inside a box are relative to it, as Svelte Flow expects.
  */
 export function layoutFolderGraph(nodes: Node[], edges: Edge[]): Node[] {
@@ -169,8 +170,9 @@ export function layoutFolderGraph(nodes: Node[], edges: Edge[]): Node[] {
 	};
 	const place = (container: string): { width: number; height: number } => {
 		const items: LayoutItem[] = (children.get(container) ?? []).map((n) => {
-			if (n.type === 'folderBox') return { id: n.id, ...place(n.id) };
-			return { id: n.id, width: n.measured?.width ?? NODE_WIDTH, height: n.measured?.height ?? NODE_HEIGHT };
+			// A box is whatever holds other nodes: an open folder, or an expanded member job on a group's page.
+			if (n.type === 'folderBox' || children.has(n.id)) return { id: n.id, ...place(n.id) };
+			return { id: n.id, width: n.measured?.width ?? n.width ?? NODE_WIDTH, height: n.measured?.height ?? n.height ?? NODE_HEIGHT };
 		});
 		const seen = new Set<string>();
 		const pairs = edges.flatMap((e) => {

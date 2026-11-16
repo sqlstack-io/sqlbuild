@@ -194,6 +194,7 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		select: wire.select ?? null,
 		members: null,
 		nodeCount: wire.selection.length,
+		nodes: wire.selection,
 		overlap: wire.overlap,
 		onFailure: wire.on_failure ? { retries: wire.on_failure.retries, retryDelaySeconds: wire.on_failure.retry_delay_seconds } : null,
 		concurrencyGroups: wire.concurrency_groups,

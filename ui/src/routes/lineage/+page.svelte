@@ -30,8 +30,14 @@
 	import SqlViewer from '$lib/components/code/sql-viewer.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
+	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
+	import ViewSummaryPanel from '$lib/components/lineage/view-summary.svelte';
+	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
+	import { viewSummary } from '$lib/lineage/view-summary';
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
+	import FitControls from '$lib/lineage/fit-controls.svelte';
+	import { READABLE_ZOOM } from '$lib/lineage/fit';
 	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
 	import { scaleGraph } from '$lib/mock/scale-graph';
@@ -53,17 +59,19 @@
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
 	import { MAX_DRAWN, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
-	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
+	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
 	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
 
 	let browserOpen = $state(false);
-	let inspectorOpen = $state(true);
+	// Closed until something is selected, then as the person last left it (remembered in this browser).
+	const details = createDetailsPanel('lineage', () => selectedNodes.length > 0);
+	const inspectorOpen = $derived(details.open);
 	let neighbourhoodOnly = $state(false);
 	let modelQuery = $state('');
 
 	const nodeTypes = { asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode, stub: StubNode };
 	// Automatic fits stop at a zoom where cards stay readable; the fit button and the wheel go further, to the whole graph.
-	const FIT_FLOOR = 0.3;
+	const FIT_FLOOR = READABLE_ZOOM;
 
 	// The graph is the catalog: every node in the current snapshot with its
 	// build state. Later refreshes update card data in place so positions,
@@ -468,6 +476,18 @@
 		{ value: 'behind' as const, label: 'Stale · behind' },
 		{ value: 'failed' as const, label: 'Last build failed' }
 	];
+	// The sidebar's summary with nothing selected: the nodes drawn, and what narrows or dims them.
+	const inView = $derived(viewSummary(shownNodes(catalogNodes, { selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree })));
+	const activeFilters = $derived(
+		[
+			pickedNodes.length ? `${pickedNodes.length.toLocaleString('en')} picked node${pickedNodes.length === 1 ? '' : 's'}` : '',
+			!pickedNodes.length && selectedFolders.length ? `Folders: ${selectedFolders.join(', ')}` : '',
+			staleOnly ? 'Only nodes out of date' : '',
+			kindFilter ? `Kind: ${nodeKindPlural[kindFilter as keyof typeof nodeKindPlural] ?? kindFilter} (others dimmed)` : '',
+			groupFilter ? `Group: ${groupFilter} (others dimmed)` : '',
+			statusFilter ? `Status: ${statusOptions.find((o) => o.value === statusFilter)?.label ?? statusFilter} (others dimmed)` : ''
+		].filter(Boolean)
+	);
 
 	// The list names every node, including those inside closed folders.
 	const listNodes = $derived<Pick<Node, 'id' | 'data'>[]>(scaleMode ? nodes : catalogNodes.map((n) => ({ id: n.key, data: cardData(n) })));
@@ -828,7 +848,7 @@
 			{#if n}<span title="{n} {label}"><i style:background={c}></i>{n}</span>{/if}
 		{/each}
 	</div>
-	<Button variant="ghost" size="icon-bar" aria-pressed={inspectorOpen} onclick={() => (inspectorOpen = !inspectorOpen)} title={inspectorOpen ? 'Hide details' : 'Show details'} aria-label="Toggle details"><PanelRightIcon /></Button>
+	<Button variant="ghost" size="icon-bar" aria-pressed={inspectorOpen} onclick={details.toggle} title={inspectorOpen ? 'Hide details' : 'Show details'} aria-label="Toggle details"><PanelRightIcon /></Button>
 </div>
 
 <div class="lineage-stage relative flex min-h-0 flex-1">
@@ -891,9 +911,9 @@
 			onnodepointerenter={({ node }) => (hoveredId = node.id)}
 			onnodepointerleave={() => (hoveredId = null)}
 		>
-			<FlowController bind:fitView={fitFlow} bind:viewport bind:setViewport={setFlowViewport} bind:fitted fitFloor={scaleMode ? undefined : FIT_FLOOR} />
+			<FlowController bind:fitView={fitFlow} bind:viewport bind:setViewport={setFlowViewport} bind:fitted fitFloor={scaleMode ? undefined : FIT_FLOOR} readable={!scaleMode} />
 			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-			<Controls />
+			{#if scaleMode}<Controls />{:else}<FitControls onfit={() => fitFlow?.()} showLock />{/if}
 		</SvelteFlow>
 		{#if tooMany}
 			<div class="graph-too-many">
@@ -944,22 +964,18 @@
 					{selectedNodes.map((n) => n.data.name).slice(0, 3).join(', ')}{selectedNodes.length > 3 ? '…' : ''}
 				</div>
 			</div>
-		{:else}
-			<div class="inspector-head">
-				<div class="flex items-center gap-2">
-					<span class="truncate text-[15px] font-semibold" title={String(primary?.data.name ?? '')}>{primary?.data.label ?? primary?.data.name}</span>
-					{#if d}<a href={to(`/catalog/${primarySlug}`)} class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
-				</div>
-				<div class="inspector-meta">
+		{:else if primary}
+			<InspectorHead title={String(primary?.data.label ?? primary?.data.name ?? '')} hint={String(primary?.data.name ?? '')} href={d ? to(`/catalog/${primarySlug}`) : undefined} linkLabel="Catalog ↗" linkTitle="Open in Catalog">
+				{#snippet meta()}
 					<!-- From the selected card, so the header names the node at once, before its detail arrives. -->
 					<span>{primary?.data.kind}</span>
 					{#if primary?.data.group}<span>{primary.data.group}</span>{/if}
-				</div>
-			</div>
+				{/snippet}
+			</InspectorHead>
 		{/if}
 		<div class="insp-body">
 			{#if !scaleMode && !primary}
-				<InspectorSection title="Details"><p class="insp-description">Select a node to see its details.</p></InspectorSection>
+				<ViewSummaryPanel summary={inView} filters={activeFilters} />
 			{:else}
 			{#if scaleMode}
 				<InspectorSection title="Scale test">
@@ -1523,36 +1539,6 @@
 	}
 	.browser-row strong {
 		font: 500 12.5px var(--font-sans);
-	}
-	.inspector-head {
-		padding: 14px 16px 12px;
-		border-bottom: 1px solid var(--border);
-	}
-	.inspector-meta span + span::before {
-		content: '·';
-		margin-right: 12px;
-		color: var(--sb-text-faint);
-	}
-	.inspector-meta {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 4px 12px;
-		margin-top: 6px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.head-link {
-		flex: 0 0 auto;
-		padding: 3px 8px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.head-link:hover {
-		background: var(--sb-hover);
-		color: var(--foreground);
 	}
 	.check-row {
 		display: flex;
