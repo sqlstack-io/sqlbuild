@@ -1,4 +1,5 @@
 import { topFolder } from '$lib/lineage/catalog-graph';
+import { recentDeploys } from '$lib/build-area/overview-panels';
 import { checkCountsOf } from './http-catalog';
 import type { Acknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, GroupStatus, Overview, PlatformEvent, Run, SnapshotChange } from './types';
 
@@ -6,7 +7,6 @@ const DAY = 24 * 60 * 60 * 1000;
 const MODEL_KINDS = new Set(['view', 'table', 'incremental']);
 const PROBLEM_STATUSES = new Set(['failed', 'partial', 'presumed_failed']);
 const ACTIVE_STATUSES = new Set(['queued', 'launched', 'running', 'unresponsive']);
-const RECENT_CHANGES = 4;
 
 export type OverviewInputs = {
 	/** Listed runs, newest first; the listing holds the newest 1,000, so a busier day undercounts. */
@@ -105,7 +105,7 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 		},
 		attention,
 		groups: nodes.some((n) => n.stale !== null) ? groupStatusOf(nodes) : null,
-		recentChanges: changes.slice(0, RECENT_CHANGES),
+		recentChanges: recentDeploys(changes),
 		latestRun: latest ? { id: latest.id, status: latest.status, endedAt: latest.endedAt } : null
 	};
 }

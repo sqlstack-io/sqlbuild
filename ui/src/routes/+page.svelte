@@ -22,6 +22,7 @@
 	import type { AttentionItem } from '$lib/api';
 	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
+	import { quietDeployLine, recentDeployRows, visibleFolders } from '$lib/build-area/overview-panels';
 	import { pagesBeyondTarget } from '$lib/nav';
 	import OverviewCost from './overview-cost.svelte';
 
@@ -80,6 +81,11 @@
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	const costChange = $derived(m?.cost && m.cost.baseline ? Math.round(((m.cost.last24h - m.cost.baseline) / m.cost.baseline) * 100) : null);
 	const groups = $derived(data?.groups ?? []);
+	let showAllFolders = $state(false);
+	const folders = $derived(visibleFolders(groups, showAllFolders));
+	// Whether collapsing hides any folders; folders that need attention always show.
+	const collapsedHidden = $derived(visibleFolders(groups, false).hidden);
+	const deployRows = $derived(recentDeployRows(data?.recentChanges ?? []));
 	// Parts without a server read stay hidden rather than showing zeros, and wait for the read so they don't appear and vanish.
 	const showGroups = $derived(!!data?.groups?.length);
 	const showTimeline = $derived(app.client.supports('timeline'));
@@ -241,8 +247,8 @@
 					</div>
 					<div class="groups">
 						<div class="group-row head"><span>Folder</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
-						{#each groups as g (g.group)}
-							<a class="group-row" href={to(`/catalog?group=${g.group}`)}>
+						{#each folders.rows as g (g.group)}
+							<a class="group-row" href={to(`/catalog?group=${encodeURIComponent(g.group)}`)} title="Open {g.group} in the catalog">
 								<span>{g.group}</span>
 								<span class="group-bar" title="{g.current} of {g.total} current">
 									<i class="fresh" style:width="{(g.current / g.total) * 100}%"></i>
@@ -257,6 +263,9 @@
 						{:else}
 							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet. Deploy the project to see its models here.{/if}</div>
 						{/each}
+						{#if collapsedHidden}
+							<button class="folders-toggle" aria-expanded={showAllFolders} onclick={() => (showAllFolders = !showAllFolders)}>{showAllFolders ? 'Show fewer' : `Show all ${groups.length} folders`}</button>
+						{/if}
 					</div>
 				</section>{/if}
 				<section class="surface-panel">
@@ -265,7 +274,11 @@
 						<a href={to(`/changes`)}>All changes →</a>
 					</div>
 					<div>
-						{#each data?.recentChanges ?? [] as c (c.snapshotId)}
+						{#each deployRows as row (row.key)}
+							{#if row.kind === 'quiet'}
+								<div class="change quiet">{quietDeployLine(row, app.now)}</div>
+							{:else}
+							{@const c = row.change}
 							<a class="change" href={to(`/changes#gen-${c.generation}`)}>
 								<span class="change-rev" title={c.gitRevision ? `Commit ${c.gitRevision}` : 'Published outside a git checkout'}><code>{c.gitRevision?.slice(0, 7) ?? '—'}</code><small>version {c.generation}</small></span>
 								<span class="change-copy">
@@ -274,6 +287,7 @@
 								</span>
 								<small>{c.gitAuthor ? `${c.gitAuthor} · ` : ''}{formatAgo(c.publishedAt, app.now)}</small>
 							</a>
+							{/if}
 						{:else}
 							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet.{/if}</div>
 						{/each}
@@ -339,6 +353,7 @@
 	.issue-icon.info { color: var(--muted-foreground); background: var(--sb-hover); }
 	.change { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--inner-line); }
 	.change:last-child { border-bottom: 0; }
+	.change.quiet { display: block; padding: 7px 14px 7px 96px; color: var(--sb-text-faint); font-size: 12px; }
 	.change:hover { background: var(--sb-hover); }
 	.change-rev code { display: block; color: var(--primary); font: 12px var(--font-mono); }
 	.change-rev small { color: var(--sb-text-faint); font-size: 11px; }
@@ -368,7 +383,7 @@
 	.metric .success-note { color: var(--sb-success); }
 	.metric .warning-note { color: var(--sb-warning); }
 	.stale-value { color: var(--sb-stale); }
-	.lower-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr); gap: 14px; align-items: start; }
+	.lower-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr); gap: 14px; align-items: stretch; }
 	.lower-grid.single { grid-template-columns: 1fr; }
 	.panel-heading { display: flex; min-height: 53px; align-items: center; padding: 0 14px 0 16px; border-bottom: 1px solid var(--border); }
 	.panel-heading > div:first-child { margin-right: auto; }
@@ -386,6 +401,8 @@
 	.group-row > span:first-child { color: var(--muted-foreground); }
 	.group-row b { color: var(--foreground); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
 	.group-row.head span:not(:first-child) { text-align: right; }
+	.folders-toggle { display: block; margin: 4px 16px 0; color: var(--primary); font: 500 12px var(--font-sans); }
+	.folders-toggle:hover { text-decoration: underline; }
 	.group-bar { display: flex; height: 7px; overflow: hidden; border-radius: 2px; background: var(--sb-hover); }
 	.group-bar .fresh { background: var(--sb-success); }
 	.stale-segment { background: var(--sb-stale); }

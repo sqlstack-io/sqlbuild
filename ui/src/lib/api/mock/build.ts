@@ -5,6 +5,7 @@
 
 import { ApiError } from '../client';
 import { groupStatusOf, problemRunsOf } from '../http-overview';
+import { recentDeploys } from '$lib/build-area/overview-panels';
 import type {
 	AttentionItem,
 	BuiltDefinition,
@@ -279,7 +280,7 @@ export class MockBuild {
 			},
 			attention,
 			groups: groupStatusOf(nodes),
-			recentChanges: this.#changes(scope).slice(0, 4),
+			recentChanges: recentDeploys(this.#changes(scope)),
 			latestRun: latest ? { id: latest.id, status: latest.status, endedAt: latest.endedAt } : null
 		});
 	}

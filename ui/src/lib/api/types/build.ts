@@ -389,6 +389,7 @@ export type Overview = {
 	attention: AttentionItem[];
 	/** Null when the server reports no per-group build state. */
 	groups: GroupStatus[] | null;
+	/** Newest first, up to the fourth deploy that changed something, with the deploys without changes between. */
 	recentChanges: SnapshotChange[];
 	latestRun: (Pick<Run, 'id' | 'endedAt'> & { status: RunStatus }) | null;
 };
