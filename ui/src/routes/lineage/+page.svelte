@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Loading from '$lib/components/loading.svelte';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import '@xyflow/svelte/dist/style.css';
@@ -9,8 +10,10 @@
 	import StubNode from '$lib/components/lineage/stub-node.svelte';
 	import XIcon from '@lucide/svelte/icons/x';
 	import FolderIcon from '@lucide/svelte/icons/folder';
+	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import NodeFieldsPopover from '$lib/components/lineage/node-fields-popover.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import FocusIcon from '@lucide/svelte/icons/focus';
 	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
@@ -725,10 +728,10 @@
 </script>
 
 <AppTopbar title="Lineage">
-	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => catalog.refresh()} />
 	{#if app.client.supports('launchAdhocRun')}
-		{#if changedCount}<GatedButton requires="run.adhoc" variant="stale" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build {changedCount} changed</GatedButton>{/if}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
+		{#if changedCount}<GatedButton size="bar" requires="run.adhoc" variant="stale" onclick={() => goto(to(CHANGED_PLAN_HREF))}><HammerIcon />Build {changedCount} changed</GatedButton>{/if}
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}><PlayIcon class="size-3.5 fill-current stroke-none" />Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
 	{/if}
 </AppTopbar>
 
@@ -778,7 +781,7 @@
 			class:focus-active={grouped}
 			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
 		>
-			<FolderIcon size={13} /> Folders
+			<FolderIcon size={14} /> Folders
 		</button>
 		{#if selectionLabel}
 			<span class="selection-chip" title="Showing {selectionLabel}">
@@ -797,7 +800,7 @@
 	>
 		<FocusIcon size={14} /> {neighbourhoodOnly ? 'Show all' : 'Focus'}
 	</button>
-	<button onclick={resetLayout} class="toolbar-action" title="Reset layout"><RotateCcwIcon size={13} /> Reset</button>
+	<button onclick={resetLayout} class="toolbar-action" title="Reset layout"><RotateCcwIcon size={14} /> Reset</button>
 	<div class="status-summary ml-auto">
 		{#each [['ok', 'var(--sb-success)', 'last build succeeded'], ['warn', 'var(--sb-warning)', 'last build warned'], ['stale', 'var(--sb-stale)', 'stale'], ['fail', 'var(--sb-error)', 'last build failed']] as [st, c, label] (st)}
 			{@const n = scaleMode ? nodes.filter((x) => (st === 'stale' ? !!x.data.stale : x.data.status === st)).length : catalogNodes.filter((c) => (st === 'stale' ? !!c.stale?.length : cardStatus(c) === st)).length}
@@ -1482,14 +1485,16 @@
 		margin: 0 6px;
 		background: var(--border);
 	}
+	/* Toolbar buttons match the top bar's: 30 px high, 13 px medium text, 14 px icons. */
 	.toolbar-filter,
 	.toolbar-action {
 		height: 30px;
-		gap: 5px;
+		gap: 6px;
 		padding: 0 9px;
 		border: 0;
 		border-radius: 2px;
-		font-size: 12.5px;
+		font-size: 13px;
+		font-weight: 500;
 	}
 	.toolbar-filter :global(svg) {
 		color: var(--sb-text-faint);

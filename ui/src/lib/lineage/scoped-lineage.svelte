@@ -3,6 +3,7 @@
 	// Shows the selected node's neighborhood with adjustable upstream/downstream
 	// depth, lets you select nodes, and Execute acts on the current selection.
 	import '@xyflow/svelte/dist/style.css';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import { layoutGraph } from '$lib/lineage/layout';
@@ -183,10 +184,10 @@
 		<div class="ml-auto flex items-center gap-2.5">
 			<span class="text-[var(--sb-text-faint)] text-[12px]">--select <span class="text-muted-foreground">{selectExpr}</span></span>
 			{#if onExecute}<button
-				class="bg-primary rounded-[2px] px-3 py-1 text-[12px] font-medium text-white disabled:opacity-50"
+				class="bg-primary inline-flex items-center gap-1.5 rounded-[2px] px-3 py-1 text-[12px] font-medium text-white disabled:opacity-50"
 				disabled={!app.can('run.adhoc')}
 				title={app.can('run.adhoc') ? undefined : 'Requires run.adhoc'}
-				onclick={() => onExecute(effectiveSelection.map((id) => graphNodes.find((n) => n.id === id)?.name ?? id))}>▷ Execute {effectiveSelection.length > 1 ? `(${effectiveSelection.length})` : ''}</button
+				onclick={() => onExecute(effectiveSelection.map((id) => graphNodes.find((n) => n.id === id)?.name ?? id))}><PlayIcon class="size-3.5 fill-current stroke-none" />Execute {effectiveSelection.length > 1 ? `(${effectiveSelection.length})` : ''}</button
 			>{/if}
 		</div>
 	</div>

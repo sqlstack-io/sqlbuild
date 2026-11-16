@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { goto } from '$app/navigation';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -40,7 +41,7 @@
 
 <AppTopbar title="Runs">
 	{#if app.client.supports('launchAdhocRun')}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref()))}>▷ New run</GatedButton>
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref()))}><PlayIcon class="size-3.5 fill-current stroke-none" />New run</GatedButton>
 	{/if}
 </AppTopbar>
 

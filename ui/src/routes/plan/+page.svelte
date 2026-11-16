@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { appPath, to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import HelpTip from '$lib/components/help-tip.svelte';
 	// Every Run button opens this page with its command. A build is planned by the location (`sqb plan`)
 	// from the server's synced copy of the warehouse metadata; other verbs show the server's dry run.
@@ -404,7 +405,7 @@
 		<div class="why">
 			{#if launchError}<span class="problem">{launchError}</span>{:else if !canLaunch && blockedReason && blockedReason !== problem}<span class="faint">{blockedReason}</span>{/if}
 		</div>
-		<GatedButton requires={job ? 'job.run' : 'run.adhoc'} variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
+		<GatedButton requires={job ? 'job.run' : 'run.adhoc'} variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	</div>
 </div>
 

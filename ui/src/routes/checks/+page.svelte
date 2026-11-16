@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { openRow, to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import type { Check, CheckAttachment, CheckOutcome } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
@@ -72,8 +73,8 @@
 </script>
 
 <AppTopbar title="Checks">
-	<Button variant="outline" size="sm" onclick={() => checks.refresh()}>↻ Refresh</Button>
-	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(filtered.length === all.length ? [] : runSelection, 'audit')))}>▷ Run checks</GatedButton>{/if}
+	<RefreshButton onclick={() => checks.refresh()} />
+	{#if app.client.supports('launchAdhocRun')}<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(filtered.length === all.length ? [] : runSelection, 'audit')))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run checks</GatedButton>{/if}
 </AppTopbar>
 
 

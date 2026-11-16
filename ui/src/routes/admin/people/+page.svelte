@@ -4,6 +4,7 @@
 	import ShieldQuestionIcon from '@lucide/svelte/icons/shield-question';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
@@ -38,7 +39,7 @@
 </script>
 
 <AppTopbar title="People">
-	<Button variant="outline" size="sm" onclick={() => d.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => d.refresh()} />
 </AppTopbar>
 
 {#if !allowed}

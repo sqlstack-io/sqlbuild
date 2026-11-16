@@ -5,7 +5,7 @@
 	import PackageIcon from '@lucide/svelte/icons/package';
 	import type { SnapshotChange } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -49,7 +49,7 @@
 </script>
 
 <AppTopbar title="Changes">
-	<Button variant="outline" size="sm" onclick={() => changes.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => changes.refresh()} />
 </AppTopbar>
 
 <ListToolbar loading={changes.data === undefined} bind:query placeholder="Search nodes, commits, authors" total="{filtered.length} of {all.length} deploys">

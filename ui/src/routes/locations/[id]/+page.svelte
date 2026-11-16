@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -49,7 +49,7 @@
 </script>
 
 <AppTopbar title="Locations">
-	<Button variant="outline" size="sm" onclick={() => (location.refresh(), problems.refresh())}>↻ Refresh</Button>
+	<RefreshButton onclick={() => (location.refresh(), problems.refresh())} />
 </AppTopbar>
 
 <div class="flex min-h-0 flex-1 flex-col">

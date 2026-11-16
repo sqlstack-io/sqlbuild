@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
@@ -58,7 +58,7 @@
 </script>
 
 <AppTopbar title="Maintenance">
-	<Button variant="outline" size="sm" onclick={() => history.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => history.refresh()} />
 </AppTopbar>
 
 <PageTabs

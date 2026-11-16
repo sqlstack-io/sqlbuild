@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	// Every rerun opens here first, like every Run button opens the plan page: it shows what the rerun repeats
 	// and nothing reruns until Run is pressed. A rerun repeats its run's frozen version and settings, so it is
 	// not planned against the current project.
@@ -179,7 +180,7 @@
 		<div class="why">
 			{#if launchError}<span class="problem">{launchError}</span>{:else if blockedReason}<span class="faint">{blockedReason}</span>{/if}
 		</div>
-		<GatedButton requires="run.rerun" variant={canRun ? 'default' : 'outline'} disabled={!canRun} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
+		<GatedButton requires="run.rerun" variant={canRun ? 'default' : 'outline'} disabled={!canRun} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	</div>
 </div>
 

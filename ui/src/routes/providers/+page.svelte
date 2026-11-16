@@ -2,7 +2,7 @@
 	import { openRow, to } from '$lib/paths';
 	import PuzzleIcon from '@lucide/svelte/icons/puzzle';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -17,7 +17,7 @@
 </script>
 
 <AppTopbar title="Providers">
-	<Button variant="outline" size="sm" onclick={() => providers.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => providers.refresh()} />
 </AppTopbar>
 
 <ListToolbar loading={providers.data === undefined} bind:query placeholder="Search providers" total="{shown.length} of {all.length} providers">

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { goto } from '$app/navigation';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import type { CheckEvidence, CheckSql } from '$lib/api';
@@ -67,7 +68,7 @@
 
 <AppTopbar title="Checks">
 	{#if c && app.client.supports('launchAdhocRun')}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(c?.node ? [c.node] : [], 'audit')))}>▷ Run check</GatedButton>
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(c?.node ? [c.node] : [], 'audit')))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run check</GatedButton>
 	{/if}
 </AppTopbar>
 

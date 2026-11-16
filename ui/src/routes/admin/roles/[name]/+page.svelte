@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import NoAccess from '$lib/components/platform/no-access.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
@@ -38,7 +38,7 @@
 </script>
 
 <AppTopbar title="Roles">
-	<Button variant="outline" size="sm" onclick={() => role.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => role.refresh()} />
 </AppTopbar>
 
 {#if !app.can('role.assign')}

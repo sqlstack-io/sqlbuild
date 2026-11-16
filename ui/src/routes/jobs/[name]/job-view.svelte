@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Loading from '$lib/components/loading.svelte';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { openRow, to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import type { Trigger } from '$lib/api';
@@ -90,19 +91,20 @@
 <AppTopbar title="Jobs">
 	{#if picked.length && def?.kind === 'job'}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
-		<GatedButton requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}>▷ Run all but {picked.length}</GatedButton>
-		<GatedButton requires="job.run" variant="default" onclick={() => run(picked)}>▷ Run {picked.length} selected</GatedButton>
+		<GatedButton size="bar" requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run all but {picked.length}</GatedButton>
+		<GatedButton size="bar" requires="job.run" variant="default" onclick={() => run(picked)}><PlayIcon class="size-3.5 fill-current stroke-none" />Run {picked.length} selected</GatedButton>
 	{:else if picked.length && canRunPicked}
 		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}>▷ Run {picked.length} selected</GatedButton>
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run {picked.length} selected</GatedButton>
 	{:else}
 		<GatedButton
+			size="bar"
 			requires="job.run"
 			variant="default"
 			disabled={!def || targetBlocked}
 			reason={targetBlocked ? `This job only runs on ${def?.targets?.join(', ')}` : undefined}
 			onclick={() => run([])}
-		>▷ Run</GatedButton>
+		><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	{/if}
 </AppTopbar>
 

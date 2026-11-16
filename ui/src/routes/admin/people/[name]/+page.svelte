@@ -5,7 +5,7 @@
 	import { tick } from 'svelte';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import GatedButton from '$lib/components/platform/gated-button.svelte';
 	import NoAccess from '$lib/components/platform/no-access.svelte';
@@ -67,7 +67,7 @@
 </script>
 
 <AppTopbar title="People">
-	<Button variant="outline" size="sm" onclick={changed}>↻ Refresh</Button>
+	<RefreshButton onclick={changed} />
 </AppTopbar>
 
 {#if !canSee}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { openRow, to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import type { CatalogNode } from '$lib/api';
@@ -10,7 +11,7 @@
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
 	import { planHref } from '$lib/run/command';
@@ -84,8 +85,8 @@
 </script>
 
 <AppTopbar title="Catalog">
-	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
-	{#if canRun}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(narrowed ? filteredRunnable : [])))}>▷ Execute{narrowed ? ` ${filteredRunnable.length}` : ''}</GatedButton>{/if}
+	<RefreshButton onclick={() => catalog.refresh()} />
+	{#if canRun}<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(narrowed ? filteredRunnable : [])))}><PlayIcon class="size-3.5 fill-current stroke-none" />Execute{narrowed ? ` ${filteredRunnable.length}` : ''}</GatedButton>{/if}
 </AppTopbar>
 
 

@@ -4,7 +4,7 @@
 	import DatabaseIcon from '@lucide/svelte/icons/database';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ConnectionTest from '$lib/components/platform/connection-test.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
@@ -24,7 +24,7 @@
 </script>
 
 <AppTopbar title="Connections">
-	<Button variant="outline" size="sm" onclick={() => connections.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => connections.refresh()} />
 </AppTopbar>
 
 <div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-12">

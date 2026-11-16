@@ -13,8 +13,9 @@
 				ghost: "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground",
 				destructive: "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30",
 				link: "text-primary underline-offset-4 hover:underline",
-				// Purple means "needs building": solid for changed nodes, outlined for nodes only behind.
-				stale: "bg-(--sb-stale) text-background hover:bg-(--sb-stale)/85",
+				// Purple means "needs building": tinted for building changed nodes, outlined for nodes only behind.
+				// Execute's solid blue stays the bar's one solid button.
+				stale: "border-(--sb-stale)/45 bg-(--sb-stale)/14 text-(--sb-stale) hover:bg-(--sb-stale)/22",
 				"stale-outline": "border-(--sb-stale) bg-background text-(--sb-stale) hover:bg-(--sb-stale)/10",
 			},
 			size: {
@@ -26,6 +27,9 @@
 				"icon-xs": "size-6 rounded-[min(var(--radius-md),8px)] in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
 				"icon-sm": "size-8 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-md",
 				"icon-lg": "size-10",
+				// Top-bar and toolbar buttons: 30 px high, 13 px medium text and 14 px icons, square 2 px corners.
+				bar: "h-[30px] gap-1.5 rounded-(--radius) px-[11px] text-[13px] font-medium tracking-[.005em] [&_svg:not([class*='size-'])]:size-3.5",
+				"icon-bar": "size-[30px] rounded-(--radius) [&_svg:not([class*='size-'])]:size-3.5",
 			},
 		},
 		defaultVariants: {

@@ -7,13 +7,13 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import type { Trigger, TriggerKind, TriggerState } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
@@ -95,7 +95,7 @@
 </script>
 
 <AppTopbar title="Triggers">
-	<Button variant="outline" size="sm" onclick={() => triggers.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => triggers.refresh()} />
 </AppTopbar>
 
 <ListToolbar

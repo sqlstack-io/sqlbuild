@@ -3,6 +3,7 @@
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
+	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import AlertCircleIcon from '@lucide/svelte/icons/circle-alert';
@@ -10,7 +11,7 @@
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -96,7 +97,7 @@
 
 <!-- The alerts below list every platform problem, so the banner would only repeat them. -->
 <AppTopbar title="Overview" events={() => false}>
-	<Button variant="outline" size="sm" onclick={() => overview.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => overview.refresh()} />
 </AppTopbar>
 
 
@@ -166,7 +167,7 @@
 								<span class="issue-actions">
 									{#if view.build}
 										{@const build = view.build}
-										<GatedButton requires="run.adhoc" size="xs" variant={build.variant} onclick={() => goto(to(build.href))}>{build.label}</GatedButton>
+										<GatedButton requires="run.adhoc" size="xs" variant={build.variant} onclick={() => goto(to(build.href))}>{#if build.variant === 'stale'}<HammerIcon class="size-3.5" />{/if}{build.label}</GatedButton>
 									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>

@@ -62,7 +62,7 @@
 		{/if}
 		{#if children}<span class="ml-1 flex items-center gap-2.5">{@render children()}</span>{/if}
 		<button
-			class="bg-card text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] grid h-8 w-8 place-items-center rounded-md border border-border"
+			class="bg-card text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] grid size-[30px] place-items-center rounded-(--radius) border border-border"
 			aria-label="Toggle theme"
 			onclick={toggleTheme}
 		>

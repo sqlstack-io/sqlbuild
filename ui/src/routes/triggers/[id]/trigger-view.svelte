@@ -49,12 +49,12 @@
 	{#if t}
 		{#if app.can('trigger.toggle')}<input class="reason" bind:value={reason} placeholder="Why? (saved in the history)" aria-label="Reason for the change" />{/if}
 		{#if t.state !== t.defaultState}
-			<GatedButton requires="trigger.toggle" {busy} onclick={resetDefault}>Set back to the code ({t.defaultState === 'running' ? 'on' : 'paused'})</GatedButton>
+			<GatedButton size="bar" requires="trigger.toggle" {busy} onclick={resetDefault}>Set back to the code ({t.defaultState === 'running' ? 'on' : 'paused'})</GatedButton>
 		{/if}
 		{#if t.state === 'running'}
-			<GatedButton requires="trigger.toggle" {busy} onclick={() => setState('paused')}>Pause</GatedButton>
+			<GatedButton size="bar" requires="trigger.toggle" {busy} onclick={() => setState('paused')}>Pause</GatedButton>
 		{:else}
-			<GatedButton requires="trigger.toggle" variant="default" {busy} onclick={() => setState('running')}>Turn on</GatedButton>
+			<GatedButton size="bar" requires="trigger.toggle" variant="default" {busy} onclick={() => setState('running')}>Turn on</GatedButton>
 		{/if}
 	{/if}
 </AppTopbar>

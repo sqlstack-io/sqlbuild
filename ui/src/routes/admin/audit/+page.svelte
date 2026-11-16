@@ -2,7 +2,7 @@
 	import { to } from '$lib/paths';
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
@@ -39,14 +39,12 @@
 </script>
 
 <AppTopbar title="Audit log">
-	<Button
-		variant="outline"
-		size="sm"
+	<RefreshButton
 		onclick={() => {
 			entries.refresh();
 			everyone.refresh();
-		}}>↻ Refresh</Button
-	>
+		}}
+	/>
 </AppTopbar>
 
 {#if !app.can('audit.view')}

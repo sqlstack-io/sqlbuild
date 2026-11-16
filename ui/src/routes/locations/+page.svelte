@@ -2,7 +2,7 @@
 	import { openRow, to } from '$lib/paths';
 	import MapPinIcon from '@lucide/svelte/icons/map-pin';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
@@ -48,7 +48,7 @@
 </script>
 
 <AppTopbar title="Locations">
-	<Button variant="outline" size="sm" onclick={() => (locations.refresh(), status?.refresh())}>↻ Refresh</Button>
+	<RefreshButton onclick={() => (locations.refresh(), status?.refresh())} />
 </AppTopbar>
 
 {#if showsServer}<ServerStatus bind:this={status} />{/if}

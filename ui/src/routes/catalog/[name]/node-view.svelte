@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { to } from '$lib/paths';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import SqlViewer from '$lib/components/code/sql-viewer.svelte';
@@ -87,9 +88,9 @@
 </script>
 
 <AppTopbar title="Catalog">
-	<Button variant="outline" size="sm" onclick={() => res.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => res.refresh()} />
 	{#if n && n.kind !== 'source' && canRun}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => execute([name])}>▷ Build</GatedButton>
+		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => execute([name])}><PlayIcon class="size-3.5 fill-current stroke-none" />Build</GatedButton>
 	{/if}
 </AppTopbar>
 

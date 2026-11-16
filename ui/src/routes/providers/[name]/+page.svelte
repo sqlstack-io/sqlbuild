@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import KeyValues from '$lib/components/platform/key-values.svelte';
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -20,7 +20,7 @@
 </script>
 
 <AppTopbar title="Providers">
-	<Button variant="outline" size="sm" onclick={() => providers.refresh()}>↻ Refresh</Button>
+	<RefreshButton onclick={() => providers.refresh()} />
 </AppTopbar>
 
 <div class="flex min-h-0 flex-1 flex-col">
