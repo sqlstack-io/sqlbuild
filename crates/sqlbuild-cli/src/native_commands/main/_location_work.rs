@@ -23,7 +23,7 @@ use crate::native_commands::models::{LocationServe, LocationWatch};
 
 /// Retry the exact completed result without rerunning it; `true` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
-    (options, script): (&LocationServe, &Path),
+    (options, script, connected): (&LocationServe, &Path, bool),
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -59,7 +59,13 @@ pub(super) async fn run_location_work(
             }
         };
         let copy = (client, poll.session_id, claim.generation);
-        let checked = perform_work((options, script), claim.request.work, copy, expires).await?;
+        let checked = perform_work(
+            (options, script, connected),
+            claim.request.work,
+            copy,
+            expires,
+        )
+        .await?;
         let Some((outcome, local_files)) = checked else {
             drop(write_output(&[(
                 Stream::Stderr,
@@ -121,9 +127,9 @@ pub(super) async fn run_location_work(
     Ok(Some((files, sync)))
 }
 
-/// One named operation; `None` means it stopped at shutdown or its lease ended.
+/// One named operation; `None` means it stopped at shutdown or its lease ended; `sqb dev` never signs in here.
 async fn perform_work(
-    (options, script): (&LocationServe, &Path),
+    (options, script, connected): (&LocationServe, &Path, bool),
     work: LocationWork,
     copy: (&LocationWorkClient, Uuid, i64),
     expires: impl Future<Output = Result<(), ControlError>>,
@@ -138,7 +144,7 @@ async fn perform_work(
     Ok(match work {
         LocationWork::SyncWarehouse {} => Some((LocationWorkOutcome::SyncStarted {}, Vec::new())),
         LocationWork::CheckConnection {} => {
-            check_location_connection((options, script, true), expires)
+            check_location_connection((options, script, connected), expires)
                 .await?
                 .map(|(healthy, _, files)| (LocationWorkOutcome::Connection { healthy }, files))
         }

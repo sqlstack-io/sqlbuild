@@ -465,7 +465,7 @@ pub(crate) fn metadata_sync(
         cycle_started_at: None,
         safety_seconds,
         safety_at: Instant::now() + Duration::from_secs(safety_seconds),
-        read_failure: None,
+        failed_reads: 0,
         halted: false,
         change_tokens: HashMap::new(),
         scan_token: None,
@@ -1388,7 +1388,7 @@ pub(crate) async fn read_metadata_page(
         },
     };
     if matches!(reply, MetadataReply::Page(_)) {
-        state.read_failure = None;
+        state.failed_reads = 0;
     }
     Ok(Some((state, reply)))
 }
@@ -1409,7 +1409,7 @@ pub(crate) async fn wait_for_file(
     Ok(Some(state))
 }
 
-/// Report the failed read with its error, then retry it later or stop after identical failures.
+/// Report the failed read with its error, then retry it later or stop after failures in a row.
 pub(crate) async fn failed_read(
     mut state: LocationMetadataSync,
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
@@ -1421,8 +1421,7 @@ pub(crate) async fn failed_read(
         result = stopped => { result?; return Ok(None); },
         () = metadata_health(&state, (client, poll), (started, read), Some(&failure.reason)) => {},
     }
-    let reason = failure.reason.clone();
-    let message = match state.fail_read(failure) {
+    let message = match state.fail_read(failure.page_size) {
         Some(wait) => format!(
             "Warehouse history read failed; retaining mirror and retrying in {}s.\n",
             wait.as_secs()
@@ -1430,7 +1429,8 @@ pub(crate) async fn failed_read(
         None => {
             state = close_metadata_reader(state).await?;
             format!(
-                "Warehouse history synchronization stopped after {METADATA_FAILURE_LIMIT} identical failed reads: {reason}. Request a sync or publish again to retry.\n"
+                "Warehouse history synchronization stopped after {METADATA_FAILURE_LIMIT} failed reads in a row: {}. Request a sync or publish again to retry.\n",
+                failure.reason
             )
         }
     };

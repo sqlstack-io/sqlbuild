@@ -10,8 +10,8 @@ pub fn parse_dev_event(line: &str) -> Option<DevEvent> {
     if !trimmed.starts_with(EVENT_LINE_PREFIX) {
         return None;
     }
-    match serde_json::from_str(trimmed) {
-        Ok(event) => Some(event),
-        Err(_) => None,
-    }
+    let Ok(event) = serde_json::from_str(trimmed) else {
+        return None;
+    };
+    Some(event)
 }

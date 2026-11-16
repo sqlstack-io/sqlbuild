@@ -104,8 +104,9 @@ async fn watch_location(
         let ready;
         (watch, ready) = observe_location_inputs(&options.project_dir, watch);
         if !ready {
+            let connected: bool = controls.borrow().warehouse == Some(true);
             let Some(idle) = poll_location(
-                (options, script),
+                (options, script, connected),
                 (client, poll, published_generation),
                 (watch, work_at, metadata),
                 stopped.as_mut(),
@@ -150,7 +151,7 @@ async fn watch_location(
 
 /// Named work and metadata share one idle turn without transferring interpreter ownership.
 async fn poll_location(
-    (options, script): (&LocationServe, &Path),
+    (options, script, connected): (&LocationServe, &Path, bool),
     (client, poll, generation): (&LocationWorkClient, &LocationWorkPoll, Option<i64>),
     (mut watch, mut work_at, mut metadata): (LocationWatch, Instant, Option<LocationMetadataSync>),
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -159,7 +160,7 @@ async fn poll_location(
     if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
         if Instant::now() >= work_at {
             let Some((files, sync)) = run_location_work(
-                (options, script),
+                (options, script, connected),
                 (client, poll, &watch),
                 generation,
                 stopped.as_mut(),

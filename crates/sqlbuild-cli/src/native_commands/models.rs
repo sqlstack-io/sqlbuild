@@ -16,9 +16,7 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
-use crate::native_commands::constants::{
-    METADATA_BACKOFF_MAX_SECONDS, METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS,
-};
+use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
 use crate::native_commands::types::LocationPublication;
 
 /// Privileged local operations require direct ownership of the control database.
@@ -231,9 +229,9 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) safety_seconds: u64,
     /// When an idle location syncs even though no run ended and nobody asked.
     pub(crate) safety_at: tokio::time::Instant,
-    /// The latest failed read and how many times in a row it failed the same way.
-    pub(crate) read_failure: Option<(WarehouseHistoryFailure, u32)>,
-    /// Identical failed reads stopped the synchronization until a sync request or a new publication.
+    /// Failed reads in a row that did not shrink the page; a delivered page resets it.
+    pub(crate) failed_reads: u32,
+    /// Failed reads in a row stopped the synchronization until a sync request or a new publication.
     pub(crate) halted: bool,
     /// Per scan index: the table's change token after its last complete read.
     pub(crate) change_tokens: HashMap<usize, ScanToken>,
@@ -271,8 +269,8 @@ impl LocationMetadataSync {
     /// A person asked for a sync: start one now when idle, or one more after the current one.
     pub(crate) fn request_sync(&mut self) {
         self.cycle_started_at = None;
-        self.read_failure = None;
-        if std::mem::take(&mut self.halted) || self.idle {
+        let backing_off = std::mem::take(&mut self.failed_reads) > 0;
+        if std::mem::take(&mut self.halted) || backing_off || self.idle {
             self.next_at = tokio::time::Instant::now();
         }
     }
@@ -295,10 +293,7 @@ impl LocationMetadataSync {
     }
 
     /// Halve the page after a page-size failure, else back off; the wait, or `None` once stopped.
-    pub(crate) fn fail_read(
-        &mut self,
-        failure: WarehouseHistoryFailure,
-    ) -> Option<std::time::Duration> {
+    pub(crate) fn fail_read(&mut self, page_size: bool) -> Option<std::time::Duration> {
         self.statistics = None;
         let statistics = self.kind() == WarehouseHistoryKind::Statistics;
         let limit = if statistics {
@@ -306,7 +301,7 @@ impl LocationMetadataSync {
         } else {
             &mut self.limit
         };
-        let seconds = if failure.page_size && *limit > 1 {
+        let seconds = if page_size && *limit > 1 {
             *limit /= 2;
             if statistics {
                 self.index -= 1;
@@ -317,18 +312,12 @@ impl LocationMetadataSync {
             }
             METADATA_POLL_SECONDS
         } else {
-            let repeats = match &self.read_failure {
-                Some((last, repeats)) if *last == failure => repeats + 1,
-                _ => 1,
-            };
-            self.read_failure = Some((failure, repeats));
-            if repeats >= METADATA_FAILURE_LIMIT {
+            self.failed_reads += 1;
+            if self.failed_reads >= METADATA_FAILURE_LIMIT {
                 self.halted = true;
                 return None;
             }
-            METADATA_POLL_SECONDS
-                .saturating_mul(1 << (repeats - 1))
-                .min(METADATA_BACKOFF_MAX_SECONDS)
+            METADATA_POLL_SECONDS << (self.failed_reads - 1)
         };
         let wait = std::time::Duration::from_secs(seconds);
         self.next_at = tokio::time::Instant::now() + wait;
@@ -337,7 +326,7 @@ impl LocationMetadataSync {
 
     /// A synchronization is mid-flight and its next page is due, so the loop need not wait a tick.
     pub(crate) fn paging(&self) -> bool {
-        !self.idle && tokio::time::Instant::now() >= self.next_at
+        !self.idle && !self.halted && tokio::time::Instant::now() >= self.next_at
     }
 
     pub(crate) fn reconciling(&self) -> bool {

@@ -10,7 +10,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::dev_screen::models::{DevStep, KeyGate, ScreenMessage};
 use crate::dev_session::_helpers::connection::{connection_outcome, split_debug_output};
-use crate::dev_session::constants::{CONNECTING, NO_REPORT};
+use crate::dev_session::constants::{CONNECTING, DEBUG_DRAIN, NO_REPORT};
 use crate::dev_session::models::DevProject;
 
 /// Run `sqb debug --json` with the terminal's input, framing the client's own output; true when it connected.
@@ -43,7 +43,7 @@ pub(crate) async fn connect_in_foreground(
     connected
 }
 
-/// The debug report on stdout; stderr streams to the screen as the client writes it.
+/// The report on stdout and stderr streamed to the screen, until `sqb debug` exits even if a browser it opened keeps the pipes.
 async fn run_debug(
     screen: &UnboundedSender<ScreenMessage>,
     dev: &DevProject,
@@ -78,7 +78,19 @@ async fn run_debug(
             }
         }
     };
-    tokio::try_join!(relay, stdout.read_to_end(&mut report))?;
+    {
+        let reading = async { tokio::try_join!(relay, stdout.read_to_end(&mut report)) };
+        tokio::pin!(reading);
+        tokio::select! {
+            read = &mut reading => { read?; }
+            exited = child.wait() => {
+                exited?;
+                if let Ok(read) = tokio::time::timeout(DEBUG_DRAIN, &mut reading).await {
+                    read?;
+                }
+            }
+        }
+    }
     child.wait().await?;
     Ok(report)
 }

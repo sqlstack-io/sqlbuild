@@ -96,10 +96,8 @@ pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
 pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 /// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.
 pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
-/// Identical failed reads in a row that stop a synchronization until someone asks for one.
+/// Failed reads in a row, waiting twice as long after each, that stop a sync until one is requested.
 pub(crate) const METADATA_FAILURE_LIMIT: u32 = 5;
-/// The longest wait between repeated failed reads, matching the default safety sync.
-pub(crate) const METADATA_BACKOFF_MAX_SECONDS: u64 = 1800;
 /// Characters of a failed read's error that its health report carries.
 pub(crate) const METADATA_ERROR_CHARS: usize = 500;
 /// A metadata reader that ignores end of input this long after a synchronization is killed.

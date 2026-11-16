@@ -1,6 +1,4 @@
-use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryFailure, WarehouseHistoryKind,
-};
+use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryKind;
 
 use crate::argv::models::{TypeFailure, Value};
 use crate::native_commands::errors::PythonNeeded;
@@ -102,14 +100,16 @@ pub(super) struct MetadataRetryTestCase {
     pub(super) expected_statistics_limit: usize,
 }
 
-/// Failed reads of one table around a sync request, their waits, and the page size and stop after them.
+/// Failed reads of one table (true when page-size) around a sync request, and what follows them.
 pub(super) struct MetadataBackoffTestCase {
     pub(super) description: &'static str,
-    pub(super) failures: Vec<WarehouseHistoryFailure>,
-    pub(super) failures_after_request: Vec<WarehouseHistoryFailure>,
+    pub(super) failures: Vec<bool>,
+    pub(super) failures_after_request: Vec<bool>,
     pub(super) expected_waits: Vec<Option<u64>>,
     pub(super) expected_limit: usize,
     pub(super) expected_halted: bool,
+    /// Whether the sync pages right after the request, and after the last failure.
+    pub(super) expected_paging: (bool, bool),
 }
 
 /// A completed state-table read, the later scan of the same table, and whether that scan may skip.

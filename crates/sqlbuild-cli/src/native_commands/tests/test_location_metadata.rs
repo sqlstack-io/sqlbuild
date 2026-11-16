@@ -1,6 +1,6 @@
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseStateLocation,
+    WarehouseHistoryKind, WarehouseStateLocation,
 };
 
 use chrono::Utc;
@@ -47,10 +47,7 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             .iter()
             .position(|kind| *kind == test_case.failed_kind)
             .expect("kind is listed");
-        let wait = state.fail_read(WarehouseHistoryFailure {
-            reason: "Out of memory".into(),
-            page_size: true,
-        });
+        let wait = state.fail_read(true);
         assert!(wait.is_some(), "{}", test_case.description);
         let state = acknowledge_complete_pages(state, test_case.acknowledged_pages);
         assert_eq!(
@@ -67,60 +64,44 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
 }
 
 #[test]
-fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_and_identical_errors_stop()
+fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_and_failures_in_a_row_stop()
  {
-    let denied = || WarehouseHistoryFailure {
-        reason: "Insufficient privileges to operate on table '_SQLBUILD_FINGERPRINTS'".into(),
-        page_size: false,
-    };
-    let memory = || WarehouseHistoryFailure {
-        reason: "Out of memory".into(),
-        page_size: true,
-    };
-    let missing = || WarehouseHistoryFailure {
-        reason: "Table '_SQLBUILD_FINGERPRINTS' does not exist".into(),
-        page_size: false,
-    };
     let test_cases = [
         MetadataBackoffTestCase {
-            description: "a permission error never shrinks the page and waits longer each time",
-            failures: vec![denied(), denied(), denied()],
+            description: "a permission or missing-table error never shrinks the page, and a request ends its wait",
+            failures: vec![false, false, false],
             failures_after_request: vec![],
             expected_waits: vec![Some(30), Some(60), Some(120)],
             expected_limit: MAX_HISTORY_RECORDS,
             expected_halted: false,
+            expected_paging: (true, true),
         },
         MetadataBackoffTestCase {
-            description: "the fifth identical failure stops the sync",
+            description: "the fifth failure in a row stops the sync, which then never pages",
             failures: vec![],
-            failures_after_request: vec![denied(), denied(), denied(), denied(), denied()],
+            failures_after_request: vec![false, false, false, false, false],
             expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None],
             expected_limit: MAX_HISTORY_RECORDS,
             expected_halted: true,
-        },
-        MetadataBackoffTestCase {
-            description: "a different error starts the count again",
-            failures: vec![denied(), denied(), denied(), denied(), missing()],
-            failures_after_request: vec![],
-            expected_waits: vec![Some(30), Some(60), Some(120), Some(240), Some(30)],
-            expected_limit: MAX_HISTORY_RECORDS,
-            expected_halted: false,
+            expected_paging: (true, false),
         },
         MetadataBackoffTestCase {
             description: "a page-size error halves the page and retries after one poll",
-            failures: vec![memory(), memory()],
+            failures: vec![true, true],
             failures_after_request: vec![],
             expected_waits: vec![Some(30), Some(30)],
             expected_limit: MAX_HISTORY_RECORDS / 4,
             expected_halted: false,
+            expected_paging: (false, false),
         },
         MetadataBackoffTestCase {
             description: "a sync request resumes a stopped sync with a fresh count",
-            failures: vec![denied(), denied(), denied(), denied(), denied()],
-            failures_after_request: vec![denied()],
+            failures: vec![false, false, false, false, false],
+            failures_after_request: vec![false],
             expected_waits: vec![Some(30), Some(60), Some(120), Some(240), None, Some(30)],
             expected_limit: MAX_HISTORY_RECORDS,
             expected_halted: false,
+            expected_paging: (true, false),
         },
     ];
     for test_case in test_cases {
@@ -129,24 +110,32 @@ fn given_repeated_failed_reads_when_retrying_then_only_page_size_errors_shrink_a
             .iter()
             .position(|kind| *kind == WarehouseHistoryKind::Fingerprints)
             .expect("kind is listed");
+        state.begin_sync(Utc::now());
         let mut waits: Vec<Option<u64>> = test_case
             .failures
             .into_iter()
-            .map(|failure| state.fail_read(failure).map(|wait| wait.as_secs()))
+            .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs()))
             .collect();
         state.request_sync();
+        let paging_after_request = state.paging();
         waits.extend(
             test_case
                 .failures_after_request
                 .into_iter()
-                .map(|failure| state.fail_read(failure).map(|wait| wait.as_secs())),
+                .map(|page_size| state.fail_read(page_size).map(|wait| wait.as_secs())),
         );
         assert_eq!(
-            (waits, state.limit, state.halted),
+            (
+                waits,
+                state.limit,
+                state.halted,
+                (paging_after_request, state.paging())
+            ),
             (
                 test_case.expected_waits,
                 test_case.expected_limit,
-                test_case.expected_halted
+                test_case.expected_halted,
+                test_case.expected_paging,
             ),
             "{}",
             test_case.description

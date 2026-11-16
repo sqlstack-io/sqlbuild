@@ -22,3 +22,5 @@ pub(crate) const RUN_POLL: Duration = Duration::from_secs(2);
 pub(crate) const RUN_PAGE: u32 = 20;
 /// The warehouse row's detail while the foreground connection runs.
 pub(crate) const CONNECTING: &str = "connecting";
+/// How long the foreground `sqb debug`'s pipes are drained after it exits.
+pub(crate) const DEBUG_DRAIN: Duration = Duration::from_secs(2);

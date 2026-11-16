@@ -803,7 +803,7 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
     }
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
-    assert page() is None
+    assert page()["failed"]["page_size"] is False
     assert not (project / "warehouse.db").exists()
 
 
@@ -1375,7 +1375,7 @@ def test_given_fingerprint_history_when_read_in_isolated_pages_then_legacy_retri
             assert predecessor.execute("PRAGMA journal_mode").fetchone() == (journal_mode,)
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
-    assert page() is None
+    assert page()["failed"]["page_size"] is False
     assert not (project / "warehouse.db").exists()
 
 
