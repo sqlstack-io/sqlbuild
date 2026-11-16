@@ -326,8 +326,8 @@ crates/sqlbuild-python-planner/src/planner_phases/_helpers/rebuilds/retention.rs
 crates/sqlbuild-python-planner/src/planner_phases/_helpers/inputs/warehouse_state.rs	MigrationDecision.moves_data
 crates/sqlbuild-python-planner/src/planner_phases/_helpers/inputs/warehouse_state.rs	PlannerRelationsContext.source_warehouse_columns
 crates/sqlbuild-python-planner/src/planner_resolution/_helpers/safety/maximum_safety.rs	FutureCursorAction.value
-crates/sqlbuild-python-planner/src/planner_resolution/_helpers/cursor/cursor_overrides.rs	CursorOverrides.typed_as
-crates/sqlbuild-python-planner/src/planner_resolution/_helpers/references/refs.rs	DbtCompileReferenceResolver.resolve_reference
+crates/sqlbuild-python-planner/src/planner_resolution/_helpers/references/values.rs	CursorOverrides.typed_as
+crates/sqlbuild-python-planner/src/planner_resolution/_helpers/references/values.rs	DbtCompileReferenceResolver.resolve_reference
 crates/sqlbuild-python-planner/src/planner_scenario/_helpers/artifacts.rs	ScenarioArtifactKind.value
 crates/sqlbuild-python-planner/src/planner_strategy/_helpers/audit_entries.rs	PlannerRelationsContext.model_locations
 crates/sqlbuild-python-planner/src/planner_strategy/main/audit_entries/build_selected_audit_entries.rs	PlannerRelationsContext.model_locations

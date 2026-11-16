@@ -12,7 +12,6 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 #[pyfunction]
 #[pyo3(signature = (*, project, selection, policies))]
-/// The selected, stale-warning and inspection scopes `selection` resolves over `project`.
 pub fn resolve_planner_scopes<'py>(
     project: &Bound<'py, PyAny>,
     selection: &Bound<'py, PyAny>,
