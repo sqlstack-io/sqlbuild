@@ -14,7 +14,6 @@ use sqlbuild_analysis::review_command::models::{IncrementalStart, ReviewGraph, V
 
 use crate::bindings::_helpers::build_command::command::run_build_command;
 use crate::bindings::_helpers::clone::clone_command::run_clone_command;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::dagster_invocation::access::string_tuple as texts;
 use crate::bindings::_helpers::review_command::planning::ReviewSettings;
 use crate::bindings::_helpers::review_command::support::{quietly, review_error};
@@ -24,6 +23,7 @@ use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 
 const FAILED_STATUS: &str = "failed";
 const AUDIT_KIND: &str = "audit";

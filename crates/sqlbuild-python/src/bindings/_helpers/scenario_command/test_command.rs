@@ -24,7 +24,6 @@ use crate::bindings::_helpers::change_selection::base_snapshot::{
 use crate::bindings::_helpers::change_selection::selection::{
     ChangedProject, changed_project, tests_and_models, with_since_section,
 };
-use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
 use crate::bindings::_helpers::result_output::documents::format_scenario_execution_json_with;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
@@ -45,6 +44,7 @@ use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 
 const LOCAL_ADAPTER: &str = "duckdb";
 const LOCAL_STATUSES: [&str; 4] = ["PASS", "FAIL", "ERROR", "SKIP"];

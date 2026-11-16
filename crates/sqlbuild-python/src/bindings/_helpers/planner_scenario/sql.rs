@@ -9,7 +9,6 @@ use crate::bindings::_helpers::planner_scenario::{
     values::{error, string},
 };
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
-use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python, pyfunction};
 use pyo3::types::{PyDict, PyStringMethods};
 use sqlbuild_analysis::planner_scenario::{
@@ -18,6 +17,7 @@ use sqlbuild_analysis::planner_scenario::{
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
 use sqlbuild_sqltext::sql_scan::models::Unclosed;
 
 pub(super) fn resolve_sql(

@@ -5,12 +5,6 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::cursor::intervals::partition;
-use crate::bindings::_helpers::cursor::scalars;
-use crate::bindings::_helpers::cursor::scalars::compare_values;
-use crate::bindings::_helpers::cursor::scalars::render_value;
-use crate::bindings::_helpers::cursor::scalars::to_inclusive;
-use crate::bindings::_helpers::model_config::typed_config::{config_cursor_bound, model_values};
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
     by_name, config_str, model_key, native_member, optional_text, planner_error, planner_model,
@@ -49,6 +43,13 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+use sqlbuild_python_front::cursor::main::intervals::partition::partition;
+use sqlbuild_python_front::cursor::main::scalars::compare_values::compare_values;
+use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
+use sqlbuild_python_front::cursor::main::scalars::to_inclusive::to_inclusive;
+use sqlbuild_python_front::cursor::main::scalars::try_parse::try_parse;
+use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -126,7 +127,7 @@ fn parse<'py>(
     raw: &Bound<'py, PyAny>,
     cursor_type: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
-    scalars::parse(raw, &text(py, cursor_type))
+    sqlbuild_python_front::cursor::main::scalars::parse::parse(raw, &text(py, cursor_type))
 }
 
 fn render<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
@@ -337,7 +338,7 @@ fn floor_lifts(info: &CursorModel<'_>, observed: &Bound<'_, PyAny>) -> PyResult<
     let (Some(floor), Some(cursor_type)) = (&info.floor, &info.cursor_type) else {
         return Ok(false);
     };
-    match scalars::try_parse(&text(py, floor), &text(py, cursor_type))? {
+    match try_parse(&text(py, floor), &text(py, cursor_type))? {
         Some(floor) => Ok(compare_values(&floor, observed)? > 0),
         None => Ok(false),
     }

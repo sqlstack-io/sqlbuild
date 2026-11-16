@@ -14,8 +14,6 @@ use sqlbuild_core::cli_text::models::{
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::compile_command::surrogates::SurrogateText;
-use crate::bindings::_helpers::discovery::constants::SQL_HOOK_OUTPUT_FIELDS;
-use crate::bindings::_helpers::discovery::hook_entries::hook_entries;
 use crate::bindings::_helpers::semantic_shapes::coverage::semantic_coverage;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -28,6 +26,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::discovery::constants::SQL_HOOK_OUTPUT_FIELDS;
+use sqlbuild_python_front::discovery::main::headers::hook_entries::hook_entries;
 
 const METADATA_MODULE: &str = "importlib.metadata";
 const TARGET_DIRECTORY: &str = "target";

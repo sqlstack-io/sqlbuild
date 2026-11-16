@@ -8,13 +8,7 @@ use sqlbuild_cursor::algebra::main::compare::compare;
 use sqlbuild_cursor::algebra::main::floor_to_grain::floor_to_grain;
 use sqlbuild_cursor::algebra::models::{Grain, Scalar};
 
-use crate::bindings::_helpers::attachments::cursor_intrinsics::{
-    compile_input_error, resolve_cursor_intrinsics,
-};
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::cursor::conversion::CursorSession;
-use crate::bindings::_helpers::cursor::scalars::{parse_value, render_value};
-use crate::bindings::_helpers::model_config::typed_config::{config_text_object, model_values};
 use crate::bindings::_helpers::sql_test_glue::constants::{
     CURSOR_ALGEBRA_EXCEPTIONS, CURSOR_END_KEY, CURSOR_START_KEY, DEFAULT_INTEGER_END,
     DEFAULT_INTEGER_START, DEFAULT_TIMESTAMP_END, DEFAULT_TIMESTAMP_START, INTEGER_CURSOR_TYPE,
@@ -26,6 +20,13 @@ use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_v
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::attachments::main::compile_input_error::compile_input_error;
+use sqlbuild_python_front::attachments::main::resolve_cursor_intrinsics::resolve_cursor_intrinsics;
+use sqlbuild_python_front::cursor::main::scalars::parse_value::parse_value;
+use sqlbuild_python_front::cursor::main::scalars::render_value::render_value;
+use sqlbuild_python_front::cursor::models::CursorSession;
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 /// One model's cursor name, type and timestamp grain.
 struct ModelCursor<'py> {

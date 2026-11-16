@@ -2,10 +2,12 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::macro_bridge::{first_compile, module_digests, store_keys};
+use sqlbuild_python_front::macro_bridge::main::register_first_compile::register_first_compile;
+use sqlbuild_python_front::macro_bridge::main::register_module_digests::register_module_digests;
+use sqlbuild_python_front::macro_bridge::main::register_store_keys::register_store_keys;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    first_compile::register(module)?;
-    module_digests::register(module)?;
-    store_keys::register(module)
+    register_first_compile(module)?;
+    register_module_digests(module)?;
+    register_store_keys(module)
 }

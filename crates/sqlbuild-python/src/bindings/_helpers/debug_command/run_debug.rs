@@ -34,10 +34,7 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
     CommandScope, WarehouseInputs, apply_warehouse, command_scope, find_authored, resolve_warehouse,
 };
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
-use crate::bindings::_helpers::discovery::configuration::discover_configured_providers;
-use crate::bindings::_helpers::discovery::provider_secrets::SecretPolicy;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -51,6 +48,9 @@ use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::discovery::main::project::discover_configured_providers::discover_configured_providers;
+use sqlbuild_python_front::discovery::models::SecretPolicy;
 
 const DEBUG_OPTIONS: (&[&str], &[&str]) = (
     &[],

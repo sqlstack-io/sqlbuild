@@ -1,9 +1,9 @@
 //! A compiled model, read from the native compiled project that owns it.
 
-use crate::bindings::_helpers::model_config::header_audits::HeaderAudits;
 use sqlbuild_project::models as project_models;
 use sqlbuild_project::models::{DestinationFact, ModelMetadataTexts};
 use sqlbuild_project::types::InferredRow;
+use sqlbuild_python_front::model_config::models::HeaderAudits;
 use std::sync::Arc;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -29,10 +29,10 @@ use crate::bindings::_helpers::compiled_views::model_input_view::{
 };
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::compiled_views::relation_keys::RelationKeyRow;
-use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;
-use crate::bindings::_helpers::model_config::header_metadata::HeaderColumns;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::model_config::models::HeaderColumns;
 
 const DATABASE_KEY: &str = "database";
 const SCHEMA_KEY: &str = "schema";

@@ -1,6 +1,5 @@
 //! Loader dependency mapping and synthetic source boundary construction.
 
-use crate::bindings::_helpers::contracts::spec_resolution::loader_parts;
 use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::planner_scope::values::{
@@ -15,6 +14,7 @@ use sqlbuild_analysis::planner_scope::main::{
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::loader_parts::loader_parts;
 use std::collections::HashSet;
 
 #[pyfunction]

@@ -7,11 +7,11 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::discovery::provider_secrets::invocation_allows_missing_secrets;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
 use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_front::discovery::main::sources::invocation_allows_missing_secrets::invocation_allows_missing_secrets;
 
 /// The version of the runtime identity a stored compile records.
 const REUSE_FORMAT_VERSION: &str = "1";

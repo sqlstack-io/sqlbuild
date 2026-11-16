@@ -17,8 +17,8 @@ use crate::bindings::_helpers::cost_report::records::{
     cost_run, cost_runs, record_object, record_tuple,
 };
 use crate::bindings::_helpers::cost_report::store;
-use crate::bindings::_helpers::scopes::scope_report_objects::json_to_python;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_front::scopes::main::reports::json_to_python::json_to_python;
 
 const BREAKDOWN_OPTIONS: (&[&str], &[&str]) = (
     &["record", "use_color"],

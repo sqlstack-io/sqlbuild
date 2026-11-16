@@ -24,11 +24,12 @@ use crate::bindings::_helpers::compiled_views::records::compiled_project_facts;
 use crate::bindings::_helpers::contracts::model_contracts::{
     ConflictRow, DiagnosticRow, evaluate_project_model_contracts, project_promotion_conflicts,
 };
-use crate::bindings::_helpers::sqltext::model_headers::{ColumnLocation, location_rows};
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::sqltext::main::location_rows::location_rows;
+use sqlbuild_python_front::sqltext::models::ColumnLocation;
 
 const PATHLIB_MODULE: &str = "pathlib";
 const GENERIC_DIALECT: &str = "generic";

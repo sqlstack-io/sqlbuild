@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.234.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.233.1...v0.234.0) (2026-11-16)
+
+
+### Features
+
+* built-in Snowflake performance rules for JSON copied onto finer rows ([#1515](https://github.com/sqlstack-io/sqlbuild/issues/1515)) ([f450b25](https://github.com/sqlstack-io/sqlbuild/commit/f450b25f5fe323c7a7536a469545cc06dfa1b5ca))
+
 ## [0.233.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.233.0...v0.233.1) (2026-11-16)
 
 

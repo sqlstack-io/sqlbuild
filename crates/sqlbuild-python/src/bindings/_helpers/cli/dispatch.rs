@@ -17,7 +17,6 @@ use crate::bindings::_helpers::dbt_command::init::run_dbt_init_command;
 use crate::bindings::_helpers::debug_command::run_debug::run_debug_command;
 use crate::bindings::_helpers::diff_report::command::run_diff_command;
 use crate::bindings::_helpers::diff_report::support::cli_error;
-use crate::bindings::_helpers::discovery::provider_secrets::MissingSecretsScope;
 use crate::bindings::_helpers::format_command::command::run_format_command;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::init_command::command::run_init_command;
@@ -57,6 +56,7 @@ use sqlbuild_core::format_command::main::format_path_selectors::format_path_sele
 use sqlbuild_python_base::cli::main::withhold_launch_record::withhold_launch_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_front::discovery::models::MissingSecretsScope;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;

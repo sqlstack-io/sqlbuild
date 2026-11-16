@@ -14,9 +14,9 @@ use sqlbuild_analysis::compiler::main::missing_expected_columns::missing_expecte
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 
-use crate::bindings::_helpers::sql_test_glue::authored_ctes::prefixed_ctes;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::sql_test_glue::main::prefixed_ctes::prefixed_ctes;
 
 fn prefixed_names<'py>(test: &Bound<'py, PyAny>, prefix: &str) -> PyResult<Bound<'py, PyAny>> {
     let py = test.py();
