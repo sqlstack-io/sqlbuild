@@ -113,7 +113,7 @@ def test_given_case_distinct_postgres_relations_when_reading_catalog_then_column
             _ = adapter.execute(connection=connection, sql=sql)
         adapter.close(connection)
         page: Any = warehouse_history_page(project, "catalog")
-        assert (page is not None) is test_case.expected_page_delivered
+        assert ("records" in page) is test_case.expected_page_delivered
         assert page == {"records": fixture["postgres_records"], "next_after": None}
 
 
@@ -167,8 +167,10 @@ def test_given_non_authoritative_adapter_scope_when_reading_catalog_then_no_page
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert (json.loads(result.stdout) is not None) is test_case.expected_page_delivered
-    assert "No page delivered" in result.stderr
+    reply: dict[str, Any] = json.loads(result.stdout)
+    assert ("records" in reply) is test_case.expected_page_delivered
+    if not test_case.expected_page_delivered:
+        assert "scan incomplete" in reply["error"], "a failed read returns its cause"
 
 
 @pytest.mark.parametrize(

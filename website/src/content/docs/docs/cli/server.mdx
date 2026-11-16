@@ -366,7 +366,7 @@ The location starts the sync within a few seconds, and the top bar shows when it
 | --- | --- | --- | --- |
 | `[control] server` | `SQLBUILD_CONTROL_SERVER` | none | HTTPS origin of the server, as `sqb login --server` takes it |
 | `[control] location` | `SQLBUILD_CONTROL_LOCATION` | none | Location name a signed-in `sqb build` asks to sync |
-| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"` | Longest a location waits between syncs; `"0"` or `"off"` turns it off |
+| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"`, or off on Databricks, ClickHouse and MotherDuck | Longest a location waits between syncs; `"0"` or `"off"` turns it off. See [warehouse cost](#warehouse-cost-of-an-always-on-location) |
 | none | `SQLBUILD_CONTROL_CA_CERT` | none | Extra trusted PEM CA certificate for the server |
 
 An environment variable overrides the project file. `sqb location serve --sync-at-least-every`
@@ -388,6 +388,25 @@ Details:
 - A sync reads the warehouse and never writes to it. On Snowflake, it skips state tables that
   haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
+
+### Warehouse cost of an always-on location
+
+A location syncs when it starts, after each run ends, when someone asks, and on the
+`sync_at_least_every` interval. Which reads need running compute depends on the adapter:
+
+| Adapter | Reads that need running compute | Interval sync while idle |
+| --- | --- | --- |
+| Snowflake | Reading a state table that changed since the last sync. Change checks, the catalog (`SHOW TABLES`, `SHOW VIEWS`, `SHOW COLUMNS`), statistics (`SHOW OBJECTS`) and existence checks run in cloud services | Every 30 minutes. A sync with nothing new resumes no warehouse; one after another writer changed a state table resumes it once |
+| BigQuery | None to resume, but every sync queries each state table and is billed for the bytes it reads | Every 30 minutes |
+| Databricks | Every read, including the catalog and existence checks, runs on the SQL warehouse | Off: a stopped warehouse would start each time |
+| ClickHouse | Every read is a query, which wakes an idle ClickHouse Cloud service | Off |
+| MotherDuck | Every read runs on MotherDuck compute | Off |
+| PostgreSQL, SQL Server | The server is always running; a serverless database that pauses when idle wakes on connection | Every 30 minutes; set `sync_at_least_every = "off"` for one that pauses |
+| DuckDB, SQLite | None; the location reads the file | Every 30 minutes |
+
+Where the interval is off, an idle location syncs only after a run ends or when someone asks, with
+**Sync now**, `sqb control sync` or a signed-in `sqb build`. A run has just used the warehouse, so
+the sync after it rarely resumes anything. Set `sync_at_least_every` to turn the interval back on.
 
 ### Follow a sync
 

@@ -152,6 +152,8 @@ pub(crate) struct LocationServe {
     pub(crate) metadata_reconcile_seconds: u32,
     /// Seconds between safety syncs of an idle location; `0` turns them off.
     pub(crate) safety_sync_seconds: u64,
+    /// A flag, the environment or the project set the interval, rather than the default.
+    pub(crate) safety_sync_explicit: bool,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -236,6 +238,10 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) page_seconds: u64,
     /// Progress of the current synchronization, for its per-table lines and summary.
     pub(crate) progress: SyncProgress,
+    /// The adapter's history reads start or wake billed compute, as the reader reports.
+    pub(crate) reads_wake_compute: bool,
+    /// Someone set the safety interval, so it applies even where reads wake compute.
+    pub(crate) safety_explicit: bool,
 }
 
 /// Rows delivered and time taken by the current synchronization and its current table.
@@ -305,13 +311,23 @@ impl LocationMetadataSync {
     }
 
     /// Whether an idle location starts its one outstanding sync: first, requested, after a run, or safety.
+    ///
+    /// The safety interval does not apply by default where history reads wake billed compute.
     pub(crate) fn sync_due(&self, runs_ended_at: Option<DateTime<Utc>>) -> bool {
         let ran = match (self.cycle_started_at, runs_ended_at) {
             (None, _) => true,
             (Some(started_at), Some(ended_at)) => ended_at >= started_at,
             (Some(_), None) => false,
         };
-        ran || (self.safety_seconds > 0 && tokio::time::Instant::now() >= self.safety_at)
+        ran || (self.safety_seconds > 0
+            && !self.defers_safety_sync()
+            && tokio::time::Instant::now() >= self.safety_at)
+    }
+
+    /// An idle location never wakes billed compute on the default interval alone; the next run
+    /// or a request syncs instead.
+    pub(crate) fn defers_safety_sync(&self) -> bool {
+        self.reads_wake_compute && !self.safety_explicit
     }
 
     /// Start the sync `sync_due` asked for, at server time `now`.

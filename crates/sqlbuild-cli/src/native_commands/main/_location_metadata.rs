@@ -81,7 +81,10 @@ pub(super) async fn sync_location_metadata(
         };
         state = read;
         let page = match page {
-            Ok(page) => page,
+            Ok(page) => {
+                state.reads_wake_compute = page.wakes_compute;
+                page
+            }
             Err(failure) => {
                 return failed_read(state, failure, (client, poll), started, stopped.as_mut())
                     .await;

@@ -177,7 +177,13 @@ pub(crate) fn read_history<'py>(
             "metadata state schema must not be blank",
         ));
     }
-    read_page(py, (session, stream), request)
+    let (mut page, stream) = read_page(py, (session, stream), request)?;
+    page.wakes_compute = session
+        .adapter
+        .getattr("history_reads_wake_compute")
+        .and_then(|value| value.extract::<bool>())
+        .unwrap_or(false);
+    Ok((page, stream))
 }
 
 /// Any request but the open scan's next page discards that result before running other SQL.
@@ -366,6 +372,7 @@ fn read_page<'py>(
             next_after: None,
             change_token: None,
             unchanged: false,
+            wakes_compute: false,
         };
         return Ok((page, None));
     }
@@ -380,6 +387,7 @@ fn read_page<'py>(
             next_after: None,
             change_token,
             unchanged: true,
+            wakes_compute: false,
         };
         return Ok((page, None));
     }
@@ -676,6 +684,7 @@ fn stream_page<'py>(
         next_after,
         change_token: None,
         unchanged: false,
+        wakes_compute: false,
     };
     Ok((page, open))
 }

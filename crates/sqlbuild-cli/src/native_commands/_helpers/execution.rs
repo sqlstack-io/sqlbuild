@@ -374,6 +374,8 @@ pub(crate) fn metadata_sync(
         state_history_versions: None,
         page_seconds: METADATA_PAGE_SECONDS,
         progress: SyncProgress::new(),
+        reads_wake_compute: false,
+        safety_explicit: true,
     }
 }
 
@@ -809,7 +811,7 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
             )));
         }
     };
-    let safety_sync_seconds = safety_sync_seconds(
+    let safety_sync = safety_sync_setting(
         text(namespace, "location_sync_at_least_every").as_deref(),
         environment.as_deref(),
         || {
@@ -823,31 +825,35 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
     )
     .map_err(ControlError::Invalid)?;
     Ok(LocationServe {
+        safety_sync_explicit: safety_sync.is_some(),
+        safety_sync_seconds: safety_sync.unwrap_or(METADATA_SAFETY_SYNC_SECONDS),
         project_dir,
         server_url: text(namespace, "location_server_url").unwrap_or_default(),
         location_id,
         target,
         image_id: text(namespace, "location_image_id"),
         metadata_reconcile_seconds,
-        safety_sync_seconds,
     })
 }
 
-/// The safety sync interval from the flag, then the environment, then the project, then thirty minutes.
-pub(crate) fn safety_sync_seconds(
+/// The safety sync interval from the flag, then the environment, then the project; `None` when
+/// nothing sets one and the default of thirty minutes applies.
+pub(crate) fn safety_sync_setting(
     flag: Option<&str>,
     environment: Option<&str>,
     project: impl FnOnce() -> Result<ControlConfig, String>,
-) -> Result<u64, String> {
+) -> Result<Option<u64>, String> {
     if let Some(text) = flag {
-        return sync_interval_seconds(text).map_err(|help| format!("--sync-at-least-every {help}"));
+        return sync_interval_seconds(text)
+            .map(Some)
+            .map_err(|help| format!("--sync-at-least-every {help}"));
     }
     if let Some(text) = environment.filter(|text| !text.trim().is_empty()) {
-        return sync_interval_seconds(text).map_err(|help| format!("{SAFETY_SYNC_ENV} {help}"));
+        return sync_interval_seconds(text)
+            .map(Some)
+            .map_err(|help| format!("{SAFETY_SYNC_ENV} {help}"));
     }
-    Ok(project()?
-        .sync_at_least_every_seconds
-        .unwrap_or(METADATA_SAFETY_SYNC_SECONDS))
+    Ok(project()?.sync_at_least_every_seconds)
 }
 
 /// Reconcile from the server after restarts or lost acknowledgements; transient outages retry.
@@ -1329,6 +1335,7 @@ pub(crate) async fn read_metadata_page(
             next_after: statistics.next_after.map(|id| vec![Some(id.to_string())]),
             change_token: None,
             unchanged: false,
+            wakes_compute: false,
         };
         return Ok(Some((state, Ok(page))));
     }

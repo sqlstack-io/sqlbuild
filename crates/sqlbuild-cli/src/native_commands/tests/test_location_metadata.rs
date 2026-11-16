@@ -11,9 +11,10 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::native_commands::_helpers::execution::{
-    history_request, metadata_sync, read_metadata_page, rows_text, safety_sync_seconds, scan_line,
+    history_request, metadata_sync, read_metadata_page, rows_text, safety_sync_setting, scan_line,
     sync_progress,
 };
+use crate::native_commands::constants::METADATA_SAFETY_SYNC_SECONDS;
 use crate::native_commands::main::_location_metadata::read_failure_line;
 use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
@@ -351,12 +352,13 @@ fn given_safety_sync_settings_when_resolving_then_flag_beats_environment_beats_p
         },
     ];
     for test_case in test_cases {
-        let resolved = safety_sync_seconds(test_case.flag, test_case.environment, || {
+        let resolved = safety_sync_setting(test_case.flag, test_case.environment, || {
             Ok(ControlConfig {
                 sync_at_least_every_seconds: test_case.project,
                 ..ControlConfig::default()
             })
-        });
+        })
+        .map(|seconds| seconds.unwrap_or(METADATA_SAFETY_SYNC_SECONDS));
         assert_eq!(
             resolved,
             test_case.expected_seconds.map_err(str::to_owned),
@@ -481,6 +483,7 @@ fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_pag
             image_id: None,
             metadata_reconcile_seconds: 3600,
             safety_sync_seconds: 0,
+            safety_sync_explicit: false,
         };
         let mut state = metadata_sync((one_location(), 1), (3600, 0));
         state.index = WarehouseHistoryKind::ALL
@@ -589,4 +592,36 @@ fn given_a_delivered_page_when_reporting_health_then_progress_completes_only_on_
         !sync_progress(&state, true).completed,
         "an earlier kind's last page does not"
     );
+}
+
+#[test]
+fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_or_a_set_interval_sync()
+ {
+    let idle = |wakes: bool, explicit: bool| {
+        let mut state = metadata_sync((one_location(), 1), (3600, 1800));
+        state.cycle_started_at = Some(Utc::now());
+        state.safety_at = Instant::now() - Duration::from_secs(1);
+        state.reads_wake_compute = wakes;
+        state.safety_explicit = explicit;
+        state
+    };
+    assert!(
+        !idle(true, false).sync_due(None),
+        "the default interval never wakes compute on a timer"
+    );
+    assert!(
+        idle(false, false).sync_due(None),
+        "metadata-only reads keep the default interval"
+    );
+    assert!(
+        idle(true, true).sync_due(None),
+        "an interval someone set still applies"
+    );
+    assert!(
+        idle(true, false).sync_due(Some(Utc::now() + chrono::Duration::seconds(1))),
+        "a run that ended still syncs"
+    );
+    let mut requested = idle(true, false);
+    requested.request_sync();
+    assert!(requested.sync_due(None), "a request still syncs");
 }

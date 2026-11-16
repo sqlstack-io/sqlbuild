@@ -119,6 +119,9 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
     metadata_inspection_concurrency: ClassVar[int] = 1
     concurrent_ddl_limit: ClassVar[int] = 1
     supports_session_warehouse: ClassVar[bool] = False
+    # Reading SQLBuild's state tables and catalog starts or wakes billed compute, so an idle code
+    # location defers its interval sync until a run ends or someone asks for one.
+    history_reads_wake_compute: ClassVar[bool] = False
     state_timestamp_type: ClassVar[str | None] = None
     untyped_column_type: ClassVar[str | None] = None
     _snapshot_sql_dialect: ClassVar[SnapshotSqlDialect] = SnapshotSqlDialect(

@@ -124,13 +124,15 @@ async fn watch_location(
         if published {
             watch.retry_at = refresh_at;
             published_generation = Some(generation);
-            metadata = Some(metadata_sync(
+            let mut sync = metadata_sync(
                 (locations, generation),
                 (
                     options.metadata_reconcile_seconds,
                     options.safety_sync_seconds,
                 ),
-            ));
+            );
+            sync.safety_explicit = options.safety_sync_explicit;
+            metadata = Some(sync);
             let Some(files) = check_published_location(
                 options,
                 script,

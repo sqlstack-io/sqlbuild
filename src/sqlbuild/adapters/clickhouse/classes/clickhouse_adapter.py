@@ -175,6 +175,8 @@ class ClickHouseAdapter(
     max_identifier_length: ClassVar[int] = MAX_IDENTIFIER_LENGTH
     relation_grants_supported: ClassVar[bool] = False
     state_timestamp_type: ClassVar[str | None] = STATE_TIMESTAMP_TYPE
+    # Any query wakes an idle ClickHouse Cloud service.
+    history_reads_wake_compute: ClassVar[bool] = True
     _snapshot_sql_dialect: ClassVar[SnapshotSqlDialect] = SnapshotSqlDialect(
         timestamp_type="Nullable(DateTime64(6, 'UTC'))",
         distinct_condition=render_is_distinct_from,

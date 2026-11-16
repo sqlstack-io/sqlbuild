@@ -197,3 +197,10 @@ class AdapterCursorLiteralEscapingTestCase:
     adapter: StrictAdapter
     expected_literal: str
     expected_delete_bound: str
+
+
+@dataclass(frozen=True)
+class HistoryComputeTestCase:
+    description: str
+    adapter: type[BaseAdapter]
+    expected_wakes_compute: bool

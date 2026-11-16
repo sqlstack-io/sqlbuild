@@ -763,7 +763,7 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
     }
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
-    assert page() is None
+    assert "records" not in page() and "metadata reads failed" in page()["error"]
     assert not (project / "warehouse.db").exists()
 
 
@@ -1233,7 +1233,7 @@ def test_given_fingerprint_history_when_read_in_isolated_pages_then_legacy_retri
     adapter.close(connection)
 
     def page(after: list[str | None] | None = None, observed_since: str | None = None) -> Any:
-        return warehouse_history_page(project, "fingerprints", after, observed_since)
+        return warehouse_history_page(project, "fingerprints", after, observed_since, limit=100)
 
     legacy: dict[str, Any] = page()
     assert legacy["next_after"] is None
@@ -1337,7 +1337,7 @@ def test_given_fingerprint_history_when_read_in_isolated_pages_then_legacy_retri
             assert predecessor.execute("PRAGMA journal_mode").fetchone() == (journal_mode,)
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
-    assert page() is None
+    assert "records" not in page() and "metadata reads failed" in page()["error"]
     assert not (project / "warehouse.db").exists()
 
 
