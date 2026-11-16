@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import GitCommitIcon from '@lucide/svelte/icons/git-commit-horizontal';
 	import PackageIcon from '@lucide/svelte/icons/package';
 	import type { SnapshotChange } from '$lib/api';
@@ -14,7 +15,9 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { changeOpLabel, changeOpTone, formatCredits } from '$lib/build-area/labels';
 	import { NODE_LIST_LIMIT, nodeChangeGroups, summarizeChange } from '$lib/build-area/changes';
-	import { nodeHref, orchestrationHref, percentChange } from './utils';
+	import { quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
+	import { shortRunId } from '$lib/operate/labels';
+	import { nodeHref, orchestrationHref, percentChange, shortRevision } from './utils';
 
 	type Area = 'all' | 'nodes' | 'orchestration' | 'roles' | 'environment';
 
@@ -39,6 +42,13 @@
 	);
 	/** Deploys, by snapshot, whose long node list is shown in full. */
 	let listed = $state<Record<string, boolean>>({});
+	/** Deploys that changed nothing are merged into one line per run of them, as on the overview. */
+	const rows = $derived(recentDeployRows(filtered));
+	/** Merged lines, by key, that are expanded; a search shows every match, so it expands them all. */
+	let openQuiet = $state<Record<string, boolean>>({});
+	const newest = $derived(all[0]?.snapshotId);
+	const hasBody = (c: SnapshotChange) =>
+		c.nodes.length > 0 || c.orchestration.length > 0 || c.roles.length > 0 || !!c.environment || !!c.costChanges?.length || c.followingRuns.length > 0;
 	const areaOptions: { value: Area; label: string }[] = [
 		{ value: 'all', label: 'All' },
 		{ value: 'nodes', label: 'Nodes' },
@@ -58,23 +68,24 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="feed sb-scroll">
-	{#if changes.error}<div class="msg err">Couldn't load the change feed: {changes.error}</div>{/if}
-	{#each filtered as c, i (c.snapshotId)}
-		<article class="deploy" id="gen-{c.generation}">
-			<header>
-				<span class="icon"><GitCommitIcon size={15} /></span>
-				<div class="title">
-					<strong title="Snapshot {c.snapshotId}, generation {c.generation}">Version {c.generation}</strong>
-					{#if c.gitRevision}<code title="Commit">{c.gitRevision}{c.gitDirty ? ' · with uncommitted changes' : ''}</code>{/if}
-					<span class="faint">{summarizeChange(c)}</span>
-				</div>
-				<div class="who">
-					{#if c.gitAuthor}<span>{c.gitAuthor}</span>{/if}
-					<span class="faint">{c.publishedBy ? `deployed by ${c.publishedBy.displayName} · ` : 'published '}<span title={formatStamp(c.publishedAt)}>{formatAgo(c.publishedAt, app.now)}</span></span>
-				</div>
-			</header>
+{#snippet deploy(c: SnapshotChange)}
+	<article class="deploy" id="gen-{c.generation}">
+		<header>
+			<span class="icon"><GitCommitIcon size={15} /></span>
+			<div class="title">
+				<strong title="Snapshot {c.snapshotId}, generation {c.generation}">Version {c.generation}</strong>
+				{#if c.gitRevision}<code title="Commit {c.gitRevision}">{shortRevision(c.gitRevision)}</code>{/if}
+				{#if c.gitDirty}<span class="faint">with uncommitted changes</span>{/if}
+				<span class="faint">{summarizeChange(c)}</span>
+				{#if !c.followingRuns.length}<span class="no-runs" title="No runs of this version yet">No runs</span>{/if}
+			</div>
+			<div class="who">
+				{#if c.gitAuthor}<span>{c.gitAuthor}</span>{/if}
+				<span class="faint">{c.publishedBy ? `deployed by ${c.publishedBy.displayName} · ` : 'published '}<span title={formatStamp(c.publishedAt)}>{formatAgo(c.publishedAt, app.now)}</span></span>
+			</div>
+		</header>
 
+		{#if hasBody(c)}
 			<div class="body">
 				{#if c.nodes.length}
 					{@const grouped = c.nodes.length > NODE_LIST_LIMIT && !listed[c.snapshotId] && !query.trim()}
@@ -157,30 +168,47 @@
 							{@const pct = percentChange(cc.before, cc.after)}
 							<div class="row">
 								<a class="key" href={to(`/jobs/${cc.jobKey}`)}>{cc.jobKey}</a>
-								<span class="detail">{formatCredits(cc.before)} → {formatCredits(cc.after)} per run <b class:up={pct > 0} class:down={pct < 0}>{pct > 0 ? '+' : ''}{pct}%</b> <span class="faint">over {cc.runsAfter} {cc.runsAfter === 1 ? 'run' : 'runs'} since revision {c.gitRevision}</span></span>
+								<span class="detail">{formatCredits(cc.before)} → {formatCredits(cc.after)} per run <b class:up={pct > 0} class:down={pct < 0}>{pct > 0 ? '+' : ''}{pct}%</b> <span class="faint">over {cc.runsAfter} {cc.runsAfter === 1 ? 'run' : 'runs'} since {c.gitRevision ? `revision ${shortRevision(c.gitRevision)}` : 'this deploy'}</span></span>
 							</div>
 						{/each}
 					</section>
 				{/if}
 
-				<section>
-					<h3>Runs that followed <span>{c.followingRuns.length}{i > 0 ? ' before the next deploy' : ''}</span></h3>
-					{#if c.followingRuns.length}
+				{#if c.followingRuns.length}
+					<section>
+						<h3>Runs that followed <span>{c.followingRuns.length}{c.snapshotId !== newest ? ' before the next deploy' : ''}</span></h3>
 						<div class="runs">
 							{#each c.followingRuns as r (r.id)}
-								<a class="run" href={to(`/runs/${r.id}`)} title="{runStatusLabel[r.status]} · {formatStamp(r.startedAt ?? r.queuedAt)}">
+								<a class="run" href={to(`/runs/${r.id}`)} title="{r.id} · {runStatusLabel[r.status]} · {formatStamp(r.startedAt ?? r.queuedAt)}">
 									<i style:background={runStatusTone[r.status]}></i>
-									<code>{r.id}</code>
+									<code>{shortRunId(r.id)}</code>
 									<span class="faint">{r.jobKey ?? 'started by hand'} · {formatAgo(r.startedAt ?? r.queuedAt, app.now)}</span>
 								</a>
 							{/each}
 						</div>
-					{:else}
-						<p class="faint">No runs of this version yet.</p>
-					{/if}
-				</section>
+					</section>
+				{/if}
 			</div>
-		</article>
+		{/if}
+	</article>
+{/snippet}
+
+<div class="feed sb-scroll">
+	{#if changes.error}<div class="msg err">Couldn't load the change feed: {changes.error}</div>{/if}
+	{#each rows as row (row.key)}
+		{#if row.kind === 'deploy'}
+			{@render deploy(row.change)}
+		{:else if query.trim()}
+			{#each row.changes as c (c.snapshotId)}{@render deploy(c)}{/each}
+		{:else}
+			{@const open = !!openQuiet[row.key]}
+			<button class="quiet" class:open aria-expanded={open} onclick={() => (openQuiet[row.key] = !open)}>
+				<ChevronRightIcon size={14} />{quietDeployLine(row, app.now)}
+			</button>
+			{#if open}
+				{#each row.changes as c (c.snapshotId)}{@render deploy(c)}{/each}
+			{/if}
+		{/if}
 	{:else}
 		{#if changes.data === undefined && !changes.error}<div class="msg"><Loading lines={4} /></div>{:else}<div class="msg">{all.length ? 'No deploys match the filter.' : 'Nothing has been deployed to this location yet.'}</div>{/if}
 	{/each}
@@ -194,7 +222,7 @@
 		padding: 18px 24px 48px;
 	}
 	.deploy {
-		margin-bottom: 16px;
+		margin-bottom: 12px;
 		border: 1px solid var(--panel-border);
 		border-radius: 2px;
 		background: var(--card);
@@ -208,7 +236,9 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		padding: 12px 16px;
+		padding: 11px 16px;
+	}
+	header:not(:last-child) {
 		border-bottom: 1px solid var(--border);
 	}
 	.icon {
@@ -222,9 +252,43 @@
 	}
 	.title {
 		display: flex;
+		min-width: 0;
+		flex-wrap: wrap;
 		align-items: baseline;
-		gap: 10px;
+		gap: 4px 10px;
+		font-size: 12.5px;
+	}
+	.title strong {
 		font-size: 13px;
+		font-weight: 600;
+	}
+	.no-runs {
+		color: var(--sb-text-faint);
+		font-size: 12px;
+	}
+	/* A run of deploys that changed nothing, as one line; it expands to list them. */
+	.quiet {
+		display: flex;
+		width: 100%;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 12px;
+		padding: 8px 16px;
+		border: 1px dashed var(--panel-border);
+		border-radius: 2px;
+		color: var(--sb-text-faint);
+		font-size: 12px;
+		text-align: left;
+	}
+	.quiet:hover {
+		color: var(--foreground);
+		background: var(--sb-hover);
+	}
+	.quiet :global(svg) {
+		transition: transform 0.12s;
+	}
+	.quiet.open :global(svg) {
+		transform: rotate(90deg);
 	}
 	.title code {
 		color: var(--primary);
@@ -232,10 +296,12 @@
 	}
 	.who {
 		display: flex;
+		flex: 0 0 auto;
 		flex-direction: column;
 		align-items: flex-end;
 		margin-left: auto;
-		font-size: 12.5px;
+		font-size: 12px;
+		line-height: 1.45;
 	}
 	.body {
 		padding: 4px 16px 12px;
@@ -244,19 +310,21 @@
 		margin-top: 12px;
 	}
 	h3 {
-		margin: 0 0 6px;
+		margin: 0 0 4px;
 		color: var(--sb-text-faint);
 		font-size: 12px;
 		font-weight: 500;
 	}
 	h3 span {
+		margin-left: 4px;
 		font-weight: 400;
+		font-variant-numeric: tabular-nums;
 	}
 	.row {
 		display: flex;
 		align-items: baseline;
 		gap: 10px;
-		padding: 4px 0;
+		padding: 3px 0;
 		font-size: 12.5px;
 	}
 	.more {
@@ -271,20 +339,19 @@
 		padding-left: 22px;
 	}
 	.op {
-		min-width: 64px;
+		flex: 0 0 64px;
 		color: var(--tone);
-		font-size: 11.5px;
+		font-size: 11px;
 		font-weight: 600;
 		text-transform: uppercase;
-		letter-spacing: 0.03em;
+		letter-spacing: 0.04em;
 	}
 	.op.small {
-		min-width: 64px;
 		font-weight: 500;
 		opacity: 0.85;
 	}
 	.kind {
-		min-width: 52px;
+		flex: 0 0 52px;
 		font-size: 12px;
 	}
 	.key {
@@ -350,7 +417,7 @@
 	.msg {
 		padding: 14px 0;
 		color: var(--muted-foreground);
-		font-size: 13px;
+		font-size: 12.5px;
 	}
 	.err {
 		color: var(--sb-error);

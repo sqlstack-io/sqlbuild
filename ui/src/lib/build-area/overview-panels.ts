@@ -30,7 +30,7 @@ export function recentDeploys(changes: readonly SnapshotChange[], limit = RECENT
 
 export type RecentDeployRow =
 	| { kind: 'deploy'; key: string; change: SnapshotChange }
-	| { kind: 'quiet'; key: string; count: number; newestAt: string; oldestAt: string };
+	| { kind: 'quiet'; key: string; count: number; newestAt: string; oldestAt: string; changes: SnapshotChange[] };
 
 /** Deploys newest first, with each run of deploys that changed nothing merged into one row. */
 export function recentDeployRows(changes: readonly SnapshotChange[]): RecentDeployRow[] {
@@ -44,8 +44,9 @@ export function recentDeployRows(changes: readonly SnapshotChange[]): RecentDepl
 		if (last?.kind === 'quiet') {
 			last.count += 1;
 			last.oldestAt = change.publishedAt;
+			last.changes.push(change);
 		} else {
-			rows.push({ kind: 'quiet', key: `quiet-${change.snapshotId}`, count: 1, newestAt: change.publishedAt, oldestAt: change.publishedAt });
+			rows.push({ kind: 'quiet', key: `quiet-${change.snapshotId}`, count: 1, newestAt: change.publishedAt, oldestAt: change.publishedAt, changes: [change] });
 		}
 	}
 	return rows;
