@@ -15,7 +15,7 @@ use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::compile_driver::targets::project_setup_context;
+use crate::bindings::_helpers::command_runtime::setup_context::project_setup_context;
 use crate::bindings::_helpers::event_exporting::dispatcher::EventExporterDispatcher;
 use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::result_output::terminal_index::TerminalEventIndex;

@@ -106,7 +106,7 @@ def test_given_missing_cursor_interval_when_resolving_then_rejects_intrinsics(
 ) -> None:
     model: CompiledModelView = build_cursor_intrinsic_model(config_values=test_case.model_config)
 
-    with pytest.raises(PlannerInputError, match=test_case.expected_error_fragment):
+    with pytest.raises(PlannerInputError, match=test_case.expected_error_fragment) as raised:
         resolve_model_sql(
             adapter=DuckDbAdapter(),
             model=model,
@@ -116,3 +116,4 @@ def test_given_missing_cursor_interval_when_resolving_then_rejects_intrinsics(
             full_refresh=test_case.full_refresh,
             cursor_overrides=CursorOverridePair(),
         )
+    assert raised.value.code == "S204"

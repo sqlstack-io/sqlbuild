@@ -26,12 +26,6 @@ use crate::bindings::_helpers::format_command::stages::{
     QuoteFix, each_file, format_header_text, lint_header_text, on_format_workers, parse_faults,
     quote_fixed_text,
 };
-use crate::bindings::_helpers::rules::dsl_headers::rules_config;
-use crate::bindings::_helpers::rules::fixture_formatting::format_redundant_fixture_nulls;
-use crate::bindings::_helpers::rules::lint_pipeline::{
-    LintViolationRow, ViolationClasses, project_relative_path,
-};
-use crate::bindings::_helpers::rules::lint_text::{relative_parts, unsafe_fault};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::compile_driver::constants::FORMAT_CACHE_HITS;
@@ -45,6 +39,13 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_compile::rules::main::checking::rules_config::rules_config;
+use sqlbuild_python_compile::rules::main::lint::project_relative_path::project_relative_path;
+use sqlbuild_python_compile::rules::main::lint::relative_parts::relative_parts;
+use sqlbuild_python_compile::rules::main::lint::unsafe_fault::unsafe_fault;
+use sqlbuild_python_compile::rules::main::sql::format_redundant_fixture_nulls::format_redundant_fixture_nulls;
+use sqlbuild_python_compile::rules::models::LintViolationRow;
+use sqlbuild_python_compile::rules::models::ViolationClasses;
 use sqlbuild_python_front::discovery::main::records::externally_described_models::externally_described_models;
 
 const DESCRIPTION_PRESENT: &str = "description-present";
@@ -206,7 +207,7 @@ impl<'py> Run<'_, '_, 'py> {
         let request: &FormatRequest<'_, 'py> = self.request;
         let none = || py.None().into_bound(py);
         let result: Bound<'py, PyAny> =
-            crate::bindings::_helpers::rules::fix_session::plan_rule_fixes(
+            sqlbuild_python_compile::rules::main::fix::plan_rule_fixes::plan_rule_fixes(
                 py,
                 Some(keywords(
                     py,

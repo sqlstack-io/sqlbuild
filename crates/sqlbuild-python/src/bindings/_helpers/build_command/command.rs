@@ -19,9 +19,6 @@ use crate::bindings::_helpers::build_command::planning::{
     write_compile_target, write_plan_text,
 };
 use crate::bindings::_helpers::check::check_core::relevant_check_functions;
-use crate::bindings::_helpers::compile_driver::targets::{
-    TargetSettingsValues, selected_target_settings,
-};
 use crate::bindings::_helpers::recall::console::write_stderr;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -30,6 +27,8 @@ use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::diagnostics::models::BuildPhaseTimingTracker;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_compile::compile_driver::main::setup::selected_target_settings::selected_target_settings;
+use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
 use sqlbuild_python_front::discovery::main::sources::provider_uses::provider_uses;

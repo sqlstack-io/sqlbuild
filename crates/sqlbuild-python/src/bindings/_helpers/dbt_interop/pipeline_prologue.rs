@@ -1,7 +1,5 @@
 //! Discover, compile and resolve the combined dbt pipeline through its existing boundaries.
 
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::dbt_interop::cli::resolve_dbt_executable;
 use crate::bindings::_helpers::dbt_interop::cli::route_dbt_interop_args;
 use crate::bindings::_helpers::dbt_interop::graph::build_dbt_combined_graph;
@@ -17,6 +15,8 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_compile::compile_driver::main::setup::build_compiled_project::build_compiled_project;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 
 use crate::bindings::_helpers::dbt_interop::reference_resolver::DbtCompileReferenceResolver;

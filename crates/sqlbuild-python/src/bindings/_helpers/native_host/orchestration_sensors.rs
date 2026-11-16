@@ -11,7 +11,7 @@ use sqlbuild_orchestration::sensors::models::{
     CustomSensorOutcome, SensorCondition, SensorEvaluationRequest,
 };
 
-use crate::bindings::_helpers::compile_driver::targets::project_setup_context;
+use crate::bindings::_helpers::command_runtime::setup_context::project_setup_context;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;

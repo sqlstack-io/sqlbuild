@@ -26,7 +26,6 @@ use crate::bindings::_helpers::clone::clone_execution::{
 use crate::bindings::_helpers::clone::clone_pipeline::{ClonePipeline, timed_clone_pipeline};
 use crate::bindings::_helpers::clone::clone_progress::{clone_item_text, write_line};
 use crate::bindings::_helpers::command_runtime::connection::resolve_target_connection_config;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::result_output::documents::format_clone_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
@@ -43,6 +42,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;

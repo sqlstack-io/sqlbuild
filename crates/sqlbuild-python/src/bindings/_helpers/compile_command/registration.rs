@@ -2,20 +2,23 @@
 
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 
-use crate::bindings::_helpers::compile_command::models::CompileReuseAttempt;
+use sqlbuild_python_compile::compile_command::models::CompileReuseAttempt;
 
-use crate::bindings::_helpers::compile_command::{
-    prepared_artifacts, report, reuse_attempt, reuse_recording, runtime_identity, startup_inputs,
-    target_writer,
-};
+use sqlbuild_python_compile::compile_command::main::artifacts::register_prepared_artifacts::register_prepared_artifacts;
+use sqlbuild_python_compile::compile_command::main::artifacts::register_target_writer::register_target_writer;
+use sqlbuild_python_compile::compile_command::main::invocation::register_report::register_report;
+use sqlbuild_python_compile::compile_command::main::invocation::register_reuse_attempt::register_reuse_attempt;
+use sqlbuild_python_compile::compile_command::main::invocation::register_reuse_recording::register_reuse_recording;
+use sqlbuild_python_compile::compile_command::main::invocation::register_runtime_identity::register_runtime_identity;
+use sqlbuild_python_compile::compile_command::main::invocation::register_startup_inputs::register_startup_inputs;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<CompileReuseAttempt>()?;
-    report::register(module)?;
-    reuse_attempt::register(module)?;
-    reuse_recording::register(module)?;
-    runtime_identity::register(module)?;
-    startup_inputs::register(module)?;
-    target_writer::register(module)?;
-    prepared_artifacts::register(module)
+    register_report(module)?;
+    register_reuse_attempt(module)?;
+    register_reuse_recording(module)?;
+    register_runtime_identity(module)?;
+    register_startup_inputs(module)?;
+    register_target_writer(module)?;
+    register_prepared_artifacts(module)
 }

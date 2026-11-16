@@ -2,10 +2,12 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::semantic_checks::{help_catalogue, resource_sql, stage};
+use sqlbuild_python_compile::semantic_checks::main::register_help_catalogue::register_help_catalogue;
+use sqlbuild_python_compile::semantic_checks::main::register_resource_sql::register_resource_sql;
+use sqlbuild_python_compile::semantic_checks::main::register_stage::register_stage;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    resource_sql::register(module)?;
-    help_catalogue::register(module)?;
-    stage::register(module)
+    register_resource_sql(module)?;
+    register_help_catalogue(module)?;
+    register_stage(module)
 }

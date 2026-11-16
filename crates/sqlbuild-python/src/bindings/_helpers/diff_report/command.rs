@@ -19,8 +19,6 @@ use sqlbuild_core::json::models::{JsonDialect, StdlibJsonOptions};
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_target_connection_config;
-use crate::bindings::_helpers::compile_driver::diff::run_diff_pipeline;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::diff_report::facts::diff_facts;
 use crate::bindings::_helpers::diff_report::output::publish_diff_output;
@@ -39,6 +37,8 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
+use sqlbuild_python_compile::compile_driver::main::stages::run_diff_pipeline::run_diff_pipeline;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_front::discovery::main::project::discover_project_configuration::discover_project_configuration;

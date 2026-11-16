@@ -701,7 +701,7 @@ ANALYSIS_NATIVE_CODE_SCAN_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-analysis/src/semantic_checks/_helpers/resource_sql/diagnostics.rs",
     "crates/sqlbuild-analysis/src/contracts/constants.rs",
     "crates/sqlbuild-analysis/src/assembly/target_checks/constants.rs",
-    "crates/sqlbuild-python/src/bindings/_helpers/input_loops/model_loop.rs",
+    "crates/sqlbuild-python-compile/src/input_loops/_helpers/model/model_loop.rs",
 )
 NATIVE_CODE_TEST_DIRECTORY: str = "tests"
 RENDER_NATIVE_CODE_SCAN_ROOTS: tuple[str, ...] = (
@@ -709,7 +709,7 @@ RENDER_NATIVE_CODE_SCAN_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-render/src",
     "crates/sqlbuild-python/src/bindings/_helpers/compiled_project",
     "crates/sqlbuild-python/src/bindings/_helpers/compiled_views",
-    "crates/sqlbuild-python/src/bindings/_helpers/input_loops",
+    "crates/sqlbuild-python-compile/src/input_loops",
 )
 NATIVE_CODE_CONSTANT_PATTERN: re.Pattern[str] = re.compile(
     r'const [A-Z0-9_]*_CODE: &str = "([A-Z][0-9]{3})";'

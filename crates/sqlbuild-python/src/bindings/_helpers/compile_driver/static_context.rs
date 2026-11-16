@@ -4,12 +4,11 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyFrozenSet};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::compile_driver::deferral::{
-    build_deferred_locations, resolve_deferred_target_config,
-};
-use crate::bindings::_helpers::compile_driver::pipeline::compile_project_phase;
-use crate::bindings::_helpers::compile_driver::pipeline_entries::build_project_graph_from_compiled_project;
-use crate::bindings::_helpers::compile_driver::selection_phases::unit_test_selectors_applied;
+use sqlbuild_python_compile::compile_driver::main::stages::build_deferred_locations::build_deferred_locations;
+use sqlbuild_python_compile::compile_driver::main::stages::resolve_deferred_target_config::resolve_deferred_target_config;
+use sqlbuild_python_compile::compile_driver::main::setup::compile_project_phase::compile_project_phase;
+use sqlbuild_python_compile::compile_driver::main::setup::build_project_graph_from_compiled_project::build_project_graph_from_compiled_project;
+use sqlbuild_python_compile::compile_driver::main::stages::unit_test_selectors_applied::unit_test_selectors_applied;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
