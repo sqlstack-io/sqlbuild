@@ -7,18 +7,9 @@ use pyo3::types::{PyBool, PyDict, PyFrozenSet, PyString, PyTuple};
 use sqlbuild_analysis::planner_strategy::main::cursor_input_column::cursor_input_column_failure;
 use sqlbuild_analysis::planner_strategy::models::{CursorInputColumnCheck, CursorInputColumnOwner};
 
-use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_identity::metadata::or_empty;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::planner_strategy::constants::{
-    ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
-    SOURCE_REFERENCE, TIMESTAMP_CURSOR,
-};
 use crate::bindings::_helpers::planner_strategy::lineage::resolve_lineage_reference;
-use crate::bindings::_helpers::planner_strategy::models::CursorInputLookups;
 use crate::bindings::_helpers::planner_strategy::values::{input_error, text};
-use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -32,6 +23,14 @@ use sqlbuild_python_front::model_config::main::config::config_cursor_bound::conf
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::planner_strategy::constants::{
+    ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
+    SOURCE_REFERENCE, TIMESTAMP_CURSOR,
+};
+use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
+use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 
 /// Whether a model is incremental with a cursor column.
 fn incremental_cursor_flag(
@@ -109,7 +108,10 @@ pub(crate) fn reject_unexposed_cursor_input_columns<'py>(
     let models_by_name = &lookups.models_by_name;
     let source_map: &Bound<'py, PyAny> = &lookups.source_map;
     let warehouse_columns: &Bound<'py, PyAny> = &lookups.source_warehouse_columns;
-    let model_name: String = model_reads::model_name(model)?;
+    let model_name: String =
+        sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name(
+            model,
+        )?;
     for role in ["filter_inputs", "watermark_inputs"] {
         for item in mapping_items(&native_field(&roles, role)?)?.try_iter()? {
             let (input_name, column): (String, String) = item?.extract()?;

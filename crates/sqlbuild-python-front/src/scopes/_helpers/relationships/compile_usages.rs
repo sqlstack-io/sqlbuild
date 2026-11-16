@@ -3,11 +3,9 @@
 use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_scopes::compile_usages::main::merged_usages::merged_usages;
 use sqlbuild_scopes::compile_usages::main::schema_scope_usages::schema_scope_usages;
 use sqlbuild_scopes::compile_usages::models::{
@@ -275,9 +273,4 @@ pub(crate) fn merged_usage_rows(
         merged.into_iter().map(source_rows).collect(),
         combined,
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(model_schema_scope_usages, module)?)?;
-    Ok(())
 }

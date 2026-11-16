@@ -7,24 +7,12 @@ use pyo3::types::{IntoPyDict, PyDict, PyDictMethods, PyFrozenSet, PyString};
 use sqlbuild_analysis::assembly::analysis_session::types::Shapes;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::analysis::binding_catalog::BindingCatalog;
 use crate::bindings::_helpers::project_assembly::declared_relations::DeclaredShapes;
+use sqlbuild_python_project::analysis::models::BindingCatalog;
 
-use crate::bindings::_helpers::analysis_session::profile_inputs::{
-    case_sensitive_shapes, nullability_rules, profile_dialect, return_types, shape_rows,
-};
-use crate::bindings::_helpers::analysis_session::session::{
-    CacheStatsRow, FamilyRow, ModelRow, NativeModelAnalysisSession, RequestRow,
-    start_model_analysis_session,
-};
 use crate::bindings::_helpers::compile_driver::analysis_cache::{
     AnalysisCacheCounts, record_analysis_cache_metrics,
 };
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    AttachedSchema, NativeModelInput, attached_schema, input_analysis_sql, input_model_name,
-    input_reference_rows, input_sql_macro_checks,
-};
-use crate::bindings::_helpers::semantic_shapes::shapes::{VALID_FROM_DEFAULT, VALID_TO_DEFAULT};
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::cache::main::content_digest::content_digest;
@@ -36,6 +24,22 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
+use sqlbuild_python_project::analysis_session::main::case_sensitive_shapes::case_sensitive_shapes;
+use sqlbuild_python_project::analysis_session::main::nullability_rules::nullability_rules;
+use sqlbuild_python_project::analysis_session::main::profile_dialect::profile_dialect;
+use sqlbuild_python_project::analysis_session::main::return_types::return_types;
+use sqlbuild_python_project::analysis_session::main::shape_rows::shape_rows;
+use sqlbuild_python_project::analysis_session::main::start_model_analysis_session::start_model_analysis_session;
+use sqlbuild_python_project::analysis_session::models::{
+    CacheStatsRow, FamilyRow, ModelRow, NativeModelAnalysisSession, RequestRow,
+};
+use sqlbuild_python_project::compiled_views::main::model_inputs::attached_schema::attached_schema;
+use sqlbuild_python_project::compiled_views::main::model_inputs::input_analysis_sql::input_analysis_sql;
+use sqlbuild_python_project::compiled_views::main::model_inputs::input_model_name::input_model_name;
+use sqlbuild_python_project::compiled_views::main::model_inputs::input_reference_rows::input_reference_rows;
+use sqlbuild_python_project::compiled_views::main::model_inputs::input_sql_macro_checks::input_sql_macro_checks;
+use sqlbuild_python_project::compiled_views::models::{AttachedSchema, NativeModelInput};
+use sqlbuild_python_project::semantic_shapes::constants::{VALID_FROM_DEFAULT, VALID_TO_DEFAULT};
 
 const LOGGING_MODULE: &str = "logging";
 const DEBUG_LOGGER: &str = "sqlbuild.compile";

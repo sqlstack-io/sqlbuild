@@ -10,7 +10,7 @@ use sqlbuild_analysis::binding_locations::models::{
 use sqlbuild_analysis::semantic_validation::models::{DiagnosticRow, Expansion};
 use sqlbuild_python_base::positional_record;
 
-use crate::bindings::models::Positional;
+use sqlbuild_python_project::analysis::models::Positional;
 
 positional_record! {
     into;

@@ -1,18 +1,16 @@
 //! Location maps retaining the original compiled Python destination objects.
 
-use crate::bindings::_helpers::compiled_views::resource_reads;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_project::resource_views::main::resource_reads::destination::destination;
+use sqlbuild_python_project::resource_views::main::resource_reads::name::name;
 
 fn locations<'py>(items: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
     let result = PyDict::new(items.py());
     for item in items.try_iter()? {
         let item = item?;
-        result.set_item(
-            resource_reads::name(&item)?,
-            resource_reads::destination(&item)?,
-        )?;
+        result.set_item(name(&item)?, destination(&item)?)?;
     }
     Ok(result)
 }

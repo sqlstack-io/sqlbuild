@@ -18,11 +18,11 @@ use sqlbuild_python_front::discovery::models::NativeModelFile;
 use sqlbuild_python_front::model_config::main::config::carried_node::carried_node;
 use sqlbuild_python_front::model_config::main::config::config_fields::config_fields;
 use sqlbuild_python_front::model_config::main::config::view::view;
-use sqlbuild_python_front::model_config::models::BuiltConfig;
-use sqlbuild_python_front::model_config::models::ConfigBuild;
 use sqlbuild_python_front::model_config::models::ConfigClasses;
-use sqlbuild_python_front::model_config::models::NativeModelConfigBuilder;
 use sqlbuild_python_front::model_config::models::PyNode;
+use sqlbuild_python_front::model_config::models::{
+    BuiltConfig, ConfigBuild, NativeModelConfigBuilder,
+};
 use sqlbuild_python_front::model_config::types::BuiltConfigValues;
 
 const COLUMNS_KEY: &str = "columns";

@@ -1,9 +1,7 @@
 //! Fail before anything runs when a provider in `uses` lacks required secrets, listing each with what needs it.
 
 use crate::discovery::_helpers::sources::provider_secrets;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Fail before anything runs when a provider in `uses` lacks required secrets, listing each with what needs it.
 #[inline]

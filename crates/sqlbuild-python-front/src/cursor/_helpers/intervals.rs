@@ -1,24 +1,20 @@
 //! Building, intersecting, merging, splitting and capping half-open cursor intervals.
 
+use crate::cursor::main::scalars::as_scalar::as_scalar;
 use std::cmp::Ordering;
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PySlice, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cursor::algebra::main::cap_from_end::cap_from_end;
 use sqlbuild_cursor::algebra::main::cap_from_start::cap_from_start;
 use sqlbuild_cursor::algebra::main::clamp::clamp;
 use sqlbuild_cursor::algebra::main::compare::compare;
 use sqlbuild_cursor::algebra::main::merge::merge;
-use sqlbuild_cursor::algebra::main::observed_partition::observed_partition;
 use sqlbuild_cursor::algebra::main::split_into_batches::split_into_batches;
-use sqlbuild_cursor::algebra::main::validate_interval::validate_interval;
 use sqlbuild_cursor::algebra::models::{Interval, Scalar};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::cursor::_helpers::scalars::as_scalar;
 use crate::cursor::models::CursorSession;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -44,40 +40,10 @@ fn python_intervals<'py>(
     PyTuple::new(session.py(), built)
 }
 
-/// Raise `CursorAlgebraError` unless the ends form a valid aligned interval.
-#[pyfunction(name = "validate_cursor_interval")]
-#[pyo3(signature = (*, start, end, grain))]
-pub(crate) fn interval_validation(
-    start: &Bound<'_, PyAny>,
-    end: &Bound<'_, PyAny>,
-    grain: &Bound<'_, PyAny>,
-) -> PyResult<()> {
-    let session: CursorSession<'_> = CursorSession::new(start.py())?;
-    let interval = Interval {
-        start: session.scalar(start)?,
-        end: session.scalar(end)?,
-        grain: session.grain(grain)?,
-    };
-    session.checked(validate_interval(&interval, &session))
-}
-
-/// The canonical partition containing an observed physical value.
-#[pyfunction(name = "cursor_observed_partition")]
-#[pyo3(signature = (*, value, grain))]
-pub(crate) fn partition<'py>(
-    value: &Bound<'py, PyAny>,
-    grain: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let session: CursorSession<'py> = CursorSession::new(value.py())?;
-    let scalar: Scalar = session.scalar(value)?;
-    let interval: Interval = session.checked(observed_partition(&scalar, session.grain(grain)?))?;
-    session.python_interval(&interval)
-}
-
 /// The intersection of two compatible half-open intervals, or `None`.
 #[pyfunction(name = "cursor_clamp")]
 #[pyo3(signature = (*, interval, bounds))]
-fn clamp_intervals<'py>(
+pub(crate) fn clamp_intervals<'py>(
     interval: &Bound<'py, PyAny>,
     bounds: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -93,7 +59,7 @@ fn clamp_intervals<'py>(
 /// Overlapping or adjacent canonical intervals merged.
 #[pyfunction(name = "cursor_merge")]
 #[pyo3(signature = (*, intervals))]
-fn merge_intervals<'py>(intervals: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn merge_intervals<'py>(intervals: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
     let session: CursorSession<'py> = CursorSession::new(intervals.py())?;
     let typed: Vec<Interval> = intervals
         .try_iter()?
@@ -106,7 +72,7 @@ fn merge_intervals<'py>(intervals: &Bound<'py, PyAny>) -> PyResult<Bound<'py, Py
 /// Overlapping or adjacent raw microbatch intervals merged, keeping disjoint ones in order.
 #[pyfunction(name = "merge_microbatch_intervals")]
 #[pyo3(signature = (*, intervals, cursor_type))]
-fn merge_raw_intervals<'py>(
+pub(crate) fn merge_raw_intervals<'py>(
     intervals: &Bound<'py, PyAny>,
     cursor_type: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
@@ -167,7 +133,7 @@ fn merge_raw_intervals<'py>(
 /// An interval split into batches of a positive number of grain units.
 #[pyfunction(name = "cursor_split_into_batches")]
 #[pyo3(signature = (*, interval, step))]
-fn split<'py>(interval: &Bound<'py, PyAny>, step: i64) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn split<'py>(interval: &Bound<'py, PyAny>, step: i64) -> PyResult<Bound<'py, PyTuple>> {
     let session: CursorSession<'py> = CursorSession::new(interval.py())?;
     let typed: Interval = session.interval(interval)?;
     let batches: Vec<Interval> = session.checked(split_into_batches(&typed, step, &session))?;
@@ -185,28 +151,22 @@ fn sliced<'py>(
 /// At most `count` intervals from the start.
 #[pyfunction(name = "cursor_cap_from_start")]
 #[pyo3(signature = (*, intervals, count))]
-fn cap_start<'py>(intervals: &Bound<'py, PyAny>, count: i64) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn cap_start<'py>(
+    intervals: &Bound<'py, PyAny>,
+    count: i64,
+) -> PyResult<Bound<'py, PyAny>> {
     sliced(intervals, cap_from_start(intervals.len()?, count))
 }
 
 /// At most `count` intervals from the end; an empty tuple when `count` is not positive.
 #[pyfunction(name = "cursor_cap_from_end")]
 #[pyo3(signature = (*, intervals, count))]
-fn cap_end<'py>(intervals: &Bound<'py, PyAny>, count: i64) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn cap_end<'py>(
+    intervals: &Bound<'py, PyAny>,
+    count: i64,
+) -> PyResult<Bound<'py, PyAny>> {
     if count <= 0 {
         return Ok(PyTuple::empty(intervals.py()).into_any());
     }
     sliced(intervals, cap_from_end(intervals.len()?, count))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(interval_validation, module)?)?;
-    module.add_function(wrap_pyfunction!(partition, module)?)?;
-    module.add_function(wrap_pyfunction!(clamp_intervals, module)?)?;
-    module.add_function(wrap_pyfunction!(merge_intervals, module)?)?;
-    module.add_function(wrap_pyfunction!(merge_raw_intervals, module)?)?;
-    module.add_function(wrap_pyfunction!(split, module)?)?;
-    module.add_function(wrap_pyfunction!(cap_start, module)?)?;
-    module.add_function(wrap_pyfunction!(cap_end, module)?)?;
-    Ok(())
 }

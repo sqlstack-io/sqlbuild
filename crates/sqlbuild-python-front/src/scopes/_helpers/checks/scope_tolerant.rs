@@ -9,12 +9,9 @@ use sqlbuild_scopes::scope_index::models::{
 };
 
 use crate::scopes::_helpers::checks::scope_validation::replace;
-use crate::scopes::_helpers::index::scope_objects::enum_text;
-use crate::scopes::_helpers::index::scope_objects::field;
-use crate::scopes::_helpers::index::scope_objects::optional_item;
-use crate::scopes::_helpers::index::scope_objects::read_resource;
-use crate::scopes::_helpers::index::scope_objects::root_object;
-use crate::scopes::_helpers::index::scope_objects::tuple_attribute;
+use crate::scopes::_helpers::index::scope_objects::{
+    enum_text, field, optional_item, read_resource, root_object, tuple_attribute,
+};
 use crate::scopes::models::ScopeClasses;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;

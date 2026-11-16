@@ -2,7 +2,6 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::column_objects::{lower, model, replace, text};
 use crate::bindings::_helpers::planner_migrations::compatibility::check_migration_compatibility;
 use crate::bindings::_helpers::planner_migrations::model_handover::{
@@ -23,6 +22,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::state_rows::main::migrations::newest_move::newest_move;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 pub(super) fn relation<'py>(location: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?.call1((location,))
@@ -76,7 +76,10 @@ pub(super) fn decide<'py>(
     let py = runtime.py();
     let request = decision_request.request;
     let item = request.model.clone();
-    let destination = model_reads::destination(&item)?;
+    let destination =
+        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
+            &item,
+        )?;
     let origin = decision_request.origin.clone();
     let snapshot = decision_request.snapshot.clone();
     let state = decision_request.state.clone();
@@ -102,7 +105,7 @@ pub(super) fn decide<'py>(
         py,
         RecordId::ModelMigrationPlanEntry,
         &[
-            ("model_name", model_reads::name_object(&item)?),
+            ("model_name", name_object(&item)?),
             ("discovery", request.discovery.clone()),
             (
                 "decision",
@@ -163,7 +166,7 @@ pub(super) fn decide<'py>(
         }
         let inherited = if recorded && !applies(&item, &newest, &snapshot)? {
             native_field(&native_field(&snapshot, "fingerprints")?, "models")?
-                .call_method1("get", (model_reads::name_object(&item)?,))?
+                .call_method1("get", (name_object(&item)?,))?
         } else {
             empty_version(&item, &fingerprint)?
         };

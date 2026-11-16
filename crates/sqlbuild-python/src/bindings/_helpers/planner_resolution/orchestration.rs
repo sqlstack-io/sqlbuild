@@ -1,8 +1,5 @@
 //! Model, function and SQL-hook orchestration through adapter-owned rendering.
 
-use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_resolution::cursor_model::{
@@ -35,6 +32,10 @@ use sqlbuild_python_front::model_config::main::config::config_text_is::config_te
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
 
 const APPEND_STRATEGY: &str = "append";
 
@@ -216,12 +217,9 @@ pub(crate) fn resolve_model_sql<'py>(
         cursor_type: cursor_type.clone(),
         lower_bound_inclusive: append_cursor_inclusive(model)?,
     };
-    let mut sql = resolution.resolve(
-        &model_reads::query_sql(model)?.extract::<String>()?,
-        &filtering,
-    )?;
+    let mut sql = resolution.resolve(&query_sql(model)?.extract::<String>()?, &filtering)?;
     let (_, uses_intrinsics) = resolve_cursor_intrinsics(py, &sql, None, None)?;
-    let name: String = model_reads::model_name(model)?;
+    let name: String = model_name(model)?;
     if uses_intrinsics {
         let cause = match &request.full_rebuild_cause {
             Some(cause) => Some(cause.clone()),
@@ -331,11 +329,10 @@ pub(crate) fn resolve_function_sql<'py>(
         function_locations: args.value("function_locations")?,
     };
     let function = args.value("function")?;
-    let name: String = function_reads::name(&function)?.extract()?;
-    let sql: String = resolution.unbounded(
-        function_reads::body_sql(&function)?,
-        &format!("Function '{name}'"),
-    )?;
+    let name: String =
+        sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
+            .extract()?;
+    let sql: String = resolution.unbounded(body_sql(&function)?, &format!("Function '{name}'"))?;
     Ok(PyString::new(py, &sql).into_any())
 }
 
@@ -358,7 +355,7 @@ pub(crate) fn model_hook_entries<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = model.py();
     let values = model_values(model)?;
-    let name: String = model_reads::model_name(model)?;
+    let name: String = model_name(model)?;
     let mut hooks: Vec<Bound<'py, PyAny>> = Vec::new();
     for key in ["pre_hooks", "post_hooks"] {
         hooks.push(resolution.hook(

@@ -1,19 +1,19 @@
 //! The directory snapshot one discovery pass shares, and the native tree it memoises.
 
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRefMut, PyResult, Python,
-};
+use crate::discovery::main::snapshots::escaped::escaped;
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyRefMut, PyResult, Python};
+use pyo3::pymethods;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods};
-use pyo3::{pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_discovery::models::ProjectRoot;
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_python_base::boundary::main::context_variable::context_variable;
 use std::path::PathBuf;
 
 use crate::discovery::_helpers::failures::raised::discovery_error;
-use crate::discovery::_helpers::snapshots::native_classes::NativeDirectorySnapshot;
-use crate::discovery::_helpers::snapshots::native_classes::NativeProjectTree;
+use crate::discovery::_helpers::snapshots::native_classes::{
+    NativeDirectorySnapshot, NativeProjectTree,
+};
 use crate::discovery::models::NativeDirectorySnapshotScope;
 
 const SNAPSHOT_VARIABLE: &str = "sqlbuild_directory_snapshot";
@@ -23,8 +23,8 @@ const PROJECT_PATH_KIND: &str = "project_path";
 const SURROGATE_ESCAPE_BASE: u32 = 0xDC00;
 const ESCAPED_BYTE_FIRST: u16 = 0xDC80;
 const ESCAPED_BYTE_LAST: u16 = 0xDCFF;
-const UTF16_ENCODING: &str = "utf-16-le";
-const SURROGATE_PASS: &str = "surrogatepass";
+pub(crate) const UTF16_ENCODING: &str = "utf-16-le";
+pub(crate) const SURROGATE_PASS: &str = "surrogatepass";
 
 static ACTIVE_SNAPSHOT: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
@@ -140,25 +140,6 @@ impl NativeDirectorySnapshotScope {
     }
 }
 
-/// Share one directory snapshot across every discovery call for `project_dir` inside the scope.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir))]
-pub(crate) fn directory_snapshot_scope(
-    project_dir: Bound<'_, PyAny>,
-) -> NativeDirectorySnapshotScope {
-    NativeDirectorySnapshotScope {
-        project_dir: project_dir.unbind(),
-        token: None,
-    }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeDirectorySnapshot>()?;
-    module.add_class::<NativeDirectorySnapshotScope>()?;
-    module.add_function(wrap_pyfunction!(directory_snapshot_scope, module)?)?;
-    Ok(())
-}
-
 /// `str(project_dir / "_")` without its probe: the text printed before a relative path.
 pub(crate) fn display_prefix(project_dir: &Bound<'_, PyAny>) -> PyResult<String> {
     let probed: String = project_dir.div(DISPLAY_PROBE)?.str()?.to_str()?.to_owned();
@@ -213,25 +194,7 @@ pub(crate) fn project_tree<'py>(
     Ok(created)
 }
 
-/// Python's `_escaped`: undecodable name bytes as `\xNN`, other lone surrogates as `\uXXXX`.
-pub(crate) fn escaped(text: &Bound<'_, PyString>) -> PyResult<String> {
-    let encoded: Vec<u8> = text
-        .call_method1("encode", (UTF16_ENCODING, SURROGATE_PASS))?
-        .extract()?;
-    let units = encoded
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|pair| u16::from_le_bytes(*pair));
-    Ok(char::decode_utf16(units)
-        .map(|decoded| match decoded {
-            Ok(character) => character.to_string(),
-            Err(error) => escaped_unit(error.unpaired_surrogate()),
-        })
-        .collect())
-}
-
-fn escaped_unit(unit: u16) -> String {
+pub(crate) fn escaped_unit(unit: u16) -> String {
     if cfg!(unix) && (ESCAPED_BYTE_FIRST..=ESCAPED_BYTE_LAST).contains(&unit) {
         return format!("\\x{:02x}", u32::from(unit) - SURROGATE_ESCAPE_BASE);
     }

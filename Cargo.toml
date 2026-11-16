@@ -25,6 +25,7 @@ members = [
     "crates/sqlbuild-cli",
     "crates/sqlbuild-python-base",
     "crates/sqlbuild-python-front",
+    "crates/sqlbuild-python-project",
     "crates/sqlbuild-python",
 ]
 resolver = "2"
@@ -59,9 +60,10 @@ order = [
     "sqlbuild-cli",
     "sqlbuild-python-base",
     "sqlbuild-python-front",
+    "sqlbuild-python-project",
     "sqlbuild-python",
 ]
-python-boundary = ["sqlbuild-python-base", "sqlbuild-python-front", "sqlbuild-python"]
+python-boundary = ["sqlbuild-python-base", "sqlbuild-python-front", "sqlbuild-python-project", "sqlbuild-python"]
 polyglot-floor = "sqlbuild-analysis"
 
 [workspace.package]
@@ -183,6 +185,7 @@ sqlbuild-process-ownership = { path = "crates/sqlbuild-process-ownership" }
 sqlbuild-project = { path = "crates/sqlbuild-project" }
 sqlbuild-python-base = { path = "crates/sqlbuild-python-base" }
 sqlbuild-python-front = { path = "crates/sqlbuild-python-front" }
+sqlbuild-python-project = { path = "crates/sqlbuild-python-project" }
 sqlbuild-pysource = { path = "crates/sqlbuild-pysource" }
 sqlbuild-recall = { path = "crates/sqlbuild-recall" }
 sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }

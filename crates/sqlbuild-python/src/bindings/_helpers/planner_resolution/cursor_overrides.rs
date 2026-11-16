@@ -1,6 +1,5 @@
 //! Selected-model inspection and untyped override conversion.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_resolution::values::{method, string};
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -18,6 +17,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 
 const MATERIALIZED_KEY: &str = "materialized";
 const CURSOR_KEY: &str = "cursor";
@@ -66,7 +66,7 @@ pub(crate) fn type_cursor_overrides<'py>(
         }
         for kind in [INTEGER_CURSOR, TIMESTAMP_CURSOR] {
             if config_text_is(py, &values, CURSOR_TYPE_KEY, kind)? {
-                models.push((model_reads::name_object(model)?.extract()?, kind.to_owned()));
+                models.push((name_object(model)?.extract()?, kind.to_owned()));
             }
         }
     }

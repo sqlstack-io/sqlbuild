@@ -38,13 +38,6 @@ use crate::bindings::_helpers::lineage::lineage_cache::{
 };
 use crate::bindings::_helpers::lineage::lineage_index::{graph_index, index_views, lineage_keys};
 use crate::bindings::_helpers::lineage::project_lineage::build_direct_semantic_uses;
-use crate::bindings::_helpers::planner_selection::selectors::resolve_project_selector_tokens;
-use crate::bindings::_helpers::planner_selection::selectors::resolve_project_selectors;
-use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
-use crate::bindings::_helpers::planner_selection::selectors::{
-    match_project_selector, parse_project_selector,
-};
-use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use sqlbuild_python_base::build_progress::main::transient_status::maybe_status::maybe_status;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
@@ -56,6 +49,12 @@ use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::NativeAttr;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_project::planner_selection::main::match_project_selector::match_project_selector;
+use sqlbuild_python_project::planner_selection::main::parse_project_selector::parse_project_selector;
+use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
+use sqlbuild_python_project::planner_selection::main::resolve_project_selector_tokens::resolve_project_selector_tokens;
+use sqlbuild_python_project::planner_selection::main::resolve_project_selectors::resolve_project_selectors;
+use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 
 const UNKNOWN_SELECTOR_ERROR_CODE: &str = "S007";
 const RICH_MODE: &str = "rich";

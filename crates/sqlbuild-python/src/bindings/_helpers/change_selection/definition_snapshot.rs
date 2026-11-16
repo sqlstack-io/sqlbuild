@@ -21,13 +21,16 @@ use sqlbuild_analysis::definition_changes::models::{DefinitionSnapshot, NodeDefi
 use crate::bindings::_helpers::change_selection::fingerprints::{
     Fingerprinting, directory_digest, file_digest, text_of,
 };
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::planner_identity::metadata::{function_local_hashes, seed_identity};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
+use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
+use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
+use sqlbuild_python_project::resource_views::main::function_reads::source_file_path::source_file_path;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 
 /// Header values that rename rather than redefine a model.
 const RENAME_CONFIG_KEYS: [&str; 2] = ["migrate_from", "description"];
@@ -237,10 +240,14 @@ fn model_node(
     fingerprints: &Fingerprinting,
     uses: &BTreeMap<String, BTreeSet<String>>,
 ) -> PyResult<(String, NodeDefinition)> {
-    let name: String = model_reads::model_name(model)?;
-    let config: Bound<'_, PyAny> = model_reads::config(model)?;
+    let name: String = model_name(model)?;
+    let config: Bound<'_, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::config::config(model)?;
     let config_values: Bound<'_, PyAny> = native_field(&config, "values")?;
-    let schema: Bound<'_, PyAny> = model_reads::schema_entry(model)?;
+    let schema: Bound<'_, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
+            model,
+        )?;
     let contract: String = match config_values.cast::<PyDict>() {
         Ok(values) => match values.get_item(CONTRACT_KEY)? {
             Some(value) => fingerprints.canonical(&value, &[])?.to_string(),
@@ -296,8 +303,10 @@ fn source_node(
     source: &Bound<'_, PyAny>,
     fingerprints: &Fingerprinting,
 ) -> PyResult<(String, NodeDefinition)> {
-    let name: String = source_reads::name(source)?.extract()?;
-    let mut encoded: Value = fingerprints.canonical(&source_reads::source_entry(source)?, &[])?;
+    let name: String =
+        sqlbuild_python_project::resource_views::main::source_reads::name::name(source)?
+            .extract()?;
+    let mut encoded: Value = fingerprints.canonical(&source_entry(source)?, &[])?;
     let mut shape: Map<String, Value> = Map::new();
     let mut reads: Option<String> = None;
     if let Value::Object(fields) = &mut encoded {
@@ -333,9 +342,13 @@ fn seed_node(
     seed: &Bound<'_, PyAny>,
     fingerprints: &Fingerprinting,
 ) -> PyResult<(String, NodeDefinition)> {
-    let name: String = seed_reads::name(seed)?.extract()?;
+    let name: String =
+        sqlbuild_python_project::resource_views::main::seed_reads::name::name(seed)?.extract()?;
     let (version_hash, _) = seed_identity(seed)?;
-    let schema: Bound<'_, PyAny> = seed_reads::schema_entry(seed)?;
+    let schema: Bound<'_, PyAny> =
+        sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry(
+            seed,
+        )?;
     let columns: String = if schema.is_none() {
         definition_digest(&[])
     } else {
@@ -450,7 +463,8 @@ fn function_nodes(
     fingerprints: &Fingerprinting,
 ) -> PyResult<Vec<(String, NodeDefinition)>> {
     let mut nodes: Vec<(String, NodeDefinition)> = Vec::new();
-    let functions: Bound<'_, PyAny> = project_reads::functions(project)?;
+    let functions: Bound<'_, PyAny> =
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?;
     let hashes: Bound<'_, PyDict> = function_local_hashes(
         &functions,
         None,
@@ -458,17 +472,20 @@ fn function_nodes(
     )?;
     for function in functions.try_iter()? {
         let function: Bound<'_, PyAny> = function?;
-        let key: Bound<'_, PyAny> = function_reads::key(&function)?;
+        let key: Bound<'_, PyAny> =
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?;
         let kind: String = text_of(&native_field(
             &native_field(&key, "resource_type")?,
             "value",
         )?)?;
-        let name: String = function_reads::name(&function)?.extract()?;
+        let name: String =
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
+                .extract()?;
         let Some(hash) = hashes.get_item(&name)? else {
             continue;
         };
         let mut digest: String = hash.extract()?;
-        let source_file: Bound<'_, PyAny> = function_reads::source_file_path(&function)?;
+        let source_file: Bound<'_, PyAny> = source_file_path(&function)?;
         if !source_file.is_none() {
             let path: String = text_of(&source_file)?;
             if path.ends_with(PYTHON_SUFFIX) {
@@ -479,7 +496,7 @@ fn function_nodes(
             }
         }
         let mut definition: NodeDefinition = node(&kind, &name, vec![(DEFINITION_ASPECT, digest)]);
-        for dependency in function_reads::deps(&function)?.try_iter()? {
+        for dependency in deps(&function)?.try_iter()? {
             let dependency: Bound<'_, PyAny> = dependency?;
             definition.uses.push(node_key(
                 &text_of(&native_field(
@@ -501,7 +518,7 @@ fn test_file_nodes(
     fingerprints: &Fingerprinting,
 ) -> PyResult<BTreeMap<String, NodeDefinition>> {
     let mut nodes: BTreeMap<String, NodeDefinition> = BTreeMap::new();
-    for test in project_reads::sql_tests(project)?.try_iter()? {
+    for test in sql_tests(project)?.try_iter()? {
         let file: Bound<'_, PyAny> = native_field(&test?, "test_file")?;
         let path: String = text_of(&native_field(&file, "relative_path")?)?;
         let key: String = node_key(TEST_FILE_KIND, &path);
@@ -590,15 +607,15 @@ pub(crate) fn definition_snapshot(
     );
     let (connection_key, connection) = connection_node(project, discovered, &fingerprints)?;
     nodes.insert(connection_key, connection);
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let (key, definition) = model_node(&model?, &fingerprints, &uses)?;
         nodes.insert(key, definition);
     }
-    for source in project_reads::sources(project)?.try_iter()? {
+    for source in sources(project)?.try_iter()? {
         let (key, definition) = source_node(&source?, &fingerprints)?;
         nodes.insert(key, definition);
     }
-    for seed in project_reads::seeds(project)?.try_iter()? {
+    for seed in seeds(project)?.try_iter()? {
         let (key, definition) = seed_node(&seed?, &fingerprints)?;
         nodes.insert(key, definition);
     }

@@ -28,13 +28,6 @@ use sqlbuild_rules::models::{
     ModelRowsContext, RowsEvaluation, RowsRequest, RulesConfig,
 };
 
-use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_project::values::plain_value;
-use crate::bindings::_helpers::compiled_views::audit_views::NativeCompiledAudit;
-use crate::bindings::_helpers::compiled_views::model_reads::native_model;
-use crate::bindings::_helpers::compiled_views::records::compiled_project_facts;
-use crate::bindings::_helpers::compiled_views::records::declaration_rows;
-use crate::bindings::_helpers::compiled_views::relation_keys::project_relation_keys;
 use crate::bindings::_helpers::rules::config_json::asdict_json;
 use crate::bindings::_helpers::rules::early_builtin_rules::EarlyBuiltinRules;
 use crate::bindings::_helpers::rules::fact_replay::{project_attribute, project_models};
@@ -53,6 +46,13 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::type_system::main::types_equal::types_equal;
 use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_front::scopes::main::reports::metadata_projection_value::metadata_projection_value;
+use sqlbuild_python_project::compiled_project::main::plain_value::plain_value;
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
+use sqlbuild_python_project::compiled_views::main::compiled_models::native_model::native_model;
+use sqlbuild_python_project::compiled_views::main::compiled_models::project_relation_keys::project_relation_keys;
+use sqlbuild_python_project::compiled_views::main::project::compiled_project_facts::compiled_project_facts;
+use sqlbuild_python_project::compiled_views::main::project::declaration_rows::declaration_rows;
+use sqlbuild_python_project::resource_views::models::NativeCompiledAudit;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const NATIVE_RULES_CACHE_FILE: &str = "native.json";

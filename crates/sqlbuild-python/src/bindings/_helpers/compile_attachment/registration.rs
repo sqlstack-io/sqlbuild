@@ -4,7 +4,7 @@ use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
 
 use crate::bindings::_helpers::compile_attachment::{
-    cursor_roles, declaration_scope, model_config, model_inputs, sql_expansion_context, target,
+    declaration_scope, model_config, model_inputs, sql_expansion_context, target,
 };
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config_function::build_effective_connection_config_function;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_function::build_effective_connection_function;
@@ -13,6 +13,7 @@ use sqlbuild_python_front::compile_attachment::main::build_effective_settings_co
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_function::build_effective_settings_function;
 use sqlbuild_python_front::compile_attachment::main::build_effective_target_config_function::build_effective_target_config_function;
 use sqlbuild_python_front::compile_attachment::main::build_effective_vars_function::build_effective_vars_function;
+use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles_function::resolve_cursor_input_roles_function;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(
@@ -47,9 +48,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         declaration_scope::rebind_declaration_scope,
         module
     )?)?;
-    module.add_function(wrap_pyfunction!(
-        cursor_roles::resolve_cursor_input_roles,
-        module
-    )?)?;
+    module.add_function(resolve_cursor_input_roles_function(module)?)?;
     Ok(())
 }

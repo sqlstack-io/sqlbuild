@@ -1,0 +1,9 @@
+pub(crate) mod fixture_completion;
+pub(crate) mod fixture_context;
+pub(crate) mod fixture_metadata;
+pub(crate) mod fixture_preparation;
+pub(crate) mod fixture_reads;
+pub(crate) mod fixture_selection;
+pub(crate) mod fixture_sql;
+pub(crate) mod fixture_types;
+pub(crate) mod fixture_values;

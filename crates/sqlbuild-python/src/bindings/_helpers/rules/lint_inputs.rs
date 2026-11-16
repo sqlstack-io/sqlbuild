@@ -6,16 +6,15 @@ use std::sync::Arc;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::bindings::_helpers::compiled_views::model_input_view::{
-    ModelInputRecord, NativeModelInput,
-};
-use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::rules::lint_pipeline::{
     CompiledExpansion, CompiledSource, span_pass,
 };
 use sqlbuild_project::models::ExpansionRecord;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::render::types::SpanRow;
+use sqlbuild_python_project::compiled_views::models::NativeModelInput;
+use sqlbuild_python_project::compiled_views::models::NativeProjectView;
+use sqlbuild_python_project::compiled_views::types::ModelInputRecord;
 
 const FILE_PATH_ATTRIBUTE: &str = "file_path";
 

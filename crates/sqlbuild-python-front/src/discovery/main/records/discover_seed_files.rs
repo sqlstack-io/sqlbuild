@@ -1,13 +1,15 @@
 //! Discover seed CSV files under seeds/.
 
-use crate::discovery::_helpers::records::declaration_records;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::discovery::_helpers::records::declaration_records::discovered;
+use crate::discovery::_helpers::records::declaration_records::faults;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::PyTuple;
+use sqlbuild_discovery::declaration_files::models::CollectionKind;
 
 /// Discover seed CSV files under seeds/.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, project_dir))]
 pub fn discover_seed_files<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
-    declaration_records::discover_seed_files(project_dir)
+    discovered(&faults(project_dir, None), CollectionKind::Seeds, false)
 }

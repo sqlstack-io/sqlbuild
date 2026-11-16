@@ -1,34 +1,27 @@
 //! SQL unit-test and scenario files discovered natively and built as Python discovery records.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{
     PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyStringMethods, PyTuple,
 };
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_discovery::models::{DiscoveredFile, DiscoveryFailure, FileOutcome, StageFailure};
-use sqlbuild_discovery::sql_tests::main::discover_scenario_files::discover_scenario_files as discover_scenarios;
-use sqlbuild_discovery::sql_tests::main::discover_sql_test_files::discover_sql_test_files as discover_tests;
 use sqlbuild_discovery::sql_tests::main::parse_scenario_text::parse_scenario_text;
-use sqlbuild_discovery::sql_tests::main::parse_sql_test_text::parse_sql_test_text;
 use sqlbuild_discovery::sql_tests::models::{
     DiscoveredScenarioFile, DiscoveredSqlTestFile, SqlTestBlock, SqlTestFileOptions,
 };
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_model_config::execution_limits::main::parse_execution_limit::parse_execution_limit;
 
-use crate::discovery::_helpers::failures::faults::FileFaults;
-use crate::discovery::_helpers::failures::faults::record_tuple;
-use crate::discovery::_helpers::failures::raised::discovery_error;
-use crate::discovery::_helpers::failures::raised::failure_error;
-use crate::discovery::_helpers::failures::raised::read_error;
-use crate::discovery::_helpers::failures::raised::stage_error;
-use crate::discovery::_helpers::project::project_files::path_object;
+use crate::discovery::_helpers::failures::faults::{FileFaults, record_tuple};
+use crate::discovery::_helpers::failures::raised::{
+    discovery_error, failure_error, read_error, stage_error,
+};
 use crate::discovery::_helpers::snapshots::native_classes::NativeProjectTree;
-use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
-use crate::discovery::_helpers::snapshots::snapshot::project_root;
-use crate::discovery::_helpers::snapshots::snapshot::project_tree;
-use crate::discovery::_helpers::sources::sql_test_blocks::sql_test_block_records;
-use crate::discovery::_helpers::sources::sql_test_blocks::validate_block_names;
+use crate::discovery::_helpers::snapshots::snapshot::{in_snapshot, project_root, project_tree};
+use crate::discovery::_helpers::sources::sql_test_blocks::{
+    sql_test_block_records, validate_block_names,
+};
 use crate::sqltext::main::map_to_python::map_to_python;
 use sqlbuild_discovery::constants;
 use sqlbuild_discovery::sql_tests::main::sql_test_file_options::sql_test_file_options;
@@ -56,14 +49,14 @@ type Discoverer<T> = fn(
 type RecordBuilder<'py, T> =
     fn((&Bound<'py, PyAny>, &Bound<'py, PyAny>), T) -> PyResult<Bound<'py, PyAny>>;
 
-fn options() -> PyResult<SqlTestFileOptions> {
+pub(crate) fn options() -> PyResult<SqlTestFileOptions> {
     Ok(sql_test_file_options(
         sqlbuild_python_base::compile_context::main::delta::injection::injection()
             .map(|injection| std::sync::Arc::new(injection.test_paths.clone())),
     ))
 }
 
-fn path_class(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+pub(crate) fn path_class(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     imported(py, PATHLIB_MODULE, "Path")
 }
 
@@ -73,7 +66,7 @@ fn ownership_root<'py>(py: Python<'py>, root: &str) -> PyResult<Bound<'py, PyAny
 }
 
 /// Discover the files natively in the pass's snapshot: each relative path text and outcome.
-fn discovered_files<'py, T: Send>(
+pub(crate) fn discovered_files<'py, T: Send>(
     project_dir: &Bound<'py, PyAny>,
     discover: Discoverer<T>,
 ) -> PyResult<(Bound<'py, NativeProjectTree>, Vec<DiscoveredFile<T>>)> {
@@ -93,7 +86,7 @@ fn discovered_files<'py, T: Send>(
 }
 
 /// Each block as a `DiscoveredSqlTestBlock`, then the split failure, then the name check.
-fn test_blocks<'py>(
+pub(crate) fn test_blocks<'py>(
     file_path: &Bound<'py, PyAny>,
     blocks: Vec<SqlTestBlock>,
     failure: Option<DiscoveryFailure>,
@@ -127,7 +120,7 @@ fn test_blocks<'py>(
     PyTuple::new(py, records)
 }
 
-fn test_file<'py>(
+pub(crate) fn test_file<'py>(
     paths: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     file: DiscoveredSqlTestFile,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -153,7 +146,7 @@ fn test_file<'py>(
 }
 
 /// Python's `build_sql_scenario_file`: validate the header and build the record.
-fn scenario_file<'py>(
+pub(crate) fn scenario_file<'py>(
     paths: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     file: DiscoveredScenarioFile,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -229,7 +222,7 @@ fn scenario_file<'py>(
 }
 
 /// Build each file, raising or reporting each failing one.
-fn records<'py, T>(
+pub(crate) fn records<'py, T>(
     faults: &FileFaults<'py>,
     files: Vec<(Bound<'py, PyAny>, FileOutcome<T>)>,
     build: RecordBuilder<'py, T>,
@@ -248,81 +241,6 @@ fn records<'py, T>(
     record_tuple(py, built)
 }
 
-/// Discover the (selected) SQL test files natively, reporting failing files to `on_fault`.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, selected_paths=None, on_fault=None))]
-pub(crate) fn discover_test_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    selected_paths: Option<Bound<'py, PyAny>>,
-    on_fault: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = project_dir.py();
-    let (tree, files) = discovered_files(project_dir, discover_tests)?;
-    let tree: &ProjectTree = &tree.get().inner;
-    let mut kept: Vec<(Bound<'py, PyAny>, FileOutcome<DiscoveredSqlTestFile>)> = Vec::new();
-    for file in files {
-        let relative: Bound<'py, PyAny> = path_object(py, tree, file.relative_path)?.into_bound(py);
-        if let Some(selected) = &selected_paths
-            && !selected.contains(project_dir.div(&relative)?.call_method0("resolve")?)?
-        {
-            continue;
-        }
-        kept.push((path_class(py)?.call1((relative,))?, file.outcome));
-    }
-    records(
-        &FileFaults {
-            project_dir: project_dir.clone(),
-            on_fault,
-        },
-        kept,
-        test_file,
-    )
-}
-
-/// Discover scenario files natively, reporting failing files to `on_fault`.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, on_fault=None))]
-pub(crate) fn discover_scenario_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    on_fault: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = project_dir.py();
-    let (tree, files) = discovered_files(project_dir, discover_scenarios)?;
-    let tree: &ProjectTree = &tree.get().inner;
-    let kept: Vec<(Bound<'py, PyAny>, FileOutcome<DiscoveredScenarioFile>)> = files
-        .into_iter()
-        .map(|file| {
-            Ok((
-                path_class(py)?.call1((path_object(py, tree, file.relative_path)?,))?,
-                file.outcome,
-            ))
-        })
-        .collect::<PyResult<_>>()?;
-    records(
-        &FileFaults {
-            project_dir: project_dir.clone(),
-            on_fault,
-        },
-        kept,
-        scenario_file,
-    )
-}
-
-/// Parse in-memory SQL test contents into ordered blocks, as test discovery does.
-#[pyfunction]
-#[pyo3(signature = (*, contents, file_path))]
-pub(crate) fn parse_sql_test_file<'py>(
-    contents: String,
-    file_path: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = file_path.py();
-    let path: String = file_path.str()?.to_str()?.to_owned();
-    let options: SqlTestFileOptions = options()?;
-    let parsed = py.detach(|| parse_sql_test_text(&path, contents, &options));
-    let file: DiscoveredSqlTestFile = parsed.map_err(|failure| failure_error(py, failure))?;
-    test_blocks(file_path, file.blocks, file.failure)
-}
-
 /// Parse in-memory scenario contents into the record scenario discovery builds for a file.
 #[pyfunction]
 #[pyo3(signature = (*, contents, file_path, relative_path))]
@@ -337,11 +255,4 @@ pub(crate) fn parse_sql_scenario_file<'py>(
     let parsed = py.detach(|| parse_scenario_text(&path, contents, &options));
     let file: DiscoveredScenarioFile = parsed.map_err(|failure| failure_error(py, failure))?;
     scenario_file((file_path, relative_path), file)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_test_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_scenario_files, module)?)?;
-    module.add_function(wrap_pyfunction!(parse_sql_test_file, module)?)?;
-    module.add_function(wrap_pyfunction!(parse_sql_scenario_file, module)?)
 }

@@ -1,9 +1,7 @@
 //! Decorated model lifecycle hook functions under hooks/python/.
 
 use crate::discovery::_helpers::python_files::imported_python_nodes;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Decorated model lifecycle hook functions under hooks/python/.
 #[inline]

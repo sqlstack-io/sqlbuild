@@ -1,6 +1,5 @@
 pub(crate) mod _helpers;
 pub mod main;
-pub(crate) mod models;
 
 #[cfg(test)]
 mod tests;

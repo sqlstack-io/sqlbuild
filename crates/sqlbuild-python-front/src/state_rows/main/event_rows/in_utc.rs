@@ -1,12 +1,13 @@
 //! `value.astimezone(UTC)`.
 
-use crate::state_rows::_helpers::event_rows::timestamps;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::cursor::constants::DATETIME_MODULE;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 /// `value.astimezone(UTC)`.
-#[inline]
 pub fn in_utc<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    timestamps::in_utc(value)
+    value.call_method1(
+        "astimezone",
+        (imported(value.py(), DATETIME_MODULE, "UTC")?,),
+    )
 }

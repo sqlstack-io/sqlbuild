@@ -1,21 +1,14 @@
 //! Declaration scope resolvers, per-path declaration contexts and adapter-rendered constants.
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
-use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyInt, PyList, PyString, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
-use sqlbuild_host::entries::models::ExecutorHost;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyString, PyTuple};
+use pyo3::{IntoPyObject, pyfunction};
 
-use crate::scopes::main::index::build_scope_lookup::build_scope_lookup;
 use crate::scopes::models::NativeDeclarationContexts;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
-use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
@@ -29,7 +22,7 @@ use sqlbuild_python_base::records::types::RecordId;
 const NO_DECLARATION_KIND: u8 = 255;
 /// Declaration kinds by their native code: enum 0, constant 1, macro 2.
 const DECLARATION_KINDS: [&str; 3] = ["ENUM", "CONSTANT", "MACRO"];
-const TYPES_MODULE: &str = "types";
+pub(crate) const TYPES_MODULE: &str = "types";
 const SCALAR_KINDS: [&str; 6] = ["string", "integer", "boolean", "float", "decimal", "null"];
 const COLLECTION_KINDS: [&str; 2] = ["list", "set"];
 const ARRAY_RENDERING: &str = "array";
@@ -51,7 +44,7 @@ fn declaration_identity<'py>(
 }
 
 /// Each project declaration's identity mapped to its process-local value.
-fn runtime_declarations<'py>(
+pub(crate) fn runtime_declarations<'py>(
     discovered: &Bound<'py, PyAny>,
     loaded_macros: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
@@ -119,7 +112,9 @@ fn runtime_declarations<'py>(
 }
 
 /// Resources whose declarations differ from their directory's: private owners and grantees.
-fn resource_specific<'py>(scope_index: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyFrozenSet>> {
+pub(crate) fn resource_specific<'py>(
+    scope_index: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyFrozenSet>> {
     let py: Python<'py> = scope_index.py();
     let private: Bound<'py, PyAny> = enum_member(py, RecordId::ScopeKind, "PRIVATE")?;
     let mut resources: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -135,45 +130,6 @@ fn resource_specific<'py>(scope_index: &Bound<'py, PyAny>) -> PyResult<Bound<'py
         resources.push(native_field(&grant?, "resource")?);
     }
     PyFrozenSet::new(py, resources)
-}
-
-/// Pair the serializable static index with original process-local declaration values.
-pub(crate) fn declaration_scope_resolver<'py>(
-    discovered: &Bound<'py, PyAny>,
-    scope_index: &Bound<'py, PyAny>,
-    (loaded_macros, lookup): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = discovered.py();
-    let declarations: Bound<'py, PyDict> = runtime_declarations(discovered, loaded_macros)?;
-    let lookup: Bound<'py, PyAny> = if lookup.is_none() {
-        build_scope_lookup(py, scope_index)?.into_bound(py)
-    } else {
-        lookup.clone()
-    };
-    let projection: Bound<'py, PyAny> = new_record_with(
-        py,
-        RecordId::DeclarationRuntimeProjection,
-        &[(
-            "declarations",
-            imported(py, TYPES_MODULE, "MappingProxyType")?.call1((&declarations,))?,
-        )],
-    )?;
-    let native_contexts: Bound<'py, PyAny> =
-        native_declaration_contexts(&lookup, declarations.as_any())?;
-    new_record_with(
-        py,
-        RecordId::DeclarationScopeResolver,
-        &[
-            ("project_dir", native_field(discovered, "project_dir")?),
-            ("lookup", lookup),
-            ("projection", projection),
-            (
-                "resource_specific",
-                resource_specific(scope_index)?.into_any(),
-            ),
-            ("native_contexts", native_contexts),
-        ],
-    )
 }
 
 /// The native code of declaration kind `kind`, or the no-kind code.
@@ -331,7 +287,7 @@ pub(crate) fn native_declaration_contexts<'py>(
 /// Hand one scope lookup's positions and runtime values to the native classifier.
 #[pyfunction]
 #[pyo3(signature = (*, lookup, declarations))]
-fn build_native_declaration_contexts<'py>(
+pub(crate) fn build_native_declaration_contexts<'py>(
     lookup: &Bound<'py, PyAny>,
     declarations: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -353,7 +309,7 @@ pub(crate) fn resolved_declaration_context<'py>(
 }
 
 /// The adapter's SQL for one constant under `selected` collection rendering, or its error.
-fn rendered_constant<'py>(
+pub(crate) fn rendered_constant<'py>(
     declaration: &Bound<'py, PyAny>,
     value_renderer: &Bound<'py, PyAny>,
     selected: &Bound<'py, PyAny>,
@@ -390,73 +346,13 @@ fn rendered_constant<'py>(
     Ok(rendered)
 }
 
-/// Render one validated constant with the active adapter's typed-value contract.
-pub(crate) fn constant_declaration_sql<'py>(
-    declaration: &Bound<'py, PyAny>,
-    value_renderer: &Bound<'py, PyAny>,
-    (collection_rendering, file_path): (&Bound<'py, PyAny>, Option<&str>),
-) -> PyResult<String> {
-    let py: Python<'py> = declaration.py();
-    let render_as: Bound<'py, PyAny> = native_field(declaration, "render_as")?;
-    let selected: Bound<'py, PyAny> = if render_as.is_truthy()? {
-        render_as
-    } else {
-        collection_rendering.clone()
-    };
-    let error: PyErr = match rendered_constant(declaration, value_renderer, &selected) {
-        Ok(rendered) => return Ok(rendered),
-        Err(error) => error,
-    };
-    let rendering_error: Bound<'py, PyAny> = host_entry(py, ExecutorHost::SqlValueRenderingError)?;
-    let validation_error: Bound<'py, PyAny> = native_attr(py, NativeAttr::SqlValueValidationError)?;
-    let raised: Bound<'py, PyAny> = error.value(py).clone().into_any();
-    if !(raised.is_instance(&rendering_error)? || raised.is_instance(&validation_error)?) {
-        return Err(error);
-    }
-    let relative_path: Bound<'py, PyAny> = native_field(declaration, "relative_path")?;
-    let location: String = match file_path {
-        Some(file_path) => file_path.to_owned(),
-        None => relative_path.str()?.to_string(),
-    };
-    let compile_error: Bound<'py, PyAny> =
-        error_class(py, ErrorId::CompileInput)?.call1((format!(
-            "{} constant '{}' could not be rendered in '{}' by adapter '{}' as {}: {}",
-            relative_path.str()?,
-            native_field(declaration, "name")?.str()?,
-            location,
-            native_field(value_renderer, "adapter_name")?.str()?,
-            native_field(&selected, "value")?.str()?,
-            raised.str()?,
-        ),))?;
-    compile_error.setattr("__cause__", &raised)?;
-    Err(PyErr::from_value(compile_error))
-}
-
-/// One enum member value as a SQL scalar literal.
-#[pyfunction]
-#[pyo3(signature = (*, value))]
-pub(crate) fn render_enum_member_value(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    if value.is_instance_of::<PyInt>() {
-        return value.str()?.extract();
-    }
-    let text: String = value.extract()?;
-    Ok(format!("'{}'", text.replace('\'', "''")))
-}
-
 /// Canonical visibility for one authored path, projected onto runtime declaration values.
 #[pyfunction]
 #[pyo3(signature = (*, resolver, file_path, resource=None))]
-fn resolve_declaration_context<'py>(
+pub(crate) fn resolve_declaration_context<'py>(
     resolver: &Bound<'py, PyAny>,
     file_path: &Bound<'py, PyAny>,
     resource: Option<Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     resolved_declaration_context(resolver, file_path, resource.as_ref())
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(build_native_declaration_contexts, module)?)?;
-    module.add_function(wrap_pyfunction!(render_enum_member_value, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_declaration_context, module)?)?;
-    Ok(())
 }

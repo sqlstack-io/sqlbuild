@@ -2,7 +2,7 @@
 
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
+use pyo3::types::{PyTuple, PyTupleMethods};
 use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 
 use sqlbuild_host::entries::models::UserCodeHost;
@@ -130,30 +130,6 @@ pub(crate) fn discovery_error_from(
 /// Whether `error` is an `Exception`, which discovery wraps; other exceptions propagate.
 pub(crate) fn is_exception(py: Python<'_>, error: &PyErr) -> bool {
     error.is_instance_of::<PyException>(py)
-}
-
-/// `{provider.name: provider for provider in providers}`.
-pub(crate) fn provider_by_name<'py>(providers: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
-    let by_name: Bound<'py, PyDict> = PyDict::new(providers.py());
-    for provider in providers.try_iter()? {
-        let provider: Bound<'py, PyAny> = provider?;
-        by_name.set_item(native_field(&provider, "name")?, provider)?;
-    }
-    Ok(by_name)
-}
-
-/// The provider parameters of one loaded user function.
-pub(crate) fn provider_usages<'py>(
-    function: &Bound<'py, PyAny>,
-    provider_by_name: &Bound<'py, PyDict>,
-) -> PyResult<Bound<'py, PyAny>> {
-    call_with(
-        &shim(function.py(), UserCodeHost::ProviderUsages)?,
-        &[
-            ("function", function.clone()),
-            ("provider_by_name", provider_by_name.clone().into_any()),
-        ],
-    )
 }
 
 /// A tuple of the given items.

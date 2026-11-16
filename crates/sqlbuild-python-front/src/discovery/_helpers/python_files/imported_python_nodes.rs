@@ -1,29 +1,19 @@
 //! Decorated Python nodes, audit factories, hooks and materializations from imported modules.
 
-use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
+use crate::discovery::main::python_files::provider_by_name::provider_by_name;
+use crate::discovery::main::python_files::provider_usages::provider_usages;
 use std::collections::HashMap;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyList, PyString, PyTuple};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::discovery::_helpers::python_files::imported_modules::ProjectDir;
-use crate::discovery::_helpers::python_files::imported_modules::definition;
-use crate::discovery::_helpers::python_files::imported_modules::discovered;
-use crate::discovery::_helpers::python_files::imported_modules::discovery_error;
-use crate::discovery::_helpers::python_files::imported_modules::discovery_error_from;
-use crate::discovery::_helpers::python_files::imported_modules::is_exception;
-use crate::discovery::_helpers::python_files::imported_modules::module_functions;
-use crate::discovery::_helpers::python_files::imported_modules::provider_by_name;
-use crate::discovery::_helpers::python_files::imported_modules::provider_usages;
-use crate::discovery::_helpers::python_files::imported_modules::shim;
-use crate::discovery::_helpers::python_files::imported_modules::tuple_of;
-use crate::discovery::_helpers::python_files::imported_providers::bind_event_exporter_declarations;
-use crate::discovery::_helpers::python_files::imported_providers::discover_event_exporter_declarations;
-use crate::discovery::_helpers::python_files::imported_providers::discover_event_exporter_functions;
-use crate::discovery::_helpers::python_files::imported_providers::discover_provider_classes;
+use crate::discovery::_helpers::python_files::imported_modules::{
+    ProjectDir, definition, discovered, discovery_error, discovery_error_from, is_exception,
+    module_functions, shim, tuple_of,
+};
 use crate::discovery::_helpers::python_files::python_hook_files::discover_python_hook_files;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -113,9 +103,9 @@ const NODE_KINDS: [NodeKind; 4] = [
 ];
 
 /// Discovered loaders, tasks, assets, checks and audit factories, in discovery order.
-struct Buckets<'py> {
-    nodes: [Vec<Bound<'py, PyAny>>; 4],
-    audit_factories: Vec<(String, String, Bound<'py, PyAny>)>,
+pub(crate) struct Buckets<'py> {
+    pub(crate) nodes: [Vec<Bound<'py, PyAny>>; 4],
+    pub(crate) audit_factories: Vec<(String, String, Bound<'py, PyAny>)>,
 }
 
 /// The module and the file it was imported from.
@@ -261,7 +251,7 @@ impl<'py> Buckets<'py> {
         Ok(())
     }
 
-    fn discover_nodes(
+    pub(crate) fn discover_nodes(
         &mut self,
         project: &ProjectDir<'py>,
         providers: &Bound<'py, PyDict>,
@@ -406,64 +396,6 @@ fn factory_functions<'py>(
     Ok(functions)
 }
 
-/// Decorated Python DAG node functions under python/.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, providers = None))]
-pub(crate) fn discover_python_node_functions<'py>(
-    project_dir: Bound<'py, PyAny>,
-    providers: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = project_dir.py();
-    let project = ProjectDir { path: project_dir };
-    let providers: Bound<'py, PyDict> = match providers {
-        Some(providers) => provider_by_name(&providers)?,
-        None => PyDict::new(py),
-    };
-    let mut buckets = Buckets {
-        nodes: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
-        audit_factories: Vec::new(),
-    };
-    let node_root: Bound<'py, PyAny> = project.child(PYTHON_NODE_ROOT)?;
-    if node_root.call_method0("is_dir")?.is_truthy()? {
-        let saved: Bound<'py, PyAny> = call_with(
-            &shim(py, UserCodeHost::InstallPythonRootPackage)?,
-            &[
-                ("node_root", node_root),
-                ("project_dir", project.path.clone()),
-            ],
-        )?;
-        let discovered_nodes: PyResult<()> =
-            within_identity_pass(py, || buckets.discover_nodes(&project, &providers));
-        call_with(
-            &shim(py, UserCodeHost::RestorePythonRootModules)?,
-            &[("saved_modules", saved)],
-        )?;
-        discovered_nodes?;
-    }
-    let [loaders, tasks, assets, checks] = buckets.nodes;
-    discovered(
-        py,
-        RecordId::DiscoveredPythonNodeFunctions,
-        &[
-            ("loaders", tuple_of(py, loaders)?),
-            ("tasks", tuple_of(py, tasks)?),
-            ("assets", tuple_of(py, assets)?),
-            ("checks", tuple_of(py, checks)?),
-            (
-                "audit_factories",
-                tuple_of(
-                    py,
-                    buckets
-                        .audit_factories
-                        .into_iter()
-                        .map(|(_, _, record)| record)
-                        .collect(),
-                )?,
-            ),
-        ],
-    )
-}
-
 /// Decorated model lifecycle hook functions under hooks/python/.
 #[pyfunction]
 #[pyo3(signature = (*, project_dir, providers = None))]
@@ -522,62 +454,6 @@ pub(crate) fn discover_hook_functions<'py>(
         }
     }
     tuple_of(py, hooks)
-}
-
-/// Custom materialization Python files under materializations/.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, providers = None))]
-pub(crate) fn discover_materialization_files<'py>(
-    project_dir: Bound<'py, PyAny>,
-    providers: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = project_dir.py();
-    let project = ProjectDir { path: project_dir };
-    if !project
-        .child("materializations")?
-        .call_method0("is_dir")?
-        .is_truthy()?
-    {
-        return tuple_of(py, Vec::new());
-    }
-    let providers: Bound<'py, PyDict> = match providers {
-        Some(providers) => provider_by_name(&providers)?,
-        None => PyDict::new(py),
-    };
-    let mut files: Vec<Bound<'py, PyAny>> = Vec::new();
-    for file_path in project.module_files("materializations", false)? {
-        let materialize: Bound<'py, PyAny> =
-            project.load(UserCodeHost::LoadMaterializeFunction, &file_path)?;
-        let usages: Bound<'py, PyAny> = if materialize.is_none() {
-            tuple_of(py, Vec::new())?
-        } else {
-            provider_usages(&materialize, &providers)?
-        };
-        files.push(discovered(
-            py,
-            RecordId::DiscoveredMaterializationFile,
-            &[
-                ("file_path", file_path.clone()),
-                ("relative_path", project.relative(&file_path)?),
-                ("name", native_field(&file_path, "stem")?),
-                ("provider_usages", usages),
-            ],
-        )?);
-    }
-    tuple_of(py, files)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_python_node_functions, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_hook_functions, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_materialization_files, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_provider_classes, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        discover_event_exporter_declarations,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(bind_event_exporter_declarations, module)?)?;
-    module.add_function(wrap_pyfunction!(discover_event_exporter_functions, module)?)
 }
 
 fn optional_value<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {

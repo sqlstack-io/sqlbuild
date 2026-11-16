@@ -16,7 +16,6 @@ use crate::bindings::_helpers::compile_driver::inputs::{InputsRequest, attached_
 use crate::bindings::_helpers::compile_driver::project::compile_adapter_context;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
-use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_EXPECTED_MODELS_SCAN_ALGORITHM;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -31,6 +30,7 @@ use sqlbuild_python_front::scopes::main::index::open_native_scope_index::open_na
 use sqlbuild_python_front::scopes::main::index::project_fingerprint::project_fingerprint;
 use sqlbuild_python_front::scopes::main::index::read_scope_index_cache::read_scope_index_cache;
 use sqlbuild_python_front::scopes::main::index::write_scope_index_cache::write_scope_index_cache;
+use sqlbuild_python_project::sql_test_glue::constants::SQL_TEST_EXPECTED_MODELS_SCAN_ALGORITHM;
 
 const SCOPE_CACHE_DIRECTORY_NAME: &str = "declaration-scopes-v2";
 const SCOPE_CACHE_FILENAME: &str = "scope-index.json";

@@ -15,8 +15,6 @@ use sqlbuild_rules::lint_text::main::scan_fixture_null_candidates::scan_fixture_
 
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
-use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
-use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -36,6 +34,8 @@ use sqlbuild_python_front::discovery::main::records::discover_schema_files::disc
 use sqlbuild_python_front::discovery::main::records::discover_source_files::discover_source_files;
 use sqlbuild_python_front::discovery::main::records::discover_test_files::discover_test_files;
 use sqlbuild_python_front::discovery::main::snapshots::directory_snapshot_scope::directory_snapshot_scope;
+use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
+use sqlbuild_python_project::planner_selection::main::select_project_graph::select_project_graph;
 
 const SELECTION_CODE: &str = "S007";
 

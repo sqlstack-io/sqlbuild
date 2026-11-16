@@ -1,9 +1,8 @@
 //! Native config errors handed to Python, which raises them as the Python stages would.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pymethods;
 use pyo3::types::{PyDict, PyDictMethods};
-use pyo3::{Py, PyErr, pymethods};
-use sqlbuild_model_config::errors::{ConfigError, ErrorClass};
 
 use crate::model_config::_helpers::config::config_values::config_value_type_error;
 use crate::model_config::errors::NativeConfigError;
@@ -12,33 +11,10 @@ use sqlbuild_python_base::records::types::ErrorId;
 
 const EXPECTED_STRING: &str = "a string";
 
-const COMPILE_INPUT_CLASS: &str = "compile_input";
-const CONFIG_VALUE_TYPE_CLASS: &str = "config_value_type";
-const RESOURCE_IDENTITY_CLASS: &str = "resource_identity";
-const DISCOVERY_CONFLICT_CLASS: &str = "discovery_conflict";
-
-/// Wrap `error` for Python.
-pub(crate) fn native_config_error(
-    py: Python<'_>,
-    error: ConfigError,
-) -> PyResult<Py<NativeConfigError>> {
-    let class_name = match error.class {
-        ErrorClass::CompileInput => COMPILE_INPUT_CLASS,
-        ErrorClass::ConfigValueType => CONFIG_VALUE_TYPE_CLASS,
-        ErrorClass::ResourceIdentity => RESOURCE_IDENTITY_CLASS,
-        ErrorClass::DiscoveryConflict => DISCOVERY_CONFLICT_CLASS,
-    };
-    Py::new(
-        py,
-        NativeConfigError {
-            class_name,
-            message: error.message,
-            code: error.code,
-            help: error.help,
-            key: error.key,
-        },
-    )
-}
+pub(crate) const COMPILE_INPUT_CLASS: &str = "compile_input";
+pub(crate) const CONFIG_VALUE_TYPE_CLASS: &str = "config_value_type";
+pub(crate) const RESOURCE_IDENTITY_CLASS: &str = "resource_identity";
+pub(crate) const DISCOVERY_CONFLICT_CLASS: &str = "discovery_conflict";
 
 /// The Python exception a native config error raises as, given the values it names.
 pub(crate) fn config_exception<'py>(
@@ -47,17 +23,6 @@ pub(crate) fn config_exception<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let error: Bound<'py, NativeConfigError> = error.cast::<NativeConfigError>()?.clone();
     error.get().exception(error.py(), values)
-}
-
-/// `config_exception` as the raised error, or the failure building it.
-pub(crate) fn raised_config_exception(
-    error: &Bound<'_, PyAny>,
-    values: Option<&Bound<'_, PyAny>>,
-) -> PyErr {
-    match config_exception(error, values) {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(failure) => failure,
-    }
 }
 
 #[pymethods]
@@ -90,9 +55,4 @@ impl NativeConfigError {
         };
         error_class(py, class)?.call((&self.message,), Some(&keywords))
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeConfigError>()?;
-    Ok(())
 }

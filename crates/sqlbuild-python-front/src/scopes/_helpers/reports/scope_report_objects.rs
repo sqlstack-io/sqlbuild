@@ -1,5 +1,6 @@
 //! Scope report requests read from, and results built as, the Python report models.
 
+use crate::scopes::main::reports::json_to_python::json_to_python;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -12,14 +13,12 @@ use sqlbuild_scopes::scope_report::main::cached_diagnostic_facts::cached_diagnos
 use sqlbuild_scopes::scope_report::models::{
     BrowseResult, DeclarationReport, DeclarationTarget, Explanation, ListResult, MovePreview,
     Provenance, QueryTarget, ReportDiagnostic, ReportFilters, ResourceReport, ScopeChainEntry,
-    ScopeFolder, ScopeReport, ScopeResult, ScopeSection, SourceLocation,
+    ScopeFolder, ScopeReport, ScopeSection, SourceLocation,
 };
 
-use crate::scopes::_helpers::index::scope_objects::field;
-use crate::scopes::_helpers::index::scope_objects::optional_item;
-use crate::scopes::_helpers::index::scope_objects::read_declaration_identity;
-use crate::scopes::_helpers::index::scope_objects::read_diagnostic;
-use crate::scopes::_helpers::index::scope_objects::read_qualified;
+use crate::scopes::_helpers::index::scope_objects::{
+    field, optional_item, read_declaration_identity, read_diagnostic, read_qualified,
+};
 use crate::scopes::models::ScopeClasses;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
@@ -96,43 +95,6 @@ pub(crate) fn read_filters(filters: &Bound<'_, PyAny>) -> PyResult<ReportFilters
         nearby_depth: field(filters, "nearby_depth")?,
         globals: field(filters, "globals")?,
     })
-}
-
-/// A JSON value as Python builds it; arrays become tuples or lists.
-pub(crate) fn json_to_python(py: Python<'_>, value: JsonValue, tuples: bool) -> PyResult<PyObject> {
-    match value {
-        JsonValue::Null => Ok(py.None()),
-        JsonValue::Bool(flag) => flag.into_py_any(py),
-        JsonValue::Integer(integer) => match integer.to_i128() {
-            Some(number) => number.into_py_any(py),
-            None => Ok(py
-                .import("builtins")?
-                .getattr("int")?
-                .call1((integer.as_str(),))?
-                .unbind()),
-        },
-        JsonValue::Float(number) => number.into_py_any(py),
-        JsonValue::String(text) => text.into_py_any(py),
-        JsonValue::Utf16(units) => String::from_utf16_lossy(&units).into_py_any(py),
-        JsonValue::Array(items) => {
-            let values: Vec<PyObject> = items
-                .into_iter()
-                .map(|item| json_to_python(py, item, tuples))
-                .collect::<PyResult<_>>()?;
-            if tuples {
-                PyTuple::new(py, values)?.into_py_any(py)
-            } else {
-                PyList::new(py, values)?.into_py_any(py)
-            }
-        }
-        JsonValue::Object(entries) => {
-            let dictionary: Bound<'_, PyDict> = PyDict::new(py);
-            for (key, item) in entries {
-                dictionary.set_item(key, json_to_python(py, item, tuples)?)?;
-            }
-            dictionary.into_py_any(py)
-        }
-    }
 }
 
 /// `plain_value(int(integer))`: a 64-bit signed or unsigned number, else the wide-integer error.
@@ -504,7 +466,7 @@ fn read_declaration_report(report: &Bound<'_, PyAny>) -> PyResult<DeclarationRep
     })
 }
 
-fn read_declaration_reports(
+pub(crate) fn read_declaration_reports(
     item: &Bound<'_, PyAny>,
     name: &str,
 ) -> PyResult<Vec<DeclarationReport>> {
@@ -514,7 +476,7 @@ fn read_declaration_reports(
         .collect()
 }
 
-fn read_section(section: &Bound<'_, PyAny>) -> PyResult<ScopeSection> {
+pub(crate) fn read_section(section: &Bound<'_, PyAny>) -> PyResult<ScopeSection> {
     Ok(ScopeSection {
         name: field(section, "name")?,
         total: field(section, "total")?,
@@ -529,7 +491,7 @@ fn read_section(section: &Bound<'_, PyAny>) -> PyResult<ScopeSection> {
     })
 }
 
-fn read_folder(folder: &Bound<'_, PyAny>) -> PyResult<ScopeFolder> {
+pub(crate) fn read_folder(folder: &Bound<'_, PyAny>) -> PyResult<ScopeFolder> {
     let mut kind_counts: Vec<(String, i64)> = Vec::new();
     for entry in native_field(folder, "kind_counts")?.try_iter()? {
         let (kind, count): (Bound<'_, PyAny>, i64) = entry?.extract()?;
@@ -552,7 +514,7 @@ fn read_folder(folder: &Bound<'_, PyAny>) -> PyResult<ScopeFolder> {
     })
 }
 
-fn read_diagnostics(item: &Bound<'_, PyAny>) -> PyResult<Vec<ReportDiagnostic>> {
+pub(crate) fn read_diagnostics(item: &Bound<'_, PyAny>) -> PyResult<Vec<ReportDiagnostic>> {
     native_field(item, "diagnostics")?
         .try_iter()?
         .map(|diagnostic| {
@@ -587,7 +549,7 @@ fn read_move(preview: &Bound<'_, PyAny>) -> PyResult<MovePreview> {
     })
 }
 
-fn read_report(report: &Bound<'_, PyAny>) -> PyResult<ScopeReport> {
+pub(crate) fn read_report(report: &Bound<'_, PyAny>) -> PyResult<ScopeReport> {
     let resource: Bound<'_, PyAny> = native_field(report, "resource")?;
     Ok(ScopeReport {
         resource: ResourceReport {
@@ -627,31 +589,4 @@ fn read_report(report: &Bound<'_, PyAny>) -> PyResult<ScopeReport> {
         diagnostics: read_diagnostics(report)?,
         complete: field(report, "complete")?,
     })
-}
-
-/// A `ScopeReport`, `ScopeBrowseResult` or, otherwise, `ScopeListResult` as its native result.
-pub(crate) fn read_result(
-    classes: &ScopeClasses<'_>,
-    result: &Bound<'_, PyAny>,
-) -> PyResult<ScopeResult> {
-    if result.is_instance(&classes.model(RecordId::ScopeReport)?)? {
-        return Ok(ScopeResult::Report(Box::new(read_report(result)?)));
-    }
-    if result.is_instance(&classes.model(RecordId::ScopeBrowseResult)?)? {
-        return Ok(ScopeResult::Browse(BrowseResult {
-            folder: field(result, "folder")?,
-            folders: native_field(result, "folders")?
-                .try_iter()?
-                .map(|folder| read_folder(&folder?))
-                .collect::<PyResult<_>>()?,
-            diagnostics: read_diagnostics(result)?,
-            complete: field(result, "complete")?,
-        }));
-    }
-    Ok(ScopeResult::List(ListResult {
-        folder: field(result, "folder")?,
-        declarations: read_declaration_reports(result, "declarations")?,
-        section: read_section(&native_field(result, "section")?)?,
-        diagnostics: read_diagnostics(result)?,
-    }))
 }

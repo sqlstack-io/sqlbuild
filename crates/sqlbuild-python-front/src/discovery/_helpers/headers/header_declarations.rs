@@ -1,10 +1,8 @@
 //! Model-header enums and constants, and typed constant file entries, validated natively.
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_model_config::declarations::errors::DeclarationFailure;
 use sqlbuild_model_config::declarations::main::model_constant_declarations::model_constant_declarations;
 use sqlbuild_model_config::declarations::main::model_enum_declarations::model_enum_declarations;
@@ -189,8 +187,4 @@ pub(crate) fn typed_constant_record<'py>(
         ),
         Err(failure) => Err(declaration_error(py, failure)?),
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(model_header_declarations, module)?)
 }
