@@ -178,7 +178,8 @@ export function evaluateMockSelection(select: string, exclude: string): { keys: 
 			for (const part of token.split(',')) {
 				const found = matchPart(part);
 				if (!found) {
-					const suggestions = [...new Set(SNAPSHOT_NODES.flatMap((n) => n.tags))].filter((tag) => part.startsWith('tag:') && tag.startsWith(part.slice(4, 6))).map((tag) => token.replace(part, `tag:${tag}`));
+					const bare = part.replace(/^\+/, '').replace(/\+$/, '');
+					const suggestions = [...new Set(SNAPSHOT_NODES.flatMap((n) => n.tags))].filter((tag) => bare.startsWith('tag:') && tag.startsWith(bare.slice(4, 6))).map((tag) => token.replace(part, part.replace(bare, `tag:${tag}`)));
 					return { code: 'S007', message: `unknown selector name '${part}'`, help: null, location: { field, token, start: match.index, end: match.index + token.length }, suggestions };
 				}
 				hits = hits ? new Set([...hits].filter((key) => found.has(key))) : found;

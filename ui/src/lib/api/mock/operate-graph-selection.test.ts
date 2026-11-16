@@ -16,6 +16,10 @@ describe('mock selection evaluation', () => {
 		});
 	});
 
+	it('keeps the + of the part it fixes in a suggestion', () => {
+		expect(evaluateMockSelection('+tag:finanse,kind:model', '').error?.suggestions).toEqual(['+tag:finance,kind:model']);
+	});
+
 	it('counts models of every materialization as one kind', () => {
 		expect(mockVocabulary().kinds).toEqual([
 			{ value: 'loader', count: 1 },
