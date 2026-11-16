@@ -60,6 +60,38 @@ async function settle(page: Page) {
 		.catch(() => {});
 }
 
+/** In the page: each node card's status line that wraps or cuts a part off, as problems. */
+function statusLines(): string[] {
+	const problems: string[] = [];
+	// A node card's status line is one line, each part whole: none wraps, none is cut off.
+	for (const line of document.querySelectorAll<HTMLElement>('.svelte-flow__node .status')) {
+		const box = line.getBoundingClientRect();
+		if (!box.height || getComputedStyle(line).visibility === 'hidden') continue;
+		const name = line.closest<HTMLElement>('.svelte-flow__node')?.dataset.id;
+		const parts = [...line.children].filter((c) => c.getBoundingClientRect().width > 0);
+		// Wrapped: a run of a part's text over two lines (its line boxes, from a range over each text
+		// node; icons beside the text sit at their own height), or parts on different rows.
+		const lines = (p: Element) => {
+			let most = 0;
+			const walk = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+			for (let text = walk.nextNode(); text; text = walk.nextNode()) {
+				if (!text.textContent?.trim()) continue;
+				const range = document.createRange();
+				range.selectNodeContents(text);
+				most = Math.max(most, new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size);
+			}
+			return most;
+		};
+		const middles = parts.map((p) => p.getBoundingClientRect().top + p.getBoundingClientRect().height / 2);
+		const wrapped = parts.some((p) => lines(p) > 1) || Math.max(...middles) - Math.min(...middles) > 3;
+		const cut = parts.some((p) => p.getBoundingClientRect().right > box.right - 1);
+		if (wrapped || cut || line.scrollWidth > line.clientWidth + 1) {
+			problems.push(`${name}: its status line ${wrapped ? 'wraps' : 'is cut off'} ("${(line.textContent ?? '').replace(/\s+/g, ' ').trim()}")`);
+		}
+	}
+	return problems;
+}
+
 /** In the page: each fitted graph's start card (`data-fit-anchor`) not wholly inside its canvas, as problems. */
 function anchorOutside(): string[] {
 	const found: string[] = [];
@@ -155,6 +187,7 @@ async function checkLayout(page: Page, label: string) {
 		}
 		return problems;
 	}, MAX_ROWS);
+	found.push(...(await page.evaluate(statusLines)));
 	// A graph larger than its view opens with the card it starts on wholly inside the canvas.
 	found.push(...((await page.evaluate(`(${anchorOutside.toString()})()`)) as string[]));
 	expect(found, label).toEqual([]);
@@ -235,6 +268,25 @@ for (const width of WIDTHS) {
 				await settle(page);
 				await checkLayout(page, path);
 				await checkStickyHeaders(page, path);
+			});
+		}
+
+		// Cards drawn in full, so their status lines show: a job's node cards, and a group's folder and
+		// job cards. Zoomed in until cards aren't compact, as a narrow window may open them compact.
+		for (const path of ['/jobs/core_build', '/jobs/warehouse_nightly']) {
+			test(`${path}'s cards keep their status line on one line`, async ({ page }) => {
+				await page.goto(awkward(path));
+				await settle(page);
+				const canvas = page.locator('.graph-canvas').first();
+				const pane = (await page.locator('.svelte-flow').first().boundingBox())!;
+				await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2);
+				for (let i = 0; i < 20 && /\bcompact\b/.test((await canvas.getAttribute('class')) ?? ''); i++) {
+					await page.mouse.wheel(0, -60);
+					await page.waitForTimeout(300);
+				}
+				await expect(canvas).not.toHaveClass(/\bcompact\b/);
+				expect(await page.locator('.svelte-flow__node .status').count(), 'status lines').toBeGreaterThan(3);
+				expect(await page.evaluate(statusLines), path).toEqual([]);
 			});
 		}
 

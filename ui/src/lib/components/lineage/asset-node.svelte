@@ -21,6 +21,8 @@
 	import { formatAgo } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
 	import CompactFace from '$lib/components/graph/compact-face.svelte';
+	import { fonts } from '$lib/components/graph/fonts.svelte';
+	import { fitStatus } from '$lib/lineage/status-line';
 
 	type AssetData = {
 		name: string;
@@ -93,6 +95,17 @@
 	const faceTone = $derived(
 		d.status === 'fail' || d.status === 'run' ? tone : d.stale === 'behind' ? 'var(--sb-behind)' : d.stale ? 'var(--sb-stale)' : tone
 	);
+	// The status line stays one line: worked out once per card, the drift chip and then the status word
+	// shorten when its parts don't fit; the time never does.
+	const fit = $derived(
+		(void fonts.ready,
+		fitStatus({
+			label: f.status ? statusLabel[d.status] : undefined,
+			when: f.lastBuilt && when ? when : undefined,
+			drift: d.stale ? staleLabel[d.stale] : undefined,
+			checks: f.checks && d.checks ? d.checks : undefined
+		}))
+	);
 	const showStatus = $derived(f.status || (f.checks && d.checks) || (f.lastBuilt && when) || d.stale);
 
 	const hasDetail = $derived(
@@ -124,12 +137,12 @@
 	{#if showStatus}
 		<div class="status" style:--tone={tone}>
 			{#if f.status}
-				<i></i>
-				<span class="label">{statusLabel[d.status]}</span>
+				<i title={statusLabel[d.status]}></i>
+				{#if fit.label}<span class="label">{statusLabel[d.status]}</span>{/if}
 			{/if}
-			{#if f.lastBuilt && when}<span class="when" class:first={!f.status}>{when}</span>{/if}
+			{#if f.lastBuilt && when}<span class="when" class:first={!f.status || !fit.label}>{when}</span>{/if}
 			{#if d.stale}
-				<span class="drift {d.stale}" title={staleTitle[d.stale]}><GitCompareIcon size={10} strokeWidth={2} />{staleLabel[d.stale]}</span>
+				<span class="drift {d.stale}" title={staleTitle[d.stale]}><GitCompareIcon size={10} strokeWidth={2} />{#if fit.driftWord}{staleLabel[d.stale]}{/if}</span>
 			{/if}
 			{#if f.checks && d.checks}
 				<span class="checks" style:color={d.checksColor ?? 'var(--muted-foreground)'}>{d.checks}</span>
@@ -244,6 +257,12 @@
 		border-top: 1px solid var(--border);
 		background: color-mix(in srgb, var(--tone) 9%, var(--card));
 		font-size: 11px;
+		/* One line, whatever the parts: they are fitted to it (status-line.ts); none wraps or shrinks. */
+		white-space: nowrap;
+		overflow: hidden;
+	}
+	.status > :global(*) {
+		flex-shrink: 0;
 	}
 	.status i {
 		width: 7px;

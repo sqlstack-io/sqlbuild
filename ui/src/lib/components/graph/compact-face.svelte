@@ -1,11 +1,5 @@
-<script module lang="ts">
-	// Titles are fitted with the card font's real widths once it has loaded: until then the widths are
-	// estimated, so every compact title is fitted once more when the fonts are ready (not per zoom).
-	let fontsReady = $state(false);
-	if (typeof document !== 'undefined') void document.fonts?.ready.then(() => (fontsReady = true));
-</script>
-
 <script lang="ts">
+	import { fonts } from './fonts.svelte';
 	import { LINE_HEIGHT, fitTitle } from './compact-title';
 	import { CARD_WIDTH, COMPACT_LEVELS, MAX_TITLE_PX, MIN_TITLE_PX } from '$lib/lineage/fit';
 
@@ -24,7 +18,7 @@
 	 * from 11 to 16 px on screen. `px` is the title's size on screen, kept through the level.
 	 */
 	const fits = $derived(
-		(void fontsReady,
+		(void fonts.ready,
 		COMPACT_LEVELS.map((zoom) => {
 			const fit = fitTitle(title, {
 				width: CARD_WIDTH - 2 - EDGE - 2 * PAD_X,

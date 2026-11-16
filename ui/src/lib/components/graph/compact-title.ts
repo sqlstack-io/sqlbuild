@@ -2,8 +2,8 @@
 // name separators onto as many lines as fit, and shortened in the middle when even the smallest font
 // doesn't fit. Pure apart from the default text measurer; worked out once per card, never per zoom step.
 
-/** The width of `text` at `font` px, in px. */
-export type Measure = (text: string, font: number) => number;
+/** The width of `text` at `font` px (and `weight`, 600 by default), in px. */
+export type Measure = (text: string, font: number, weight?: number) => number;
 
 export type TitleBox = {
 	/** Room for the title, in the card's own px. */
@@ -84,8 +84,8 @@ export function fitTitle(text: string, box: TitleBox, measure: Measure = measure
 // browser), estimated generously, so a title fitted early errs on the short side.
 const FAMILY = '"Inter Variable", sans-serif';
 let context: CanvasRenderingContext2D | null | undefined;
-export const measureText: Measure = (text, font) => {
-	const spec = `600 ${font}px ${FAMILY}`;
+export const measureText: Measure = (text, font, weight = 600) => {
+	const spec = `${weight} ${font}px ${FAMILY}`;
 	if (context === undefined) context = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
 	if (!context || !document.fonts?.check(spec)) return text.length * font * 0.64;
 	context.font = spec;
