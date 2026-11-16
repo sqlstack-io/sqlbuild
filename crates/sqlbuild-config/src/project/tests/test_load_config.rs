@@ -1,5 +1,6 @@
 use crate::project::errors::ConfigFailure;
 use crate::project::main::load_changes_config::load_changes_config;
+use crate::project::main::load_concurrency_groups::load_concurrency_groups;
 use crate::project::main::load_control_config::load_control_config;
 use crate::project::main::load_git_base_ref::load_git_base_ref;
 use crate::project::main::load_review_config::load_review_config;
@@ -7,8 +8,9 @@ use crate::project::models::ConfigFile;
 use crate::project::models::{ChangesConfig, ControlConfig, ReviewConfig};
 use crate::project::tests::helpers::{failure_at, first_failure, project_directory};
 use crate::project::tests::test_types::{
-    ChangesConfigTestCase, ControlConfigTestCase, GitBaseRefTestCase, ProjectFailureTestCase,
-    ReviewConfigErrorTestCase, ReviewConfigTestCase,
+    ChangesConfigTestCase, ConcurrencyGroupsErrorTestCase, ConcurrencyGroupsTestCase,
+    ControlConfigTestCase, GitBaseRefTestCase, ProjectFailureTestCase, ReviewConfigErrorTestCase,
+    ReviewConfigTestCase,
 };
 
 const PROJECT: &str = "name = 'orders'\nadapter = 'duckdb'\n";
@@ -478,5 +480,99 @@ fn given_invalid_changes_section_when_loading_then_project_loading_rejects_it() 
                 test_case.description
             );
         }
+    }
+}
+
+#[test]
+fn given_concurrency_groups_when_reading_for_a_target_then_its_overrides_replace_the_project_limits()
+ {
+    let project = "name = 'orders'\nadapter = 'duckdb'\n[concurrency_groups]\nnightly_window = 1\n\
+                   warehouse = 4\n[targets.prod.concurrency_groups]\nwarehouse = 2\n[targets.dev]\n\
+                   schema = 'dev'\n";
+    let test_cases = [
+        ConcurrencyGroupsTestCase {
+            description: "the declared groups, for no target",
+            project,
+            target: None,
+            expected_groups: &[("nightly_window", 1), ("warehouse", 4)],
+        },
+        ConcurrencyGroupsTestCase {
+            description: "a target's override",
+            project,
+            target: Some("prod"),
+            expected_groups: &[("nightly_window", 1), ("warehouse", 2)],
+        },
+        ConcurrencyGroupsTestCase {
+            description: "a target without overrides",
+            project,
+            target: Some("dev"),
+            expected_groups: &[("nightly_window", 1), ("warehouse", 4)],
+        },
+        ConcurrencyGroupsTestCase {
+            description: "a project without groups",
+            project: PROJECT,
+            target: Some("dev"),
+            expected_groups: &[],
+        },
+    ];
+    for test_case in test_cases {
+        let (_directory, paths) = project_directory(test_case.project, "");
+
+        let groups =
+            load_concurrency_groups(&paths, test_case.target).expect(test_case.description);
+
+        assert_eq!(
+            groups
+                .iter()
+                .map(|(name, limit)| (name.as_str(), *limit))
+                .collect::<Vec<_>>(),
+            test_case.expected_groups,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_invalid_concurrency_groups_when_loading_then_project_loading_rejects_them() {
+    let test_cases = [
+        ConcurrencyGroupsErrorTestCase {
+            description: "a limit of zero",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[concurrency_groups]\nnightly = 0\n",
+            local: "",
+            expected_fragment: "concurrency_groups.nightly must be the most runs at once, from 1 to 10000",
+        },
+        ConcurrencyGroupsErrorTestCase {
+            description: "a limit that is not a whole number",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[concurrency_groups]\nnightly = 'one'\n",
+            local: "",
+            expected_fragment: "concurrency_groups.nightly must be the most runs at once",
+        },
+        ConcurrencyGroupsErrorTestCase {
+            description: "a target overriding a group the project does not declare",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[concurrency_groups]\nnightly = 1\n\
+                      [targets.prod.concurrency_groups]\nnightly_windw = 1\n",
+            local: "",
+            expected_fragment: "targets.prod.concurrency_groups.nightly_windw overrides a group \
+                                [concurrency_groups] does not declare",
+        },
+        ConcurrencyGroupsErrorTestCase {
+            description: "a local file setting a project rule",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[concurrency_groups]\nnightly = 1\n",
+            local: "[targets.prod.concurrency_groups]\nnightly = 2\n",
+            expected_fragment: "targets.prod.concurrency_groups is project policy; set it in \
+                                sqlbuild_project.toml",
+        },
+    ];
+    for test_case in test_cases {
+        let (_directory, paths) = project_directory(test_case.project, test_case.local);
+
+        let failure = format!("{:?}", first_failure(&paths).expect(test_case.description));
+
+        assert!(
+            failure.contains(test_case.expected_fragment),
+            "{}: {failure}",
+            test_case.description
+        );
     }
 }

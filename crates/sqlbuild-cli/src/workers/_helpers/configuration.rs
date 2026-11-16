@@ -17,12 +17,14 @@ impl<'a> Launcher<'a> {
                 target: &location.target,
                 server_url: &location.server_url,
                 max_workers: location.max_workers,
+                concurrency_caps: &location.concurrency_caps,
             },
             Self::Docker(location) => LauncherScope {
                 location_id: location.location_id,
                 target: &location.target,
                 server_url: &location.server_url,
                 max_workers: location.max_workers,
+                concurrency_caps: &location.concurrency_caps,
             },
         }
     }

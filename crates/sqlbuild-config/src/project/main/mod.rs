@@ -1,6 +1,7 @@
 pub mod deprecated_setting_warnings;
 pub mod explicit_references_help;
 pub mod load_changes_config;
+pub mod load_concurrency_groups;
 pub mod load_control_config;
 pub mod load_git_base_ref;
 pub mod load_local_config;

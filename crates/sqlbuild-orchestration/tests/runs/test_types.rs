@@ -344,3 +344,27 @@ pub(crate) struct RoundTripGroupTestCase {
     /// The order the group launches its members in.
     pub(crate) expected_order: &'static [&'static str],
 }
+
+pub(crate) struct ProjectLimitTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) project_limit: u32,
+    pub(crate) server_cap: Option<u32>,
+    pub(crate) expected_running_per_location: usize,
+}
+
+pub(crate) struct WaitReasonTestCase {
+    pub(crate) description: &'static str,
+    /// Each node's upstream nodes.
+    pub(crate) deps: &'static [(&'static str, &'static [&'static str])],
+    pub(crate) jobs: serde_json::Value,
+    pub(crate) waits: serde_json::Value,
+    pub(crate) expected_reasons: serde_json::Value,
+}
+
+pub(crate) struct DeclarationCheckTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) jobs: serde_json::Value,
+    pub(crate) groups: serde_json::Value,
+    pub(crate) expected_error: &'static str,
+}

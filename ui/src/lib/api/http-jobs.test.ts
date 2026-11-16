@@ -115,6 +115,7 @@ describe('job mapping', () => {
 			description: 'Build orders',
 			selection: ['model:customers', 'model:orders'],
 			concurrency_groups: ['warehouse_heavy'],
+			concurrency: [{ group: 'warehouse_heavy', limit: 1, shared_with: ['nightly'] }],
 			snapshot_id: SNAPSHOT,
 			select: '+orders',
 			declared_at: { path: 'orchestration/jobs.py', line: 12 },
@@ -127,6 +128,7 @@ describe('job mapping', () => {
 		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrencyGroups: ['warehouse_heavy'], select: '+orders', sourceFile: 'orchestration/jobs.py:12', owner: 'Orders team', overlap: 'skip', onFailure: { retries: 2, retryDelaySeconds: 300 }, priority: null });
 		expect(toJob({ ...wire, owner: ' ', overlap: 'queue', on_failure: null }, triggers, [])).toMatchObject({ owner: null, overlap: 'queue', onFailure: null });
 		expect(job.lastRun?.id).toBe('r-ord');
+		expect(job.concurrencyRules).toEqual([{ group: 'warehouse_heavy', limit: 1, sharedWith: ['nightly'] }]);
 		const detail = jobDetailOf(job, { ...wire, settings: { vars: '[REDACTED]', concurrency: 4, empty_ok: true, models: ['a', 'b'] }, members: [], member_of: ['nightly'], critical_nodes: ['model:orders'], exclude: ' stg_orders  audit_orders', targets: ['production'], cursor_type: 'integer' });
 		expect(detail.resolvedNodes).toEqual(['model:customers', 'model:orders']);
 		expect(detail.settings).toEqual({ vars: '[REDACTED]', concurrency: '4', empty_ok: true, models: '["a","b"]' });
@@ -143,6 +145,7 @@ describe('job mapping', () => {
 			description: 'Everything nightly',
 			selection: [],
 			concurrency_groups: [],
+			concurrency: [],
 			snapshot_id: SNAPSHOT,
 			settings: {},
 			member_of: [],
@@ -154,10 +157,10 @@ describe('job mapping', () => {
 			cursor_type: null,
 			overlap: 'queue',
 			members: [
-				{ job_key: 'stock', waits_for: [] },
-				{ job_key: 'orders', waits_for: [] },
-				{ job_key: 'customers', waits_for: ['orders'] },
-				{ job_key: 'audit', waits_for: ['customers', 'stock'] }
+				{ job_key: 'stock', waits_for: [], reasons: [] },
+				{ job_key: 'orders', waits_for: [], reasons: [] },
+				{ job_key: 'customers', waits_for: ['orders'], reasons: [{ upstream_job: 'orders', from_node: 'model:orders', to_node: 'model:customers' }] },
+				{ job_key: 'audit', waits_for: ['customers', 'stock'], reasons: [] }
 			]
 		};
 		const detail = jobDetailOf(toJob(wire, [], []), wire);
@@ -168,6 +171,7 @@ describe('job mapping', () => {
 			['audit', 2, ['customers', 'stock']]
 		]);
 		expect(detail.groupMembers?.flatMap((m) => m.upstream.map((u) => u.source))).toEqual([null, null, null]);
+		expect(detail.groupMembers?.[2].reasons).toEqual([{ upstreamJob: 'orders', fromNode: 'model:orders', toNode: 'model:customers' }]);
 		expect(detail.members).toEqual(['stock', 'orders', 'customers', 'audit']);
 		expect([detail.select, detail.sourceFile, detail.exclude, detail.targets, detail.cursorType]).toEqual([null, null, [], null, null]);
 	});

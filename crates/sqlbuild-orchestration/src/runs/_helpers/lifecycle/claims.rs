@@ -6,6 +6,7 @@ use std::num::NonZeroU32;
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::runs::_helpers::groups::admission::slot_key;
 use crate::runs::_helpers::lifecycle::events::append_run_event;
 use crate::runs::models::{RunClaim, RunRequest};
 use crate::store::errors::ControlError;
@@ -16,7 +17,7 @@ use crate::store::models::{ControlTransaction, Parameter};
 pub(crate) async fn reserve_claims(
     mut transaction: ControlTransaction,
     request: &RunRequest,
-    limits: &BTreeMap<String, NonZeroU32>,
+    caps: &BTreeMap<String, NonZeroU32>,
 ) -> Result<(ControlTransaction, bool), ControlError> {
     if let Some(job_key) = &request.job_key {
         let rows;
@@ -69,12 +70,13 @@ pub(crate) async fn reserve_claims(
         }
     }
     for group in &request.concurrency_groups {
+        let key = slot_key(request, group);
         if let Some(parent_id) = request.parent_run_id {
             let inherited;
             (transaction, inherited) = query(
                 transaction,
                 "SELECT slot FROM sqb_concurrency_slots WHERE group_key=$1 AND run_id=$2",
-                vec![Parameter::Text(group.clone()), Parameter::Id(parent_id)],
+                vec![Parameter::Text(key.clone()), Parameter::Id(parent_id)],
             )
             .await?;
             if !inherited.is_empty() {
@@ -84,17 +86,12 @@ pub(crate) async fn reserve_claims(
                 continue;
             }
         }
-        let limit = limits
-            .get(group)
-            .ok_or_else(|| {
-                ControlError::Invalid(format!("concurrency group {group} has no configured limit"))
-            })?
-            .get();
+        let limit = effective_limit(request, caps, group)?;
         let slots;
         (transaction, slots) = query(
             transaction,
             "SELECT slot FROM sqb_concurrency_slots WHERE group_key=$1 ORDER BY slot",
-            vec![Parameter::Text(group.clone())],
+            vec![Parameter::Text(key.clone())],
         )
         .await?;
         let occupied: BTreeSet<i64> = slots
@@ -115,7 +112,7 @@ pub(crate) async fn reserve_claims(
             "INSERT INTO sqb_concurrency_slots (group_key, slot, run_id) VALUES ($1,$2,$3) \
              ON CONFLICT (group_key, slot) DO NOTHING RETURNING slot",
             vec![
-                Parameter::Text(group.clone()),
+                Parameter::Text(key.clone()),
                 Parameter::Integer(slot),
                 Parameter::Id(request.run_id),
             ],
@@ -126,6 +123,21 @@ pub(crate) async fn reserve_claims(
         }
     }
     Ok((transaction, true))
+}
+
+/// The project's limit for `group`, lowered to the server's cap; a cap never raises it.
+fn effective_limit(
+    request: &RunRequest,
+    caps: &BTreeMap<String, NonZeroU32>,
+    group: &str,
+) -> Result<u32, ControlError> {
+    let limits = [request.concurrency_limits.get(group), caps.get(group)];
+    limits
+        .into_iter()
+        .flatten()
+        .min()
+        .map(|limit| limit.get())
+        .ok_or_else(|| ControlError::Invalid(format!("concurrency group {group} has no limit")))
 }
 
 /// Publish ownership only after every physical claim has been reserved in this transaction.

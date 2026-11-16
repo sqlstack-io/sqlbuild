@@ -95,6 +95,8 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 json!({"kind":"custom", "function":"orders_ready", "code_hash":"orders_v1"});
             input.documents.get_mut("jobs").expect("jobs")["orders"]["concurrency_groups"] =
                 json!(["warehouse_heavy"]);
+            input.documents.get_mut("jobs").expect("jobs")["orders"]["concurrency_limits"] =
+                json!({"warehouse_heavy": 100});
             input.documents.insert(
                 "groups".into(),
                 json!({"nightly": {"description": "Nightly orders", "selection": ["orders"], "jobs": {"orders": []}}}),
@@ -418,10 +420,10 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         jobs.as_array().into_iter().flatten().cloned().collect();
                     let expected_jobs = [
                         json!({"job_key": "nightly", "kind": "group", "description": "Nightly orders",
-                            "selection": ["orders"], "concurrency_groups": [], "snapshot_id": published.snapshot_id,
+                            "selection": ["orders"], "concurrency_groups": [], "concurrency": [], "snapshot_id": published.snapshot_id,
                             "select": null, "declared_at": null, "owner": null, "overlap": "queue", "on_failure": null}),
                         json!({"job_key": "orders", "kind": "job", "description": "Refresh orders",
-                            "selection": ["orders"], "concurrency_groups": ["warehouse_heavy"], "snapshot_id": published.snapshot_id,
+                            "selection": ["orders"], "concurrency_groups": ["warehouse_heavy"], "concurrency": [{"group": "warehouse_heavy", "limit": 100, "shared_with": []}], "snapshot_id": published.snapshot_id,
                             "select": null, "declared_at": null, "owner": null, "overlap": "queue", "on_failure": null}),
                     ];
                     assert_eq!(

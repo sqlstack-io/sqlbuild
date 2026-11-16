@@ -885,6 +885,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         write_files(
             project_dir=tmp_path,
             files={
+                "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+                + "\n[concurrency_groups]\norder_reporting = 2\n"
+                + "\n[targets.development.concurrency_groups]\norder_reporting = 1\n",
                 "orchestration/jobs/nightly_orders_job.toml": (
                     'name = "nightly_orders_job"\n'
                     'description = "Refresh order reporting."\n'
@@ -929,6 +932,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                 "warehouse": "reporting",
             },
             "concurrency_groups": ["order_reporting"],
+            "concurrency_limits": {"order_reporting": 1},
             "select": "+orders",
             "exclude": "stg_orders",
             "targets": ["development"],
@@ -1229,6 +1233,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                 "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
                     "MODEL (", "MODEL (tags ['edge_case'],", 1
                 ),
+                "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+                + "\n[concurrency_groups]\nedge_inventory_limit = 1\nedge_products_limit = 1\n",
             },
             expected_jobs=(
                 "edge_snapshot_inventory_job",
@@ -1987,6 +1993,22 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             },
             expected_error=ValueError,
             expected_message="unknown variant",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a job naming a concurrency group the project does not declare",
+            files={
+                "orchestration/jobs/nightly_orders_job.toml": (
+                    'name = "nightly_orders_job"\n'
+                    'description = "Refresh order reporting."\n'
+                    'select = "orders"\n'
+                    'concurrency_groups = ["nightly_window"]\n'
+                )
+            },
+            expected_error=ValueError,
+            expected_message=(
+                r"job 'nightly_orders_job' names concurrency group 'nightly_window', which "
+                r"\[concurrency_groups\] in sqlbuild_project.toml does not declare"
+            ),
         ),
     ],
     ids=lambda case: case.description,

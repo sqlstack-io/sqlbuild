@@ -1,6 +1,6 @@
 //! Resolve a command against the current publication and freeze it as an ad-hoc run request.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -123,6 +123,7 @@ pub(crate) async fn frozen_adhoc_request(
                 settings: plan.settings,
                 window: None,
                 concurrency_groups: BTreeSet::new(),
+                concurrency_limits: BTreeMap::new(),
                 narrowing: None,
                 retry: None,
                 member_attempt: None,

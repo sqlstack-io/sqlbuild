@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::declarations::_helpers::documents::decode_definitions;
+use crate::declarations::_helpers::documents::{decode_definitions, limits_and_reasons};
 use crate::declarations::main::group_dependencies::group_dependencies;
 use crate::declarations::models::{Definitions, Schedule};
 use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
@@ -14,6 +14,7 @@ use crate::store::errors::ControlError;
 /// Names, references and resolved selections are checked again at the native trust boundary.
 pub fn snapshot_definitions(input: &SnapshotInput) -> Result<Definitions, ControlError> {
     let definitions = decode_definitions(&input.documents)?;
+    limits_and_reasons(&definitions, input)?;
     for (name, job) in &definitions.jobs {
         if name.trim().is_empty()
             || job.description.trim().is_empty()

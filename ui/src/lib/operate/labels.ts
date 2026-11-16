@@ -129,8 +129,7 @@ export function describeWait(wait: QueueWait): WaitPart[] {
 		case 'concurrency_limit':
 			return [
 				{ text: `Waiting: the ${slotLabel(wait.limit)} limit is in use by ` },
-				...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)]),
-				...(wait.elsewhere ? [{ text: `${wait.holders.length ? ' and ' : ''}${wait.elsewhere} run${wait.elsewhere === 1 ? '' : 's'} elsewhere` }] : [])
+				...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)])
 			];
 		case 'earlier_run':
 			return [{ text: 'Waiting: ' }, wait.runId ? runLink(wait.runId) : { text: 'an earlier run elsewhere' }, { text: ` goes first on the ${slotLabel(wait.limit)} limit` }];
@@ -158,7 +157,7 @@ export function waitTechnical(wait: QueueWait): string {
 		case 'write_claim':
 			return `write claim held by ${wait.runId ?? 'another location or target'} on ${wait.nodeKey}${wait.otherNodes ? ` (+${wait.otherNodes})` : ''}`;
 		case 'concurrency_limit':
-			return `concurrency limit ${wait.limit} held by ${[...wait.holders, ...(wait.elsewhere ? [`${wait.elsewhere} elsewhere`] : [])].join(', ')}`;
+			return `concurrency limit ${wait.limit} held by ${wait.holders.join(', ')}`;
 		case 'earlier_run':
 			return `${wait.runId ?? 'a run elsewhere'} is ahead on ${wait.limit} (priority, then queue order)`;
 		case 'job_running':

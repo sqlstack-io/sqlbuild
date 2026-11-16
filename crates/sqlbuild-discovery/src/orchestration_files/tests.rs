@@ -1,3 +1,5 @@
+#[path = "tests/test_concurrency_groups.rs"]
+mod concurrency_groups;
 #[path = "tests/helpers.rs"]
 mod helpers;
 #[path = "tests/test_orchestration_inventory.rs"]

@@ -110,7 +110,7 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
                 .definition["deps"] = json!(["orders"]);
             input.documents.insert("jobs".into(), json!({
                 "daily_orders": {"description": "Orders and stock", "selection": ["customers", "inventory", "orders"],
-                    "concurrency_groups": ["orders-load"]},
+                    "concurrency_groups": ["orders-load"], "concurrency_limits": {"orders-load": 100}},
                 "customer_sync": {"description": "Customers", "selection": ["customers"]},
             }));
             input.documents.insert(

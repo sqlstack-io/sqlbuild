@@ -6,7 +6,9 @@ use serde_json::Value;
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 
 use crate::declarations::constants::{DEFER_SETTING_PREFIX, VARS_SETTING, WITHHELD_SETTING};
-use crate::declarations::models::{Definitions, GroupDefinition, JobMember};
+use crate::declarations::models::{
+    ConcurrencyRule, Definitions, GroupDefinition, JobDefinition, JobMember,
+};
 use crate::snapshots::models::SnapshotNode;
 
 /// Members whose waits are all earlier come next, by name among equals; validation rejected cycles.
@@ -23,6 +25,7 @@ pub(crate) fn members_in_order(group: &GroupDefinition) -> Vec<JobMember> {
             members.push(JobMember {
                 job_key: name.clone(),
                 waits_for: waits.clone(),
+                reasons: group.wait_reasons.get(name).cloned().unwrap_or_default(),
             });
         }
     }
@@ -43,6 +46,51 @@ fn ready_members<'a>(
 
 fn all_placed(waits: &BTreeSet<String>, placed: &BTreeSet<&str>) -> bool {
     waits.iter().all(|wait| placed.contains(wait.as_str()))
+}
+
+/// Each of `job`'s concurrency groups with its limit and the other declarations in `all` naming it.
+pub(crate) fn concurrency_rules(
+    (job_key, job): (&str, &JobDefinition),
+    all: &[(&str, &BTreeSet<String>)],
+) -> Vec<ConcurrencyRule> {
+    let mut rules: Vec<ConcurrencyRule> = Vec::new();
+    for group in &job.concurrency_groups {
+        rules.push(ConcurrencyRule {
+            group: group.clone(),
+            limit: job.concurrency_limits.get(group).map(|limit| limit.get()),
+            shared_with: sharing(group, job_key, all),
+        });
+    }
+    rules
+}
+
+/// The declarations in `all` other than `job_key` that name `group`.
+fn sharing(group: &str, job_key: &str, all: &[(&str, &BTreeSet<String>)]) -> BTreeSet<String> {
+    let mut shared: BTreeSet<String> = BTreeSet::new();
+    for (other, groups) in all {
+        if *other != job_key && groups.contains(group) {
+            shared.insert((*other).to_owned());
+        }
+    }
+    shared
+}
+
+/// The groups running `job_key`, and its concurrency rules among every job and group of its snapshot.
+pub(crate) fn snapshot_relations(
+    definitions: &Definitions,
+    (job_key, job): (&str, &JobDefinition),
+) -> (BTreeSet<String>, Vec<ConcurrencyRule>) {
+    let mut all: Vec<(&str, &BTreeSet<String>)> = Vec::new();
+    for (name, other) in &definitions.jobs {
+        all.push((name, &other.concurrency_groups));
+    }
+    for (name, group) in &definitions.groups {
+        all.push((name, &group.job.concurrency_groups));
+    }
+    (
+        groups_running(definitions, job_key),
+        concurrency_rules((job_key, job), &all),
+    )
 }
 
 /// `vars` can carry credentials and a deferral can name a storage path, so only their presence shows.
@@ -74,7 +122,7 @@ fn target_name(text: &str) -> bool {
 }
 
 /// The groups of the snapshot that run `job_key`.
-pub(crate) fn groups_running(definitions: &Definitions, job_key: &str) -> BTreeSet<String> {
+fn groups_running(definitions: &Definitions, job_key: &str) -> BTreeSet<String> {
     definitions
         .groups
         .iter()

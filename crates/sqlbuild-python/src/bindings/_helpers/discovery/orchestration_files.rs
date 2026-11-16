@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use sqlbuild_discovery::orchestration_files::main::check_concurrency_groups::check_concurrency_groups;
 use sqlbuild_discovery::orchestration_files::main::orchestration_inventory::orchestration_inventory;
 use sqlbuild_discovery::orchestration_files::models::{
     OrchestrationFailure, OrchestrationInventory,
@@ -10,6 +11,7 @@ use sqlbuild_discovery::orchestration_files::models::{
 use sqlbuild_discovery::tree::models::ProjectTree;
 
 use crate::bindings::_helpers::discovery::orchestration_values::check_orchestration_values;
+use crate::bindings::_helpers::discovery::project_config::project_concurrency_groups;
 use crate::bindings::_helpers::discovery::raised::{
     failure_error, relative_read_error, stage_error,
 };
@@ -25,6 +27,9 @@ pub(crate) fn orchestration_declarations(
     let inventory = py.detach(|| orchestration_inventory(&tree, (version.major, version.minor)));
     let inventory =
         inventory.map_err(|failure| orchestration_error(&tree, project_dir, failure))?;
+    let declared = project_concurrency_groups(py, project_dir, None)?;
+    check_concurrency_groups(&inventory, &declared)
+        .map_err(|failure| orchestration_error(&tree, project_dir, failure))?;
     check_orchestration_values(py, &inventory).map_err(|failure| failure_error(py, failure))?;
     Ok(inventory)
 }

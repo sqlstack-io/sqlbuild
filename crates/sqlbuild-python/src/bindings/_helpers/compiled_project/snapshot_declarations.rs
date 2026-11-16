@@ -1,6 +1,7 @@
 //! Compile TOML jobs and groups and Python calendars and sensors against retained graph data before publication.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU32;
 use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
@@ -8,11 +9,14 @@ use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use serde_json::Value;
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
+use sqlbuild_config::project::main::load_concurrency_groups::load_concurrency_groups;
+use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_discovery::orchestration_files::models::{
     FilePosition, InitialStatus, NamedModule, OrchestrationInventory, RunFile, ScheduleSource,
 };
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::group_dependencies::group_dependencies;
+use sqlbuild_orchestration::declarations::main::group_wait_reasons::group_wait_reasons;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
     DeclaredAt, Definitions, GroupDefinition, JobDefinition, Schedule, TriggerDeclaration,
@@ -141,6 +145,24 @@ fn matching_imports(
     Ok(())
 }
 
+/// Each of the run's concurrency groups with the limit the project declares for the target.
+fn run_limits(
+    run: &RunFile,
+    limits: &BTreeMap<String, u32>,
+) -> PyResult<BTreeMap<String, NonZeroU32>> {
+    let mut limited: BTreeMap<String, NonZeroU32> = BTreeMap::new();
+    for group in &run.concurrency_groups {
+        let Some(limit) = limits.get(group).copied().and_then(NonZeroU32::new) else {
+            return Err(PyValueError::new_err(format!(
+                "{} names concurrency group {group}, which the project does not declare",
+                run.name.value
+            )));
+        };
+        limited.insert(group.clone(), limit);
+    }
+    Ok(limited)
+}
+
 pub(crate) fn compile_declarations(
     py: Python<'_>,
     mut input: SnapshotInput,
@@ -211,6 +233,10 @@ pub(crate) fn compile_declarations(
             .map(str::to_owned)
             .collect::<Vec<_>>()
     };
+    let limits: BTreeMap<String, u32> =
+        load_concurrency_groups(&project_config_paths(project_dir), Some(&input.target)).map_err(
+            |_| PyValueError::new_err("cannot read [concurrency_groups] of sqlbuild_project.toml"),
+        )?;
     let mut jobs: BTreeMap<String, JobDefinition> = BTreeMap::new();
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();
     let mut calendar_requests: Vec<CalendarRequest> = Vec::new();
@@ -250,6 +276,7 @@ pub(crate) fn compile_declarations(
                 selection,
                 settings: job.settings.clone(),
                 concurrency_groups: run.concurrency_groups.iter().cloned().collect(),
+                concurrency_limits: run_limits(run, &limits)?,
                 select: Some(job.select.value.clone()),
                 exclude,
                 targets: run.targets.iter().cloned().collect(),
@@ -299,6 +326,7 @@ pub(crate) fn compile_declarations(
                     selection,
                     settings: BTreeMap::new(),
                     concurrency_groups: run.concurrency_groups.iter().cloned().collect(),
+                    concurrency_limits: run_limits(run, &limits)?,
                     select: None,
                     exclude: None,
                     targets: run.targets.iter().cloned().collect(),
@@ -308,6 +336,7 @@ pub(crate) fn compile_declarations(
                     on_failure: controls.on_failure,
                     resources: None,
                 },
+                wait_reasons: group_wait_reasons(&input, &jobs, &dependencies),
                 jobs: dependencies,
                 dependency_failure: dependency_failures(&group.dependencies, &members),
             },

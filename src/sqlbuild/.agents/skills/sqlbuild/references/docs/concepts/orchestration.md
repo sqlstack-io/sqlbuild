@@ -89,7 +89,7 @@ cpus = 2
 | `targets` | No | The targets the job exists in; all targets when omitted |
 | `owner` | No | Shown on the job's page and in the job list |
 | `overlap` | No | `queue` (default) or `skip`; see [Skip overlapping runs](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
-| `concurrency_groups` | No | Server concurrency limits the job's runs share |
+| `concurrency_groups` | No | Groups of jobs that share a limit of runs at once, declared in [`[concurrency_groups]`](project-configuration.md#concurrency-groups) |
 | `schedule` | No | When the server starts the job; see below |
 | `[retry]` | No | `attempts`, the most runs in all, from 2 to 11, and `delay_seconds` from 0 to 86400; see [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
 | `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh` or `changed` |
@@ -122,6 +122,10 @@ schedule = { cron = "0 3 * * *", timezone = "UTC" }
 A group takes `name`, `description` and `jobs`, and the same `targets`, `owner`, `overlap`,
 `concurrency_groups`, `schedule` and `[retry]` as a job. Its members are jobs, never other
 groups.
+
+When a location publishes, it records why each member waits, node by node: a node of the earlier
+job feeds a node of the waiting job, directly or through nodes no member selects, such as a source
+between a loader job and the models that read it. The job's page shows these reasons.
 
 ### Choose what happens after a failure
 
@@ -274,6 +278,7 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | `declares a second sensor; each module declares exactly one` | Split the module |
 | `schedule cron: invalid cron expression: Pattern must have 5 fields when seconds are disallowed.` | Write a five-field cron, such as `0 2 * * *` |
 | `job nightly_orders_job resources: cpus must be a positive number` | Set `cpus` above zero |
+| `job 'nightly_orders_job' names concurrency group 'nightly_windw', which [concurrency_groups] in sqlbuild_project.toml does not declare` | Fix the name, or declare the group in [`[concurrency_groups]`](project-configuration.md#concurrency-groups) |
 | `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
 
 Details:

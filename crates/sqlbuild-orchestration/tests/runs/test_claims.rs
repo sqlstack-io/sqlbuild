@@ -605,7 +605,6 @@ fn given_claimed_work_here_and_elsewhere_when_listing_the_queue_then_each_run_sh
             let slot = QueueWait::ConcurrencyLimit {
                 limit: "warehouse".into(),
                 holders: vec![running.run_id],
-                elsewhere: 1,
             };
             let expected = [
                 (

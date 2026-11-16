@@ -46,7 +46,7 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
                     store,
                     lease,
                     (
-                        &self.configuration.concurrency_limits,
+                        scope.concurrency_caps,
                         RunDispatch {
                             scope: Some((scope.location_id, scope.target)),
                             eligible: Some(&eligible),
@@ -207,7 +207,7 @@ impl Workers {
                 let Some(claim) = claim_next_run(
                     store,
                     lease,
-                    &self.configuration.concurrency_limits,
+                    scope.concurrency_caps,
                     RunDispatch {
                         scope: Some((scope.location_id, scope.target)),
                         eligible: Some(&eligible),

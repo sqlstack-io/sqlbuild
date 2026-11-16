@@ -7,6 +7,7 @@ import type {
 	CancelProgress,
 	CatchUpPolicy,
 	ConcurrencyGroup,
+	ConcurrencyRule,
 	JobDetail,
 	LaunchVerb,
 	Principal,
@@ -35,7 +36,7 @@ export const SNAPSHOT_GENERATION = 42;
 type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 
 type JobDef = Known<
-	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'memberOf' | 'cursorType' | 'groupMembers'>,
+	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'concurrencyRules' | 'memberOf' | 'cursorType' | 'groupMembers'>,
 	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
 >;
 
@@ -324,6 +325,15 @@ export function jobNodes(key: string): string[] {
 	if (!job) return [];
 	if (job.kind === 'group') return [...new Set(job.members.flatMap(jobNodes))];
 	return writeSetOf(selectorTerms(job), job.exclude);
+}
+
+/** Each of the job's groups with its limit and the other jobs naming it, as the server publishes them. */
+export function concurrencyRulesOf(job: JobDef | undefined): ConcurrencyRule[] {
+	return (job?.concurrencyGroups ?? []).map((group) => ({
+		group,
+		limit: CONCURRENCY_LIMITS[group] ?? 1,
+		sharedWith: JOB_DEFS.filter((other) => other.key !== job?.key && other.concurrencyGroups.includes(group)).map((other) => other.key)
+	}));
 }
 
 export function concurrencyGroupsOf(job: JobDef | undefined): ConcurrencyGroup[] {

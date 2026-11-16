@@ -1,11 +1,14 @@
 //! Real slot accounting and successful completion through the public worker lifecycle.
 
 use std::collections::BTreeMap;
+use std::num::NonZeroU32;
 
 use crate::runs::main::change_run::change_run;
+use crate::runs::main::claim_next_run::claim_next_run;
 use crate::runs::models::{
     NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome,
 };
+use crate::scheduler::models::SchedulerLease;
 use crate::store::models::ControlStore;
 use uuid::Uuid;
 
@@ -21,6 +24,7 @@ pub(crate) async fn slot_counts(store: &ControlStore) -> BTreeMap<String, i64> {
             .expect("slot query")
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
             .expect("SQLite slot counts")
+            .map(|row| row.map(by_group))
             .collect::<Result<_, _>>()
             .expect("decode slot counts");
     };
@@ -29,7 +33,18 @@ pub(crate) async fn slot_counts(store: &ControlStore) -> BTreeMap<String, i64> {
         .await
         .expect("PostgreSQL slot counts")
         .into_iter()
+        .map(by_group)
         .collect()
+}
+
+/// Slot keys carry their location and target; tests count by group name.
+fn by_group((key, count): (String, i64)) -> (String, i64) {
+    (
+        key.rsplit_once('/')
+            .map_or(key.as_str(), |(_, group)| group)
+            .to_owned(),
+        count,
+    )
 }
 
 pub(crate) async fn succeed(store: &ControlStore, claim: &RunClaim) {
@@ -79,4 +94,29 @@ pub(crate) async fn finish(
         .await
         .expect("worker fact");
     }
+}
+
+/// Claim `count` runs with `caps`, each of which must be claimable, then refuse one more.
+pub(crate) async fn claim_exactly(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    (caps, count): (&BTreeMap<String, NonZeroU32>, usize),
+) -> Vec<RunClaim> {
+    let mut claims: Vec<RunClaim> = Vec::new();
+    for _ in 0..count {
+        claims.push(
+            claim_next_run(store, lease, caps, None)
+                .await
+                .expect("claim")
+                .expect("claimable within the limit"),
+        );
+    }
+    assert!(
+        claim_next_run(store, lease, caps, None)
+            .await
+            .expect("claim")
+            .is_none(),
+        "no run past the limit is claimable"
+    );
+    claims
 }

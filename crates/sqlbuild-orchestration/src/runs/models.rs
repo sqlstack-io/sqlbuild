@@ -1,6 +1,7 @@
 //! Frozen run requests and the run, node and claim records the control store keeps.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU32;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -162,6 +163,10 @@ pub struct RunRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<RunWindow>,
     pub concurrency_groups: BTreeSet<String>,
+    /// The project's limit of each of `concurrency_groups`, frozen with the run; the server's cap may lower it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schema(value_type = BTreeMap<String, u32>)]
+    pub concurrency_limits: BTreeMap<String, NonZeroU32>,
     /// The selectors a person narrowed a job run with; reruns copy it with the rest of the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub narrowing: Option<RunNarrowing>,
@@ -338,12 +343,8 @@ pub enum QueueWait {
         node_key: String,
         other_nodes: u32,
     },
-    /// Running runs hold slots of a concurrency limit this run takes.
-    ConcurrencyLimit {
-        limit: String,
-        holders: Vec<Uuid>,
-        elsewhere: u32,
-    },
+    /// Running runs of the same location and target hold the slots of a concurrency group this run takes.
+    ConcurrencyLimit { limit: String, holders: Vec<Uuid> },
     /// An earlier queued run takes the same concurrency limit, so it goes first.
     EarlierRun { run_id: Option<Uuid>, limit: String },
     /// An automatic retry waits out the job's retry delay.

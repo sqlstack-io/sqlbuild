@@ -79,13 +79,13 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 .expect("inventory model")
                 .definition["deps"] = json!(["products"]);
             input.documents.insert("jobs".into(), json!({
-                "staging": {"description": "Stage orders", "selection": ["orders", "customers"], "concurrency_groups": ["warehouse"], "settings": {"vars": {"batch": 23}}},
-                "marts": {"description": "Build inventory", "selection": ["inventory"], "concurrency_groups": ["inventory_limit"]},
+                "staging": {"description": "Stage orders", "selection": ["orders", "customers"], "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 100}, "settings": {"vars": {"batch": 23}}},
+                "marts": {"description": "Build inventory", "selection": ["inventory"], "concurrency_groups": ["inventory_limit"], "concurrency_limits": {"inventory_limit": 100}},
                 "completed": {"description": "Build products and shipments", "selection": ["products", "shipments"]}
             }));
             input.documents.insert("groups".into(), json!({"daily_orders": {
                 "description": "Build daily orders", "selection": ["customers", "orders", "inventory", "products", "shipments"],
-                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["completed"], "completed": ["staging"]}
+                "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 100}, "jobs": {"staging": [], "marts": ["completed"], "completed": ["staging"]}
             }}));
             let published = publish_snapshot(store, &input).await.expect("publish");
             let source_id = Uuid::now_v7();

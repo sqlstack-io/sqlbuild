@@ -108,6 +108,7 @@ pub(crate) fn request(
         settings: BTreeMap::new(),
         window: None,
         concurrency_groups: BTreeSet::new(),
+        concurrency_limits: BTreeMap::new(),
         narrowing: None,
         retry: None,
         member_attempt: None,
@@ -443,4 +444,13 @@ pub(crate) fn snapshot_node(kind: &str, definition: serde_json::Value) -> Snapsh
         compiled_sql: None,
         python_source: None,
     }
+}
+
+/// A project limit of 100 for each group, above every test's server cap, so the caps govern.
+pub(crate) fn hundred(groups: &[&str]) -> serde_json::Value {
+    let mut limits = serde_json::Map::new();
+    for group in groups {
+        limits.insert((*group).to_owned(), serde_json::json!(100));
+    }
+    serde_json::Value::Object(limits)
 }

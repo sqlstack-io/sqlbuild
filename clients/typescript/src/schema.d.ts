@@ -1764,6 +1764,16 @@ export interface components {
             /** Format: uuid */
             snapshot_id?: string | null;
         };
+        /** @description A job's concurrency group: its most runs at once and the other jobs and groups that share it. */
+        ConcurrencyRule: {
+            group: string;
+            /**
+             * Format: int32
+             * @description Absent for a snapshot published before limits were part of it.
+             */
+            limit?: number | null;
+            shared_with: string[];
+        };
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -1955,6 +1965,8 @@ export interface components {
         };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
+            /** @description Each concurrency group's limit and the other jobs sharing it, by group name. */
+            concurrency: components["schemas"]["ConcurrencyRule"][];
             concurrency_groups: string[];
             /** @description Selected nodes whose failure stops a group. */
             critical_nodes: string[];
@@ -1985,11 +1997,15 @@ export interface components {
         };
         JobMember: {
             job_key: string;
+            /** @description Node by node, why it waits for each of `waits_for`; a wait with none follows lineage through another member. */
+            reasons: components["schemas"]["WaitReason"][];
             /** @description Members this one waits for, from the lineage between their nodes. */
             waits_for: string[];
         };
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
+            /** @description Each concurrency group's limit and the other jobs sharing it, by group name. */
+            concurrency: components["schemas"]["ConcurrencyRule"][];
             concurrency_groups: string[];
             declared_at?: null | components["schemas"]["DeclaredAt"];
             description: string;
@@ -2840,8 +2856,6 @@ export interface components {
             /** Format: uuid */
             run_id?: string | null;
         } | {
-            /** Format: int32 */
-            elsewhere: number;
             holders: string[];
             /** @enum {string} */
             kind: "concurrency_limit";
@@ -3217,6 +3231,10 @@ export interface components {
         RunRequest: {
             command?: components["schemas"]["RunCommand"];
             concurrency_groups: string[];
+            /** @description The project's limit of each of `concurrency_groups`, frozen with the run; the server's cap may lower it. */
+            concurrency_limits?: {
+                [key: string]: number;
+            };
             image_id?: string | null;
             job_key?: string | null;
             kind: components["schemas"]["RunKind"];
@@ -3614,6 +3632,12 @@ export interface components {
         };
         /** @enum {string} */
         TriggerStatus: "running" | "paused";
+        /** @description One reason a member waits: `from_node` of `upstream_job` feeds its `to_node`, directly or through nodes no member selects. */
+        WaitReason: {
+            from_node: string;
+            to_node: string;
+            upstream_job: string;
+        };
         WarehouseCatalogColumn: {
             data_type: string;
             name: string;

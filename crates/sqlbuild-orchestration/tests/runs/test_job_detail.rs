@@ -68,6 +68,7 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     "select": "orders", "targets": ["development"],
                     "declared_at": {"path": "orchestration/jobs.py", "line": 7},
                     "owner": "Orders team", "overlap": "skip",
+                    "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 1},
                     "on_failure": {"retries": 2, "retry_delay_seconds": 300}},
                 "customers": {"description": "Build customers", "selection": ["customers"]},
             }));
@@ -75,7 +76,10 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 "groups".into(),
                 json!({"orders_group": {
                 "description": "Orders, then customers", "selection": ["customers", "orders"],
-                "jobs": {"customers": ["daily_orders"], "daily_orders": []}}}),
+                "concurrency_groups": ["warehouse"], "concurrency_limits": {"warehouse": 1},
+                "jobs": {"customers": ["daily_orders"], "daily_orders": []},
+                "wait_reasons": {"customers": [
+                    {"upstream_job": "daily_orders", "from_node": "orders", "to_node": "customers"}]}}}),
             );
             input
                 .nodes
@@ -201,6 +205,20 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     (test_case.expected_order[1], json!(["daily_orders"]))
                 ],
                 "{}: members in run order, not name order, with their waits",
+                test_case.description
+            );
+            assert_eq!(
+                (
+                    json!(group.members[1].reasons),
+                    json!(job.concurrency),
+                    json!(listed[1].concurrency)
+                ),
+                (
+                    json!([{"upstream_job": "daily_orders", "from_node": "orders", "to_node": "customers"}]),
+                    json!([{"group": "warehouse", "limit": 1, "shared_with": ["orders_group"]}]),
+                    json!([{"group": "warehouse", "limit": 1, "shared_with": ["orders_group"]}])
+                ),
+                "{}: a member's node-level reasons, and each group's limit with what shares it",
                 test_case.description
             );
             assert!(

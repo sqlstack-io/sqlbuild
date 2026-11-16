@@ -811,6 +811,10 @@ def scheduled_worker(
                 'name = "orders"\nadapter = "duckdb"\n'
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 '[targets.development]\nschema = "main"\n'
+                "[concurrency_groups]\n"
+                + "".join(
+                    f"{name} = {limit}\n" for name, limit in test_case.concurrency_groups.items()
+                )
             ),
             "models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n" + test_case.model_sql + "\n"
@@ -874,12 +878,7 @@ def scheduled_worker(
         )
         write_server_config(
             configuration,
-            {
-                "launchers": {
-                    deployment.kind: [launcher],
-                    "concurrency_limits": test_case.concurrency_limits,
-                }
-            },
+            {"launchers": {deployment.kind: [launcher]}},
         )
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:

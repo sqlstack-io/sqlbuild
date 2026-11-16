@@ -74,3 +74,25 @@ pub(crate) fn upstream_keys<'a>(input: &'a SnapshotInput, key: &str) -> Vec<&'a 
     }
     upstream
 }
+
+/// The selected nodes upstream of `start`, a node no member selects, through other such nodes.
+pub(crate) fn selected_upstream(
+    input: &SnapshotInput,
+    selected: &BTreeSet<&str>,
+    start: &str,
+) -> BTreeSet<String> {
+    let mut found: BTreeSet<String> = BTreeSet::new();
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
+    let mut pending: Vec<&str> = upstream_keys(input, start);
+    while let Some(key) = pending.pop() {
+        if !seen.insert(key) {
+            continue;
+        }
+        if selected.contains(key) {
+            found.insert(key.to_owned());
+        } else {
+            pending.extend(upstream_keys(input, key));
+        }
+    }
+    found
+}

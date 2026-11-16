@@ -198,6 +198,7 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		overlap: wire.overlap,
 		onFailure: wire.on_failure ? { retries: wire.on_failure.retries, retryDelaySeconds: wire.on_failure.retry_delay_seconds } : null,
 		concurrencyGroups: wire.concurrency_groups,
+		concurrencyRules: (wire.concurrency ?? []).map((rule) => ({ group: rule.group, limit: rule.limit ?? null, sharedWith: rule.shared_with })),
 		priority: null,
 		owner: wire.owner?.trim() || null,
 		sourceFile: wire.declared_at ? `${wire.declared_at.path}:${wire.declared_at.line}` : null,
@@ -216,7 +217,8 @@ function groupMembersOf(members: Wire['JobMember'][]): JobGroupMember[] {
 		const stage = Math.max(-1, ...m.waits_for.map((w) => stageOf.get(w) ?? -1)) + 1;
 		stageOf.set(m.job_key, stage);
 		// The server reports the waits, not whether lineage or `after` caused each one.
-		return { jobKey: m.job_key, upstream: m.waits_for.map((jobKey) => ({ jobKey, source: null })), stage };
+		const reasons = (m.reasons ?? []).map((r) => ({ upstreamJob: r.upstream_job, fromNode: r.from_node, toNode: r.to_node }));
+		return { jobKey: m.job_key, upstream: m.waits_for.map((jobKey) => ({ jobKey, source: null })), stage, reasons };
 	});
 }
 

@@ -7,7 +7,8 @@ import { edgeTitle, edgeWidth, innerId, memberGraph, memberLinks, memberNodeId, 
 const member = (jobKey: string, stage: number, waitsFor: string[] = []): JobGroupMember => ({
 	jobKey,
 	stage,
-	upstream: waitsFor.map((k) => ({ jobKey: k, source: null }))
+	upstream: waitsFor.map((k) => ({ jobKey: k, source: null })),
+	reasons: []
 });
 
 function node(key: string, upstream: string[] = [], stale: StaleReason['reason'][] = []): CatalogNode {
