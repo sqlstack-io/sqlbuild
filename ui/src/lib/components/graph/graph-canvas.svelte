@@ -7,7 +7,7 @@
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
 	import CountEdge from '$lib/lineage/count-edge.svelte';
-	import { READABLE_ZOOM, compactLevel } from '$lib/lineage/fit';
+	import { LABEL_MIN_ZOOM, READABLE_ZOOM, compactLevel } from '$lib/lineage/fit';
 
 	// Every graph in the UI is drawn here, so they share one canvas: the same background, fit controls
 	// and readable fit (a large graph opens on its cards at a zoom where they read, never as dots), and
@@ -117,15 +117,16 @@
 	}
 	// Semantic zoom: zoomed out past the point where the cards' lines would no longer read, each card
 	// shows its compact form instead (CompactFace: its title filling the card, on its state's colour), by
-	// one class on the canvas; `far` swaps in the larger title fit for the furthest zooms. Cards keep
-	// their size, so edges don't move. Card controls grow with `--sb-unzoom` so they keep their size.
+	// one class on the canvas; `data-compact` picks the title fit for the level of zoom, and
+	// `--sb-title-unzoom` keeps the title's size on screen. Cards keep their size, so edges don't move.
+	// Card controls grow with `--sb-unzoom` so they keep their size.
 	const level = $derived(compactLevel(settledZoom));
-	const compact = $derived(level !== 'full');
-	const far = $derived(level === 'far');
+	const compact = $derived(level > 0);
+	const titleUnzoom = $derived(compact ? 1 / Math.max(settledZoom, LABEL_MIN_ZOOM) : 1);
 	const controlScale = $derived(unzoom(settledZoom));
 </script>
 
-<div class="graph-canvas sb-flow" class:framed class:compact class:far class:moving class:unfitted={!fitted && nodes.length > 0} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
+<div class="graph-canvas sb-flow" class:framed class:compact class:moving class:unfitted={!fitted && nodes.length > 0} data-compact={level || undefined} style:--sb-title-unzoom={titleUnzoom} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
 	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} elevateEdgesOnSelect={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
 		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
 		<!-- The dot grid lives in the viewport, so it moves and scales with the graph's layer. -->

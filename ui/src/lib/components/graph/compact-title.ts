@@ -61,7 +61,7 @@ export function fitTitle(text: string, box: TitleBox, measure: Measure = measure
 	// The largest font at which the title wraps only at its separators; failing that, at the smallest
 	// font, broken anywhere; failing that, shortened in the middle.
 	const fonts = [];
-	for (let font = Math.floor(box.maxFont); font > box.minFont; font--) fonts.push(font);
+	for (let font = box.maxFont; font > box.minFont; font = Math.ceil(font) - 1) fonts.push(font);
 	for (const font of [...fonts, box.minFont]) {
 		const lines = wrap(text, box.width, font, measure, true);
 		if (fits(lines, font)) return { font, lines };

@@ -1,8 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import { COMPACT_LEVELS } from '../src/lib/lineage/fit';
 
-// Zoomed out, cards take their compact form: the whole card is its title, as large as fits, on its
-// state's colour; never a small title in an empty frame. Each title covers half its card, or, for a
-// name too short for that, spans the card's width or height. Cards are drawn in full down to 0.6.
+// Zoomed out, cards take their compact form: the whole card is its title, on its state's colour; never
+// a small title in an empty frame, nor a shouting one. Each title shows centred, at 11 to 16 px on
+// screen, and covers half its card, or spans the card's width or height, or is as large as it may be.
+// Cards are drawn in full down to 0.82. Cards are drawn in full down to 0.6.
 // With SHOTS set, each graph is also photographed at each zoom: SHOTS=/some/dir npx playwright test e2e/compact.spec.ts
 const shots = process.env.SHOTS;
 
@@ -32,10 +34,15 @@ async function zoomTo(page: Page, target: number) {
 	await page.waitForTimeout(600);
 }
 
-/** Each compact card wholly in view whose title doesn't fill it, as problems. */
-function emptyCards(): string[] {
+/**
+ * Each compact card wholly in view whose title doesn't fill it, as problems. A title keeps its size on
+ * screen through its level of zoom (`levels`: each level's lowest zoom, where it was fitted) while the
+ * card grows, so how much of the card it fills is judged at that zoom.
+ */
+function emptyCards(levels: readonly number[]): string[] {
 	const problems: string[] = [];
 	const flow = document.querySelector('.svelte-flow')!.getBoundingClientRect();
+	const level = Number(document.querySelector<HTMLElement>('.graph-canvas')!.dataset.compact);
 	const zoom = Number(/scale\(([\d.]+)\)/.exec(document.querySelector<HTMLElement>('.svelte-flow__viewport')!.style.transform)?.[1] ?? 1);
 	const cards = [...document.querySelectorAll<HTMLElement>('.svelte-flow__node')].filter((n) => n.querySelector('.cface'));
 	let checked = 0;
@@ -53,13 +60,20 @@ function emptyCards(): string[] {
 		const lines = [...title.querySelectorAll('span')].map((s) => s.getBoundingClientRect());
 		const [left, right] = [Math.min(...lines.map((r) => r.left)), Math.max(...lines.map((r) => r.right))];
 		const [top, bottom] = [Math.min(...lines.map((r) => r.top)), Math.max(...lines.map((r) => r.bottom))];
-		const share = ((right - left) * (bottom - top)) / (card.width * card.height);
-		const [wide, tall] = [(right - left) / card.width, (bottom - top) / card.height];
-		// A title covers half its card, or is as large as the card allows: a name too short to cover half
-		// of it spans the card's width or its height.
-		if (share < 0.5 && wide < 0.8 && tall < 0.75) problems.push(`${name}: its title covers ${Math.round(share * 100)}% of the card, ${Math.round(wide * 100)}% of its width and ${Math.round(tall * 100)}% of its height`);
+		const grown = Math.max(1, zoom / levels[level - 1]);
+		const [wide, tall] = [((right - left) / card.width) * grown, ((bottom - top) / card.height) * grown];
+		const share = wide * tall;
 		const px = parseFloat(getComputedStyle(title).fontSize) * zoom;
-		if (px < 10.95) problems.push(`${name}: its title shows at ${px.toFixed(1)} px`);
+		if (px < 10.95 || px > 16.05) problems.push(`${name}: its title shows at ${px.toFixed(1)} px`);
+		// As large as the card allows: a name too short to cover half its card spans the card's width or
+		// height, or shows at the largest size.
+		if (share < 0.5 && wide < 0.8 && tall < 0.75 && px < 15.5)
+			problems.push(`${name}: its title covers ${Math.round(share * 100)}% of the card, ${Math.round(wide * 100)}% of its width and ${Math.round(tall * 100)}% of its height, at ${px.toFixed(1)} px`);
+		// Centred in the card, beside its state edge.
+		const face = title.closest('.cface')!.getBoundingClientRect();
+		const edge = parseFloat(getComputedStyle(title.closest('.cface')!).borderLeftWidth) * zoom;
+		const [dx, dy] = [(left + right) / 2 - (face.left + edge + face.right) / 2, (top + bottom) / 2 - (face.top + face.bottom) / 2];
+		if (Math.abs(dx) > 4 || Math.abs(dy) > 4) problems.push(`${name}: its title is ${Math.round(dx)} px, ${Math.round(dy)} px off the card's centre`);
 	}
 	if (!checked) problems.push('no compact card in view');
 	return problems;
@@ -77,15 +91,16 @@ for (const { name, path, click } of GRAPHS) {
 		const canvas = page.locator('.graph-canvas').first();
 
 		// Just above the compact zoom, cards are still drawn in full.
-		await zoomTo(page, 0.65);
+		await zoomTo(page, 0.85);
 		await expect(canvas).not.toHaveClass(/\bcompact\b/);
-		if (shots) await page.screenshot({ path: `${shots}/compact-${name}-full.png` });
+		if (shots) await page.screenshot({ path: `${shots}/compact-${name}-z085-full.png` });
 
-		for (const [level, zoom] of [['near', 0.55], ['far', 0.4]] as const) {
+		// Each compact level: just below the switch, and further out.
+		for (const zoom of [0.7, 0.5, 0.4]) {
 			await zoomTo(page, zoom);
 			await expect(canvas).toHaveClass(/\bcompact\b/);
-			if (shots) await page.screenshot({ path: `${shots}/compact-${name}-${level}.png` });
-			expect(await page.evaluate(emptyCards), `${name} at ${zoom}`).toEqual([]);
+			if (shots) await page.screenshot({ path: `${shots}/compact-${name}-z0${Math.round(zoom * 100)}.png` });
+			expect(await page.evaluate(emptyCards, COMPACT_LEVELS), `${name} at ${zoom}`).toEqual([]);
 		}
 	});
 }

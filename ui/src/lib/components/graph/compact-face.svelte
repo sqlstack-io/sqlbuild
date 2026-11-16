@@ -7,36 +7,46 @@
 
 <script lang="ts">
 	import { LINE_HEIGHT, fitTitle } from './compact-title';
-	import { CARD_WIDTH, COMPACT_MIN_FONT } from '$lib/lineage/fit';
+	import { CARD_WIDTH, COMPACT_LEVELS, MAX_TITLE_PX, MIN_TITLE_PX } from '$lib/lineage/fit';
 
 	// A card's compact form, shown by the graph (the `compact` class on its canvas) when zoomed out too far
-	// for the card's lines to read: the whole card is its title, as large as fits, on the colour of its
-	// state. `height` is the card's inner height; the card keeps its size and layout.
+	// for the card's lines to read: the whole card is its title on the colour of its state, the title
+	// between 11 and 16 px on screen, as large as fits. `height` is the card's inner height; the card
+	// keeps its size and layout.
 	let { title, tone, height, badge }: { title: string; tone: string; height: number; badge?: number } = $props();
 
 	const PAD_X = 6;
 	const PAD_Y = 2;
 	const EDGE = 4;
-	/** A level's title box: the card inside its state edge and padding. (A badge sits on the card's corner.) */
-	function box(minFont: number) {
-		// As large as one line of it fits the card's height; the title's width limits it from there.
-		const inner = height - 2 * PAD_Y;
-		return { width: CARD_WIDTH - 2 - EDGE - 2 * PAD_X, height: inner, minFont, maxFont: Math.max(minFont, inner / LINE_HEIGHT) };
-	}
-	/** The badge's font against the title's smallest. */
-	const BADGE = 0.7;
-	const near = $derived((void fontsReady, fitTitle(title, box(COMPACT_MIN_FONT.near))));
-	const far = $derived((void fontsReady, fitTitle(title, box(COMPACT_MIN_FONT.far))));
+	/**
+	 * Each level's fit, at the level's lowest zoom, where the card is smallest on screen against its
+	 * title: the card inside its state edge and padding (a badge sits on the card's corner), the title
+	 * from 11 to 16 px on screen. `px` is the title's size on screen, kept through the level.
+	 */
+	const fits = $derived(
+		(void fontsReady,
+		COMPACT_LEVELS.map((zoom) => {
+			const fit = fitTitle(title, {
+				width: CARD_WIDTH - 2 - EDGE - 2 * PAD_X,
+				height: height - 2 * PAD_Y,
+				minFont: MIN_TITLE_PX / zoom,
+				maxFont: Math.min(MAX_TITLE_PX / zoom, (height - 2 * PAD_Y) / LINE_HEIGHT)
+			});
+			return { px: Math.min(MAX_TITLE_PX, Math.max(MIN_TITLE_PX, Math.round(fit.font * zoom * 4) / 4)), lines: fit.lines };
+		}))
+	);
+	/** The badge's size on screen. */
+	const BADGE_PX = 9;
 </script>
 
-<div class="cface" style:--tone={tone} style:--badge-near="{BADGE * COMPACT_MIN_FONT.near}px" style:--badge-far="{BADGE * COMPACT_MIN_FONT.far}px" aria-hidden="true">
-	<div class="ctitle near" style:font-size="{near.font}px">
-		{#each near.lines as line, i (i)}<span>{line}</span>{/each}
-	</div>
-	<div class="ctitle far" style:font-size="{far.font}px">
-		{#each far.lines as line, i (i)}<span>{line}</span>{/each}
-	</div>
-	{#if badge != null}<span class="cbadge">{badge}</span>{/if}
+<div class="cface" style:--tone={tone} aria-hidden="true">
+	{#each fits as fit, level (level)}
+		<!-- Sized on screen: the canvas's --sb-title-unzoom undoes the zoom. -->
+		<div class="ctitle" data-level={level + 1} style:font-size="calc({fit.px}px * var(--sb-title-unzoom, 1))">
+			{#each fit.lines as line, i (i)}<span>{line}</span>{/each}
+		</div>
+	{/each}
+	{#if badge != null}<span class="cbadge" style:font-size="calc({BADGE_PX}px * var(--sb-title-unzoom, 1))">{badge}</span>{/if}
 </div>
 
 <style>
@@ -53,16 +63,17 @@
 		font-family: var(--font-sans);
 		pointer-events: none;
 	}
-	/* Shown by the canvas once the view settles below the compact zoom; `far` is further out, where the
-	   title's smallest font grows so it still reads. */
+	/* Shown by the canvas once the view settles below the compact zoom, with the title fitted for the
+	   level of zoom (`data-compact`). */
 	:global(.graph-canvas.compact) .cface {
 		display: flex;
 	}
-	:global(.graph-canvas.compact.far) .near,
-	:global(.graph-canvas.compact:not(.far)) .far {
+	.ctitle {
 		display: none;
 	}
-	.ctitle {
+	:global(.graph-canvas[data-compact='1']) .ctitle[data-level='1'],
+	:global(.graph-canvas[data-compact='2']) .ctitle[data-level='2'],
+	:global(.graph-canvas[data-compact='3']) .ctitle[data-level='3'] {
 		display: flex;
 		max-width: 100%;
 		flex-direction: column;
@@ -89,12 +100,8 @@
 		background: var(--card);
 		transform: translate(35%, -55%);
 		color: var(--muted-foreground);
-		font-size: var(--badge-near);
 		font-variant-numeric: tabular-nums;
 		font-weight: 600;
 		line-height: 1.2;
-	}
-	:global(.graph-canvas.compact.far) .cbadge {
-		font-size: var(--badge-far);
 	}
 </style>

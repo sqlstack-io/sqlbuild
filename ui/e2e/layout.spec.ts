@@ -120,7 +120,7 @@ async function checkLayout(page: Page, label: string) {
 		// Every graph has finished its first fit: an unfitted graph stays hidden.
 		if (document.querySelector('.graph-canvas.unfitted')) problems.push('a graph never fitted');
 		// A graph opens with its card titles readable: compact titles at least 11 px on screen, full cards
-		// only down to the compact zoom, 0.6, where their 12.5 px titles show at 7.5 px. (A graph with the
+		// only down to the compact zoom, 0.82, where their 12.5 px titles show at 10.25 px. (A graph with the
 		// library's own controls is drawn whole at any zoom, as Lineage's very large graphs are.)
 		for (const canvas of document.querySelectorAll<HTMLElement>('.graph-canvas:not(.unfitted)')) {
 			if (!canvas.querySelector('.fit-control')) continue;
@@ -129,7 +129,7 @@ async function checkLayout(page: Page, label: string) {
 			const title = [...canvas.querySelectorAll<HTMLElement>(compact ? '.svelte-flow__node .cface .ctitle' : '.svelte-flow__node .name')].find((t) => t.offsetParent !== null);
 			if (!scale || !title) continue;
 			const px = parseFloat(getComputedStyle(title).fontSize) * Number(scale[1]);
-			if (px < (compact ? 10.95 : 7.45)) problems.push(`${compact ? 'compact' : 'card'} titles show at ${px.toFixed(1)} px`);
+			if (px < (compact ? 10.95 : 10.2)) problems.push(`${compact ? 'compact' : 'card'} titles show at ${px.toFixed(1)} px`);
 		}
 		// Every scroll area has the themed scrollbar, not the browser's default.
 		for (const el of [document.documentElement, ...document.querySelectorAll<HTMLElement>('body *')]) {
