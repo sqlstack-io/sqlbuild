@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::engine::tests::helpers;
@@ -18,6 +19,7 @@ macro_rules! orders_flattened {
 #[test]
 fn given_dialect_sql_when_reading_query_facts_then_findings_match_the_authored_sql()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         QueryFactsTestCase {
             description: "a Snowflake // comment holds no dependency call",

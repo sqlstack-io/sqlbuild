@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use sqlbuild_analysis::definition_changes::main::definition_digest::definition_digest;
-use sqlbuild_rules::constants::NATIVE_BUILD_IDENTITY;
+use sqlbuild_rules::build_identity::main::native_build_identity::native_build_identity;
 
 use crate::bindings::_helpers::change_selection::base_compile::NOTES_EXTENSION;
 use crate::bindings::_helpers::change_selection::fingerprints::{
@@ -82,7 +82,7 @@ pub(crate) fn cache_key_with(
     lookup: &dyn Fn(&str) -> Option<String>,
 ) -> std::io::Result<String> {
     Ok(definition_digest(&[
-        NATIVE_BUILD_IDENTITY,
+        native_build_identity(),
         target.unwrap_or_default(),
         vars,
         local_config,

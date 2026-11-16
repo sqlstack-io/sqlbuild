@@ -1,8 +1,8 @@
 //! `parse_rule_cache`: the usable entries of a stored SQL rule cache.
 
+use crate::build_identity::main::native_build_identity::native_build_identity;
 use serde_json::{Map, Value};
 
-use crate::constants::NATIVE_BUILD_IDENTITY;
 use crate::rule_cache::constants::{
     BUILD_IDENTITY_KEY, CACHE_VERSION, ENTRIES_KEY, FINDINGS_KEY, IDENTITY_KEY, VERSION_KEY,
 };
@@ -24,7 +24,7 @@ pub fn parse_rule_cache(text: &str) -> CachedEntries {
         return CachedEntries::new();
     };
     let current: bool = payload.get(VERSION_KEY).and_then(Value::as_str) == Some(CACHE_VERSION)
-        && payload.get(BUILD_IDENTITY_KEY).and_then(Value::as_str) == Some(NATIVE_BUILD_IDENTITY);
+        && payload.get(BUILD_IDENTITY_KEY).and_then(Value::as_str) == Some(native_build_identity());
     let Some(Value::Object(entries)) = payload.get(ENTRIES_KEY).filter(|_| current) else {
         return CachedEntries::new();
     };

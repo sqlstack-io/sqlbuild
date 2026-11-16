@@ -2,10 +2,12 @@ use crate::rule_cache::_helpers::model_rule_key::model_rule_key;
 use crate::rule_cache::main::model_rule_keys::model_rule_keys;
 use crate::rule_cache::models::ModelKeyInput;
 use crate::rule_cache::tests::test_types::ModelRuleKeysTestCase;
+use crate::tests::helpers::install_test_identity;
 
 #[test]
 fn given_models_when_hashing_rule_keys_together_then_each_key_matches_its_single_model_key_in_order()
  {
+    install_test_identity();
     let test_cases = [
         ModelRuleKeysTestCase {
             description: "no models give no keys",

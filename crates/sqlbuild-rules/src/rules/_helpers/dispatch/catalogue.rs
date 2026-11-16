@@ -1,4 +1,5 @@
-use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY, PYTHON_RULE_PREFIX, SQL_RULE_PREFIX};
+use crate::build_identity::main::native_build_identity::native_build_identity;
+use crate::constants::{API_VERSION, PYTHON_RULE_PREFIX, SQL_RULE_PREFIX};
 use crate::models::RulesCodeGrammar;
 use crate::models::{CustomRule, ResolveRulesRequest, RuleGuidance, RuleMetadata, RuleScope};
 use crate::python_rules::main::python_catalogue::python_catalogue;
@@ -19,7 +20,7 @@ macro_rules! rule {
             message: $message.into(),
             remediation: $remediation.into(),
             guidance: None,
-            implementation_fingerprint: NATIVE_BUILD_IDENTITY.into(),
+            implementation_fingerprint: native_build_identity().into(),
             enabled_by_default: !matches!($family, "performance"),
             project_wide: matches!(
                 $code,
@@ -410,7 +411,7 @@ pub(crate) fn catalogue() -> Vec<RuleMetadata> {
                 message: rule.message.into(),
                 remediation: rule.remediation.into(),
                 guidance: None,
-                implementation_fingerprint: NATIVE_BUILD_IDENTITY.into(),
+                implementation_fingerprint: native_build_identity().into(),
                 enabled_by_default: defaults.contains(&rule.code),
                 project_wide: false,
                 custom: false,
@@ -440,7 +441,7 @@ fn minimum_tests_rule() -> RuleMetadata {
             "Add a SQL unit test that mocks each real import and asserts concrete transformed rows. Empty-input-only tests flagged by SQBRTEST203 do not count toward this minimum unless they are listed in its allowed_tests option; do not write them to satisfy the minimum.",
         ),
         guidance: Some(guidance),
-        implementation_fingerprint: NATIVE_BUILD_IDENTITY.into(),
+        implementation_fingerprint: native_build_identity().into(),
         enabled_by_default: true,
         project_wide: false,
         custom: false,
@@ -622,7 +623,7 @@ pub(crate) fn fingerprint(
     config: &crate::models::RulesConfig,
     dialect: &str,
 ) -> Result<String, String> {
-    let payload = serde_json::to_vec(&(rules, config, dialect, NATIVE_BUILD_IDENTITY))
+    let payload = serde_json::to_vec(&(rules, config, dialect, native_build_identity()))
         .map_err(|e| e.to_string())?;
     Ok(format!("{:x}", Sha256::digest(payload)))
 }

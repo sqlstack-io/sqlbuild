@@ -8,7 +8,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_rules::constants::NATIVE_BUILD_IDENTITY;
+use sqlbuild_rules::build_identity::main::native_build_identity::native_build_identity;
 use sqlbuild_rules::errors::{SkillInstallError, SkillInstallErrorKind};
 use sqlbuild_rules::models::RulesConfig;
 use sqlbuild_rules::rule_catalogue::main::format_rule_text::format_rule_text;
@@ -118,7 +118,7 @@ fn fingerprint_rule(
         implementation_hash: if custom {
             custom_rule_implementation_fingerprint(rule, project_dir, None)?
         } else {
-            NATIVE_BUILD_IDENTITY.to_owned()
+            native_build_identity().to_owned()
         },
     })
 }

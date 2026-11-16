@@ -1,6 +1,4 @@
 pub const API_VERSION: u32 = 1;
-/// A content hash of every native crate, including the release version in their manifests.
-pub const NATIVE_BUILD_IDENTITY: &str = env!("SQLBUILD_NATIVE_SOURCE_HASH");
 pub(crate) const SCOPE_METADATA_SCHEMA_VERSION: u32 = 3;
 pub(crate) const BUILT_IN_RULE_NAMESPACE: &str = "SQBR";
 pub(crate) const PIPELINE_SUBJECT: &str = "pipeline";

@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::python_rules::tests::helpers::{owned_faults, python_rule_faults};
@@ -7,6 +8,7 @@ const PROVIDER_RULES: [&str; 3] = ["SQBRPYTHON013", "SQBRPYTHON014", "SQBRPYTHON
 
 #[test]
 fn given_providers_when_evaluating_provider_rules_then_reports_each_broken_convention() {
+    install_test_identity();
     let test_cases = [
         PythonRunTestCase {
             description: "capability folders with provider.py, role files and private folders report nothing",

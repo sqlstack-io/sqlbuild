@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::orchestration_rules::tests::helpers::{
@@ -8,6 +9,7 @@ use crate::orchestration_rules::tests::test_types::NamedSelectorLimitTestCase;
 #[test]
 fn given_job_and_sensor_selections_when_evaluating_then_more_named_nodes_than_the_limit_are_findings()
  {
+    install_test_identity();
     let selected = json!({ "select": ["SQBRORCHESTRATION101"] });
     let test_cases = [
         NamedSelectorLimitTestCase {

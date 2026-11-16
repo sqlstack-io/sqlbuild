@@ -1,3 +1,4 @@
+use crate::build_identity::main::native_build_identity::native_build_identity;
 use crate::models::{
     DeclarationKind, EvaluateRequest, Fault, Model, ResourceKind, RuleMetadata, RulesConfig,
     ScopeResource, SqlScenarioFact, SqlTestCteFact, SqlTestFact, SqlTestMode,
@@ -18,8 +19,6 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::rc::Rc;
-
-use crate::constants::NATIVE_BUILD_IDENTITY;
 
 const UNIT_ROOT: &str = "tests/unit";
 const SCENARIO_ROOT: &str = "tests/scenarios";
@@ -838,7 +837,7 @@ struct StoredSummaries {
 pub(crate) fn with_fixture_memo<T>(store: Option<&Path>, body: impl FnOnce() -> (T, bool)) -> T {
     let loaded: BTreeMap<String, FixtureSummary> = store
         .and_then(stored_summaries)
-        .filter(|stored| stored.build == NATIVE_BUILD_IDENTITY)
+        .filter(|stored| stored.build == native_build_identity())
         .map(|stored| stored.summaries)
         .unwrap_or_default();
     let loaded_count: usize = loaded.len();
@@ -866,7 +865,7 @@ pub(crate) fn with_fixture_memo<T>(store: Option<&Path>, body: impl FnOnce() -> 
             summaries, used, ..
         } = memo;
         let stored: StoredSummaries = StoredSummaries {
-            build: NATIVE_BUILD_IDENTITY.to_owned(),
+            build: native_build_identity().to_owned(),
             summaries: summaries
                 .into_iter()
                 .filter(|(key, _)| used.contains(key))

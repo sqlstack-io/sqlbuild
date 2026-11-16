@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::python_rules::tests::helpers::{owned_faults, python_rule_faults};
@@ -33,6 +34,7 @@ def main(ctx: TaskContext) -> PythonNodeResult:
 
 #[test]
 fn given_node_units_when_evaluating_unit_rules_then_reports_each_broken_convention() {
+    install_test_identity();
     let test_cases = [
         PythonRunTestCase {
             description: "a project laid out in units reports nothing",
@@ -616,6 +618,7 @@ def tables():
 #[test]
 fn given_valid_shapes_and_hidden_mistakes_when_evaluating_unit_rules_then_reports_only_the_mistakes()
  {
+    install_test_identity();
     let test_cases = [
         PythonRunTestCase {
             description: "a node.py in utils/, a role folder or a unit's _helpers/ is not a unit",
