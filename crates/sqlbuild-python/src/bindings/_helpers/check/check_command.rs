@@ -11,7 +11,6 @@ use crate::bindings::_helpers::compile_driver::targets::{
     TargetSettingsValues, project_target_settings,
 };
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::planner_entries::command_plans::build_relation_command_plan;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -33,6 +32,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_uses;
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
 use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
+use sqlbuild_python_planner::planner_entries::main::plans::build_relation_command_plan::build_relation_command_plan;
 use sqlbuild_python_project::graph::main::nodes::sql_ref_key::sql_ref_key;
 use sqlbuild_python_project::graph::main::nodes::transitive_closure_many::transitive_closure_many;
 use sqlbuild_python_project::graph::main::python_nodes::build_python_sql_run_lifecycle::build_python_sql_run_lifecycle;

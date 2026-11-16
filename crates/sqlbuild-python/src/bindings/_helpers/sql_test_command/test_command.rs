@@ -43,7 +43,6 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::statement_report::StatementReport;
-use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
@@ -72,6 +71,7 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_planner::planner_entries::main::plans::build_test_command_plan::build_test_command_plan;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 

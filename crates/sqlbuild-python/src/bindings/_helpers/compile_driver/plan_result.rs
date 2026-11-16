@@ -9,10 +9,10 @@ use crate::bindings::_helpers::compile_driver::pipeline_entries::build_project_g
 use crate::bindings::_helpers::compile_driver::python_plan_entries::{
     build_python_run_plan_outputs, python_read_source_names_for,
 };
-use crate::bindings::_helpers::planner_entries::execution_plan::build_execution_plan;
 use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_planner::planner_entries::main::plans::build_execution_plan::build_execution_plan;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::models::KeyCache;
 use sqlbuild_python_project::planner_phases::main::object::object;

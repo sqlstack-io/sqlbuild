@@ -2,10 +2,12 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::lifecycle_events::{catalog, envelopes, validation};
+use sqlbuild_python_planner::lifecycle_events::main::register_catalog::register_catalog;
+use sqlbuild_python_planner::lifecycle_events::main::register_envelopes::register_envelopes;
+use sqlbuild_python_planner::lifecycle_events::main::register_validation::register_validation;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    catalog::register(module)?;
-    envelopes::register(module)?;
-    validation::register(module)
+    register_catalog(module)?;
+    register_envelopes(module)?;
+    register_validation(module)
 }

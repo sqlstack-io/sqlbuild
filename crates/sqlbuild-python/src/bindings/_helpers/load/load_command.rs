@@ -31,7 +31,6 @@ use crate::bindings::_helpers::load::load_progress::{
 use crate::bindings::_helpers::load::load_selection::{
     LoadProject, LoaderDefaults, loader_defaults, loader_write_schemas, target_vars,
 };
-use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
 use crate::bindings::_helpers::result_output::documents::format_load_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
@@ -55,6 +54,7 @@ use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_use
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
 use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
+use sqlbuild_python_planner::planner_resolution::main::cursor::type_cursor_overrides::type_cursor_overrides;
 use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 

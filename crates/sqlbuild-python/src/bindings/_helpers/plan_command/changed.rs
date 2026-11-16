@@ -6,8 +6,10 @@ use sqlbuild_core::cli_text::main::format_tree_connector::format_tree_connector;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_state::consumption::models::{HeldBack, NodeKey, RunReason};
 
-use crate::bindings::_helpers::consumption::policy::{kind_value, reach_value};
-use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, run_reason_text};
+use sqlbuild_python_planner::consumption::main::kind_value::kind_value;
+use sqlbuild_python_planner::consumption::main::reach_value::reach_value;
+use sqlbuild_python_planner::consumption::main::run_reason_text::run_reason_text;
+use sqlbuild_python_planner::consumption::models::ChangedDecision;
 
 fn node(key: &NodeKey) -> String {
     format!("{}:{}", key.kind, key.name)

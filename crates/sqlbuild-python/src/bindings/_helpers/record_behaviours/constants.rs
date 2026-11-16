@@ -1,6 +1,5 @@
 //! Native behaviour of the hosted shapes: computed attributes, methods, ordering and validation.
 
-use crate::bindings::_helpers::freshness::observation::normalize_observation;
 use crate::bindings::_helpers::record_behaviours::auditing::{
     finish_measurement_contract, finish_threshold_bound, finish_thresholds,
 };
@@ -71,13 +70,13 @@ use crate::bindings::_helpers::record_behaviours::values::{
 };
 use crate::bindings::_helpers::{
     analysis, analysis_session, build_progress, compile_command, compute_logs, dbt_events,
-    dbt_interop, event_exporting, execution_history, planner_entries, planner_migrations,
-    planner_phases, project_assembly, result_output, rules,
+    dbt_interop, event_exporting, execution_history, project_assembly, result_output, rules,
 };
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
 use sqlbuild_python_base::records::types::ClassProperty;
 use sqlbuild_python_base::records::types::RecordFinish;
+use sqlbuild_python_planner::freshness::main::normalize_observation::normalize_observation;
 use sqlbuild_python_project::lineage::main::facts_eq::facts_eq;
 use sqlbuild_python_project::lineage::main::facts_getitem::facts_getitem;
 use sqlbuild_python_project::lineage::main::facts_iter::facts_iter;
@@ -372,9 +371,9 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     execution_history::getters::GETTERS,
     sqlbuild_python_project::graph::constants::GETTERS,
     sqlbuild_python_front::model_config::constants::GETTERS,
-    planner_entries::getters::GETTERS,
-    planner_migrations::getters::GETTERS,
-    planner_phases::getters::GETTERS,
+    sqlbuild_python_planner::planner_entries::constants::GETTERS,
+    sqlbuild_python_planner::planner_migrations::constants::GETTERS,
+    sqlbuild_python_planner::planner_phases::constants::GETTERS,
     sqlbuild_python_base::presentation_text::constants::GETTERS,
     project_assembly::getters::GETTERS,
     result_output::getters::GETTERS,
