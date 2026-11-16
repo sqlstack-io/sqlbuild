@@ -1,3 +1,4 @@
+pub(crate) mod dependencies;
 pub(crate) mod inventory_files;
 pub(crate) mod python_modules;
 pub(crate) mod raw;

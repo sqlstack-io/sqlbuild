@@ -147,6 +147,33 @@ pub struct GroupDefinition {
     #[serde(flatten)]
     pub job: JobDefinition,
     pub jobs: BTreeMap<String, BTreeSet<String>>,
+    /// Each member whose `[dependencies] on_failure` is not `partial`, with its policy.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub dependency_failure: BTreeMap<String, DependencyFailure>,
+}
+
+impl GroupDefinition {
+    /// What `member` does when a job it depends on failed.
+    #[must_use]
+    pub fn member_dependency_failure(&self, member: &str) -> DependencyFailure {
+        self.dependency_failure
+            .get(member)
+            .copied()
+            .unwrap_or_default()
+    }
+}
+
+/// What a group member does when a job it depends on failed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DependencyFailure {
+    /// Build what can still be built, skipping nodes downstream of the failed ones.
+    #[default]
+    Partial,
+    /// Do not run the member: its nodes end skipped.
+    Skip,
+    /// Run every node regardless.
+    Run,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -249,7 +276,7 @@ pub struct JobDetailRecord {
     pub cursor_type: Option<String>,
     pub owner: Option<String>,
     pub overlap: Overlap,
-    /// A member job's own policy applies only when it runs alone; inside a group run the group's applies.
+    /// Also applies to the job inside a group run: the group retries it while the members that depend on it wait.
     pub on_failure: Option<OnFailure>,
 }
 

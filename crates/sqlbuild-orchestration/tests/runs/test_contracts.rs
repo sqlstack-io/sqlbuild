@@ -1,5 +1,5 @@
 #[path = "claims/helpers.rs"]
-mod claim_helpers;
+pub(crate) mod claim_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
 #[path = "monitor/helpers.rs"]
@@ -18,6 +18,10 @@ mod test_coalesce;
 mod test_faults;
 #[path = "test_group_admission.rs"]
 mod test_group_admission;
+#[path = "test_group_dependencies.rs"]
+mod test_group_dependencies;
+#[path = "test_group_retries.rs"]
+mod test_group_retries;
 #[path = "test_groups.rs"]
 mod test_groups;
 #[path = "test_job_detail.rs"]

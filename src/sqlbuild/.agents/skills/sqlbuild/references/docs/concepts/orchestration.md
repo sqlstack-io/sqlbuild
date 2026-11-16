@@ -67,9 +67,9 @@ overlap = "skip"
 concurrency_groups = ["warehouse_heavy"]
 schedule = { cron = "0 2 * * *", timezone = "Europe/London" }
 
-[on_failure]
-retries = 2
-retry_delay_seconds = 600
+[retry]
+attempts = 3
+delay_seconds = 600
 
 [settings]
 concurrency = 4
@@ -91,12 +91,16 @@ cpus = 2
 | `overlap` | No | `queue` (default) or `skip`; see [Skip overlapping runs](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
 | `concurrency_groups` | No | Server concurrency limits the job's runs share |
 | `schedule` | No | When the server starts the job; see below |
-| `[on_failure]` | No | `retries` from 1 to 10, `retry_delay_seconds` from 0 to 86400 |
+| `[retry]` | No | `attempts`, the most runs in all, from 2 to 11, and `delay_seconds` from 0 to 86400; see [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures) |
 | `[settings]` | No | Build options for each run, such as `concurrency`, `vars`, `full_refresh` or `changed` |
 | `[resources]` | No | Docker worker limits; see [Limit worker containers](../cli/server.md#limit-worker-containers) |
 
 A job's `[settings]` cannot set `select` or `exclude`: the job's own selection is the run's
 selection.
+
+`[retry]` was called `[on_failure]`, with `retries` and `retry_delay_seconds` for `attempts` and
+`delay_seconds`. `retries` counted reruns, so `retries = 2` reads as `attempts = 3`. The old names
+still load, and `sqb compile` prints a deprecation warning for each one a file uses.
 
 Select a pipeline by its folder or a tag rather than listing its nodes. Rule `SQBRORCHESTRATION101`
 reports a job or sensor `select` that names more than three nodes one by one; see
@@ -116,8 +120,46 @@ schedule = { cron = "0 3 * * *", timezone = "UTC" }
 ```
 
 A group takes `name`, `description` and `jobs`, and the same `targets`, `owner`, `overlap`,
-`concurrency_groups`, `schedule` and `[on_failure]` as a job. Its members are jobs, never other
+`concurrency_groups`, `schedule` and `[retry]` as a job. Its members are jobs, never other
 groups.
+
+### Choose what happens after a failure
+
+`[dependencies]` sets how a member reacts when a job it depends on fails:
+
+```toml
+# orchestration/job_groups/nightly_job_group.toml
+name = "nightly_job_group"
+description = "Orders, inventory and the partner export"
+jobs = ["orders_job", "inventory_job", "partner_export_job"]
+schedule = { cron = "0 21 * * *", timezone = "UTC" }
+
+[dependencies]
+wait_for = "job"
+on_failure = "partial"
+
+[dependencies.partner_export_job]
+on_failure = "skip"
+```
+
+| Setting | Value | Meaning |
+| --- | --- | --- |
+| `wait_for` | `job` (default) | A member starts once the jobs it reads from have finished |
+| `on_failure` | `partial` (default) | Build what can still be built; nodes downstream of a failed node are skipped |
+| | `skip` | Don't run the member; all its nodes end skipped and the member ends `skipped` |
+| | `run` | Run every node of the member regardless |
+
+- `[dependencies.<job>]` overrides the group's settings for one member, and must name a job in
+  `jobs`. Overrides live in the group file because a job can belong to several groups.
+- A skipped member raises no failure alert and fires `run_event` sensors with `kinds=["skipped"]`,
+  not `"failed"`. The jobs that depend on it react to it as they would to a failure, since what
+  they read was not built.
+- A member job's own `[retry]` runs it again inside the group run, and the jobs that depend on it
+  wait for its final attempt before `on_failure` applies. A group's `[retry]` reruns the whole
+  group's failures once the group run ends; see
+  [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures).
+- `wait_for = "node"`, which will start each node as soon as the nodes it reads are built, is
+  planned but not available yet; `sqb compile` refuses it, so use `"job"` for now.
 
 ## Schedule a job
 
@@ -178,10 +220,17 @@ on_new_orders = sensor(
 | Condition | Starts a run for |
 | --- | --- |
 | `platform_event(kinds=[...])` | Server events, such as an overdue tick |
-| `run_event(job="...", kinds=[...])` | Outcomes of another job or group, optionally only when `executed_successfully` nodes ran and succeeded |
+| `run_event(job="...", kinds=[...])` | Outcomes of another job or group, including the job's runs inside groups, optionally only when `executed_successfully` nodes ran and succeeded |
 | `node_event(select="...", kinds=[...])` | Each success, failure or recovery of the selected nodes in any run |
 | `source_new_data(select="...")` | Each new version of the selected sources |
 | `source_stale(select="...", after_seconds=...)` | Each source version older than `after_seconds` |
+
+A `run_event` on a job also fires for that job's runs inside a job group. Each member of a group
+run ends with its own outcome as soon as it finishes, while the rest of the group may still be
+running, and `executed_successfully` checks that member's nodes. Moving a job into a group therefore
+keeps every sensor that watches it. A sensor on the group fires once, when the whole group run ends.
+`kinds` takes `success`, `warn`, `partial`, `failed`, `cancelled`, `skipped` (a member its group
+did not run) or `completed` for any of them.
 
 A sensor without `when` decorates a function that polls and returns `RunRequest(run_key=...)`
 values or a `SkipReason`. A sensor also takes `minimum_interval_seconds` (default 30),

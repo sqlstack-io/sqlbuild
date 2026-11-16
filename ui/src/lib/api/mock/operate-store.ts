@@ -998,7 +998,7 @@ export class MockOperate {
 					const me = members.find((m) => m.jobKey === rec.run.jobKey);
 					for (const up of me?.upstream ?? []) {
 						const sibling = this.#children(parent).find((c) => c.run.jobKey === up.jobKey);
-						if (sibling && isActive(sibling.run.status)) waits.push({ kind: 'upstream_job', runId: sibling.run.id, jobKey: up.jobKey });
+						if (sibling && isActive(sibling.run.status)) waits.push({ kind: 'upstream_job', runId: sibling.run.id, jobKey: up.jobKey, attempt: sibling.run.memberAttempt });
 					}
 				}
 				if (parent && parent.run.status === 'queued') waits.push({ kind: 'group_parent', runId: parent.run.id });
@@ -1050,6 +1050,7 @@ export class MockOperate {
 				tickScheduledFor: null,
 				runKey: null,
 				rerunOfRunId: spec.rerunOf ?? null,
+				memberAttempt: null,
 				narrowing: spec.narrowing ?? null,
 				window: null,
 				requestedBy: spec.by,

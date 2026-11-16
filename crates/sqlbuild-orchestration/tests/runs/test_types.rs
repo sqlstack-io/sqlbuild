@@ -308,3 +308,30 @@ pub(crate) struct RunLogRetentionTestCase {
     pub(crate) expected_artifacts: i64,
     pub(crate) expected_runs: i64,
 }
+
+/// What a member of a group does once the job it depends on has failed.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum MemberReaction {
+    /// It runs, and the worker skips these nodes, each because of the failed node named.
+    Runs(Vec<(&'static str, &'static str)>),
+    /// The group ends it without running: its nodes are skipped because of the failed node.
+    Skipped,
+}
+
+pub(crate) struct GroupDependencyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The group's `dependency_failure` document: each member whose policy is not `partial`.
+    pub(crate) dependency_failure: serde_json::Value,
+    pub(crate) expected_marts: MemberReaction,
+    pub(crate) expected_inventory: MemberReaction,
+}
+
+pub(crate) struct GroupMemberRetryTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The failing member's `retry_delay_seconds`.
+    pub(crate) delay_seconds: u32,
+    /// The member events the group run's timeline shows, in order.
+    pub(crate) expected_messages: &'static [&'static str],
+}

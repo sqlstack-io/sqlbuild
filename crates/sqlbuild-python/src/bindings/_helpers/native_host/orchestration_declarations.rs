@@ -1,6 +1,6 @@
 //! The public authoring records enter native compilation here, never scheduler execution.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Component, Path};
 
 use pyo3::exceptions::PyValueError;
@@ -10,7 +10,9 @@ use pyo3::{FromPyObject, pyfunction};
 use serde_json::Value;
 use sqlbuild_discovery::orchestration_files::models::{self as files, RunFile};
 use sqlbuild_host::entries::models::UserCodeHost;
-use sqlbuild_orchestration::declarations::models::{DeclaredAt, OnFailure, Overlap, RunResources};
+use sqlbuild_orchestration::declarations::models::{
+    DeclaredAt, DependencyFailure, OnFailure, Overlap, RunResources,
+};
 
 use crate::bindings::_helpers::native_host::constants::{
     AUTHORING_MODULE, CALENDAR_CLASS, CONSTRUCTING_MODULES, SENSOR_CLASS,
@@ -123,11 +125,35 @@ pub(crate) fn run_controls(run: &RunFile) -> RunControls {
             files::Overlap::Queue => Overlap::Queue,
             files::Overlap::Skip => Overlap::Skip,
         },
-        on_failure: run.on_failure.map(|policy| OnFailure {
-            retries: policy.retries,
-            retry_delay_seconds: policy.retry_delay_seconds,
+        // The published policy counts reruns: every attempt after the first.
+        on_failure: run.retry.map(|policy| OnFailure {
+            retries: policy.attempts.saturating_sub(1),
+            retry_delay_seconds: policy.delay_seconds,
         }),
     }
+}
+
+/// Each published member whose `[dependencies] on_failure`, its override or else the group's, is not `partial`.
+pub(crate) fn dependency_failures(
+    dependencies: &files::GroupDependencies,
+    members: &BTreeSet<String>,
+) -> BTreeMap<String, DependencyFailure> {
+    members
+        .iter()
+        .filter_map(|member| {
+            let written = dependencies
+                .members
+                .get(member)
+                .and_then(|settings| settings.on_failure)
+                .or(dependencies.defaults.on_failure)?;
+            let policy = match written {
+                files::DependencyFailure::Partial => return None,
+                files::DependencyFailure::Skip => DependencyFailure::Skip,
+                files::DependencyFailure::Run => DependencyFailure::Run,
+            };
+            Some((member.clone(), policy))
+        })
+        .collect()
 }
 
 /// Refuse an unknown limit, a memory size Docker cannot read, and CPUs or a process limit that is not positive.

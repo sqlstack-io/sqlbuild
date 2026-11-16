@@ -2699,6 +2699,11 @@ export interface components {
             /** Format: uuid */
             run_id: string;
         } | {
+            /**
+             * Format: int32
+             * @description The upstream job's attempt when the group is retrying it; absent for its first attempt.
+             */
+            attempt?: number | null;
             job_key: string;
             /** @enum {string} */
             kind: "upstream_job";
@@ -2923,7 +2928,7 @@ export interface components {
             occurred_at?: string | null;
         };
         /** @enum {string} */
-        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text. */
         RunEventRecord: {
             /** Format: int64 */
@@ -2935,6 +2940,8 @@ export interface components {
             event_id: string;
             event_type: string;
             invocation_id: string;
+            /** @description A summary the scheduler writes for a group run's member events, such as a member retry; never error or SQL text. */
+            message?: string | null;
             occurred_at: string;
             outcome?: string | null;
             producer?: string | null;
@@ -2996,7 +3003,7 @@ export interface components {
          * @description Terminal outcomes cannot be confused with a request to change an active status.
          * @enum {string}
          */
-        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Captured output and error text of a run's invocations; both can quote warehouse data. */
         RunOutput: {
             /** @description Invocation failures and error diagnostics, oldest first. */
@@ -3039,6 +3046,11 @@ export interface components {
             launched_at?: string | null;
             /** Format: uuid */
             location_id: string;
+            /**
+             * Format: int32
+             * @description Which attempt of its member job a group child is, once the group retried it; absent for a first attempt and for every other run.
+             */
+            member_attempt?: number | null;
             narrowing?: null | components["schemas"]["RunNarrowing"];
             node_counts_json: {
                 [key: string]: number;
@@ -3093,6 +3105,11 @@ export interface components {
             kind: components["schemas"]["RunKind"];
             /** Format: uuid */
             location_id: string;
+            /**
+             * Format: int32
+             * @description Which attempt of its member job a group child is, from the second on; the first leaves it unset.
+             */
+            member_attempt?: number | null;
             narrowing?: null | components["schemas"]["RunNarrowing"];
             origin: components["schemas"]["RunOrigin"];
             /** Format: uuid */
@@ -3121,7 +3138,7 @@ export interface components {
             window?: null | components["schemas"]["RunWindow"];
             write_set: string[];
         };
-        /** @description Which retry of the job's `on_failure` policy a run is, and when it may start. */
+        /** @description Which retry of the job's `[retry]` policy a run is, and when it may start. */
         RunRetry: {
             /** Format: int32 */
             attempt: number;
@@ -3159,7 +3176,7 @@ export interface components {
             statement_id: string;
         };
         /** @enum {string} */
-        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Inclusive typed CLI cursor bounds; the native planner derives exclusive execution ends. */
         RunWindow: {
             /** Format: date-time */

@@ -97,6 +97,7 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		tickScheduledFor: null,
 		runKey: null,
 		rerunOfRunId: wire.rerun_of_run_id ?? null,
+		memberAttempt: wire.member_attempt ?? null,
 		narrowing: wire.narrowing ?? null,
 		window: wire.window ? { start: String(wire.window.start), end: String(wire.window.end) } : null,
 		requestedBy: requesterOf(wire),
@@ -137,7 +138,7 @@ function toQueueWait(wait: Wire['QueueWait']): QueueWait {
 		case 'earlier_run':
 			return { kind: wait.kind, runId: wait.run_id ?? null, limit: wait.limit };
 		case 'upstream_job':
-			return { kind: wait.kind, runId: wait.run_id, jobKey: wait.job_key };
+			return { kind: wait.kind, runId: wait.run_id, jobKey: wait.job_key, attempt: wait.attempt ?? null };
 		case 'job_running':
 		case 'group_parent':
 			return { kind: wait.kind, runId: wait.run_id };
@@ -365,7 +366,7 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 	const rows = wire.affected_rows ?? wire.row_count;
 	const failure = [wire.error_type, wire.error_code].filter(Boolean).join(': ');
 	const facts = [durationText(wire.duration_ms), rows === null || rows === undefined ? '' : `${rows} ${rows === 1 ? 'row' : 'rows'}`].filter(Boolean).join(' · ');
-	const message = type === 'requested' ? 'Requested' : type === 'cancel_requested' ? 'Cancel requested' : wire.event_type.endsWith('_failed') ? failure || facts || 'no error code recorded' : type === 'audit_completed' ? (wire.outcome ?? '') : facts;
+	const message = wire.message ? wire.message : type === 'requested' ? 'Requested' : type === 'cancel_requested' ? 'Cancel requested' : wire.event_type.endsWith('_failed') ? failure || facts || 'no error code recorded' : type === 'audit_completed' ? (wire.outcome ?? '') : facts;
 	return {
 		id: wire.event_id,
 		storageId: wire.storage_id,

@@ -22,7 +22,8 @@ use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    ImportedDeclarations, imported_declarations, module_declarations, run_controls, run_resources,
+    ImportedDeclarations, dependency_failures, imported_declarations, module_declarations,
+    run_controls, run_resources,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     CalendarRequest, compile_calendars, compile_sensors,
@@ -308,6 +309,7 @@ pub(crate) fn compile_declarations(
                     resources: None,
                 },
                 jobs: dependencies,
+                dependency_failure: dependency_failures(&group.dependencies, &members),
             },
         );
     }

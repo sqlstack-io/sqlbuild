@@ -5,10 +5,12 @@ use std::num::NonZeroU32;
 
 use uuid::Uuid;
 
+use crate::declarations::models::DependencyFailure;
 use crate::runs::_helpers::groups::admission::{
     admission_limits, earlier_waiter_blocks, limit_waiters,
 };
 use crate::runs::_helpers::groups::context::load_group;
+use crate::runs::_helpers::groups::selection::{failed_upstream, member_dependencies};
 use crate::runs::_helpers::lifecycle::claims::reserve_claims;
 use crate::runs::_helpers::lifecycle::publish_change::publish_change;
 use crate::runs::models::{
@@ -82,6 +84,8 @@ pub(crate) async fn advance_group(
                 .await?;
             }
         }
+    } else if parent.state.status == RunStatus::Running {
+        transaction = skip_blocked_members(transaction, &group).await?;
     } else if parent.state.status == RunStatus::Queued && parent.request_json.due(transaction.now) {
         let admission = RunRequest {
             concurrency_groups: admission_limits(
@@ -120,6 +124,75 @@ pub(crate) async fn advance_group(
     Ok(transaction)
 }
 
+/// End each queued member whose policy is `skip` once a job it depends on ended without success.
+async fn skip_blocked_members(
+    mut transaction: ControlTransaction,
+    group: &GroupContext,
+) -> Result<ControlTransaction, ControlError> {
+    let Some(declaration) = group
+        .parent
+        .request_json
+        .job_key
+        .as_ref()
+        .and_then(|name| group.definitions.groups.get(name))
+    else {
+        return Ok(transaction);
+    };
+    for child in &group.children {
+        let request = &child.request_json;
+        let Some(name) = request.job_key.as_deref() else {
+            continue;
+        };
+        if child.state.status != RunStatus::Queued
+            || child.state.cancel_requested_at.is_some()
+            || declaration.member_dependency_failure(name) != DependencyFailure::Skip
+        {
+            continue;
+        }
+        let Some(failed) = failed_upstream(group, &member_dependencies(group, name)) else {
+            continue;
+        };
+        let failed_job = failed.request_json.job_key.clone().unwrap_or_default();
+        let rows;
+        (transaction, rows) = query(transaction,
+            "SELECT n.node_key, n.skipped_because_of FROM sqb_run_nodes n WHERE n.run_id=$1 AND n.kind='node' \
+             AND n.status IN ('failed','skipped','cancelled') ORDER BY CASE n.status WHEN 'failed' THEN 0 ELSE 1 END, n.node_key LIMIT 1",
+            vec![Parameter::Id(failed.request_json.run_id)]).await?;
+        let cause: Option<String> = rows.first().and_then(|row| {
+            row["skipped_because_of"]
+                .as_str()
+                .or_else(|| row["node_key"].as_str())
+                .map(str::to_owned)
+        });
+        for node_key in &request.selection {
+            transaction = group_change(
+                transaction,
+                request.run_id,
+                RunChange::NodeFinished {
+                    node_key: node_key.clone(),
+                    outcome: NodeOutcome::Skipped,
+                    rows_affected: None,
+                    error_code: None,
+                    skipped_because_of: cause.clone(),
+                    error_message: None,
+                },
+            )
+            .await?;
+        }
+        transaction = group_change(
+            transaction,
+            request.run_id,
+            RunChange::Finished {
+                outcome: RunOutcome::Skipped,
+                reason: format!("skipped because {failed_job} did not succeed"),
+                exit_code: None,
+            },
+        )
+        .await?;
+    }
+    Ok(transaction)
+}
+
 async fn finish_group(
     transaction: ControlTransaction,
     group: &GroupContext,
@@ -128,8 +201,39 @@ async fn finish_group(
     let parent = &group.parent;
     let parent_id = parent.request_json.run_id;
     let (mut transaction, rows) = query(transaction,
-        "SELECT n.* FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id WHERE r.parent_run_id=$1 AND n.kind='node' ORDER BY r.run_id, n.node_key",
+        "SELECT n.*, r.rerun_of_run_id AS previous_attempt FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
+         WHERE r.parent_run_id=$1 AND n.kind='node' ORDER BY r.run_id, n.node_key",
         vec![Parameter::Id(parent_id)]).await?;
+    let mut latest: BTreeMap<(Uuid, String), (usize, RunNodeRecord)> = BTreeMap::new();
+    let previous: BTreeMap<Uuid, Uuid> = rows
+        .iter()
+        .filter_map(|row| {
+            let run: Uuid = serde_json::from_value(row.get("run_id")?.clone()).ok()?;
+            let earlier: Uuid =
+                serde_json::from_value(row.get("previous_attempt")?.clone()).ok()?;
+            Some((run, earlier))
+        })
+        .collect();
+    let runs: BTreeSet<Uuid> = rows
+        .iter()
+        .filter_map(|row| serde_json::from_value(row.get("run_id")?.clone()).ok())
+        .collect();
+    for row in rows {
+        let run: Uuid = serde_json::from_value(row["run_id"].clone())
+            .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        let (mut first, mut attempt) = (run, 1);
+        while let Some(earlier) = previous
+            .get(&first)
+            .filter(|earlier| runs.contains(*earlier))
+        {
+            (first, attempt) = (*earlier, attempt + 1);
+        }
+        let node: RunNodeRecord = decode_row(row)?;
+        let key = (first, node.node_key.clone());
+        if latest.get(&key).is_none_or(|(seen, _)| attempt > *seen) {
+            latest.insert(key, (attempt, node));
+        }
+    }
     let mut nodes: BTreeMap<String, RunNodeRecord> = BTreeMap::new();
     let rank = |status: &str| match status {
         "failed" => 5,
@@ -139,8 +243,7 @@ async fn finish_group(
         "success" => 1,
         _ => 0,
     };
-    for row in rows {
-        let node: RunNodeRecord = decode_row(row)?;
+    for (_, node) in latest.into_values() {
         if nodes
             .get(&node.node_key)
             .is_none_or(|previous| rank(&node.status) > rank(&previous.status))

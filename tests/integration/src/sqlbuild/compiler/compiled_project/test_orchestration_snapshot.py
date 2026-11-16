@@ -39,6 +39,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotProcessReuseTestCase,
     SnapshotProvidersTestCase,
     SnapshotRejectionTestCase,
+    SnapshotRetryTestCase,
     SnapshotScheduleTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
@@ -957,6 +958,64 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
 @pytest.mark.parametrize(
     "test_case",
     [
+        SnapshotRetryTestCase(
+            description="current retry names",
+            tables="[retry]\nattempts = 3\ndelay_seconds = 900\n",
+            expected_on_failure={"retries": 2, "retry_delay_seconds": 900},
+            expected_warnings=(),
+        ),
+        SnapshotRetryTestCase(
+            description="deprecated on_failure names",
+            tables="[on_failure]\nretries = 2\nretry_delay_seconds = 600\n",
+            expected_on_failure={"retries": 2, "retry_delay_seconds": 600},
+            expected_warnings=(
+                "Warning: orchestration/jobs/daily_build_job.toml:6:1: "
+                "`[on_failure]` is deprecated; rename it to `[retry]`",
+                "Warning: orchestration/jobs/daily_build_job.toml:7:11: "
+                "`retries` is deprecated; rename it to `attempts`",
+                "Warning: orchestration/jobs/daily_build_job.toml:8:23: "
+                "`retry_delay_seconds` is deprecated; rename it to `delay_seconds`",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_job_retry_table_when_compiling_then_both_names_publish_one_policy_and_old_ones_warn(
+    tmp_path: Path, capfd: pytest.CaptureFixture[str], test_case: SnapshotRetryTestCase
+) -> None:
+    text: str = "".join(f"{key} = {value}\n" for key, value in _DAILY_BUILD.items())
+    write_files(
+        project_dir=tmp_path,
+        files=TYPE_PROOF_FILES
+        | {"orchestration/jobs/daily_build_job.toml": text + "\n" + test_case.tables},
+    )
+    capfd.readouterr()
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    warnings: list[str] = [
+        line for line in capfd.readouterr().err.splitlines() if line.startswith("Warning: ")
+    ]
+    snapshot: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=build_compiled_project(
+                discovered_inputs=discovered,
+                adapter=DuckDbAdapter(),
+                resolved_connection={"database": "warehouse", "schema": "main"},
+            ),
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            discovered_inputs=discovered,
+        ).to_json()
+    )
+
+    assert snapshot["documents"]["jobs"]["daily_build_job"]["on_failure"] == (
+        test_case.expected_on_failure
+    )
+    assert tuple(warnings) == test_case.expected_warnings
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         SnapshotDeclarationRejectionTestCase(
             description="blank description",
             fields={"description": '" "'},
@@ -1284,6 +1343,46 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "job_key": "source_job_group",
                         "kinds": ["completed"],
                         "executed_successfully": ["model:orders"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 2},
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
+            description="a run_event on a group member can watch for the group skipping it",
+            files={
+                "orchestration/jobs/source_orders_job.toml": (
+                    'name = "source_orders_job"\ndescription = "Orders."\nselect = "orders"\n'
+                ),
+                "orchestration/jobs/inventory_job.toml": (
+                    'name = "inventory_job"\ndescription = "Inventory."\nselect = "stg_orders"\n'
+                ),
+                "orchestration/job_groups/source_job_group.toml": (
+                    'name = "source_job_group"\ndescription = "Source orders."\n'
+                    'jobs = ["source_orders_job"]\n'
+                ),
+                "orchestration/sensors/on_orders_sensor.py": (
+                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
+                    "on_orders = sensor(\n"
+                    "    'on_orders_sensor',\n"
+                    "    description='Build inventory when the group skips orders.',\n"
+                    "    when=run_event(job='source_orders_job', kinds=[RunEventKind.SKIPPED]),\n"
+                    "    run='inventory_job',\n"
+                    ")\n"
+                ),
+            },
+            expected_jobs=("inventory_job", "source_orders_job"),
+            expected_groups={"source_job_group": {"source_orders_job": []}},
+            expected_sensors={
+                "on_orders_sensor": {
+                    "description": "Build inventory when the group skips orders.",
+                    "job_key": "inventory_job",
+                    "when": {
+                        "kind": "run_event",
+                        "job_key": "source_orders_job",
+                        "kinds": ["skipped"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",

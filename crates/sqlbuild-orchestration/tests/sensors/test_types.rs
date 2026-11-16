@@ -22,3 +22,14 @@ pub(crate) struct SensorExecutionTestCase {
     pub(crate) expected_selector: &'static str,
     pub(crate) expected_filters: &'static [&'static str],
 }
+
+pub(crate) struct GroupMemberSensorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The node and run outcome the first member ends with.
+    pub(crate) staging: (NodeOutcome, RunOutcome),
+    /// Sensors that fire once the first member ends, while the group still runs.
+    pub(crate) expected_firing: &'static [&'static str],
+    /// Member sensors that have fired once the dependent member ends too.
+    pub(crate) expected_after_marts: &'static [&'static str],
+}

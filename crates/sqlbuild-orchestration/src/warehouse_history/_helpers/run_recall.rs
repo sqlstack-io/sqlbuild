@@ -9,13 +9,13 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT};
 use crate::runs::models::{
     RunErrorText, RunEventRecord, RunOutput, RunOutputLine, RunStatementRecord, RunStatementSql,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
-use crate::store::main::query_records::query_records;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 
@@ -162,11 +162,62 @@ pub(crate) async fn run_events_in(
         Parameter::Integer(after),
         Parameter::Integer(i64::from(limit.min(5000))),
     ]);
-    query_records(transaction,
+    let (transaction, rows) = query(transaction,
         &format!("SELECT storage_id, event_id, invocation_id, occurred_at, event_type, severity, producer, resource_id, \
          resource_kind, resource_name, resource_attempt_id, statement_id, error_type, error_code, duration_ms, outcome, \
-         row_count, affected_rows FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", next + 1),
-        parameters).await
+         row_count, affected_rows, CASE WHEN event_type IN ('{MEMBER_RETRYING_EVENT}','{MEMBER_RECOVERED_EVENT}') \
+         THEN payload END AS member_payload FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", next + 1),
+        parameters).await?;
+    let records = rows
+        .into_iter()
+        .map(|mut row| {
+            let payload = row.remove("member_payload").unwrap_or(Value::Null);
+            if let Some(message) = member_message(&payload) {
+                row.insert("message".into(), Value::String(message));
+            }
+            decode_row(row)
+        })
+        .collect::<Result<_, _>>()?;
+    Ok((transaction, records))
+}
+
+/// The scheduler's summary of a member retry or recovery on its group run, from its own payload.
+fn member_message(payload: &Value) -> Option<String> {
+    let payload: Value = match payload {
+        Value::String(text) => serde_json::from_str(text).ok()?,
+        Value::Null => return None,
+        other => other.clone(),
+    };
+    let member = payload.get("member")?;
+    let job_key = member.get("job_key")?.as_str()?;
+    let attempt = member.get("attempt")?.as_u64()?;
+    let Some(attempts) = member.get("attempts").and_then(Value::as_u64) else {
+        return Some(format!("{job_key} succeeded on attempt {attempt}"));
+    };
+    let delay = member
+        .get("delay_seconds")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let when = if delay == 0 {
+        "now".to_owned()
+    } else {
+        format!("in {}", delay_text(delay))
+    };
+    Some(format!(
+        "{job_key} failed, retrying {when} (attempt {attempt} of {attempts})"
+    ))
+}
+
+/// A retry delay as people read it, such as `45 s`, `15 min` or `1 h 30 min`.
+fn delay_text(seconds: u64) -> String {
+    let (hours, minutes, rest) = (seconds / 3600, seconds % 3600 / 60, seconds % 60);
+    match (hours, minutes, rest) {
+        (0, 0, rest) => format!("{rest} s"),
+        (0, minutes, 0) => format!("{minutes} min"),
+        (0, minutes, rest) => format!("{minutes} min {rest} s"),
+        (hours, 0, _) => format!("{hours} h"),
+        (hours, minutes, _) => format!("{hours} h {minutes} min"),
+    }
 }
 
 pub(crate) async fn run_statements_in(

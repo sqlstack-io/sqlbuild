@@ -8,7 +8,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { runKindLabel, runOriginLabel, runStatusTone } from '$lib/status';
 	import RerunButton from './rerun-button.svelte';
-	import { costSummary } from './utils';
+	import { costSummary, retriedMembers } from './utils';
 	import type { RunDetailState } from './state.svelte';
 
 	let { view, runId }: { view: RunDetailState; runId: string } = $props();
@@ -17,6 +17,7 @@
 	const pct = $derived(view.progress.total ? (view.progress.done / view.progress.total) * 100 : 0);
 	const what = $derived(run?.jobKey ?? (view.detail?.selection.join(' ') || 'whole project'));
 	const cancelRequested = $derived(!!view.detail?.cancel && !view.detail.cancel.terminatedAt);
+	const retried = $derived(retriedMembers(view.detail?.children ?? []));
 </script>
 
 <div class="head">
@@ -34,6 +35,7 @@
 					{#if run.jobKey}<a href={to(`/jobs/${run.jobKey}`)}>{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
 				</h2>
 				<RunStatusPill status={run.status} size="md" />
+				{#if retried}<span class="chip" title="Member jobs the group retried inside this run" data-testid="run-retried">· {retried} retried</span>{/if}
 				<!-- The kind is a fact about this run; the origin opens what started it, when that has a page. -->
 				<span class="chip" title="{runKindLabel[run.kind]} run">{runKindLabel[run.kind].toLowerCase()}</span>
 				{#if run.narrowing}
