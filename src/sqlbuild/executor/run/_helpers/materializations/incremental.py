@@ -923,6 +923,8 @@ def _execute_dml(
         )
 
     if strategy == IncrementalStrategy.DELETE_INSERT:
+        # replace_key names groups of rows to replace; unique_key keeps its one-row-per-key meaning.
+        unique_key = entry.replace_key or unique_key
         cursor_column: str | None = entry.cursor_column
         if cursor_column is not None:
             if cursor_start is None or cursor_end is None:

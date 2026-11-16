@@ -658,6 +658,7 @@ pub(crate) fn assemble_model_plan_entry<'py>(
         (&enforcement, &warehouse_columns),
     )?;
     let unique_key: Bound<'py, PyTuple> = string_list(&values.0, "unique_key")?;
+    let replace_key: Bound<'py, PyTuple> = string_list(&values.0, "replace_key")?;
     let merge_exclude: Bound<'py, PyTuple> =
         config_text_tuple(py, &values, "merge_exclude_columns")?
             .unwrap_or_else(|| PyTuple::empty(py));
@@ -668,9 +669,15 @@ pub(crate) fn assemble_model_plan_entry<'py>(
         )?,
         "value",
     )?;
+    // Only delete_insert accepts replace_key, and then it is the key whose rows are replaced.
+    let delete_key: &Bound<'py, PyTuple> = if replace_key.is_empty()? {
+        &unique_key
+    } else {
+        &replace_key
+    };
     let ddl: String = logical_ddl(
         request,
-        (&unique_key, &merge_exclude),
+        (delete_key, &merge_exclude),
         (&warehouse_columns, ddl_cursor_bounds(request)?),
     )?;
     let entry: Bound<'py, PyDict> = PyDict::new(py);
@@ -687,6 +694,7 @@ pub(crate) fn assemble_model_plan_entry<'py>(
     config_fields(request, &values, &entry)?;
     execution_limit_fields(model, &values, &entry)?;
     entry.set_item("unique_key", unique_key)?;
+    entry.set_item("replace_key", replace_key)?;
     entry.set_item("merge_exclude_columns", merge_exclude)?;
     entry.set_item("table_type", table_type)?;
     storage_fields(request, &values, &entry)?;

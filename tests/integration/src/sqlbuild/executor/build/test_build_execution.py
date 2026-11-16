@@ -141,6 +141,48 @@ _FAILING_TEST_SQL: str = (
             ),
         ),
         BuildExecutionTestCase(
+            description="delete_insert by replace_key replaces every row of a delta's key values",
+            project_files={
+                "sqlbuild_project.toml": _PROJECT_YML,
+                "models/forecasts.sql": (
+                    "MODEL (description 'Forecast lines, several per version.',\n"
+                    "  materialized incremental,\n"
+                    "  incremental_strategy delete_insert,\n"
+                    "  replace_key [forecast_version],\n"
+                    ");\n\n"
+                    'SELECT forecast_version, line_no, amount FROM __source("raw_forecasts")'
+                ),
+                "sources/raw.yml": (
+                    "sources:\n  - name: raw_forecasts\n    description: Test source raw_forecasts.\n"
+                    "    schema: main\n    table: raw_forecasts\n"
+                ),
+            },
+            setup_sql=(
+                "CREATE TABLE main.forecasts AS SELECT * FROM (VALUES "
+                "('v1', 1, 10), ('v1', 2, 20), ('v2', 1, 30), ('v2', 2, 40)) "
+                "AS t(forecast_version, line_no, amount)",
+                "CREATE TABLE raw_forecasts AS SELECT * FROM (VALUES "
+                "('v2', 1, 31), ('v2', 2, 41), ('v2', 3, 51)) "
+                "AS t(forecast_version, line_no, amount)",
+            ),
+            expected_status=BuildStatus.SUCCESS,
+            expected_success_count=1,
+            expected_model_statuses=(("forecasts", ExecutionStatus.SUCCESS),),
+            expected_query_results=(
+                (
+                    "SELECT forecast_version, line_no, amount FROM main.forecasts "
+                    "ORDER BY forecast_version, line_no",
+                    (
+                        ("v1", 1, 10),
+                        ("v1", 2, 20),
+                        ("v2", 1, 31),
+                        ("v2", 2, 41),
+                        ("v2", 3, 51),
+                    ),
+                ),
+            ),
+        ),
+        BuildExecutionTestCase(
             description="sql udf builds before dependent model",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
