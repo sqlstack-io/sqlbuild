@@ -387,6 +387,18 @@ fn given_dialect_sql_when_reading_query_facts_then_findings_match_the_authored_s
             expected_faults: &[],
         },
         QueryFactsTestCase {
+            description: "the parent serialized to JSON text is still a whole copy",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT TO_JSON(o.value) AS line_text, TO_VARCHAR(OBJECT_DELETE(o.value, 'lines')) AS trimmed\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[("SQBRPERFORMANCE101", 1, 8, "line_text copies o.value whole")],
+        },
+        QueryFactsTestCase {
             description: "the parent cast and wrapped in an array is still a whole copy",
             dialect: "snowflake",
             query_sql: concat!(

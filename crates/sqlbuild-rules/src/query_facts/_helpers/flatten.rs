@@ -92,10 +92,20 @@ const EMBEDDING_FUNCTIONS: [&str; 5] = [
     "array_construct_compact",
 ];
 
+/// Conversions whose result is their first argument whole, in another type.
+const CONVERSION_FUNCTIONS: [&str; 5] = [
+    "to_json",
+    "to_variant",
+    "to_object",
+    "to_array",
+    "to_varchar",
+];
+
 /// Every `<alias>.value` `expression` copies whole, with the keys `OBJECT_DELETE` removes from it.
 ///
-/// Only the value itself, casts and parentheses around it, and the constructors that embed it
-/// count; any other function of the value, such as a hash or a path into it, does not copy it.
+/// Only the value itself, casts, conversions and parentheses around it, and the constructors that
+/// embed it count; any other function of the value, such as a hash or a path into it, does not
+/// copy it.
 pub(crate) fn whole_values(expression: &Expression) -> Vec<WholeValue> {
     let mut found: Vec<WholeValue> = Vec::new();
     let mut pending: Vec<(&Expression, Vec<String>)> = vec![(expression, Vec::new())];
@@ -112,6 +122,15 @@ pub(crate) fn whole_values(expression: &Expression) -> Vec<WholeValue> {
             Expression::Paren(paren) => pending.push((&paren.this, removed)),
             Expression::Cast(cast) | Expression::TryCast(cast) | Expression::SafeCast(cast) => {
                 pending.push((&cast.this, removed));
+            }
+            Expression::Function(function)
+                if CONVERSION_FUNCTIONS
+                    .iter()
+                    .any(|name| function.name.eq_ignore_ascii_case(name)) =>
+            {
+                if let Some(value) = function.args.first() {
+                    pending.push((value, removed));
+                }
             }
             Expression::Function(function)
                 if function.name.eq_ignore_ascii_case("object_delete") =>

@@ -38,8 +38,8 @@ error[SQBRPERFORMANCE101]: line_json copies o.value whole onto every row flatten
   --> models/line_options.sql:7:3
 ```
 
-The parent also counts as copied when a cast, `OBJECT_CONSTRUCT`, `OBJECT_INSERT` or
-`ARRAY_CONSTRUCT` embeds it. Paths into it, such as `o.value:sku`, and other functions of it, such
+The parent also counts as copied through a cast, a conversion such as `TO_JSON` or `TO_VARIANT`,
+or a constructor that embeds it: `OBJECT_CONSTRUCT`, `OBJECT_INSERT` or `ARRAY_CONSTRUCT`. Paths into it, such as `o.value:sku`, and other functions of it, such
 as `MD5(TO_VARCHAR(o.value))`, are not copies.
 
 Read the fields you need from the parent, such as `o.value:sku::string`, or remove the child array
