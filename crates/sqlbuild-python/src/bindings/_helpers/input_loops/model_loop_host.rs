@@ -22,21 +22,25 @@ use crate::bindings::_helpers::compiled_project::project::{
 use crate::bindings::_helpers::compiled_views::model_input_view::{
     InputProjections, ModelInputHandles, ModelInputRecord, SchemaHandles, SchemaRecord,
 };
-use crate::bindings::_helpers::discovery::model_file_record::{ModelFileTexts, NativeModelFile};
 use crate::bindings::_helpers::input_loops::model_loop_header::AttachedHeader;
 use crate::bindings::_helpers::input_loops::model_loop_inputs::{
     HOOK_KEYS, reference_fact, stripped_values,
 };
-use crate::bindings::_helpers::model_config::config_nodes::carried_node;
-use crate::bindings::_helpers::model_config::typed_config::{retain_values, typed_values};
-use crate::bindings::_helpers::render::declaration_expansion::{ExpandedDeclarations, span_rows};
-use crate::bindings::_helpers::render::macro_call_rows::{SpanRow, span_row};
-use crate::bindings::_helpers::render::macro_expansion::ExpansionOutput;
-use crate::bindings::_helpers::sqltext::declaration_references::ScannedReference;
 use sqlbuild_project::models::ExpansionRecord;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_front::discovery::models::ModelFileTexts;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::model_config::main::config::carried_node::carried_node;
+use sqlbuild_python_front::model_config::main::config::retain_values::retain_values;
+use sqlbuild_python_front::model_config::main::config::typed_values::typed_values;
+use sqlbuild_python_front::render::main::calls::span_row::span_row;
+use sqlbuild_python_front::render::main::declarations::span_rows::span_rows;
+use sqlbuild_python_front::render::models::ExpandedDeclarations;
+use sqlbuild_python_front::render::models::ExpansionOutput;
+use sqlbuild_python_front::render::types::SpanRow;
+use sqlbuild_python_front::sqltext::models::ScannedReference;
 
 const HEADER_KEYS_ATTRIBUTE: &str = "model_header_keys";
 const LAYER_SCHEMA_ATTRIBUTE: &str = "layer_schema";

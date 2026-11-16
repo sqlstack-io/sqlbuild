@@ -16,12 +16,11 @@ use crate::bindings::_helpers::janitor::janitor_facts::{
 use crate::bindings::_helpers::janitor::janitor_keys::{
     Folded, Key, SchemaKey, optional, record, sorted_schemas, text, tuple,
 };
-use crate::bindings::_helpers::state_rows::migration_io::{
-    read_histories as read_view_histories, stored_columns_binding,
-};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_front::state_rows::main::migrations::read_histories::read_histories as read_view_histories;
+use sqlbuild_python_front::state_rows::main::migrations::stored_columns_binding::stored_columns_binding;
 
 const IS_COMPATIBILITY_VIEW: ExecutorHost = ExecutorHost::IsCompatibilityView;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;

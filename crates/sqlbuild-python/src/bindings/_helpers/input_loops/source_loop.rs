@@ -17,24 +17,28 @@ use crate::bindings::_helpers::input_loops::model_loop::{
 use crate::bindings::_helpers::input_loops::model_loop_macros::{
     argument_references as macro_argument_references, expanded_with,
 };
-use crate::bindings::_helpers::model_config::config_errors::native_config_error;
-use crate::bindings::_helpers::model_config::config_errors::raised_config_exception;
-use crate::bindings::_helpers::model_config::config_templates::{
-    PythonHost, Stop, TemplateSources, expanded, template_error,
-};
 use crate::bindings::_helpers::project_assembly::resources::{
     syntax_error_message, syntax_error_messages,
 };
-use crate::bindings::_helpers::render::declaration_expansion::{
-    DeclarationExpansion, ExpandedDeclarations, ExpansionClasses, ExpansionConsumer,
-    expand_declarations,
-};
-use crate::bindings::_helpers::render::sql_macro_host::SqlMacroSource;
-use crate::bindings::_helpers::scopes::declaration_contexts::NativeDeclarationContexts;
-use crate::bindings::_helpers::sqltext::declaration_references::declaration_scan;
-use crate::bindings::_helpers::sqltext::static_sql::{InterpolationSources, interpolated};
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::model_config::main::config::expanded::expanded;
+use sqlbuild_python_front::model_config::main::config::native_config_error::native_config_error;
+use sqlbuild_python_front::model_config::main::config::raised_config_exception::raised_config_exception;
+use sqlbuild_python_front::model_config::main::config::template_error::template_error;
+use sqlbuild_python_front::model_config::models::PythonHost;
+use sqlbuild_python_front::model_config::models::Stop;
+use sqlbuild_python_front::model_config::models::TemplateSources;
+use sqlbuild_python_front::render::main::declarations::expand_declarations::expand_declarations;
+use sqlbuild_python_front::render::models::DeclarationExpansion;
+use sqlbuild_python_front::render::models::DeclarationExpansionClasses;
+use sqlbuild_python_front::render::models::ExpandedDeclarations;
+use sqlbuild_python_front::render::models::ExpansionConsumer;
+use sqlbuild_python_front::render::models::SqlMacroSource;
+use sqlbuild_python_front::scopes::models::NativeDeclarationContexts;
+use sqlbuild_python_front::sqltext::main::declaration_scan::declaration_scan;
+use sqlbuild_python_front::sqltext::main::interpolated::interpolated;
+use sqlbuild_python_front::sqltext::models::InterpolationSources;
 
 const MACRO_TOKEN: char = '@';
 const NATIVE_CONTEXTS_ATTRIBUTE: &str = "native_contexts";
@@ -233,7 +237,7 @@ pub(crate) fn expanded_authored_sql<'py>(
     let mut argument_references: Vec<ReferenceRow> = Vec::new();
     let mut expanded_sql: String = interpolated_sql.clone();
     if !references.is_empty() || stop.is_some() {
-        let classes: ExpansionClasses<'py> = ExpansionClasses {
+        let classes: DeclarationExpansionClasses<'py> = DeclarationExpansionClasses {
             usage_record: context.classes.usage_record.clone(),
             compile_error: context.classes.compile_error.clone(),
         };

@@ -4,7 +4,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PySet, PySetMethods};
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::compile_analysis_selection;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
@@ -19,6 +18,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 
 /// The current build's phase timing tracker, when one is recording.
 pub(crate) fn timing_tracker(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {

@@ -2,8 +2,6 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::cursor::conversion::{CursorSession, algebra_error};
-use crate::bindings::_helpers::cursor::scalars::try_parse;
 use crate::bindings::_helpers::planner_resolution::maximum_safety::apply_maximum_start_policy;
 use crate::bindings::_helpers::planner_resolution::values::string;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -22,6 +20,9 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::main::conversion::algebra_error::algebra_error;
+use sqlbuild_python_front::cursor::main::scalars::try_parse::try_parse;
+use sqlbuild_python_front::cursor::models::CursorSession;
 
 pub(super) fn optional_scalar<'py>(
     session: &CursorSession<'py>,

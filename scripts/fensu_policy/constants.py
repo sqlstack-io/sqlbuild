@@ -286,6 +286,7 @@ PUBLIC_EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "sinks")
 NATIVE_BINDINGS_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-python/src/",
     "crates/sqlbuild-python-base/src/",
+    "crates/sqlbuild-python-front/src/",
 )
 NATIVE_CROSSING_PATTERNS: tuple[str, ...] = (
     r"\.getattr\(",

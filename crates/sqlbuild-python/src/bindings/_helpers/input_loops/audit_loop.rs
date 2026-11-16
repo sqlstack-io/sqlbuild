@@ -37,15 +37,16 @@ use crate::bindings::_helpers::input_loops::model_loop_named::{
 use crate::bindings::_helpers::input_loops::source_loop::{
     AuthoredExpansion, expanded_authored_sql, file_declarations,
 };
-use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
-use crate::bindings::_helpers::model_config::header_audits::{AuditInstance, HeaderAudits};
-use crate::bindings::_helpers::model_config::header_metadata::HeaderColumns;
-use crate::bindings::_helpers::model_config::header_metadata::thresholds;
-use crate::bindings::_helpers::model_config::model_validator::NativeModelValidator;
 use sqlbuild_project::models::AttachedTarget;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::model_config::main::headers::thresholds::thresholds;
+use sqlbuild_python_front::model_config::models::AuditInstance;
+use sqlbuild_python_front::model_config::models::HeaderAudits;
+use sqlbuild_python_front::model_config::models::HeaderColumns;
+use sqlbuild_python_front::model_config::models::NativeModelValidator;
+use sqlbuild_python_front::model_config::models::PyNode;
 
 const THRESHOLDS_KEY: &str = "thresholds";
 const MINIMUM_SAMPLES_KEY: &str = "minimum_samples";

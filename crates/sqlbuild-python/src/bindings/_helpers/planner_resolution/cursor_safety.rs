@@ -1,6 +1,5 @@
 //! Shared safety horizon conversion and Python evidence construction.
 
-use crate::bindings::_helpers::cursor::conversion::CursorSession;
 use crate::bindings::_helpers::planner_resolution::cursor_bounds::duration;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use sqlbuild_cursor::algebra::models::{DurationSpan, Grain, Scalar};
@@ -15,6 +14,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::models::CursorSession;
 
 pub(super) fn safety_error(py: Python<'_>, class: ErrorId, message: &str) -> PyErr {
     new_plain_error(py, class, message)

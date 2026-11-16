@@ -15,9 +15,6 @@ use sqlbuild_model_config::header_metadata::constants::ACCEPTED_VALUES_ARGUMENT;
 
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_reads::binding_validated;
-use crate::bindings::_helpers::model_config::config_nodes::PyConfigNode;
-use crate::bindings::_helpers::model_config::header_audits::AuditInstance;
-use crate::bindings::_helpers::model_config::header_metadata::HeaderValue;
 use crate::bindings::_helpers::semantic_checks::failures::semantic_error;
 use crate::bindings::_helpers::semantic_checks::inputs::{
     column_names, resource_sql_diagnostics, sql_test_columns,
@@ -32,6 +29,9 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_front::model_config::models::AuditInstance;
+use sqlbuild_python_front::model_config::types::HeaderValue;
+use sqlbuild_python_front::model_config::types::PyConfigNode;
 
 /// `SqlReferenceKind.UDF` and `SqlReferenceKind.TABLE_FUNCTION` values.
 const FUNCTION_REFERENCE_KINDS: [&str; 2] = ["udf", "table_fn"];

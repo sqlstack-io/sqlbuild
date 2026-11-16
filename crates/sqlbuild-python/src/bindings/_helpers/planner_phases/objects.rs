@@ -4,7 +4,6 @@ use sqlbuild_host::entries::models::HostId;
 
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::model_config::typed_config::{config_text, model_values};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyFrozenSet, PyString, PyTuple};
 use pyo3::{BoundObject, IntoPyObject};
@@ -18,6 +17,8 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_text::config_text;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 /// A Python `str`.
 pub(crate) fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {

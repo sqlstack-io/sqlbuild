@@ -17,10 +17,10 @@ use sqlbuild_core::loader_connection::models::LoaderConnection;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::model_config::template_data::expanded_template_data;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::model_config::main::config::expanded_template_data::expanded_template_data;
 
 const INGESTR_ERROR: ThirdPartyHost = ThirdPartyHost::IngestrIntegrationError;
 const INGESTR_SOURCE_CONFIG: ThirdPartyHost = ThirdPartyHost::IngestrSourceConfig;

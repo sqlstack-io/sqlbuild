@@ -8,8 +8,6 @@ use sqlbuild_analysis::python_selection::models::{InventoryIndexes, InventoryNod
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
 
-use crate::bindings::_helpers::discovery::imported_modules::provider_usages;
-use crate::bindings::_helpers::discovery::imported_python_nodes::node_identity;
 use crate::bindings::_helpers::graph::python_selection::resolve_python_sql_run_selection;
 use crate::bindings::_helpers::graph::views::compiled_graph_keys;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -19,6 +17,8 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::discovery::main::python_files::node_identity::node_identity;
+use sqlbuild_python_front::discovery::main::python_files::provider_usages::provider_usages;
 
 const NAME_KEY: &str = "name";
 
