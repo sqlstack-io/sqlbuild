@@ -57,7 +57,7 @@ fn given_four_times_the_modules_when_finding_unreachable_definitions_then_time_g
         growth: 4,
         pairs: 5,
         expected_unreachable_definitions: 2001,
-        expected_max_ratio: 6.5,
+        expected_max_ratio: 5.0,
     }];
     for test_case in test_cases {
         let small = scaling_project(test_case.units, test_case.noisy_files, test_case.functions);
