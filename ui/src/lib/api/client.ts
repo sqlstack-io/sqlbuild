@@ -36,6 +36,9 @@ import type {
 	RunTabCounts,
 	Scope,
 	SnapshotChange,
+	SelectionEvaluation,
+	SelectionRequest,
+	SelectionVocabulary,
 	SnapshotNode,
 	StatementSql,
 	Timeline,
@@ -128,6 +131,10 @@ export interface ApiClient extends PlatformApi {
 	rerunSelectedNodes(scope: Scope, runId: string, nodes: string[]): Promise<Run>;
 
 	listSnapshotNodes(scope: Scope): Promise<SnapshotNode[]>;
+	/** Resolves a selection exactly as `sqb build` would; a refused selection is a result with its error, not a throw. */
+	evaluateSelection(scope: Scope, request: SelectionRequest): Promise<SelectionEvaluation>;
+	/** Tags, folders, jobs, sources, seeds and kinds of the current publication, with node counts. */
+	selectionVocabulary(scope: Scope): Promise<SelectionVocabulary>;
 	/** The server's pre-launch check: resolution, write set and authorization. */
 	checkAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<AdhocRunCheck>;
 	launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run>;

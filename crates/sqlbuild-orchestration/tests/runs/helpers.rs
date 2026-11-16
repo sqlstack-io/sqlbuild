@@ -444,3 +444,55 @@ pub(crate) fn snapshot_node(kind: &str, definition: serde_json::Value) -> Snapsh
         python_source: None,
     }
 }
+
+/// IDs that differ by a case's small numbers, so cases read as `target 1, snapshot 2`.
+pub(crate) fn cache_id(number: u8) -> Uuid {
+    Uuid::from_u128(u128::from(number) + 1)
+}
+
+/// The cached value of `snapshot` in target `scope`, built as the snapshot's number, and whether this lookup built it.
+pub(crate) async fn cache_lookup(
+    slots: &std::sync::Mutex<crate::runs::models::SnapshotSlots<u8>>,
+    (scope, snapshot): (u8, u8),
+) -> (u8, bool) {
+    let built = std::cell::Cell::new(false);
+    let ((), value) = crate::runs::_helpers::publications::cached(
+        slots,
+        ((cache_id(scope), "development".into()), cache_id(snapshot)),
+        (),
+        |()| async {
+            built.set(true);
+            Ok(((), snapshot))
+        },
+    )
+    .await
+    .expect("cached value");
+    (*value, built.get())
+}
+
+/// A selection evaluation as `(count, page, next offset, refusal message)`.
+pub(crate) fn selection_outcome(
+    evaluation: &crate::runs::models::SelectionEvaluation,
+) -> (u64, Vec<String>, Option<u32>, Option<String>) {
+    (
+        evaluation.count,
+        evaluation.keys.clone(),
+        evaluation.next_offset,
+        evaluation
+            .error
+            .as_ref()
+            .map(|problem| problem.message.clone()),
+    )
+}
+
+/// An expected selection in [`selection_outcome`]'s owned form.
+pub(crate) fn owned_selection(
+    (count, keys, next, error): crate::runs::tests::test_types::ExpectedSelection,
+) -> (u64, Vec<String>, Option<u32>, Option<String>) {
+    (
+        count,
+        keys.iter().map(|key| (*key).to_owned()).collect(),
+        next,
+        error.map(str::to_owned),
+    )
+}

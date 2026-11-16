@@ -818,6 +818,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["evaluateSelection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/selection/vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readSelectionVocabulary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/snapshots": {
         parameters: {
             query?: never;
@@ -3322,6 +3354,72 @@ export interface components {
             /** Format: int64 */
             storage_id: number;
         };
+        /** @description The nodes `sqb build --select … --exclude …` selects in the current publication, or why it refuses the selectors. */
+        SelectionEvaluation: {
+            /**
+             * Format: int64
+             * @description Every selected node, across all pages.
+             */
+            count: number;
+            error?: null | components["schemas"]["SelectionProblem"];
+            /** @description One page of the selected `kind:name` keys, sorted. */
+            keys: string[];
+            /**
+             * Format: int32
+             * @description The offset of the next page, when there is one.
+             */
+            next_offset?: number | null;
+            /**
+             * Format: uuid
+             * @description The publication evaluated; `None` before the first one.
+             */
+            snapshot_id?: string | null;
+        };
+        /** @enum {string} */
+        SelectionField: "select" | "exclude";
+        /** @description One selector token in the request's `select` or `exclude` text. */
+        SelectionLocation: {
+            /** Format: int32 */
+            end: number;
+            field: components["schemas"]["SelectionField"];
+            /**
+             * Format: int32
+             * @description Where the token starts and ends in its field, in UTF-16 code units, as JavaScript indexes strings.
+             */
+            start: number;
+            token: string;
+        };
+        /** @description Why `sqb` refuses a selection, where, and what might have been meant. */
+        SelectionProblem: {
+            /** @description The selector error code, such as `S007`; `None` when the selection as a whole is refused. */
+            code?: string | null;
+            /** @description `sqb`'s own help line, such as "did you mean 'orders'?". */
+            help?: string | null;
+            location?: null | components["schemas"]["SelectionLocation"];
+            message: string;
+            /** @description Replacements for that whole token, closest first. */
+            suggestions: string[];
+        };
+        /** @description The values each selector type takes in the current publication, with how many nodes each one selects. */
+        SelectionVocabulary: {
+            /** @description `job:` names: the nodes each job or job group selects. */
+            jobs: components["schemas"]["VocabularyEntry"][];
+            /** @description `kind:` values: the nodes of each kind. */
+            kinds: components["schemas"]["VocabularyEntry"][];
+            /** @description `path:` folders such as `models/staging`: the nodes below each, at any depth. */
+            paths: components["schemas"]["VocabularyEntry"][];
+            /** @description `seed:` names, one node each. */
+            seeds: components["schemas"]["VocabularyEntry"][];
+            /**
+             * Format: uuid
+             * @description The publication described; `None` before the first one.
+             */
+            snapshot_id?: string | null;
+            /** @description `source:` names, one node each. */
+            sources: components["schemas"]["VocabularyEntry"][];
+            /** @description `tag:` values: the SQL resources and Python nodes with each tag. */
+            tags: components["schemas"]["VocabularyEntry"][];
+        };
         SensorCondition: {
             /** @enum {string} */
             kind: "platform_event";
@@ -3594,6 +3692,12 @@ export interface components {
         };
         /** @enum {string} */
         TriggerStatus: "running" | "paused";
+        /** @description One selector value and the number of nodes it selects. */
+        VocabularyEntry: {
+            /** Format: int64 */
+            count: number;
+            value: string;
+        };
         WarehouseCatalogColumn: {
             data_type: string;
             name: string;
@@ -6004,6 +6108,98 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    evaluateSelection: {
+        parameters: {
+            query?: {
+                /** @description Space-separated selectors, as `sqb build -s` takes them; empty selects every node */
+                select?: string;
+                /** @description Space-separated selectors, as `--exclude` takes them */
+                exclude?: string;
+                /** @description Sorted keys to skip */
+                offset?: number;
+                /** @description Page size; defaults to 1,000, clamped to 1..10,000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The selected keys, or why `sqb` refuses the selectors */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SelectionEvaluation"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readSelectionVocabulary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SelectionVocabulary"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };

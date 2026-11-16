@@ -323,15 +323,15 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             expected_plan: Err("no sources are selected or upstream of the selection"),
         },
     ];
-    let planner = adhoc_planner();
+    let publication = adhoc_planner().prepare(resources.to_vec(), jobs);
     for test_case in test_cases {
         let command: Vec<String> = test_case
             .command
             .iter()
             .map(|token| (*token).to_owned())
             .collect();
-        let actual = planner
-            .plan(&command, (&resources, &jobs))
+        let actual = publication
+            .plan(&command)
             .map(|plan| {
                 (
                     plan.selection.into_iter().collect::<Vec<String>>(),
@@ -548,15 +548,15 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             expected_plan: Err("the selectors match no nodes in the current publication"),
         },
     ];
-    let planner = adhoc_planner();
+    let publication = adhoc_planner().prepare(resources.to_vec(), jobs);
     for test_case in test_cases {
         let command: Vec<String> = test_case
             .command
             .iter()
             .map(|token| (*token).to_owned())
             .collect();
-        let actual = planner
-            .plan(&command, (&resources, &jobs))
+        let actual = publication
+            .plan(&command)
             .map(|plan| {
                 (
                     plan.selection.into_iter().collect::<Vec<String>>(),

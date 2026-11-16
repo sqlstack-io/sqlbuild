@@ -10,6 +10,9 @@ import type {
 	Acknowledgement,
 	AdhocPermission,
 	AdhocRunCheck,
+	SelectionEvaluation,
+	SelectionRequest,
+	SelectionVocabulary,
 	PlanChanged,
 	PlanResult,
 	AdhocRunRequest,
@@ -70,7 +73,7 @@ import {
 	type TriggerDef
 } from './operate';
 import { SCHEDULER } from './principals';
-import { ancestors, isWritable, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
+import { ancestors, evaluateMockSelection, isWritable, mockVocabulary, resolveSelection, SNAPSHOT_NODES, snapshotNode, sortTopologically, edgesWithin, writeSetOf } from './operate-graph';
 import {
 	commandOf,
 	computeNodes,
@@ -517,6 +520,21 @@ export class MockOperate {
 	listSnapshotNodes(scope: Scope): Promise<SnapshotNode[]> {
 		void scope;
 		return this.#ctx.reply(structuredClone(SNAPSHOT_NODES));
+	}
+
+	evaluateSelection(scope: Scope, request: SelectionRequest): Promise<SelectionEvaluation> {
+		void scope;
+		const { keys, error } = evaluateMockSelection(request.select, request.exclude);
+		const offset = request.offset ?? 0;
+		const limit = Math.min(Math.max(request.limit ?? 1000, 1), 10_000);
+		const page = keys.slice(offset, offset + limit);
+		return this.#ctx.reply({ snapshotId: 'mock-snapshot', count: keys.length, keys: page, nextOffset: offset + limit < keys.length ? offset + limit : null, error });
+	}
+
+	selectionVocabulary(scope: Scope): Promise<SelectionVocabulary> {
+		void scope;
+		const jobs = JOB_DEFS.map((j) => ({ value: j.key, count: jobNodes(j.key).length })).sort((a, b) => a.value.localeCompare(b.value));
+		return this.#ctx.reply({ snapshotId: 'mock-snapshot', jobs, ...mockVocabulary() });
 	}
 
 	// ---- actions: runs ----
