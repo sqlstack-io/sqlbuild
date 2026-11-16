@@ -269,8 +269,9 @@ pub(super) fn publish_location<'py>(
             &arguments.value("server_url")?.extract::<String>()?,
             &bearer,
         )?.map_err(|error| {
-            let message = if matches!(error, sqlbuild_orchestration::api::errors::ClientError::Transport(_)) {
-                format!("Publication outcome is unknown; generation {} may already be published. Check the current snapshot before retrying: {error}", input.generation)
+            let message = if let sqlbuild_orchestration::api::errors::ClientError::Transport(transport) = &error {
+                let cause = if transport.is_timeout() { " (the server did not answer in time)" } else { "" };
+                format!("Publication outcome is unknown; generation {} may already be published. Check the current snapshot before retrying: {error}{cause}", input.generation)
             } else {
                 error.to_string()
             };
