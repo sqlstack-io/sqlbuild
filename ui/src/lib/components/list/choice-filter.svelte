@@ -133,6 +133,7 @@
 		<Popover.Content
 			class="choice-panel"
 			align="start"
+			collisionPadding={8}
 			style="width: {width}"
 			onOpenAutoFocus={(e: Event) => {
 				e.preventDefault();
