@@ -113,6 +113,7 @@ Python hooks declare a `HookContext` parameter named `ctx`, `context`, `_ctx`, o
 | `ctx.hook_index` | Zero-based position in the authored hook list |
 | `ctx.run_id` | Current run ID |
 | `ctx.target` | Active target |
+| `ctx.target_config` | The active target's database and schemas ([Target settings](/docs/concepts/python-nodes/overview#target-settings)) |
 | `ctx.vars` | Effective project variables |
 | `ctx.destination` | Destination relation metadata |
 | `ctx.relation(ref)` | Adapter-qualified relation for a [declared read](#declared-reads) |

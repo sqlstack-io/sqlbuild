@@ -1,8 +1,18 @@
-use crate::progress::models::{ProgressEvent, ProgressPayload, ProgressSettings};
-use crate::progress::tests::helpers::{
-    attempt_event, audit_rows, operation_event, orders_claim, plain, project_case,
+use std::collections::BTreeMap;
+
+use crate::progress::main::consume_progress_event::consume_progress_event;
+use crate::progress::main::format_statement_summary::format_statement_summary;
+use crate::progress::main::statement_summary_json::statement_summary_json;
+use crate::progress::models::{
+    ProgressEvent, ProgressPayload, ProgressProjection, ProgressSettings, StatementSummary,
+    StatementTiming, StatementTimings,
 };
-use crate::progress::tests::test_types::{AuditRowTestCase, ProjectionTestCase};
+use crate::progress::tests::helpers::{
+    attempt_event, audit_rows, operation_event, orders_claim, plain, project_case, statement_event,
+};
+use crate::progress::tests::test_types::{
+    AuditRowTestCase, ProjectionTestCase, StatementCountTestCase, StatementSummaryTextTestCase,
+};
 
 #[test]
 fn given_lifecycle_facts_when_projecting_then_progress_lines_match() {
@@ -260,6 +270,234 @@ fn given_standalone_audit_when_projecting_then_row_names_target_and_outcome() {
         assert_eq!(
             audit_rows(&test_case),
             test_case.expected_lines,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_statement_terminals_when_projecting_then_every_finished_statement_is_counted_once() {
+    let test_cases = [
+        StatementCountTestCase {
+            description: "a known resource's terminal takes the query id its submission reported",
+            events: vec![
+                attempt_event("r1", "resource_attempt_started", ("a1", None)),
+                statement_event(
+                    ("s1", "statement_started"),
+                    ("st1", "CREATE", None),
+                    Some("a1"),
+                ),
+                statement_event(
+                    ("s2", "statement_submitted"),
+                    ("st1", "CREATE", Some("q1")),
+                    Some("a1"),
+                ),
+                statement_event(
+                    ("s3", "statement_completed"),
+                    ("st1", "CREATE", None),
+                    Some("a1"),
+                ),
+            ],
+            expected_by_kind: vec![("CREATE", 1)],
+            expected_query_ids: vec!["q1"],
+        },
+        StatementCountTestCase {
+            description: "a redelivered terminal is counted once",
+            events: vec![
+                statement_event(
+                    ("s1", "statement_completed"),
+                    ("st1", "WITH", Some("q1")),
+                    None,
+                ),
+                statement_event(
+                    ("s1", "statement_completed"),
+                    ("st1", "WITH", Some("q1")),
+                    None,
+                ),
+            ],
+            expected_by_kind: vec![("WITH", 1)],
+            expected_query_ids: vec!["q1"],
+        },
+        StatementCountTestCase {
+            description: "statements outside known resources count, failed ones too",
+            events: vec![
+                statement_event(
+                    ("s1", "statement_completed"),
+                    ("st1", "WITH", Some("q1")),
+                    None,
+                ),
+                statement_event(("s2", "statement_failed"), ("st2", "DROP", None), None),
+                statement_event(
+                    ("s3", "statement_completed"),
+                    ("st3", "WITH", Some("q3")),
+                    None,
+                ),
+            ],
+            expected_by_kind: vec![("DROP", 1), ("WITH", 2)],
+            expected_query_ids: vec!["q1", "q3"],
+        },
+        StatementCountTestCase {
+            description: "starts, submissions and heartbeats alone are not finished statements",
+            events: vec![
+                statement_event(("s1", "statement_started"), ("st1", "SELECT", None), None),
+                statement_event(
+                    ("s2", "statement_submitted"),
+                    ("st1", "SELECT", Some("q1")),
+                    None,
+                ),
+                statement_event(
+                    ("s3", "statement_heartbeat"),
+                    ("st1", "SELECT", Some("q1")),
+                    None,
+                ),
+            ],
+            expected_by_kind: vec![],
+            expected_query_ids: vec![],
+        },
+    ];
+
+    for test_case in test_cases {
+        let mut projection: ProgressProjection = ProgressProjection::new(plain());
+        for event in &test_case.events {
+            projection = consume_progress_event(projection, event).0;
+        }
+        let summary: &StatementSummary = projection.statement_summary();
+        assert_eq!(
+            (summary.by_kind.clone(), summary.query_ids.clone()),
+            (
+                test_case
+                    .expected_by_kind
+                    .iter()
+                    .map(|(kind, count)| ((*kind).to_owned(), *count))
+                    .collect::<BTreeMap<String, u64>>(),
+                test_case
+                    .expected_query_ids
+                    .iter()
+                    .map(|query_id| (*query_id).to_owned())
+                    .collect::<Vec<String>>(),
+            ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_statement_summary_when_formatting_then_line_and_json_report_kinds_and_timing() {
+    let summary: StatementSummary = StatementSummary {
+        by_kind: BTreeMap::from([
+            ("CREATE".to_owned(), 2),
+            ("DROP".to_owned(), 2),
+            ("SELECT".to_owned(), 7),
+            ("ALTER".to_owned(), 1),
+        ]),
+        query_ids: (0..12).map(|index| format!("q{index}")).collect(),
+    };
+    let reported = |compile_ms: f64, execution_ms: f64, timed_statements: u64| {
+        StatementTiming::Reported(StatementTimings {
+            compile_ms,
+            execution_ms,
+            timed_statements,
+        })
+    };
+    let test_cases = [
+        StatementSummaryTextTestCase {
+            description: "kinds run from most to least frequent, ties by name",
+            summary: summary.clone(),
+            timing: reported(1540.0, 260.0, 12),
+            expected_line: Some(
+                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s",
+            ),
+            expected_json: serde_json::json!({
+                "total": 12,
+                "by_kind": {"ALTER": 1, "CREATE": 2, "DROP": 2, "SELECT": 7},
+                "compile_time": {
+                    "source": "snowflake_query_history",
+                    "compile_ms": 1540.0,
+                    "execution_ms": 260.0,
+                    "timed_statements": 12,
+                    "identified_statements": 12,
+                },
+            }),
+        },
+        StatementSummaryTextTestCase {
+            description: "statements missing from query history are called out",
+            summary: summary.clone(),
+            timing: reported(1000.0, 0.0, 10),
+            expected_line: Some(
+                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.0s, execution 0.0s (10 of 12 statements in query history)",
+            ),
+            expected_json: serde_json::json!({
+                "total": 12,
+                "by_kind": {"ALTER": 1, "CREATE": 2, "DROP": 2, "SELECT": 7},
+                "compile_time": {
+                    "source": "snowflake_query_history",
+                    "compile_ms": 1000.0,
+                    "execution_ms": 0.0,
+                    "timed_statements": 10,
+                    "identified_statements": 12,
+                },
+            }),
+        },
+        StatementSummaryTextTestCase {
+            description: "an adapter without query history says so",
+            summary: summary.clone(),
+            timing: StatementTiming::NotReported("duckdb".to_owned()),
+            expected_line: Some(
+                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time not reported by duckdb",
+            ),
+            expected_json: serde_json::json!({
+                "total": 12,
+                "by_kind": {"ALTER": 1, "CREATE": 2, "DROP": 2, "SELECT": 7},
+                "compile_time": null,
+            }),
+        },
+        StatementSummaryTextTestCase {
+            description: "a failed read says why",
+            summary: summary.clone(),
+            timing: StatementTiming::Failed("query history read failed".to_owned()),
+            expected_line: Some(
+                "Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile time unavailable (query history read failed)",
+            ),
+            expected_json: serde_json::json!({
+                "total": 12,
+                "by_kind": {"ALTER": 1, "CREATE": 2, "DROP": 2, "SELECT": 7},
+                "compile_time": {
+                    "source": "snowflake_query_history",
+                    "error": "query history read failed",
+                },
+            }),
+        },
+        StatementSummaryTextTestCase {
+            description: "a run without statements has no line",
+            summary: StatementSummary::default(),
+            timing: reported(0.0, 0.0, 0),
+            expected_line: None,
+            expected_json: serde_json::json!({
+                "total": 0,
+                "by_kind": {},
+                "compile_time": {
+                    "source": "snowflake_query_history",
+                    "compile_ms": 0.0,
+                    "execution_ms": 0.0,
+                    "timed_statements": 0,
+                    "identified_statements": 0,
+                },
+            }),
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            (
+                format_statement_summary(&test_case.summary, &test_case.timing),
+                statement_summary_json(&test_case.summary, &test_case.timing),
+            ),
+            (
+                test_case.expected_line.map(str::to_owned),
+                test_case.expected_json,
+            ),
             "{}",
             test_case.description
         );

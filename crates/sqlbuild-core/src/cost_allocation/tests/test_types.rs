@@ -12,3 +12,10 @@ pub(crate) struct AllocationTestCase {
     pub(crate) expected_seconds: &'static str,
     pub(crate) expected_usd: &'static str,
 }
+
+pub(crate) struct StatementTimingsSqlTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) database: Option<&'static str>,
+    pub(crate) query_ids: Vec<&'static str>,
+    pub(crate) expected_sql: &'static str,
+}

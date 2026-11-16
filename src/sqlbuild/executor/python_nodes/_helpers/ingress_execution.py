@@ -283,6 +283,7 @@ def _execute_ingress_loader(
                 runtime=LoadRuntimeParams(
                     run_id=runtime.run_id,
                     target=runtime.target,
+                    target_config=runtime.target_config,
                     vars=runtime.vars,
                     is_reload=runtime.is_reload,
                     start_cursor_ts=runtime.start_cursor_ts,

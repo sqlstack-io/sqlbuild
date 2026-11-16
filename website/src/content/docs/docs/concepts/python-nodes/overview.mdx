@@ -97,6 +97,7 @@ Each node receives a context object as its first argument (`TaskContext`, `Asset
 |--------|-------------|
 | `ctx.run_id` | Unique identifier for this run |
 | `ctx.target` | Active target name |
+| `ctx.target_config` | The active target's database and schemas, as SQLBuild resolves them (see [Target settings](#target-settings)) |
 | `ctx.vars` | Project variables |
 | `ctx.is_reload` | `True` when `--reload` was passed |
 | `ctx.adapter` / `ctx.connection` | Adapter and live connection |
@@ -111,6 +112,30 @@ Each node receives a context object as its first argument (`TaskContext`, `Asset
 Task and asset contexts add `ctx.result(...)` and `ctx.skip(...)`. Check contexts add `ctx.pass_(...)`, `ctx.fail(...)`, and `ctx.warn(...)`.
 
 Providers can also be injected directly as function parameters by name. See [Providers](/docs/concepts/python-nodes/providers) for details.
+
+### Target settings
+
+Read the active target's locations from `ctx.target_config` instead of keeping each target's schema names in Python. The values are resolved the way SQLBuild resolves them for models and loaders, including `sqlbuild_local.toml` overrides, and are read-only:
+
+| Field | Value |
+|-------|-------|
+| `name` | Active target name, or `None` without targets |
+| `database` | Database models build into, or `None` when the adapter has none or the value is `preserve` |
+| `schema` | Schema models build into, or `None` when it is `preserve` |
+| `loader_schema` | Schema a managed source without its own `schema` loads into: `loader_schema`, else the target's `schema`; `None` when that schema uses a `${CTX:...}` template |
+| `database_preserved` / `schema_preserved` | `True` when the target sets that value to `preserve` |
+
+```python
+@asset
+def partner_export(ctx):
+    """Export orders to the partner staging table."""
+    target = ctx.target_config
+    staging = f"{target.database}.{target.loader_schema}.partner_staging"
+    ctx.execute_sql(f"CREATE OR REPLACE TABLE {staging} AS SELECT * FROM orders")
+    return ctx.result()
+```
+
+Connection settings and secrets are not part of `ctx.target_config`.
 
 ## Returns and skips
 

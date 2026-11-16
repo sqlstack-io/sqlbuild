@@ -26,6 +26,7 @@ from sqlbuild._native import (
     PythonHookEntry,
     SourceEntry,
     StartCursorsConfig,
+    TargetSettings,
     TimestampValue,
 )
 from sqlbuild._native import cursor_compare as compare
@@ -104,6 +105,7 @@ class HookContext:
     providers: ProviderContainer = field(default_factory=_empty_provider_container, repr=False)
     relations: Mapping[SqlResourceRef, str] = field(default_factory=dict, repr=False)
     relation_guard: RuntimeRelationGuard | None = field(default=None, repr=False)
+    target_config: TargetSettings | None = None
 
     def execute_sql(self, sql: str) -> None:
         if self.relation_guard is not None:
@@ -314,6 +316,7 @@ class ModelMaterializationContext:
     schema_prepared: bool = False
     hook_functions: tuple[DiscoveredHookFunction, ...] = ()
     effective_target_name: str | None = None
+    target_config: TargetSettings | None = None
     effective_vars: Mapping[str, object] | None = None
     providers: ProviderContainer | None = None
     python_identity_recorder: PythonIdentityRecorder | None = None
@@ -532,6 +535,7 @@ class HookRunContext:
     destination: CompiledRelationLocation | None = None
     run_id: str = ""
     target: str | None = None
+    target_config: TargetSettings | None = None
     effective_vars: Mapping[str, object] | None = None
     statement_recorder: StatementRecorder | None = None
     providers: ProviderContainer | None = None

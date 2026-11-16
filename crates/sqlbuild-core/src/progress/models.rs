@@ -1,6 +1,6 @@
 //! The lifecycle facts progress projection reads, and the invocation projection state.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use crate::progress::types::DifferenceSample;
 
@@ -83,6 +83,33 @@ pub struct ProgressProjection {
     pub(crate) resource_names: HashMap<String, String>,
     pub(crate) statement_starts: HashMap<String, ProgressEvent>,
     pub(crate) statement_query_ids: HashMap<String, String>,
+    pub(crate) statements: StatementSummary,
+}
+
+/// The warehouse statements an invocation finished: how many of each leading keyword, and their query identifiers.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StatementSummary {
+    pub by_kind: BTreeMap<String, u64>,
+    pub query_ids: Vec<String>,
+}
+
+/// Warehouse-reported time of the statements found in query history.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct StatementTimings {
+    pub compile_ms: f64,
+    pub execution_ms: f64,
+    /// How many of the summary's query identifiers query history returned.
+    pub timed_statements: u64,
+}
+
+/// What the warehouse reports about the time of an invocation's statements.
+#[derive(Clone, Debug, PartialEq)]
+pub enum StatementTiming {
+    Reported(StatementTimings),
+    /// The adapter, by name, keeps no per-statement compile time.
+    NotReported(String),
+    /// Reading query history failed, for this reason.
+    Failed(String),
 }
 
 impl ProgressProjection {
@@ -114,6 +141,12 @@ impl ProgressProjection {
     pub fn record_audit_outcome(&mut self, resource_attempt_id: &str, outcome: &str) {
         self.audit_outcomes
             .insert(resource_attempt_id.to_owned(), outcome.to_owned());
+    }
+
+    /// The warehouse statements finished so far.
+    #[must_use]
+    pub fn statement_summary(&self) -> &StatementSummary {
+        &self.statements
     }
 
     /// Whether a visible operation with this name currently owns progress.

@@ -1177,10 +1177,8 @@ max_positional_args = 1
 
 [[targets.python.threshold_overrides]]
 paths = ["src/sqlbuild/__init__.py"]
-# Raised from 89,457 for the shared Python identity pass (identity_pass.py, object_source.py).
-# Raised from 89,626 for helper-class anchors in Python identity (object_source.py, identity.py).
-thresholds = { max_crate_code_lines = 89643 }
-reason = "The runtime package is above the code-line limit; this caps it at its current size until it is split into packages by area. Lower the cap as code moves out."
+thresholds = { max_crate_code_lines = 100000 }
+reason = "The runtime package is above Fensu's default code-line limit. Kevin set 100,000 on 16 Nov to avoid per-PR raises while the crate split and UI work land; reducing it is parked (backlog)."
 
 [targets.python.rule_options.XSB074]
 pending_budgets = [
@@ -1672,7 +1670,7 @@ select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077", "XSB078", "X
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 147491 }
+thresholds = { max_crate_code_lines = 147789 }
 reason = "The Python bindings crate is above the code-line limit; this caps it at its current size until it is split into crates by area. Lower the cap as code moves out."
 
 [[targets.rust.threshold_overrides]]
@@ -2386,7 +2384,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/compile_attachment/model_inputs.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_attachment/sql_expansion_context.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_attachment/storage_policies.rs=1",
-    "crates/sqlbuild-python/src/bindings/_helpers/compile_attachment/target.rs=6",
+    "crates/sqlbuild-python/src/bindings/_helpers/compile_attachment/target.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_command/models.rs=0",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_command/prepared_artifacts.rs=41",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_command/report.rs=30",
@@ -2476,11 +2474,11 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/runtime_execution.rs=18",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/runtime_results.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/sqlbuild_work.rs=4",
-    "crates/sqlbuild-python/src/bindings/_helpers/debug_command/run_debug.rs=26",
+    "crates/sqlbuild-python/src/bindings/_helpers/debug_command/run_debug.rs=24",
     "crates/sqlbuild-python/src/bindings/_helpers/diff_report/command.rs=10",
     "crates/sqlbuild-python/src/bindings/_helpers/diff_report/facts.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/diff_report/output.rs=4",
-    "crates/sqlbuild-python/src/bindings/_helpers/diff_report/query.rs=19",
+    "crates/sqlbuild-python/src/bindings/_helpers/diff_report/query.rs=17",
     "crates/sqlbuild-python/src/bindings/_helpers/diff_report/support.rs=6",
     "crates/sqlbuild-python/src/bindings/_helpers/diff_report/tolerances.rs=5",
     "crates/sqlbuild-python/src/bindings/_helpers/event_exporting/dispatcher.rs=28",
@@ -2731,7 +2729,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/semantic_checks/metadata.rs=6",
     "crates/sqlbuild-python/src/bindings/_helpers/semantic_checks/resource_sql.rs=6",
     "crates/sqlbuild-python/src/bindings/_helpers/semantic_checks/stage_objects.rs=2",
-    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=99",
+    "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=97",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/assembly.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/compiled_tests.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/workspace_commands/commands.rs=5",

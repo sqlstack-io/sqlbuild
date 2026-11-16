@@ -1632,3 +1632,23 @@ class PythonUpstreamResultE2ETestCase:
     select: str
     upstream_select: str
     expected_error: str
+
+
+@dataclass(frozen=True)
+class PythonTargetConfigBuildE2ETestCase:
+    """Test case for the active target's settings seen by Python nodes and loaders."""
+
+    description: str
+    project_target_lines: str
+    local_target_lines: str
+    expected_settings: dict[str, object]
+
+
+@dataclass(frozen=True)
+class CtxTargetSchemaE2ETestCase:
+    """Test case for commands under a target schema that resolves only inside a model."""
+
+    description: str
+    target_schema: str
+    expected_model_schema: str
+    expected_loader_schema: str | None
