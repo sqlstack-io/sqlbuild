@@ -128,6 +128,15 @@ pub(crate) fn project_sources(
         .collect()
 }
 
+/// `[settings] allow_warehouse_round_trips` of a compiled project.
+pub(crate) fn allows_round_trips(project: &Bound<'_, PyAny>) -> PyResult<bool> {
+    native_field(
+        &native_field(project, "settings")?,
+        "allow_warehouse_round_trips",
+    )?
+    .extract()
+}
+
 /// The Python node names `select` minus `exclude` resolve to; every node when unselected.
 #[pyfunction]
 #[pyo3(signature = (*, graph, select, exclude))]
@@ -152,6 +161,7 @@ pub(crate) fn resolve_python_sql_run_selection(
     let project_graph: &Bound<'_, CompiledProjectGraph> = project_graph.cast()?;
     let native: &Bound<'_, NativeProjectGraph> = project_graph.get().native(py);
     let sources: Vec<(String, Option<String>)> = project_sources(project_graph.get().project(py))?;
+    let allow_warehouse_round_trips: bool = allows_round_trips(project_graph.get().project(py))?;
     let nodes: PythonSelectionGraph = selection_graph(python_graph)?;
     let node_names: Vec<&str> = nodes.nodes.iter().map(|node| node.name.as_str()).collect();
     let selectors: Vec<String> = select.iter().chain(&exclude).cloned().collect();
@@ -161,6 +171,7 @@ pub(crate) fn resolve_python_sql_run_selection(
                 SqlSelectionGraph {
                     graph: native.get().graph(),
                     sources: &sources,
+                    allow_warehouse_round_trips,
                 },
                 &nodes,
                 catalog,
@@ -172,6 +183,7 @@ pub(crate) fn resolve_python_sql_run_selection(
             SqlSelectionGraph {
                 graph: &graph,
                 sources: &sources,
+                allow_warehouse_round_trips,
             },
             &nodes,
             &select,

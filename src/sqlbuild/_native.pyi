@@ -12048,6 +12048,7 @@ class SettingsConfig(NativeRecord):
     scenario_timeout_seconds: int | None
     delta_compile: bool
     allow_missing_secrets: bool
+    allow_warehouse_round_trips: bool
     def __init__(
         self,
         sql_analysis: bool = ...,
@@ -12068,6 +12069,7 @@ class SettingsConfig(NativeRecord):
         scenario_timeout_seconds: int | None = ...,
         delta_compile: bool = ...,
         allow_missing_secrets: bool = ...,
+        allow_warehouse_round_trips: bool = ...,
     ) -> None: ...
     @property
     def sql_validation(self) -> bool: ...
