@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Lives inside <SvelteFlow> so it can access the flow context, and exposes
+	// Lives inside the graph canvas so it can access the flow context, and exposes
 	// fitView() upward so the parent can reset pan+zoom after re-layout.
 	// `fitFloor` keeps these fits readable on a large graph; zooming out by hand can still go below it.
 	// With `readable`, a graph too large to show whole at `fitFloor` is shown at `fitFloor` instead,

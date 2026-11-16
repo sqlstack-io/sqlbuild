@@ -1,15 +1,14 @@
 <script lang="ts">
-	import '@xyflow/svelte/dist/style.css';
-	import { Background, SvelteFlow, type Edge, type Node, type Viewport } from '@xyflow/svelte';
+	import type { Edge, Node, Viewport } from '@xyflow/svelte';
 	import { tick, untrack } from 'svelte';
 	import type { CatalogNode, JobGroupMember } from '$lib/api';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FolderNode from '$lib/components/lineage/folder-node.svelte';
 	import TooManyCard from '$lib/components/lineage/too-many-card.svelte';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
-	import FitControls from '$lib/lineage/fit-controls.svelte';
-	import { folderBoxId, folderCardId, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import GraphToolbar from '$lib/components/graph/graph-toolbar.svelte';
+	import { MAX_DRAWN, folderBoxId, folderCardId, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { absolutePosition as positionOn, anchoredViewport } from '$lib/lineage/fit';
 	import { innerId, layoutMemberGraph, litEdges, memberGraph, memberNodeId, memberReach, type MemberInfo, type MemberSelection, type NodeLink } from '$lib/lineage/member-graph';
 	import { toggled } from '$lib/lineage/member-expand';
@@ -27,13 +26,16 @@
 		info,
 		catalog = [],
 		links = new Map(),
-		selection = $bindable(null)
+		selection = $bindable(null),
+		details
 	}: {
 		members: JobGroupMember[];
 		info: ReadonlyMap<string, MemberInfo>;
 		catalog?: readonly CatalogNode[];
 		links?: ReadonlyMap<string, NodeLink[]>;
 		selection?: MemberSelection | null;
+		/** The page's details panel, toggled from the toolbar as on Lineage. */
+		details?: { open: boolean; toggle: () => void };
 	} = $props();
 
 	const nodeTypes = { member: MemberNode, memberBox: MemberBoxNode, asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode };
@@ -65,7 +67,47 @@
 		setFolders(jobKey, new Set([...(openFolders.get(jobKey) ?? []), folder]));
 	}
 
-	const graph = $derived(memberGraph(members, info, { catalog, links, expanded, openFolders, ontoggle: toggle, oncloseFolder: closeFolder }));
+	// Focus: only the selected member and the members it waits for or that wait for it.
+	let focusOn = $state<string | null>(null);
+	const shownMembers = $derived.by(() => {
+		if (!focusOn) return members;
+		const keep = new Set([focusOn, ...(reach.up.get(focusOn) ?? []), ...(reach.down.get(focusOn) ?? [])]);
+		return members.filter((m) => keep.has(m.jobKey));
+	});
+	function toggleFocus() {
+		focusOn = focusOn ? null : (selection?.member ?? null);
+	}
+	let expandNote = $state('');
+	/** Opens every member whose nodes are known, in order, stopping before the graph draws too many cards. */
+	function expandEverything() {
+		let next = new Set(expanded);
+		const openable = shownMembers.filter((m) => (info.get(m.jobKey)?.nodes?.length ?? 0) > 0 && !next.has(m.jobKey));
+		let opened = 0;
+		for (const m of openable) {
+			const trial = new Set([...next, m.jobKey]);
+			if (memberGraph(shownMembers, info, { catalog, links, expanded: trial, openFolders }).nodes.length > MAX_DRAWN) break;
+			next = trial;
+			opened++;
+		}
+		expandNote = opened < openable.length ? `Opened ${opened} of ${openable.length} jobs: the graph draws at most ${MAX_DRAWN.toLocaleString('en')} cards` : '';
+		expanded = next;
+	}
+	function collapseEverything() {
+		expanded = new Set();
+		openFolders = new Map();
+		expandNote = '';
+	}
+	/** Back to how the graph opened: every member closed, no focus, fitted again. */
+	async function reset() {
+		focusOn = null;
+		collapseEverything();
+		await tick();
+		if (nodes.length) nodes = layoutMemberGraph(nodes, edges);
+		await tick();
+		requestAnimationFrame(() => fit?.());
+	}
+
+	const graph = $derived(memberGraph(shownMembers, info, { catalog, links, expanded, openFolders, ontoggle: toggle, oncloseFolder: closeFolder }));
 	const tooMany = $derived(tooManyToDraw(graph));
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
@@ -177,44 +219,53 @@
 	}
 </script>
 
-<div class="graph sb-flow" bind:this={panel} class:unfitted={!fitted && nodes.length > 0}>
-	<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {onnodeclick} onpaneclick={() => (selection = null)} onnodepointerenter={({ node }) => (hoveredId = node.id)} onnodepointerleave={() => (hoveredId = null)}>
-		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport readable />
-		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-		<FitControls onfit={() => fit?.()} />
-	</SvelteFlow>
+<div class="member-graph">
+	<GraphToolbar
+		expand={{ all: expandEverything, collapse: collapseEverything, canCollapse: expanded.size > 0, allTitle: 'Open every job in place, up to the graph’s card limit', collapseTitle: 'Close every job', note: expandNote }}
+		focus={{ on: !!focusOn, can: !!selection, toggle: toggleFocus, title: 'Show only the selected job and the jobs it waits for or that wait for it' }}
+		onreset={reset}
+		{details}
+	/>
+	<GraphCanvas
+		bind:nodes
+		bind:edges
+		bind:fit
+		bind:fitted
+		bind:viewport
+		bind:setViewport
+		bind:element={panel}
+		{nodeTypes}
+		{edgeTypes}
+		nodesDraggable={false}
+		nodesConnectable={false}
+		elementsSelectable={false}
+		{onnodeclick}
+		onpaneclick={() => (selection = null)}
+		onnodepointerenter={({ node }) => (hoveredId = node.id)}
+		onnodepointerleave={() => (hoveredId = null)}
+	/>
 	{#if tooMany}
 		<TooManyCard count={graph.nodes.length}>
 			{#snippet actions()}
-				{#if expanded.size}<Button variant="outline" size="bar" onclick={() => (expanded = new Set())}>Close every job</Button>{/if}
+				{#if expanded.size}<Button variant="outline" size="bar" onclick={collapseEverything}>Close every job</Button>{/if}
 			{/snippet}
 		</TooManyCard>
 	{/if}
 </div>
 
 <style>
-	.graph {
+	.member-graph {
 		position: relative;
+		display: flex;
 		height: 100%;
+		flex-direction: column;
 		overflow: hidden;
 		border: 1px solid var(--border);
 		border-radius: 2px;
 		background: var(--sb-inset);
 	}
-	.unfitted :global(.svelte-flow__viewport),
-	.unfitted :global(.svelte-flow__controls) {
-		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
-		opacity: 0;
-	}
-	.graph :global(.svelte-flow__node-folder),
-	.graph :global(.svelte-flow__node-asset) {
+	.member-graph :global(.svelte-flow__node-folder),
+	.member-graph :global(.svelte-flow__node-asset) {
 		cursor: pointer;
-	}
-	.graph :global(.svelte-flow__controls-button) {
-		background: var(--card);
-		border-bottom: 1px solid var(--border);
-	}
-	.graph :global(.svelte-flow__controls-button svg) {
-		fill: var(--muted-foreground);
 	}
 </style>

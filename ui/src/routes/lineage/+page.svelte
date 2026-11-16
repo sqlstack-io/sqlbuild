@@ -1,4 +1,6 @@
 <script lang="ts">
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import GraphToolbar from '$lib/components/graph/graph-toolbar.svelte';
 	import { countBy } from '$lib/list/count-by';
 	import { matchesAny } from '$lib/list/choice';
 	import { plural } from '$lib/format/plural';
@@ -7,7 +9,7 @@
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import '@xyflow/svelte/dist/style.css';
-	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
+	import { type Node, type Edge } from '@xyflow/svelte';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FolderNode from '$lib/components/lineage/folder-node.svelte';
 	import StubNode from '$lib/components/lineage/stub-node.svelte';
@@ -18,13 +20,10 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import FocusIcon from '@lucide/svelte/icons/focus';
 	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
 	import PanelLeftIcon from '@lucide/svelte/icons/panel-left';
-	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import { layoutGraph } from '$lib/lineage/layout';
 	import { nodeFields } from '$lib/lineage/node-fields.svelte';
 	import { tracePath } from '$lib/lineage/trace';
@@ -40,8 +39,6 @@
 	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
 	import { viewSummary } from '$lib/lineage/view-summary';
 	import { tick, untrack } from 'svelte';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
-	import FitControls from '$lib/lineage/fit-controls.svelte';
 	import { READABLE_ZOOM, anchoredViewport, absolutePosition as positionOn } from '$lib/lineage/fit';
 	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
@@ -64,8 +61,6 @@
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
 	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
-	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
-	import ChevronsDownUpIcon from '@lucide/svelte/icons/chevrons-down-up';
 	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
 	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
 
@@ -841,76 +836,65 @@
 <!-- filter toolbar -->
 <div class="lineage-page">
 	<section class="lineage-workbench">
-<div class="lineage-toolbar">
-	<Button variant="ghost" size="icon-bar" aria-pressed={browserOpen} onclick={() => (browserOpen = !browserOpen)} title={browserOpen ? 'Hide model list' : 'Show model list'} aria-label="Toggle model list"><PanelLeftIcon /></Button>
-	<div class="search-wrap">
-		<label class="model-search">
-			<SearchIcon size={14} />
-			<input bind:value={modelQuery} placeholder="Search models" />
-		</label>
-		{#if modelQuery.trim() && !browserOpen}
-			<div class="search-results">
-				{#each browserNodes.slice(0, 8) as node (node.id)}
-					<!-- raw-button: a result in the search's dropdown list -->
-					<button onclick={() => { selectModel(node.id); modelQuery = ''; }}>
-						<i class="browser-status {String(node.data.status)}"></i>
-						<span title={String(node.data.name)}>{node.data.label ?? node.data.name}</span>
-						<small>{String(node.data.kind).split(' · ')[0]}</small>
-					</button>
-				{:else}
-					<div class="browser-empty">No matching models</div>
-				{/each}
+<GraphToolbar
+	folders={scaleMode ? undefined : { on: grouped, toggle: () => regroup({ grouped: !grouped, expanded: new Set(), fit: true }) }}
+	expand={!scaleMode && grouped && !tooMany
+		? { all: expandEverything, collapse: collapseEverything, canCollapse: expanded.size > 0, allTitle: `Open every folder in view, up to ${MAX_DRAWN.toLocaleString('en')} cards`, collapseTitle: 'Close every folder in view', note: expandNote }
+		: undefined}
+	focus={{ on: neighbourhoodOnly, can: selectedNodes.length > 0, toggle: toggleNeighbourhood, title: 'Show only the selected model and its immediate dependencies' }}
+	onreset={resetLayout}
+	details={{ open: inspectorOpen, toggle: details.toggle }}
+>
+	{#snippet start()}
+		<Button variant="ghost" size="icon-bar" aria-pressed={browserOpen} onclick={() => (browserOpen = !browserOpen)} title={browserOpen ? 'Hide model list' : 'Show model list'} aria-label="Toggle model list"><PanelLeftIcon /></Button>
+		<div class="search-wrap">
+			<label class="model-search">
+				<SearchIcon size={14} />
+				<input bind:value={modelQuery} placeholder="Search models" />
+			</label>
+			{#if modelQuery.trim() && !browserOpen}
+				<div class="search-results">
+					{#each browserNodes.slice(0, 8) as node (node.id)}
+						<!-- raw-button: a result in the search's dropdown list -->
+						<button onclick={() => { selectModel(node.id); modelQuery = ''; }}>
+							<i class="browser-status {String(node.data.status)}"></i>
+							<span title={String(node.data.name)}>{node.data.label ?? node.data.name}</span>
+							<small>{String(node.data.kind).split(' · ')[0]}</small>
+						</button>
+					{:else}
+						<div class="browser-empty">No matching models</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+		{#if !scaleMode}
+			<div class="toolbar-group">
+				<ChoiceFilter multiple label="Kind" bind:values={kindFilter} options={kindOptions} />
+				{#if groupOptions.length}<ChoiceFilter multiple label="Group" bind:values={groupFilter} options={groupOptions} />{/if}
+				<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />
 			</div>
 		{/if}
-	</div>
-	{#if !scaleMode}
-		<div class="toolbar-group">
-			<ChoiceFilter multiple label="Kind" bind:values={kindFilter} options={kindOptions} />
-			{#if groupOptions.length}<ChoiceFilter multiple label="Group" bind:values={groupFilter} options={groupOptions} />{/if}
-			<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />
+	{/snippet}
+	{#snippet middle()}
+		{#if !scaleMode}
+			{#if selectionLabel}
+				<span class="selection-chip" title="Showing {selectionLabel}">
+					<span>Showing: {selectionLabel}</span>
+					<Button variant="ghost" size="icon-xs" class="rounded-full" onclick={clearSelection} aria-label="Show every folder" title="Show every folder"><XIcon /></Button>
+				</span>
+			{/if}
+		{/if}
+		<NodeFieldsPopover />
+	{/snippet}
+	{#snippet end()}
+		<div class="status-summary">
+			{#each [['ok', 'var(--sb-success)', 'last build succeeded'], ['warn', 'var(--sb-warning)', 'last build warned'], ['stale', 'var(--sb-stale)', 'stale'], ['fail', 'var(--sb-error)', 'last build failed']] as [st, c, label] (st)}
+				{@const n = scaleMode ? nodes.filter((x) => (st === 'stale' ? !!x.data.stale : x.data.status === st)).length : catalogNodes.filter((c) => (st === 'stale' ? !!c.stale?.length : cardStatus(c) === st)).length}
+				{#if n}<span title="{n} {label}"><i style:background={c}></i>{n}</span>{/if}
+			{/each}
 		</div>
-	{/if}
-	<span class="toolbar-sep"></span>
-	{#if !scaleMode}
-		<Button
-			variant="ghost"
-			aria-pressed={grouped}
-			onclick={() => regroup({ grouped: !grouped, expanded: new Set(), fit: true })}
-			title={grouped ? 'Draw every node' : 'One card per folder'}
-		>
-			<FolderIcon />Folders
-		</Button>
-		{#if grouped && !tooMany}
-			<Button variant="ghost" onclick={expandEverything} title="Open every folder in view, up to {MAX_DRAWN.toLocaleString('en')} cards"><ChevronsUpDownIcon />Expand all</Button>
-			<Button variant="ghost" onclick={collapseEverything} disabled={!expanded.size} title="Close every folder in view"><ChevronsDownUpIcon />Collapse all</Button>
-			{#if expandNote}<span class="expand-note" role="status">{expandNote}</span>{/if}
-		{/if}
-		{#if selectionLabel}
-			<span class="selection-chip" title="Showing {selectionLabel}">
-				<span>Showing: {selectionLabel}</span>
-				<Button variant="ghost" size="icon-xs" class="rounded-full" onclick={clearSelection} aria-label="Show every folder" title="Show every folder"><XIcon /></Button>
-			</span>
-		{/if}
-	{/if}
-	<NodeFieldsPopover />
-	<Button
-		variant="ghost"
-		aria-pressed={neighbourhoodOnly}
-		onclick={toggleNeighbourhood}
-		disabled={!neighbourhoodOnly && selectedNodes.length === 0}
-		title={!neighbourhoodOnly && selectedNodes.length === 0 ? 'Select a model to focus on it' : 'Show only the selected model and its immediate dependencies'}
-	>
-		<FocusIcon />{neighbourhoodOnly ? 'Show all' : 'Focus'}
-	</Button>
-	<Button variant="ghost" onclick={resetLayout} title="Reset layout"><RotateCcwIcon />Reset</Button>
-	<div class="status-summary ml-auto">
-		{#each [['ok', 'var(--sb-success)', 'last build succeeded'], ['warn', 'var(--sb-warning)', 'last build warned'], ['stale', 'var(--sb-stale)', 'stale'], ['fail', 'var(--sb-error)', 'last build failed']] as [st, c, label] (st)}
-			{@const n = scaleMode ? nodes.filter((x) => (st === 'stale' ? !!x.data.stale : x.data.status === st)).length : catalogNodes.filter((c) => (st === 'stale' ? !!c.stale?.length : cardStatus(c) === st)).length}
-			{#if n}<span title="{n} {label}"><i style:background={c}></i>{n}</span>{/if}
-		{/each}
-	</div>
-	<Button variant="ghost" size="icon-bar" aria-pressed={inspectorOpen} onclick={details.toggle} title={inspectorOpen ? 'Hide details' : 'Show details'} aria-label="Toggle details"><PanelRightIcon /></Button>
-</div>
+	{/snippet}
+</GraphToolbar>
 
 <div class="lineage-stage relative flex min-h-0 flex-1">
 	{#if browserOpen}
@@ -954,12 +938,20 @@
 	{/if}
 	<!-- graph canvas -->
 	<div class="graph-panel sb-flow relative min-w-0 flex-1 overflow-hidden" style="background: var(--sb-inset)" bind:this={graphPanel}>
-		<SvelteFlow
+		<GraphCanvas
 			bind:nodes
 			bind:edges
+			bind:fit={fitFlow}
+			fitOnInit
+			bind:viewport
+			bind:setViewport={setFlowViewport}
+			bind:fitted
+			fitFloor={scaleMode ? undefined : FIT_FLOOR}
+			readable={!scaleMode}
+			controls={scaleMode ? 'full' : 'fit'}
+			showLock
 			{nodeTypes}
 			{edgeTypes}
-			fitView
 			fitViewOptions={{ padding: 0.08, maxZoom: 1, minZoom: scaleMode ? undefined : FIT_FLOOR, includeHiddenNodes: scaleMode }}
 			minZoom={scaleMode ? 0.02 : 0.05}
 			onlyRenderVisibleElements={scaleMode}
@@ -968,15 +960,10 @@
 			nodesDraggable
 			multiSelectionKey={['Shift', 'Meta', 'Control']}
 			selectionKey="Shift"
-			proOptions={{ hideAttribution: true }}
 			onnodeclick={({ node }) => node.type === 'folder' && openFolder(String(node.data.group))}
 			onnodepointerenter={({ node }) => (hoveredId = node.id)}
 			onnodepointerleave={() => (hoveredId = null)}
-		>
-			<FlowController bind:fitView={fitFlow} bind:viewport bind:setViewport={setFlowViewport} bind:fitted fitFloor={scaleMode ? undefined : FIT_FLOOR} readable={!scaleMode} />
-			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-			{#if scaleMode}<Controls />{:else}<FitControls onfit={() => fitFlow?.()} showLock />{/if}
-		</SvelteFlow>
+		/>
 		{#if tooMany}
 			<div class="graph-too-many">
 				<div class="too-many-card" role="status">
@@ -1246,12 +1233,6 @@
 		flex: 1;
 		overflow: hidden;
 	}
-	.lineage-toolbar {
-		flex: 0 0 auto;
-		gap: 5px;
-		padding-top: 7px;
-		padding-bottom: 7px;
-	}
 	.model-search {
 		display: flex;
 		width: 230px;
@@ -1475,16 +1456,6 @@
 		--sb-edge-dim: color-mix(in srgb, var(--foreground) 9%, transparent);
 		font-family: var(--font-sans);
 	}
-	.lineage-toolbar {
-		display: flex;
-		height: 46px;
-		flex: 0 0 46px;
-		align-items: center;
-		gap: 4px;
-		padding: 0 10px;
-		border-bottom: 1px solid var(--border);
-		background: var(--card);
-	}
 	.search-wrap {
 		position: relative;
 		margin: 0 6px 0 2px;
@@ -1535,12 +1506,6 @@
 		display: flex;
 		gap: 2px;
 	}
-	.toolbar-sep {
-		width: 1px;
-		height: 18px;
-		margin: 0 6px;
-		background: var(--border);
-	}
 	/* Toolbar buttons match the top bar's: 30 px high, 13 px medium text, 14 px icons. */
 	.toolbar-filter {
 		height: 30px;
@@ -1579,10 +1544,6 @@
 	}
 	.browser-row strong {
 		font: 500 12.5px var(--font-sans);
-	}
-	.expand-note {
-		color: var(--muted-foreground);
-		font-size: 12px;
 	}
 	.check-row {
 		display: flex;

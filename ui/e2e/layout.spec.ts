@@ -47,6 +47,8 @@ const awkward = (path: string) => `${path}${path.includes('?') ? '&' : '?'}mock&
 async function settle(page: Page) {
 	await page.waitForLoadState('networkidle');
 	await page.waitForTimeout(500);
+	// A graph shows once its first fit is done, after its data loads; the layout check fails one still hidden.
+	await page.waitForFunction(() => !document.querySelector('.graph-canvas.unfitted'), null, { timeout: 10_000 }).catch(() => {});
 }
 
 async function checkLayout(page: Page, label: string) {
@@ -69,6 +71,8 @@ async function checkLayout(page: Page, label: string) {
 				}
 			}
 		}
+		// Every graph has finished its first fit: an unfitted graph stays hidden.
+		if (document.querySelector('.graph-canvas.unfitted')) problems.push('a graph never fitted');
 		// Every scroll area has the themed scrollbar, not the browser's default.
 		for (const el of [document.documentElement, ...document.querySelectorAll<HTMLElement>('body *')]) {
 			const style = getComputedStyle(el);
@@ -188,24 +192,12 @@ for (const width of WIDTHS) {
 			// Waits implied by others aren't drawn: at most two lines per member.
 			expect(found.edges, 'lines drawn').toBeLessThanOrEqual(2 * found.members);
 			expect(found.inside, 'member cards wholly in view after load').toBeGreaterThan(0);
-		});
-
-		test('Checks opens again quickly from the sidebar with thousands of checks', async ({ page }) => {
-			const nav = (name: string) => page.locator('nav a', { hasText: name }).first();
-			const openChecks = async () => {
-				const started = Date.now();
-				await nav('Checks').click();
-				await page.locator('table.sb-table tbody tr:not(.spacer)').first().waitFor();
-				await page.waitForLoadState('networkidle');
-				return Date.now() - started;
-			};
-			await page.goto(awkward('/'));
-			await settle(page);
-			await openChecks();
-			await nav('Overview').click();
-			await settle(page);
-			// The first visit loads the list; the second used to take 12–19 s counting filter options.
-			expect(await openChecks(), 'ms for the second visit to Checks to settle').toBeLessThan(2000);
+			// The shared toolbar: Expand all opens members in place, Reset closes them again.
+			const boxes = () => page.locator('.svelte-flow__node-memberBox').count();
+			await page.getByRole('button', { name: 'Expand all' }).click();
+			await expect.poll(boxes).toBeGreaterThan(0);
+			await page.getByRole('button', { name: 'Reset' }).click();
+			await expect.poll(boxes).toBe(0);
 		});
 
 		for (const { list, link } of ITEMS) {

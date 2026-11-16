@@ -5,7 +5,8 @@ import { test } from '@playwright/test';
 const dir = process.env.SHOTS;
 const PAGES = [
 	{ name: 'group-page', path: '/jobs/warehouse_nightly?mock' },
-	{ name: 'lineage', path: '/lineage?mock' }
+	{ name: 'lineage', path: '/lineage?mock' },
+	{ name: 'job-page', path: '/jobs/core_build?mock' }
 ];
 
 test.describe('screenshots', () => {
@@ -15,6 +16,7 @@ test.describe('screenshots', () => {
 		test(name, async ({ page }) => {
 			await page.goto(path);
 			await page.waitForLoadState('networkidle');
+			await page.waitForFunction(() => !document.querySelector('.graph-canvas.unfitted'), null, { timeout: 10_000 }).catch(() => {});
 			await page.waitForTimeout(1000);
 			await page.screenshot({ path: `${dir}/${name}.png` });
 		});
