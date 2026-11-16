@@ -50,6 +50,12 @@ pub(super) struct ProjectFactsTestCase {
     pub(super) expected_native: bool,
 }
 
+pub(super) struct ProjectNameTestCase {
+    pub(super) description: &'static str,
+    pub(super) project_file: &'static str,
+    pub(super) expected_name: Option<&'static str>,
+}
+
 /// One `rules` inspection over a project and the start of what it prints.
 pub(super) struct RulesTestCase {
     pub(super) description: &'static str,

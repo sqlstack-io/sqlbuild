@@ -6,7 +6,6 @@
 	import type { ConnectionState, PlatformEvent } from '$lib/api';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 	import { formatAgo } from '$lib/format/time';
-	import { targetWords } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import PlatformEventBanner from './shell/platform-event-banner.svelte';
 	import WarehouseSyncStatus from './shell/warehouse-sync-status.svelte';
@@ -35,7 +34,7 @@
 	};
 
 	const snapshot = $derived(app.snapshot);
-	const where = $derived(app.location ? `${app.location.name} · ${targetWords(app.location.target)}` : '—');
+	const where = $derived(app.location ? `${app.location.name} · ${app.location.target.name}` : '—');
 </script>
 
 <div class="app-topbar flex h-[52px] shrink-0 items-center gap-3 border-b border-border px-5">

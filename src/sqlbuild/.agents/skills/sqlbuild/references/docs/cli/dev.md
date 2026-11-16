@@ -48,6 +48,10 @@ sqb dev --triggers
   for a server other people or machines connect to.
 - The control store keeps runs, trigger changes and history between sessions. Delete
   `.sqlbuild/control.sqlite3` to start again from nothing.
+- The location is named after the project, the `name` in `sqlbuild_project.toml`. When the
+  control store already has a location with that name, for example from another target of the
+  same project, it gets ` (2)`, then ` (3)`, and so on. A location created by an earlier version
+  keeps its name until you recreate the control store.
 - The UI is ready once the project compiles and publishes. The location then reads SQLBuild's
   history from the warehouse and prints a line per kind; plan previews, history and costs show
   **Syncing warehouse history…** until that first sync completes. See

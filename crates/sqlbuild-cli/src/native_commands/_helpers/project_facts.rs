@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use sqlbuild_config::models::ConfigValue;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::models::{Built, ConfigPaths};
@@ -55,6 +56,19 @@ pub(crate) fn has_no_runtime_extensions(project_dir: &Path) -> bool {
 /// Whether the project defines custom rules, which Python imports.
 pub(crate) fn has_custom_rules(project_dir: &Path) -> bool {
     project_dir.join(CUSTOM_RULES_DIRECTORY).is_dir()
+}
+
+/// The project's required `name`, which names its development location.
+pub(crate) fn development_project_name(project_dir: &Path) -> Result<String, ControlError> {
+    let invalid =
+        || ControlError::Invalid("project configuration is invalid; run sqb debug".into());
+    let config = load_project_config(&project_config_paths(project_dir)).map_err(|_| invalid())?;
+    match object_field(&config, "name") {
+        Some(Built::Value(ConfigValue::String(name))) if !name.trim().is_empty() => {
+            Ok(name.clone())
+        }
+        _ => Err(invalid()),
+    }
 }
 
 /// Resolve development's target through the same selected/local/default precedence as compilation.
