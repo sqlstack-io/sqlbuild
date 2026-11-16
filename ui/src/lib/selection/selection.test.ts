@@ -4,7 +4,7 @@ import { backspace, choose, comma, commit, EMPTY, fieldOf, fieldText, finished, 
 import { readingText } from './reading';
 import { parseSelection } from './syntax';
 import { pickedValues, setValuesIn, toggleValueIn } from './picker';
-import { buildHref, copyCommand, problemParts, problemToken, readSelectionParams, writeSelectionParams } from './command';
+import { buildHref, copyCommand, problemParts, problemText, problemToken, readSelectionParams, writeSelectionParams } from './command';
 import { suggest } from './suggest';
 
 const typing = (s: FieldState, text: string) => ({ ...s, text });
@@ -108,6 +108,8 @@ describe('chip value picker', () => {
 });
 
 describe('selection outside the bar', () => {
+	const problem: SelectionProblem = { code: 'S008', message: "no nodes found with tag 'finanse'", help: null, location: { field: 'select', token: '+tag:finanse,path:x', start: 2, end: 21 }, suggestions: ['+tag:finance,path:x'], refused: null };
+
 	it('round-trips through the URL, and reads an old single-node link', () => {
 		const params = writeSelectionParams(new URLSearchParams('fields=a'), { select: '+tag:a,path:b c', exclude: 'tag:x' });
 		expect(readSelectionParams(new URLSearchParams(params.toString()))).toEqual({ select: '+tag:a,path:b c', exclude: 'tag:x' });
@@ -122,11 +124,27 @@ describe('selection outside the bar', () => {
 	});
 
 	it('finds the token and part a refusal points at', () => {
-		const problem: SelectionProblem = { code: 'S008', message: "no nodes found with tag 'finanse'", help: null, location: { field: 'select', token: '+tag:finanse,path:x', start: 2, end: 21 }, suggestions: ['+tag:finance,path:x'] };
 		expect(problemToken(problem, 'select', 'a +tag:finanse,path:x')).toBe(1);
 		expect(problemToken(problem, 'exclude', 'a +tag:finanse,path:x')).toBeNull();
 		expect(problemParts(problem, '+tag:finanse,path:x')).toEqual([0]);
 		expect(problemParts({ ...problem, message: 'refused' }, '+tag:finanse,path:x')).toEqual([0, 1]);
+		expect(problemParts({ ...problem, message: 'refused', refused: { part: 1, type: 'path', value: 'x' } }, '+tag:finanse,path:x')).toEqual([1]);
+	});
+
+	it.each([
+		[{ part: 0, type: 'tag', value: 'finanse' }, 'No tag called finanse.'],
+		[{ part: 0, type: null, value: 'x' }, 'No node called x.'],
+		[{ part: 0, type: 'path', value: 'models/x' }, 'No folder models/x.'],
+		[{ part: 0, type: null, value: 'models/x' }, 'No folder models/x.'],
+		[{ part: 0, type: 'job', value: 'nightly' }, 'No job called nightly.'],
+		[{ part: 0, type: 'kind', value: 'modle' }, 'No node kind called modle.'],
+		[{ part: 0, type: null, value: 'stg_*' }, 'Nothing matches stg_*.']
+	])('words a refused %o as the design does', (refused, text) => {
+		expect(problemText({ ...problem, refused })).toBe(text);
+	});
+
+	it("falls back to sqb's message when the refused part is unknown", () => {
+		expect(problemText(problem)).toBe("no nodes found with tag 'finanse'");
 	});
 });
 

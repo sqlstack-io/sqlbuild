@@ -17,7 +17,9 @@ export function toSelectionEvaluation(wire: Wire['SelectionEvaluation']): Select
 			message: problem.message,
 			help: problem.help ?? null,
 			location: problem.location ?? null,
-			suggestions: problem.suggestions
+			suggestions: problem.suggestions,
+			// The server reports the refused token, not which part of it or that part's type and value.
+			refused: null
 		}
 	};
 }

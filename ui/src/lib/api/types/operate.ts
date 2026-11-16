@@ -566,6 +566,11 @@ export type SelectionProblem = {
 	location: SelectionLocation | null;
 	/** Whole-token replacements, closest first. */
 	suggestions: string[];
+	/**
+	 * The comma part of the located token `sqb` refuses: its selector type (`null` for a bare name or
+	 * folder) and value, as typed. The server does not report it yet, so it is null from the server.
+	 */
+	refused: { part: number; type: string | null; value: string } | null;
 };
 
 /** What `sqb build --select … --exclude …` selects in the current publication: one page of keys and the total. */

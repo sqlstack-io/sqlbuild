@@ -14,7 +14,7 @@
 	import { to } from '$lib/paths';
 	import { app } from '$lib/state/app.svelte';
 	import { noun } from '$lib/format/plural';
-	import { buildHref, copyCommand, problemParts, problemToken } from '$lib/selection/command';
+	import { buildHref, copyCommand, problemParts, problemText, problemToken } from '$lib/selection/command';
 	import { readSelection } from '$lib/selection/reading';
 	import { parseSelection } from '$lib/selection/syntax';
 	import type { NameEntry } from '$lib/selection/suggest';
@@ -139,7 +139,7 @@
 	{#if problem}
 		<div class="sb-msg err" role="alert">
 			<CircleAlertIcon size={14} />
-			<span>{problem.message}</span>
+			<span title={problem.refused ? problem.message : undefined}>{problemText(problem)}</span>
 			{#if problem.suggestions[0]}
 				<Button variant="link" size="inline" onclick={applyFix}>Did you mean <code>{problem.suggestions[0]}</code>?</Button>
 				<kbd>Tab</kbd><span class="faint">to fix</span>

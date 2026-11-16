@@ -12,7 +12,8 @@ describe('mock selection evaluation', () => {
 			message: "unknown selector name 'tag:fin'",
 			help: null,
 			location: { field: 'exclude', token: 'tag:fin', start: 0, end: 7 },
-			suggestions: ['tag:finance']
+			suggestions: ['tag:finance'],
+			refused: { part: 0, type: 'tag', value: 'fin' }
 		});
 	});
 

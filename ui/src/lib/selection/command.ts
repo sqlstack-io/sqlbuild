@@ -47,6 +47,22 @@ export function buildHref(s: Selection): string {
 	return `/plan?cmd=${encodeURIComponent(out.join(' '))}`;
 }
 
+const NAMED: Record<string, string> = { tag: 'tag', job: 'job', kind: 'node kind', source: 'source', seed: 'seed', test: 'test' };
+
+/**
+ * The problem in the design's words, from its structured fields: "No tag called finanse.", "No node
+ * called orders.", "No folder models/x.". Without them (the server does not report the refused
+ * part yet) it is `sqb`'s own message.
+ */
+export function problemText(problem: SelectionProblem): string {
+	const r = problem.refused;
+	if (!r) return problem.message;
+	if (r.type === 'path' || (r.type === null && r.value.includes('/'))) return `No folder ${r.value}.`;
+	if (/[*?[]/.test(r.value)) return `Nothing matches ${r.type ? `${r.type}:` : ''}${r.value}.`;
+	if (r.type === null) return `No node called ${r.value}.`;
+	return NAMED[r.type] ? `No ${NAMED[r.type]} called ${r.value}.` : `Unknown selector type ${r.type}.`;
+}
+
 /** The token a refused selection points at, by index in its field's tokens; `null` when it names none. */
 export function problemToken(problem: SelectionProblem | null, field: 'select' | 'exclude', text: string): number | null {
 	const at = problem?.location;
@@ -55,9 +71,10 @@ export function problemToken(problem: SelectionProblem | null, field: 'select' |
 	return i < 0 ? null : i;
 }
 
-/** Which parts of a refused token the message is about: those it quotes, else all of them. */
+/** Which parts of a refused token the problem is about: the refused part when known, else those the message quotes, else all of them. */
 export function problemParts(problem: SelectionProblem, token: string): number[] {
 	const parts = parseSelection(token)[0]?.parts ?? [];
+	if (problem.refused && problem.refused.part < parts.length) return [problem.refused.part];
 	const named = parts.flatMap((p, i) => (problem.message.includes(`'${p.value}'`) || problem.message.includes(`'${p.raw}'`) ? [i] : []));
 	return named.length ? named : parts.map((_, i) => i);
 }

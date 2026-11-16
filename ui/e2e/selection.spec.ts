@@ -81,7 +81,7 @@ test('an unknown value is a red chip with a fix, and Build these waits for it', 
 	const bad = chips(page).first();
 	await expect(bad).toHaveClass(/bad/);
 	const alert = page.getByRole('alert');
-	await expect(alert).toContainText('finanse');
+	await expect(alert).toContainText('No tag called finanse.');
 	await expect(alert).toContainText('Did you mean');
 	await expect(page.getByRole('button', { name: 'Build these' })).toBeDisabled();
 	await expect(page.getByRole('button', { name: /Copy as/ })).toBeDisabled();
@@ -104,4 +104,24 @@ test('a job page shows its selection as chips that open in Lineage', async ({ pa
 	expect(new URL(page.url()).searchParams.get('select')).toBe('daily_revenue revenue_report export_revenue_csv');
 	await expect(page.locator('.selection-bar .sel-chip')).toHaveCount(3);
 	await expect(page.locator('.sb-count')).toHaveText(/^\d+ nodes?$/);
+});
+
+test('a job selecting folders opens in Lineage without an error', async ({ page }) => {
+	await page.goto('/jobs/core_build?mock');
+	await expect(page.locator('.sel-chips .sel-chip')).toHaveText([/path:models\/staging/, /path:models\/marts/]);
+	await page.locator('.sel-chips').getByRole('link', { name: 'Open in Lineage' }).click();
+	await page.waitForURL(/\/lineage\?/);
+	await expect(page.locator('.sb-count')).toHaveText(/^\d+ nodes?$/);
+	await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('a folder on the Overview opens in the catalog as a path selection', async ({ page }) => {
+	await page.goto('/?mock');
+	const marts = page.locator('a.group-row', { hasText: 'marts' }).first();
+	await marts.click();
+	await page.waitForURL(/\/catalog\?/);
+	expect(new URL(page.url()).searchParams.get('select')).toBe('path:models/marts');
+	await expect(page.locator('.selection-bar .sel-chip')).toHaveText([/path:models\/marts/]);
+	await expect(page.getByRole('alert')).toHaveCount(0);
+	await expect(page.getByRole('button', { name: /^Folder/ })).toHaveCount(0);
 });

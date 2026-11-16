@@ -175,12 +175,14 @@ export function evaluateMockSelection(select: string, exclude: string): { keys: 
 		for (const match of text.matchAll(/\S+/g)) {
 			const token = match[0];
 			let hits = null as Set<string> | null;
-			for (const part of token.split(',')) {
+			for (const [index, part] of token.split(',').entries()) {
 				const found = matchPart(part);
 				if (!found) {
 					const bare = part.replace(/^\+/, '').replace(/\+$/, '');
 					const suggestions = [...new Set(SNAPSHOT_NODES.flatMap((n) => n.tags))].filter((tag) => bare.startsWith('tag:') && tag.startsWith(bare.slice(4, 6))).map((tag) => token.replace(part, part.replace(bare, `tag:${tag}`)));
-					return { code: 'S007', message: `unknown selector name '${part}'`, help: null, location: { field, token, start: match.index, end: match.index + token.length }, suggestions };
+					const colon = bare.indexOf(':');
+					const refused = { part: index, type: colon > 0 ? bare.slice(0, colon) : null, value: colon > 0 ? bare.slice(colon + 1) : bare };
+					return { code: 'S007', message: `unknown selector name '${part}'`, help: null, location: { field, token, start: match.index, end: match.index + token.length }, suggestions, refused };
 				}
 				hits = hits ? new Set([...hits].filter((key) => found.has(key))) : found;
 			}
@@ -193,7 +195,7 @@ export function evaluateMockSelection(select: string, exclude: string): { keys: 
 	const excluded = resolve('exclude', exclude);
 	if (!(excluded instanceof Set)) return { keys: [], error: excluded };
 	const keys = [...selected].filter((key) => !excluded.has(key)).sort();
-	if (!keys.length) return { keys, error: { code: null, message: 'the selectors match no nodes in the current publication', help: null, location: null, suggestions: [] } };
+	if (!keys.length) return { keys, error: { code: null, message: 'the selectors match no nodes in the current publication', help: null, location: null, suggestions: [], refused: null } };
 	return { keys, error: null };
 }
 
