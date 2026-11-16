@@ -8,6 +8,7 @@ from scripts.cold_compile_performance._helpers.dense_project import (
     write_dense_compile_project,
 )
 from scripts.cold_compile_performance.constants import (
+    DENSE_ALL_RULE_SELECT,
     VARIED_ARRAY_VARIANT,
     VARIED_CASE_SHARE,
     VARIED_GROUP_SHARE,
@@ -32,7 +33,9 @@ _IMPORT: re.Pattern[str] = re.compile(r'__(?:ref|source)\("([^"\n]+)"\)')
 def write_varied_compile_project(*, project_dir: Path, model_count: int) -> None:
     """Write independent neutral SQL with diverse expressions and shared ancestors."""
 
-    write_dense_compile_project(project_dir=project_dir, model_count=model_count)
+    write_dense_compile_project(
+        project_dir=project_dir, model_count=model_count, rule_select=DENSE_ALL_RULE_SELECT
+    )
     for index, model in enumerate(sorted((project_dir / "models").rglob("*.sql"))):
         contents: str = model.read_text(encoding="utf-8")
         replacements: dict[str, str] = _dependency_replacements(

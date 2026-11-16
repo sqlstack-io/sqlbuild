@@ -7,7 +7,7 @@ use crate::python_rules::tests::helpers::{
 use crate::python_rules::tests::test_types::{
     CatalogueTestCase, CoreRuleTestCase, OptionsTestCase, SelectionTestCase, SourceKeyTestCase,
 };
-use crate::rules::_helpers::catalogue::catalogue;
+use crate::rules::_helpers::dispatch::catalogue::catalogue;
 use crate::rules::main::builtin_options::builtin_options;
 use crate::rules::models::BuiltinOptionKind;
 

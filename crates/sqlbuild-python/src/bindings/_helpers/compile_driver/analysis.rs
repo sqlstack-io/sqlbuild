@@ -306,6 +306,10 @@ fn analyzed<'py>(
                 "custom_rule_timings",
                 native_field(&rules_result, "custom_rule_timings")?,
             ),
+            (
+                "skipped_models",
+                native_field(&rules_result, "skipped_models")?,
+            ),
         ],
     )
 }

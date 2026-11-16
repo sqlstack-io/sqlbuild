@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use pyo3::PyResult;
+use sqlbuild_rules::engine::main::needs_json_grains::needs_json_grains;
 use sqlbuild_rules::models::{EvaluateRequest, Model, SqlTestFact};
 
 use sqlbuild_python_base::compile_context::main::delta::delta_unsupported::delta_unsupported;
@@ -15,6 +16,11 @@ pub(crate) fn whole_project_request(request: EvaluateRequest) -> PyResult<Evalua
     let Some(injection) = injection() else {
         return Ok(request);
     };
+    if needs_json_grains(&request).unwrap_or(true) {
+        return Err(delta_unsupported(
+            "SQBRPERFORMANCE102 compares keys and readers across models",
+        ));
+    }
     let taken: Option<BaseRules> = injection
         .rules
         .lock()

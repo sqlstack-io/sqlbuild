@@ -1,7 +1,7 @@
 //! `selected_sql_codes`: the built-in SQL Rule codes a `select`/`ignore` pair enables.
 
 use crate::models::RulesCodeGrammar;
-use crate::rules::_helpers::catalogue::{matches_any_selector, sql_lint_selection};
+use crate::rules::_helpers::dispatch::catalogue::{matches_any_selector, sql_lint_selection};
 use crate::rules::main::catalogue::catalogue;
 
 /// SQL Rule codes `select` enables (SQLClean's defaults when it is `None`) that no `ignore` selector matches, in catalogue order.

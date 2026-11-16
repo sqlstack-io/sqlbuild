@@ -10,6 +10,7 @@ use crate::constants::{
 };
 use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
 use crate::models::{Declaration, EvaluateRequest, Fault, Model, RuleMetadata, RulesConfig};
+use crate::query_facts::constants::SNOWFLAKE_DIALECT;
 use crate::query_facts::main::dependency_texts::dependency_texts;
 use crate::query_facts::main::facts_available::facts_available;
 use crate::query_facts::main::model_shape::model_shape;
@@ -18,11 +19,13 @@ use crate::query_facts::models::{
     CallKind, ColumnFact, ComparisonFacts, ItemFacts, ModelCall, ModelSource, QueryFacts,
     RelationFacts, SelectFacts,
 };
-use crate::rules::_helpers::domain_layout::folder_layer_details;
-use crate::rules::_helpers::{
-    contract_name_types, dynamic_contracts, explicit_output_types, model_layers, numeric_decisions,
-    sql_test_rules, typed_contract_columns,
+use crate::rules::_helpers::contracts::{
+    contract_name_types, dynamic_contracts, explicit_output_types, typed_contract_columns,
 };
+use crate::rules::_helpers::layers::domain_layout::folder_layer_details;
+use crate::rules::_helpers::layers::model_layers;
+use crate::rules::_helpers::performance::{flatten_parent_copy, json_finer_grain};
+use crate::rules::_helpers::sql_checks::{numeric_decisions, sql_test_rules};
 use crate::rules::models::{
     FaultCollector, ModelEvaluationRequest, ProjectEvaluationRequest, ResolvedThresholdOverride,
 };
@@ -215,6 +218,16 @@ fn evaluate_model_inner(request: ModelEvaluationRequest<'_>) -> Result<Vec<Fault
     if let Some(rule) = metadata("SQBRCONTRACT105") {
         explicit_output_types::evaluate(&parsed, rule, &faults, &request.dialect);
     }
+    if let Some(rule) = metadata("SQBRPERFORMANCE101")
+        && request.dialect.eq_ignore_ascii_case(SNOWFLAKE_DIALECT)
+    {
+        flatten_parent_copy::evaluate(&parsed, rule, &faults);
+    }
+    if let Some(rule) = metadata("SQBRPERFORMANCE102")
+        && request.dialect.eq_ignore_ascii_case(SNOWFLAKE_DIALECT)
+    {
+        json_finer_grain::evaluate(&parsed, config, rule, &faults);
+    }
     evaluate_naming_rules(&parsed, config, selected, &faults);
     evaluate_literal_rules(&parsed, selected, &faults);
     evaluate_test_rules(TestRuleEvaluation {
@@ -261,7 +274,7 @@ macro_rules! custom_fault {
     };
 }
 
-pub(super) fn path_fault(
+pub(in crate::rules::_helpers) fn path_fault(
     rule: &RuleMetadata,
     path: &str,
     message: String,
@@ -334,6 +347,7 @@ fn requires_model_query(rule: &RuleMetadata) -> bool {
     !rule.custom
         && (rule.code.starts_with("SQBRMODEL")
             || rule.code.starts_with("SQBRCONTRACT")
+            || rule.code.starts_with("SQBRPERFORMANCE")
             || matches!(
                 rule.code.as_str(),
                 "SQBRGRAPH102"
@@ -350,7 +364,7 @@ fn requires_model_query(rule: &RuleMetadata) -> bool {
             ))
 }
 
-pub(super) fn plain_select(select: &SelectFacts, allow_star: bool) -> bool {
+pub(in crate::rules::_helpers) fn plain_select(select: &SelectFacts, allow_star: bool) -> bool {
     if select.items.is_empty() || select.filtered || !select.joins.is_empty() {
         return false;
     }
@@ -378,7 +392,7 @@ fn dependency_kind(relation: &RelationFacts) -> Option<CallKind> {
     }
 }
 
-pub(super) fn reads_dependency(select: &SelectFacts) -> bool {
+pub(in crate::rules::_helpers) fn reads_dependency(select: &SelectFacts) -> bool {
     select.from.len() == 1 && select.joins.is_empty() && dependency_kind(&select.from[0]).is_some()
 }
 
@@ -386,7 +400,7 @@ fn dependency_import(query: &QueryFacts) -> bool {
     query.root_select().is_some_and(reads_dependency) && plain_projection(query, true)
 }
 
-pub(super) fn sole_table_name(query: &QueryFacts) -> Option<&str> {
+pub(in crate::rules::_helpers) fn sole_table_name(query: &QueryFacts) -> Option<&str> {
     let select = query.root_select()?;
     if select.from.len() != 1 || !select.joins.is_empty() {
         return None;
@@ -579,15 +593,15 @@ fn select_star(
 }
 
 #[derive(Clone)]
-pub(super) struct NameParts {
-    pub(super) domain: String,
-    pub(super) layer: String,
-    pub(super) subject: String,
-    pub(super) source: Option<String>,
-    pub(super) is_view: bool,
+pub(in crate::rules::_helpers) struct NameParts {
+    pub(in crate::rules::_helpers) domain: String,
+    pub(in crate::rules::_helpers) layer: String,
+    pub(in crate::rules::_helpers) subject: String,
+    pub(in crate::rules::_helpers) source: Option<String>,
+    pub(in crate::rules::_helpers) is_view: bool,
 }
 
-pub(super) fn parse_name(name: &str) -> Option<NameParts> {
+pub(in crate::rules::_helpers) fn parse_name(name: &str) -> Option<NameParts> {
     let parts: Vec<&str> = name.split("__").collect();
     if !(3..=4).contains(&parts.len()) {
         return None;

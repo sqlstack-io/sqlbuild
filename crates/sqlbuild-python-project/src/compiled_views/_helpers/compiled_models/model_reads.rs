@@ -3,12 +3,10 @@
 use crate::compiled_views::models::LineageFactRow;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::compiled_views::models::NativeCompiledModel;
+use crate::compiled_views::main::compiled_models::native_model::native_model;
 use crate::compiled_views::types::DeclaredRow;
 use crate::compiled_views::types::LineageInput;
 use sqlbuild_project::types::InferredRow;
-use sqlbuild_python_base::compile_driver::constants::COMPILED_VIEW_FALLBACKS;
-use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const TRANSFORM_VALUES: [&str; 6] = [
@@ -20,18 +18,6 @@ const TRANSFORM_VALUES: [&str; 6] = [
     "constant",
 ];
 const CONFIDENCE_VALUES: [&str; 3] = ["unknown", "high", "medium"];
-
-/// The native view behind a model object; any other object is a Python-built record, counted.
-#[inline]
-pub(crate) fn native_model<'a>(
-    model: &'a Bound<'_, PyAny>,
-) -> PyResult<Option<&'a NativeCompiledModel>> {
-    if let Ok(view) = model.cast::<NativeCompiledModel>() {
-        return Ok(Some(view.get()));
-    }
-    count_stage(model.py(), COMPILED_VIEW_FALLBACKS, 1)?;
-    Ok(None)
-}
 
 /// Each inferred output column as `(name, type, nullability)`, `None` when none were inferred.
 pub(crate) fn inferred_rows(model: &Bound<'_, PyAny>) -> PyResult<Option<Vec<InferredRow>>> {

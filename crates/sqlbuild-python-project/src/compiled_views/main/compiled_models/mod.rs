@@ -19,6 +19,7 @@ pub mod model_key;
 pub mod model_key_row;
 pub mod model_name;
 pub mod name_object;
+pub mod native_model;
 pub mod object_key;
 pub mod one_row_seed_names;
 pub mod output_proven;
