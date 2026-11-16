@@ -64,7 +64,6 @@ from sqlbuild.executor.build._helpers.retention import (
     reconcile_model_retention,
 )
 from sqlbuild.executor.build._helpers.scheduler import (
-    _build_worker_failure_completion,
     _build_worker_success_completion,
     _dispatch_model,
     _model_execution_resource_kind,
@@ -519,8 +518,6 @@ class BuildScheduler:
 
                 completion: NodeCompletion = self._completion_queue.get()
                 self._in_flight.discard(completion.key)
-                # An error that escaped a node stops the run as it does at concurrency 1, once
-                # the nodes already running have finished.
                 if completion.error is not None:
                     if escaped is None:
                         escaped = completion.error
@@ -559,7 +556,7 @@ class BuildScheduler:
             completion_queue=self._completion_queue,
             execute=lambda connection: self._execute_node(key=key, connection=connection),
             build_success=_build_worker_success_completion,
-            build_failure=_build_worker_failure_completion,
+            build_failure=NodeCompletion,
         )
 
     def _is_concurrent_microbatch(self, key: CompiledObjectKey) -> bool:
@@ -586,7 +583,7 @@ class BuildScheduler:
                 key=key, pool=pool, connection=connection
             ),
             build_success=_build_worker_success_completion,
-            build_failure=_build_worker_failure_completion,
+            build_failure=NodeCompletion,
         )
 
     def _execute_concurrent_microbatch_node(

@@ -64,12 +64,6 @@ def _build_worker_success_completion(
     return NodeCompletion(key=key, result=result)
 
 
-def _build_worker_failure_completion(
-    *, key: CompiledObjectKey, error: BaseException
-) -> NodeCompletion:
-    return NodeCompletion(key=key, error=error)
-
-
 def _dispatch_model(
     *,
     context: ModelMaterializationContext,
