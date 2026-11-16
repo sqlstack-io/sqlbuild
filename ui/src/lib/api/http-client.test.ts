@@ -198,8 +198,8 @@ describe('HttpChangeFeed', () => {
 		changes.follow(ORDERS);
 		const state = { last_build: { observed_at: '2026-01-02T00:00:00Z', run_id: 'r2', version_hash: 'h2' }, last_outcome: { at: '2026-01-02T00:00:00Z', status: 'failed' }, definition_changed: false, checks: { total: 1, passing: 0, warning: 0, failing: 1 } };
 		const send = (notice: unknown) => latest().listeners.get('changed')!(new MessageEvent('changed', { data: JSON.stringify(notice) }));
-		send({ topic: 'node_status:development', data: { version: 8, previous_version: 7, states: { 'model:orders': state } } });
-		send({ topic: 'node_status:development', data: { version: 9, previous_version: 8, full: true } });
+		send({ topic: 'node_status:development', version: 8, previous_version: 7, states: { 'model:orders': state } });
+		send({ topic: 'node_status:development', version: 9, previous_version: 8, full: true });
 		send({ topic: 'node_status:development' });
 		expect(signals.map((s) => s.nodeStatus)).toEqual([
 			{

@@ -1579,9 +1579,23 @@ export interface components {
         };
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
         ChangeNotice: {
-            /** @description The changed node states of a `node_status` notice; absent on other topics. */
-            data?: unknown;
+            /** @description `node_status` only: too many nodes or a new snapshot changed; refetch node states. */
+            full?: boolean | null;
+            /**
+             * Format: int64
+             * @description `node_status` only: the version this change applies to; refetch node states when it is not yours.
+             */
+            previous_version?: number | null;
+            /** @description `node_status` only: the nodes whose state changed, absent when `full` is set. */
+            states?: {
+                [key: string]: components["schemas"]["NodeState"];
+            } | null;
             topic: string;
+            /**
+             * Format: int64
+             * @description `node_status` only: the state version after this change.
+             */
+            version?: number | null;
         };
         /** @description One result's stored evidence rows; `view.evidence` reads them, audited. */
         CheckEvidence: {
@@ -2217,23 +2231,22 @@ export interface components {
             /** Format: uuid */
             snapshot_id: string;
         };
-        /** @description Every node's build state at one status version of the current snapshot. */
-        NodeStates: {
-            /** Format: uuid */
-            snapshot_id: string;
-            /** @description Node states by node key. */
-            states: {
-                [key: string]: components["schemas"]["NodeState"];
-            };
-            /** Format: int64 */
-            version: number;
-        };
-        /** @description A node's build state, with the same meaning as the matching `CatalogNodeRecord` fields. */
+        /** @description The state fields of a `CatalogNodeRecord`, with the same meaning. */
         NodeState: {
             checks: components["schemas"]["CatalogNodeChecks"];
             definition_changed: boolean;
             last_build?: null | components["schemas"]["CatalogNodeBuild"];
             last_outcome?: null | components["schemas"]["CatalogNodeOutcome"];
+        };
+        /** @description Every current node's state at one version; `snapshot_id` is null before the first publication. */
+        NodeStatesRecord: {
+            /** Format: uuid */
+            snapshot_id?: string | null;
+            states: {
+                [key: string]: components["schemas"]["NodeState"];
+            };
+            /** Format: int64 */
+            version: number;
         };
         NodeStatus: {
             build?: null | components["schemas"]["FingerprintObservation"];
@@ -4383,7 +4396,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description changed events: all, runs, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. */
+            /** @description changed events: all, runs, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. node_status carries version, previous_version and the changed states (empty when none changed), or full: refetch node states when full is set or previous_version is not the version held. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5005,13 +5018,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Every node's state at the current status version */
+            /** @description Every current node's state at the state version node_status events continue from */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NodeStates"];
+                    "application/json": components["schemas"]["NodeStatesRecord"];
                 };
             };
             /** @description Session rejected */
@@ -5081,7 +5094,10 @@ export interface operations {
     listPersonCatalogNodes: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description An ETag from an earlier response; 304 when the snapshot and state version are unchanged */
+                "If-None-Match"?: string | null;
+            };
             path: {
                 location_id: string;
                 target: string;
@@ -5093,11 +5109,21 @@ export interface operations {
             /** @description Every node of the current snapshot; empty before the first publication */
             200: {
                 headers: {
+                    /** @description "<snapshot_id>:<state_version>"; absent before the first publication */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogNodeRecord"][];
                 };
+            };
+            /** @description Unchanged since the If-None-Match ETag */
+            304: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session rejected */
             401: {
@@ -6493,7 +6519,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description changed events: all, runs, run:<id>, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. */
+            /** @description changed events: all, runs, run:<id>, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. node_status carries version, previous_version and the changed states (empty when none changed), or full: refetch node states when full is set or previous_version is not the version held. */
             200: {
                 headers: {
                     [name: string]: unknown;

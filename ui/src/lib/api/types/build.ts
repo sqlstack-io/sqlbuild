@@ -91,7 +91,7 @@ export type NodeState = {
 };
 
 /** Every node's state at one status version of a snapshot. */
-export type NodeStates = { snapshotId: string; version: number; states: Record<string, NodeState> };
+export type NodeStates = { snapshotId: string | null; version: number; states: Record<string, NodeState> };
 
 /**
  * A `node_status` change: the states that changed between two versions, or `full` when too many

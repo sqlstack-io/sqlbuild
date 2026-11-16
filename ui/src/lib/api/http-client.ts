@@ -233,7 +233,7 @@ export class HttpChangeFeed implements ChangeSubscription {
 		source.addEventListener('changed', (event) => {
 			const notice = JSON.parse((event as MessageEvent<string>).data) as Wire['ChangeNotice'];
 			const channel = channelOf(notice.topic, scope);
-			this.#emit(channel, channel.startsWith('node_status:') ? toNodeStatusDelta(notice.data) : null);
+			this.#emit(channel, channel.startsWith('node_status:') ? toNodeStatusDelta(notice) : null);
 		});
 	}
 
