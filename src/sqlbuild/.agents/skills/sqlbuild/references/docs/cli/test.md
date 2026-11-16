@@ -68,7 +68,7 @@ many of them timed out. A timeout still fails the run: `sqb test` exits non-zero
 ## Statement summary
 
 After the pass/fail summary, `sqb test` and `sqb scenario test` print how many warehouse statements
-the run sent, by leading keyword, and how long the warehouse spent compiling and executing them:
+the SQL tests or scenarios sent, by leading keyword, and how long the warehouse spent compiling and executing them:
 
 ```
 Statements: 12 (SELECT 7, CREATE 2, DROP 2, ALTER 1); compile 1.5s, execution 0.3s
@@ -88,6 +88,7 @@ Details:
   the line says how many were found, such as `(10 of 12 statements in query history)`.
 - When the query-history read fails, the counts still print and the line says
   `compile time unavailable (...)`; the run's exit code does not change.
+- Statements from [Python tests](#python-tests) are not counted.
 
 ## Python tests
 

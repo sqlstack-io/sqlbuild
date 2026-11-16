@@ -122,7 +122,7 @@ Read the active target's locations from `ctx.target_config` instead of keeping e
 | `name` | Active target name, or `None` without targets |
 | `database` | Database models build into, or `None` when the adapter has none or the value is `preserve` |
 | `schema` | Schema models build into, or `None` when it is `preserve` |
-| `loader_schema` | Schema a managed source without its own `schema` loads into: `loader_schema`, else the target's `schema` |
+| `loader_schema` | Schema a managed source without its own `schema` loads into: `loader_schema`, else the target's `schema`; `None` when that schema uses a `${CTX:...}` template |
 | `database_preserved` / `schema_preserved` | `True` when the target sets that value to `preserve` |
 
 ```python

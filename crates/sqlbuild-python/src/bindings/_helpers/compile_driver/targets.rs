@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use pyo3::exceptions::PyException;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -473,11 +474,17 @@ pub(crate) fn target_settings<'py>(
         )?
     };
     let none: Bound<'py, PyAny> = py.None().into_bound(py);
-    let (_, loader_schema): Namespace = managed_source_namespace(
+    // A loader location that only resolves inside a model, such as a `${CTX:...}` target schema,
+    // has no value here; managed loads still resolve and report it themselves.
+    let loader_schema: Option<String> = match managed_source_namespace(
         (none.clone(), none),
         (&target_config, connection, effective_vars),
         adapter,
-    )?;
+    ) {
+        Ok((_, schema)) => schema,
+        Err(error) if error.is_instance_of::<PyException>(py) => None,
+        Err(error) => return Err(error),
+    };
     Ok(TargetSettingsValues {
         name: target_name.extract()?,
         database,

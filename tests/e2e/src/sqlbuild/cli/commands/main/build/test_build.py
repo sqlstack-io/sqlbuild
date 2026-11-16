@@ -1929,6 +1929,66 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
     assert all(line == test_case.expected_settings for line in recorded), recorded
 
 
+def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_loader_schema(
+    tmp_path: Path,
+) -> None:
+    # A per-model schema has no single loader location outside a model; it must not fail commands.
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="ctx_target_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "ctx_target_project"\n'
+                'adapter = "duckdb"\n'
+                'default_target = "dev"\n\n'
+                "[connection]\n"
+                'database = "ctx_target_project.duckdb"\n\n'
+                "[targets.dev]\n"
+                'schema = "s_${CTX:model.name}"\n'
+            ),
+            "models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
+            "python/recorder.py": _TARGET_CONFIG_RECORDER,
+            "python/loaders/raw.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.loaders import loader\n\n"
+                "@loader\n"
+                "def raw_orders(ctx):\n"
+                '    """Test loader raw_orders."""\n'
+                "    record(ctx, 'loader')\n"
+                "    return [{'order_id': 1}]\n"
+            ),
+            "sources/raw.yml": (
+                "sources:\n"
+                "  - name: raw_orders\n    description: Test source raw_orders.\n"
+                "    managed: true\n"
+                "    schema: raw\n"
+                "    write_strategy: table\n"
+                "    columns:\n"
+                "      - name: order_id\n"
+                "        type: INTEGER\n"
+            ),
+        },
+    )
+
+    results: list[subprocess.CompletedProcess[str]] = [
+        run_sqb(command=("--no-color", *command), project_dir=project_dir)
+        for command in (("build", "--select", "orders"), ("load",), ("check",))
+    ]
+
+    for result in results:
+        assert result.returncode == 0, result.stdout + result.stderr
+    db_path: Path = project_dir / "ctx_target_project.duckdb"
+    assert table_exists(db_path=db_path, table_name="orders", schema="s_orders")
+    assert table_exists(db_path=db_path, table_name="raw_orders", schema="raw")
+    recorded: list[dict[str, object]] = [
+        json.loads(line)
+        for line in (project_dir / "target_config.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [(line["node"], line["name"], line["loader_schema"]) for line in recorded] == [
+        ("loader", "dev", None)
+    ], recorded
+
+
 @pytest.mark.parametrize(
     "test_case",
     [

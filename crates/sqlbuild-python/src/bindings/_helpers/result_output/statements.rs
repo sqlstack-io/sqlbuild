@@ -2,6 +2,7 @@
 
 use std::time::Instant;
 
+use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTypeMethods};
 use serde_json::Value;
@@ -21,6 +22,9 @@ const STATEMENTS_SECTION: &str = "statements";
 const QUERY_ID_BATCH: usize = 1_000;
 /// Extra query-history window before the run started, for statements issued while planning.
 const LOOKBACK_MARGIN_SECONDS: u64 = 600;
+/// Connection and statement limits of the history read, so it cannot stall a finished run.
+const CONNECTION_LIMITS: [(&str, u64); 2] = [("login_timeout", 5), ("network_timeout", 15)];
+const STATEMENT_TIMEOUT_SECONDS: &str = "10";
 
 /// The adapter and connection a run's statements went to, and when the run started.
 pub(crate) struct StatementSource<'a, 'py> {
@@ -92,10 +96,11 @@ fn statement_timing(
     }
     Ok(match read_timings(source, query_ids) {
         Ok(timings) => StatementTiming::Reported(timings),
-        Err(error) => StatementTiming::Failed(format!(
+        Err(error) if error.is_instance_of::<PyException>(py) => StatementTiming::Failed(format!(
             "query history read failed: {}",
             error.get_type(py).name()?
         )),
+        Err(error) => return Err(error),
     })
 }
 
@@ -103,23 +108,27 @@ fn read_timings(
     source: &StatementSource<'_, '_>,
     query_ids: &[String],
 ) -> PyResult<StatementTimings> {
-    let database: Option<String> = match source.connection_config.downcast::<PyDict>() {
-        Ok(config) => match config.get_item("database")? {
-            Some(database) if !database.is_none() => Some(database.str()?.extract()?),
-            _ => None,
-        },
-        Err(_) => None,
+    let py: Python<'_> = source.adapter.py();
+    let config: Bound<'_, PyDict> = source.connection_config.downcast::<PyDict>()?.copy()?;
+    let database: Option<String> = match config.get_item("database")? {
+        Some(database) if !database.is_none() => Some(database.str()?.extract()?),
+        _ => None,
     };
+    for (name, limit) in CONNECTION_LIMITS {
+        config.set_item(name, limit)?;
+    }
+    let parameters: Bound<'_, PyDict> = PyDict::new(py);
+    parameters.set_item("STATEMENT_TIMEOUT_IN_SECONDS", STATEMENT_TIMEOUT_SECONDS)?;
+    let options: Bound<'_, PyDict> = PyDict::new(py);
+    options.set_item("statement_params", parameters)?;
     let lookback_seconds: u64 = source.started.elapsed().as_secs() + LOOKBACK_MARGIN_SECONDS;
-    let connection: Bound<'_, PyAny> = source
-        .adapter
-        .call_method1("connect", (source.connection_config,))?;
+    let connection: Bound<'_, PyAny> = source.adapter.call_method1("connect", (config,))?;
     let read = || -> PyResult<StatementTimings> {
         let mut timings: StatementTimings = StatementTimings::default();
         for batch in query_ids.chunks(QUERY_ID_BATCH) {
             let sql: String = statement_timings_sql(database.as_deref(), batch, lookback_seconds);
             let (count, compile_ms, execution_ms): (u64, f64, f64) = connection
-                .call_method1("execute", (sql,))?
+                .call_method("execute", (sql,), Some(&options))?
                 .call_method0("fetchone")?
                 .extract()?;
             timings.timed_statements += count;
