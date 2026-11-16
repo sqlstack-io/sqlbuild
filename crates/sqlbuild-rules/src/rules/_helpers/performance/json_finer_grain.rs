@@ -105,6 +105,7 @@ fn output_start(body: &SetFacts, name: &str) -> Option<usize> {
                         .output_name
                         .as_deref()
                         .is_some_and(|output| output.eq_ignore_ascii_case(name))
+                    && expression.start.is_some()
                 {
                     return expression.start;
                 }
