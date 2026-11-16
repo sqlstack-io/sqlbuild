@@ -1,7 +1,9 @@
 use crate::dag_artifact::errors::DagArtifactError;
 use crate::dag_artifact::models::{DagProjectInput, DagPythonGraphInput};
-use crate::dag_artifact::tests::helpers::{built, key, loader, python_node, source, team_meta};
-use crate::dag_artifact::tests::test_types::BuildDagJsonTestCase;
+use crate::dag_artifact::tests::helpers::{
+    built, dag_edges, key, loader, python_node, source, team_meta,
+};
+use crate::dag_artifact::tests::test_types::{BuildDagJsonTestCase, DagEdgeTestCase};
 use crate::dag_artifact::types::DagValue;
 
 const EMPTY_JSON: &str = "{
@@ -167,6 +169,49 @@ fn given_project_when_building_dag_json_then_python_artifact_agrees() {
         assert_eq!(
             built(&test_case),
             test_case.expected_json.map(str::to_owned),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_loader_depending_on_a_task_when_building_dag_json_then_the_edge_reaches_its_source() {
+    let test_cases = [DagEdgeTestCase {
+        description: "a task upstream of a declared loader points at the loader's source",
+        project: DagProjectInput {
+            sources: vec![source(
+                "partner_scores",
+                Some("partner_scores"),
+                DagValue::Object(Vec::new()),
+            )],
+            loaders: vec![loader("partner_scores", None, &[])],
+            ..DagProjectInput::default()
+        },
+        python: DagPythonGraphInput {
+            nodes: vec![
+                python_node("task", "score_orders", vec![key("model", "orders")]),
+                python_node("loader", "partner_scores", Vec::new()),
+            ],
+            dependency_edges: vec![("score_orders".to_owned(), "partner_scores".to_owned())],
+            kinds_by_name: vec![
+                ("score_orders".to_owned(), "task".to_owned()),
+                ("partner_scores".to_owned(), "loader".to_owned()),
+            ],
+        },
+        expected_edges: &[
+            ("model:orders", "task:score_orders"),
+            ("task:score_orders", "source:partner_scores"),
+        ],
+    }];
+    for test_case in test_cases {
+        assert_eq!(
+            dag_edges(&test_case),
+            test_case
+                .expected_edges
+                .iter()
+                .map(|(from, to)| ((*from).to_owned(), (*to).to_owned()))
+                .collect::<Vec<(String, String)>>(),
             "{}",
             test_case.description
         );

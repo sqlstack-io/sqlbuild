@@ -4,7 +4,7 @@ use crate::dag_artifact::main::build_dag_json::build_dag_json;
 use crate::dag_artifact::models::{
     DagColumnInput, DagLoaderInput, DagPythonNodeInput, DagSourceEntryInput, DagSourceInput,
 };
-use crate::dag_artifact::tests::test_types::BuildDagJsonTestCase;
+use crate::dag_artifact::tests::test_types::{BuildDagJsonTestCase, DagEdgeTestCase};
 use crate::dag_artifact::types::DagValue;
 use crate::graph::models::ProjectGraph;
 use crate::python_values::main::text_key::text_key;
@@ -87,6 +87,28 @@ pub(crate) fn built(test_case: &BuildDagJsonTestCase) -> Result<String, DagArtif
         test_case.python.as_ref(),
         "orders_project",
     )
+}
+
+/// `(from_id, to_id)` of each edge of an edge test case's artifact, in artifact order.
+pub(crate) fn dag_edges(test_case: &DagEdgeTestCase) -> Vec<(String, String)> {
+    let artifact: String = build_dag_json(
+        &ProjectGraph::default(),
+        &test_case.project,
+        Some(&test_case.python),
+        "orders_project",
+    )
+    .expect("artifact");
+    let lines: Vec<&str> = artifact.lines().map(str::trim).collect();
+    lines
+        .windows(2)
+        .filter_map(|pair| {
+            let from: &str = pair[0]
+                .strip_prefix("\"from_id\": \"")?
+                .strip_suffix("\",")?;
+            let to: &str = pair[1].strip_prefix("\"to_id\": \"")?.strip_suffix('"')?;
+            Some((from.to_owned(), to.to_owned()))
+        })
+        .collect()
 }
 
 /// Source meta with a `None` owner and the given team.
