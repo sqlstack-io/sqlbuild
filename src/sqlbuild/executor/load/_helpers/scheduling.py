@@ -1,4 +1,4 @@
-"""Load pipeline phases: external preloads, connections, and DAG scheduling."""
+"""Load pipeline phases: connections and DAG scheduling."""
 
 from __future__ import annotations
 
@@ -10,10 +10,8 @@ from contextvars import copy_context
 from functools import partial
 from typing import Any
 
-from sqlbuild._native import DiscoveredLoaderFunction, LoaderConnectionMode, SourceEntry
+from sqlbuild._native import SourceEntry
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
-from sqlbuild.compiler.python_nodes.types import SkipMode
-from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.load._helpers.dag_runtime import (
     build_load_dag_state,
     complete_dag_source,
@@ -23,10 +21,8 @@ from sqlbuild.executor.load._helpers.dag_runtime import (
 from sqlbuild.executor.load._helpers.execution import (
     build_source_downstream_names,
     build_source_upstream_names,
-    dependency_node_names,
 )
 from sqlbuild.executor.load.models import (
-    ExternalLoadPhaseResult,
     LoadCallbacks,
     LoadDagState,
     LoadDispatchInputs,
@@ -34,105 +30,10 @@ from sqlbuild.executor.load.models import (
     LoadExecutionResult,
     LoadRuntimeParams,
 )
-from sqlbuild.executor.load.types import LoadProgressCallback
 from sqlbuild.executor.pipeline.main.raise_warehouse_connection_failure import (
     raise_warehouse_connection_failure,
 )
-from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.runtime.contracts.types import ConnectionElapsedCallback
-
-
-def validate_external_loaders_are_preconnect_runnable(
-    *, sources: tuple[SourceEntry, ...], indexes: LoadExecutionIndexes
-) -> None:
-    """Reject external loaders that depend on SQLBuild-connection loaders."""
-
-    source_by_name: dict[str, SourceEntry] = {source.name: source for source in sources}
-    source: SourceEntry
-    for source in sources:
-        if source.loader is None:
-            continue
-        loader: DiscoveredLoaderFunction = indexes.loader_by_name[source.loader]
-        if loader.connection_mode != LoaderConnectionMode.EXTERNAL:
-            continue
-        dependency_name: str
-        for dependency_name in dependency_node_names(source=source, indexes=indexes):
-            dependency_source: SourceEntry | None = source_by_name.get(dependency_name)
-            if dependency_source is None or dependency_source.loader is None:
-                continue
-            dependency_loader: DiscoveredLoaderFunction = indexes.loader_by_name[
-                dependency_source.loader
-            ]
-            if dependency_loader.connection_mode == LoaderConnectionMode.SQLBUILD:
-                raise ExecutorInputError(
-                    f"External loader '{loader.name}' cannot depend on SQLBuild-connection "
-                    f"loader '{dependency_loader.name}'. External loaders must be runnable "
-                    "before SQLBuild opens warehouse connections."
-                )
-
-
-def run_external_source_loads(
-    *,
-    sources: tuple[SourceEntry, ...],
-    indexes: LoadExecutionIndexes,
-    source_by_name: dict[str, SourceEntry],
-    adapter: BaseAdapter,
-    connection_config: dict[str, object],
-    runtime: LoadRuntimeParams,
-    callbacks: LoadCallbacks,
-) -> ExternalLoadPhaseResult:
-    """Run external-connection loaders before opening warehouse connections."""
-
-    external_sources: tuple[SourceEntry, ...] = tuple(
-        source
-        for source in sources
-        if source.loader is not None
-        and indexes.loader_by_name[source.loader].connection_mode == LoaderConnectionMode.EXTERNAL
-    )
-    sqlbuild_sources: tuple[SourceEntry, ...] = tuple(
-        source
-        for source in sources
-        if source.loader is None
-        or indexes.loader_by_name[source.loader].connection_mode == LoaderConnectionMode.SQLBUILD
-    )
-    preloaded_results: list[LoadExecutionResult] = []
-    failed_or_hard_skipped: set[str] = set()
-    on_load_progress: LoadProgressCallback | None = callbacks.on_load_progress
-    external_source: SourceEntry
-    for external_source in external_sources:
-        result: LoadExecutionResult = execute_ready_dag_source(
-            source_name=external_source.name,
-            dispatch=LoadDispatchInputs(
-                source_by_name=source_by_name,
-                indexes=indexes,
-                failed_or_hard_skipped=failed_or_hard_skipped,
-                results_by_name={},
-            ),
-            adapter=adapter,
-            connection_config=connection_config,
-            connection=None,
-            runtime=runtime,
-            on_load_start=callbacks.on_load_start,
-            on_progress=(
-                None
-                if on_load_progress is None
-                else lambda message, source=external_source: on_load_progress(
-                    source, message=message
-                )
-            ),
-        )
-        preloaded_results.append(result)
-        if result.status == ExecutionStatus.FAILED or (
-            result.status == ExecutionStatus.SKIPPED and result.skip_mode == SkipMode.HARD
-        ):
-            failed_or_hard_skipped.add(external_source.name)
-        if callbacks.on_load_complete is not None:
-            callbacks.on_load_complete(result)
-    return ExternalLoadPhaseResult(
-        preloaded_results=tuple(preloaded_results),
-        failed_or_hard_skipped=frozenset(failed_or_hard_skipped),
-        sqlbuild_sources=sqlbuild_sources,
-    )
 
 
 def open_load_connections(
@@ -167,38 +68,36 @@ def open_load_connections(
 
 def run_load_dag(
     *,
-    sqlbuild_sources: tuple[SourceEntry, ...],
+    sources: tuple[SourceEntry, ...],
     source_by_name: dict[str, SourceEntry],
     indexes: LoadExecutionIndexes,
     adapter: BaseAdapter,
     connection_config: dict[str, object],
     connections: tuple[Any, ...],
     effective_concurrency: int,
-    initial_failed_or_hard_skipped: frozenset[str],
     runtime: LoadRuntimeParams,
     callbacks: LoadCallbacks,
 ) -> tuple[LoadExecutionResult, ...]:
-    """Execute the SQLBuild-connection loader DAG sequentially or concurrently."""
+    """Execute the loader DAG sequentially or concurrently."""
 
     source_index_by_name: dict[str, int] = {
-        source.name: index for index, source in enumerate(sqlbuild_sources)
+        source.name: index for index, source in enumerate(sources)
     }
     upstream_names: dict[str, tuple[str, ...]] = build_source_upstream_names(
-        sources=sqlbuild_sources,
+        sources=sources,
         indexes=indexes,
     )
     downstream_names: dict[str, tuple[str, ...]] = build_source_downstream_names(
         upstream_names=upstream_names
     )
-    results: list[LoadExecutionResult | None] = [None] * len(sqlbuild_sources)
+    results: list[LoadExecutionResult | None] = [None] * len(sources)
     state: LoadDagState = build_load_dag_state(
-        sources=sqlbuild_sources,
+        sources=sources,
         results=results,
         source_index_by_name=source_index_by_name,
         upstream_names=upstream_names,
         downstream_names=downstream_names,
     )
-    state.failed_or_skipped.update(initial_failed_or_hard_skipped)
     if effective_concurrency == 1:
         _run_sequential_load_dag(
             state=state,

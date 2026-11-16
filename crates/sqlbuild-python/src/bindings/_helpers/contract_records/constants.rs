@@ -642,11 +642,6 @@ const R_SCHEMA_SEED_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("audits", FieldDefault::EmptyTuple),
     ],
 };
-const R_INTEGRATION_LOADER_CONFIG: RecordSpec = RecordSpec {
-    name: "IntegrationLoaderConfig",
-    doc: "Typed configuration for one declarative integration loader.",
-    fields: &[FieldSpec::required("kind"), FieldSpec::required("config")],
-};
 const R_SOURCE_FRESHNESS_AGE_POLICY: RecordSpec = RecordSpec {
     name: "SourceFreshnessAgePolicy",
     doc: "Age-based source freshness warning/error thresholds.",
@@ -691,7 +686,6 @@ const R_SOURCE_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("final", FieldDefault::False),
         FieldSpec::new("loader", FieldDefault::None),
         FieldSpec::new("managed", FieldDefault::False),
-        FieldSpec::new("integration_loader", FieldDefault::None),
         FieldSpec::new("freshness", FieldDefault::None),
         FieldSpec::new("write_strategy", FieldDefault::None),
         FieldSpec::new("load_batch_size", FieldDefault::None),
@@ -761,7 +755,6 @@ pub(crate) const CONTRACT_RECORDS: &[RecordSpec] = &[
     R_SCHEMA_DYNAMIC_COLUMN_FAMILY,
     R_SCHEMA_MODEL_ENTRY,
     R_SCHEMA_SEED_ENTRY,
-    R_INTEGRATION_LOADER_CONFIG,
     R_SOURCE_FRESHNESS_AGE_POLICY,
     R_SOURCE_FRESHNESS_CONFIG,
     R_SOURCE_COLUMN_ENTRY,

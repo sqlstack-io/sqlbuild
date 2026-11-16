@@ -100,24 +100,6 @@ _PROJECT_TOML: str = 'name = "orders"\nadapter = "duckdb"\n'
                 'replay_on_change = "bounded-14d"',
             ),
         ),
-        ModelHeaderKeyCompileCase(
-            description="misspelled dlt resource key",
-            repo_files={
-                "sqlbuild_project.toml": _PROJECT_TOML,
-                "sources/raw.yml": (
-                    "dlt_sources:\n  - type: sql_database\n    config:\n"
-                    "      credentials: duckdb:///inputs.duckdb\n    resources:\n"
-                    "      - name: raw_orders\n        table: orders\n"
-                    "        primary_keys: order_id\n"
-                ),
-                "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.');\n\nSELECT 1 AS order_id\n",
-            },
-            expected_fragments=(
-                "error[D006]",
-                "dlt sql_database resource 'raw_orders' has unknown keys: primary_keys",
-                "did you mean 'primary_key'?",
-            ),
-        ),
     ],
     ids=lambda case: case.description,
 )

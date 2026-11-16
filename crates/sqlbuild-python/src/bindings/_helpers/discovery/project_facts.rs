@@ -9,9 +9,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTypeMethods};
 use sqlbuild_discovery::project_validation::errors::CsvDialectError;
 use sqlbuild_discovery::project_validation::models::{
-    AuditFileFact, CsvSettings, DependencyFact, IntegrationLoaderFact, ModelFact, NamedPath,
-    NodeFact, NodeKind, ProjectFacts, SchemaFileFact, ScopedDeclarationsFact, SeedEntryFact,
-    SeedFileFact, SourceFact, SourceFileFact, TestBlockFact, TestFileFact,
+    AuditFileFact, CsvSettings, DependencyFact, ModelFact, NamedPath, NodeFact, NodeKind,
+    ProjectFacts, SchemaFileFact, ScopedDeclarationsFact, SeedEntryFact, SeedFileFact, SourceFact,
+    SourceFileFact, TestBlockFact, TestFileFact,
 };
 
 const CSV_MODULE: &str = "csv";
@@ -213,19 +213,10 @@ fn schema_fact(py: Python<'_>, schema: &Bound<'_, PyAny>) -> PyResult<SchemaFile
 }
 
 fn source_fact(entry: &Bound<'_, PyAny>) -> PyResult<SourceFact> {
-    let integration: Bound<'_, PyAny> = native_field(entry, "integration_loader")?;
-    let integration_loader: Option<IntegrationLoaderFact> = if integration.is_none() {
-        None
-    } else {
-        Some(IntegrationLoaderFact {
-            kind: native_field(&integration, "kind")?.extract()?,
-        })
-    };
     Ok(SourceFact {
         name: column_name(entry)?,
         managed: native_field(entry, "managed")?.extract()?,
         loader: optional_text(entry, "loader")?,
-        integration_loader,
     })
 }
 

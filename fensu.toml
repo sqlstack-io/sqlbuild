@@ -588,46 +588,6 @@ symbols = ["DbtProfileError"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
-modules = ["sqlbuild.integrations.dlt.constants"]
-symbols = ["DLT_INTEGRATION_KIND"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
-modules = ["sqlbuild.integrations.dlt.exceptions"]
-symbols = ["DltIntegrationError"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
-modules = ["sqlbuild.integrations.dlt.main._loaders"]
-symbols = ["dlt_loader_function"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
-modules = ["sqlbuild.integrations.dlt.models"]
-symbols = ["DltResourceConfig", "DltSourceConfig"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
-modules = ["sqlbuild.integrations.ingestr.constants"]
-symbols = ["INGESTR_INTEGRATION_KIND"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
-modules = ["sqlbuild.integrations.ingestr.exceptions"]
-symbols = ["IngestrIntegrationError"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
-modules = ["sqlbuild.integrations.ingestr.main._loaders"]
-symbols = ["ingestr_loader_function"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
-modules = ["sqlbuild.integrations.ingestr.models"]
-symbols = ["IngestrSourceConfig"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.integrations.rivers.constants"]
 symbols = ["RIVERS_ASSET_NODE_KINDS"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
@@ -1494,18 +1454,6 @@ reason = "This callback preserves signal.signal's required positional handler pr
 
 [[targets.python.rule_exceptions]]
 rule = "FFS120"
-path = "src/sqlbuild/integrations/dlt/classes/sqlbuild_dlt_progress_collector.py"
-symbols = [
-    "SqlbuildDltProgressCollector.on_start_trace",
-    "SqlbuildDltProgressCollector.on_start_trace_step",
-    "SqlbuildDltProgressCollector.on_end_trace_step",
-    "SqlbuildDltProgressCollector.on_end_trace",
-    "SqlbuildDltProgressCollector.update",
-]
-reason = "These collector methods preserve dlt's external positional progress protocol."
-
-[[targets.python.rule_exceptions]]
-rule = "FFS120"
 path = "src/sqlbuild/runtime/user_code/classes/user_code_finder.py"
 symbols = ["UserCodeFinder.find_spec"]
 reason = "importlib calls meta-path finders positionally as find_spec(fullname, path, target)."
@@ -2145,7 +2093,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/discovery/snapshot.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/discovery/sql_test_blocks.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/discovery/sql_test_records.rs=5",
-    "crates/sqlbuild-python/src/bindings/_helpers/discovery/yaml_entries.rs=14",
+    "crates/sqlbuild-python/src/bindings/_helpers/discovery/yaml_entries.rs=10",
     "crates/sqlbuild-python/src/bindings/_helpers/discovery/yaml_records.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/event_exporting/dispatcher.rs=28",
     "crates/sqlbuild-python/src/bindings/_helpers/event_exporting/models.rs=0",
@@ -2227,8 +2175,6 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_index.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_objects.rs=17",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/project_lineage.rs=12",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/dlt_destination.rs=4",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/ingestr_command.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_command.rs=17",
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs=17",
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs=3",
@@ -2625,7 +2571,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/discovery/project_config.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/discovery/python_function_files.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/discovery/scope_snapshot.rs=1",
-    "crates/sqlbuild-python/src/bindings/_helpers/discovery/yaml_entries.rs=13",
+    "crates/sqlbuild-python/src/bindings/_helpers/discovery/yaml_entries.rs=9",
     "crates/sqlbuild-python/src/bindings/_helpers/event_exporting/dispatcher.rs=14",
     "crates/sqlbuild-python/src/bindings/_helpers/event_exporting/models.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/event_exporting/scope.rs=9",
@@ -2667,7 +2613,6 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_facts.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_index.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/lineage/lineage_objects.rs=16",
-    "crates/sqlbuild-python/src/bindings/_helpers/load/dlt_destination.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_command.rs=12",
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_progress.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/load/load_selection.rs=4",

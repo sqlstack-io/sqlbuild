@@ -332,13 +332,4 @@ class LoadCallbacks:
     on_connection_error: ConnectionElapsedCallback | None = None
 
 
-@dataclass(frozen=True)
-class ExternalLoadPhaseResult:
-    """Outcome of running external-connection loaders before warehouse connect."""
-
-    preloaded_results: tuple[LoadExecutionResult, ...]
-    failed_or_hard_skipped: frozenset[str]
-    sqlbuild_sources: tuple[SourceEntry, ...]
-
-
 from sqlbuild.executor.load.classes.dag_state import LoadDagState  # noqa: E402,F401

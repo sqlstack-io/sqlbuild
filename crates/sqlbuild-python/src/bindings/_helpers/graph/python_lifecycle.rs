@@ -11,8 +11,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::python_plan::main::run_lifecycle::run_lifecycle;
 use sqlbuild_analysis::python_plan::models::{LifecycleNode, RunLifecycle};
 
-const EXTERNAL_CONNECTION_MODE: &str = "external";
-
 /// `build_python_sql_run_lifecycle(*, selection, python_graph)`: a `PythonSqlRunLifecyclePlan`.
 #[pyfunction]
 #[pyo3(signature = (*, selection, python_graph))]
@@ -68,13 +66,8 @@ pub(crate) fn build_python_sql_run_lifecycle<'py>(
 }
 
 fn lifecycle_node(node: &Bound<'_, PyAny>) -> PyResult<LifecycleNode> {
-    let loader: Bound<'_, PyAny> = native_field(node, "loader")?;
-    let external_loader: bool = !loader.is_none()
-        && native_field(&loader, "connection_mode")?.extract::<String>()?
-            == EXTERNAL_CONNECTION_MODE;
     Ok(LifecycleNode {
         kind: native_field(node, "kind")?.extract()?,
-        external_loader,
     })
 }
 

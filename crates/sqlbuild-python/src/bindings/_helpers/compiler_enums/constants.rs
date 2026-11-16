@@ -713,11 +713,6 @@ const E_HARD_CODED_RELATION_OWNER_KIND: EnumSpec = EnumSpec {
     doc: "The kind of Python code that names a project relation in SQL.",
     members: &[("NODE", "node"), ("HOOK", "hook"), ("LOADER", "loader")],
 };
-const E_LOADER_CONNECTION_MODE: EnumSpec = EnumSpec {
-    name: "LoaderConnectionMode",
-    doc: "How a source loader owns the destination warehouse connection.",
-    members: &[("SQLBUILD", "sqlbuild"), ("EXTERNAL", "external")],
-};
 const E_RULE_SUBJECT: EnumSpec = EnumSpec {
     name: "RuleSubject",
     doc: "Compiler-owned unit used to invoke and cache one custom rule.",
@@ -796,6 +791,5 @@ pub(crate) const COMPILER_ENUMS: &[EnumSpec] = &[
     E_SCENARIO_ARTIFACT_KIND,
     E_SQL_REFERENCE_KIND,
     E_HARD_CODED_RELATION_OWNER_KIND,
-    E_LOADER_CONNECTION_MODE,
     E_RULE_SUBJECT,
 ];

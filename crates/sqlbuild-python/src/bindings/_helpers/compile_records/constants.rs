@@ -940,10 +940,6 @@ const R_DISCOVERED_LOADER_FUNCTION: RecordSpec = RecordSpec {
         FieldSpec::new("columns", FieldDefault::EmptyTuple),
         FieldSpec::new("contract", FieldDefault::None),
         FieldSpec::new("description", FieldDefault::None),
-        FieldSpec::new(
-            "connection_mode",
-            FieldDefault::NativeMember(RecordId::LoaderConnectionMode, "SQLBUILD"),
-        ),
         FieldSpec::new("provider_usages", FieldDefault::EmptyTuple),
         FieldSpec {
             name: "identity",

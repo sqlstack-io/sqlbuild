@@ -5,8 +5,6 @@
 pub struct LifecycleNode {
     /// `task`, `asset`, `loader` or `check`.
     pub kind: String,
-    /// Whether the node is a loader that owns its own warehouse connection.
-    pub external_loader: bool,
 }
 
 /// Selected Python nodes split into ingress and read-side regions, each sorted.

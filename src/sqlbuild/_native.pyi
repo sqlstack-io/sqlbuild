@@ -3352,25 +3352,6 @@ def format_seed_execution_json(
     *, results: tuple[SeedExecutionResult, ...], plan: PlanOutput
 ) -> str: ...
 def format_load_execution_json(*, results: tuple[LoadExecutionResult, ...]) -> str: ...
-def build_ingestr_command(
-    *,
-    source_entry: SourceEntry,
-    adapter_name: str,
-    connection_config: dict[str, object],
-    destination_name: str,
-    vars: dict[str, object],
-    environment: str | None,
-    run_id: str,
-    is_reload: bool,
-) -> tuple[str, ...]: ...
-def format_ingestr_command(command: Sequence[str], /) -> str: ...
-def dlt_destination_arguments(
-    *,
-    adapter_name: str,
-    connection_config: Mapping[str, object],
-    destination_config: Mapping[str, object] | None,
-    dataset_name: str | None,
-) -> tuple[str, dict[str, Any], dict[str, Any], str | None]: ...
 def format_clone_execution_json(
     *,
     result: CloneExecutionResult,
@@ -10500,7 +10481,6 @@ class DiscoveredPythonLoaderMetadata(NativeRecord):
     unique_key: tuple[str, ...]
     columns: tuple[SourceColumnEntry, ...]
     contract: str | None
-    connection_mode: LoaderConnectionMode
     def __init__(
         self,
         destination: str | None = ...,
@@ -10509,7 +10489,6 @@ class DiscoveredPythonLoaderMetadata(NativeRecord):
         unique_key: tuple[str, ...] = ...,
         columns: tuple[SourceColumnEntry, ...] = ...,
         contract: str | None = ...,
-        connection_mode: LoaderConnectionMode = ...,
     ) -> None: ...
 
 class DiscoveredPythonTaskMetadata(NativeRecord):
@@ -12616,17 +12595,6 @@ class SchemaSeedEntry(NativeRecord):
         audits: tuple[SchemaAuditInstance, ...] = ...,
     ) -> None: ...
 
-class IntegrationLoaderConfig(NativeRecord):
-    """Typed configuration for one declarative integration loader."""
-
-    kind: str
-    config: object
-    def __init__(
-        self,
-        kind: str,
-        config: object,
-    ) -> None: ...
-
 class SourceFreshnessAgePolicy(NativeRecord):
     """Age-based source freshness warning/error thresholds."""
 
@@ -12688,7 +12656,6 @@ class SourceEntry(NativeRecord):
     final: bool
     loader: str | None
     managed: bool
-    integration_loader: IntegrationLoaderConfig | None
     freshness: SourceFreshnessConfig | None
     write_strategy: SourceWriteStrategy | None
     load_batch_size: int | None
@@ -12710,7 +12677,6 @@ class SourceEntry(NativeRecord):
         final: bool = ...,
         loader: str | None = ...,
         managed: bool = ...,
-        integration_loader: IntegrationLoaderConfig | None = ...,
         freshness: SourceFreshnessConfig | None = ...,
         write_strategy: SourceWriteStrategy | None = ...,
         load_batch_size: int | None = ...,
@@ -14163,7 +14129,6 @@ class SourceLoadPlanEntry(NativeRecord):
     cursor_column: str | None
     unique_key: tuple[str, ...]
     is_reload: bool
-    integration_kind: str | None
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14175,7 +14140,6 @@ class SourceLoadPlanEntry(NativeRecord):
         cursor_column: str | None = ...,
         unique_key: tuple[str, ...] = ...,
         is_reload: bool = ...,
-        integration_kind: str | None = ...,
     ) -> None: ...
 
 class FunctionPlanEntry(NativeRecord):
@@ -14603,12 +14567,6 @@ class HardCodedRelationOwnerKind(StrEnum):
     HOOK = "hook"
     LOADER = "loader"
 
-class LoaderConnectionMode(StrEnum):
-    """How a source loader owns the destination warehouse connection."""
-
-    SQLBUILD = "sqlbuild"
-    EXTERNAL = "external"
-
 class SqlHookEntry(NativeRecord):
     """A model lifecycle hook that executes SQL."""
 
@@ -14813,7 +14771,6 @@ class DiscoveredLoaderFunction(NativeRecord):
     columns: tuple[SourceColumnEntry, ...]
     contract: str | None
     description: str | None
-    connection_mode: LoaderConnectionMode
     provider_usages: tuple[DiscoveredProviderUsage, ...]
     identity: PythonNodeIdentity | None
     def __init__(
@@ -14830,7 +14787,6 @@ class DiscoveredLoaderFunction(NativeRecord):
         columns: tuple[SourceColumnEntry, ...] = ...,
         contract: str | None = ...,
         description: str | None = ...,
-        connection_mode: LoaderConnectionMode = ...,
         provider_usages: tuple[DiscoveredProviderUsage, ...] = ...,
         identity: PythonNodeIdentity | None = ...,
     ) -> None: ...
