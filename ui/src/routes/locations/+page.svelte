@@ -11,7 +11,7 @@
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { hasCapability, type ConnectionTest } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { errorMessage, healthTone, healthWords, targetWords, testTone } from '$lib/platform/labels';
+	import { errorMessage, healthTone, healthWords, targetWords, testTone, brokenDeployPolicyHelp, brokenDeployPolicyLabel } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import ServerStatus from './server-status.svelte';
@@ -71,7 +71,7 @@
 	counts={[{ tone: 'var(--sb-warning)', count: unhealthy, label: 'need attention' }]}
 />
 
-<DataTable columns={tableColumns} rows={filtered} key={(l) => l.id} resource={locations} empty={all.length ? 'No locations match the search.' : 'No code locations yet. Register one with the server using a location token.'}>
+<DataTable columns={tableColumns} rows={filtered} key={(l) => l.id} resource={locations} empty={all.length ? 'No locations match the search.' : 'No locations yet.'}>
 	{#snippet row(l)}
 				{@const test = tested[l.id] ?? l.connectionTest}
 				{@const opens = opensDetail && l.health !== null}
@@ -127,7 +127,7 @@
 						{#if l.health === null}<span class="muted" title={partialTitle}>—</span>{:else}<div>{l.liveInstances === 1 ? 'Running' : l.liveInstances === 0 ? 'Not running' : `${l.liveInstances} running`}</div>
 						{#if l.lastSeenAt}<RelativeTime value="last check-in {formatAgo(l.lastSeenAt, app.now)}" exact={formatStamp(l.lastSeenAt)} />{/if}{/if}
 					</td>
-					{#if knowsPolicy}<td class="muted">{l.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : l.brokenDeployPolicy ? 'Hold scheduled runs until a deploy works' : '—'}</td>{/if}
+					{#if knowsPolicy}<td class="muted" title={l.brokenDeployPolicy ? brokenDeployPolicyHelp[l.brokenDeployPolicy === 'fallback' ? 'fallback' : 'hold'] : undefined}>{l.brokenDeployPolicy ? brokenDeployPolicyLabel[l.brokenDeployPolicy === 'fallback' ? 'fallback' : 'hold'] : '—'}</td>{/if}
 				</tr>
 	{/snippet}
 </DataTable>

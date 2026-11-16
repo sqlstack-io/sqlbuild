@@ -69,7 +69,7 @@
 									<i style:background={replicaLive(i.lastSeenAt, app.now) ? 'var(--sb-success)' : 'var(--sb-error)'}></i>
 									<code>{i.instanceId}</code>
 									<span class="muted">
-										{!i.schedulerEnabled ? 'web and API only' : lease?.holder === i.instanceId ? 'running the scheduler' : 'standing by to take over'}
+										<span title={!i.schedulerEnabled ? 'Serves the web UI and API only' : lease?.holder === i.instanceId ? 'Running the scheduler' : 'Standing by to take over the scheduler'}>{!i.schedulerEnabled ? 'Web only' : lease?.holder === i.instanceId ? 'Scheduler' : 'Standby'}</span>
 									</span>
 									<span class="faint">seen {formatAgo(i.lastSeenAt, app.now)}</span>
 								</li>
@@ -94,13 +94,13 @@
 					<div>
 						<h4>Event forwarding</h4>
 						{#if h.sink}
-							<p>Sends problems as they happen to a {h.sink.kind} set in the server config (<code>{h.sink.destinationSource}</code>).</p>
+							<p title="Forwards problems as they happen; set in the server config">{h.sink.kind} · <code>{h.sink.destinationSource}</code></p>
 							<p class="faint">
 								{h.sink.eventKinds.length ? h.sink.eventKinds.join(', ') : 'Every kind of event'} · {h.sink.pendingEvents} waiting · last tried {formatAgo(h.sink.lastAttemptAt, app.now)}
 							</p>
 							{#if h.sink.lastError}<p class="err">{h.sink.lastError}</p>{/if}
 						{:else}
-							<p class="faint">Not set up. <HelpTip text="Sensors still see every problem; forwarding pushes them out without code." /></p>
+							<p class="faint">Off <HelpTip text="Sensors still see every problem; forwarding pushes them out without code." /></p>
 						{/if}
 					</div>
 				{/if}
