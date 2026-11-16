@@ -4,11 +4,10 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple, PyTupleMethods};
 
-use crate::bindings::_helpers::cursor::durations::{
-    parse_cursor_duration, shift_by_cursor_duration,
-};
-use crate::bindings::_helpers::cursor::intervals::interval_validation;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::cursor::main::durations::parse_cursor_duration::parse_cursor_duration;
+use sqlbuild_python_front::cursor::main::durations::shift_by_cursor_duration::shift_by_cursor_duration;
+use sqlbuild_python_front::cursor::main::intervals::interval_validation::interval_validation;
 
 /// `(field, unit suffix)` of each duration part, in declaration order.
 const DURATION_UNITS: [(&str, &str); 6] = [

@@ -13,15 +13,17 @@ use sqlbuild_model_config::config_presence::main::contains_template::contains_te
 use sqlbuild_model_config::config_presence::main::mutable_config_value::mutable_config_value;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
-use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, config_error};
-use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
-use crate::bindings::_helpers::model_config::config_classes::{ConfigClasses, config_fields, view};
-use crate::bindings::_helpers::model_config::config_nodes::carried_node;
-use crate::bindings::_helpers::model_config::model_config_builder::{
-    BuiltConfig, ConfigBuild, NativeModelConfigBuilder,
-};
-use crate::bindings::_helpers::model_config::typed_config::BuiltConfigValues;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::model_config::main::config::carried_node::carried_node;
+use sqlbuild_python_front::model_config::main::config::config_fields::config_fields;
+use sqlbuild_python_front::model_config::main::config::view::view;
+use sqlbuild_python_front::model_config::models::BuiltConfig;
+use sqlbuild_python_front::model_config::models::ConfigBuild;
+use sqlbuild_python_front::model_config::models::ConfigClasses;
+use sqlbuild_python_front::model_config::models::NativeModelConfigBuilder;
+use sqlbuild_python_front::model_config::models::PyNode;
+use sqlbuild_python_front::model_config::types::BuiltConfigValues;
 
 const COLUMNS_KEY: &str = "columns";
 const DESCRIPTION_KEY: &str = "description";

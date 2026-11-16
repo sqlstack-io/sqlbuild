@@ -649,7 +649,7 @@ fn path_rows(outcome: LintOutcome) -> Vec<(PathBuf, LintViolationRow)> {
 /// Build lint expansion with the compiled target and vars, reusing the compiler's scope only for the same discovery.
 fn lint_expansion_context(
     run: &SqlRun<'_, '_>,
-) -> PyResult<crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs> {
+) -> PyResult<sqlbuild_python_front::render::models::SqlExpansionInputs> {
     let py: Python<'_> = run.project.py();
     let reuse: Option<&ExpansionReuse> = match run
         .early_lint

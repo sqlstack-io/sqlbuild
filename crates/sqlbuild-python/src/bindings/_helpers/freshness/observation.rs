@@ -12,8 +12,6 @@ use crate::bindings::_helpers::freshness::support::{
     text,
 };
 use crate::bindings::_helpers::references::source_relations::render_source_read;
-use crate::bindings::_helpers::state_rows::freshness::{normalize, version_hash};
-use crate::bindings::_helpers::state_rows::timestamps::{in_utc, offset_aware};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -27,6 +25,10 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::state_rows::main::event_rows::in_utc::in_utc;
+use sqlbuild_python_front::state_rows::main::event_rows::normalize::normalize;
+use sqlbuild_python_front::state_rows::main::event_rows::offset_aware::offset_aware;
+use sqlbuild_python_front::state_rows::main::event_rows::version_hash::version_hash;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const COLUMN_STRATEGY: &str = "column";

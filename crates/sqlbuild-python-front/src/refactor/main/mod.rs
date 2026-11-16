@@ -1,0 +1,11 @@
+pub mod compare_contracts;
+pub mod declaration_placement;
+pub mod edit_contract_model;
+pub mod edit_contract_source;
+pub mod model_facts;
+pub mod refactor_facts;
+pub mod register_contract_compare;
+pub mod register_contract_edits;
+pub mod register_python_strings;
+pub mod remaining_contract_findings;
+pub mod unit_test_rebindings;

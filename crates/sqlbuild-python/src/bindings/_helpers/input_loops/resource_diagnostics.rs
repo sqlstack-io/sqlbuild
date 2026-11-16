@@ -28,13 +28,13 @@ use crate::bindings::_helpers::compiled_project::attachment_inputs::{
 };
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::seed_views::{SeedParts, SeedViews};
-use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::compile_context::main::delta::capture::capture;
 use sqlbuild_python_base::compile_context::main::delta::capturing::capturing;
 use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 use sqlbuild_python_base::compile_context::models::DeltaInjection;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
 
 const MISSING_DESCRIPTION_CODE: &str = "P010";
 const DESCRIPTION_LENGTH_CODE: &str = "P027";

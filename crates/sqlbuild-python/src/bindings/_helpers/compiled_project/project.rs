@@ -56,11 +56,11 @@ use crate::bindings::_helpers::compiled_views::seed_views::{
 use crate::bindings::_helpers::compiled_views::source_views::{
     NativeCompiledSource, NativeSourceInput, SourceRecord,
 };
-use crate::bindings::_helpers::render::declaration_values::ConstantRendering;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_project::types::ObjectKeyRow;
 use sqlbuild_project::types::SourceNamespace;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_front::render::models::ConstantRendering;
 
 pub(crate) const CONTRACT_KEY: &str = "contract";
 const INPUT_CLASSES_UNSET: &str = "no model loop recorded inputs into this project";

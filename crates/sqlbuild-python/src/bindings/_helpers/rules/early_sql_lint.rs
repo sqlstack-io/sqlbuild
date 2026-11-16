@@ -26,7 +26,6 @@ use crate::bindings::_helpers::compiled_views::relation_keys::model_key_row;
 use crate::bindings::_helpers::compiled_views::relation_keys::{
     RelationKeyRow, RelationKeys, one_row_seed_names, relation_keys, source_key_input,
 };
-use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::rules::lint_expansion::{
     LintExpansionSources, lint_expansion_inputs,
 };
@@ -40,6 +39,7 @@ use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::native_threads::main::join_interruptibly::join_interruptibly;
 use sqlbuild_python_base::native_threads::models::Joined;
 use sqlbuild_python_base::records::main::fields::field::field as record_field;
+use sqlbuild_python_front::render::models::SqlExpansionInputs;
 
 /// The lint thresholds used when the project leaves them unset.
 const DEFAULT_MAX_LITERAL_LENGTH: i64 = 100;

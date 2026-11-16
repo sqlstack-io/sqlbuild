@@ -18,7 +18,6 @@ use sqlbuild_analysis::planner_strategy::types::Timeline;
 use sqlbuild_cursor::algebra::main::parse_duration::parse_duration;
 use sqlbuild_cursor::algebra::models::{DurationDigits, DurationSpan};
 
-use crate::bindings::_helpers::cursor::durations::shifted_moment;
 use crate::bindings::_helpers::plan_output::display::aligned_timestamp_bounds;
 use crate::bindings::_helpers::planner_strategy::values::text;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
@@ -27,6 +26,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::main::durations::shifted_moment::shifted_moment;
 
 const INTEGER_CURSOR: &str = "integer";
 const TIMESTAMP_CURSOR: &str = "timestamp";

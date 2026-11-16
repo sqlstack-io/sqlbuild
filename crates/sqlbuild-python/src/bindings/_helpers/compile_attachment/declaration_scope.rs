@@ -4,13 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyTuple;
 
-use crate::bindings::_helpers::render::declaration_values::declaration_scope_resolver;
-use crate::bindings::_helpers::scopes::scope_index::open_native_scope_index;
-use crate::bindings::_helpers::scopes::scope_lookup::build_scope_lookup;
-use crate::bindings::_helpers::scopes::scope_validation::validate_scope_index;
-use crate::bindings::_helpers::sql_test_glue::authored_ctes::validate_authored_sql_test_ctes;
 use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_EXPECTED_MODELS_SCAN_ALGORITHM;
-use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::cache::models::SqlTestScanCache;
@@ -22,6 +16,12 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::render::main::declarations::declaration_scope_resolver::declaration_scope_resolver;
+use sqlbuild_python_front::scopes::main::checks::validate_scope_index::validate_scope_index;
+use sqlbuild_python_front::scopes::main::index::build_scope_lookup::build_scope_lookup;
+use sqlbuild_python_front::scopes::main::index::open_native_scope_index::open_native_scope_index;
+use sqlbuild_python_front::sql_test_glue::main::validate_authored_sql_test_ctes::validate_authored_sql_test_ctes;
+use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
 
 fn compile_error(py: Python<'_>, message: Bound<'_, PyAny>) -> PyResult<PyErr> {
     Ok(PyErr::from_value(

@@ -5,7 +5,6 @@ use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::GraphIndexes;
 use std::collections::HashSet;
 
-use crate::bindings::_helpers::attachments::reference_markers::assert_no_unresolved_sql_markers;
 use crate::bindings::_helpers::auditing::render::render_audit_sql;
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
@@ -23,6 +22,7 @@ use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyListMethods, PyString};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_front::attachments::main::assert_no_unresolved_sql_markers::assert_no_unresolved_sql_markers;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::Request;

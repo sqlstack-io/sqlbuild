@@ -4,7 +4,6 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::records::compiled_model_record;
 use crate::bindings::_helpers::graph::keys::KeyCache;
-use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_entries::model_entries::plan_model;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_identity::graph::{execution_deps, execution_order};
@@ -44,6 +43,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]

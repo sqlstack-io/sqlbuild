@@ -42,7 +42,6 @@ use crate::bindings::_helpers::rules::findings::{FindingClasses, finding_fault};
 use crate::bindings::_helpers::rules::rule_run::bulk_cache_file;
 use crate::bindings::_helpers::rules::selection::rules_error;
 use crate::bindings::_helpers::rules::sql_test_objects::{scenario_fact, sql_test_fact};
-use crate::bindings::_helpers::scopes::scope_reports::metadata_projection_value;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
@@ -53,6 +52,7 @@ use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::type_system::main::types_equal::types_equal;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_front::scopes::main::reports::metadata_projection_value::metadata_projection_value;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const NATIVE_RULES_CACHE_FILE: &str = "native.json";

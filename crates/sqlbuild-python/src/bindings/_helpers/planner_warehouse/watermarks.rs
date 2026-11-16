@@ -3,7 +3,6 @@
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{config_str, planner_error, text};
 use crate::bindings::_helpers::planner_strategy::cursor_types::classify_cursor_sql_type;
@@ -14,6 +13,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 use std::collections::HashMap;
 
 const CONTRACT_KEY: &str = "contract";

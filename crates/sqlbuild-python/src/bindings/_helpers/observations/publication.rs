@@ -10,10 +10,6 @@ use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KI
 
 use crate::bindings::_helpers::compiled_views::{model_reads, project_reads};
 use crate::bindings::_helpers::consumption::relation_reads::relation;
-use crate::bindings::_helpers::native_host::consumption_state::{ConsumptionConnection, Location};
-use crate::bindings::_helpers::native_host::observations_state::{
-    ObservationAppend, append_observations,
-};
 use crate::bindings::_helpers::observations::source_capture::take_source_capture;
 use crate::bindings::_helpers::planner_phases::objects::config_str;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_BOUNDED;
@@ -21,6 +17,10 @@ use crate::bindings::_helpers::planner_warehouse::cursors::{adapter_cursor_sql, 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::native_host::main::append_observations::append_observations;
+use sqlbuild_python_front::native_host::models::ConsumptionConnection;
+use sqlbuild_python_front::native_host::models::Location;
+use sqlbuild_python_front::native_host::models::ObservationAppend;
 
 /// Dependency kind of a source in a model's `dep_rows`.
 const SOURCE_DEPENDENCY: &str = "source";

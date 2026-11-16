@@ -11,7 +11,6 @@ use crate::bindings::_helpers::planner_migrations::model_handover::{
 use crate::bindings::_helpers::planner_migrations::models::{
     CompatibilityCheck, MigrationDecisionRequest,
 };
-use crate::bindings::_helpers::state_rows::migration_projections::newest_move;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyBool;
 use sqlbuild_analysis::planner_migrations::main::model_decision::model_decision;
@@ -23,6 +22,7 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::state_rows::main::migrations::newest_move::newest_move;
 
 pub(super) fn relation<'py>(location: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?.call1((location,))

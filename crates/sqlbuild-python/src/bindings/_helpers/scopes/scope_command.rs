@@ -14,13 +14,6 @@ use sqlbuild_scopes::scope_text::main::scope_result_failed::scope_result_failed;
 use sqlbuild_scopes::scope_text::models::ScopeTextRequest;
 
 use crate::bindings::_helpers::scopes::scope_loading::load_or_build_scope_index;
-use crate::bindings::_helpers::scopes::scope_lookup::build_scope_lookup;
-use crate::bindings::_helpers::scopes::scope_objects::ScopeClasses;
-use crate::bindings::_helpers::scopes::scope_report_objects::read_result;
-use crate::bindings::_helpers::scopes::scope_reports::{
-    ExplainArguments, ListArguments, ReportArguments, scope_browse, scope_explain, scope_list,
-    scope_move_preview, scope_report, serialize_scope_report,
-};
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -29,6 +22,18 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::scopes::main::index::build_scope_lookup::build_scope_lookup;
+use sqlbuild_python_front::scopes::main::reports::read_result::read_result;
+use sqlbuild_python_front::scopes::main::reports::scope_browse::scope_browse;
+use sqlbuild_python_front::scopes::main::reports::scope_explain::scope_explain;
+use sqlbuild_python_front::scopes::main::reports::scope_list::scope_list;
+use sqlbuild_python_front::scopes::main::reports::scope_move_preview::scope_move_preview;
+use sqlbuild_python_front::scopes::main::reports::scope_report::scope_report;
+use sqlbuild_python_front::scopes::main::reports::serialize_scope_report::serialize_scope_report;
+use sqlbuild_python_front::scopes::models::ExplainArguments;
+use sqlbuild_python_front::scopes::models::ListArguments;
+use sqlbuild_python_front::scopes::models::ReportArguments;
+use sqlbuild_python_front::scopes::models::ScopeClasses;
 
 const TARGET_ERROR_CODE: &str = "C960";
 const BARE_USAGE: &str = "bare names work for models, sources, seeds and functions; write macros, \

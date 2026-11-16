@@ -14,16 +14,8 @@ use sqlbuild_host::entries::models::{AdapterHost, UserCodeHost};
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::inputs::{InputsRequest, attached_inputs};
 use crate::bindings::_helpers::compile_driver::project::compile_adapter_context;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::discovery::scope_snapshot::discover_scope_snapshot;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
-use crate::bindings::_helpers::scopes::scope_cache::{
-    project_fingerprint, read_scope_index_cache, write_scope_index_cache,
-};
-use crate::bindings::_helpers::scopes::scope_index::open_native_scope_index;
-use crate::bindings::_helpers::scopes::scope_tolerant::scope_tolerant_index;
-use crate::bindings::_helpers::scopes::scope_validation::scope_index_with_compile_usages;
 use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_EXPECTED_MODELS_SCAN_ALGORITHM;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -31,6 +23,14 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::discovery::main::snapshots::discover_scope_snapshot::discover_scope_snapshot;
+use sqlbuild_python_front::scopes::main::checks::scope_index_with_compile_usages::scope_index_with_compile_usages;
+use sqlbuild_python_front::scopes::main::checks::scope_tolerant_index::scope_tolerant_index;
+use sqlbuild_python_front::scopes::main::index::open_native_scope_index::open_native_scope_index;
+use sqlbuild_python_front::scopes::main::index::project_fingerprint::project_fingerprint;
+use sqlbuild_python_front::scopes::main::index::read_scope_index_cache::read_scope_index_cache;
+use sqlbuild_python_front::scopes::main::index::write_scope_index_cache::write_scope_index_cache;
 
 const SCOPE_CACHE_DIRECTORY_NAME: &str = "declaration-scopes-v2";
 const SCOPE_CACHE_FILENAME: &str = "scope-index.json";

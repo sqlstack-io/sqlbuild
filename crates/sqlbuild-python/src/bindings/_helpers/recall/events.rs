@@ -8,13 +8,13 @@ use pyo3::types::{
 use serde_json::{Map, Number, Value};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::discovery::snapshot::escaped;
 use crate::bindings::_helpers::recall::constants::{
     EVENT_OPTIONAL_TEXT_FIELDS, EVENT_TEXT_FIELDS, INVOCATION_METADATA_SCHEMA_VERSION,
     TIMESTAMP_PARTS, UTC_ZONE_NAME,
 };
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::discovery::main::snapshots::escaped::escaped;
 
 /// The text of `text`; lone surrogates, which UTF-8 cannot hold, are kept as `\\xNN` or `\\uXXXX` escapes.
 pub(crate) fn escaped_text(text: &Bound<'_, PyString>) -> PyResult<String> {

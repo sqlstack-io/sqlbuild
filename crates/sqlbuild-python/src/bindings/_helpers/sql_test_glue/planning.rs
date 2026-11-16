@@ -13,10 +13,10 @@ use sqlbuild_analysis::compiler::models::{
 };
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
 
 const MODEL_RESOURCE_TYPE: &str = "model";
 const PLANNING_WORKERS: usize = 4;
