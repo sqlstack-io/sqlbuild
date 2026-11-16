@@ -10,6 +10,7 @@ use crate::constants::{
 };
 use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
 use crate::models::{Declaration, EvaluateRequest, Fault, Model, RuleMetadata, RulesConfig};
+use crate::query_facts::constants::SNOWFLAKE_DIALECT;
 use crate::query_facts::main::dependency_texts::dependency_texts;
 use crate::query_facts::main::facts_available::facts_available;
 use crate::query_facts::main::model_shape::model_shape;
@@ -20,8 +21,8 @@ use crate::query_facts::models::{
 };
 use crate::rules::_helpers::domain_layout::folder_layer_details;
 use crate::rules::_helpers::{
-    contract_name_types, dynamic_contracts, explicit_output_types, model_layers, numeric_decisions,
-    sql_test_rules, typed_contract_columns,
+    contract_name_types, dynamic_contracts, explicit_output_types, flatten_parent_copy,
+    model_layers, numeric_decisions, sql_test_rules, typed_contract_columns,
 };
 use crate::rules::models::{
     FaultCollector, ModelEvaluationRequest, ProjectEvaluationRequest, ResolvedThresholdOverride,
@@ -215,6 +216,11 @@ fn evaluate_model_inner(request: ModelEvaluationRequest<'_>) -> Result<Vec<Fault
     if let Some(rule) = metadata("SQBRCONTRACT105") {
         explicit_output_types::evaluate(&parsed, rule, &faults, &request.dialect);
     }
+    if let Some(rule) = metadata("SQBRPERFORMANCE101")
+        && request.dialect.eq_ignore_ascii_case(SNOWFLAKE_DIALECT)
+    {
+        flatten_parent_copy::evaluate(&parsed, rule, &faults);
+    }
     evaluate_naming_rules(&parsed, config, selected, &faults);
     evaluate_literal_rules(&parsed, selected, &faults);
     evaluate_test_rules(TestRuleEvaluation {
@@ -334,6 +340,7 @@ fn requires_model_query(rule: &RuleMetadata) -> bool {
     !rule.custom
         && (rule.code.starts_with("SQBRMODEL")
             || rule.code.starts_with("SQBRCONTRACT")
+            || rule.code == "SQBRPERFORMANCE101"
             || matches!(
                 rule.code.as_str(),
                 "SQBRGRAPH102"
