@@ -155,6 +155,8 @@
 	);
 
 	// The name column fits the longest job name, within limits; longer names truncate and show in full on hover.
+	// `--tl-gutter` is registered as a length (see the style block), so `ch` resolves once, at the job names'
+	// font size on `.tl`, and the header, rows and grid overlay all share the same pixel width.
 	const longestName = $derived(Math.max(0, ...(timeline.data?.jobKeys ?? []).map((j) => j.length)));
 	const gutter = $derived(`clamp(200px, calc(${longestName}ch + 30px), 380px)`);
 
@@ -172,7 +174,7 @@
 	}
 </script>
 
-<div class="tl" class:fill={scroll && maxHeight == null} style:--sticky-top="{stickyTop}px" style:--gutter={gutter}>
+<div class="tl" class:fill={scroll && maxHeight == null} style:--sticky-top="{stickyTop}px" style:--tl-gutter={gutter}>
 	<div class="tl-controls">
 		{#if showSearch}
 			<label class="tl-search">
@@ -288,9 +290,17 @@
 {/if}
 
 <style>
+	/* A registered length computes to px where it is declared; unregistered, `ch` would resolve at each
+	   use site and the 12 px header, 12.5 px job names and the overlay would get different widths. */
+	@property --tl-gutter {
+		syntax: '<length>';
+		inherits: true;
+		initial-value: 200px;
+	}
 	.tl {
-		--gutter: 200px;
+		--tl-gutter: 200px;
 		display: flex;
+		font-size: 12.5px;
 		min-height: 0;
 		flex-direction: column;
 	}
@@ -379,8 +389,8 @@
 		background: var(--card);
 	}
 	.gutter {
-		width: var(--gutter);
-		flex: 0 0 var(--gutter);
+		width: var(--tl-gutter);
+		flex: 0 0 var(--tl-gutter);
 		border-right: 1px solid var(--border);
 	}
 	.tl-head .gutter {
@@ -457,7 +467,7 @@
 	.overlay {
 		position: absolute;
 		z-index: 0;
-		inset: 0 0 0 var(--gutter);
+		inset: 0 0 0 var(--tl-gutter);
 		pointer-events: none;
 	}
 	.gridline,
