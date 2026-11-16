@@ -166,7 +166,29 @@ export function litEdges(focus: string, edges: readonly Edge[], nodes: readonly 
 }
 
 /**
- * Why each member waits for another, node by node: a link from a node of the upstream member to a
+ * Why each member waits for another, node by node, as the server publishes it (`reasons`), keyed
+ * by `pairKey` like `memberLinks`; a wait with none is direct with no lineage, such as an ordering.
+ * Null when no member has a reason: a snapshot published before reasons were recorded sends every
+ * member's list empty, which can't be told from a group whose waits are all orderings, so the page
+ * works the reasons out from lineage instead (`memberLinks`), which finds none for the latter too.
+ */
+export function publishedLinks(members: readonly JobGroupMember[]): Map<string, NodeLink[]> | null {
+	if (!members.some((m) => m.reasons.length)) return null;
+	const links = new Map<string, NodeLink[]>();
+	for (const [jobKey, waits] of waitsWithin(members)) for (const upstream of waits) links.set(pairKey(upstream, jobKey), []);
+	for (const m of members) {
+		for (const r of m.reasons) {
+			const key = pairKey(r.upstreamJob, m.jobKey);
+			if (!links.has(key)) continue;
+			links.get(key)!.push({ from: r.fromNode, to: r.toNode });
+		}
+	}
+	return links;
+}
+
+/**
+ * Why each member waits for another, node by node, worked out from lineage, for a server that
+ * doesn't publish it (`publishedLinks`): a link from a node of the upstream member to a
  * node of the waiting member it feeds, directly or through nodes no member selects (such as a
  * source between a loader job and the models reading it). Lineage through another member's node
  * is that member's link, not this pair's. Keyed by `pairKey`; a pair the server reports with no

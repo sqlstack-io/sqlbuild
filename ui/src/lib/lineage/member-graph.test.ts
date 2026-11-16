@@ -16,6 +16,7 @@ import {
 	memberGraph,
 	memberLinks,
 	memberNodeId,
+	publishedLinks,
 	memberReach,
 	needsBuilding,
 	pairKey,
@@ -57,6 +58,35 @@ const nodesOf: Record<string, string[]> = {
 const info = new Map<string, MemberInfo>(Object.entries(nodesOf).map(([k, nodes]) => [k, { nodeCount: nodes.length, lastRun: null, nodes }]));
 const links = memberLinks(members, info, catalog);
 const pairs = (edges: { source: string; target: string }[]) => edges.map((e) => `${e.source} > ${e.target}`);
+
+describe('published wait reasons', () => {
+	// The server's reasons for the same members: shipments waits for inventory with none, an ordering.
+	const published = members.map((m) =>
+		m.jobKey === 'orders'
+			? { ...m, reasons: [{ upstreamJob: 'customers', fromNode: 'model:customer_dim', toNode: 'model:orders' }] }
+			: m.jobKey === 'shipments'
+				? { ...m, reasons: [{ upstreamJob: 'orders', fromNode: 'model:order_lines', toNode: 'model:shipments' }] }
+				: m
+	);
+
+	it("uses the server's reasons, each wait keyed as the lineage derivation keys it", () => {
+		const links = publishedLinks(published)!;
+		expect(links.get(pairKey('customers', 'orders'))).toEqual([{ from: 'model:customer_dim', to: 'model:orders' }]);
+		expect(links.get(pairKey('orders', 'shipments'))).toEqual([{ from: 'model:order_lines', to: 'model:shipments' }]);
+		expect(links.get(pairKey('inventory', 'shipments'))).toEqual([]);
+	});
+
+	it('draws a direct wait the server gives no reasons for dashed', () => {
+		const { edges } = memberGraph(published, info, { catalog, links: publishedLinks(published)! });
+		const style = (from: string, to: string) => String(edges.find((e) => e.source === memberNodeId(from) && e.target === memberNodeId(to))!.style);
+		expect(style('inventory', 'shipments')).toContain('stroke-dasharray');
+		expect(style('orders', 'shipments')).not.toContain('stroke-dasharray');
+	});
+
+	it('has none to give for a snapshot that predates them, so the page works them out from lineage', () => {
+		expect(publishedLinks(members)).toBeNull();
+	});
+});
 
 describe('member links', () => {
 	it('finds the node-level reasons for each wait, through nodes no member selects', () => {

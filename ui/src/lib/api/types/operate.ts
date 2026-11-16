@@ -769,7 +769,7 @@ export type JobGroupMember = {
 	upstream: { jobKey: string; source: 'lineage' | null }[];
 	/** Position in the derived order; members in the same stage run side by side. */
 	stage: number;
-	/** Node-level reasons for its waits, as the snapshot records them; empty from a mock or older server. */
+	/** Node-level reasons for its waits, as the snapshot records them; every member's is empty in a snapshot published before they were recorded. */
 	reasons: WaitReason[];
 };
 

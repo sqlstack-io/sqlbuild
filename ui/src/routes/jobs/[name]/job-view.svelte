@@ -25,7 +25,7 @@
 	import { concurrencyText, formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
-	import { memberLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
+	import { memberLinks, publishedLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
 	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
@@ -47,7 +47,10 @@
 
 	const def = $derived(job.data ?? null);
 	// Why each member waits for another, node by node, from the catalog's lineage.
-	const links = $derived(def?.groupMembers && memberJobs.data && catalog.data ? memberLinks(def.groupMembers, memberJobs.data, catalog.data) : new Map());
+	// Why members wait, node by node: as the server publishes it, or worked out from lineage for a
+	// snapshot that predates published reasons.
+	const published = $derived(def?.groupMembers ? publishedLinks(def.groupMembers) : null);
+	const links = $derived(published ?? (def?.groupMembers && memberJobs.data && catalog.data ? memberLinks(def.groupMembers, memberJobs.data, catalog.data) : new Map()));
 	const runs = $derived(jobRuns.data ?? []);
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
 	const showCost = $derived(runs.some((r) => r.cost !== null));

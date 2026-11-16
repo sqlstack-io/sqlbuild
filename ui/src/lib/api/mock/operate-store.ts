@@ -6,8 +6,11 @@ import { parseCommand } from '$lib/run/command';
 import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
 import type { LocalChangeBus } from '../signals';
+import { memberLinks, pairKey } from '$lib/lineage/member-graph';
 import type {
 	Acknowledgement,
+	CatalogNode,
+	WaitReason,
 	AdhocPermission,
 	AdhocRunCheck,
 	SelectionEvaluation,
@@ -1203,7 +1206,16 @@ export class MockOperate {
 			stage.set(m, s);
 			return s;
 		};
-		return job.members.map((m) => ({ jobKey: m, upstream: upstream.get(m) ?? [], stage: stageOf(m), reasons: [] }));
+		const members = job.members.map((m) => ({ jobKey: m, upstream: upstream.get(m) ?? [], stage: stageOf(m), reasons: [] as WaitReason[] }));
+		// Published as the server publishes them: node by node, from the snapshot's lineage.
+		const info = new Map(job.members.map((m) => [m, { nodeCount: null, lastRun: null, nodes: jobNodes(m) }]));
+		const links = memberLinks(members, info, SNAPSHOT_NODES as unknown as CatalogNode[]);
+		for (const m of members) {
+			for (const { jobKey: up } of m.upstream) {
+				for (const link of links.get(pairKey(up, m.jobKey)) ?? []) m.reasons.push({ upstreamJob: up, fromNode: link.from, toNode: link.to });
+			}
+		}
+		return members;
 	}
 
 	#jobView(key: string, scope: Scope): JobDetail {
