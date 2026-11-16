@@ -1,12 +1,12 @@
 //! The native `(resource type, name)` pair of a `CompiledObjectKey`.
 
-use crate::graph::_helpers::nodes::keys;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The native `(resource type, name)` pair of a `CompiledObjectKey`.
-#[inline]
 pub fn native_key(key: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
-    keys::native_key(key)
+    Ok((
+        native_field(key, "resource_type")?.str()?.extract()?,
+        native_field(key, "name")?.extract()?,
+    ))
 }

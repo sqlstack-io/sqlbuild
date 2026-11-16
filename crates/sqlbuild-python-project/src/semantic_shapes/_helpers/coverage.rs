@@ -2,9 +2,9 @@
 
 use std::collections::BTreeSet;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
 use crate::compiled_views::main::compiled_models::star_flags::star_flags;
@@ -110,8 +110,4 @@ fn own_reasons<'py>(
         partial.insert("type checking awaits dialect coercion support".to_owned());
     }
     Ok(partial)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(semantic_coverage, module)?)
 }

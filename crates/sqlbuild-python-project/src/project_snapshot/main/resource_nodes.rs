@@ -3,8 +3,7 @@
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::models::NativeProjectView;
 use crate::project_snapshot::_helpers::snapshot::snapshot_resources;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{PyResult, Python};
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 use std::collections::BTreeMap;
 

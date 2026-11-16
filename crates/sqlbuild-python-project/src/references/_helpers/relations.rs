@@ -1,15 +1,14 @@
 //! Relation names in SQL and the project relations they match, for hard-coded name checks.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::analysis::main::extract_sql_relation_names::extract_sql_relation_names;
 use crate::analysis::types::RelationRow;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const RUNTIME_RELATION_PREFIX: &str = "SELECT 1 FROM ";
@@ -39,7 +38,7 @@ fn relation_name<'py>(
 /// Relations named in `sql` and temporary tables it creates, or None if unparseable.
 #[pyfunction]
 #[pyo3(signature = (*, sql, dialect))]
-fn extract_relation_names<'py>(
+pub(crate) fn extract_relation_names<'py>(
     py: Python<'py>,
     sql: &str,
     dialect: Option<&str>,
@@ -61,50 +60,17 @@ fn extract_relation_names<'py>(
 }
 
 /// Whether two optional qualifier parts can name the same relation.
-fn parts_compatible(left: Option<&str>, right: Option<&str>) -> bool {
+pub(crate) fn parts_compatible(left: Option<&str>, right: Option<&str>) -> bool {
     match (left, right) {
         (Some(left), Some(right)) => python_casefold(left) == python_casefold(right),
         _ => true,
     }
 }
 
-/// The project relation `relation` names, resolving missing qualifiers from the defaults.
-#[pyfunction]
-#[pyo3(signature = (*, index, relation, default_database = None, default_schema = None))]
-pub(crate) fn match_project_relation<'py>(
-    index: &Bound<'py, PyAny>,
-    relation: &Bound<'py, PyAny>,
-    default_database: Option<String>,
-    default_schema: Option<String>,
-) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let name: String = python_casefold(&native_field(relation, "name")?.extract::<String>()?);
-    let schema: Option<String> = native_field(relation, "schema")?
-        .extract::<Option<String>>()?
-        .or(default_schema);
-    let database: Option<String> = native_field(relation, "database")?
-        .extract::<Option<String>>()?
-        .or(default_database);
-    for candidate in native_field(index, "relations")?.try_iter()? {
-        let candidate: Bound<'py, PyAny> = candidate?;
-        let target: Bound<'py, PyAny> = native_field(&candidate, "relation")?;
-        if python_casefold(&native_field(&target, "name")?.extract::<String>()?) != name {
-            continue;
-        }
-        let target_schema: Option<String> = native_field(&target, "schema")?.extract()?;
-        let target_database: Option<String> = native_field(&target, "database")?.extract()?;
-        if parts_compatible(schema.as_deref(), target_schema.as_deref())
-            && parts_compatible(database.as_deref(), target_database.as_deref())
-        {
-            return Ok(Some(candidate));
-        }
-    }
-    Ok(None)
-}
-
 /// Project relations from adapter-rendered runtime relation names, deduplicated in order.
 #[pyfunction]
 #[pyo3(signature = (*, relations, dialect))]
-fn runtime_project_relations<'py>(
+pub(crate) fn runtime_project_relations<'py>(
     py: Python<'py>,
     relations: &Bound<'py, PyAny>,
     dialect: Option<&str>,
@@ -133,11 +99,4 @@ fn runtime_project_relations<'py>(
         &host_entry(py, ExecutorHost::ProjectRelationIndex)?,
         &[("relations", PyTuple::new(py, resolved.keys())?.into_any())],
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(extract_relation_names, module)?)?;
-    module.add_function(wrap_pyfunction!(match_project_relation, module)?)?;
-    module.add_function(wrap_pyfunction!(runtime_project_relations, module)?)?;
-    Ok(())
 }

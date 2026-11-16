@@ -1,14 +1,20 @@
 //! Normalize analysis sql.
 
-use crate::analysis::_helpers::normalization;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{PyResult, Python};
+use pyo3::pyfunction;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// Normalize analysis sql.
-#[inline]
+#[pyfunction]
 pub fn normalize_analysis_sql(
     py: Python<'_>,
     request: crate::analysis::models::NormalizationInput,
 ) -> PyResult<String> {
-    normalization::normalize_analysis_sql(py, request)
+    py.compiler_detach(|| {
+        sqlbuild_analysis::semantic_validation::main::normalize::normalize_analysis_sql(
+            request.into(),
+        )
+    })
+    .map_err(value_error)
 }

@@ -1,17 +1,27 @@
 //! Model, source, seed and function selectors resolved against compiled graph mappings.
 
-use crate::planner_selection::_helpers::selectors;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
-use pyo3::types::PyDict;
-use pyo3::types::PyFrozenSet;
+use crate::graph::models::NativeProjectGraph;
+use crate::planner_selection::_helpers::selectors::VIEW_OPTIONS;
+use crate::planner_selection::_helpers::selectors::arguments_graph;
+use crate::planner_selection::_helpers::selectors::resolved;
+use pyo3::prelude::{Bound, PyResult, Python};
+use pyo3::types::{PyDict, PyFrozenSet};
+use sqlbuild_python_base::boundary::models::KeywordArguments;
 
 /// Model, source, seed and function selectors resolved against compiled graph mappings.
-#[inline]
 pub fn resolve_project_selectors<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyFrozenSet>> {
-    selectors::resolve_project_selectors(py, options)
+    let arguments: KeywordArguments<'py> = KeywordArguments::read(
+        py,
+        "resolve_project_selectors",
+        options,
+        (&[&["select", "exclude"], VIEW_OPTIONS].concat(), &[]),
+    )?;
+    let graph: NativeProjectGraph = arguments_graph(&arguments)?;
+    resolved(
+        graph.graph(),
+        (&arguments.value("select")?, &arguments.value("exclude")?),
+    )
 }

@@ -1,25 +1,23 @@
 //! Interpolate `@@` tokens in authored SQL and extract static SQL references.
 
-use crate::sqltext::models::InterpolationRow;
 use crate::sqltext::models::InterpolationSources;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 use std::cell::RefCell;
 
 use pyo3::PyErr;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyString, PyStringMethods};
-use sqlbuild_sqltext::compiler::main::sql_interpolation::interpolate_sql;
 use sqlbuild_sqltext::compiler::models::InterpolationRead;
 use sqlbuild_sqltext::compiler::types::InterpolationHost;
 
 const ENVIRONMENT_READ: &str = "env";
 const CONTEXT_READ: &str = "ctx";
 
-struct PythonInterpolationHost<'py> {
-    sources: InterpolationSources<'py>,
+pub(crate) struct PythonInterpolationHost<'py> {
+    pub(crate) sources: InterpolationSources<'py>,
     /// A Python exception other than a rendering `ValueError`, raised after the scan.
-    raised: RefCell<Option<PyErr>>,
+    pub(crate) raised: RefCell<Option<PyErr>>,
 }
 
 impl PythonInterpolationHost<'_> {
@@ -132,63 +130,10 @@ fn key_text(key: &Bound<'_, PyAny>) -> String {
     key.str().map(|text| text.to_string()).unwrap_or_default()
 }
 
-/// Each `(sql, file path)` interpolated in order; non-rendering Python failures raise.
-pub(crate) fn interpolation_batch(
-    sources: InterpolationSources<'_>,
-    sqls: &[(String, String)],
-) -> PyResult<Vec<InterpolationRow>> {
-    let host = PythonInterpolationHost {
-        sources,
-        raised: RefCell::new(None),
-    };
-    let mut rows = Vec::with_capacity(sqls.len());
-    for (sql, file_path) in sqls {
-        let row = match interpolate_sql(&host, sql, file_path) {
-            Ok(result) => InterpolationRow {
-                sql: result.sql,
-                spans: result.spans,
-                reads: read_rows(result.reads),
-                error: None,
-            },
-            Err(failure) => InterpolationRow {
-                sql: None,
-                spans: Vec::new(),
-                reads: read_rows(failure.reads),
-                error: Some(failure.message),
-            },
-        };
-        if let Some(error) = host.raised.borrow_mut().take() {
-            return Err(error);
-        }
-        rows.push(row);
-    }
-    Ok(rows)
-}
-
 /// `(sql or None when unchanged, reads, error message or None)` for one SQL text.
 pub(crate) type InterpolatedRow = (Option<String>, Vec<(&'static str, String)>, Option<String>);
 
-/// One SQL text interpolated: the SQL (`None` when unchanged), its reads, and its error.
-pub(crate) fn interpolated(
-    sources: InterpolationSources<'_>,
-    sql: &str,
-    file_path: &str,
-) -> PyResult<InterpolatedRow> {
-    let host = PythonInterpolationHost {
-        sources,
-        raised: RefCell::new(None),
-    };
-    let row = match interpolate_sql(&host, sql, file_path) {
-        Ok(result) => (result.sql, read_rows(result.reads), None),
-        Err(failure) => (None, read_rows(failure.reads), Some(failure.message)),
-    };
-    if let Some(error) = host.raised.borrow_mut().take() {
-        return Err(error);
-    }
-    Ok(row)
-}
-
-fn read_rows(reads: Vec<InterpolationRead>) -> Vec<(&'static str, String)> {
+pub(crate) fn read_rows(reads: Vec<InterpolationRead>) -> Vec<(&'static str, String)> {
     reads
         .into_iter()
         .map(|read| match read {

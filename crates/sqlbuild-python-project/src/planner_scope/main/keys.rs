@@ -1,13 +1,13 @@
 //! Keys.
 
-use crate::planner_scope::_helpers::values;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::graph::main::nodes::native_key::native_key;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 
 /// Keys.
-#[inline]
 pub fn keys(values: &Bound<'_, PyAny>) -> PyResult<Vec<ObjectKey>> {
-    values::keys(values)
+    values
+        .try_iter()?
+        .map(|value| native_key(&value?))
+        .collect()
 }

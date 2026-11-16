@@ -1,12 +1,11 @@
 //! Register the source relations functions and classes.
 
-use crate::references::_helpers::source_relations;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::references::main::render_source_relation::render_source_relation;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the source relations functions and classes.
-#[inline]
 pub fn register_source_relations(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    source_relations::register(module)
+    module.add_function(wrap_pyfunction!(render_source_relation, module)?)?;
+    Ok(())
 }

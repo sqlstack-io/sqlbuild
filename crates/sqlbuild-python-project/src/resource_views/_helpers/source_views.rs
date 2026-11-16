@@ -1,5 +1,6 @@
 //! Sources attached by the native loop, held by the compiled project, and their views.
 
+use crate::resource_views::main::source_views::replaced::replaced;
 use crate::resource_views::models::NativeCompiledSource;
 use crate::resource_views::models::NativeSourceInput;
 use crate::resource_views::models::SourceKeyFacts;
@@ -16,7 +17,6 @@ use sqlbuild_python_base::positional_record;
 use crate::compiled_project::main::python_column_facts::python_column_facts;
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::main::compiled_models::audit_key_rows::audit_key_rows;
-use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 
 pub(crate) const SOURCE_RESOURCE: &str = "source";
 
@@ -92,15 +92,6 @@ impl SourceViews for SourceRecord {
     }
 }
 
-/// `dataclasses.replace(value, **changes)`.
-pub(crate) fn replaced(
-    _py: Python<'_>,
-    value: &Bound<'_, PyAny>,
-    changes: &Bound<'_, PyDict>,
-) -> PyResult<Py<PyAny>> {
-    Ok(replaced_keywords(value, changes)?.unbind())
-}
-
 /// Read the source record behind a native source view, or `None` for any other object.
 pub(crate) fn read_source_view<'py, T>(
     view: &Bound<'py, PyAny>,
@@ -130,21 +121,4 @@ pub(crate) fn read_source<'py, T>(
         .get(index)
         .ok_or_else(|| PyIndexError::new_err(index))?;
     read(source, py)
-}
-
-/// Keep `attached` in `owner`; return each source's view.
-pub(crate) fn retain_sources(
-    owner: &Bound<'_, NativeCompiledProject>,
-    attached: Vec<AttachedSource>,
-) -> Vec<NativeSourceInput> {
-    let mut project = owner.borrow_mut();
-    let first: usize = project.sources().len();
-    let count: usize = attached.len();
-    for source in attached {
-        project.retain_source(source_record(source));
-    }
-    drop(project);
-    (first..first + count)
-        .map(|index| NativeSourceInput::new(owner.clone().unbind(), index))
-        .collect()
 }

@@ -1,48 +1,35 @@
 //! Compile usage merging, placement validation and move relocation over a Python `ScopeIndex`.
 
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use crate::scopes::main::checks::relocated_declarations::relocated_declarations;
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_scopes::compile_usages::models::UsageKey;
 use sqlbuild_scopes::placement::main::diagnostic_order::diagnostic_order;
 use sqlbuild_scopes::placement::main::placement_diagnostics::placement_diagnostics;
-use sqlbuild_scopes::placement::main::relocate_for_resource_moves::relocate_for_resource_moves;
 use sqlbuild_scopes::placement::models::{
-    DiagnosticOrderKey, PlacementCode, PlacementDiagnostic, PlacementIndex, Relocation,
+    DiagnosticOrderKey, PlacementCode, PlacementDiagnostic, PlacementIndex,
 };
 use sqlbuild_scopes::scope_index::models::ResourceIdentity;
 
-use crate::scopes::_helpers::declarations::placement::QualifiedRow;
-use crate::scopes::_helpers::declarations::placement::resource_identity;
-use crate::scopes::_helpers::index::scope_objects::enum_text;
-use crate::scopes::_helpers::index::scope_objects::field;
-use crate::scopes::_helpers::index::scope_objects::identity_row;
-use crate::scopes::_helpers::index::scope_objects::optional_item;
-use crate::scopes::_helpers::index::scope_objects::qualified_row;
-use crate::scopes::_helpers::index::scope_objects::read_completeness;
-use crate::scopes::_helpers::index::scope_objects::read_placement_index;
-use crate::scopes::_helpers::index::scope_objects::root_object;
-use crate::scopes::_helpers::index::scope_objects::tuple_attribute;
-use crate::scopes::_helpers::index::scope_objects::value_of;
-use crate::scopes::_helpers::relationships::compile_usages::MergeRows;
-use crate::scopes::_helpers::relationships::compile_usages::SourceRow;
-use crate::scopes::_helpers::relationships::compile_usages::merged_usage_rows;
-use crate::scopes::_helpers::relationships::compile_usages::model_schema_scope_usages;
+use crate::scopes::_helpers::declarations::placement::{QualifiedRow, resource_identity};
+use crate::scopes::_helpers::index::scope_objects::{
+    enum_text, field, identity_row, optional_item, qualified_row, read_completeness,
+    read_placement_index, tuple_attribute, value_of,
+};
+use crate::scopes::_helpers::relationships::compile_usages::{
+    MergeRows, SourceRow, merged_usage_rows,
+};
 use crate::scopes::models::ScopeClasses;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
-use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
 
-const RUNTIME_USAGE: usize = 2;
+pub(crate) const RUNTIME_USAGE: usize = 2;
 /// Compile input groups whose items carry declaration usages, after the model inputs.
-const COMPILE_USAGE_GROUPS: [&str; 5] = [
+pub(crate) const COMPILE_USAGE_GROUPS: [&str; 5] = [
     "source_inputs",
     "sql_function_inputs",
     "audit_inputs",
@@ -306,138 +293,6 @@ pub(crate) fn scope_relocated_declarations(
     Ok(relocated.map(|(records, _)| records.unbind()))
 }
 
-/// Relocated records after every move in `moves`, and per record whether it lacks a needed group.
-pub(crate) fn relocated_declarations<'py>(
-    index: &Bound<'py, PyAny>,
-    moves: &[(ResourceIdentity, String)],
-) -> PyResult<Option<(Bound<'py, PyTuple>, Vec<bool>)>> {
-    let py: Python<'py> = index.py();
-    if !read_completeness(index)?[RUNTIME_USAGE] {
-        return Ok(None);
-    }
-    let placement: PlacementIndex = read_placement_index(index)?;
-    let relocations: Option<Vec<Relocation>> = py
-        .compiler_detach(|| Ok(relocate_for_resource_moves(&placement, moves)))
-        .map_err(compiler_error)?;
-    let Some(relocations) = relocations else {
-        return Ok(None);
-    };
-    let classes: ScopeClasses<'_> = ScopeClasses::new(py)?;
-    let records: Bound<'_, PyTuple> = tuple_attribute(index, "declarations")?;
-    let mut moved: Vec<Bound<'py, PyAny>> = Vec::with_capacity(relocations.len());
-    let mut grouping: Vec<bool> = Vec::with_capacity(relocations.len());
-    for item in relocations {
-        let owning_path: Bound<'_, PyAny> = item.owning_path.into_bound_py_any(py)?;
-        let record: Bound<'py, PyAny> = replace(
-            &records.get_item(item.declaration)?,
-            &[
-                ("path", item.path.into_bound_py_any(py)?),
-                (
-                    "scope",
-                    classes.member(RecordId::ScopeKind, item.scope.as_str())?,
-                ),
-                (
-                    "ownership_root",
-                    root_object(&classes, &item.ownership_root)?,
-                ),
-                ("owning_path", owning_path),
-            ],
-        )?;
-        moved.push(record);
-        grouping.push(item.requires_group);
-    }
-    Ok(Some((PyTuple::new(py, moved)?, grouping)))
-}
-
-fn usage_records<'py>(records: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
+pub(crate) fn usage_records<'py>(records: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
     records.try_iter()?.collect()
-}
-
-/// Compile inputs' canonical index with all usage and placement facts.
-pub(crate) fn scope_index_with_compile_usages<'py>(
-    inputs: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = inputs.py();
-    let scope: Bound<'py, PyAny> = native_field(inputs, "declaration_scope")?;
-    let resolver: Bound<'py, PyAny> = if scope.is_none() {
-        scope
-    } else {
-        native_field(&scope, "resolver")?
-    };
-    let schema_files: Bound<'py, PyAny> = native_field(
-        &native_field(inputs, "discovered_inputs")?,
-        "model_schema_files",
-    )?;
-    let mut usages: Vec<Bound<'py, PyAny>> = Vec::new();
-    usages.extend(usage_records(
-        model_schema_scope_usages(&schema_files, &resolver)?.as_any(),
-    )?);
-    let digests: bool = sqlbuild_python_base::compile_context::main::delta::capturing::capturing();
-    for model in native_field(inputs, "model_inputs")?.try_iter()? {
-        let model: Bound<'py, PyAny> = model?;
-        let macro_usages: Vec<Bound<'py, PyAny>> =
-            usage_records(&native_field(&model, "macro_usages")?)?;
-        let declaration_usages: Vec<Bound<'py, PyAny>> =
-            usage_records(&native_field(&model, "declaration_usages")?)?;
-        if digests {
-            sqlbuild_python_base::compile_context::main::image_facts::record_model_usages::record_model_usages(
-                &model,
-                (&macro_usages, &declaration_usages),
-            )?;
-        }
-        usages.extend(macro_usages);
-        usages.extend(declaration_usages);
-    }
-    for group in COMPILE_USAGE_GROUPS {
-        for item in native_field(inputs, group)?.try_iter()? {
-            usages.extend(usage_records(&native_field(&item?, "declaration_usages")?)?);
-        }
-    }
-    let enforce_placement: bool = native_field(
-        &native_field(&native_field(inputs, "project_config")?, "scopes")?,
-        "enforce_placement",
-    )?
-    .extract()?;
-    Ok(scope_placement_validated_index(
-        &native_field(inputs, "scope_index")?,
-        enforce_placement,
-        Some(PyTuple::new(py, usages)?),
-    )?
-    .into_bound(py))
-}
-
-/// Python's `validate_scope_index`: raise one `ScopeValidationError` for its error diagnostics.
-#[pyfunction]
-#[pyo3(signature = (*, index))]
-pub(crate) fn validate_scope_index(index: &Bound<'_, PyAny>) -> Result<(), PyErr> {
-    let py: Python<'_> = index.py();
-    let error: Bound<'_, PyAny> = enum_member(py, RecordId::ScopeDiagnosticSeverity, "ERROR")?;
-    let mut errors: Vec<Bound<'_, PyAny>> = Vec::new();
-    for item in native_field(index, "diagnostics")?.try_iter()? {
-        let item: Bound<'_, PyAny> = item?;
-        if native_field(&item, "severity")?.is(&error) {
-            errors.push(item);
-        }
-    }
-    if errors.is_empty() {
-        return Ok(());
-    }
-    let mut message: String = String::from("Invalid declaration scope index:");
-    for item in &errors {
-        let code: String = native_field(&native_field(item, "code")?, "value")?.extract()?;
-        let text: String = native_field(item, "message")?.extract()?;
-        message.push_str(&format!("\n[{code}] {text}"));
-    }
-    let options: Bound<'_, PyDict> = PyDict::new(py);
-    options.set_item("diagnostics", PyTuple::new(py, errors)?)?;
-    Err(PyErr::from_value(
-        error_class(py, ErrorId::ScopeValidation)?.call((message,), Some(&options))?,
-    ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(validate_scope_index, module)?)?;
-    module.add_function(wrap_pyfunction!(scope_placement_validated_index, module)?)?;
-    module.add_function(wrap_pyfunction!(scope_relocated_declarations, module)?)?;
-    Ok(())
 }

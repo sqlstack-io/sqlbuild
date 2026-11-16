@@ -1,12 +1,10 @@
 //! Register the first compile functions and classes.
 
-use crate::macro_bridge::_helpers::first_compile;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::macro_bridge::_helpers::first_compile::claim_first_compile;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the first compile functions and classes.
-#[inline]
 pub fn register_first_compile(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    first_compile::register(module)
+    module.add_function(wrap_pyfunction!(claim_first_compile, module)?)
 }

@@ -1,14 +1,11 @@
 //! Project metadata stays native until its immutable snapshot is sent over HTTP.
 
-use crate::project_snapshot::models::NativeOrchestrationSnapshot;
 use std::collections::BTreeMap;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::prelude::PyResult;
 use serde_json::Value;
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
-
-use crate::project_snapshot::models::NativeOrchestrationWorker;
 
 /// Duplicate resource identities must fail, rather than silently replacing an earlier node.
 pub(crate) fn insert_node(
@@ -40,9 +37,4 @@ pub(crate) fn destination(value: &sqlbuild_project::models::DestinationFact) -> 
         "logical_database": value.logical_database,
         "logical_schema": value.logical_schema,
     })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeOrchestrationSnapshot>()?;
-    module.add_class::<NativeOrchestrationWorker>()
 }

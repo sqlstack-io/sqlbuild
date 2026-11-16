@@ -149,6 +149,7 @@ crates/sqlbuild-python/src/bindings/_helpers/compile_driver/phases.rs	PreparedCo
 crates/sqlbuild-python/src/bindings/_helpers/compile_driver/python_plan_entries.rs	PythonNodeGraph.selected_sql_refs
 crates/sqlbuild-python/src/bindings/_helpers/compile_driver/selection_phases.rs	PlannerScopeResolution.stale_warning_scope
 crates/sqlbuild-python-project/src/compiled_views/_helpers/project/records.rs	CollectionRendering.value
+crates/sqlbuild-python-project/src/compiled_views/main/project/plain_typed_value.rs	CollectionRendering.value
 crates/sqlbuild-python/src/bindings/_helpers/contract_command/command.rs	ConnectionProgressReporter.on_connection_complete
 crates/sqlbuild-python/src/bindings/_helpers/dag_artifact/rows.rs	SqlValueKind.value
 crates/sqlbuild-python/src/bindings/_helpers/dbt_command/auto_init.rs	DbtInitProgressReporter.complete
@@ -382,7 +383,9 @@ crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/planner.rs	Column
 crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/values.rs	SqlValueKind.value
 crates/sqlbuild-python-front/src/refactor/_helpers/refactor_facts.rs	DeclarationKind.value
 crates/sqlbuild-python-front/src/render/_helpers/declarations/declaration_values.rs	CollectionRendering.value
+crates/sqlbuild-python-front/src/render/main/declarations/constant_declaration_sql.rs	CollectionRendering.value
 crates/sqlbuild-python-front/src/render/_helpers/declarations/declaration_values.rs	VisibilityReason.value
+crates/sqlbuild-python-front/src/render/main/declarations/constant_declaration_sql.rs	VisibilityReason.value
 crates/sqlbuild-python-front/src/render/_helpers/calls/macro_call_classes.rs	DeclarationKind.value
 crates/sqlbuild-python-front/src/render/_helpers/expansion/macro_evaluation.rs	NativeMacroExpansion.render_relation
 crates/sqlbuild-python-front/src/render/_helpers/expansion/macro_expansion.rs	ResourceKind.value
@@ -414,7 +417,7 @@ crates/sqlbuild-python-front/src/scopes/_helpers/index/scope_objects.rs	ScopeDia
 crates/sqlbuild-python-front/src/scopes/_helpers/index/scope_objects.rs	ScopeDiagnosticSeverity.value
 crates/sqlbuild-python-front/src/scopes/_helpers/index/scope_objects.rs	ScopeKind.value
 crates/sqlbuild-python-front/src/scopes/_helpers/index/scope_objects.rs	UsageKind.value
-crates/sqlbuild-python-front/src/scopes/_helpers/checks/scope_validation.rs	ScopeDiagnosticCode.value
+crates/sqlbuild-python-front/src/scopes/main/checks/validate_scope_index.rs	ScopeDiagnosticCode.value
 crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs	ConnectionProgressReporter.on_connection_start
 crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs	NativeProgressProjector.configure_resources
 crates/sqlbuild-python/src/bindings/_helpers/seed_command/command.rs	NativeProgressProjector.consume_resource_terminal

@@ -1,12 +1,11 @@
 //! Register the render functions and classes.
 
-use crate::auditing::_helpers::render;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::auditing::main::render_audit_sql::render_audit_sql;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the render functions and classes.
-#[inline]
 pub fn register_render(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    render::register(module)
+    module.add_function(wrap_pyfunction!(render_audit_sql, module)?)?;
+    Ok(())
 }

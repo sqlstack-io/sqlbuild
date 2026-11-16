@@ -2,11 +2,9 @@
 
 use pyo3::PyErr;
 use pyo3::exceptions::PyKeyError;
-use pyo3::prelude::{
-    Bound, IntoPyObject, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, IntoPyObject, Py, PyAny, PyAnyMethods, PyModule, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyList, PyListMethods, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_render::macro_arguments::errors::ArgumentError;
 use sqlbuild_render::macro_arguments::main::parse_macro_arguments::parse_macro_arguments as parse;
 use sqlbuild_render::macro_arguments::models::{ArgumentValue, MacroArguments};
@@ -62,7 +60,7 @@ impl ArgumentHost for UnicodeHost<'_> {
 
 /// `("ok", positional, keywords, typed references)` or `("error", detail, help, line, column)`.
 #[pyfunction]
-fn parse_macro_arguments(
+pub(crate) fn parse_macro_arguments(
     py: Python<'_>,
     text: &str,
     nested: Vec<(usize, usize)>,
@@ -145,9 +143,4 @@ fn value_row<'py>(py: Python<'py>, value: &ArgumentValue) -> PyResult<Bound<'py,
         ArgumentValue::Positive(inner) => ("+", value_row(py, inner)?).into_pyobject(py)?,
     };
     Ok(row.into_any())
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(parse_macro_arguments, module)?)?;
-    Ok(())
 }

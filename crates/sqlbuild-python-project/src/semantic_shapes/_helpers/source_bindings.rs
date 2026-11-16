@@ -1,23 +1,20 @@
 //! Rebind selected models to source columns the planner already inspected.
 
+use crate::semantic_shapes::main::declared_types::declared_types;
+use crate::semantic_shapes::main::function_names::function_names;
 use std::collections::HashSet;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::analysis::constants::CASE_SENSITIVE_BINDING_DIALECTS;
-use crate::analysis::constants::NATIVE_DIALECT_ALIASES;
+use crate::analysis::constants::{CASE_SENSITIVE_BINDING_DIALECTS, NATIVE_DIALECT_ALIASES};
 use crate::analysis::main::schema_validation_request::schema_validation_request;
 use crate::analysis::main::schema_validations::schema_validations;
 use crate::analysis::models::BindingPositions;
 use crate::analysis::models::SchemaRequestParts;
 use crate::analysis_session::main::infer_native_query_columns::infer_native_query_columns;
-use crate::semantic_shapes::_helpers::declarations::declared_types;
-use crate::semantic_shapes::_helpers::declarations::function_names;
-use crate::semantic_shapes::_helpers::shapes::model_inputs;
-use crate::semantic_shapes::_helpers::shapes::project_shapes;
-use crate::semantic_shapes::_helpers::shapes::published_shape;
+use crate::semantic_shapes::_helpers::shapes::{model_inputs, project_shapes, published_shape};
 use crate::semantic_shapes::constants::SOURCE_REBINDING_ANALYSES;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
@@ -496,8 +493,4 @@ fn call<'py>(callable: &Object<'py>, pairs: &[(&str, Object<'py>)]) -> PyResult<
         arguments.set_item(*name, value)?;
     }
     callable.call((), Some(&arguments))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(source_binding_diagnostics, module)?)
 }

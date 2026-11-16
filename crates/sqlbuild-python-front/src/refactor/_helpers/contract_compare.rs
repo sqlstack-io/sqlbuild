@@ -1,9 +1,9 @@
 //! Contract adoption's comparison of authored contracts with physical warehouse columns.
 
 use pyo3::exceptions::PyException;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 use sqlbuild_host::entries::models::AdapterHost;
 
@@ -24,7 +24,7 @@ const SOURCE_RESOURCE: &str = "source";
 /// Python callables and classes the comparison builds findings with.
 struct Vocabulary<'py> {
     finding: Bound<'py, PyAny>,
-    kinds: Bound<'py, PyAny>,
+    pub(crate) kinds: Bound<'py, PyAny>,
 }
 
 impl<'py> Vocabulary<'py> {
@@ -435,7 +435,7 @@ fn compared<'py>(
 /// `item` compared with its physical columns, or marked missing when there are none.
 #[pyfunction]
 #[pyo3(signature = (*, item, physical_columns, adapter))]
-fn compare_contract_evidence<'py>(
+pub(crate) fn compare_contract_evidence<'py>(
     py: Python<'py>,
     item: &Bound<'py, PyAny>,
     physical_columns: &Bound<'py, PyAny>,
@@ -507,10 +507,4 @@ pub(crate) fn compare_contracts<'py>(
         evidence.push(compared(&vocabulary, (item, &columns), adapter)?);
     }
     PyTuple::new(py, evidence)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(compare_contracts, module)?)?;
-    module.add_function(wrap_pyfunction!(compare_contract_evidence, module)?)?;
-    Ok(())
 }

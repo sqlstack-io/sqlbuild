@@ -10,61 +10,23 @@ use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::ErrorId;
 
 /// Discovered collections of sinks that run with every command.
-const SINK_COLLECTIONS: [&str; 2] = ["event_exporters", "command_output_sinks"];
+pub(crate) const SINK_COLLECTIONS: [&str; 2] = ["event_exporters", "command_output_sinks"];
 
 thread_local! {
     /// Whether the invocation running on this thread passed `--allow-missing-secrets`.
     pub(crate) static INVOCATION_ALLOWS_MISSING_SECRETS: Cell<bool> = const { Cell::new(false) };
 }
 
-/// Whether the running invocation passed `--allow-missing-secrets`.
-pub(crate) fn invocation_allows_missing_secrets() -> bool {
-    INVOCATION_ALLOWS_MISSING_SECRETS.get()
-}
-
-/// `(provider, consumer)` for each usage, named by the usage's own `consumer_name` or else by `consumer`.
-pub(crate) fn provider_uses(
-    usages: &Bound<'_, PyAny>,
+pub(crate) fn usage_pair(
+    usage: &Bound<'_, PyAny>,
     consumer: Option<&str>,
-) -> PyResult<Vec<(String, String)>> {
-    usages
-        .try_iter()?
-        .map(|usage| usage_pair(&usage?, consumer))
-        .collect()
-}
-
-fn usage_pair(usage: &Bound<'_, PyAny>, consumer: Option<&str>) -> PyResult<(String, String)> {
+) -> PyResult<(String, String)> {
     let provider: String = field(usage, "provider_name")?.extract()?;
     let name: String = match consumer {
         Some(name) => name.to_owned(),
         None => field(usage, "consumer_name")?.extract()?,
     };
     Ok((provider, name))
-}
-
-/// `(provider, consumer)` for each provider the named consumers, such as checks or loaders, inject.
-pub(crate) fn consumer_uses(consumers: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
-    let mut uses: Vec<(String, String)> = Vec::new();
-    for consumer in consumers.try_iter()? {
-        let consumer: Bound<'_, PyAny> = consumer?;
-        let name: String = field(&consumer, "name")?.extract()?;
-        uses.extend(provider_uses(
-            &field(&consumer, "provider_usages")?,
-            Some(&name),
-        )?);
-    }
-    Ok(uses)
-}
-
-/// The providers the project's lifecycle and command-output sinks use, which run with every command.
-pub(crate) fn sink_uses(discovered: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
-    let mut uses: Vec<(String, String)> = Vec::new();
-    for collection in SINK_COLLECTIONS {
-        if let Some(sinks) = discovered.getattr_opt(collection)? {
-            uses.extend(consumer_uses(&sinks)?);
-        }
-    }
-    Ok(uses)
 }
 
 /// Fail before anything runs when a provider in `uses` lacks required secrets, listing each with what needs it.

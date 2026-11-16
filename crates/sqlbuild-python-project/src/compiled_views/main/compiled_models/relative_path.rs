@@ -1,12 +1,14 @@
 //! The model file's relative path.
 
-use crate::compiled_views::_helpers::compiled_models::model_reads;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::compiled_views::main::compiled_models::native_model::native_model;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The model file's relative path.
-#[inline]
 pub fn relative_path<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    model_reads::relative_path(model)
+    let py: Python<'py> = model.py();
+    if let Some(view) = native_model(model)? {
+        return Ok(view.relative_path(py)?.into_bound(py));
+    }
+    native_field(model, "relative_path")
 }

@@ -1,12 +1,12 @@
 //! `dialect or "generic"`.
 
-use crate::analysis_session::_helpers::profile_inputs;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::analysis_session::_helpers::profile_inputs::GENERIC_DIALECT;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 
 /// `dialect or "generic"`.
-#[inline]
 pub fn dialect_or_generic(dialect: &Bound<'_, PyAny>) -> PyResult<String> {
-    profile_inputs::dialect_or_generic(dialect)
+    if dialect.is_truthy()? {
+        return dialect.extract();
+    }
+    Ok(GENERIC_DIALECT.to_owned())
 }

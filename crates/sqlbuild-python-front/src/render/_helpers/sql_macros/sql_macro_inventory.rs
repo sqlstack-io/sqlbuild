@@ -1,7 +1,7 @@
 //! SQL macro files parsed and checked when the project's macros load.
 
-use pyo3::prelude::{Bound, PyErr, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use sqlbuild_analysis::sql_macros::constants::CYCLE_CODE;
 use sqlbuild_analysis::sql_macros::errors::SqlMacroError;
 use sqlbuild_analysis::sql_macros::main::parse_sql_macro::parse_sql_macro;
@@ -37,7 +37,10 @@ fn definition_row(definition: SqlMacroDefinition) -> DefinitionRow {
 
 /// Each SQL macro's parameters and calls, or the first file that is not a valid SQL macro.
 #[pyfunction]
-fn inventory_sql_macros(py: Python<'_>, sources: Vec<SourceRow>) -> PyResult<Vec<DefinitionRow>> {
+pub(crate) fn inventory_sql_macros(
+    py: Python<'_>,
+    sources: Vec<SourceRow>,
+) -> PyResult<Vec<DefinitionRow>> {
     let mut definitions: Vec<SqlMacroDefinition> = Vec::with_capacity(sources.len());
     for (name, path, contents) in &sources {
         definitions
@@ -69,8 +72,4 @@ fn inventory_sql_macros(py: Python<'_>, sources: Vec<SourceRow>) -> PyResult<Vec
         return Err(raised(py, &error));
     }
     Ok(definitions.into_iter().map(definition_row).collect())
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(inventory_sql_macros, module)?)
 }

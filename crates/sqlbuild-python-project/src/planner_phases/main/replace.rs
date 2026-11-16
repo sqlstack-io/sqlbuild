@@ -1,15 +1,13 @@
 //! `dataclasses.replace(value, **fields)`.
 
-use crate::planner_phases::_helpers::objects;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 
 /// `dataclasses.replace(value, **fields)`.
-#[inline]
 pub fn replace<'py>(
     value: &Bound<'py, PyAny>,
     fields: &[(&str, Bound<'py, PyAny>)],
 ) -> PyResult<Bound<'py, PyAny>> {
-    objects::replace(value, fields)
+    replaced_keywords(value, &keywords(value.py(), fields)?)
 }

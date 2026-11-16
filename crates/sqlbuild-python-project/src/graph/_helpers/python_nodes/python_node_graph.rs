@@ -1,20 +1,16 @@
 //! The executable Python-node graph built from discovered project inputs.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::graph::main::python_nodes::python_node_graph::python_node_graph;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_analysis::python_selection::main::python_node_graph_indexes::python_node_graph_indexes as graph_indexes;
 use sqlbuild_analysis::python_selection::models::{InventoryIndexes, InventoryNode};
 use sqlbuild_host::entries::models::UserCodeHost;
-use sqlbuild_python_base::native_host::main::within_identity_pass::within_identity_pass;
 
-use crate::graph::_helpers::project::views::compiled_graph_keys;
-use crate::graph::_helpers::python_nodes::python_selection::resolve_python_sql_run_selection;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
-use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::discovery::main::python_files::node_identity::node_identity;
@@ -23,7 +19,7 @@ use sqlbuild_python_front::discovery::main::python_files::provider_usages::provi
 const NAME_KEY: &str = "name";
 
 /// One discovered function collection, its node kind and whether it carries documentation.
-const KINDS: [(&str, &str, bool); 4] = [
+pub(crate) const KINDS: [(&str, &str, bool); 4] = [
     ("loader_functions", "LOADER", false),
     ("task_functions", "TASK", true),
     ("asset_functions", "ASSET", true),
@@ -31,11 +27,11 @@ const KINDS: [(&str, &str, bool); 4] = [
 ];
 
 /// Python classes and shims every node is built with.
-struct Vocabulary<'py> {
-    node: Bound<'py, PyAny>,
-    kinds: Bound<'py, PyAny>,
-    sql_ref: Bound<'py, PyAny>,
-    providers: Bound<'py, PyDict>,
+pub(crate) struct Vocabulary<'py> {
+    pub(crate) node: Bound<'py, PyAny>,
+    pub(crate) kinds: Bound<'py, PyAny>,
+    pub(crate) sql_ref: Bound<'py, PyAny>,
+    pub(crate) providers: Bound<'py, PyDict>,
 }
 
 fn attribute_value<'py>(value: &Bound<'py, PyAny>, name: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -91,7 +87,7 @@ fn kind_metadata<'py>(
 }
 
 /// One `DiscoveredPythonNode` with its identity and provider usages read by the user shims.
-fn python_node<'py>(
+pub(crate) fn python_node<'py>(
     vocabulary: &Vocabulary<'py>,
     (kind, documented): (&str, bool),
     discovered: &Bound<'py, PyAny>,
@@ -135,7 +131,7 @@ fn python_node<'py>(
 }
 
 /// Each node's upstream Python-node names, resolving decorated dependencies through the shim.
-fn upstream_names(
+pub(crate) fn upstream_names(
     py: Python<'_>,
     nodes: &[Bound<'_, PyAny>],
     sql_ref: &Bound<'_, PyAny>,
@@ -171,7 +167,10 @@ fn upstream_names(
         .collect()
 }
 
-fn inventory_node(node: &Bound<'_, PyAny>, upstream: Vec<String>) -> PyResult<InventoryNode> {
+pub(crate) fn inventory_node(
+    node: &Bound<'_, PyAny>,
+    upstream: Vec<String>,
+) -> PyResult<InventoryNode> {
     Ok(InventoryNode {
         name: native_field(node, "name")?.extract()?,
         tags: native_field(node, "tags")?.extract()?,
@@ -182,42 +181,9 @@ fn inventory_node(node: &Bound<'_, PyAny>, upstream: Vec<String>) -> PyResult<In
     })
 }
 
-/// The internal executable Python-node graph of discovered project inputs.
-pub(crate) fn python_node_graph<'py>(
-    discovered_inputs: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = discovered_inputs.py();
-    let providers: Bound<'py, PyDict> = PyDict::new(py);
-    for provider in native_field(discovered_inputs, "providers")?.try_iter()? {
-        let provider: Bound<'py, PyAny> = provider?;
-        providers.set_item(native_field(&provider, "name")?, provider)?;
-    }
-    let vocabulary: Vocabulary<'py> = Vocabulary {
-        node: record_class(py, RecordId::DiscoveredPythonNode)?,
-        kinds: host_entry(py, UserCodeHost::PythonNodeKind)?,
-        sql_ref: host_entry(py, UserCodeHost::SqlResourceRef)?,
-        providers,
-    };
-    let mut nodes: Vec<Bound<'py, PyAny>> = Vec::new();
-    within_identity_pass(py, || {
-        for (collection, kind, documented) in KINDS {
-            for discovered in native_field(discovered_inputs, collection)?.try_iter()? {
-                nodes.push(python_node(&vocabulary, (kind, documented), &discovered?)?);
-            }
-        }
-        Ok(())
-    })?;
-    let inventory: Vec<InventoryNode> = nodes
-        .iter()
-        .zip(upstream_names(py, &nodes, &vocabulary.sql_ref)?)
-        .map(|(node, upstream)| inventory_node(node, upstream))
-        .collect::<PyResult<_>>()?;
-    graph_record(py, &nodes, graph_indexes(&inventory))
-}
-
 type NameRows = Vec<(String, Vec<String>)>;
 
-fn graph_record<'py>(
+pub(crate) fn graph_record<'py>(
     py: Python<'py>,
     nodes: &[Bound<'py, PyAny>],
     indexes: InventoryIndexes,
@@ -290,40 +256,12 @@ fn graph_record<'py>(
     )
 }
 
-/// `PythonSqlRunSelection` of run selectors over the project graph and discovered Python nodes.
-pub(crate) fn run_selection_from_inputs<'py>(
-    (select, exclude): (Vec<String>, Vec<String>),
-    project_graph: &Bound<'py, PyAny>,
-    discovered_inputs: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = project_graph.py();
-    let python_graph: Bound<'py, PyAny> = python_node_graph(discovered_inputs)?;
-    let (sql_keys, python_node_names) =
-        resolve_python_sql_run_selection(project_graph, &python_graph, select, exclude)?;
-    new_record_with(
-        py,
-        RecordId::PythonSqlRunSelection,
-        &[
-            ("sql_keys", compiled_graph_keys(py, sql_keys)?.into_any()),
-            (
-                "python_node_names",
-                PyFrozenSet::new(py, python_node_names)?.into_any(),
-            ),
-        ],
-    )
-}
-
 /// Build the internal executable Python-node graph from discovered project inputs.
 #[pyfunction]
 #[pyo3(signature = (**options))]
-fn build_python_node_graph<'py>(
+pub(crate) fn build_python_node_graph<'py>(
     options: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let request = Request::new("build_python_node_graph", options)?;
     python_node_graph(&request.get("discovered_inputs")?)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(build_python_node_graph, module)?)?;
-    Ok(())
 }

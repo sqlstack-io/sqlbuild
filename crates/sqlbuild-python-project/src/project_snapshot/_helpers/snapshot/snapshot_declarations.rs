@@ -11,7 +11,6 @@ use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_discovery::orchestration_files::models::{
     FilePosition, InitialStatus, NamedModule, OrchestrationInventory, RunFile, ScheduleSource,
 };
-use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::group_dependencies::group_dependencies;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
@@ -25,32 +24,12 @@ use crate::native_host::main::compile_calendars::compile_calendars;
 use crate::native_host::main::compile_sensors::compile_sensors;
 use crate::native_host::models::CalendarRequest;
 use sqlbuild_python_base::orchestration_reads::main::imported_declarations::imported_declarations;
-use sqlbuild_python_base::orchestration_reads::main::module_declarations::module_declarations;
 use sqlbuild_python_base::orchestration_reads::main::run_controls::run_controls;
 use sqlbuild_python_base::orchestration_reads::main::run_resources::run_resources;
 use sqlbuild_python_base::orchestration_reads::models::ImportedDeclarations;
 use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
 use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
 use sqlbuild_rules::lint_text::models::FormatSettings;
-
-/// The calendars and sensors of the inventory's modules, imported by publication and by sensor evaluation.
-pub(crate) fn python_declarations<'py>(
-    py: Python<'py>,
-    project_dir: &Path,
-    inventory: &OrchestrationInventory,
-) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let tree = ProjectTree::new(project_dir);
-    let mut declarations: Vec<Bound<'py, PyAny>> = Vec::new();
-    let mut seen: BTreeSet<usize> = BTreeSet::new();
-    for module in inventory.calendars.iter().chain(&inventory.sensors) {
-        for declaration in module_declarations(py, &tree.absolute(&module.path), project_dir)? {
-            if seen.insert(declaration.as_ptr() as usize) {
-                declarations.push(declaration);
-            }
-        }
-    }
-    Ok(declarations)
-}
 
 /// Where a TOML job or group is declared: its file and the line of its `name`.
 fn file_site(path: &str, position: FilePosition) -> Option<DeclaredAt> {

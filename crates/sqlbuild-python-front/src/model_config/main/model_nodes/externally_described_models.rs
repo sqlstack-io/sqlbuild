@@ -1,9 +1,7 @@
 //! The file path of each model whose layered config or model schema gives it a description.
 
 use crate::model_config::_helpers::model_nodes::described_models;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyDict;
 
 /// The file path of each model whose layered config or model schema gives it a description.

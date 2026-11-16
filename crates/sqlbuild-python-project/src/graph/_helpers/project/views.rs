@@ -1,38 +1,27 @@
 //! The native project graph's indexes as the Python dicts graph consumers read, and back.
 
+use crate::graph::main::nodes::native_key::native_key;
+use crate::graph::main::project::edge_dict::edge_dict;
+use crate::graph::main::project::graph_from_view_mappings::graph_from_view_mappings;
 use crate::graph::models::GraphViewMappings;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRef, PyResult, Python,
-};
-use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
 use sqlbuild_analysis::graph::models::{GraphIndexes, ProjectGraph};
 
-use crate::graph::_helpers::nodes::keys::native_key;
 use crate::graph::models::KeyCache;
 use crate::graph::models::NativeProjectGraph;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
 
 /// The native graph's pairs for `keys`, in order.
 #[pyfunction]
-fn native_graph_keys(keys: &Bound<'_, PyAny>) -> PyResult<Vec<ObjectKey>> {
+pub(crate) fn native_graph_keys(keys: &Bound<'_, PyAny>) -> PyResult<Vec<ObjectKey>> {
     keys.try_iter()?.map(|key| native_key(&key?)).collect()
-}
-
-/// `CompiledObjectKey`s for native graph key pairs.
-#[pyfunction]
-pub(crate) fn compiled_graph_keys<'py>(
-    py: Python<'py>,
-    keys: Vec<ObjectKey>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let cache: KeyCache<'py> = KeyCache::new(py)?;
-    PyFrozenSet::new(py, cache.keys(&keys)?)
 }
 
 /// Selector name to key, in project order, without the other graph views.
@@ -49,20 +38,11 @@ pub(crate) fn lineage_graph_names<'py>(
     Ok(names)
 }
 
-pub(crate) fn edge_dict<'py>(
-    cache: &KeyCache<'py>,
-    edges: &[(ObjectKey, Vec<ObjectKey>)],
-) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = cache.py();
-    let dict: Bound<'py, PyDict> = PyDict::new(py);
-    for (key, deps) in edges {
-        dict.set_item(cache.key(key)?, PyTuple::new(py, cache.keys(deps)?)?)?;
-    }
-    Ok(dict)
-}
-
 /// The native graph's indexes as `LineageGraphViews` dicts, in project order.
-fn graph_views<'py>(py: Python<'py>, graph: &ProjectGraph) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn graph_views<'py>(
+    py: Python<'py>,
+    graph: &ProjectGraph,
+) -> PyResult<Bound<'py, PyAny>> {
     let cache: KeyCache<'py> = KeyCache::new(py)?;
     let tags: Bound<'py, PyDict> = PyDict::new(py);
     for (tag, keys) in &graph.tags {
@@ -94,18 +74,9 @@ pub(crate) fn lineage_graph_views<'py>(
     graph_views(py, graph.graph())
 }
 
-/// The project's lineage edges and selector indexes, from its native graph.
-#[pyfunction]
-pub(crate) fn project_lineage_views<'py>(
-    py: Python<'py>,
-    project: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let graph: PyRef<'py, NativeProjectGraph> =
-        native_field(project, "lineage_graph")?.extract()?;
-    graph_views(py, graph.graph())
-}
-
-fn native_edges(mapping: &Bound<'_, PyAny>) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
+pub(crate) fn native_edges(
+    mapping: &Bound<'_, PyAny>,
+) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
     let mut edges: Vec<(ObjectKey, Vec<ObjectKey>)> = Vec::new();
     for item in mapping_items(mapping)?.try_iter()? {
         let (key, deps): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
@@ -114,14 +85,16 @@ fn native_edges(mapping: &Bound<'_, PyAny>) -> PyResult<Vec<(ObjectKey, Vec<Obje
     Ok(edges)
 }
 
-fn graph_from_dicts(indexes: GraphIndexes) -> PyResult<NativeProjectGraph> {
+pub(crate) fn graph_from_dicts(indexes: GraphIndexes) -> PyResult<NativeProjectGraph> {
     compiler_guard(|| Ok(NativeProjectGraph::new(graph_from_indexes(indexes))))
 }
 
 /// A native graph over these indexes, keeping their order.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn native_graph_from_views(request: Option<&Bound<'_, PyDict>>) -> PyResult<NativeProjectGraph> {
+pub(crate) fn native_graph_from_views(
+    request: Option<&Bound<'_, PyDict>>,
+) -> PyResult<NativeProjectGraph> {
     let Some(request) = request else {
         return Err(pyo3::exceptions::PyTypeError::new_err(
             "native_graph_from_views() missing keyword arguments",
@@ -141,59 +114,4 @@ fn native_graph_from_views(request: Option<&Bound<'_, PyDict>>) -> PyResult<Nati
         tag_index: &field("tag_index")?,
         path_index: &field("path_index")?,
     })
-}
-
-/// A native graph over Python's index mappings, keeping their order.
-pub(crate) fn graph_from_view_mappings(
-    mappings: GraphViewMappings<'_, '_>,
-) -> PyResult<NativeProjectGraph> {
-    let mut names: Vec<(String, ObjectKey)> = Vec::new();
-    for item in mapping_items(mappings.all_keys)?.try_iter()? {
-        let (name, key): (String, Bound<'_, PyAny>) = item?.extract()?;
-        names.push((name, native_key(&key)?));
-    }
-    let mut tags: Vec<(String, Vec<ObjectKey>)> = Vec::new();
-    for item in mapping_items(mappings.tag_index)?.try_iter()? {
-        let (tag, keys): (String, Bound<'_, PyAny>) = item?.extract()?;
-        tags.push((tag, native_graph_keys(&keys)?));
-    }
-    let mut paths: Vec<(ObjectKey, String)> = Vec::new();
-    for item in mapping_items(mappings.path_index)?.try_iter()? {
-        let (key, folder): (Bound<'_, PyAny>, String) = item?.extract()?;
-        paths.push((native_key(&key)?, folder));
-    }
-    graph_from_dicts(GraphIndexes {
-        names,
-        upstream: native_edges(mappings.upstream)?,
-        downstream: native_edges(mappings.downstream)?,
-        tags,
-        paths,
-    })
-}
-
-/// A native graph holding these edges in their order, with no selector indexes.
-#[pyfunction]
-#[pyo3(signature = (*, upstream, downstream))]
-pub(crate) fn native_graph_from_edges(
-    upstream: &Bound<'_, PyAny>,
-    downstream: &Bound<'_, PyAny>,
-) -> PyResult<NativeProjectGraph> {
-    graph_from_dicts(GraphIndexes {
-        names: Vec::new(),
-        upstream: native_edges(upstream)?,
-        downstream: native_edges(downstream)?,
-        tags: Vec::new(),
-        paths: Vec::new(),
-    })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(native_graph_keys, module)?)?;
-    module.add_function(wrap_pyfunction!(compiled_graph_keys, module)?)?;
-    module.add_function(wrap_pyfunction!(lineage_graph_names, module)?)?;
-    module.add_function(wrap_pyfunction!(lineage_graph_views, module)?)?;
-    module.add_function(wrap_pyfunction!(project_lineage_views, module)?)?;
-    module.add_function(wrap_pyfunction!(native_graph_from_views, module)?)?;
-    module.add_function(wrap_pyfunction!(native_graph_from_edges, module)?)?;
-    Ok(())
 }

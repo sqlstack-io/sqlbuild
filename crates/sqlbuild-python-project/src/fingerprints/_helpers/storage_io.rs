@@ -2,11 +2,9 @@
 
 use pyo3::IntoPyObject;
 use pyo3::exceptions::{PyException, PyValueError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::fingerprint_storage::main::create_table_sql::create_table_sql;
 use sqlbuild_analysis::fingerprint_storage::main::read_latest_sql::read_latest_sql;
 use sqlbuild_analysis::fingerprint_storage::main::relevant_read_sql::relevant_read_sql;
@@ -14,10 +12,12 @@ use sqlbuild_analysis::fingerprint_storage::models::RelevantRead;
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::fingerprints::_helpers::latest_rows::fingerprint_input_error;
-use crate::fingerprints::_helpers::latest_rows::fingerprint_set_from_rows;
-use crate::fingerprints::_helpers::storage_sql::fingerprint_insert_batches;
-use crate::fingerprints::_helpers::storage_sql::fingerprint_insert_sql;
+use crate::fingerprints::_helpers::latest_rows::{
+    fingerprint_input_error, fingerprint_set_from_rows,
+};
+use crate::fingerprints::_helpers::storage_sql::{
+    fingerprint_insert_batches, fingerprint_insert_sql,
+};
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 
@@ -274,7 +274,7 @@ fn present<'py>(request: &Request<'_, 'py>, name: &str) -> PyResult<Option<Bound
 /// Fingerprint-table DDL for a target schema.
 #[pyfunction]
 #[pyo3(signature = (*, database, schema, render_qualified_name, render_framework_type))]
-fn build_create_table_sql(
+pub(crate) fn build_create_table_sql(
     database: Option<&str>,
     schema: &str,
     render_qualified_name: &Bound<'_, PyAny>,
@@ -291,7 +291,7 @@ fn build_create_table_sql(
 /// The windowed latest-row read of a target schema's fingerprint table.
 #[pyfunction]
 #[pyo3(signature = (*, database, schema, render_qualified_name))]
-fn build_read_latest_sql(
+pub(crate) fn build_read_latest_sql(
     database: Option<&str>,
     schema: &str,
     render_qualified_name: &Bound<'_, PyAny>,
@@ -392,7 +392,7 @@ pub(crate) fn read_latest_fingerprints<'py>(
 /// Append one fingerprint row, retrying transient concurrent-writer conflicts. With `ensure_table` false the table is assumed to exist and is set up only after the insert fails; returns whether the write set up the table.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn write_fingerprint<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<bool> {
+pub(crate) fn write_fingerprint<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<bool> {
     let request = Request::new("write_fingerprint", request)?;
     let py: Python<'py> = request.py();
     let fingerprint: Bound<'py, PyAny> = request.get("fingerprint")?;
@@ -446,7 +446,7 @@ fn batch_warning<'py>(batch: &[Bound<'py, PyAny>], error: &PyErr) -> PyResult<Re
 /// Append fingerprints with one table setup and bounded multi-row inserts.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn write_fingerprints<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<()> {
+pub(crate) fn write_fingerprints<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<()> {
     let request = Request::new("write_fingerprints", request)?;
     let py: Python<'py> = request.py();
     let fingerprints: Vec<Bound<'py, PyAny>> = request
@@ -485,14 +485,5 @@ fn write_fingerprints<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<()>
             progress.call((), Some(&keywords))?;
         }
     }
-    Ok(())
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(build_create_table_sql, module)?)?;
-    module.add_function(wrap_pyfunction!(build_read_latest_sql, module)?)?;
-    module.add_function(wrap_pyfunction!(read_latest_fingerprints, module)?)?;
-    module.add_function(wrap_pyfunction!(write_fingerprint, module)?)?;
-    module.add_function(wrap_pyfunction!(write_fingerprints, module)?)?;
     Ok(())
 }

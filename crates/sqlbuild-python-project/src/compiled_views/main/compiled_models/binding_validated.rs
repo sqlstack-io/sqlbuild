@@ -1,12 +1,13 @@
 //! Whether the native session validated the model's bindings.
 
-use crate::compiled_views::_helpers::compiled_models::model_reads;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::compiled_views::main::compiled_models::native_model::native_model;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Whether the native session validated the model's bindings.
-#[inline]
 pub fn binding_validated(model: &Bound<'_, PyAny>) -> PyResult<bool> {
-    model_reads::binding_validated(model)
+    if let Some(view) = native_model(model)? {
+        return view.binding_validated(model.py());
+    }
+    native_field(model, "binding_validated")?.is_truthy()
 }

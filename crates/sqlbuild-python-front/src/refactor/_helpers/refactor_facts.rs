@@ -7,7 +7,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple, PyTupleMethods};
 use sqlbuild_refactor::refactoring::models::{
     AuthoredFile, DeclarationPlacement, DependencyFacts, DestinationFacts, DiscoveredFile,
     ExpansionFacts, ExpansionSpan, LocationFacts, ManualLocation, ModelFacts, PlacedDeclaration,
-    RefactorFacts, RefactorOperation, RefactorRequest, RelocatedDeclaration, ResourceColumnsFacts,
+    RefactorOperation, RefactorRequest, RelocatedDeclaration, ResourceColumnsFacts,
     SchemaColumnFacts, SqlFileRole, UnitTestFacts,
 };
 use sqlbuild_scopes::scope_index::models::{ResourceIdentity, ResourceKind};
@@ -17,11 +17,10 @@ use crate::refactor::_helpers::python_strings::find_python_string_locations;
 use crate::scopes::main::checks::relocated_declarations::relocated_declarations;
 use crate::scopes::main::index::build_scope_lookup::build_scope_lookup;
 use crate::scopes::main::reports::scope_move_preview::scope_move_preview;
-use crate::scopes::main::reports::scope_rebound_usages::scope_rebound_usages;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const SQL_SUFFIX: &str = ".sql";
-const GENERIC_DIALECT: &str = "generic";
+pub(crate) const GENERIC_DIALECT: &str = "generic";
 const MATERIALIZED_KEY: &str = "materialized";
 const MIGRATE_FROM_KEY: &str = "migrate_from";
 const MODEL_KIND_PREFIX: &str = "model:";
@@ -30,7 +29,7 @@ fn posix(path: &Bound<'_, PyAny>) -> PyResult<String> {
     path.call_method0("as_posix")?.extract()
 }
 
-fn discovered_files(files: &Bound<'_, PyAny>) -> PyResult<Vec<DiscoveredFile>> {
+pub(crate) fn discovered_files(files: &Bound<'_, PyAny>) -> PyResult<Vec<DiscoveredFile>> {
     let mut discovered: Vec<DiscoveredFile> = Vec::new();
     for item in files.try_iter()? {
         let item: Bound<'_, PyAny> = item?;
@@ -49,7 +48,7 @@ fn column_names(columns: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
         .collect()
 }
 
-fn resource_columns(
+pub(crate) fn resource_columns(
     resources: &Bound<'_, PyAny>,
     entry: &str,
 ) -> PyResult<Vec<ResourceColumnsFacts>> {
@@ -113,7 +112,10 @@ fn schema_columns(entry: &Bound<'_, PyAny>) -> PyResult<Option<Vec<SchemaColumnF
     Ok(Some(columns))
 }
 
-fn model(model: &Bound<'_, PyAny>, expansion: Option<&Bound<'_, PyAny>>) -> PyResult<ModelFacts> {
+pub(crate) fn model(
+    model: &Bound<'_, PyAny>,
+    expansion: Option<&Bound<'_, PyAny>>,
+) -> PyResult<ModelFacts> {
     let py: Python<'_> = model.py();
     let values: Bound<'_, PyDict> = PyDict::new(py);
     values.call_method1(
@@ -158,38 +160,6 @@ fn model(model: &Bound<'_, PyAny>, expansion: Option<&Bound<'_, PyAny>>) -> PyRe
     })
 }
 
-/// Every compiled model's refactoring facts, or none without a project.
-pub(crate) fn model_facts(
-    refactor_project: &Bound<'_, PyAny>,
-) -> PyResult<Option<Vec<ModelFacts>>> {
-    if refactor_project.is_none() {
-        return Ok(None);
-    }
-    let project: Bound<'_, PyAny> =
-        native_field(&native_field(refactor_project, "graph")?, "project")?;
-    let project_dir: Bound<'_, PyAny> = native_field(refactor_project, "project_dir")?;
-    let mut expansions: HashMap<String, Bound<'_, PyAny>> = HashMap::new();
-    let items: Vec<Bound<'_, PyAny>> = native_field(&project, "sql_expansions")?
-        .call_method0("items")?
-        .try_iter()?
-        .collect::<PyResult<_>>()?;
-    for item in items.iter().rev() {
-        let (path, expansion): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item.extract()?;
-        expansions.insert(path.call_method0("resolve")?.str()?.extract()?, expansion);
-    }
-    let mut facts: Vec<ModelFacts> = Vec::new();
-    for compiled in native_field(&project, "models")?.try_iter()? {
-        let compiled: Bound<'_, PyAny> = compiled?;
-        let resolved: String = project_dir
-            .div(native_field(&compiled, "relative_path")?)?
-            .call_method0("resolve")?
-            .str()?
-            .extract()?;
-        facts.push(model(&compiled, expansions.get(&resolved))?);
-    }
-    Ok(Some(facts))
-}
-
 fn block_bodies(blocks: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     blocks
         .try_iter()?
@@ -205,7 +175,7 @@ struct FileGroup {
     blocks: bool,
 }
 
-fn authored_files(discovered: &Bound<'_, PyAny>) -> PyResult<Vec<AuthoredFile>> {
+pub(crate) fn authored_files(discovered: &Bound<'_, PyAny>) -> PyResult<Vec<AuthoredFile>> {
     let groups: [FileGroup; 6] = [
         FileGroup {
             role: SqlFileRole::Test,
@@ -270,7 +240,7 @@ fn authored_files(discovered: &Bound<'_, PyAny>) -> PyResult<Vec<AuthoredFile>> 
     Ok(files)
 }
 
-fn python_locations(
+pub(crate) fn python_locations(
     project: &Bound<'_, PyAny>,
     request: &RefactorRequest,
 ) -> PyResult<Vec<ManualLocation>> {
@@ -308,7 +278,7 @@ fn python_locations(
 }
 
 /// Whether `request` moves a model without renaming it: a folder, or a file of the same name.
-fn move_keeps_name(request: &RefactorRequest) -> bool {
+pub(crate) fn move_keeps_name(request: &RefactorRequest) -> bool {
     if request.operation != RefactorOperation::MoveModel {
         return false;
     }
@@ -319,44 +289,8 @@ fn move_keeps_name(request: &RefactorRequest) -> bool {
     }
 }
 
-/// The facts one refactoring plan of `requests` reads.
-pub(crate) fn refactor_facts(
-    project: &Bound<'_, PyAny>,
-    requests: &[RefactorRequest],
-) -> PyResult<RefactorFacts> {
-    let mut locations: Vec<ManualLocation> = Vec::new();
-    for request in requests {
-        if !move_keeps_name(request) {
-            locations.extend(python_locations(project, request)?);
-        }
-    }
-    let compiled: Bound<'_, PyAny> = native_field(&native_field(project, "graph")?, "project")?;
-    let discovered: Bound<'_, PyAny> = native_field(project, "discovered")?;
-    let dialect: Option<String> = native_field(&compiled, "sql_analysis_dialect")?.extract()?;
-    let mut yaml_files: Vec<DiscoveredFile> =
-        discovered_files(&native_field(&discovered, "source_files")?)?;
-    yaml_files.extend(discovered_files(&native_field(
-        &discovered,
-        "schema_files",
-    )?)?);
-    Ok(RefactorFacts {
-        project_dir: native_field(project, "project_dir")?.str()?.extract()?,
-        dialect: dialect
-            .filter(|dialect| !dialect.is_empty())
-            .unwrap_or_else(|| GENERIC_DIALECT.to_owned()),
-        models: model_facts(project)?.unwrap_or_default(),
-        sources: resource_columns(&native_field(&compiled, "sources")?, "source_entry")?,
-        seeds: resource_columns(&native_field(&compiled, "seeds")?, "schema_entry")?,
-        model_files: discovered_files(&native_field(&discovered, "model_files")?)?,
-        authored_files: authored_files(&discovered)?,
-        yaml_files,
-        unit_tests: unit_tests(&compiled)?,
-        python_locations: locations,
-    })
-}
-
 /// Every compiled SQL unit test with its file, header name and target models.
-fn unit_tests(compiled: &Bound<'_, PyAny>) -> PyResult<Vec<UnitTestFacts>> {
+pub(crate) fn unit_tests(compiled: &Bound<'_, PyAny>) -> PyResult<Vec<UnitTestFacts>> {
     let mut tests: Vec<UnitTestFacts> = Vec::new();
     for test in native_field(compiled, "sql_tests")?.try_iter()? {
         let test: Bound<'_, PyAny> = test?;
@@ -374,20 +308,6 @@ fn unit_tests(compiled: &Bound<'_, PyAny>) -> PyResult<Vec<UnitTestFacts>> {
 
 fn identity_key(identity: &Bound<'_, PyAny>) -> PyResult<String> {
     identity.repr()?.extract()
-}
-
-/// Scoped declarations the test file at `path` uses that resolve differently from `destination`.
-pub(crate) fn unit_test_rebindings(
-    project: &Bound<'_, PyAny>,
-    paths: (&str, &str),
-) -> PyResult<Option<Vec<String>>> {
-    let py: Python<'_> = project.py();
-    let index: Bound<'_, PyAny> = native_field(
-        &native_field(&native_field(project, "graph")?, "project")?,
-        "scope_index",
-    )?;
-    let lookup: Bound<'_, PyAny> = build_scope_lookup(py, &index)?.into_bound(py);
-    scope_rebound_usages(py, &lookup, paths)
 }
 
 /// Where scope placement puts declarations once every `(model, destination)` moves together.

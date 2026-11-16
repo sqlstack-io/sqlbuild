@@ -1,16 +1,16 @@
 //! `fit_artifact_logical_name`, raising `SharedInputError` when the name cannot fit.
 
-use crate::relation_naming::_helpers::fitting;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use crate::relation_naming::main::shared_error::shared_error;
+use pyo3::prelude::{PyResult, Python};
+use sqlbuild_analysis::identifier_fitting::main::fit_artifact_logical_name::fit_artifact_logical_name as fit_logical;
 
 /// `fit_artifact_logical_name`, raising `SharedInputError` when the name cannot fit.
-#[inline]
 pub fn fitted_logical_name(
     py: Python<'_>,
     names: (&str, &str),
     identifier_limit: i64,
     artifact_label: &str,
 ) -> PyResult<String> {
-    fitting::fitted_logical_name(py, names, identifier_limit, artifact_label)
+    fit_logical(names, identifier_limit, artifact_label)
+        .map_err(|message| shared_error(py, message))
 }

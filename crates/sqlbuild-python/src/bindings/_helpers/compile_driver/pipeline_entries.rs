@@ -11,8 +11,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::graph::models::CompiledProjectGraph;
-use sqlbuild_python_project::graph::models::NativeProjectGraph;
+use sqlbuild_python_project::graph::models::{CompiledProjectGraph, NativeProjectGraph};
 
 /// Discovered Python node functions whose selectors need the Python graph.
 const PYTHON_NODE_FUNCTIONS: [&str; 4] = [

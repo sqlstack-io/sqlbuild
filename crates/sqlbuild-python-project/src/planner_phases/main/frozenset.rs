@@ -1,13 +1,9 @@
 //! A frozenset of the items.
 
-use crate::planner_phases::_helpers::objects;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use pyo3::types::PyFrozenSet;
 
 /// A frozenset of the items.
-#[inline]
 pub fn frozenset<'py>(py: Python<'py>, items: &[Bound<'py, PyAny>]) -> PyResult<Bound<'py, PyAny>> {
-    objects::frozenset(py, items)
+    Ok(PyFrozenSet::new(py, items)?.into_any())
 }

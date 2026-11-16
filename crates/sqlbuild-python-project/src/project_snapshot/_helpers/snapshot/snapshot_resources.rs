@@ -1,5 +1,6 @@
 //! Sources, functions and audits are read from their retained native records.
 
+use crate::project_snapshot::main::relative_path::relative_path;
 use std::collections::BTreeMap;
 
 use pyo3::prelude::{PyAnyMethods, PyResult, Python};
@@ -10,13 +11,12 @@ use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 use crate::compiled_project::main::plain_value::plain_value;
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::models::NativeProjectView;
-use crate::project_snapshot::_helpers::snapshot::snapshot::dependency_keys;
-use crate::project_snapshot::_helpers::snapshot::snapshot::destination;
-use crate::project_snapshot::_helpers::snapshot::snapshot::insert_node;
-use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::boundary_nodes;
-use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::columns;
-use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::metadata;
-use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::relative_path;
+use crate::project_snapshot::_helpers::snapshot::snapshot::{
+    dependency_keys, destination, insert_node,
+};
+use crate::project_snapshot::_helpers::snapshot::snapshot_boundary::{
+    boundary_nodes, columns, metadata,
+};
 use crate::resource_views::models::NativeCompiledFunction;
 
 pub(crate) fn resource_nodes(

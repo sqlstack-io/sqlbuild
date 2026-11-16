@@ -1,39 +1,24 @@
 //! Authored trigger controls and bounded calendars evaluated only in the location interpreter.
 
-use crate::native_host::models::CalendarRequest;
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::collections::BTreeSet;
 
-use chrono::{DateTime, TimeDelta, Timelike, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use chrono_tz::Tz;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyDictMethods};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::types::{PyDict, PyDictMethods};
 use serde_json::{Value, json};
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_cursor::algebra::main::parse_duration::parse_duration;
-use sqlbuild_host::entries::models::UserCodeHost;
-use sqlbuild_orchestration::declarations::models::{Definitions, Schedule, TriggerDefinition};
+use sqlbuild_orchestration::declarations::models::Schedule;
 use sqlbuild_orchestration::scheduler::constants::MAX_TICKS_PER_BATCH;
-use sqlbuild_orchestration::sensors::models::SensorDefinition;
-use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::graph::models::ProjectSelection;
-use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::constants::CALENDAR_WINDOW_PARAMETER;
 use sqlbuild_python_base::native_host::constants::SOURCE_NEW_DATA_CONDITION;
 use sqlbuild_python_base::native_host::constants::SOURCE_STALE_CONDITION;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
-use sqlbuild_python_base::orchestration_reads::main::callback_code_hash::callback_code_hash;
-use sqlbuild_python_base::orchestration_reads::main::declared_at::declared_at;
-use sqlbuild_python_base::orchestration_reads::main::orchestration_code_hash::orchestration_code_hash;
-use sqlbuild_python_base::orchestration_reads::models::AuthoredSensor;
-use sqlbuild_python_front::discovery::main::python_files::discover_provider_classes::discover_provider_classes;
-use sqlbuild_python_front::discovery::main::python_files::provider_by_name::provider_by_name;
 use sqlbuild_python_front::discovery::main::python_files::provider_usages::provider_usages;
-use sqlbuild_python_front::discovery::models::SecretPolicy;
 
 fn horizon(value: &str) -> PyResult<TimeDelta> {
     let invalid = || {
@@ -63,7 +48,7 @@ fn horizon(value: &str) -> PyResult<TimeDelta> {
     TimeDelta::try_seconds(seconds).ok_or_else(invalid)
 }
 
-fn calendar_times(
+pub(crate) fn calendar_times(
     (authored, timezone): (&Bound<'_, PyAny>, &str),
     session: &Bound<'_, PyAny>,
     providers: &Bound<'_, PyDict>,
@@ -142,132 +127,7 @@ fn calendar_times(
     })
 }
 
-/// Each calendar request's trigger, with each (calendar, timezone) pair evaluated once.
-pub(crate) fn compile_calendars(
-    py: Python<'_>,
-    project_dir: &Path,
-    (calendars, requests): (&BTreeMap<String, Bound<'_, PyAny>>, Vec<CalendarRequest>),
-    mut definitions: Definitions,
-) -> PyResult<Definitions> {
-    if requests.is_empty() {
-        return Ok(definitions);
-    }
-    let providers = discover_provider_classes(
-        imported(py, "pathlib", "Path")?.call1((project_dir,))?,
-        SecretPolicy::Defer.name(),
-    )?;
-    let by_name = provider_by_name(&providers)?;
-    let session = call_with(
-        &entry(py, UserCodeHost::BuildProviderSession)?,
-        &[
-            ("discovered_providers", providers),
-            ("allow_shared", PyBool::new(py, false).to_owned().into_any()),
-        ],
-    )?;
-    let now = Utc::now();
-    let start = now
-        .with_nanosecond(now.timestamp_subsec_micros() * 1_000)
-        .ok_or_else(|| PyValueError::new_err("calendar clock is out of range"))?;
-    within(&session, |_| {
-        let mut evaluated: BTreeMap<(String, String), Schedule> = BTreeMap::new();
-        for request in requests {
-            let key = (request.calendar.clone(), request.timezone.clone());
-            let schedule = match evaluated.get(&key) {
-                Some(schedule) => schedule.clone(),
-                None => {
-                    let calendar = calendars.get(&request.calendar).ok_or_else(|| {
-                        PyValueError::new_err(format!(
-                            "calendar '{}' is not declared by a calendar module",
-                            request.calendar
-                        ))
-                    })?;
-                    let schedule =
-                        calendar_times((calendar, &request.timezone), &session, &by_name, start)
-                            .map_err(|error| {
-                                PyValueError::new_err(format!(
-                                    "calendar '{}': {error}",
-                                    request.calendar
-                                ))
-                            })?;
-                    evaluated.insert(key, schedule.clone());
-                    schedule
-                }
-            };
-            let mut trigger = TriggerDefinition {
-                schedule,
-                ..request.trigger
-            };
-            trigger.starts_at.get_or_insert(start);
-            definitions
-                .triggers
-                .insert(trigger.job_key.clone(), trigger);
-        }
-        Ok(definitions)
-    })
-}
-
-pub(crate) fn compile_sensors(
-    py: Python<'_>,
-    (project_dir, input, graph): (&Path, &SnapshotInput, (&ProjectGraph, &ProjectSelection)),
-    authored: Vec<AuthoredSensor>,
-    mut definitions: Definitions,
-) -> PyResult<Definitions> {
-    let sources = if authored.iter().any(|sensor| sensor.function.is_some()) {
-        orchestration_code_hash(project_dir)?
-    } else {
-        String::new()
-    };
-    for sensor in authored {
-        if !sensor.targets.is_empty() && !sensor.targets.iter().any(|value| value == &input.target)
-        {
-            continue;
-        }
-        let condition = match (sensor.when, sensor.function) {
-            (Some(when), None) => {
-                let mut condition = json!({"kind": when.kind});
-                if when.kind == SOURCE_STALE_CONDITION {
-                    condition["after_seconds"] = when.after_seconds;
-                } else if when.kind != SOURCE_NEW_DATA_CONDITION {
-                    condition["kinds"] = json!(when.kinds);
-                }
-                if let Some(job) = when.job {
-                    condition["job_key"] = json!(job);
-                }
-                if let Some(select) = when.select {
-                    let selectors: Vec<String> =
-                        select.split_whitespace().map(str::to_owned).collect();
-                    condition["selection"] = sensor_nodes(graph, &selectors, &when.kind)?;
-                }
-                if let Some(selectors) = when.executed_successfully {
-                    condition["executed_successfully"] =
-                        sensor_nodes(graph, &selectors, "executed_successfully")?;
-                }
-                condition
-            }
-            (None, Some(function)) => json!({"kind": "custom", "function": sensor.name,
-                "code_hash": callback_code_hash(function.bind(py), &sources)?}),
-            _ => {
-                return Err(PyValueError::new_err(
-                    "sensor needs either a built-in condition or a decorated polling callback; callbacks with when are not supported yet",
-                ));
-            }
-        };
-        let definition: SensorDefinition = serde_json::from_value(json!({
-            "description": sensor.description,
-            "job_key": sensor.run,
-            "when": condition,
-            "minimum_interval_seconds": sensor.minimum_interval_seconds,
-            "default_status": sensor.default_status,
-            "targets": sensor.targets,
-            "declared_at": declared_at(project_dir, sensor.declared_at)?,
-        }))
-        .map_err(|error| PyValueError::new_err(format!("sensor {}: {error}", sensor.name)))?;
-        definitions.sensors.insert(sensor.name, definition);
-    }
-    Ok(definitions)
-}
-
-fn sensor_nodes(
+pub(crate) fn sensor_nodes(
     (graph, selected): (&ProjectGraph, &ProjectSelection),
     selectors: &[String],
     field: &str,

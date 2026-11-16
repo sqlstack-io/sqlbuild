@@ -1,25 +1,18 @@
 //! The native model analysis session and expression-source shapes.
 
-use crate::analysis_session::models::CacheStatsRow;
 use crate::analysis_session::models::FamilyRow;
 use crate::analysis_session::models::ModelRow;
-use crate::analysis_session::models::NativeModelAnalysisSession;
-use crate::analysis_session::models::PivotRequestRow;
 use crate::analysis_session::models::ProofRow;
 use crate::analysis_session::models::RequestRow;
-use pyo3::prelude::{Bound, Py, PyAny, PyErr, PyModule, PyModuleMethods, PyRef, PyResult, Python};
+use pyo3::prelude::{Py, PyAny, PyErr, PyRef, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict;
-use sqlbuild_analysis::assembly::analysis_session::main::attach_analysis_cache::attach_analysis_cache;
 use sqlbuild_analysis::assembly::analysis_session::main::expression_shapes::expression_shapes;
 use sqlbuild_analysis::assembly::analysis_session::main::model_reference_facts::model_reference_facts;
 use sqlbuild_analysis::assembly::analysis_session::main::names_set_operation::names_set_operation;
-use sqlbuild_analysis::assembly::analysis_session::main::prove_dynamic_contracts::prove_dynamic_contracts;
-use sqlbuild_analysis::assembly::analysis_session::main::start_analysis_session::start_analysis_session;
 use sqlbuild_analysis::assembly::analysis_session::models::{
-    AnalysisSession, ColumnFact, DynamicFamily, ExpressionShape, ExpressionShapeRequest,
-    LineageFacts, LineageRow, ModelOutcome, ModelRequest, PivotBatchRequest, PivotModel,
-    PivotOutcome, PivotTables, SessionRequest, SessionStep,
+    ColumnFact, DynamicFamily, ExpressionShape, ExpressionShapeRequest, LineageFacts, LineageRow,
+    ModelOutcome, ModelRequest, PivotModel, PivotOutcome, SessionRequest, SessionStep,
 };
 use sqlbuild_analysis::assembly::analysis_session::types::{Pairs, Shapes};
 use sqlbuild_analysis::semantic_validation::models::DiagnosticRow;
@@ -29,15 +22,13 @@ use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults
 use sqlbuild_core::constants::PANIC_MESSAGE;
 use sqlbuild_core::panics::main::is_compiler_panic::is_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
-use std::path::PathBuf;
 
 use crate::analysis::models::Positional;
 use crate::analysis::models::ProjectCatalog;
-use crate::analysis_session::_helpers::nullability_rules::RuleFailure;
-use crate::analysis_session::_helpers::nullability_rules::nullability_callback;
-use crate::analysis_session::_helpers::nullability_rules::raised;
+use crate::analysis_session::_helpers::nullability_rules::{
+    RuleFailure, nullability_callback, raised,
+};
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
-use sqlbuild_python_base::cache::main::open_store::open_store;
 use sqlbuild_python_base::types::CompilerDetach;
 
 /// `(name, type, nullability)`.
@@ -97,7 +88,7 @@ pub(crate) type FinishRow = (Shapes, Vec<String>, Vec<bool>);
 const SESSION_CONTEXT: &str = "native model analysis";
 const SHAPES_CONTEXT: &str = "native expression-source shapes";
 /// The native store kind holding finished model analyses.
-const MODEL_ANALYSIS_STORE_KIND: &str = "model-analyses";
+pub(crate) const MODEL_ANALYSIS_STORE_KIND: &str = "model-analyses";
 
 /// An internal native failure of the session as `NativeCompilerError`.
 pub(crate) fn internal_error(reason: &str) -> PyErr {
@@ -105,59 +96,6 @@ pub(crate) fn internal_error(reason: &str) -> PyErr {
         return compiler_error(reason);
     }
     compiler_error(native_failure(SESSION_CONTEXT, reason))
-}
-
-/// Start a session on `catalog`.
-pub(crate) fn start_model_analysis_session(
-    catalog: PyRef<'_, ProjectCatalog>,
-    request: RequestRow,
-    cache: Option<(PathBuf, String)>,
-    adapter_rules: Option<(Py<PyDict>, Py<PyAny>)>,
-) -> PyResult<NativeModelAnalysisSession> {
-    let py: Python<'_> = catalog.py();
-    let mut request: SessionRequest =
-        sqlbuild_python_base::compile_context::main::delta::inject_relations::inject_relations(
-            session_request(request),
-        )?;
-    let rule_failure: RuleFailure = RuleFailure::default();
-    let dialect: String = request.dialect.clone();
-    request.nullability_callback = adapter_rules
-        .map(|(rules, nullability)| nullability_callback(rules, nullability, rule_failure.clone()));
-    let catalog = &catalog.inner;
-    let mut session: AnalysisSession = py
-        .compiler_detach(|| start_analysis_session(request, catalog))
-        .map_err(|reason| internal_error(&reason))?;
-    let cache: Option<(PathBuf, String)> = cache.filter(|_| {
-        sqlbuild_python_base::compile_context::main::delta::injection::injection().is_none()
-    });
-    let mut cache_path: Option<PathBuf> = None;
-    let mut cache_stats: Option<CacheStatsRow> = None;
-    if let Some((path, environment)) = cache {
-        match open_store(py, &path, MODEL_ANALYSIS_STORE_KIND, &environment) {
-            Ok(store) => {
-                attach_analysis_cache(&mut session, store);
-                cache_path = Some(path);
-            }
-            Err(error) => {
-                cache_stats = Some(CacheStatsRow {
-                    hits: 0,
-                    misses: 0,
-                    stored: 0,
-                    failure: Some(error.to_string()),
-                });
-            }
-        }
-    }
-    Ok(NativeModelAnalysisSession {
-        inner: Some(session),
-        finished: None,
-        outcomes: Vec::new(),
-        sharing: (0, 0),
-        cache_path,
-        cache_stats,
-        rule_failure,
-        dialect,
-    })
 }
 
 /// Each expression's shape, `None` where it has none; adapter rules run as in the session.
@@ -202,7 +140,7 @@ pub(crate) fn infer_expression_source_shapes(
         .collect())
 }
 
-fn session_request(request: RequestRow) -> SessionRequest {
+pub(crate) fn session_request(request: RequestRow) -> SessionRequest {
     let RequestRow {
         dialect,
         case_sensitive_shapes,
@@ -357,45 +295,10 @@ pub(crate) fn outcome_row(outcome: ModelOutcome, cleaned_sql: String) -> Outcome
     }
 }
 
-/// Each model's dynamic pivot proof outside any session.
-#[pyfunction]
-pub(crate) fn prove_dynamic_column_contracts(
-    py: Python<'_>,
-    request: PivotRequestRow,
-) -> PyResult<Vec<ContractRow>> {
-    let PivotRequestRow {
-        dialect,
-        column_types,
-        authoritative_types,
-        column_nullability,
-        families_by_table: by_table,
-        models,
-    } = request;
-    let request = PivotBatchRequest {
-        tables: PivotTables {
-            dialect,
-            column_types,
-            authoritative_types,
-            column_nullability,
-            families_by_table: families_by_table(by_table),
-        },
-        models: models.into_iter().map(pivot_model).collect(),
-    };
-    let outcomes: Vec<PivotOutcome> = py
-        .compiler_detach(|| prove_dynamic_contracts(&request))
-        .map_err(|reason| internal_error(&reason))?;
-    Ok(outcomes.into_iter().map(contract_row).collect())
-}
-
 pub(crate) fn pivot_model(row: PivotModelRow) -> PivotModel {
     let (sql, families) = row;
     PivotModel {
         sql,
         families: families.into_iter().map(dynamic_family).collect(),
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeModelAnalysisSession>()?;
-    Ok(())
 }

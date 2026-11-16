@@ -46,8 +46,7 @@ use sqlbuild_python_front::discovery::main::failures::microbatch_guidance::micro
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::project::functions::functions;
 use sqlbuild_python_project::planner_phases::main::object::object;
-use sqlbuild_python_project::planner_strategy::models::CursorInputLookups;
-use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
+use sqlbuild_python_project::planner_strategy::models::{CursorInputLookups, ModelEntryDecisions};
 use sqlbuild_python_project::semantic_shapes::main::source_binding_diagnostics::source_binding_diagnostics;
 
 const MICROBATCH_COMPLEXITY_CODE: &str = "MICROBATCH_CONCURRENCY_COMPLEXITY";

@@ -1,13 +1,9 @@
 //! A tuple of the items.
 
-use crate::planner_phases::_helpers::objects;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use pyo3::types::PyTuple;
 
 /// A tuple of the items.
-#[inline]
 pub fn tuple<'py>(py: Python<'py>, items: Vec<Bound<'py, PyAny>>) -> PyResult<Bound<'py, PyAny>> {
-    objects::tuple(py, items)
+    Ok(PyTuple::new(py, items)?.into_any())
 }

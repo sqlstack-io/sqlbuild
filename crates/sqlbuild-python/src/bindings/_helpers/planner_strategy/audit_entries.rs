@@ -45,10 +45,9 @@ use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_project::planner_strategy::constants::AUDIT_TYPES_MODULE;
-use sqlbuild_python_project::planner_strategy::constants::COMPILE_TYPES_MODULE;
-use sqlbuild_python_project::planner_strategy::constants::MODEL_ATTACHMENT;
-use sqlbuild_python_project::planner_strategy::constants::SOURCE_ATTACHMENT;
+use sqlbuild_python_project::planner_strategy::constants::{
+    AUDIT_TYPES_MODULE, COMPILE_TYPES_MODULE, MODEL_ATTACHMENT, SOURCE_ATTACHMENT,
+};
 use sqlbuild_python_project::planner_strategy::models::AuditPlanning;
 
 /// One attribute read of a compiled audit.

@@ -1,10 +1,7 @@
 //! Every model's column contract diagnostics in model order; no build is staged without `adapter_default`.
 
 use crate::contracts::_helpers::contract_diagnostics;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 /// Every model's column contract diagnostics in model order; no build is staged without `adapter_default`.
 #[inline]

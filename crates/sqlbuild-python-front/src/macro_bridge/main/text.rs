@@ -1,13 +1,14 @@
 //! A Python `str` as JSON text; one holding a lone surrogate as UTF-16 code units.
 
-use crate::macro_bridge::_helpers::store_keys;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyResult;
-use pyo3::types::PyString;
+use pyo3::prelude::{Bound, PyResult};
+use pyo3::types::{PyString, PyStringMethods};
 use sqlbuild_core::json::models::JsonValue;
+use sqlbuild_python_base::boundary::main::utf16_units::utf16_units;
 
 /// A Python `str` as JSON text; one holding a lone surrogate as UTF-16 code units.
-#[inline]
 pub fn text(value: &Bound<'_, PyString>) -> PyResult<JsonValue> {
-    store_keys::text(value)
+    match value.to_str() {
+        Ok(text) => Ok(JsonValue::String(text.to_owned())),
+        Err(_) => utf16_units(value).map(JsonValue::Utf16),
+    }
 }

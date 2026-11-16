@@ -1,12 +1,13 @@
 //! The model's compiled query SQL.
 
-use crate::compiled_views::_helpers::compiled_models::model_reads;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::compiled_views::main::compiled_models::native_model::native_model;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The model's compiled query SQL.
-#[inline]
 pub fn query_sql<'py>(model: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    model_reads::query_sql(model)
+    if let Some(view) = native_model(model)? {
+        return Ok(view.query_sql(model.py())?.into_any());
+    }
+    native_field(model, "query_sql")
 }

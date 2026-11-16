@@ -1,10 +1,7 @@
 //! Return P005, P007 and P008 errors and unmatched Python-SQL relations; raise P001.
 
 use crate::references::_helpers::explicit_references;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 /// Return P005, P007 and P008 errors and unmatched Python-SQL relations; raise P001.
 #[inline]

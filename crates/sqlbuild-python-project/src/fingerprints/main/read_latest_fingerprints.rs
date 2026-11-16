@@ -1,9 +1,7 @@
 //! The latest fingerprint per node identity, read with the adapter-rendered latest-row SQL.
 
 use crate::fingerprints::_helpers::storage_io;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyDict;
 
 /// The latest fingerprint per node identity, read with the adapter-rendered latest-row SQL.

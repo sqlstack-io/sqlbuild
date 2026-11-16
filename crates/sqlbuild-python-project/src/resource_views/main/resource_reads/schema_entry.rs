@@ -1,12 +1,28 @@
 //! A resource's `schema_entry` from whichever native view it is; any other object is read by attribute, counted.
 
-use crate::resource_views::_helpers::resource_reads;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::compiled_views::models::NativeCompiledModel;
+use crate::resource_views::models::NativeCompiledSeed;
+use pyo3::IntoPyObjectExt;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use sqlbuild_python_base::compile_driver::constants::COMPILED_VIEW_FALLBACKS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// A resource's `schema_entry` from whichever native view it is; any other object is read by attribute, counted.
-#[inline]
 pub fn schema_entry<'py>(resource: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    resource_reads::schema_entry(resource)
+    let py: Python<'py> = resource.py();
+    if let Ok(view) = resource.cast::<NativeCompiledModel>() {
+        let view: &NativeCompiledModel = view.get();
+        return view
+            .schema_entry(py)
+            .and_then(|value| value.into_bound_py_any(py));
+    }
+    if let Ok(view) = resource.cast::<NativeCompiledSeed>() {
+        let view: &NativeCompiledSeed = view.get();
+        return view
+            .schema_entry(py)
+            .and_then(|value| value.into_bound_py_any(py));
+    }
+    count_stage(py, COMPILED_VIEW_FALLBACKS, 1)?;
+    native_field(resource, "schema_entry")
 }

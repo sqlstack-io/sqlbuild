@@ -1,12 +1,13 @@
 //! The model's name.
 
-use crate::compiled_views::_helpers::compiled_models::model_reads;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::compiled_views::main::compiled_models::native_model::native_model;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The model's name.
-#[inline]
 pub fn model_name(model: &Bound<'_, PyAny>) -> PyResult<String> {
-    model_reads::model_name(model)
+    if let Some(view) = native_model(model)? {
+        return view.name(model.py());
+    }
+    native_field(model, "name")?.extract()
 }

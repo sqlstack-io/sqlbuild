@@ -3,10 +3,10 @@
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet};
-use pyo3::{pyfunction, pymethods, wrap_pyfunction};
+use pyo3::{pyfunction, pymethods};
 use sqlbuild_analysis::planner_fixtures::main::fixture_schema::fixture_schema;
 use sqlbuild_analysis::planner_fixtures::models::FixtureColumn;
 
@@ -19,29 +19,20 @@ use crate::native_host::models::ModelHandle;
 use crate::planner_strategy::_helpers::fixtures::fixture_metadata::model_fixture_relation;
 use crate::planner_strategy::_helpers::fixtures::fixture_reads::lineage_reads;
 use crate::planner_strategy::_helpers::fixtures::fixture_types::projections;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::columns;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::folded_name;
-use crate::planner_strategy::constants::MODEL_REFERENCE_KIND;
-use crate::planner_strategy::constants::SEED_REFERENCE_KIND;
-use crate::planner_strategy::constants::SOURCE_REFERENCE_KIND;
-use crate::planner_strategy::models::FixtureReadCacheHost;
-use crate::planner_strategy::models::FixtureRelation;
-use crate::planner_strategy::models::ModelFixtureFacts;
-use crate::planner_strategy::models::RelationFixturePlanningContext;
-use crate::planner_strategy::types::FixtureKey;
-use crate::planner_strategy::types::FixtureRelationInput;
+use crate::planner_strategy::_helpers::fixtures::fixture_values::{columns, folded_name};
+use crate::planner_strategy::constants::{
+    MODEL_REFERENCE_KIND, SEED_REFERENCE_KIND, SOURCE_REFERENCE_KIND,
+};
+use crate::planner_strategy::models::{
+    FixtureReadCacheHost, FixtureRelation, ModelFixtureFacts, RelationFixturePlanningContext,
+};
+use crate::planner_strategy::types::{FixtureKey, FixtureRelationInput};
 use crate::resource_views::main::resource_reads::name::name;
 use crate::resource_views::main::seed_reads::schema_entry::schema_entry;
 use crate::resource_views::main::source_reads::source_entry::source_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 static FIXTURE_READS: PyOnceLock<Py<FixtureReadCacheHost>> = PyOnceLock::new();
-
-/// Count one batch resolution of SQL-test model chains.
-pub(crate) fn count_chain_resolution(py: Python<'_>) -> PyResult<()> {
-    work_counts(py)?.borrow_mut().chain_resolutions += 1;
-    Ok(())
-}
 
 /// The extension-wide fixture read cache and planning work counters.
 pub(crate) fn work_counts(py: Python<'_>) -> PyResult<Bound<'_, FixtureReadCacheHost>> {
@@ -252,7 +243,7 @@ impl RelationFixturePlanningContext {
 /// Build the project-wide fixture planning context once for many SQL-test plans.
 #[pyfunction]
 #[pyo3(signature = (*, project, models_by_name = None))]
-fn build_relation_fixture_context(
+pub(crate) fn build_relation_fixture_context(
     project: &Bound<'_, PyAny>,
     models_by_name: Option<Bound<'_, PyDict>>,
 ) -> PyResult<RelationFixturePlanningContext> {
@@ -262,7 +253,7 @@ fn build_relation_fixture_context(
 /// Planning contexts built and SQL-test chain batches resolved, optionally resetting both.
 #[pyfunction]
 #[pyo3(signature = (*, reset = false))]
-fn fixture_planning_work_info(py: Python<'_>, reset: bool) -> PyResult<(u64, u64)> {
+pub(crate) fn fixture_planning_work_info(py: Python<'_>, reset: bool) -> PyResult<(u64, u64)> {
     let host = work_counts(py)?;
     let mut host = host.borrow_mut();
     let counts = (host.context_builds, host.chain_resolutions);
@@ -271,10 +262,4 @@ fn fixture_planning_work_info(py: Python<'_>, reset: bool) -> PyResult<(u64, u64
         host.chain_resolutions = 0;
     }
     Ok(counts)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<RelationFixturePlanningContext>()?;
-    module.add_function(wrap_pyfunction!(build_relation_fixture_context, module)?)?;
-    module.add_function(wrap_pyfunction!(fixture_planning_work_info, module)?)
 }

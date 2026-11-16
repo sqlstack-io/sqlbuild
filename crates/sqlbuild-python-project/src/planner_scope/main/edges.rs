@@ -1,13 +1,18 @@
 //! Edges.
 
-use crate::planner_scope::_helpers::values;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::graph::main::nodes::native_key::native_key;
+use crate::planner_scope::main::keys::keys;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 /// Edges.
-#[inline]
 pub fn edges(values: &Bound<'_, PyAny>) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
-    values::edges(values)
+    mapping_items(values)?
+        .try_iter()?
+        .map(|item| {
+            let (key, deps): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
+            Ok((native_key(&key)?, keys(&deps)?))
+        })
+        .collect()
 }

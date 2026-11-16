@@ -1,9 +1,7 @@
 //! orjson's value for `value`: enums by value, dataclasses by public attribute, dates in ISO form.
 
 use crate::compiled_project::_helpers::values;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use serde_json::Value;
 
 /// orjson's value for `value`: enums by value, dataclasses by public attribute, dates in ISO form.

@@ -1,8 +1,8 @@
 //! Adapter nullability rules over `InferredNullability` arguments, decided by the native rules.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::PyString;
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::nullability_rules::main::conditional_result_nullability::conditional_result_nullability;
 use sqlbuild_analysis::nullability_rules::main::safe_cast_nullability::safe_cast_nullability;
 
@@ -34,7 +34,9 @@ fn argument_values(args: &Bound<'_, PyAny>, count: usize) -> PyResult<Vec<String
 
 /// The first argument itself, or `InferredNullability.UNKNOWN` without arguments.
 #[pyfunction]
-fn infer_first_arg_nullability<'py>(args: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn infer_first_arg_nullability<'py>(
+    args: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
     if !args.is_truthy()? {
         return enum_member(args.py(), RecordId::InferredNullability, UNKNOWN_MEMBER);
     }
@@ -43,7 +45,7 @@ fn infer_first_arg_nullability<'py>(args: &Bound<'py, PyAny>) -> PyResult<Bound<
 
 /// IF/IFF-style nullability from the true and false result arguments.
 #[pyfunction]
-fn infer_conditional_result_nullability<'py>(
+pub(crate) fn infer_conditional_result_nullability<'py>(
     args: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let values: Vec<String> = argument_values(args, args.len()?)?;
@@ -53,7 +55,9 @@ fn infer_conditional_result_nullability<'py>(
 
 /// SAFE_CAST/TRY_CAST nullability without assuming the conversion succeeds.
 #[pyfunction]
-fn infer_safe_cast_nullability<'py>(args: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn infer_safe_cast_nullability<'py>(
+    args: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
     let values: Vec<String> = if args.is_truthy()? {
         argument_values(args, 1)?
     } else {
@@ -61,14 +65,4 @@ fn infer_safe_cast_nullability<'py>(args: &Bound<'py, PyAny>) -> PyResult<Bound<
     };
     let values: Vec<&str> = values.iter().map(String::as_str).collect();
     member(args, safe_cast_nullability(&values))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(infer_first_arg_nullability, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        infer_conditional_result_nullability,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(infer_safe_cast_nullability, module)?)?;
-    Ok(())
 }

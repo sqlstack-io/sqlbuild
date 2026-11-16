@@ -1,9 +1,10 @@
 //! Microbatch guidance.
 
-use crate::discovery::_helpers::failures::guidance;
+use pyo3::pyfunction;
+use sqlbuild_config::project::main::microbatch_guidance::microbatch_guidance as concurrency_guidance;
 
 /// Microbatch guidance.
-#[inline]
+#[pyfunction]
 pub fn microbatch_guidance() -> (String, String) {
-    guidance::microbatch_guidance()
+    concurrency_guidance()
 }

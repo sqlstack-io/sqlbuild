@@ -1,32 +1,10 @@
 //! Python function identity and compiled graph conversion.
 
-use crate::compiled_views::main::project::sources::sources;
-use crate::graph::main::nodes::native_key::native_key;
-use crate::resource_views::main::source_reads::source_entry::source_entry;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyDict;
 use pyo3::types::PyDictMethods;
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::planner_scope::models::LoaderGraph;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
-
-pub(crate) fn keys(values: &Bound<'_, PyAny>) -> PyResult<Vec<ObjectKey>> {
-    values
-        .try_iter()?
-        .map(|value| native_key(&value?))
-        .collect()
-}
-
-pub(crate) fn edges(values: &Bound<'_, PyAny>) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
-    mapping_items(values)?
-        .try_iter()?
-        .map(|item| {
-            let (key, deps): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
-            Ok((native_key(&key)?, keys(&deps)?))
-        })
-        .collect()
-}
 
 /// Resolve dependencies using the same Python dictionary lookup as the authored function boundary.
 pub(crate) fn loader_names<'py>(loaders: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
@@ -63,18 +41,6 @@ pub(crate) fn loader_graph(loaders: &Bound<'_, PyAny>) -> PyResult<LoaderGraph> 
             native_field(&loader, "name")?.extract()?,
             dependency_names(&loader, &names)?,
         );
-    }
-    Ok(graph)
-}
-
-pub(crate) fn project_graph(project: &Bound<'_, PyAny>) -> PyResult<LoaderGraph> {
-    let mut graph = loader_graph(&native_field(project, "loader_functions")?)?;
-    for source in sources(project)?.try_iter()? {
-        let entry = source_entry(&source?)?;
-        graph.sources.push((
-            native_field(&entry, "name")?.extract()?,
-            native_field(&entry, "loader")?.extract()?,
-        ));
     }
     Ok(graph)
 }

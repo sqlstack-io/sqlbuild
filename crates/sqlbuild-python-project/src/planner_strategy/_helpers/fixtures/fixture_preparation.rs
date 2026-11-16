@@ -1,12 +1,11 @@
 //! Inference and schema preparation at the fixture Python boundary.
 
+use crate::planner_strategy::main::complete_empty_fixture_sql::complete_empty_fixture_sql;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_fixtures::main::empty_fixture_marker::empty_fixture_marker;
 
-use crate::planner_strategy::_helpers::fixtures::fixture_sql::complete_empty_fixture_sql;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::diagnostic;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::label;
+use crate::planner_strategy::_helpers::fixtures::fixture_values::{diagnostic, label};
 use crate::planner_strategy::models::RelationFixturePlanningContext;
 use crate::planner_strategy::types::FixtureKey;
 use sqlbuild_python_base::boundary::main::value_error::value_error;

@@ -1,16 +1,14 @@
 //! Closed relation shapes of a compiled project, as binding and semantic checks read them.
 
-use crate::semantic_shapes::constants::VALID_FROM_DEFAULT;
-use crate::semantic_shapes::constants::VALID_TO_DEFAULT;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use crate::semantic_shapes::main::snapshot_validity_columns::snapshot_validity_columns;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::analysis::constants::CASE_SENSITIVE_BINDING_DIALECTS;
 use crate::analysis::main::normalize_analysis_sql::normalize_analysis_sql;
-use crate::analysis::models::BindingCatalog;
-use crate::analysis::models::CatalogKey;
+use crate::analysis::models::{BindingCatalog, CatalogKey};
 use crate::analysis_session::main::infer_native_expression_source_shapes::infer_native_expression_source_shapes;
 use crate::compiled_project::models::ReferenceTuple;
 use crate::compiled_views::main::compiled_models::declared_rows::declared_rows;
@@ -25,7 +23,6 @@ use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 
@@ -113,29 +110,6 @@ pub(crate) fn published_shape<'py>(
         shape.set_item(name, UNKNOWN)?;
     }
     Ok(shape)
-}
-
-/// A snapshot model's validity column names, which the snapshot adds to its query's columns.
-pub(crate) fn snapshot_validity_columns(model: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let py: Python<'_> = model.py();
-    let values: Bound<'_, PyAny> = native_field(&native_field(model, "config")?, "values")?;
-    let snapshot: Bound<'_, PyAny> = enum_member(py, RecordId::MaterializationType, "SNAPSHOT")?;
-    if !mapping_get(&values, "materialized")?.eq(snapshot)? {
-        return Ok(Vec::new());
-    }
-    let mut names: Vec<String> = Vec::with_capacity(2);
-    for (key, default) in [
-        ("valid_from_column", VALID_FROM_DEFAULT),
-        ("valid_to_column", VALID_TO_DEFAULT),
-    ] {
-        let name: Bound<'_, PyAny> = mapping_get(&values, key)?;
-        names.push(if name.is_truthy()? {
-            name.str()?.extract()?
-        } else {
-            default.to_owned()
-        });
-    }
-    Ok(names)
 }
 
 /// Inferred columns, re-quoted from authored SQL where the dialect keeps quoted case.
@@ -388,14 +362,16 @@ fn all_known(names: &[String], shapes: &Bound<'_, PyDict>) -> PyResult<bool> {
 /// Closed relation shapes; `profile` defaults to the project's dialect.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn semantic_shapes<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyDict>> {
+pub(crate) fn semantic_shapes<'py>(
+    request: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyDict>> {
     let request = Request::new("semantic_shapes", request)?;
     project_shapes(&request.get("project")?, request.optional("profile")?)
 }
 
 /// The analysis names the references bind, UDFs excluded.
 #[pyfunction]
-fn binding_relation_names<'py>(
+pub(crate) fn binding_relation_names<'py>(
     references: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyFrozenSet>> {
     let py: Python<'py> = references.py();
@@ -420,7 +396,7 @@ fn binding_relation_names<'py>(
 /// A model relation's published shape: `published_model_shape(*, model, columns, inputs, profile)`.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn published_model_shape<'py>(
+pub(crate) fn published_model_shape<'py>(
     request: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let request = Request::new("published_model_shape", request)?;
@@ -430,10 +406,4 @@ fn published_model_shape<'py>(
         request.get("inputs")?.downcast()?,
         &request.get("profile")?,
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(semantic_shapes, module)?)?;
-    module.add_function(wrap_pyfunction!(published_model_shape, module)?)?;
-    module.add_function(wrap_pyfunction!(binding_relation_names, module)?)
 }

@@ -1,5 +1,7 @@
 //! Retained audit contracts; Python-authored factory results remain opaque values.
 
+use crate::model_config::main::config::config_node::config_node;
+use crate::model_config::main::config::config_object::config_object;
 use pyo3::prelude::{PyResult, Python};
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 use sqlbuild_discovery::model_files::main::config_value::config_value;
@@ -8,8 +10,6 @@ use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_model_config::header_metadata::models::ParsedAudit;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
-use crate::model_config::_helpers::config::config_nodes::config_node;
-use crate::model_config::_helpers::config::config_nodes::config_object;
 use crate::model_config::types::HeaderValue;
 use crate::model_config::types::PyConfigNode;
 use crate::sqltext::main::authored_value_to_python::authored_value_to_python;

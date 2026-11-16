@@ -1,23 +1,18 @@
 //! Effective target, vars, connection and settings precedence over the loaded config objects.
 
+use crate::contracts::main::effective_connection_fields::effective_connection_fields;
 use std::hash::{Hash, Hasher};
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, PyStringMethods, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, PyStringMethods, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyBytes, PyBytesMethods, PyDict, PyDictMethods, PyListMethods, PyString};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_config::effective::errors::{EffectiveConfigError, MessagePart};
 use sqlbuild_config::effective::main::default_connection_name::default_connection_name;
-use sqlbuild_config::effective::main::effective_connection::effective_connection;
-use sqlbuild_config::effective::main::effective_settings::effective_settings;
 use sqlbuild_config::effective::main::effective_target_name::effective_target_name;
-use sqlbuild_config::effective::main::effective_vars::effective_vars;
 use sqlbuild_config::effective::main::merged_target::merged_target;
 use sqlbuild_config::effective::main::target_fields::target_fields;
 use sqlbuild_config::effective::models::{
-    ConnectionChoice, ConnectionLayers, FieldValue, MergeRule, TargetChoice, TargetField,
-    TargetLayer,
+    ConnectionChoice, FieldValue, MergeRule, TargetChoice, TargetField, TargetLayer,
 };
 use sqlbuild_config::effective::types::Entries;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -27,7 +22,7 @@ const SURROGATE_PASS: &str = "surrogatepass";
 
 /// A `str` key compared exactly: by its UTF-8 bytes, lone surrogates passed through.
 #[derive(Clone)]
-struct Key<'py> {
+pub(crate) struct Key<'py> {
     bytes: Vec<u8>,
     handle: Bound<'py, PyString>,
 }
@@ -58,15 +53,15 @@ impl Ord for Key<'_> {
     }
 }
 
-type Value<'py> = Bound<'py, PyAny>;
+pub(crate) type Value<'py> = Bound<'py, PyAny>;
 type Layer<'py> = TargetLayer<Key<'py>, Value<'py>>;
-type Pairs<'py> = Entries<Key<'py>, Value<'py>>;
+pub(crate) type Pairs<'py> = Entries<Key<'py>, Value<'py>>;
 /// `(group, name, value)` of each merged `TargetConfig` field.
 type FieldRow<'py> = (Option<&'static str>, &'static str, Value<'py>);
 /// A result, else the precedence failure message.
 pub(crate) type Outcome<'py, T> = (Option<T>, Option<Bound<'py, PyString>>);
 
-fn key<'py>(value: &Bound<'py, PyAny>) -> PyResult<Key<'py>> {
+pub(crate) fn key<'py>(value: &Bound<'py, PyAny>) -> PyResult<Key<'py>> {
     let handle: Bound<'py, PyString> = value.downcast::<PyString>()?.clone();
     if let Ok(text) = handle.to_str() {
         return Ok(Key {
@@ -82,14 +77,14 @@ fn key<'py>(value: &Bound<'py, PyAny>) -> PyResult<Key<'py>> {
     Ok(Key { bytes, handle })
 }
 
-fn optional_key<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Key<'py>>> {
+pub(crate) fn optional_key<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Key<'py>>> {
     if value.is_none() {
         return Ok(None);
     }
     key(value).map(Some)
 }
 
-fn pairs<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Pairs<'py>> {
+pub(crate) fn pairs<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Pairs<'py>> {
     mapping
         .downcast::<PyDict>()?
         .iter()
@@ -106,7 +101,10 @@ fn keys<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Vec<Key<'py>>> {
         .collect()
 }
 
-fn dictionary<'py>(py: Python<'py>, entries: Pairs<'py>) -> PyResult<Bound<'py, PyDict>> {
+pub(crate) fn dictionary<'py>(
+    py: Python<'py>,
+    entries: Pairs<'py>,
+) -> PyResult<Bound<'py, PyDict>> {
     let dictionary: Bound<'py, PyDict> = PyDict::new(py);
     for (name, value) in entries {
         dictionary.set_item(name.handle, value)?;
@@ -162,7 +160,7 @@ fn is_set(value: &FieldValue<Key<'_>, Value<'_>>) -> bool {
 }
 
 /// The failure message as a Python `str`, authored names inserted unchanged.
-fn message<'py>(
+pub(crate) fn message<'py>(
     py: Python<'py>,
     error: &EffectiveConfigError<Key<'py>>,
 ) -> PyResult<Bound<'py, PyString>> {
@@ -251,27 +249,7 @@ pub(crate) fn effective_config_target_fields<'py>(
     Ok((Some(rows), None))
 }
 
-/// `build_effective_vars` before template expansion.
-#[pyfunction]
-pub(crate) fn effective_config_vars<'py>(
-    py: Python<'py>,
-    configs: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-    target_config: &Bound<'py, PyAny>,
-    cli_vars: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyDict>> {
-    let (project_config, local_config) = configs;
-    let project: Pairs<'py> = pairs(&native_field(&project_config, "vars")?)?;
-    let target: Pairs<'py> = if target_config.is_none() {
-        Vec::new()
-    } else {
-        pairs(&native_field(target_config, "vars")?)?
-    };
-    let local: Pairs<'py> = pairs(&native_field(&local_config, "vars")?)?;
-    let cli: Pairs<'py> = pairs(cli_vars)?;
-    dictionary(py, effective_vars(&[&project, &target, &local, &cli]))
-}
-
-fn named<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Entries<Key<'py>, Pairs<'py>>> {
+pub(crate) fn named<'py>(mapping: &Bound<'py, PyAny>) -> PyResult<Entries<Key<'py>, Pairs<'py>>> {
     mapping
         .downcast::<PyDict>()?
         .iter()
@@ -288,99 +266,4 @@ pub(crate) fn effective_config_connection<'py>(
     target_config: &Bound<'py, PyAny>,
 ) -> PyResult<Outcome<'py, Bound<'py, PyDict>>> {
     effective_connection_fields(py, (project_config, local_config), target_config, false)
-}
-
-/// Catalog selection uses the same named-layer resolver, with no writer layers.
-pub(crate) fn effective_connection_fields<'py>(
-    py: Python<'py>,
-    (project_config, local_config): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    target_config: &Bound<'py, PyAny>,
-    catalog: bool,
-) -> PyResult<Outcome<'py, Bound<'py, PyDict>>> {
-    let catalog_name = if catalog && !target_config.is_none() {
-        optional_key(&native_field(target_config, "catalog_connection")?)?
-    } else {
-        None
-    };
-    let independent = catalog_name.is_some();
-    let target: Option<(Option<Key<'py>>, Pairs<'py>)> = if independent {
-        Some((catalog_name, Vec::new()))
-    } else if target_config.is_none() {
-        None
-    } else {
-        Some((
-            optional_key(&native_field(target_config, "connection_name")?)?,
-            pairs(&native_field(target_config, "connection")?)?,
-        ))
-    };
-    let layers: ConnectionLayers<Key<'py>, Value<'py>> = ConnectionLayers {
-        project: if independent {
-            Vec::new()
-        } else {
-            pairs(&native_field(project_config, "connection")?)?
-        },
-        target,
-        project_named: named(&native_field(project_config, "connections")?)?,
-        local_named: named(&native_field(local_config, "connections")?)?,
-        local: if independent {
-            Vec::new()
-        } else {
-            pairs(&native_field(local_config, "connection")?)?
-        },
-    };
-    Ok(match effective_connection(layers) {
-        Ok(connection) => (Some(dictionary(py, connection)?), None),
-        Err(error) => {
-            let message = message(py, &error)?;
-            (
-                None,
-                Some(if independent {
-                    PyString::new(py, &format!("catalog_connection: {message}"))
-                } else {
-                    message
-                }),
-            )
-        }
-    })
-}
-
-/// `build_effective_settings`: setting values by field name, local overrides applied.
-#[pyfunction]
-pub(crate) fn effective_config_settings<'py>(
-    py: Python<'py>,
-    settings: (Bound<'py, PyAny>, Bound<'py, PyAny>),
-    overrides: &Bound<'py, PyAny>,
-    names: Vec<Bound<'py, PyString>>,
-) -> PyResult<Bound<'py, PyDict>> {
-    let read = |settings: &Bound<'py, PyAny>| -> PyResult<Pairs<'py>> {
-        names
-            .iter()
-            .map(|name| {
-                Ok((
-                    key(name.as_any())?,
-                    native_field(settings, &name.to_cow()?)?,
-                ))
-            })
-            .collect()
-    };
-    let overridden: Vec<Key<'py>> = overrides
-        .try_iter()?
-        .map(|name| key(&name?))
-        .collect::<PyResult<_>>()?;
-    let (project_settings, local_settings) = settings;
-    let settings: Pairs<'py> = effective_settings(
-        read(&project_settings)?,
-        &read(&local_settings)?,
-        &overridden,
-    );
-    dictionary(py, settings)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(effective_config_target_name, module)?)?;
-    module.add_function(wrap_pyfunction!(effective_config_target_fields, module)?)?;
-    module.add_function(wrap_pyfunction!(effective_config_vars, module)?)?;
-    module.add_function(wrap_pyfunction!(effective_config_connection, module)?)?;
-    module.add_function(wrap_pyfunction!(effective_config_settings, module)?)?;
-    Ok(())
 }

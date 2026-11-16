@@ -2,9 +2,9 @@
 
 use std::path::PathBuf;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_pysource::string_literals::main::string_literal_locations::string_literal_locations;
 use sqlbuild_pysource::string_literals::models::StringQuery;
 
@@ -99,9 +99,4 @@ pub(crate) fn find_python_string_locations<'py>(
         }
     }
     PyTuple::new(py, locations)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(find_python_string_locations, module)?)?;
-    Ok(())
 }

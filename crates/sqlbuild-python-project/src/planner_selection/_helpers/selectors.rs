@@ -1,31 +1,23 @@
 //! Planner selector parsing and resolution over native project graphs, raising `PlannerInputError`.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
-use pyo3::types::{PyBool, PyDict, PyFrozenSet, PySetMethods, PyString};
+use crate::planner_selection::main::resolve_graph_keys::resolve_graph_keys;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use pyo3::types::{PyBool, PyFrozenSet};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::errors::SelectorError;
-use sqlbuild_analysis::graph::main::match_selector::match_selector;
-use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
-use sqlbuild_analysis::graph::main::resolve_selector_tokens::resolve_selector_tokens;
-use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::models::{ParsedSelector, ProjectGraph};
 
-use crate::compiled_project::main::graph_with_jobs::graph_with_jobs;
-use crate::graph::main::nodes::closure::closure;
 use crate::graph::main::project::graph_from_view_mappings::graph_from_view_mappings;
-use crate::graph::models::CompiledProjectGraph;
 use crate::graph::models::GraphViewMappings;
 use crate::graph::models::KeyCache;
 use crate::graph::models::NativeProjectGraph;
-use crate::planner_selection::_helpers::carrier::py_strings;
 use crate::planner_selection::models::Carrier;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 
-const VIEW_OPTIONS: &[&str] = &[
+pub(crate) const VIEW_OPTIONS: &[&str] = &[
     "all_keys",
     "upstream_deps",
     "downstream_deps",
@@ -79,11 +71,11 @@ pub(crate) fn parsed_selector<'py>(
     }
 }
 
-fn graph_names(graph: &ProjectGraph) -> Vec<String> {
+pub(crate) fn graph_names(graph: &ProjectGraph) -> Vec<String> {
     graph.names.iter().map(|(name, _)| name.clone()).collect()
 }
 
-fn selected<'py>(
+pub(crate) fn selected<'py>(
     carrier: &Carrier<'py>,
     outcome: Result<Vec<ObjectKey>, SelectorError>,
 ) -> PyResult<Bound<'py, PyFrozenSet>> {
@@ -95,103 +87,18 @@ fn compiled_keys<'py>(py: Python<'py>, keys: &[ObjectKey]) -> PyResult<Bound<'py
     PyFrozenSet::new(py, KeyCache::new(py)?.keys(keys)?)
 }
 
-fn resolved<'py>(
+pub(crate) fn resolved<'py>(
     graph: &ProjectGraph,
     (select, exclude): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<Bound<'py, PyFrozenSet>> {
     compiled_keys(select.py(), &resolve_graph_keys(graph, (select, exclude))?)
 }
 
-/// Resolve graph keys for native planning without building a public frozenset.
-pub(crate) fn resolve_graph_keys<'py>(
-    graph: &ProjectGraph,
-    (select, exclude): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-) -> PyResult<Vec<ObjectKey>> {
-    let py: Python<'py> = select.py();
-    let select: Vec<Bound<'py, PyString>> = py_strings(select)?;
-    let exclude: Vec<Bound<'py, PyString>> = py_strings(exclude)?;
-    let texts: Vec<Bound<'py, PyString>> = select.iter().chain(&exclude).cloned().collect();
-    let carrier: Carrier<'py> = Carrier::new(py, &texts, || Ok(graph_names(graph)))?;
-    let (select, exclude) = (carrier.send_all(&select)?, carrier.send_all(&exclude)?);
-    let all: Vec<String> = select.iter().chain(&exclude).cloned().collect();
-    let graph = graph_with_jobs(py, graph, &all, &[])?;
-    resolve_selectors(&graph, &select, &exclude).map_err(|error| carrier.error(error))
-}
-
-fn view_graph(mappings: GraphViewMappings<'_, '_>) -> PyResult<NativeProjectGraph> {
+pub(crate) fn view_graph(mappings: GraphViewMappings<'_, '_>) -> PyResult<NativeProjectGraph> {
     graph_from_view_mappings(mappings)
 }
 
-/// Parse one selector token into Python's `ParsedSelector` or `PathSelector`.
-pub(crate) fn parse_project_selector<'py>(
-    raw: &Bound<'py, PyString>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let carrier: Carrier<'py> = Carrier::single(raw)?;
-    let parsed: ParsedSelector =
-        parse_selector(&carrier.send(raw)?).map_err(|error| carrier.error(error))?;
-    parsed_selector(&carrier, parsed)
-}
-
-/// `--select` minus `--exclude` on a native graph, adding the functions selected models need.
-pub(crate) fn resolve_graph_selection<'py>(
-    graph: PyRef<'py, NativeProjectGraph>,
-    select: &Bound<'py, PyAny>,
-    exclude: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    resolved(graph.graph(), (select, exclude))
-}
-
-/// `--select` minus `--exclude` on a project graph, adding the functions selected models need.
-pub(crate) fn select_project_graph<'py>(
-    graph: &Bound<'py, PyAny>,
-    select: &Bound<'py, PyAny>,
-    exclude: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let graph: &Bound<'py, CompiledProjectGraph> = graph.cast()?;
-    resolved(
-        graph.get().native(graph.py()).get().graph(),
-        (select, exclude),
-    )
-}
-
-/// Model, source, seed and function selectors resolved against compiled graph mappings.
-pub(crate) fn resolve_project_selectors<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "resolve_project_selectors",
-        options,
-        (&[&["select", "exclude"], VIEW_OPTIONS].concat(), &[]),
-    )?;
-    let graph: NativeProjectGraph = arguments_graph(&arguments)?;
-    resolved(
-        graph.graph(),
-        (&arguments.value("select")?, &arguments.value("exclude")?),
-    )
-}
-
-/// The keys whitespace-separated selector tokens match, without required build resources.
-pub(crate) fn resolve_project_selector_tokens<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "resolve_project_selector_tokens",
-        options,
-        (&[&["selectors"], VIEW_OPTIONS].concat(), &[]),
-    )?;
-    let graph: NativeProjectGraph = arguments_graph(&arguments)?;
-    let texts: Vec<Bound<'py, PyString>> = py_strings(&arguments.value("selectors")?)?;
-    let carrier: Carrier<'py> = Carrier::new(py, &texts, || Ok(graph_names(graph.graph())))?;
-    let selectors: Vec<String> = carrier.send_all(&texts)?;
-    let graph = graph_with_jobs(py, graph.graph(), &selectors, &[])?;
-    selected(&carrier, resolve_selector_tokens(&graph, &selectors))
-}
-
-fn arguments_graph(arguments: &KeywordArguments<'_>) -> PyResult<NativeProjectGraph> {
+pub(crate) fn arguments_graph(arguments: &KeywordArguments<'_>) -> PyResult<NativeProjectGraph> {
     view_graph(GraphViewMappings {
         all_keys: &arguments.value("all_keys")?,
         upstream: &arguments.value("upstream_deps")?,
@@ -199,42 +106,4 @@ fn arguments_graph(arguments: &KeywordArguments<'_>) -> PyResult<NativeProjectGr
         tag_index: &arguments.value("tag_index")?,
         path_index: &arguments.value("path_index")?,
     })
-}
-
-/// The keys one parsed selector matches before `+` graph expansion.
-pub(crate) fn match_project_selector<'py>(
-    parsed: &Bound<'py, PyAny>,
-    all_keys: &Bound<'py, PyAny>,
-    tag_index: &Bound<'py, PyAny>,
-    path_index: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let py: Python<'py> = parsed.py();
-    let empty: Bound<'py, PyAny> = PyDict::new(py).into_any();
-    let graph: NativeProjectGraph = view_graph(GraphViewMappings {
-        all_keys,
-        upstream: &empty,
-        downstream: &empty,
-        tag_index,
-        path_index,
-    })?;
-    let value: Bound<'py, PyString> = native_field(parsed, "value")?.downcast_into()?;
-    let carrier: Carrier<'py> = Carrier::new(py, std::slice::from_ref(&value), || {
-        Ok(graph_names(graph.graph()))
-    })?;
-    let kind: String = native_field(parsed, "kind")?.str()?.extract()?;
-    let value: String = carrier.send(&value)?;
-    let graph = graph_with_jobs(py, graph.graph(), &[format!("{kind}:{value}")], &[])?;
-    selected(
-        &carrier,
-        match_selector(&graph, &kind, &value).map(|keys| keys.into_iter().collect()),
-    )
-}
-
-/// The upstream key closure of one compiled graph key.
-pub(crate) fn expand_project_upstream_keys<'py>(
-    key: Bound<'py, PyAny>,
-    upstream_deps: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let visited = closure(vec![key], upstream_deps, (false, None))?;
-    PyFrozenSet::new(upstream_deps.py(), visited.iter())
 }

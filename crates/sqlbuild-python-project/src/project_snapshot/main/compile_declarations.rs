@@ -2,10 +2,7 @@
 
 use crate::graph::models::ProjectSelection;
 use crate::project_snapshot::_helpers::snapshot::snapshot_declarations;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;

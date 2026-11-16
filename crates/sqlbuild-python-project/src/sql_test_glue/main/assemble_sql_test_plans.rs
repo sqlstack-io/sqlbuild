@@ -2,9 +2,7 @@
 
 use crate::sql_test_glue::_helpers::plan::plan_assembly;
 use crate::sql_test_glue::models::SqlTestAssembly;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyTuple;
 
 /// Plan results of SQL tests, with fixture and expected-output diagnostics in place of failing plans.

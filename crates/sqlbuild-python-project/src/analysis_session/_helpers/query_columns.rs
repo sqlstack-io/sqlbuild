@@ -1,10 +1,10 @@
 //! Python's per-query column analysis outside the session, run natively.
 
+use crate::analysis_session::main::query_columns_error::query_columns_error;
 use crate::analysis_session::types::ColumnsRow;
-use pyo3::prelude::{Bound, Py, PyAny, PyModule, PyModuleMethods, PyRef, PyResult, Python};
+use pyo3::prelude::{Py, PyAny, PyRef, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::PyDict;
-use pyo3::{PyErr, pyfunction, wrap_pyfunction};
-use sqlbuild_analysis::assembly::analysis_session::errors::QueryColumnsFailure;
 use sqlbuild_analysis::assembly::analysis_session::main::projection_facts::projection_facts;
 use sqlbuild_analysis::assembly::analysis_session::main::query_columns::query_columns;
 use sqlbuild_analysis::assembly::analysis_session::models::{
@@ -16,13 +16,13 @@ use sqlbuild_core::panics::main::native_failure::native_failure;
 use sqlbuild_python_base::positional_record;
 
 use crate::analysis::models::ProjectCatalog;
-use crate::analysis_session::_helpers::nullability_rules::RuleFailure;
-use crate::analysis_session::_helpers::nullability_rules::nullability_callback;
-use crate::analysis_session::_helpers::nullability_rules::raised;
+use crate::analysis_session::_helpers::nullability_rules::{
+    RuleFailure, nullability_callback, raised,
+};
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::types::CompilerDetach;
 
-const QUERY_COLUMNS_CONTEXT: &str = "native query column analysis";
+pub(crate) const QUERY_COLUMNS_CONTEXT: &str = "native query column analysis";
 const PROJECTION_FACTS_CONTEXT: &str = "native fixture projection facts";
 
 positional_record! {
@@ -103,16 +103,6 @@ pub(crate) fn infer_query_columns(
         .collect())
 }
 
-/// A normalization rejection as Python's `ValueError`; anything else as an internal failure.
-pub(crate) fn query_columns_error(failure: QueryColumnsFailure) -> PyErr {
-    match failure {
-        QueryColumnsFailure::Normalization(message) => compiler_error(message),
-        QueryColumnsFailure::Internal(reason) => {
-            compiler_error(native_failure(QUERY_COLUMNS_CONTEXT, &reason))
-        }
-    }
-}
-
 fn query_input(row: QueryRow) -> Result<QueryColumnsInput, String> {
     let QueryRow {
         sql,
@@ -151,7 +141,7 @@ fn columns_row(columns: QueryColumns) -> ColumnsRow {
 
 /// Python's `_simple_projection_facts`: `(types, NULL literal names, quoted names)`, casefolded.
 #[pyfunction]
-fn fixture_projection_facts(
+pub(crate) fn fixture_projection_facts(
     py: Python<'_>,
     sql: &str,
     dialect: Option<&str>,
@@ -160,11 +150,6 @@ fn fixture_projection_facts(
         .compiler_detach(|| projection_facts(sql, dialect))
         .map_err(|reason| compiler_error(native_failure(PROJECTION_FACTS_CONTEXT, &reason)))?;
     Ok((facts.types, facts.null_literal_names, facts.quoted_names))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(fixture_projection_facts, module)?)?;
-    Ok(())
 }
 
 fn column_row(column: ColumnFact) -> (String, Option<String>, String) {

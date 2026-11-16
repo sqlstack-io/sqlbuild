@@ -1,35 +1,31 @@
 //! Authored SQL expanded through project vars, declarations and macros, with each pass's spans.
 
+use crate::render::main::calls::span_row::span_row;
+use crate::render::main::calls::span_tuple::span_tuple;
+use crate::render::main::declarations::expand_with_inputs::expand_with_inputs;
+use crate::render::main::declarations::span_rows::span_rows;
 use crate::render::models::AuthoredExpansion;
 use crate::render::models::SqlExpansionInputs;
-use pyo3::prelude::{
-    Bound, IntoPyObject, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, IntoPyObject, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::model_config::main::config::record_reads::record_reads;
 use crate::model_config::main::model_nodes::unicode_environment::unicode_environment;
-use crate::render::_helpers::calls::macro_call_rows::span_row;
-use crate::render::_helpers::calls::macro_call_rows::span_tuple;
 use crate::render::_helpers::declarations::declaration_expansion::expand_declarations;
-use crate::render::_helpers::declarations::declaration_expansion::span_rows;
 use crate::render::_helpers::declarations::declaration_values::resolved_declaration_context;
 use crate::render::_helpers::expansion::macro_expansion_result::macro_output;
 use crate::render::models::ConstantRendering;
-use crate::render::models::DeclarationExpansion;
 use crate::render::models::DeclarationExpansionClasses;
-use crate::render::models::ExpandedDeclarations;
-use crate::render::models::ExpansionConsumer;
 use crate::render::models::ExpansionRequest;
 use crate::render::models::SqlMacroSource;
+use crate::render::models::{DeclarationExpansion, ExpandedDeclarations, ExpansionConsumer};
 use crate::render::types::SpanRow;
 use crate::sqltext::main::declaration_scan::declaration_scan;
 use crate::sqltext::main::interpolation_batch::interpolation_batch;
 use crate::sqltext::main::optional_record_syntax::optional_record_syntax;
-use crate::sqltext::models::InterpolationRow;
-use crate::sqltext::models::InterpolationSources;
+use crate::sqltext::models::{InterpolationRow, InterpolationSources};
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
@@ -185,20 +181,20 @@ fn declarations_expanded<'py>(
 }
 
 /// What one authored SQL expansion reads.
-struct AuthoredSources<'a, 'py> {
-    sql: &'a Bound<'py, PyAny>,
-    file_path: &'a Bound<'py, PyAny>,
-    effective_vars: &'a Bound<'py, PyAny>,
-    context_values: &'a Bound<'py, PyAny>,
-    declarations: &'a Bound<'py, PyAny>,
-    value_renderer: &'a Bound<'py, PyAny>,
-    collection_rendering: &'a Bound<'py, PyAny>,
-    loaded_macros: &'a Bound<'py, PyAny>,
-    macro_context: &'a Bound<'py, PyAny>,
-    declaration_resolver: Option<Bound<'py, PyAny>>,
+pub(crate) struct AuthoredSources<'a, 'py> {
+    pub(crate) sql: &'a Bound<'py, PyAny>,
+    pub(crate) file_path: &'a Bound<'py, PyAny>,
+    pub(crate) effective_vars: &'a Bound<'py, PyAny>,
+    pub(crate) context_values: &'a Bound<'py, PyAny>,
+    pub(crate) declarations: &'a Bound<'py, PyAny>,
+    pub(crate) value_renderer: &'a Bound<'py, PyAny>,
+    pub(crate) collection_rendering: &'a Bound<'py, PyAny>,
+    pub(crate) loaded_macros: &'a Bound<'py, PyAny>,
+    pub(crate) macro_context: &'a Bound<'py, PyAny>,
+    pub(crate) declaration_resolver: Option<Bound<'py, PyAny>>,
 }
 
-fn authored_expansion(sources: AuthoredSources<'_, '_>) -> PyResult<AuthoredExpansion> {
+pub(crate) fn authored_expansion(sources: AuthoredSources<'_, '_>) -> PyResult<AuthoredExpansion> {
     let py: Python<'_> = sources.sql.py();
     let syntax: Option<LexicalSyntax> = context_syntax(sources.macro_context)?;
     let (interpolated, interpolation_spans) = substituted(
@@ -283,39 +279,17 @@ fn authored_sql_with_spans<'py>(request: &Request<'_, 'py>) -> PyResult<Bound<'p
     expansion_tuple(py, &expansion)
 }
 
-/// `sql` expanded with lint's expansion inputs, as `file_path`'s declarations see them.
-pub(crate) fn expand_with_inputs(
-    inputs: &SqlExpansionInputs,
-    sql: &str,
-    file_path: &Bound<'_, PyAny>,
-) -> PyResult<AuthoredExpansion> {
-    let py: Python<'_> = file_path.py();
-    let resolver: Bound<'_, PyAny> = inputs.declaration_resolver.bind(py).clone();
-    authored_expansion(AuthoredSources {
-        sql: &PyString::new(py, sql).into_any(),
-        file_path,
-        effective_vars: inputs.effective_vars.bind(py),
-        context_values: &py.None().into_bound(py),
-        declarations: &input_declarations(inputs, file_path)?,
-        value_renderer: inputs.value_renderer.bind(py),
-        collection_rendering: inputs.collection_rendering.bind(py),
-        loaded_macros: inputs.loaded_macros.bind(py),
-        macro_context: inputs.macro_context.bind(py),
-        declaration_resolver: (!resolver.is_none()).then_some(resolver),
-    })
-}
-
 /// Expand authored SQL, returning each pass's substitution spans in order.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn expand_authored_sql_with_spans<'py>(
+pub(crate) fn expand_authored_sql_with_spans<'py>(
     request: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     authored_sql_with_spans(&Request::new("expand_authored_sql_with_spans", request)?)
 }
 
 /// The declarations visible to `file_path`: the resolver's, else the inputs', plus model-local.
-fn input_declarations<'py>(
+pub(crate) fn input_declarations<'py>(
     inputs: &SqlExpansionInputs,
     file_path: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -363,7 +337,7 @@ fn input_declarations<'py>(
 /// Expand authored SQL with a project's expansion context and report each pass's spans.
 #[pyfunction]
 #[pyo3(signature = (*, sql, file_path, context))]
-fn expand_sql_with_spans<'py>(
+pub(crate) fn expand_sql_with_spans<'py>(
     sql: &str,
     file_path: &Bound<'py, PyAny>,
     context: &Bound<'py, PyAny>,
@@ -378,7 +352,7 @@ fn expand_sql_with_spans<'py>(
 /// Replace SQL interpolation tokens, returning the span of every substitution.
 #[pyfunction]
 #[pyo3(signature = (*, sql, file_path, effective_vars, context_values=None))]
-fn substitute_sql_vars_with_spans<'py>(
+pub(crate) fn substitute_sql_vars_with_spans<'py>(
     sql: &Bound<'py, PyAny>,
     file_path: &Bound<'py, PyAny>,
     effective_vars: &Bound<'py, PyAny>,
@@ -390,11 +364,4 @@ fn substitute_sql_vars_with_spans<'py>(
     let (substituted_sql, spans) =
         substituted(sql, file_path, (effective_vars, &context_values), None)?;
     Ok((substituted_sql, span_objects(py, &spans)?))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(expand_authored_sql_with_spans, module)?)?;
-    module.add_function(wrap_pyfunction!(expand_sql_with_spans, module)?)?;
-    module.add_function(wrap_pyfunction!(substitute_sql_vars_with_spans, module)?)?;
-    Ok(())
 }

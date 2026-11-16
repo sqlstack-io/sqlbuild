@@ -1,9 +1,7 @@
 //! One shape per expression, cached on `profile`'s binding catalog; a failure raises.
 
 use crate::analysis_session::_helpers::stage_functions;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::types::PyTuple;
 
 /// One shape per expression, cached on `profile`'s binding catalog; a failure raises.

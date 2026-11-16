@@ -4,11 +4,9 @@ use crate::analysis::constants::NATIVE_DIALECT_ALIASES;
 use crate::analysis::models::BindingCatalog;
 use crate::analysis::models::CatalogKey;
 
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyDictMethods, PyModule, PyModuleMethods, PyResult, Python,
-};
-use pyo3::types::{PyBool, PyDict, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyDictMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::{PyDict, PyTuple};
 use sqlbuild_analysis::semantic_validation::models as validation;
 use sqlbuild_analysis::semantic_validation::models::DiagnosticRow;
 
@@ -18,36 +16,14 @@ use sqlbuild_python_base::types::IntoPositional;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
 
 pub(crate) const QUOTED_IDENTIFIER_DELIMITER: char = '"';
-const SNOWFLAKE_DIALECT: &str = "snowflake";
-const QUOTED_CASE_PARAMETER: &str = "QUOTED_IDENTIFIERS_IGNORE_CASE";
-const SESSION_PARAMETERS: &str = "session_parameters";
+pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
+pub(crate) const QUOTED_CASE_PARAMETER: &str = "QUOTED_IDENTIFIERS_IGNORE_CASE";
+pub(crate) const SESSION_PARAMETERS: &str = "session_parameters";
 const GENERIC_DIALECT: &str = "generic";
-
-/// `ignores_quoted_case`: whether the connection explicitly enables case-insensitive quoting.
-pub(crate) fn ignores_quoted_case(
-    connection: &Bound<'_, PyAny>,
-    dialect: &Bound<'_, PyAny>,
-) -> PyResult<bool> {
-    if dialect.is_none() || dialect.extract::<String>()? != SNOWFLAKE_DIALECT {
-        return Ok(false);
-    }
-    let parameters: Bound<'_, PyAny> = mapping_get(connection, SESSION_PARAMETERS)?;
-    let Ok(parameters) = parameters.downcast::<PyDict>() else {
-        return Ok(false);
-    };
-    for (key, value) in parameters.iter() {
-        let upper: Bound<'_, PyAny> = key.str()?.call_method0("upper")?;
-        if upper.eq(QUOTED_CASE_PARAMETER)? && value.is(PyBool::new(key.py(), true)) {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
 
 /// The native dialect a request's adapter dialect validates as.
 fn native_dialect(dialect: &Bound<'_, PyAny>) -> PyResult<String> {
@@ -143,10 +119,4 @@ pub(crate) fn schema_validations<'py>(
         }
     }
     PyTuple::new(py, results)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<BindingCatalog>()?;
-    module.add_function(wrap_pyfunction!(schema_validations, module)?)?;
-    Ok(())
 }

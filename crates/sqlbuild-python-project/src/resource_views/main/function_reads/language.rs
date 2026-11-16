@@ -1,12 +1,17 @@
 //! The compiled function's `language`, as its Python attribute reads it.
 
-use crate::resource_views::_helpers::function_reads;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::resource_views::_helpers::function_reads::native_function;
+use pyo3::IntoPyObjectExt;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The compiled function's `language`, as its Python attribute reads it.
-#[inline]
 pub fn language<'py>(function: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    function_reads::language(function)
+    let py: Python<'py> = function.py();
+    if let Some(view) = native_function(function)? {
+        return view
+            .language(py)
+            .and_then(|value| value.into_bound_py_any(py));
+    }
+    native_field(function, "language")
 }

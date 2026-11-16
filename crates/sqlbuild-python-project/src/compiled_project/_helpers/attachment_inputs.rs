@@ -25,7 +25,7 @@ use crate::resource_views::models::NativeSourceInput;
 
 const ATTACHMENT_UNINSTALLED: &str = "the native module registered no resource attachment";
 
-static INSTALLED: OnceLock<ResourceAttachment> = OnceLock::new();
+pub(crate) static INSTALLED: OnceLock<ResourceAttachment> = OnceLock::new();
 
 /// Attaches the project's sources, given their rows and settings.
 pub(crate) type AttachSources = fn(
@@ -63,11 +63,6 @@ pub(crate) type AttachAudits =
         Vec<AuditFileRow>,
         AuditSettings,
     ) -> PyResult<(Vec<NativeAuditInput>, Vec<Bound<'py, PyAny>>)>;
-
-/// Install the compile's attachment runs once, at registration.
-pub(crate) fn install(attachment: ResourceAttachment) {
-    let _ = INSTALLED.get_or_init(|| attachment);
-}
 
 /// The installed attachment runs.
 pub(crate) fn resource_attachment() -> PyResult<&'static ResourceAttachment> {

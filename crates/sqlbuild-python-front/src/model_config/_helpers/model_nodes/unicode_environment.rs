@@ -1,8 +1,6 @@
 //! The process environment as compile text reads it, rejecting values that are not UTF-8.
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBytes, PyBytesMethods, PyDict, PyDictMethods, PyString};
 use pyo3::{pyclass, pymethods};
 
@@ -67,13 +65,4 @@ impl UnicodeEnvironment {
     fn __len__(&self, py: Python<'_>) -> PyResult<usize> {
         environ(py)?.len()
     }
-}
-
-/// A new view of the process environment as compile text reads it.
-pub(crate) fn unicode_environment(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    Ok(Bound::new(py, UnicodeEnvironment)?.into_any())
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<UnicodeEnvironment>()
 }

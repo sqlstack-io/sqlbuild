@@ -1,10 +1,11 @@
 //! Python config values converted once into `ConfigNode`s, and projected back into Python objects.
 
+use crate::model_config::main::config::config_node::config_node;
+use crate::model_config::main::config::config_object::config_object;
 use crate::model_config::models::HostHandle;
 use crate::model_config::types::PyConfigNode;
 use std::sync::Arc;
 
-use pyo3::IntoPyObject;
 use pyo3::exceptions::{PyOverflowError, PyUnicodeEncodeError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{
@@ -40,7 +41,10 @@ fn utf8_text(text: &Bound<'_, PyString>) -> PyResult<bool> {
 }
 
 /// An opaque value with the cheap facts `PyNode` reads of it, and its converted items.
-fn host(value: &Bound<'_, PyAny>, children: HostChildren<HostHandle>) -> PyResult<PyConfigNode> {
+pub(crate) fn host(
+    value: &Bound<'_, PyAny>,
+    children: HostChildren<HostHandle>,
+) -> PyResult<PyConfigNode> {
     let node: PyNode<'_> = PyNode(value.clone());
     let strict_text: bool = match value.downcast::<PyString>() {
         Ok(text) => utf8_text(text)?,
@@ -109,7 +113,7 @@ fn container(
     })
 }
 
-fn convert(value: &Bound<'_, PyAny>, open: &[usize]) -> PyResult<Option<PyConfigNode>> {
+pub(crate) fn convert(value: &Bound<'_, PyAny>, open: &[usize]) -> PyResult<Option<PyConfigNode>> {
     if value.is_none() {
         return Ok(Some(ConfigNode::Null));
     }
@@ -147,28 +151,11 @@ fn convert(value: &Bound<'_, PyAny>, open: &[usize]) -> PyResult<Option<PyConfig
     }))
 }
 
-/// Carry an uninspected value: exact containers keep their own objects without opening items.
-pub(crate) fn carried_node(value: &Bound<'_, PyAny>) -> PyResult<PyConfigNode> {
-    if is_exact_container(value) {
-        host(value, HostChildren::None)
-    } else {
-        config_node(value)
-    }
-}
-
 /// Whether `value` is an exact `list`, `tuple` or `dict`.
 pub(crate) fn is_exact_container(value: &Bound<'_, PyAny>) -> bool {
     value.is_exact_instance_of::<PyList>()
         || value.is_exact_instance_of::<PyTuple>()
         || value.is_exact_instance_of::<PyDict>()
-}
-
-/// One Python config value as a `ConfigNode`; a value that holds itself stays opaque whole.
-pub(crate) fn config_node(value: &Bound<'_, PyAny>) -> PyResult<PyConfigNode> {
-    match convert(value, &[])? {
-        Some(node) => Ok(node),
-        None => host(value, HostChildren::None),
-    }
 }
 
 /// A Python mapping's entries as config entries.
@@ -177,38 +164,6 @@ pub(crate) fn config_entries(mapping: &Bound<'_, PyDict>) -> PyResult<PyConfigEn
         .iter()
         .map(|(key, value)| Ok((config_node(&key)?, config_node(&value)?)))
         .collect()
-}
-
-/// The Python object of one config value: new builtins, and opaque values as themselves.
-pub(crate) fn config_object<'py>(
-    py: Python<'py>,
-    node: &PyConfigNode,
-) -> PyResult<Bound<'py, PyAny>> {
-    Ok(match node {
-        ConfigNode::Null => py.None().into_bound(py),
-        ConfigNode::Bool(flag) => PyBool::new(py, *flag).to_owned().into_any(),
-        ConfigNode::Int(number) => number.into_pyobject(py)?.into_any(),
-        ConfigNode::Float(number) => PyFloat::new(py, *number).into_any(),
-        ConfigNode::Str(text) => PyString::new(py, text).into_any(),
-        ConfigNode::List(items) => PyList::new(
-            py,
-            items
-                .iter()
-                .map(|item| config_object(py, item))
-                .collect::<PyResult<Vec<_>>>()?,
-        )?
-        .into_any(),
-        ConfigNode::Tuple(items) => PyTuple::new(
-            py,
-            items
-                .iter()
-                .map(|item| config_object(py, item))
-                .collect::<PyResult<Vec<_>>>()?,
-        )?
-        .into_any(),
-        ConfigNode::Map(entries) => config_dict(py, entries)?.into_any(),
-        ConfigNode::Host(host) => host.handle.0.bind(py).clone(),
-    })
 }
 
 /// A new Python `dict` of config entries.

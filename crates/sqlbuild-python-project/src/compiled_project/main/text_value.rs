@@ -1,12 +1,12 @@
 //! A config value when it is text.
 
-use crate::compiled_project::_helpers::project;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyResult;
-use pyo3::types::PyDict;
+use pyo3::prelude::{Bound, PyAnyMethods, PyResult};
+use pyo3::types::{PyDict, PyDictMethods, PyString};
 
 /// A config value when it is text.
-#[inline]
 pub fn text_value(values: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<String>> {
-    project::text_value(values, key)
+    match values.get_item(key)? {
+        Some(value) if value.is_instance_of::<PyString>() => Ok(Some(value.extract()?)),
+        _ => Ok(None),
+    }
 }

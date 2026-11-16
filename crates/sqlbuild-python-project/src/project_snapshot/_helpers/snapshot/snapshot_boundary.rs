@@ -1,5 +1,6 @@
 //! Discovery files and authored test payloads remain the Python host's boundary.
 
+use crate::project_snapshot::main::relative_path::relative_path;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
@@ -15,12 +16,10 @@ use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 use crate::compiled_project::main::plain_value::plain_value;
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::models::NativeProjectView;
-use crate::project_snapshot::_helpers::snapshot::snapshot::destination;
-use crate::project_snapshot::_helpers::snapshot::snapshot::insert_node;
+use crate::project_snapshot::_helpers::snapshot::snapshot::{destination, insert_node};
 use crate::resource_views::models::NativeCompiledSeed;
 use crate::resource_views::types::SeedViews;
 use sqlbuild_python_base::records::main::fields::field::field;
-use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
 
 /// Read only declared metadata fields, never callable attributes or connection settings.
 pub(crate) fn metadata(value: &Bound<'_, PyAny>, names: &[&str]) -> PyResult<Value> {
@@ -29,10 +28,6 @@ pub(crate) fn metadata(value: &Bound<'_, PyAny>, names: &[&str]) -> PyResult<Val
         result.insert((*name).into(), plain_value(&field(value, name)?)?);
     }
     Ok(Value::Object(result))
-}
-
-pub(crate) fn relative_path(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    path_posix(&field(value, "relative_path")?)
 }
 
 /// Source locations are local compiler diagnostics, not relocatable column metadata.

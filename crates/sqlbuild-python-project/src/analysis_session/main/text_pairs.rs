@@ -1,13 +1,15 @@
 //! `{column: value}` as ordered pairs, each value as `str(value)`.
 
-use crate::analysis_session::_helpers::profile_inputs;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::assembly::analysis_session::types::Pairs;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 /// `{column: value}` as ordered pairs, each value as `str(value)`.
-#[inline]
 pub fn text_pairs(shape: &Bound<'_, PyAny>) -> PyResult<Pairs> {
-    profile_inputs::text_pairs(shape)
+    let mut pairs: Pairs = Vec::new();
+    for column in mapping_items(shape)?.try_iter()? {
+        let (column, value): (String, Bound<'_, PyAny>) = column?.extract()?;
+        pairs.push((column, value.str()?.extract()?));
+    }
+    Ok(pairs)
 }

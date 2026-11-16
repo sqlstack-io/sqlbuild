@@ -4,18 +4,15 @@ use crate::graph::models::NativeProjectGraph;
 use crate::native_host::models::ModelHandle;
 use crate::native_host::models::ModelLookup;
 use crate::planner_strategy::types::FixtureKey;
-use pyo3::prelude::Bound;
-use pyo3::prelude::Py;
+use pyo3::prelude::{Bound, Py};
 use pyo3::pyclass;
 use pyo3::types::PyDict;
-use sqlbuild_analysis::planner_fixtures::models::FixtureColumn;
-use sqlbuild_analysis::planner_fixtures::models::FixtureReadCache;
-use sqlbuild_analysis::planner_fixtures::models::FixtureTypeProjection;
+use sqlbuild_analysis::planner_fixtures::models::{
+    FixtureColumn, FixtureReadCache, FixtureTypeProjection,
+};
 use sqlbuild_analysis::required_columns::models::ColumnRead;
-use std::collections::BTreeSet;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::collections::{BTreeSet, HashMap};
+use std::sync::{Arc, Mutex};
 
 /// Completed fixture SQL and inferred columns by Python fixture key, expected types and diagnostics.
 #[derive(Debug)]

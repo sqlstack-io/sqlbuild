@@ -1,12 +1,15 @@
 //! Register the explicit references functions and classes.
 
-use crate::references::_helpers::explicit_references;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::references::_helpers::explicit_references::explicit_reference_report;
+use crate::references::main::hard_coded_relation_remedy::hard_coded_relation_remedy;
+use crate::references::main::old_name_reference_message::old_name_reference_message;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the explicit references functions and classes.
-#[inline]
 pub fn register_explicit_references(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    explicit_references::register(module)
+    module.add_function(wrap_pyfunction!(explicit_reference_report, module)?)?;
+    module.add_function(wrap_pyfunction!(hard_coded_relation_remedy, module)?)?;
+    module.add_function(wrap_pyfunction!(old_name_reference_message, module)?)?;
+    Ok(())
 }

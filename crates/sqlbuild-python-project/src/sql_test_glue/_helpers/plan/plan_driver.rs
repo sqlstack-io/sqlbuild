@@ -1,19 +1,17 @@
 //! Host SQL-test request preparation, native planning, and Python result conversion.
 
+use crate::sql_test_glue::main::planned_rows::planned_rows;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python, pyfunction};
-use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use sqlbuild_host::compile_context::main::add_compile_timing::add_compile_timing;
+use pyo3::types::{PyDict, PyTuple};
 
 use crate::planner_phases::main::object::object;
 use crate::planner_strategy::main::count_chain_resolution::count_chain_resolution;
 use crate::sql_test_glue::_helpers::plan::plan_values::tuple;
-use crate::sql_test_glue::_helpers::plan::planning::ChainRequest;
-use crate::sql_test_glue::_helpers::plan::planning::PlanningRequest;
-use crate::sql_test_glue::_helpers::plan::planning::plan_compiled_sql_tests;
-use crate::sql_test_glue::_helpers::plan::planning::resolve_compiled_sql_test_chains;
+use crate::sql_test_glue::_helpers::plan::planning::{
+    ChainRequest, resolve_compiled_sql_test_chains,
+};
 use crate::sql_test_glue::models::PlanRow;
 use crate::sql_test_glue::models::SqlTestPlanOptions;
-use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -78,87 +76,6 @@ pub(crate) fn resolve_sql_test_model_chains<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     count_chain_resolution(project.py())?;
     chains(project, tests)
-}
-
-/// Native plans of one SQL-test batch, with adapter rendering and timing accounted for.
-pub(crate) fn planned_rows<'py>(
-    (project, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    tests: &Bound<'py, PyAny>,
-    options: &SqlTestPlanOptions<'py>,
-) -> PyResult<Vec<PlanRow>> {
-    let py = project.py();
-    let artifact = options.artifact;
-    if !tests.is_truthy()? {
-        return Ok(Vec::new());
-    }
-    let start: u64 = imported(py, "time", "perf_counter_ns")?
-        .call0()?
-        .extract()?;
-    let model_sql = crate::sql_test_glue::_helpers::plan::plan_rendering::models(project, adapter)?;
-    let functions =
-        crate::sql_test_glue::_helpers::plan::plan_rendering::functions(project, adapter)?;
-    let overrides =
-        crate::sql_test_glue::_helpers::plan::plan_rendering::overrides(project, tests, adapter)?;
-    let request = PlanningRequest {
-        models: native_field(project, "models")?.extract()?,
-        rendered_model_sql: model_sql.extract()?,
-        functions: functions.extract()?,
-        tests: tests.extract()?,
-        rendered_test_overrides: overrides.extract()?,
-        sql_analysis_enabled: options.sql_analysis_enabled.extract()?,
-        sql_analysis_dialect: adapter.call_method0("sql_analysis_dialect")?.extract()?,
-        set_difference_operator: adapter
-            .call_method0("render_set_difference_operator")?
-            .extract()?,
-        requires_derived_table_aliases: adapter
-            .call_method0("requires_derived_table_aliases")?
-            .extract()?,
-        lexical_syntax: native_field(
-            &native_field(project, "sql_lexical_syntax")?,
-            "native_mapping",
-        )?
-        .extract()?,
-        render_sql: artifact || options.render_sql,
-        include_plan: !artifact && options.include_plan,
-        max_unit_test_real_models: native_field(
-            &native_field(project, "settings")?,
-            "unit_test_max_real_models",
-        )?
-        .extract()?,
-    };
-    let (rows, planning_ns, rendering_ns) = match plan_compiled_sql_tests(py, request) {
-        Ok(value) => value,
-        Err(error) if error.is_instance_of::<pyo3::exceptions::PyValueError>(py) => {
-            return Err(
-                crate::sql_test_glue::_helpers::plan::plan_errors::planning_error(
-                    py, error, tests,
-                )?,
-            );
-        }
-        Err(error) => return Err(error),
-    };
-    let end: u64 = imported(py, "time", "perf_counter_ns")?
-        .call0()?
-        .extract()?;
-    for (phase, elapsed) in [
-        (
-            "test_planning_ms",
-            planning_ns
-                + end
-                    .saturating_sub(start)
-                    .saturating_sub(planning_ns)
-                    .saturating_sub(rendering_ns),
-        ),
-        ("comparison_render_ms", rendering_ns),
-    ] {
-        add_compile_timing(phase, elapsed);
-    }
-    if artifact {
-        for row in &rows {
-            row.rendered_sql(py)?;
-        }
-    }
-    Ok(rows)
 }
 
 /// Plans of one SQL-test batch, or their compiled artifacts, for Python consumers.
@@ -268,48 +185,4 @@ pub(crate) fn sql_test_plan_error_messages<'py>(
         }
     }
     PyTuple::new(warnings.py(), messages)
-}
-
-/// Return model closures resolved natively in one project batch, keyed by SQL test key.
-#[pyfunction]
-#[pyo3(signature = (*, project, tests))]
-pub(crate) fn sql_test_model_chain_names_by_key<'py>(
-    project: &Bound<'py, PyAny>,
-    tests: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyDict>> {
-    let py = project.py();
-    let chains = resolve_sql_test_model_chains(project, tests)?;
-    let by_key = PyDict::new(py);
-    for (test, chain) in tests.try_iter()?.zip(chains.try_iter()?) {
-        by_key.set_item(native_field(&test?, "key")?, chain?)?;
-    }
-    Ok(by_key)
-}
-
-/// `plan_compiled_sql_test_artifacts` as a function of `module`.
-pub(crate) fn plan_compiled_sql_test_artifacts_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(plan_compiled_sql_test_artifacts, module)
-}
-
-/// `plan_sql_tests_natively` as a function of `module`.
-pub(crate) fn plan_sql_tests_natively_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(plan_sql_tests_natively, module)
-}
-
-/// `sql_test_model_chain_names_by_key` as a function of `module`.
-pub(crate) fn sql_test_model_chain_names_by_key_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(sql_test_model_chain_names_by_key, module)
-}
-
-/// `sql_test_plan_error_messages` as a function of `module`.
-pub(crate) fn sql_test_plan_error_messages_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(sql_test_plan_error_messages, module)
 }

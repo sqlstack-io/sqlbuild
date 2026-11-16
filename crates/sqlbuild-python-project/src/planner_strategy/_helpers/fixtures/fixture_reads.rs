@@ -1,8 +1,8 @@
 //! Boundary conversion for native fixture read analysis.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::PyFrozenSet;
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::planner_fixtures::main::required_columns::required_columns;
 use sqlbuild_analysis::planner_fixtures::main::star_keys::star_keys;
 use sqlbuild_analysis::planner_fixtures::models::{
@@ -178,14 +178,10 @@ fn model_stars(
         .map_err(value_error)
 }
 
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(fixture_read_cache_info, module)?)
-}
-
 /// Report resolver misses and retained entries, optionally clearing prior fixture reuse.
 #[pyfunction]
 #[pyo3(signature = (*, reset = false))]
-fn fixture_read_cache_info(py: pyo3::Python<'_>, reset: bool) -> PyResult<(u64, usize)> {
+pub(crate) fn fixture_read_cache_info(py: pyo3::Python<'_>, reset: bool) -> PyResult<(u64, usize)> {
     let owner = work_counts(py)?;
     let mut owner = owner.borrow_mut();
     if reset {

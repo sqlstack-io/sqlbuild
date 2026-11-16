@@ -51,13 +51,10 @@ use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
 use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
 use sqlbuild_python_project::compiled_views::main::compiled_models::relative_path::relative_path;
-use sqlbuild_python_project::planner_strategy::constants::CUSTOM_MATERIALIZATION;
-use sqlbuild_python_project::planner_strategy::constants::DDL_SEPARATOR;
-use sqlbuild_python_project::planner_strategy::constants::ENFORCED_CONTRACT;
-use sqlbuild_python_project::planner_strategy::constants::MICROBATCH_MODE;
-use sqlbuild_python_project::planner_strategy::constants::PHYSICAL_STORAGE_DIALECT;
-use sqlbuild_python_project::planner_strategy::constants::PHYSICAL_STORAGE_UNSUPPORTED_CODE;
-use sqlbuild_python_project::planner_strategy::constants::TABLE_RECREATING_ACTIONS;
+use sqlbuild_python_project::planner_strategy::constants::{
+    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, MICROBATCH_MODE,
+    PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE, TABLE_RECREATING_ACTIONS,
+};
 use sqlbuild_python_project::planner_strategy::models::ModelEntryDecisions;
 
 /// Model config keys copied to the plan entry as optional strings, with their entry fields.

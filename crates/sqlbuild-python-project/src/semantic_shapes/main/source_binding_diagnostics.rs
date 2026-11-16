@@ -1,10 +1,8 @@
 //! `source_binding_diagnostics(*, project, columns, profile, selected_keys)`.
 
 use crate::semantic_shapes::_helpers::source_bindings;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyResult;
-use pyo3::types::PyDict;
-use pyo3::types::PyTuple;
+use pyo3::prelude::{Bound, PyResult};
+use pyo3::types::{PyDict, PyTuple};
 
 /// `source_binding_diagnostics(*, project, columns, profile, selected_keys)`.
 #[inline]

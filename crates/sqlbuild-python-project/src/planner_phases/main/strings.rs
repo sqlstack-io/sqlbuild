@@ -1,12 +1,11 @@
 //! The strings of any Python iterable, in iteration order.
 
-use crate::planner_phases::_helpers::objects;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 
 /// The strings of any Python iterable, in iteration order.
-#[inline]
 pub fn strings(values: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    objects::strings(values)
+    values
+        .try_iter()?
+        .map(|value| value?.extract::<String>())
+        .collect()
 }

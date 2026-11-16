@@ -1,12 +1,10 @@
 //! Register the hashing functions and classes.
 
-use crate::planner_identity::_helpers::hashing;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::planner_identity::main::model_definition_hash::model_definition_hash;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the hashing functions and classes.
-#[inline]
 pub fn register_hashing(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    hashing::register(module)
+    module.add_function(wrap_pyfunction!(model_definition_hash, module)?)
 }

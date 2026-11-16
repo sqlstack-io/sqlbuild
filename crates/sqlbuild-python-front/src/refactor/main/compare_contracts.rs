@@ -1,10 +1,8 @@
 //! Selected declarations compared with one bulk read of physical columns.
 
 use crate::refactor::_helpers::contract_compare;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyResult;
-use pyo3::types::PyDict;
-use pyo3::types::PyTuple;
+use pyo3::prelude::{Bound, PyResult};
+use pyo3::types::{PyDict, PyTuple};
 
 /// Selected declarations compared with one bulk read of physical columns.
 #[inline]

@@ -7,8 +7,7 @@ use crate::compiled_views::main::compiled_models::name_object::name_object;
 use crate::planner_strategy::main::planning_context::planning_context;
 use crate::planner_strategy::models::RelationFixturePlanningContext;
 use crate::sql_test_glue::_helpers::plan::plan_driver::planned as planned_tests;
-use crate::sql_test_glue::models::SqlTestAssembly;
-use crate::sql_test_glue::models::SqlTestPlanOptions;
+use crate::sql_test_glue::models::{SqlTestAssembly, SqlTestPlanOptions};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -153,11 +152,4 @@ pub(crate) fn assemble_sql_test_plans<'py>(
         )?);
     }
     PyTuple::new(py, results)
-}
-
-/// `plan_sql_tests` as a function of `module`.
-pub(crate) fn plan_sql_tests_function<'py>(
-    module: &pyo3::Bound<'py, pyo3::types::PyModule>,
-) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyCFunction>> {
-    pyo3::wrap_pyfunction!(plan_sql_tests, module)
 }

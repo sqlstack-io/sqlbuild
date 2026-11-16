@@ -1,12 +1,13 @@
 //! Register the contract diagnostics functions and classes.
 
-use crate::contracts::_helpers::contract_diagnostics;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::contracts::_helpers::contract_diagnostics::evaluate_model_contracts;
+use crate::contracts::main::promotion_conflict_diagnostics::promotion_conflict_diagnostics;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the contract diagnostics functions and classes.
-#[inline]
 pub fn register_contract_diagnostics(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    contract_diagnostics::register(module)
+    module.add_function(wrap_pyfunction!(evaluate_model_contracts, module)?)?;
+    module.add_function(wrap_pyfunction!(promotion_conflict_diagnostics, module)?)?;
+    Ok(())
 }

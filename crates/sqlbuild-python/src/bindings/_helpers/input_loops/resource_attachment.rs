@@ -11,18 +11,14 @@ use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
 use crate::bindings::_helpers::input_loops::resource_diagnostics::resource_diagnostics;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_project::compiled_project::models::AuditFileRow;
-use sqlbuild_python_project::compiled_project::models::AuditSettings;
-use sqlbuild_python_project::compiled_project::models::FunctionRow;
-use sqlbuild_python_project::compiled_project::models::FunctionSettings;
 use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
-use sqlbuild_python_project::compiled_project::models::ResourceAttachment;
-use sqlbuild_python_project::compiled_project::models::ScenarioRow;
-use sqlbuild_python_project::compiled_project::models::SqlTestSettings;
-use sqlbuild_python_project::compiled_project::models::TestFileRow;
-use sqlbuild_python_project::compiled_project::types::AttachedSqlTests;
-use sqlbuild_python_project::compiled_project::types::SourceRow;
-use sqlbuild_python_project::compiled_project::types::SourceSettings;
+use sqlbuild_python_project::compiled_project::models::{
+    AuditFileRow, AuditSettings, FunctionRow, FunctionSettings, ResourceAttachment, ScenarioRow,
+    SqlTestSettings, TestFileRow,
+};
+use sqlbuild_python_project::compiled_project::types::{
+    AttachedSqlTests, SourceRow, SourceSettings,
+};
 use sqlbuild_python_project::resource_views::models::NativeAuditInput;
 use sqlbuild_python_project::resource_views::models::NativeFunctionInput;
 use sqlbuild_python_project::resource_views::models::NativeSourceInput;

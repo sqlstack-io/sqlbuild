@@ -1,12 +1,10 @@
 //! Register the fixture reads functions and classes.
 
-use crate::planner_strategy::_helpers::fixtures::fixture_reads;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::planner_strategy::_helpers::fixtures::fixture_reads::fixture_read_cache_info;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the fixture reads functions and classes.
-#[inline]
 pub fn register_fixture_reads(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    fixture_reads::register(module)
+    module.add_function(wrap_pyfunction!(fixture_read_cache_info, module)?)
 }

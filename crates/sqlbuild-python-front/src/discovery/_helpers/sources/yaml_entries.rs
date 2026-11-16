@@ -1,10 +1,8 @@
 //! Loaded schema and source YAML documents parsed natively into the Python contract objects.
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{FromPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{FromPyObject, pyfunction};
 use sqlbuild_discovery::yaml_entries::main::parse_schema_document::parse_schema_document as parse_schema;
 use sqlbuild_discovery::yaml_entries::main::parse_sources_document::parse_sources_document as parse_sources;
 use sqlbuild_discovery::yaml_entries::models::{
@@ -382,9 +380,4 @@ fn loaded_sources(sources: &[ParsedSourceEntry<PyNode<'_>>]) -> Vec<String> {
             Some(name)
         })
         .collect()
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(parse_schema_document, module)?)?;
-    module.add_function(wrap_pyfunction!(parse_sources_document, module)?)
 }

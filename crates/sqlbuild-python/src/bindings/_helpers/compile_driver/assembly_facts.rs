@@ -20,9 +20,9 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::models::HeaderFamilies;
 use sqlbuild_python_project::analysis_session::main::dialect_or_generic::dialect_or_generic;
 use sqlbuild_python_project::analysis_session::main::prove_dynamic_column_contracts::prove_dynamic_column_contracts;
-use sqlbuild_python_project::analysis_session::models::FamilyRow;
-use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
-use sqlbuild_python_project::analysis_session::models::PivotRequestRow;
+use sqlbuild_python_project::analysis_session::models::{
+    FamilyRow, NativeModelAnalysisSession, PivotRequestRow,
+};
 
 /// `NativeProjectFacts` of `inputs`: resources, syntax validity, deps and standalone pivot proofs.
 pub(crate) fn native_project_facts<'py>(

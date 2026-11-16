@@ -1,7 +1,7 @@
 //! Normalize SQL for analysis and recover binding diagnostics.
 
-use pyo3::prelude::{Bound, Py, PyAny, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Py, PyAny, PyResult, Python};
+use pyo3::pyfunction;
 
 use crate::analysis::_helpers::normalization_results::normalization_results;
 use crate::analysis::models::Positional;
@@ -10,20 +10,7 @@ use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::types::CompilerDetach;
 
 #[pyfunction]
-pub(crate) fn normalize_analysis_sql(
-    py: Python<'_>,
-    request: crate::analysis::models::NormalizationInput,
-) -> PyResult<String> {
-    py.compiler_detach(|| {
-        sqlbuild_analysis::semantic_validation::main::normalize::normalize_analysis_sql(
-            request.into(),
-        )
-    })
-    .map_err(value_error)
-}
-
-#[pyfunction]
-fn normalize_dialect_sql(py: Python<'_>, sql: &str, dialect: &str) -> PyResult<String> {
+pub(crate) fn normalize_dialect_sql(py: Python<'_>, sql: &str, dialect: &str) -> PyResult<String> {
     py.compiler_detach(|| {
         sqlbuild_analysis::semantic_validation::main::normalize_dialect::normalize_dialect_sql(
             sql, dialect,
@@ -34,7 +21,7 @@ fn normalize_dialect_sql(py: Python<'_>, sql: &str, dialect: &str) -> PyResult<S
 
 /// Normalize a batch in one detached call; a failed member is returned as its exception.
 #[pyfunction]
-fn normalize_analysis_sqls(
+pub(crate) fn normalize_analysis_sqls(
     py: Python<'_>,
     dialect: &str,
     requests: Vec<sqlbuild_analysis::semantic_validation::types::NormalizationRequest>,
@@ -50,7 +37,7 @@ fn normalize_analysis_sqls(
 }
 
 #[pyfunction]
-fn binding_diagnostics(
+pub(crate) fn binding_diagnostics(
     py: Python<'_>,
     sql: &str,
     dialect: &str,
@@ -64,12 +51,4 @@ fn binding_diagnostics(
     })
     .map(Positional::wrap_all)
     .map_err(value_error)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(normalize_analysis_sql, module)?)?;
-    module.add_function(wrap_pyfunction!(normalize_dialect_sql, module)?)?;
-    module.add_function(wrap_pyfunction!(normalize_analysis_sqls, module)?)?;
-    module.add_function(wrap_pyfunction!(binding_diagnostics, module)?)?;
-    Ok(())
 }

@@ -1,10 +1,7 @@
 //! Binding diagnostics for a batch of complete-schema validation requests, in request order.
 
 use crate::analysis::_helpers::binding_catalog;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use pyo3::types::PyTuple;
 
 /// Binding diagnostics for a batch of complete-schema validation requests, in request order.

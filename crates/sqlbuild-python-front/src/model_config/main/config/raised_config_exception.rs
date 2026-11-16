@@ -1,15 +1,16 @@
 //! `config_exception` as the raised error, or the failure building it.
 
-use crate::model_config::_helpers::config::config_errors;
+use crate::model_config::_helpers::config::config_errors::config_exception;
 use pyo3::PyErr;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
+use pyo3::prelude::{Bound, PyAny};
 
 /// `config_exception` as the raised error, or the failure building it.
-#[inline]
 pub fn raised_config_exception(
     error: &Bound<'_, PyAny>,
     values: Option<&Bound<'_, PyAny>>,
 ) -> PyErr {
-    config_errors::raised_config_exception(error, values)
+    match config_exception(error, values) {
+        Ok(instance) => PyErr::from_value(instance),
+        Err(failure) => failure,
+    }
 }

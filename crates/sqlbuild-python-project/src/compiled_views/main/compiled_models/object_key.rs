@@ -1,17 +1,17 @@
 //! Object key.
 
-use crate::compiled_views::_helpers::compiled_models::compiled_model_view;
 use crate::compiled_views::models::CompiledViewClasses;
-use pyo3::prelude::Py;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
+use pyo3::types::{PyDict, PyDictMethods};
 
 /// Object key.
-#[inline]
 pub fn object_key(
     classes: &CompiledViewClasses<'_>,
     kind: &str,
     name: &str,
 ) -> PyResult<Py<PyAny>> {
-    compiled_model_view::object_key(classes, kind, name)
+    let fields: Bound<'_, PyDict> = PyDict::new(classes.object_key.py());
+    fields.set_item("resource_type", kind)?;
+    fields.set_item("name", name)?;
+    Ok(classes.object_key.call((), Some(&fields))?.unbind())
 }

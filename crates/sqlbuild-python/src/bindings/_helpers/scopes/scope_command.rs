@@ -30,10 +30,8 @@ use sqlbuild_python_front::scopes::main::reports::scope_list::scope_list;
 use sqlbuild_python_front::scopes::main::reports::scope_move_preview::scope_move_preview;
 use sqlbuild_python_front::scopes::main::reports::scope_report::scope_report;
 use sqlbuild_python_front::scopes::main::reports::serialize_scope_report::serialize_scope_report;
-use sqlbuild_python_front::scopes::models::ExplainArguments;
-use sqlbuild_python_front::scopes::models::ListArguments;
-use sqlbuild_python_front::scopes::models::ReportArguments;
 use sqlbuild_python_front::scopes::models::ScopeClasses;
+use sqlbuild_python_front::scopes::models::{ExplainArguments, ListArguments, ReportArguments};
 
 const TARGET_ERROR_CODE: &str = "C960";
 const BARE_USAGE: &str = "bare names work for models, sources, seeds and functions; write macros, \

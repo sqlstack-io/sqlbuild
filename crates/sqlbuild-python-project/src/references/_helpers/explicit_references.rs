@@ -2,22 +2,16 @@
 
 use crate::references::models::GateRow;
 use crate::references::models::HookRow;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use std::collections::{BTreeMap, BTreeSet};
 
 use pyo3::exceptions::{PyOSError, PyTypeError};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PySet, PyString, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::explicit_references::errors::ReferenceFailure;
 use sqlbuild_analysis::explicit_references::main::check_explicit_references::check_explicit_references;
-use sqlbuild_analysis::explicit_references::main::execution_gate_edges::execution_gate_edges;
-use sqlbuild_analysis::explicit_references::main::old_name_message::old_name_message;
-use sqlbuild_analysis::explicit_references::main::relation_remedy::relation_remedy;
 use sqlbuild_analysis::explicit_references::models::{
-    ExecutionGateEdges, ExecutionGateRequest, GateEdge, HookEdge, HookType, LiteralSql,
-    ReferenceReport, ReferenceRequest, SqlOwner,
+    GateEdge, HookEdge, HookType, LiteralSql, ReferenceReport, ReferenceRequest, SqlOwner,
 };
 use sqlbuild_analysis::explicit_references::types::ResourceKey;
 use sqlbuild_config::project::main::explicit_references_help::explicit_references_help as references_help;
@@ -27,8 +21,7 @@ use sqlbuild_pysource::literal_sql::main::literal_sql_calls::literal_sql_calls;
 use sqlbuild_pysource::literal_sql::models::FunctionSource;
 
 use crate::graph::main::nodes::model_python_hook_names::model_python_hook_names;
-use crate::references::_helpers::reference_facts::ProjectFacts;
-use crate::references::_helpers::reference_facts::project_facts;
+use crate::references::_helpers::reference_facts::{ProjectFacts, project_facts};
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -37,7 +30,6 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
@@ -396,57 +388,7 @@ fn python_literal_sql_calls(
     .collect()
 }
 
-/// How an owner of `owner_kind` should read `target` instead of naming its relation in SQL.
-#[pyfunction]
-#[pyo3(signature = (*, owner_kind, r#ref, upstream_loader_by_source = None))]
-pub(crate) fn hard_coded_relation_remedy(
-    owner_kind: &str,
-    r#ref: &Bound<'_, PyAny>,
-    upstream_loader_by_source: Option<&Bound<'_, PyAny>>,
-) -> PyResult<String> {
-    let target: ResourceKey = (
-        native_field(r#ref, "kind")?.getattr("value")?.extract()?,
-        native_field(r#ref, "name")?.extract()?,
-    );
-    let mut upstream_loaders: Vec<(String, String)> = Vec::new();
-    if let Some(loaders) = upstream_loader_by_source.filter(|loaders| !loaders.is_none()) {
-        for item in mapping_items(loaders)?.try_iter()? {
-            upstream_loaders.push(item?.extract()?);
-        }
-    }
-    Ok(relation_remedy(owner_kind, &target, &upstream_loaders))
-}
-
-/// The P008 message for SQL naming a relation kept only as a compatibility view.
-#[pyfunction]
-#[pyo3(signature = (*, owner_label, written, method, model_name))]
-pub(crate) fn old_name_reference_message(
-    owner_label: &str,
-    written: &str,
-    method: &str,
-    model_name: &str,
-) -> String {
-    old_name_message(owner_label, written, method, model_name)
-}
-
-/// The attached-audit gate edges and hook-read edges of one project, in Python's order.
-pub(crate) fn native_execution_gate_edges(
-    project: &Bound<'_, PyAny>,
-) -> PyResult<(Vec<GateRow>, Vec<HookRow>)> {
-    let facts: ProjectFacts = project_facts(project, false)?;
-    let edges: ExecutionGateEdges = execution_gate_edges(&ExecutionGateRequest {
-        resources: facts.resources,
-        models: facts.models,
-        audits: facts.audits,
-        hooks: facts.hooks,
-    });
-    Ok((
-        edges.audit_gates.into_iter().map(gate_row).collect(),
-        edges.hook_reads.into_iter().map(hook_row).collect(),
-    ))
-}
-
-fn gate_row(edge: GateEdge) -> GateRow {
+pub(crate) fn gate_row(edge: GateEdge) -> GateRow {
     GateRow {
         audit_name: edge.audit_name,
         target: edge.target,
@@ -455,7 +397,7 @@ fn gate_row(edge: GateEdge) -> GateRow {
     }
 }
 
-fn hook_row(edge: HookEdge) -> HookRow {
+pub(crate) fn hook_row(edge: HookEdge) -> HookRow {
     let hook_type: &'static str = match edge.hook_type {
         HookType::Python => "Python",
         HookType::Sql => "SQL",
@@ -467,11 +409,4 @@ fn hook_row(edge: HookEdge) -> HookRow {
         read: edge.read,
         hook_type,
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(explicit_reference_report, module)?)?;
-    module.add_function(wrap_pyfunction!(hard_coded_relation_remedy, module)?)?;
-    module.add_function(wrap_pyfunction!(old_name_reference_message, module)?)?;
-    Ok(())
 }

@@ -1,11 +1,8 @@
 //! Build source load entries.
 
 use crate::planner_scope::_helpers::sources;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::types::PyDict;
-use pyo3::types::PyTuple;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use pyo3::types::{PyDict, PyTuple};
 
 /// Build source load entries.
 #[inline]

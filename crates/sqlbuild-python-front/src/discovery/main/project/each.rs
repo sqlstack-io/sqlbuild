@@ -1,9 +1,7 @@
 //! `read` applied to each item of the iterable attribute `name` of `owner`.
 
 use crate::discovery::_helpers::project::project_facts;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// `read` applied to each item of the iterable attribute `name` of `owner`.
 #[inline]

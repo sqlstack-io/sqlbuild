@@ -1,44 +1,19 @@
 //! Closure, edge inversion and path nodes over any Python-keyed edge mapping.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{
-    PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyTuple,
-};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
+use crate::graph::main::nodes::closure::closure;
+use crate::graph::main::nodes::inverted::inverted;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyTuple};
 use sqlbuild_core::graph_walk::main::directed_path_nodes::directed_path_nodes;
 
 use crate::graph::models::PyNodeSet;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
-use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const BUILTINS_MODULE: &str = "builtins";
 
-/// Keys within `max_depth` edges of any start, plus the starts when `include_starts`.
-pub(crate) fn closure<'py>(
-    starts: Vec<Bound<'py, PyAny>>,
-    edges: &Bound<'py, PyAny>,
-    (include_starts, max_depth): (bool, Option<i64>),
-) -> PyResult<Bound<'py, PySet>> {
-    let py: Python<'py> = edges.py();
-    let mut visited: PyNodeSet<'py> = PyNodeSet(PySet::empty(py)?);
-    if include_starts {
-        for start in &starts {
-            visited.0.add(start)?;
-        }
-    }
-    let none: Bound<'py, PyTuple> = PyTuple::empty(py);
-    breadth_first_reach(
-        starts,
-        max_depth.map(|maximum| u64::try_from(maximum).unwrap_or(0)),
-        &mut visited,
-        |current| neighbours(edges, current, &none),
-    )?;
-    Ok(visited.0)
-}
-
 /// The keys `edges.get(current, ())` lists.
-fn neighbours<'py>(
+pub(crate) fn neighbours<'py>(
     edges: &Bound<'py, PyAny>,
     current: &Bound<'py, PyAny>,
     none: &Bound<'py, PyTuple>,
@@ -46,24 +21,10 @@ fn neighbours<'py>(
     mapping_get_or(edges, current, none)?.try_iter()?.collect()
 }
 
-/// Keys within `max_depth` edges of any start, plus the starts when requested.
-#[pyfunction]
-#[pyo3(signature = (*, starts, edges, include_starts, max_depth = None))]
-pub(crate) fn transitive_closure_many<'py>(
-    starts: &Bound<'py, PyAny>,
-    edges: &Bound<'py, PyAny>,
-    include_starts: bool,
-    max_depth: Option<i64>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let starts: Vec<Bound<'py, PyAny>> = starts.try_iter()?.collect::<PyResult<_>>()?;
-    let visited: Bound<'py, PySet> = closure(starts, edges, (include_starts, max_depth))?;
-    PyFrozenSet::new(edges.py(), visited.iter())
-}
-
 /// All graph keys reachable from a starting key.
 #[pyfunction]
 #[pyo3(signature = (*, start, edges, max_depth = None))]
-fn transitive_closure<'py>(
+pub(crate) fn transitive_closure<'py>(
     start: Bound<'py, PyAny>,
     edges: &Bound<'py, PyAny>,
     max_depth: Option<i64>,
@@ -72,35 +33,10 @@ fn transitive_closure<'py>(
     PyFrozenSet::new(edges.py(), visited.iter())
 }
 
-/// Reversed edges: every source key first, then each new target in first-seen order.
-pub(crate) fn inverted<'py>(edges: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = edges.py();
-    let inverted: Bound<'py, PyDict> = PyDict::new(py);
-    for key in edges.try_iter()? {
-        inverted.set_item(key?, PyList::empty(py))?;
-    }
-    for item in mapping_items(edges)?.try_iter()? {
-        let (source, targets): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
-        for target in targets.try_iter()? {
-            let target: Bound<'py, PyAny> = target?;
-            let sources: Bound<'py, PyList> = match inverted.get_item(&target)? {
-                Some(sources) => sources.downcast_into()?,
-                None => {
-                    let sources: Bound<'py, PyList> = PyList::empty(py);
-                    inverted.set_item(&target, &sources)?;
-                    sources
-                }
-            };
-            sources.append(&source)?;
-        }
-    }
-    Ok(inverted)
-}
-
 /// Reversed directed graph edges, each source list sorted by `sort_key` when given.
 #[pyfunction]
 #[pyo3(signature = (*, edges, sort_key = None))]
-fn invert_edges<'py>(
+pub(crate) fn invert_edges<'py>(
     edges: &Bound<'py, PyAny>,
     sort_key: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyDict>> {
@@ -128,7 +64,7 @@ fn invert_edges<'py>(
 /// Keys on directed paths between two endpoints, or `None` when `end` is not downstream.
 #[pyfunction]
 #[pyo3(signature = (*, start, end, downstream))]
-fn path_nodes<'py>(
+pub(crate) fn path_nodes<'py>(
     start: Bound<'py, PyAny>,
     end: Bound<'py, PyAny>,
     downstream: &Bound<'py, PyAny>,
@@ -150,12 +86,4 @@ fn path_nodes<'py>(
         return Ok(None);
     }
     Ok(Some(PyFrozenSet::new(py, path.0.iter())?))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(transitive_closure, module)?)?;
-    module.add_function(wrap_pyfunction!(transitive_closure_many, module)?)?;
-    module.add_function(wrap_pyfunction!(invert_edges, module)?)?;
-    module.add_function(wrap_pyfunction!(path_nodes, module)?)?;
-    Ok(())
 }

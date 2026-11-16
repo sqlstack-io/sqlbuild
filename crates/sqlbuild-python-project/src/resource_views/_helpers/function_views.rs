@@ -1,6 +1,5 @@
 //! Functions attached by the native loop, held by the compiled project, and their views.
 
-use crate::resource_views::models::FunctionProjections;
 use crate::resource_views::models::NativeCompiledFunction;
 use crate::resource_views::models::NativeFunctionInput;
 use crate::resource_views::types::AttachedFunction;
@@ -49,20 +48,6 @@ positional_record! {
         name: String,
         tags: Vec<String>,
         references: Vec<(String, String, Option<String>)>,
-    }
-}
-
-/// The function record of an attached function, before assembly resolves its dependencies.
-pub(crate) fn function_record(attached: AttachedFunction) -> FunctionRecord {
-    FunctionRecord {
-        attached,
-        deps: None,
-        host: FunctionProjections {
-            arguments: PyOnceLock::new(),
-            return_columns: PyOnceLock::new(),
-            references: PyOnceLock::new(),
-            key: PyOnceLock::new(),
-        },
     }
 }
 

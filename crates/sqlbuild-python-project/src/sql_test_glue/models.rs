@@ -1,7 +1,6 @@
 //! Public records of sql test glue.
 
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
+use pyo3::prelude::{Bound, PyAny};
 use sqlbuild_analysis::compiler::models::SqlTestPlan;
 
 /// How one batch of SQL tests is planned.

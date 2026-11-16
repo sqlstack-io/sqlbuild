@@ -1,43 +1,34 @@
 //! Query columns, expression-source shapes and dynamic pivot proofs read from Python objects.
 
+use crate::analysis_session::main::case_sensitive_shapes::case_sensitive_shapes;
+use crate::analysis_session::main::dialect_or_generic::dialect_or_generic;
+use crate::analysis_session::main::nullability_rules::nullability_rules;
+use crate::analysis_session::main::profile_dialect::profile_dialect;
+use crate::analysis_session::main::prove_dynamic_column_contracts::prove_dynamic_column_contracts;
+use crate::analysis_session::main::return_types::return_types;
+use crate::analysis_session::main::shape_rows::shape_rows;
 use pyo3::IntoPyObjectExt;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRef, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::analysis_session::types::Pairs;
 
 use crate::analysis::models::ProjectCatalog;
-use crate::analysis_session::_helpers::profile_inputs::aliased_dialect;
-use crate::analysis_session::_helpers::profile_inputs::case_sensitive_shapes;
-use crate::analysis_session::_helpers::profile_inputs::dialect_or_generic;
-use crate::analysis_session::_helpers::profile_inputs::nullability_rules;
-use crate::analysis_session::_helpers::profile_inputs::profile_catalog;
-use crate::analysis_session::_helpers::profile_inputs::profile_dialect;
-use crate::analysis_session::_helpers::profile_inputs::return_types;
-use crate::analysis_session::_helpers::profile_inputs::shape_rows;
-use crate::analysis_session::_helpers::query_columns::QueryRequestRow;
-use crate::analysis_session::_helpers::query_columns::QueryRow;
-use crate::analysis_session::_helpers::query_columns::infer_query_columns;
-use crate::analysis_session::_helpers::session::ContractRow;
-use crate::analysis_session::_helpers::session::ExpressionShapesRow;
-use crate::analysis_session::_helpers::session::PivotModelRow;
-use crate::analysis_session::_helpers::session::infer_expression_source_shapes;
-use crate::analysis_session::_helpers::session::prove_dynamic_column_contracts;
-use crate::analysis_session::models::FamilyRow;
-use crate::analysis_session::models::NativeModelAnalysisSession;
-use crate::analysis_session::models::PivotRequestRow;
+use crate::analysis_session::_helpers::profile_inputs::{aliased_dialect, profile_catalog};
+use crate::analysis_session::_helpers::query_columns::{
+    QueryRequestRow, QueryRow, infer_query_columns,
+};
+use crate::analysis_session::_helpers::session::{
+    ContractRow, ExpressionShapesRow, PivotModelRow, infer_expression_source_shapes,
+};
+use crate::analysis_session::models::{FamilyRow, NativeModelAnalysisSession, PivotRequestRow};
 use crate::analysis_session::types::ColumnsRow;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::compile_driver::constants::EXPRESSION_SHAPE_BATCHES;
 use sqlbuild_python_base::compile_driver::constants::EXPRESSION_SHAPES_INFERRED;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
-use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
-use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
-use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::headers::family_specs::family_specs;
 
 const BATCH_MODE: &str = "batch";
@@ -54,7 +45,7 @@ const LINEAGE_RESOURCE_TYPES: [(&str, &str); 4] = [
 /// Each query's `(succeeded, column rows, has star)`; a native internal failure raises.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn infer_native_query_column_rows<'py>(
+pub(crate) fn infer_native_query_column_rows<'py>(
     request: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Vec<ColumnsRow>> {
     let request = Request::new("infer_native_query_column_rows", request)?;
@@ -66,71 +57,6 @@ fn infer_native_query_column_rows<'py>(
         &request.get("profile")?,
         (&empty, &nullability),
     )
-}
-
-/// Each query's columns as `NativeQueryColumns`; a native internal failure raises.
-#[pyfunction]
-#[pyo3(signature = (**request))]
-pub(crate) fn infer_native_query_columns<'py>(
-    request: Option<&Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let request = Request::new("infer_native_query_columns", request)?;
-    let py: Python<'py> = request.py();
-    let empty: Bound<'py, PyAny> = PyDict::new(py).into_any();
-    let types: Bound<'py, PyAny> = or_empty(request.optional("column_types_by_table")?, &empty)?;
-    let nullability: Bound<'py, PyAny> =
-        or_empty(request.optional("column_nullability_by_table")?, &empty)?;
-    let rows: Vec<ColumnsRow> = query_column_rows(
-        &request.get("queries")?,
-        &request.get("profile")?,
-        (&types, &nullability),
-    )?;
-    let mut analyses: Vec<Bound<'py, PyAny>> = Vec::with_capacity(rows.len());
-    for (succeeded, columns, has_star) in rows {
-        let columns: Bound<'py, PyAny> = match columns {
-            None => py.None().into_bound(py),
-            Some(columns) => {
-                let mut built: Vec<Bound<'py, PyAny>> = Vec::with_capacity(columns.len());
-                for (name, data_type, nullability) in columns {
-                    let arguments: Bound<'py, PyDict> = PyDict::new(py);
-                    arguments.set_item("name", name)?;
-                    arguments.set_item("type", data_type)?;
-                    arguments.set_item(
-                        "nullability",
-                        enum_from_value(py, RecordId::InferredNullability, nullability)?,
-                    )?;
-                    built.push(new_record(
-                        py,
-                        RecordId::InferredColumn,
-                        (),
-                        Some(&arguments),
-                    )?);
-                }
-                PyTuple::new(py, built)?.into_any()
-            }
-        };
-        let arguments: Bound<'py, PyDict> = PyDict::new(py);
-        arguments.set_item("succeeded", succeeded)?;
-        arguments.set_item("columns", columns)?;
-        arguments.set_item("has_star", has_star)?;
-        analyses.push(new_record(
-            py,
-            RecordId::NativeQueryColumns,
-            (),
-            Some(&arguments),
-        )?);
-    }
-    PyTuple::new(py, analyses)
-}
-
-/// One shape per expression, cached on the profile's binding catalog; a failure raises.
-#[pyfunction]
-#[pyo3(signature = (**request))]
-pub(crate) fn infer_native_expression_source_shapes<'py>(
-    request: Option<&Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let request = Request::new("infer_native_expression_source_shapes", request)?;
-    expression_source_shapes(&request.get("expressions")?, &request.get("profile")?)
 }
 
 /// One shape per expression, cached on `profile`'s binding catalog; a failure raises.
@@ -199,7 +125,7 @@ pub(crate) fn expression_source_shapes<'py>(
 /// The proof row per `(sql, families)` model from the session or `tables`, else None.
 #[pyfunction]
 #[pyo3(signature = (**request))]
-fn prove_native_dynamic_contracts<'py>(
+pub(crate) fn prove_native_dynamic_contracts<'py>(
     request: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let request = Request::new("prove_native_dynamic_contracts", request)?;
@@ -268,7 +194,7 @@ pub(crate) fn family_rows(families: &Bound<'_, PyAny>) -> PyResult<Vec<FamilyRow
         .collect())
 }
 
-fn or_empty<'py>(
+pub(crate) fn or_empty<'py>(
     value: Option<Bound<'py, PyAny>>,
     empty: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -386,15 +312,4 @@ impl OrderedDict for Pairs {
         }
         Ok(dict.into_any())
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(infer_native_query_column_rows, module)?)?;
-    module.add_function(wrap_pyfunction!(infer_native_query_columns, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        infer_native_expression_source_shapes,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(prove_native_dynamic_contracts, module)?)?;
-    Ok(())
 }

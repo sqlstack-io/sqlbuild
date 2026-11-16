@@ -1,10 +1,7 @@
 //! The identity of one discovered node of `(kind, documented)`, hashed once by the user-code host.
 
 use crate::discovery::_helpers::python_files::imported_python_nodes;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 /// The identity of one discovered node of `(kind, documented)`, hashed once by the user-code host.
 #[inline]

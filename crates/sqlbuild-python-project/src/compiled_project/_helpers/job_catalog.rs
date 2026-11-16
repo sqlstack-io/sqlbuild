@@ -1,6 +1,5 @@
 //! The command target's jobs, loaded when a selector names one or `--changed` needs triggered jobs.
 
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -8,17 +7,14 @@ use std::path::PathBuf;
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyResult, Python};
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
-use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
-use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
-use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector, ProjectGraph};
+use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector};
 use sqlbuild_cli::native_commands::main::effective_target::effective_target;
 use sqlbuild_discovery::orchestration_files::models::{OrchestrationInventory, RunFile};
 
-use crate::compiled_project::constants::JOB_SELECTOR_KINDS;
-use crate::compiled_project::constants::SELECTOR_INTERSECTION;
-use crate::compiled_project::constants::SENSOR_RUN_ARGUMENT;
+use crate::compiled_project::constants::{
+    JOB_SELECTOR_KINDS, SELECTOR_INTERSECTION, SENSOR_RUN_ARGUMENT,
+};
 use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
 
 /// Each job and group's selection, and the names of those a schedule or sensor starts.
@@ -53,72 +49,8 @@ pub(crate) fn with_job_scope<T>(
     result
 }
 
-/// `graph` with the command's jobs attached when `selectors` name a job, otherwise `graph` itself.
-pub(crate) fn graph_with_jobs<'g>(
-    py: Python<'_>,
-    graph: &'g ProjectGraph,
-    selectors: &[String],
-    also_known: &[&str],
-) -> PyResult<Cow<'g, ProjectGraph>> {
-    Ok(match needed_jobs(py, graph, selectors, also_known)? {
-        Some(catalog) => Cow::Owned(attach_jobs(graph.clone(), catalog)),
-        None => Cow::Borrowed(graph),
-    })
-}
-
-/// The command's jobs when `selectors` name one and `graph` has none attached yet.
-pub(crate) fn needed_jobs(
-    py: Python<'_>,
-    graph: &ProjectGraph,
-    selectors: &[String],
-    also_known: &[&str],
-) -> PyResult<Option<BTreeMap<String, JobSelection>>> {
-    if graph.jobs.is_some() || !selectors_need_jobs(graph, selectors, also_known) {
-        return Ok(None);
-    }
-    Ok(job_catalog(py)?.map(|(catalog, _)| catalog))
-}
-
-/// The command's job and job group names, loaded on first use; empty outside a command.
-pub(crate) fn job_names(py: Python<'_>) -> PyResult<Vec<String>> {
-    Ok(job_catalog(py)?
-        .map(|(catalog, _)| catalog.into_keys().collect())
-        .unwrap_or_default())
-}
-
-/// Each job a schedule or sensor starts with the nodes it refreshes, less those of jobs `selectors` run.
-pub(crate) fn triggered_jobs(
-    py: Python<'_>,
-    graph: &ProjectGraph,
-    selectors: &[String],
-) -> PyResult<Vec<(String, BTreeSet<ObjectKey>)>> {
-    let Some((catalog, triggered)) = job_catalog(py)? else {
-        return Ok(Vec::new());
-    };
-    if triggered.is_empty() {
-        return Ok(Vec::new());
-    }
-    let running: BTreeSet<String> = selected_jobs(selectors, &catalog);
-    let mut graph: ProjectGraph = attach_jobs(graph.clone(), catalog);
-    let mut resolved = graph.jobs.take().unwrap_or_default();
-    let mut running_nodes: BTreeSet<ObjectKey> = BTreeSet::new();
-    for name in &running {
-        if let Some(Ok(keys)) = resolved.get(name) {
-            running_nodes.extend(keys.iter().cloned());
-        }
-    }
-    Ok(triggered
-        .into_iter()
-        .filter(|name| !running.contains(name))
-        .filter_map(|name| match resolved.remove(&name) {
-            Some(Ok(keys)) => Some((name, &keys - &running_nodes)),
-            _ => None,
-        })
-        .collect())
-}
-
 /// The jobs `selectors` name, as `job:<name>` or as a bare job name.
-fn selected_jobs(
+pub(crate) fn selected_jobs(
     selectors: &[String],
     catalog: &BTreeMap<String, JobSelection>,
 ) -> BTreeSet<String> {
@@ -138,7 +70,7 @@ fn selected_jobs(
     jobs
 }
 
-fn job_catalog(py: Python<'_>) -> PyResult<Option<Catalog>> {
+pub(crate) fn job_catalog(py: Python<'_>) -> PyResult<Option<Catalog>> {
     let Some(scope) = JOB_SCOPE.with(|scope| {
         scope.borrow().as_ref().map(|scope| match &scope.catalog {
             Some(catalog) => Ok(catalog.clone()),

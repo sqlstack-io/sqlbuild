@@ -1,30 +1,26 @@
 //! Latest fingerprint rows decoded into `Fingerprint` models and indexed into a `FingerprintSet`.
 
+use crate::fingerprints::main::row_fingerprint::row_fingerprint;
 use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::ffi::CString;
 
 use pyo3::exceptions::{PyUnicodeDecodeError, PyValueError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
-use pyo3::types::{PyBytes, PyDateTime, PyDict, PyString};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::types::{PyBytes, PyDict, PyString};
 use sqlbuild_analysis::fingerprint_storage::errors::StorageDecodeError;
 use sqlbuild_analysis::fingerprint_storage::main::decode_storage::decode_storage;
 use sqlbuild_analysis::fingerprint_storage::main::latest_index::latest_index;
-use sqlbuild_analysis::fingerprint_storage::main::selected_positions::selected_positions;
 use sqlbuild_analysis::fingerprint_storage::models::{FingerprintIdentity, LatestIndex};
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 
 const DATETIME_MODULE: &str = "datetime";
 const BINASCII_MODULE: &str = "binascii";
 const BASE64_MODULE: &str = "base64";
-const TIMESTAMP_COLUMN: usize = 11;
+pub(crate) const TIMESTAMP_COLUMN: usize = 11;
 
 /// `FingerprintInputError(message)`.
 pub(crate) fn fingerprint_input_error(py: Python<'_>, message: &str) -> PyErr {
@@ -55,39 +51,7 @@ pub(crate) fn fingerprint_set_from_rows<'py>(
     indexed_set(py, schema, &fingerprints)
 }
 
-/// `select_latest_fingerprints`: an unfiltered latest read narrowed as a filtered read would be.
-#[pyfunction]
-#[pyo3(signature = (*, fingerprint_set, node_names, filtered_node_types = Vec::new()))]
-pub(crate) fn select_latest_fingerprints<'py>(
-    py: Python<'py>,
-    fingerprint_set: &Bound<'py, PyAny>,
-    node_names: Vec<String>,
-    filtered_node_types: Vec<String>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let schema: String = native_field(fingerprint_set, "schema")?.extract()?;
-    if node_names.is_empty() && filtered_node_types.is_empty() {
-        return indexed_set(py, &schema, &[]);
-    }
-    let by_identity: Bound<'py, PyAny> = native_field(fingerprint_set, "fingerprints_by_identity")?;
-    let latest: Vec<Bound<'py, PyAny>> = if by_identity.is_truthy()? {
-        mapping_values(&by_identity)?
-            .try_iter()?
-            .collect::<PyResult<_>>()?
-    } else {
-        Vec::new()
-    };
-    let identities: Vec<(String, String)> =
-        latest.iter().map(identity_of).collect::<PyResult<_>>()?;
-    let positions: Vec<usize> =
-        selected_positions(&borrowed(&identities), &node_names, &filtered_node_types);
-    let selected: Vec<Bound<'py, PyAny>> = positions
-        .into_iter()
-        .map(|position| latest[position].clone())
-        .collect();
-    indexed_set(py, &schema, &selected)
-}
-
-fn indexed_set<'py>(
+pub(crate) fn indexed_set<'py>(
     py: Python<'py>,
     schema: &str,
     fingerprints: &[Bound<'py, PyAny>],
@@ -112,14 +76,14 @@ fn indexed_set<'py>(
     new_record(py, RecordId::FingerprintSet, (), Some(&kwargs))
 }
 
-fn identity_of(fingerprint: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
+pub(crate) fn identity_of(fingerprint: &Bound<'_, PyAny>) -> PyResult<(String, String)> {
     Ok((
         native_field(fingerprint, "node_type")?.extract()?,
         native_field(fingerprint, "node_name")?.extract()?,
     ))
 }
 
-fn borrowed(identities: &[(String, String)]) -> Vec<FingerprintIdentity<'_>> {
+pub(crate) fn borrowed(identities: &[(String, String)]) -> Vec<FingerprintIdentity<'_>> {
     identities
         .iter()
         .map(|(node_type, node_name)| FingerprintIdentity {
@@ -129,45 +93,9 @@ fn borrowed(identities: &[(String, String)]) -> Vec<FingerprintIdentity<'_>> {
         .collect()
 }
 
-pub(crate) fn row_fingerprint<'py>(
-    fingerprint_class: &Bound<'py, PyAny>,
-    from_iso: &Bound<'py, PyAny>,
-    row: &Bound<'py, PyAny>,
-    qualified_name: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = row.py();
-    let raw_ts: Bound<'py, PyAny> = row.get_item(TIMESTAMP_COLUMN)?;
-    let ts: Bound<'py, PyAny> = if raw_ts.is_instance_of::<PyDateTime>() {
-        raw_ts
-    } else {
-        from_iso.call1((raw_ts.str()?,))?
-    };
-    let node_type: Bound<'py, PyString> = row.get_item(0)?.str()?;
-    let node_name: Bound<'py, PyString> = row.get_item(1)?.str()?;
-    let raw_target_database: Bound<'py, PyAny> = row.get_item(2)?;
-    let raw_target_schema: Bound<'py, PyAny> = row.get_item(3)?;
-    let raw_target_name: Bound<'py, PyAny> = row.get_item(4)?;
-    let definition_storage: Bound<'py, PyString> = row.get_item(9)?.str()?;
-    let metadata_json_storage: Bound<'py, PyString> = row.get_item(10)?.str()?;
-    let definition: String = decoded(&definition_storage, &node_name, qualified_name)?;
-    let metadata_json: String = decoded(&metadata_json_storage, &node_name, qualified_name)?;
-    let kwargs: Bound<'py, PyDict> = PyDict::new(py);
-    kwargs.set_item("node_type", node_type)?;
-    kwargs.set_item("node_name", node_name)?;
-    kwargs.set_item("target_database", optional_text(&raw_target_database)?)?;
-    kwargs.set_item("target_schema", optional_text(&raw_target_schema)?)?;
-    kwargs.set_item("target_name", optional_text(&raw_target_name)?)?;
-    kwargs.set_item("run_id", row.get_item(5)?.str()?)?;
-    kwargs.set_item("definition_hash", row.get_item(6)?.str()?)?;
-    kwargs.set_item("version_hash", row.get_item(7)?.str()?)?;
-    kwargs.set_item("schema_fingerprint", row.get_item(8)?.str()?)?;
-    kwargs.set_item("definition", definition)?;
-    kwargs.set_item("metadata_json", metadata_json)?;
-    kwargs.set_item("ts", ts)?;
-    fingerprint_class.call((), Some(&kwargs))
-}
-
-fn optional_text<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyString>>> {
+pub(crate) fn optional_text<'py>(
+    value: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyString>>> {
     if value.is_none() {
         return Ok(None);
     }
@@ -175,7 +103,7 @@ fn optional_text<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, P
 }
 
 /// Base64 storage as text, raising Python's errors for non-ASCII or invalid storage.
-fn decoded(
+pub(crate) fn decoded(
     storage: &Bound<'_, PyString>,
     node_name: &Bound<'_, PyString>,
     qualified_name: &str,
@@ -243,9 +171,4 @@ fn decode_error(storage: &Bound<'_, PyString>, failure: StorageDecodeError) -> P
             ))
         }
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(select_latest_fingerprints, module)?)?;
-    Ok(())
 }

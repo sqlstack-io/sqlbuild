@@ -1,16 +1,16 @@
 //! Build intermediate source map.
 
-use crate::planner_scope::_helpers::loaders;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::planner_scope::_helpers::loaders::intermediate_map;
+use crate::planner_scope::main::keys::keys;
+use pyo3::prelude::{Bound, PyAny, PyResult, pyfunction};
 use pyo3::types::PyDict;
 
 /// Build intermediate source map.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, project, selected_keys))]
 pub fn build_intermediate_source_map<'py>(
     project: &Bound<'py, PyAny>,
     selected_keys: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    loaders::build_intermediate_source_map(project, selected_keys)
+    intermediate_map(project, &keys(selected_keys)?, false)
 }

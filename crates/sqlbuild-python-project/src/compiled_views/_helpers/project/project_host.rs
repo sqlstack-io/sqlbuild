@@ -4,8 +4,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use crate::compiled_views::models::AnalysisProjections;
 use crate::compiled_views::models::CompiledProjections;
-use crate::compiled_views::models::ModelInputHandles;
-use crate::compiled_views::models::SchemaHandles;
+use crate::compiled_views::models::{ModelInputHandles, SchemaHandles};
 use crate::resource_views::models::AuditProjections;
 use crate::resource_views::models::FunctionProjections;
 use crate::resource_views::models::SeedHandles;

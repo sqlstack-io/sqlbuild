@@ -1,17 +1,9 @@
 //! The compiled project graph and selector resolution, held natively for Python's graph users.
 
-use crate::graph::models::CompiledProjectGraph;
-use crate::graph::models::NativeProjectGraph;
-use crate::graph::models::ResourceRow;
 use sqlbuild_python_base::positional_record;
 
-use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::errors::SelectorError;
-use sqlbuild_analysis::graph::main::build_project_graph::build_project_graph;
-use sqlbuild_analysis::graph::models::GraphResource;
-
-use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 
 type Edges = Vec<(ObjectKey, Vec<ObjectKey>)>;
 positional_record! {
@@ -45,32 +37,4 @@ pub(crate) fn outcome(result: Result<Vec<ObjectKey>, SelectorError>) -> KeysOutc
 
 fn failure(error: SelectorError) -> FailureRow {
     (error.code, error.message, error.help)
-}
-
-/// The project graph indexes of these resources, in project order.
-pub(crate) fn project_graph(resources: Vec<ResourceRow>) -> PyResult<NativeProjectGraph> {
-    compiler_guard(|| {
-        let resources: Vec<GraphResource> = resources
-            .into_iter()
-            .map(
-                |ResourceRow {
-                     key,
-                     deps,
-                     tags,
-                     folder,
-                 }| GraphResource {
-                    key,
-                    deps,
-                    tags,
-                    folder,
-                },
-            )
-            .collect();
-        Ok(NativeProjectGraph::new(build_project_graph(&resources)))
-    })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeProjectGraph>()?;
-    module.add_class::<CompiledProjectGraph>()
 }

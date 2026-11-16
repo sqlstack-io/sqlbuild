@@ -1,12 +1,9 @@
 //! `None`, or the text.
 
-use crate::planner_phases::_helpers::objects;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::Python;
+use crate::planner_phases::main::text::text;
+use pyo3::prelude::{Bound, PyAny, Python};
 
 /// `None`, or the text.
-#[inline]
 pub fn optional_text<'py>(py: Python<'py>, value: Option<&str>) -> Bound<'py, PyAny> {
-    objects::optional_text(py, value)
+    value.map_or_else(|| py.None().into_bound(py), |value| text(py, value))
 }

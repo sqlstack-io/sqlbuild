@@ -1,7 +1,6 @@
 //! Public records of state rows.
 
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
+use pyo3::prelude::{Bound, PyAny};
 
 /// Which migration state table a request reads or writes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

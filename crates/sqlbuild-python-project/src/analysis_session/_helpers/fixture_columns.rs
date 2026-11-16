@@ -2,10 +2,10 @@
 
 use std::collections::HashMap;
 
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::assembly::analysis_session::main::projection_facts::projection_facts;
 use sqlbuild_analysis::assembly::analysis_session::models::ProjectionFacts;
 use sqlbuild_core::panics::main::native_failure::native_failure;
@@ -90,7 +90,7 @@ pub(crate) fn infer_fixture_column_facts<'py>(
 /// Fixture column inferences computed in this process, optionally clearing the count first.
 #[pyfunction]
 #[pyo3(signature = (*, reset = false))]
-fn fixture_inference_count(py: Python<'_>, reset: bool) -> PyResult<u64> {
+pub(crate) fn fixture_inference_count(py: Python<'_>, reset: bool) -> PyResult<u64> {
     let count = inference_count(py)?;
     let mut count = count.borrow_mut();
     if reset {
@@ -105,9 +105,4 @@ fn inference_count(py: Python<'_>) -> PyResult<Bound<'_, FixtureInferenceCount>>
         .get_or_try_init(py, || Py::new(py, FixtureInferenceCount::default()))?
         .bind(py)
         .clone())
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(infer_fixture_column_facts, module)?)?;
-    module.add_function(wrap_pyfunction!(fixture_inference_count, module)?)
 }

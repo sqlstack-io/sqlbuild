@@ -40,10 +40,8 @@ use sqlbuild_python_front::model_config::main::headers::native_schema_column::na
 use sqlbuild_python_front::model_config::main::headers::parsed_audit_identity::parsed_audit_identity;
 use sqlbuild_python_front::model_config::main::model_nodes::column_migration_error::column_migration_error;
 use sqlbuild_python_front::model_config::models::HeaderAudits;
-use sqlbuild_python_front::model_config::models::HeaderColumn;
-use sqlbuild_python_front::model_config::models::HeaderColumns;
 use sqlbuild_python_front::model_config::models::HeaderFamilies;
-use sqlbuild_python_front::model_config::models::NativeColumnSpec;
+use sqlbuild_python_front::model_config::models::{HeaderColumn, HeaderColumns, NativeColumnSpec};
 use sqlbuild_python_front::model_config::types::HeaderValue;
 use sqlbuild_python_project::compiled_project::main::family_fact::family_fact;
 

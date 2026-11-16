@@ -1,12 +1,10 @@
 //! Register the model validator functions and classes.
 
-use crate::model_config::_helpers::model_nodes::model_validator;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::model_config::models::NativeModelValidator;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 
 /// Register the model validator functions and classes.
-#[inline]
 pub fn register_model_validator(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    model_validator::register(module)
+    module.add_class::<NativeModelValidator>()?;
+    Ok(())
 }

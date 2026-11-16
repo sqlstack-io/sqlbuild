@@ -1,5 +1,6 @@
 //! Unit-test selector splitting over discovered project names.
 
+use crate::planner_selection::main::py_strings::py_strings;
 use std::collections::BTreeSet;
 
 use pyo3::IntoPyObject;
@@ -13,7 +14,6 @@ use sqlbuild_analysis::planner_selection::models::{
 };
 
 use crate::compiled_project::main::job_names::job_names;
-use crate::planner_selection::_helpers::carrier::py_strings;
 use crate::planner_selection::models::Carrier;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -116,7 +116,7 @@ fn names_unknown(selectors: &[String], names: &UnitTestSelectorNames) -> bool {
         })
 }
 
-fn split_python<'py>(
+pub(crate) fn split_python<'py>(
     (select, exclude): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     discovered: &Bound<'py, PyAny>,
     accepts_unit_tests: bool,
@@ -175,32 +175,4 @@ fn split_python<'py>(
             ("sql_test_selection", selection),
         ],
     )
-}
-
-/// Move unit-test selectors out of resource selectors, or reject them for this command.
-pub(crate) fn split_project_unit_test_selectors<'py>(
-    select: &Bound<'py, PyAny>,
-    exclude: &Bound<'py, PyAny>,
-    discovered_inputs: &Bound<'py, PyAny>,
-    accepts_unit_tests: bool,
-) -> PyResult<Bound<'py, PyAny>> {
-    split_python((select, exclude), discovered_inputs, accepts_unit_tests)
-}
-
-/// Split unit-test selectors from resource selectors for a command that runs unit tests.
-pub(crate) fn split_unit_test_selectors<'py>(
-    select: &Bound<'py, PyAny>,
-    exclude: &Bound<'py, PyAny>,
-    discovered_inputs: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    split_python((select, exclude), discovered_inputs, true)
-}
-
-/// Raise when a selector names a unit test; return the unchanged resource selectors.
-pub(crate) fn reject_unit_test_selectors<'py>(
-    select: &Bound<'py, PyAny>,
-    exclude: &Bound<'py, PyAny>,
-    discovered_inputs: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    split_python((select, exclude), discovered_inputs, false)
 }

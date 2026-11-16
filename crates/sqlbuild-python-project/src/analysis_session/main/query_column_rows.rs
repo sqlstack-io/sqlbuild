@@ -2,9 +2,7 @@
 
 use crate::analysis_session::_helpers::stage_functions;
 use crate::analysis_session::types::ColumnsRow;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Query column rows.
 #[inline]

@@ -1,28 +1,22 @@
 //! Macro call-site scanning and splicing for the Python macro bridge, with the GIL released.
 
+use crate::render::main::calls::span_row::span_row;
+use crate::render::main::calls::span_tuple::span_tuple;
+use crate::render::main::calls::top_level_macro_call_names::top_level_macro_call_names;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::PyTuple;
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_render::macro_calls::main::macro_call_names::macro_call_names as scan_names;
 use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_sites as scan_sites;
 use sqlbuild_render::macro_calls::main::splice_macro_calls::splice_macro_calls as splice_calls;
 use sqlbuild_render::macro_calls::models::{MacroCallScan, MacroScanFailure};
 
-use crate::render::_helpers::calls::macro_call_memo::MacroCallMemo;
-use crate::render::_helpers::calls::macro_call_rows::SiteRow;
-use crate::render::_helpers::calls::macro_call_rows::site_row;
-use crate::render::_helpers::calls::macro_call_rows::span_row;
-use crate::render::_helpers::calls::macro_call_rows::span_tuple;
-use crate::render::_helpers::expansion::macro_expansion::raised;
+use crate::render::_helpers::calls::macro_call_rows::{SiteRow, site_row};
 use crate::render::models::SpanTuple;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
-use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
-use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-const DECLARATION_CALLS: [&str; 2] = ["enum", "const"];
+pub(crate) const DECLARATION_CALLS: [&str; 2] = ["enum", "const"];
 
 /// `(call start or None, call name or None, message)` of the error Python's scan raises.
 type FailureRow = (Option<usize>, Option<String>, &'static str);
@@ -48,33 +42,12 @@ pub(crate) fn scan_macro_call_sites(
     ))
 }
 
-/// Python's `find_macro_call_names`: top-level call names in encounter order, declarations excluded.
-pub(crate) fn top_level_macro_call_names<'py>(
-    py: Python<'py>,
-    sql: &str,
-    syntax: Option<&LexicalSyntax>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let names = py
-        .compiler_detach(|| Ok(scan_names(sql, false, syntax)))
-        .map_err(compiler_error)?;
-    match names {
-        Ok(names) => PyTuple::new(
-            py,
-            names
-                .into_iter()
-                .filter(|name| !DECLARATION_CALLS.contains(&name.as_str()))
-                .collect::<Vec<String>>(),
-        ),
-        Err(error) => Err(raised(
-            &error_class(py, ErrorId::CompileInput)?,
-            error.message(),
-        )),
-    }
-}
-
 /// Unique authored macro call names in encounter order, declaration calls excluded.
 #[pyfunction]
-fn find_macro_call_names<'py>(py: Python<'py>, sql: &str) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn find_macro_call_names<'py>(
+    py: Python<'py>,
+    sql: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
     top_level_macro_call_names(py, sql, None)
 }
 
@@ -98,12 +71,4 @@ pub(crate) fn splice_macro_calls(
             .map(|span| span_tuple(&span_row(span)))
             .collect(),
     ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(scan_macro_call_sites, module)?)?;
-    module.add_function(wrap_pyfunction!(find_macro_call_names, module)?)?;
-    module.add_function(wrap_pyfunction!(splice_macro_calls, module)?)?;
-    module.add_class::<MacroCallMemo>()?;
-    Ok(())
 }

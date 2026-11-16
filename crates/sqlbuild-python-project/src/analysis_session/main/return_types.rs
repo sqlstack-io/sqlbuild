@@ -1,13 +1,11 @@
 //! `profile.function_return_types` items in order.
 
-use crate::analysis_session::_helpers::profile_inputs;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::analysis_session::_helpers::profile_inputs::pairs;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_analysis::assembly::analysis_session::types::Pairs;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// `profile.function_return_types` items in order.
-#[inline]
 pub fn return_types(profile: &Bound<'_, PyAny>) -> PyResult<Pairs> {
-    profile_inputs::return_types(profile)
+    pairs(&native_field(profile, "function_return_types")?)
 }

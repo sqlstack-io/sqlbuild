@@ -22,21 +22,18 @@ use sqlbuild_python_front::model_config::main::config::expanded::expanded;
 use sqlbuild_python_front::model_config::main::config::native_config_error::native_config_error;
 use sqlbuild_python_front::model_config::main::config::raised_config_exception::raised_config_exception;
 use sqlbuild_python_front::model_config::main::config::template_error::template_error;
-use sqlbuild_python_front::model_config::models::PythonHost;
-use sqlbuild_python_front::model_config::models::Stop;
-use sqlbuild_python_front::model_config::models::TemplateSources;
+use sqlbuild_python_front::model_config::models::{PythonHost, Stop, TemplateSources};
 use sqlbuild_python_front::render::main::declarations::expand_declarations::expand_declarations;
-use sqlbuild_python_front::render::models::DeclarationExpansion;
 use sqlbuild_python_front::render::models::DeclarationExpansionClasses;
-use sqlbuild_python_front::render::models::ExpandedDeclarations;
-use sqlbuild_python_front::render::models::ExpansionConsumer;
 use sqlbuild_python_front::render::models::SqlMacroSource;
+use sqlbuild_python_front::render::models::{
+    DeclarationExpansion, ExpandedDeclarations, ExpansionConsumer,
+};
 use sqlbuild_python_front::scopes::models::NativeDeclarationContexts;
 use sqlbuild_python_front::sqltext::main::declaration_scan::declaration_scan;
 use sqlbuild_python_front::sqltext::main::interpolated::interpolated;
 use sqlbuild_python_front::sqltext::models::InterpolationSources;
-use sqlbuild_python_project::compiled_project::types::SourceRow;
-use sqlbuild_python_project::compiled_project::types::SourceSettings;
+use sqlbuild_python_project::compiled_project::types::{SourceRow, SourceSettings};
 use sqlbuild_python_project::resource_views::main::source_views::replaced::replaced;
 use sqlbuild_python_project::resource_views::models::SourceHandles;
 use sqlbuild_python_project::resource_views::types::AttachedSource;

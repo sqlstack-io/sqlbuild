@@ -1,19 +1,36 @@
 //! `CompileSqlReference` records of `rows`, built once into `cache`.
 
-use crate::compiled_views::_helpers::model_inputs::model_input_view;
 use crate::compiled_views::models::InputViewClasses;
-use pyo3::prelude::Py;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
-use pyo3::types::PyTuple;
+use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_project::models::ReferenceRow;
 
 /// `CompileSqlReference` records of `rows`, built once into `cache`.
-#[inline]
 pub fn reference_tuple(
     classes: &InputViewClasses<'_>,
     rows: &[ReferenceRow],
     cache: &PyOnceLock<Py<PyTuple>>,
 ) -> PyResult<Py<PyTuple>> {
-    model_input_view::reference_tuple(classes, rows, cache)
+    let py: Python<'_> = classes.sql_reference.py();
+    cache
+        .get_or_try_init(py, || {
+            let mut references: Vec<Bound<'_, PyAny>> = Vec::with_capacity(rows.len());
+            for ReferenceRow {
+                kind,
+                name,
+                package,
+                call_argument_count: count,
+            } in rows
+            {
+                let fields: Bound<'_, PyDict> = PyDict::new(py);
+                fields.set_item("ref_kind", classes.reference_kind.call1((kind,))?)?;
+                fields.set_item("ref_name", name)?;
+                fields.set_item("ref_package", package)?;
+                fields.set_item("call_argument_count", count)?;
+                references.push(classes.sql_reference.call((), Some(&fields))?);
+            }
+            Ok::<_, pyo3::PyErr>(PyTuple::new(py, references)?.unbind())
+        })
+        .map(|references| references.clone_ref(py))
 }

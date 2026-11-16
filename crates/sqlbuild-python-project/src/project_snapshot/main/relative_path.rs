@@ -1,12 +1,10 @@
 //! Relative path.
 
-use crate::project_snapshot::_helpers::snapshot::snapshot_boundary;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
 
 /// Relative path.
-#[inline]
 pub fn relative_path(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    snapshot_boundary::relative_path(value)
+    path_posix(&field(value, "relative_path")?)
 }

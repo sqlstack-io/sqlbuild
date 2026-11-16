@@ -1,24 +1,18 @@
 //! Value-based text of everything a stored macro call result depends on besides its call text.
 
+use crate::macro_bridge::main::text::text;
+use pyo3::create_exception;
 use pyo3::exceptions::{PyRecursionError, PyUnicodeEncodeError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{
     PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString, PyStringMethods,
     PyTuple, PyTypeMethods,
 };
-use pyo3::{create_exception, pyfunction, wrap_pyfunction};
-use sqlbuild_python_base::boundary::main::utf16_units::utf16_units;
 
 use sqlbuild_cache::macro_store_keys::main::canonical_sort_text::canonical_sort_text;
-use sqlbuild_cache::macro_store_keys::main::context_store_token::context_store_token as context_key;
-use sqlbuild_cache::macro_store_keys::main::macro_store_token::macro_store_token as macro_key;
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::frontier::main::emit_error::emit_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
@@ -33,7 +27,7 @@ const CANONICAL_STACK_GROWTH: usize = 2 * 1024 * 1024;
 create_exception!(_native, UncacheableValue, pyo3::exceptions::PyException);
 
 /// Whether `error` is one that makes a value unkeyable rather than a failure to report.
-fn unstable(py: Python<'_>, error: &PyErr) -> bool {
+pub(crate) fn unstable(py: Python<'_>, error: &PyErr) -> bool {
     error.is_instance_of::<UncacheableValue>(py)
         || error.is_instance_of::<PyUnicodeEncodeError>(py)
         || error.is_instance_of::<PyRecursionError>(py)
@@ -48,21 +42,13 @@ fn type_name(kind: &Bound<'_, PyAny>) -> PyResult<String> {
     ))
 }
 
-/// A Python `str` as JSON text; one holding a lone surrogate as UTF-16 code units.
-pub(crate) fn text(value: &Bound<'_, PyString>) -> PyResult<JsonValue> {
-    match value.to_str() {
-        Ok(text) => Ok(JsonValue::String(text.to_owned())),
-        Err(_) => utf16_units(value).map(JsonValue::Utf16),
-    }
-}
-
 /// `[tag, value]`.
 fn tagged(tag: String, value: JsonValue) -> JsonValue {
     JsonValue::Array(vec![JsonValue::String(tag), value])
 }
 
 /// The Python types `_canonical` distinguishes.
-struct CanonicalTypes<'py> {
+pub(crate) struct CanonicalTypes<'py> {
     enumeration: Bound<'py, PyAny>,
     decimal: Bound<'py, PyAny>,
     dates: Bound<'py, PyTuple>,
@@ -75,7 +61,7 @@ struct CanonicalTypes<'py> {
 }
 
 impl<'py> CanonicalTypes<'py> {
-    fn load(py: Python<'py>) -> PyResult<Self> {
+    pub(crate) fn load(py: Python<'py>) -> PyResult<Self> {
         Ok(Self {
             enumeration: imported(py, "enum", "Enum")?,
             decimal: imported(py, "decimal", "Decimal")?,
@@ -96,7 +82,7 @@ impl<'py> CanonicalTypes<'py> {
     }
 
     /// `_canonical(value)`, on a stack that grows so nesting up to `MAX_DEPTH` cannot overflow it.
-    fn canonical(&self, value: &Bound<'py, PyAny>, depth: usize) -> PyResult<JsonValue> {
+    pub(crate) fn canonical(&self, value: &Bound<'py, PyAny>, depth: usize) -> PyResult<JsonValue> {
         stacker::maybe_grow(CANONICAL_RED_ZONE, CANONICAL_STACK_GROWTH, || {
             self.canonical_level(value, depth)
         })
@@ -218,85 +204,8 @@ impl<'py> CanonicalTypes<'py> {
     }
 }
 
-/// Name a macro by its name, file, identity and exact source, or None when it has no key.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn macro_store_token<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Option<String>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "macro_store_token",
-        options,
-        (&["loaded", "identity"], &[]),
-    )?;
-    let loaded: Bound<'py, PyAny> = arguments.value("loaded")?;
-    let keyed: PyResult<Option<String>> = (|| {
-        let types: CanonicalTypes<'py> = CanonicalTypes::load(py)?;
-        let name: JsonValue = text(native_field(&loaded, "name")?.downcast::<PyString>()?)?;
-        let path: JsonValue = text(
-            native_field(&loaded, "relative_path")?
-                .call_method0("as_posix")?
-                .downcast::<PyString>()?,
-        )?;
-        let identity: JsonValue = types.canonical(&arguments.value("identity")?, 0)?;
-        let raw_source: String = native_field(&loaded, "raw_source")?.extract()?;
-        macro_key((name, path), identity, &raw_source).map_err(emit_error)
-    })();
-    match keyed {
-        Err(error) if unstable(py, &error) => Ok(None),
-        other => other,
-    }
-}
-
-/// Digest the whole context a macro may read, or None when a value has no stable text.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn context_store_token<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Option<String>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "context_store_token",
-        options,
-        (&["macro_context", "declarations"], &[]),
-    )?;
-    let keyed: PyResult<Option<String>> = (|| {
-        let types: CanonicalTypes<'py> = CanonicalTypes::load(py)?;
-        let context: JsonValue = canonical_context(&types, &arguments.value("macro_context")?)?;
-        let declarations: Bound<'py, PyAny> = arguments.value("declarations")?;
-        let declared: JsonValue = if declarations.is_none() {
-            JsonValue::Null
-        } else {
-            let sorted = imported(py, "builtins", "sorted")?;
-            let mut parts: Vec<JsonValue> = vec![
-                types.canonical(&native_field(&declarations, "constants")?, 0)?,
-                types.canonical(&native_field(&declarations, "enums")?, 0)?,
-            ];
-            for name in ["inaccessible_constants", "inaccessible_enums"] {
-                let mut items: Vec<JsonValue> = Vec::new();
-                for item in sorted
-                    .call1((native_field(&declarations, name)?,))?
-                    .try_iter()?
-                {
-                    items.push(plain_json(&item?)?);
-                }
-                parts.push(JsonValue::Array(items));
-            }
-            JsonValue::Array(parts)
-        };
-        context_key(&JsonValue::Array(vec![context, declared])).map_err(emit_error)
-    })();
-    match keyed {
-        Err(error) if unstable(py, &error) => Ok(None),
-        other => other,
-    }
-}
-
 /// `_canonical_context`: the context's type and each field, the value renderer by its type.
-fn canonical_context<'py>(
+pub(crate) fn canonical_context<'py>(
     types: &CanonicalTypes<'py>,
     macro_context: &Bound<'py, PyAny>,
 ) -> PyResult<JsonValue> {
@@ -322,7 +231,7 @@ fn canonical_context<'py>(
 }
 
 /// An inaccessible declaration name, which is always a string, as JSON.
-fn plain_json(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
+pub(crate) fn plain_json(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
     match value.downcast::<PyString>() {
         Ok(string) => text(string),
         Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(format!(
@@ -330,9 +239,4 @@ fn plain_json(value: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
             value.get_type().name()?
         ))),
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(macro_store_token, module)?)?;
-    module.add_function(wrap_pyfunction!(context_store_token, module)?)
 }

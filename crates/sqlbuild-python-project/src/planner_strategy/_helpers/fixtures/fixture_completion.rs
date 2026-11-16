@@ -1,29 +1,23 @@
 //! Relation fixture completion over the Rust fixture planning context.
 
+use crate::planner_strategy::main::complete_fixtures::complete_fixtures;
 use crate::planner_strategy::models::FixtureCompletion;
 use std::collections::HashSet;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::planner_fixtures::main::align_columns::align_columns;
 use sqlbuild_analysis::planner_fixtures::models::{AlignmentInput, FixtureColumn};
 
 use crate::planner_strategy::_helpers::fixtures::fixture_context::planning_context as project_planning_context;
 use crate::planner_strategy::_helpers::fixtures::fixture_preparation::PreparedFixtures;
-use crate::planner_strategy::_helpers::fixtures::fixture_preparation::prepare;
-use crate::planner_strategy::_helpers::fixtures::fixture_reads::required_fixture_columns;
-use crate::planner_strategy::_helpers::fixtures::fixture_selection::fixture_keys_requiring_analysis;
 use crate::planner_strategy::_helpers::fixtures::fixture_selection::unknown_fixture_column_diagnostics;
-use crate::planner_strategy::_helpers::fixtures::fixture_sql::CompletionSql;
-use crate::planner_strategy::_helpers::fixtures::fixture_sql::render_completed;
-use crate::planner_strategy::_helpers::fixtures::fixture_types::expected_fixture_types;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::columns;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::diagnostic;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::label;
-use crate::planner_strategy::_helpers::fixtures::fixture_values::record;
-use crate::planner_strategy::models::ExpectedTypes;
-use crate::planner_strategy::models::RelationFixturePlanningContext;
+use crate::planner_strategy::_helpers::fixtures::fixture_sql::{CompletionSql, render_completed};
+use crate::planner_strategy::_helpers::fixtures::fixture_values::{
+    columns, diagnostic, label, record,
+};
+use crate::planner_strategy::models::{ExpectedTypes, RelationFixturePlanningContext};
 use crate::planner_strategy::types::FixtureKey;
 use sqlbuild_python_base::records::types::RecordId;
 
@@ -38,21 +32,7 @@ impl ExpectedTypes<'_> {
     }
 }
 
-/// Complete the fixture groups of one chain against the planning context.
-pub(crate) fn complete_fixtures<'py, 'a>(
-    context: &'a RelationFixturePlanningContext,
-    adapter: &Bound<'py, PyAny>,
-    (ordered_model_names, fixture_groups): (&[String], &Bound<'py, PyAny>),
-) -> PyResult<FixtureCompletion<'py, 'a>> {
-    let py = adapter.py();
-    let prepared = prepare(fixture_groups, context, adapter)?;
-    let fixture_keys = fixture_keys_requiring_analysis(&prepared, context)?;
-    let required = required_fixture_columns(context, ordered_model_names, &fixture_keys, adapter)?;
-    let expected = expected_fixture_types(context, py, ordered_model_names)?;
-    complete_prepared(prepared, (context, &required), expected, adapter)
-}
-
-fn complete_prepared<'py, 'a>(
+pub(crate) fn complete_prepared<'py, 'a>(
     mut prepared: PreparedFixtures<'py>,
     (context, required): (
         &'a RelationFixturePlanningContext,
@@ -193,7 +173,7 @@ fn quoted_names<'py>(
 /// Complete one chain's fixture groups, building the planning context when none is given.
 #[pyfunction]
 #[pyo3(signature = (*, project, adapter, request, planning_context = None))]
-fn build_relation_fixture_completion<'py>(
+pub(crate) fn build_relation_fixture_completion<'py>(
     project: &Bound<'py, PyAny>,
     adapter: &Bound<'py, PyAny>,
     request: (Vec<String>, Bound<'py, PyAny>),
@@ -223,8 +203,4 @@ fn build_relation_fixture_completion<'py>(
     kwargs.set_item("expected_types", expected)?;
     kwargs.set_item("diagnostics", PyTuple::new(py, completion.diagnostics)?)?;
     record(py, RecordId::RelationFixtureCompletion, &kwargs)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(build_relation_fixture_completion, module)?)
 }

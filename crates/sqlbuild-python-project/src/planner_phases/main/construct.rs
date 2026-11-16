@@ -1,18 +1,15 @@
 //! The staying-Python class `class(**fields)`.
 
-use crate::planner_phases::_helpers::objects;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use sqlbuild_host::entries::models::HostId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
 /// The staying-Python class `class(**fields)`.
-#[inline]
 pub fn construct<'py>(
     py: Python<'py>,
     class: impl Into<HostId>,
     fields: &[(&str, Bound<'py, PyAny>)],
 ) -> PyResult<Bound<'py, PyAny>> {
-    objects::construct(py, class, fields)
+    call_with(&host_entry(py, class)?, fields)
 }

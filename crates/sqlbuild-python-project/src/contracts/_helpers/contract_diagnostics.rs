@@ -2,11 +2,9 @@
 
 use std::collections::HashMap;
 
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRef, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, pyfunction};
 use serde_json::Value;
 use sqlbuild_analysis::compiled_project::main::project_models::project_models;
 use sqlbuild_analysis::compiled_project::models::CompiledModelFacts;
@@ -21,10 +19,9 @@ use sqlbuild_sqltext::compiler::main::model_output_columns::model_output_columns
 use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::main::compiled_models::enum_columns::enum_columns;
 use crate::compiled_views::main::project::compiled_project_facts::compiled_project_facts;
-use crate::contracts::_helpers::model_contracts::ConflictRow;
-use crate::contracts::_helpers::model_contracts::DiagnosticRow;
-use crate::contracts::_helpers::model_contracts::evaluate_project_model_contracts;
-use crate::contracts::_helpers::model_contracts::project_promotion_conflicts;
+use crate::contracts::_helpers::model_contracts::{
+    DiagnosticRow, evaluate_project_model_contracts,
+};
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -32,14 +29,14 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::sqltext::main::location_rows::location_rows;
 use sqlbuild_python_front::sqltext::models::ColumnLocation;
 
-const PATHLIB_MODULE: &str = "pathlib";
+pub(crate) const PATHLIB_MODULE: &str = "pathlib";
 const GENERIC_DIALECT: &str = "generic";
 const OUTPUT_LABEL: &str = "output";
-const CONTRACT_PHASE: &str = "contract";
+pub(crate) const CONTRACT_PHASE: &str = "contract";
 const MODEL_RESOURCE: &str = "model";
 const SQL_ANALYSIS_KEY: &str = "sql_analysis";
 
-fn keyword_call<'py>(
+pub(crate) fn keyword_call<'py>(
     callable: &Bound<'py, PyAny>,
     pairs: Vec<(&str, Bound<'py, PyAny>)>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -51,7 +48,7 @@ fn keyword_call<'py>(
 }
 
 /// The compile's retained native project, read through `_native.compiled_project_facts`.
-fn native_project<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn native_project<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     Ok(compiled_project_facts(project)?.into_any())
 }
 
@@ -283,7 +280,7 @@ fn enum_literal_diagnostic<'py>(
     )
 }
 
-fn model_resource_type(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+pub(crate) fn model_resource_type(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     enum_from_value(py, RecordId::CompiledResourceType, MODEL_RESOURCE)
 }
 
@@ -348,60 +345,4 @@ pub(crate) fn evaluate_model_contracts<'py>(
         &record_class(py, RecordId::ContractValidationResult)?,
         vec![("diagnostics", PyTuple::new(py, diagnostics)?.into_any())],
     )
-}
-
-/// One K011 error per enforced-contract table model under immediate promotion.
-#[pyfunction]
-#[pyo3(signature = (*, project, adapter_default, settings_file))]
-pub(crate) fn promotion_conflict_diagnostics<'py>(
-    py: Python<'py>,
-    project: &Bound<'py, PyAny>,
-    adapter_default: &Bound<'py, PyAny>,
-    settings_file: String,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let explicit_mode: Option<String> =
-        native_field(&native_field(project, "settings")?, "table_promotion_mode")?.extract()?;
-    let native: Bound<'py, PyAny> = native_project(project)?;
-    let native: PyRef<'py, NativeCompiledProject> = native.extract()?;
-    let conflicts: Vec<ConflictRow> = project_promotion_conflicts(
-        py,
-        (
-            explicit_mode,
-            adapter_default.str()?.extract()?,
-            settings_file,
-        ),
-        &native,
-    )?;
-    let diagnostic_type: Bound<'py, PyAny> = record_class(py, RecordId::CompilerDiagnostic)?;
-    let path_type: Bound<'py, PyAny> = py.import(PATHLIB_MODULE)?.getattr("Path")?;
-    let mut diagnostics: Vec<Bound<'py, PyAny>> = Vec::with_capacity(conflicts.len());
-    for ConflictRow {
-        name,
-        relative_path,
-        code,
-        message,
-        help,
-    } in conflicts
-    {
-        diagnostics.push(keyword_call(
-            &diagnostic_type,
-            vec![
-                ("phase", CONTRACT_PHASE.into_pyobject(py)?.into_any()),
-                ("severity", "error".into_pyobject(py)?.into_any()),
-                ("code", code.into_pyobject(py)?.into_any()),
-                ("message", message.into_pyobject(py)?.into_any()),
-                ("resource_type", model_resource_type(py)?),
-                ("resource_name", name.into_pyobject(py)?.into_any()),
-                ("path", path_type.call1((relative_path,))?),
-                ("help", help.into_pyobject(py)?.into_any()),
-            ],
-        )?);
-    }
-    PyTuple::new(py, diagnostics)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(evaluate_model_contracts, module)?)?;
-    module.add_function(wrap_pyfunction!(promotion_conflict_diagnostics, module)?)?;
-    Ok(())
 }

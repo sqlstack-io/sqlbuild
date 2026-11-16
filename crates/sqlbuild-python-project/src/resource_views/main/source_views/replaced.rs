@@ -1,19 +1,14 @@
 //! `dataclasses.replace(value, **changes)`.
 
-use crate::resource_views::_helpers::source_views;
-use pyo3::prelude::Bound;
-use pyo3::prelude::Py;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::types::PyDict;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 
 /// `dataclasses.replace(value, **changes)`.
-#[inline]
 pub fn replaced(
     _py: Python<'_>,
     value: &Bound<'_, PyAny>,
     changes: &Bound<'_, PyDict>,
 ) -> PyResult<Py<PyAny>> {
-    source_views::replaced(_py, value, changes)
+    Ok(replaced_keywords(value, changes)?.unbind())
 }

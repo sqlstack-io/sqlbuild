@@ -45,10 +45,9 @@ use sqlbuild_python_project::planner_identity::main::execution_order::execution_
 use sqlbuild_python_project::planner_phases::main::object::object;
 use sqlbuild_python_project::planner_strategy::main::complete_fixtures::complete_fixtures as complete_relation_fixtures;
 use sqlbuild_python_project::planner_strategy::main::planning_context::planning_context;
-use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_INTEGER_END;
-use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_INTEGER_START;
-use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_TIMESTAMP_END;
-use sqlbuild_python_project::sql_test_glue::constants::DEFAULT_TIMESTAMP_START;
+use sqlbuild_python_project::sql_test_glue::constants::{
+    DEFAULT_INTEGER_END, DEFAULT_INTEGER_START, DEFAULT_TIMESTAMP_END, DEFAULT_TIMESTAMP_START,
+};
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]

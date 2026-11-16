@@ -1,8 +1,8 @@
 //! In-memory declaration file parsing, for the oracle comparing native and Python parsing.
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::{pyfunction, wrap_pyfunction};
+use pyo3::prelude::{PyResult, Python};
+use pyo3::pyfunction;
 use sqlbuild_discovery::declaration_files::main::parse_declaration_text::parse_declaration_text;
 use sqlbuild_discovery::declaration_files::models::{
     CollectionKind, DeclarationFileOptions, ParsedDeclarationText,
@@ -10,7 +10,6 @@ use sqlbuild_discovery::declaration_files::models::{
 use sqlbuild_discovery::models::FileOutcome;
 
 use crate::discovery::_helpers::snapshots::native_classes::DeclarationTextRequest;
-use crate::discovery::_helpers::snapshots::native_classes::NativeDiscoverySession;
 use sqlbuild_python_base::types::CompilerDetach;
 
 const PARSED_TAG: &str = "ok";
@@ -19,7 +18,7 @@ const UNREADABLE_TAG: &str = "read";
 
 /// Whether a `kind` declaration file with these contents parses (`ok`), fails or is unreadable.
 #[pyfunction]
-fn parse_declaration_contents(
+pub(crate) fn parse_declaration_contents(
     py: Python<'_>,
     request: DeclarationTextRequest,
     names: (String, String),
@@ -53,10 +52,4 @@ fn parse_declaration_contents(
             kind.as_str()
         ))),
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeDiscoverySession>()?;
-    module.add_function(wrap_pyfunction!(parse_declaration_contents, module)?)?;
-    Ok(())
 }

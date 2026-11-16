@@ -1,16 +1,18 @@
 //! The project's lineage edges and selector indexes, from its native graph.
 
-use crate::graph::_helpers::project::views;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use crate::graph::_helpers::project::views::graph_views;
+use crate::graph::models::NativeProjectGraph;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
+use pyo3::pyfunction;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The project's lineage edges and selector indexes, from its native graph.
-#[inline]
+#[pyfunction]
 pub fn project_lineage_views<'py>(
     py: Python<'py>,
     project: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    views::project_lineage_views(py, project)
+    let graph: PyRef<'py, NativeProjectGraph> =
+        native_field(project, "lineage_graph")?.extract()?;
+    graph_views(py, graph.graph())
 }

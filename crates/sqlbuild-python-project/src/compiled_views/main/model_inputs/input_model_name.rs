@@ -1,12 +1,18 @@
 //! The name of `model_input`, its file stem; a native input answers from its record.
 
-use crate::compiled_views::_helpers::model_inputs::model_input_view;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::compiled_views::models::NativeModelInput;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The name of `model_input`, its file stem; a native input answers from its record.
-#[inline]
 pub fn input_model_name(model_input: &Bound<'_, PyAny>) -> PyResult<String> {
-    model_input_view::input_model_name(model_input)
+    if let Ok(native) = model_input.cast::<NativeModelInput>() {
+        return native
+            .get()
+            .read(model_input.py(), |record, _| Ok(record.name.clone()));
+    }
+    native_field(model_input, "model_file")?
+        .getattr("file_path")?
+        .getattr("stem")?
+        .extract()
 }

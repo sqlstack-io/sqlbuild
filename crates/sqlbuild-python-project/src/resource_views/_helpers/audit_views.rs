@@ -1,13 +1,11 @@
 //! Audits attached by the native loop, held by the compiled project, and their views.
 
-use crate::resource_views::models::AuditProjections;
 use crate::resource_views::models::NativeAuditInput;
 use crate::resource_views::models::NativeCompiledAudit;
 use crate::resource_views::types::AttachedAudit;
 use crate::resource_views::types::AuditRecord;
 use pyo3::exceptions::{PyIndexError, PyRuntimeError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::sync::PyOnceLock;
 use pyo3::types::PyTuple;
 use pyo3::{FromPyObject, pymethods};
 
@@ -40,19 +38,7 @@ pub(crate) type AuditAssemblyRow = (
     Option<(String, String)>,
 );
 
-/// The audit record of an attached audit, before assembly resolves its scope dependencies.
-pub(crate) fn audit_record(attached: AttachedAudit) -> AuditRecord {
-    AuditRecord {
-        attached,
-        scope_deps: None,
-        host: AuditProjections {
-            references: PyOnceLock::new(),
-            key: PyOnceLock::new(),
-        },
-    }
-}
-
-fn read_audit<'py, T>(
+pub(crate) fn read_audit<'py, T>(
     owner: &Py<NativeCompiledProject>,
     index: usize,
     py: Python<'py>,
@@ -338,21 +324,3 @@ audit_getters!(NativeCompiledAudit, {
         })
     }
 });
-
-/// A native audit view's reference rows, or `None` for a hand-built audit record.
-pub(crate) fn audit_reference_rows(
-    audit: &Bound<'_, PyAny>,
-) -> PyResult<Option<Vec<ReferenceRow>>> {
-    let py: Python<'_> = audit.py();
-    let (owner, index): (&Py<NativeCompiledProject>, usize) =
-        if let Ok(view) = audit.cast::<NativeCompiledAudit>() {
-            (&view.get().owner, view.get().index)
-        } else if let Ok(view) = audit.cast::<NativeAuditInput>() {
-            (&view.get().owner, view.get().index)
-        } else {
-            return Ok(None);
-        };
-    read_audit(owner, index, py, |record, _| {
-        Ok(Some(record.attached.references.clone()))
-    })
-}
