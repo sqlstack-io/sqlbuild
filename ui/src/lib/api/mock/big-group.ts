@@ -58,6 +58,9 @@ export function bigGroupShape(): BigGroupShape {
 		})
 	);
 	for (const m of alone) direct.set(m, []);
+	// The export also waits directly for a staging job none of its other waits come through, an edge
+	// across four columns of jobs.
+	direct.get('publish_e')!.push('stage_j');
 	const upstreamOf = (m: string): Set<string> => new Set((direct.get(m) ?? []).flatMap((u) => [u, ...upstreamOf(u)]));
 	const members = [...alone.slice(0, 3), ...stages.flat(), ...alone.slice(3)];
 	return {

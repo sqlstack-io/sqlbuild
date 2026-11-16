@@ -25,6 +25,8 @@ export function largeProjectNodes(template: CatalogNode): CatalogNode[] {
 			);
 			mart.forEach((key, i) => nodes.push({ ...template, key, group: `${folder}/marts`, path: `models/${folder}/marts/${key}.sql`, upstream: [staging[i], staging[(i + 1) % staging.length]], description: `${folder} mart` }));
 			marts.set(folder, mart);
+			// Finance also reconciles against the orders marts directly, a read across five layers.
+			if (folder === 'finance') nodes.find((n) => n.key === `${folder}_stg_1`)!.upstream.push(marts.get('orders')![0]);
 		});
 	});
 	return nodes;

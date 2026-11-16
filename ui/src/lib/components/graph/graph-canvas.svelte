@@ -3,6 +3,7 @@
 	import { Controls, SvelteFlow, ViewportPortal, type Edge, type Node, type Viewport } from '@xyflow/svelte';
 	import { untrack } from 'svelte';
 	import { unzoom } from '$lib/lineage/hit-area';
+	import { obstacles, shareObstacles } from '$lib/lineage/edge-routes';
 	import type { ComponentProps, Snippet } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
@@ -55,8 +56,12 @@
 		/** Overlays drawn inside the canvas, such as a panel. */
 		children?: Snippet;
 	} = $props();
-	// Every graph's edges merge into a trunk before the card they enter, the library's curves included.
+	// Every graph's edges merge into a trunk before the card they enter, the library's curves included,
+	// and run through the gaps between cards rather than across them. Where the cards are is worked out
+	// when the nodes change (a layout, a measure, a drop), never as the view pans or zooms.
 	const allEdgeTypes = $derived({ bezier: CountEdge, count: CountEdge, ...edgeTypes });
+	const cards = $derived(obstacles(nodes));
+	shareObstacles(() => cards);
 	// Panning and zooming change only the viewport's transform. Everything that depends on the zoom is
 	// worked out once the view settles (SETTLE_MS after the last move), so a gesture restyles and
 	// repaints nothing per step: while it moves the viewport is its own layer (`moving`), moved and
