@@ -1,28 +1,26 @@
 //! SQBRPERFORMANCE102: a semi-structured column must not repeat on a finer grain than its input.
 
-use crate::models::{Fault, GrainColumn, JsonGrain, RuleMetadata};
+use crate::models::{Fault, GrainColumn, JsonGrain, RuleMetadata, RulesConfig};
 use crate::query_facts::models::{ItemFacts, SetFacts};
 use crate::rules::_helpers::evaluation::ParsedModel;
+use crate::rules::_helpers::model_layers::backs_published_view;
 use crate::rules::models::FaultCollector;
 
-const SEMI_STRUCTURED_TYPES: [&str; 3] = ["VARIANT", "OBJECT", "ARRAY"];
-
-pub(crate) fn evaluate(parsed: &ParsedModel<'_>, rule: &RuleMetadata, faults: &FaultCollector) {
+pub(crate) fn evaluate(
+    parsed: &ParsedModel<'_>,
+    config: &RulesConfig,
+    rule: &RuleMetadata,
+    faults: &FaultCollector,
+) {
     let Some(grain) = &parsed.model.json_grain else {
         return;
     };
-    if grain.skipped.is_some() || grain.backs_published_view {
+    if grain.skipped.is_some() || backs_published_view(&parsed.model.name, &grain.readers, config) {
         return;
     }
     for column in &grain.columns {
-        if !column.data_type.as_deref().is_some_and(|data_type| {
-            SEMI_STRUCTURED_TYPES
-                .iter()
-                .any(|kind| starts_with_word(data_type, kind))
-        }) {
-            continue;
-        }
         if let Some((input, input_key, model_key)) = coarser_input(column, grain) {
+            let input: &str = input.split_once(':').map_or(input, |(_, name)| name);
             let (line, column_number) = output_start(&parsed.facts.body, &column.name)
                 .map_or((1, 1), |offset| parsed.source.line_column(offset));
             faults.push(Fault {
@@ -43,14 +41,6 @@ pub(crate) fn evaluate(parsed: &ParsedModel<'_>, rule: &RuleMetadata, faults: &F
             });
         }
     }
-}
-
-fn starts_with_word(data_type: &str, kind: &str) -> bool {
-    let upper: String = data_type.trim().to_ascii_uppercase();
-    upper == kind
-        || upper
-            .strip_prefix(kind)
-            .is_some_and(|rest| rest.starts_with(['(', '<', ' ']))
 }
 
 /// An input of `column` whose key is a strict subset of one of the model's keys.

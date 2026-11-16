@@ -621,10 +621,18 @@ pub struct JsonGrain {
     pub columns: Vec<GrainColumn>,
     /// Each lineage input's keys by `kind:name`, such as `ref:orders`.
     pub input_keys: BTreeMap<String, Vec<Vec<String>>>,
-    /// Whether every reader is a published view of this model's own entity, as SQBRGRAPH103 defines one.
-    pub backs_published_view: bool,
+    /// The models that read this one.
+    pub readers: Vec<String>,
     /// Why the comparison cannot run, such as missing lineage; the model is then skipped, not flagged.
     pub skipped: Option<String>,
+}
+
+/// One lineage output column: the `(resource type, name)` relations it reads and whether it aggregates them.
+#[derive(Clone, Debug, Default)]
+pub struct LineageColumn {
+    pub output: String,
+    pub sources: Vec<(String, String)>,
+    pub aggregated: bool,
 }
 
 /// One output column's inferred type and the relations its lineage reads, by `kind:name`.

@@ -282,6 +282,16 @@ pub(crate) struct QueryFactsTestCase {
     pub(crate) expected_faults: &'static [(&'static str, u64, u64, &'static str)],
 }
 
+pub(crate) struct JsonGrainTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) name: &'static str,
+    pub(crate) select: &'static [&'static str],
+    pub(crate) query_sql: &'static str,
+    pub(crate) json_grain: Value,
+    pub(crate) expected_faults: &'static [(&'static str, u64, u64, &'static str)],
+}
+
 /// A retained request evaluated again without SQL, with or without the cached findings.
 pub(crate) struct RetainedRowsTestCase {
     pub(crate) description: &'static str,

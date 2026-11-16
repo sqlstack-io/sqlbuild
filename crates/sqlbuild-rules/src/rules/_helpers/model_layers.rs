@@ -19,6 +19,8 @@ const INTERMEDIATE_FOLDER: &str = "intermediate/enriched";
 const ENTITY_SHAPE: &str = "<domain>__<layer>__<entity>";
 const QUALIFIED_SHAPE: &str = "<domain>__<layer>__<entity>__<qualifier>";
 const MODEL_FILE_SUFFIX: &str = ".sql";
+/// The rule whose published layers and view-of-own-entity test define a published view.
+const PUBLISHED_READS_RULE: &str = "SQBRGRAPH103";
 
 pub(crate) fn explicit_model_schema(model: &Model, rule: &RuleMetadata, faults: &FaultCollector) {
     if model
@@ -301,6 +303,22 @@ pub(crate) fn same_domain_published_reads(
             ));
         }
     }
+}
+
+/// Whether `readers` is not empty and each one is a published view of `model`'s own entity.
+pub(crate) fn backs_published_view(model: &str, readers: &[String], config: &RulesConfig) -> bool {
+    let layers: Vec<String> = published_layers(config, PUBLISHED_READS_RULE);
+    let Some(producer) = published_name(model).filter(|name| layers.contains(&name.layer)) else {
+        return false;
+    };
+    !readers.is_empty()
+        && readers.iter().all(|reader| {
+            published_name(reader).is_some_and(|consumer| {
+                consumer.domain == producer.domain
+                    && layers.contains(&consumer.layer)
+                    && is_view_of_own_entity(&consumer, &producer)
+            })
+        })
 }
 
 /// `X__<layer>_v__<entity>[__<qualifier>]` reading `X__<layer>__<entity>` or the same qualifier.

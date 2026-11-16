@@ -4,6 +4,7 @@ pub mod custom_host;
 pub mod discard_speculative_rows;
 pub mod evaluate_rows;
 pub mod finalize_rows;
+pub mod json_grains;
 pub mod project_model_rows;
 pub mod retained_request;
 pub mod start_speculative_rows;

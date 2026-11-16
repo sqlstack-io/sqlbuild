@@ -224,7 +224,7 @@ fn evaluate_model_inner(request: ModelEvaluationRequest<'_>) -> Result<Vec<Fault
     if let Some(rule) = metadata("SQBRPERFORMANCE102")
         && request.dialect.eq_ignore_ascii_case(SNOWFLAKE_DIALECT)
     {
-        json_finer_grain::evaluate(&parsed, rule, &faults);
+        json_finer_grain::evaluate(&parsed, config, rule, &faults);
     }
     evaluate_naming_rules(&parsed, config, selected, &faults);
     evaluate_literal_rules(&parsed, selected, &faults);

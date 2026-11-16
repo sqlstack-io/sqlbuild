@@ -645,6 +645,26 @@ pub(crate) fn query_facts_faults(
     request["models"][0]["enum_columns"] = json!(test_case.enum_columns);
     request["models"][0]["config"] = json!({"contract": "enforced"});
     request["models"][0]["columns"] = test_case.columns.clone();
+    evaluated_faults(&request)
+}
+
+/// One model named `name` with `json_grain`, evaluated with `select` under `dialect`.
+pub(crate) fn json_grain_faults(
+    test_case: &test_types::JsonGrainTestCase,
+) -> Result<Vec<(String, u64, u64, String)>, String> {
+    let project_dir = TempDir::new().map_err(|error| error.to_string())?;
+    let config = json!({"select": test_case.select, "cache": {"enabled": false}});
+    let mut request: Value =
+        serde_json::from_str(&request(&project_dir, &config)).map_err(|error| error.to_string())?;
+    request["dialect"] = json!(test_case.dialect);
+    request["models"][0]["name"] = json!(test_case.name);
+    request["models"][0]["query_sql"] = json!(test_case.query_sql);
+    request["models"][0]["authored_sql"] = json!(test_case.query_sql);
+    request["models"][0]["json_grain"] = test_case.json_grain.clone();
+    evaluated_faults(&request)
+}
+
+fn evaluated_faults(request: &Value) -> Result<Vec<(String, u64, u64, String)>, String> {
     let result: Value = serde_json::from_str(&evaluate_json(&request.to_string())?)
         .map_err(|error| error.to_string())?;
     let faults = result["faults"]
@@ -745,7 +765,7 @@ pub(crate) fn every_field_model() -> Model {
                 "ref:orders".to_owned(),
                 vec![vec!["order_id".to_owned()]],
             )]),
-            backs_published_view: true,
+            readers: vec!["shop__mart_v__orders".to_owned()],
             skipped: Some("no lineage".to_owned()),
         }),
     }
