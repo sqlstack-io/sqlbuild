@@ -1,11 +1,25 @@
 //! Running a Python-free command: its checks, then its output with the observed services.
 
+use crate::dev_screen::models::ScreenSetup;
+use crate::native_commands::_helpers::paths::exclude_location_databases;
+use crate::native_commands::_helpers::project_facts::{project_directory_name, project_name};
+use crate::native_commands::_helpers::terminal::{live_screen, stderr_columns};
+use crate::native_commands::constants::SCREEN_INDENT;
+use crate::native_commands::types::{CompileOutcome, NextGeneration, Settled};
+use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
+use sqlbuild_orchestration::credentials::main::identities::development_person::development_person;
+use sqlbuild_orchestration::credentials::main::locations::development_location::development_location;
+use sqlbuild_orchestration::credentials::models::AuditContext;
+use sqlbuild_orchestration::declarations::main::pause_development_triggers::pause_development_triggers;
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::io;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
+use tokio::sync::mpsc::UnboundedSender;
 
 use chrono::Utc;
 use serde_json::json;
@@ -73,7 +87,7 @@ use crate::dev_screen::types::DevScreenParts;
 use crate::dev_session::main::run_dev_session::run_dev_session;
 use crate::dev_session::models::{DevProject, LocationPipes};
 use crate::native_commands::_helpers::decision::{
-    control_database, control_database_variable, text,
+    control_address, control_database, control_database_variable, flag, text,
 };
 use crate::native_commands::_helpers::init::run_init;
 use crate::native_commands::_helpers::package::installed_package;
@@ -293,7 +307,7 @@ pub(crate) async fn compile_generation(
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(bool, Option<Instant>, Vec<WarehouseStateLocation>)>, ControlError> {
+) -> Result<Option<CompileOutcome>, ControlError> {
     let (reply, publication) = oneshot::channel();
     requests
         .send(LocationCompileRequest {
@@ -936,14 +950,13 @@ pub(crate) async fn check_published_location(
     Ok(Some(files))
 }
 
-/// Capture the ordinary debug check's exact local file paths and missing provider secret count without contaminating publication stdout.
+/// Capture the debug check's local file paths and missing secret count; under `sqb dev` it never connects, so nobody signs in twice.
 pub(crate) async fn check_location_connection(
     (options, script, connect): (&LocationServe, &Path, bool),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(bool, u64, Vec<PathBuf>)>, ControlError> {
     let mut command = location_child(options, script);
     command.args(["debug", "--target", &options.target, "--json"]);
-    // Under `sqb dev` the foreground check already connected; `connect` is its verdict, so never sign in twice.
     if !connect || options.dev_events {
         command.arg("--no-connection");
     }
@@ -1529,4 +1542,238 @@ pub(crate) fn location_clock() -> Interval {
     let mut clock = tokio::time::interval(Duration::from_millis(250));
     clock.set_missed_tick_behavior(MissedTickBehavior::Skip);
     clock
+}
+
+/// The inputs this compile saw; under `sqb dev`, each one changed since the last compile is reported first.
+pub(crate) fn note_compiled_inputs(
+    options: &LocationServe,
+    before: Option<Vec<PathStamp>>,
+    observed: &[PathStamp],
+) -> Option<Vec<PathStamp>> {
+    if !options.dev_events {
+        return None;
+    }
+    if let Some(before) = &before {
+        report_changed_inputs(before, observed);
+    }
+    Some(observed.to_vec())
+}
+
+/// Sync a published generation's warehouse state, or defer it until the warehouse connects, then check the location.
+pub(crate) async fn settle_publication(
+    (options, script, (bearer, session_id)): (&LocationServe, &Path, (&str, Uuid)),
+    (locations, generation, connect): (Vec<WarehouseStateLocation>, i64, bool),
+    (watch, metadata): (LocationWatch, Option<LocationMetadataSync>),
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<Settled>, ControlError> {
+    let (metadata, deferred) = if connect {
+        let sync: LocationMetadataSync = metadata_sync(
+            (locations, generation),
+            (
+                options.metadata_reconcile_seconds,
+                options.safety_sync_seconds,
+            ),
+        );
+        (Some(sync), None)
+    } else {
+        (metadata, Some((locations, generation)))
+    };
+    let Some(files) = check_published_location(
+        (options, script, connect),
+        (bearer, session_id, generation),
+        stopped,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    let watch: LocationWatch = exclude_location_databases(&options.project_dir, files, watch);
+    Ok(Some((watch, metadata, deferred)))
+}
+
+/// Act on what `sqb dev` last asked: a new recompile retries now, and a connected warehouse settles the deferred sync.
+pub(crate) async fn apply_dev_controls(
+    (options, script, session): (&LocationServe, &Path, (&str, Uuid)),
+    (control, recompiles): (DevControlState, u64),
+    (mut watch, metadata, deferred): Settled,
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<(u64, Settled)>, ControlError> {
+    if control.recompiles != recompiles {
+        watch.retry_at = Some(Instant::now());
+    }
+    let (Some(true), Some((locations, generation))) = (control.warehouse, deferred.clone()) else {
+        return Ok(Some((control.recompiles, (watch, metadata, deferred))));
+    };
+    let settled: Option<Settled> = settle_publication(
+        (options, script, session),
+        (locations, generation, true),
+        (watch, metadata),
+        stopped,
+    )
+    .await?;
+    Ok(settled.map(|settled| (control.recompiles, settled)))
+}
+
+/// The loopback address `sqb dev` listens on.
+pub(crate) fn loopback_address(namespace: &Namespace) -> Result<SocketAddr, ControlError> {
+    let address = control_address(namespace, false, &ServerSection::default())?
+        .ok_or_else(|| ControlError::Invalid("development address is required".into()))?;
+    if !address.ip().is_loopback() {
+        return Err(ControlError::Invalid(
+            "sqb dev only listens on loopback".into(),
+        ));
+    }
+    Ok(address)
+}
+
+/// Open the development store, with its checklist row and the location it names on the screen.
+pub(crate) async fn announced_store(
+    namespace: &Namespace,
+    (project, target): (&Path, &str),
+    messages: &UnboundedSender<ScreenMessage>,
+) -> Result<(ControlStore, DevelopmentScope), ControlError> {
+    drop(messages.send(ScreenMessage::Started {
+        step: DevStep::ControlStore,
+        detail: String::new(),
+    }));
+    let database: String = text(namespace, "development_store_url").unwrap_or_else(|| {
+        project
+            .join(".sqlbuild/control.sqlite3")
+            .to_string_lossy()
+            .into_owned()
+    });
+    let (store, scope) = development_store(namespace, (project, target), &database).await?;
+    drop(messages.send(ScreenMessage::Finished {
+        step: DevStep::ControlStore,
+        detail: database,
+    }));
+    drop(messages.send(ScreenMessage::Location(scope.location_id.to_string())));
+    Ok((store, scope))
+}
+
+/// The header, width and paths the screen starts with.
+pub(crate) fn screen_setup(project: &Path, target: &str) -> ScreenSetup {
+    let live: bool = live_screen();
+    ScreenSetup {
+        live,
+        facts: ScreenFacts {
+            columns: stderr_columns(),
+            style: CliStyle { use_color: live },
+            links: live,
+            indent: SCREEN_INDENT,
+        },
+        header: DevHeader {
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+            project: project_name(project),
+            target: target.to_owned(),
+        },
+        watching: format!("{}/", project_directory_name(project)),
+        project_root: project.to_string_lossy().into_owned(),
+    }
+}
+
+/// Complete retained identity and startup pauses before starting any scheduling roles.
+pub(crate) async fn development_store(
+    namespace: &Namespace,
+    (project, target): (&Path, &str),
+    database: &str,
+) -> Result<(ControlStore, DevelopmentScope), ControlError> {
+    set_release_version(env!("CARGO_PKG_VERSION"));
+    let store = open_store(database).await?;
+    migrate_store(&store).await?;
+    let context = AuditContext {
+        actor: "local-development".into(),
+        granting_role: "control-store-owner".into(),
+        request_id: Uuid::now_v7(),
+        ip_address: None,
+    };
+    let location_id =
+        development_location(&store, &project.to_string_lossy(), target, &context).await?;
+    let scope = DevelopmentScope {
+        location_id,
+        target: target.into(),
+        triggers: flag(namespace, "development_triggers"),
+        principal_id: development_person(&store, &context).await?,
+    };
+    if !scope.triggers {
+        pause_development_triggers(&store, (location_id, target)).await?;
+    }
+    Ok((store, scope))
+}
+
+/// After a compile: a publication waits for the `sqb dev` warehouse verdict and settles; a failure keeps the last good snapshot.
+pub(crate) async fn finish_compile(
+    (options, script, session): (&LocationServe, &Path, (&str, Uuid)),
+    (compiled, generation): (CompileOutcome, i64),
+    (mut watch, metadata, deferred): Settled,
+    (controls, stopped): (
+        &mut watch::Receiver<DevControlState>,
+        impl Future<Output = Result<(), ControlError>>,
+    ),
+) -> Result<Option<Settled>, ControlError> {
+    tokio::pin!(stopped);
+    let (published, refresh_at, locations) = compiled;
+    if !published {
+        watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
+        tokio::select! {
+            result = &mut stopped => { result?; return Ok(None); },
+            () = report_location_health(options, session.0, session.1, LocationHealth::CompileFailed { generation }) => {},
+        }
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Location reload failed; retaining last good snapshot. Retrying on change or in 30 seconds.\n",
+        )]));
+        return Ok(Some((watch, metadata, deferred)));
+    }
+    watch.retry_at = refresh_at;
+    let connect: bool = tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        verdict = controls.wait_for(|control| control.warehouse.is_some()) => {
+            verdict.is_ok_and(|control| control.warehouse == Some(true))
+        },
+    };
+    settle_publication(
+        (options, script, session),
+        (locations, generation, connect),
+        (watch, metadata),
+        stopped.as_mut(),
+    )
+    .await
+}
+
+/// Close the metadata reader, take the next generation number and compile it; `None` inside when no number was issued.
+pub(crate) async fn compile_next_generation(
+    (options, bearer, requests): (&LocationServe, &str, &mpsc::Sender<LocationCompileRequest>),
+    (metadata, compiled_inputs, observed): (
+        Option<LocationMetadataSync>,
+        Option<Vec<PathStamp>>,
+        &[PathStamp],
+    ),
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<NextGeneration>, ControlError> {
+    tokio::pin!(stopped);
+    let metadata: Option<LocationMetadataSync> = match metadata {
+        Some(state) => Some(close_metadata_reader(state).await?),
+        None => None,
+    };
+    let generation: Option<i64> = tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        generation = location_generation(options, bearer) => generation?,
+    };
+    let Some(generation) = generation else {
+        return Ok(Some((None, metadata, compiled_inputs)));
+    };
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!("Compiling location generation {generation} in an isolated interpreter...\n"),
+    )]));
+    let compiled_inputs = note_compiled_inputs(options, compiled_inputs, observed);
+    let compiled: Option<CompileOutcome> = compile_generation(
+        (requests, options.dev_events),
+        generation,
+        observed,
+        stopped.as_mut(),
+    )
+    .await?;
+    Ok(compiled.map(|compiled| (Some((compiled, generation)), metadata, compiled_inputs)))
 }

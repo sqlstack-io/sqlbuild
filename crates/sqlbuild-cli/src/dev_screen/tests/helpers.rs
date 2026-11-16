@@ -8,8 +8,8 @@ use sqlbuild_orchestration::dev_events::models::{
     DevEvent, DevPhase, DevStepState, SourcePosition,
 };
 
-use crate::dev_screen::main::apply_screen_message::apply_screen_message;
-use crate::dev_screen::main::new_dev_screen::new_dev_screen;
+use crate::dev_screen::_helpers::apply_screen_message::apply_screen_message;
+use crate::dev_screen::_helpers::new_dev_screen::new_dev_screen;
 use crate::dev_screen::models::{DevScreen, DevStep, ScreenMessage, ScreenOutput, ScreenSetup};
 use crate::dev_screen::tests::test_types::Transcript;
 

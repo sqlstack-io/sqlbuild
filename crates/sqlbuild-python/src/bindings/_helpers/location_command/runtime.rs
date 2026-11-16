@@ -7,16 +7,14 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
-use sqlbuild_orchestration::dev_events::main::source_position::source_position;
-use sqlbuild_orchestration::dev_events::models::DevEvent;
+use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
+use sqlbuild_orchestration::dev_events::main::generation_failed::generation_failed;
 use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseHistoryRead,
 };
 
-use crate::bindings::_helpers::location_command::command::{
-    emit_dev_event, location_arguments, publish_location,
-};
+use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
 use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::{
@@ -57,15 +55,8 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 py,
                                 &format!("Location compilation/publication failed: {error}\n"),
                             )?;
-                            let message: String = error.to_string();
-                            emit_dev_event(
-                                py,
-                                &DevEvent::Failed {
-                                    generation,
-                                    position: source_position(&message),
-                                    message,
-                                },
-                            )?;
+                            let failed = generation_failed(generation, error.to_string());
+                            py.detach(|| emit_dev_event(&failed))?;
                             None
                         }
                     };

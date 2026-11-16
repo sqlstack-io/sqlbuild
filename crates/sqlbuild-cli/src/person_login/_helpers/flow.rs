@@ -7,8 +7,8 @@ use chrono::Utc;
 use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
-use crate::native_commands::_helpers::terminal::open_browser;
 use crate::person_login::constants::{LOGIN_SECONDS, POLL_SECONDS, SECRET_BYTES};
+use crate::person_login::main::open_browser::open_browser;
 use crate::person_login::models::{LoginFlow, PersonClient, PersonCredential};
 
 pub(crate) async fn login(

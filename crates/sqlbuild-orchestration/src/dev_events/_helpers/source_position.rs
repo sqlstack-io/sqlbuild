@@ -5,7 +5,7 @@ use crate::dev_events::models::SourcePosition;
 
 /// The first `path:line` or `path:line:column` in `message` whose path is a project source file.
 #[must_use]
-pub fn source_position(message: &str) -> Option<SourcePosition> {
+pub(crate) fn source_position(message: &str) -> Option<SourcePosition> {
     message.split_whitespace().find_map(word_position)
 }
 

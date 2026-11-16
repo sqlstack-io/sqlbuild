@@ -1,4 +1,3 @@
-pub mod format_elapsed;
 pub mod format_plain_line;
 pub mod redraw_rows;
 pub mod render_dev_header;

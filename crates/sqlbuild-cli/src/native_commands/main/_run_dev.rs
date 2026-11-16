@@ -1,44 +1,24 @@
 //! Collapse the production API, scheduler and outbound location into one local process tree.
 
-use std::path::Path;
+use std::net::SocketAddr;
 
-use sqlbuild_orchestration::api::models::DevelopmentScope;
-use sqlbuild_orchestration::credentials::main::identities::development_person::development_person;
-use sqlbuild_orchestration::credentials::main::locations::development_location::development_location;
-use sqlbuild_orchestration::credentials::models::AuditContext;
-use sqlbuild_orchestration::declarations::main::pause_development_triggers::pause_development_triggers;
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::set_release_version::set_release_version;
-use sqlbuild_orchestration::store::main::{migrate_store::migrate_store, open_store::open_store};
-use sqlbuild_orchestration::store::models::ControlStore;
-use uuid::Uuid;
-
-use sqlbuild_core::cli_text::models::CliStyle;
-use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
 
 use crate::argv::models::Namespace;
 use crate::dev_screen::main::start_dev_screen::start_dev_screen;
-use crate::dev_screen::models::{DevScreenHandle, DevStep, ScreenMessage, ScreenSetup};
-use crate::native_commands::_helpers::decision::{control_address, flag, text};
+use crate::dev_screen::models::DevScreenHandle;
+use crate::native_commands::_helpers::decision::{flag, text};
 use crate::native_commands::_helpers::execution::run_development_roles;
-use crate::native_commands::_helpers::project_facts::{
-    development_target, project_directory_name, project_name,
+use crate::native_commands::_helpers::execution::{
+    announced_store, loopback_address, screen_setup,
 };
-use crate::native_commands::_helpers::terminal::{live_screen, stderr_columns};
-use crate::native_commands::constants::SCREEN_INDENT;
-use crate::server_config::models::ServerSection;
+use crate::native_commands::_helpers::project_facts::development_target;
 
 pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
     let project =
         std::fs::canonicalize(text(namespace, "project_dir").unwrap_or_else(|| ".".into()))?;
     let target = development_target(&project, text(namespace, "target"))?;
-    let address = control_address(namespace, false, &ServerSection::default())?
-        .ok_or_else(|| ControlError::Invalid("development address is required".into()))?;
-    if !address.ip().is_loopback() {
-        return Err(ControlError::Invalid(
-            "sqb dev only listens on loopback".into(),
-        ));
-    }
+    let address: SocketAddr = loopback_address(namespace)?;
     let executable = std::env::current_exe()?;
     let DevScreenHandle {
         messages,
@@ -48,22 +28,7 @@ pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
         task,
     } = start_dev_screen(screen_setup(&project, &target));
     let result: Result<(), ControlError> = async {
-        drop(messages.send(ScreenMessage::Started {
-            step: DevStep::ControlStore,
-            detail: String::new(),
-        }));
-        let database: String = text(namespace, "development_store_url").unwrap_or_else(|| {
-            project
-                .join(".sqlbuild/control.sqlite3")
-                .to_string_lossy()
-                .into_owned()
-        });
-        let (store, scope) = development_store(namespace, (&project, &target), &database).await?;
-        drop(messages.send(ScreenMessage::Finished {
-            step: DevStep::ControlStore,
-            detail: database,
-        }));
-        drop(messages.send(ScreenMessage::Location(scope.location_id.to_string())));
+        let (store, scope) = announced_store(namespace, (&project, &target), &messages).await?;
         let listener = tokio::net::TcpListener::bind(address).await?;
         run_development_roles(
             (store, scope),
@@ -80,54 +45,4 @@ pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
     let _ = finish.send(result.is_err());
     drop(task.await);
     result
-}
-
-/// The header, width and paths the screen starts with.
-fn screen_setup(project: &Path, target: &str) -> ScreenSetup {
-    let live: bool = live_screen();
-    ScreenSetup {
-        live,
-        facts: ScreenFacts {
-            columns: stderr_columns(),
-            style: CliStyle { use_color: live },
-            links: live,
-            indent: SCREEN_INDENT,
-        },
-        header: DevHeader {
-            version: env!("CARGO_PKG_VERSION").to_owned(),
-            project: project_name(project),
-            target: target.to_owned(),
-        },
-        watching: format!("{}/", project_directory_name(project)),
-        project_root: project.to_string_lossy().into_owned(),
-    }
-}
-
-/// Complete retained identity and startup pauses before starting any scheduling roles.
-async fn development_store(
-    namespace: &Namespace,
-    (project, target): (&Path, &str),
-    database: &str,
-) -> Result<(ControlStore, DevelopmentScope), ControlError> {
-    set_release_version(env!("CARGO_PKG_VERSION"));
-    let store = open_store(database).await?;
-    migrate_store(&store).await?;
-    let context = AuditContext {
-        actor: "local-development".into(),
-        granting_role: "control-store-owner".into(),
-        request_id: Uuid::now_v7(),
-        ip_address: None,
-    };
-    let location_id =
-        development_location(&store, &project.to_string_lossy(), target, &context).await?;
-    let scope = DevelopmentScope {
-        location_id,
-        target: target.into(),
-        triggers: flag(namespace, "development_triggers"),
-        principal_id: development_person(&store, &context).await?,
-    };
-    if !scope.triggers {
-        pause_development_triggers(&store, (location_id, target)).await?;
-    }
-    Ok((store, scope))
 }

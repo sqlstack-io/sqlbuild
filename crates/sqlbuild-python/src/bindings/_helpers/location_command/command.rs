@@ -1,7 +1,6 @@
 //! Compile in the location interpreter and publish data through its scoped HTTP credential.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -14,9 +13,9 @@ use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 use sqlbuild_orchestration::declarations::models::{
     Schedule, TriggerDeclaration, TriggerDefinition,
 };
-use sqlbuild_orchestration::dev_events::main::dev_event_line::dev_event_line;
-use sqlbuild_orchestration::dev_events::main::dev_events_enabled::dev_events_enabled;
-use sqlbuild_orchestration::dev_events::models::{DevEvent, DevPhase, DevStepState};
+use sqlbuild_orchestration::dev_events::main::compile_summary::compile_summary;
+use sqlbuild_orchestration::dev_events::main::emit_dev_steps::emit_dev_steps;
+use sqlbuild_orchestration::dev_events::models::{DevPhase, DevStepState};
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
@@ -24,9 +23,7 @@ use crate::bindings::_helpers::compile_driver::pipeline::compiled_phase;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::NodeKeys;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::location_command::constants::{
-    EXECUTE_ACTION, MODEL_NODE_KIND, PUBLISH_ACTION,
-};
+use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
 use crate::bindings::_helpers::location_command::snapshot::{
     build_orchestration_snapshot, orchestration_snapshot,
@@ -47,34 +44,13 @@ fn status(py: Python<'_>, message: &str) -> PyResult<()> {
     write_stderr(py, &format!("{message}\n"))
 }
 
-/// Tell a `sqb dev` parent that a publication step started or finished.
-fn step(
+/// Tell a `sqb dev` parent that each phase reached its state; silent outside `sqb dev`.
+fn steps(
     py: Python<'_>,
-    (phase, state): (DevPhase, DevStepState),
+    steps: &[(DevPhase, DevStepState)],
     detail: Option<String>,
 ) -> PyResult<()> {
-    emit_dev_event(
-        py,
-        &DevEvent::Step {
-            phase,
-            state,
-            detail,
-        },
-    )
-}
-
-/// Write `event` to a `sqb dev` parent ahead of the reply line; silent outside `sqb dev`.
-pub(super) fn emit_dev_event(py: Python<'_>, event: &DevEvent) -> PyResult<()> {
-    if !dev_events_enabled() {
-        return Ok(());
-    }
-    let line: String = dev_event_line(event);
-    py.detach(|| -> std::io::Result<()> {
-        let mut stdout = std::io::stdout().lock();
-        stdout.write_all(line.as_bytes())?;
-        stdout.flush()
-    })?;
-    Ok(())
+    Ok(py.detach(|| emit_dev_steps(steps, detail))?)
 }
 
 /// Git is optional in deployed images; absent metadata is not fabricated from the last publication.
@@ -152,31 +128,22 @@ fn compile_location<'py>(
     input: &SnapshotInput,
 ) -> PyResult<(NativeOrchestrationSnapshot, ProjectAdapter<'py>, NodeKeys)> {
     status(py, "Discovering location project...")?;
-    step(py, (DevPhase::Discover, DevStepState::Started), None)?;
+    steps(py, &[(DevPhase::Discover, DevStepState::Started)], None)?;
     let project = project_adapter(
         py,
         Some(arguments.value("project_dir")?),
         ProjectInputs::DiscoveredDeferringSecrets,
     )?;
     status(py, "Location project discovered. Compiling snapshot...")?;
-    step(py, (DevPhase::Discover, DevStepState::Finished), None)?;
-    step(py, (DevPhase::Compile, DevStepState::Started), None)?;
+    let discovered = [
+        (DevPhase::Discover, DevStepState::Finished),
+        (DevPhase::Compile, DevStepState::Started),
+    ];
+    steps(py, &discovered, None)?;
     let (snapshot, blocked) = compile_snapshot(py, arguments, (input, &project), None)?;
     status(py, "Location snapshot compiled.")?;
-    let nodes = &snapshot.input.nodes;
-    let python: usize = nodes
-        .values()
-        .filter(|node| node.python_source.is_some())
-        .count();
-    let models: usize = nodes
-        .values()
-        .filter(|node| node.kind == MODEL_NODE_KIND)
-        .count();
-    step(
-        py,
-        (DevPhase::Compile, DevStepState::Finished),
-        Some(format!("{python} python nodes, {models} models")),
-    )?;
+    let compiled = [(DevPhase::Compile, DevStepState::Finished)];
+    steps(py, &compiled, Some(compile_summary(&snapshot.input)))?;
     Ok((snapshot, project, blocked))
 }
 
@@ -304,7 +271,7 @@ pub(super) fn publish_location(
         })
         .min();
     status(py, "Publishing location snapshot...")?;
-    step(py, (DevPhase::Publish, DevStepState::Started), None)?;
+    steps(py, &[(DevPhase::Publish, DevStepState::Started)], None)?;
     let record = snapshot.publication(
             py,
             &arguments.value("server_url")?.extract::<String>()?,
@@ -318,7 +285,7 @@ pub(super) fn publish_location(
             PyValueError::new_err(message)
         })?;
     status(py, "Location snapshot published.")?;
-    step(py, (DevPhase::Publish, DevStepState::Finished), None)?;
+    steps(py, &[(DevPhase::Publish, DevStepState::Finished)], None)?;
     Ok((record, refresh_at, locations.into_iter().collect()))
 }
 

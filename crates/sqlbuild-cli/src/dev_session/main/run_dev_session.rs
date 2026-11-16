@@ -1,29 +1,24 @@
 //! Feed the `sqb dev` screen from the location child, open the warehouse in the foreground and act on hotkeys.
 
-use std::io::IsTerminal;
-
 use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
-use sqlbuild_orchestration::declarations::models::{TriggerRecord, TriggerStatus};
-use sqlbuild_orchestration::dev_events::main::dev_control_line::dev_control_line;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
 use sqlbuild_orchestration::runs::main::list_runs::list_runs;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::ChildStdin;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::argv::models::Stream;
 use crate::dev_screen::models::{ScreenAction, ScreenMessage};
 use crate::dev_screen::types::DevScreenParts;
+use crate::dev_session::_helpers::child::{publish_record, relay_logs, send_control};
 use crate::dev_session::_helpers::foreground::connect_in_foreground;
 use crate::dev_session::_helpers::runs::{SeenRuns, run_messages};
+use crate::dev_session::_helpers::triggers::trigger_summary;
 use crate::dev_session::constants::{RUN_PAGE, RUN_POLL};
 use crate::dev_session::models::{DevProject, LocationPipes};
-use crate::native_commands::_helpers::terminal::{open_browser, write_output};
+use crate::person_login::main::open_browser::open_browser;
 
 /// Run until `q`, shutdown or the location child closing its output.
 pub(crate) async fn run_dev_session(
@@ -94,49 +89,5 @@ pub(crate) async fn run_dev_session(
                 }
             }
         }
-    }
-}
-
-/// The child's log lines, kept for `l`.
-async fn relay_logs(
-    stderr: BufReader<tokio::process::ChildStderr>,
-    screen: UnboundedSender<ScreenMessage>,
-) {
-    let mut lines = stderr.lines();
-    while let Ok(Some(line)) = lines.next_line().await {
-        drop(screen.send(ScreenMessage::Log(line)));
-    }
-}
-
-/// Redirected stdout keeps one publication record per line, as `sqb location serve` prints them.
-fn publish_record(record: &serde_json::Value) {
-    if std::io::stdout().is_terminal() {
-        return;
-    }
-    let mut line: String = record.to_string();
-    line.push('\n');
-    drop(write_output(&[(Stream::Stdout, &line)]));
-}
-
-async fn send_control(stdin: &mut ChildStdin, control: DevControl) -> Result<(), ControlError> {
-    stdin
-        .write_all(dev_control_line(control).as_bytes())
-        .await?;
-    stdin.flush().await?;
-    Ok(())
-}
-
-/// `41 paused`, `3 running · 38 paused` or `none`.
-fn trigger_summary(triggers: &[TriggerRecord]) -> String {
-    let paused: usize = triggers
-        .iter()
-        .filter(|trigger| trigger.status == TriggerStatus::Paused)
-        .count();
-    let running: usize = triggers.len() - paused;
-    match (running, paused) {
-        (0, 0) => "none".to_owned(),
-        (0, paused) => format!("{paused} paused"),
-        (running, 0) => format!("{running} running"),
-        (running, paused) => format!("{running} running \u{b7} {paused} paused"),
     }
 }

@@ -10,12 +10,14 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::dev_screen::models::ScreenMessage;
 
-/// Point stderr at a pipe whose lines become log messages; the terminal, or `None` when stderr is left as it is.
+/// Point stderr at a pipe whose lines become log messages, and return the terminal it pointed at.
 #[cfg(unix)]
-pub(crate) fn capture_stderr(messages: UnboundedSender<ScreenMessage>) -> Option<File> {
-    let terminal: File = File::from(std::io::stderr().as_fd().try_clone_to_owned().ok()?);
-    let (reader, writer) = std::io::pipe().ok()?;
-    rustix::stdio::dup2_stderr(&writer).ok()?;
+pub(crate) fn capture_stderr(
+    messages: UnboundedSender<ScreenMessage>,
+) -> std::io::Result<Option<File>> {
+    let terminal: File = File::from(std::io::stderr().as_fd().try_clone_to_owned()?);
+    let (reader, writer) = std::io::pipe()?;
+    rustix::stdio::dup2_stderr(&writer)?;
     drop(writer);
     std::thread::spawn(move || {
         for line in BufReader::new(reader).split(b'\n') {
@@ -30,13 +32,15 @@ pub(crate) fn capture_stderr(messages: UnboundedSender<ScreenMessage>) -> Option
             }
         }
     });
-    Some(terminal)
+    Ok(Some(terminal))
 }
 
 /// Without file-descriptor redirection, stderr stays on the terminal.
 #[cfg(not(unix))]
-pub(crate) fn capture_stderr(_messages: UnboundedSender<ScreenMessage>) -> Option<File> {
-    None
+pub(crate) fn capture_stderr(
+    _messages: UnboundedSender<ScreenMessage>,
+) -> std::io::Result<Option<File>> {
+    Ok(None)
 }
 
 /// Point stderr back at the terminal.

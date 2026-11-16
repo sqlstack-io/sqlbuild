@@ -1,85 +1,21 @@
 use std::time::Duration;
 
-use crate::cli_text::models::CliStyle;
-use crate::screen_text::main::format_elapsed::format_elapsed;
+use crate::screen_text::_helpers::rows::elapsed_text;
 use crate::screen_text::main::format_plain_line::format_plain_line;
 use crate::screen_text::main::redraw_rows::redraw_rows;
-use crate::screen_text::main::render_dev_header::render_dev_header;
 use crate::screen_text::main::render_event_line::render_event_line;
-use crate::screen_text::main::render_frame_rule::render_frame_rule;
-use crate::screen_text::main::render_hotkey_bar::render_hotkey_bar;
 use crate::screen_text::main::render_phase_lines::render_phase_lines;
 use crate::screen_text::main::render_ready_card::render_ready_card;
 use crate::screen_text::main::render_tree_group::render_tree_group;
-use crate::screen_text::models::{
-    DevHeader, EventMark, PhaseLayout, PhaseState, ScreenFacts, Tone, TreeEntry, TreeGroup,
-    TreeRow, WarehouseState,
-};
+use crate::screen_text::models::{PhaseLayout, PhaseState, ScreenFacts, WarehouseState};
 use crate::screen_text::tests::helpers::{
-    event, failed_generation, hotkeys, millis, phase, plain_facts, ready_card, starting_checklist,
-    visible,
+    chrome_rows, colour_facts, connected, edited_events, millis, not_connected, phase, plain_facts,
+    ready_card, rows_wider_than_screen, semantic_group, starting_checklist,
 };
 use crate::screen_text::tests::test_types::{
-    ElapsedTestCase, PhaseLinesTestCase, ReadyCardTestCase, TreeGroupTestCase,
+    ChromeTestCase, DotTestCase, ElapsedTestCase, EventsTestCase, PhaseLinesTestCase,
+    PlainLineTestCase, ReadyCardTestCase, RedrawTestCase, TreeGroupTestCase, WidthTestCase,
 };
-use crate::text::main::cell_len::cell_len;
-
-fn connected() -> WarehouseState {
-    WarehouseState::Connected {
-        detail: "ANALYST \u{b7} DEVELOPER_ROLE @ DEV_ANALYST_WAREHOUSE_LARGE".to_owned(),
-    }
-}
-
-fn not_connected() -> WarehouseState {
-    WarehouseState::NotConnected {
-        reason: "sign-in skipped".to_owned(),
-    }
-}
-
-fn semantic_group(total: usize) -> TreeGroup {
-    let entry = |name: &str, rows: &[(&str, &str, Tone)]| TreeEntry {
-        name: name.to_owned(),
-        rows: rows
-            .iter()
-            .map(|(key, value, tone)| TreeRow {
-                key: (*key).to_owned(),
-                value: (*value).to_owned(),
-                tone: *tone,
-                link: (*key == "at").then(|| format!("file:///work/shop/{value}")),
-            })
-            .collect(),
-    };
-    TreeGroup {
-        title: "Partial semantic checks".to_owned(),
-        total,
-        entries: vec![
-            entry(
-                "orders__mart_v__fulfilment_monitoring",
-                &[
-                    (
-                        "reason",
-                        "reads open input orders__mart__fulfilment_monitoring",
-                        Tone::Plain,
-                    ),
-                    (
-                        "fix",
-                        "declare the input shape, then sqb compile --no-cache",
-                        Tone::Plain,
-                    ),
-                ],
-            ),
-            entry(
-                "fct_revenue",
-                &[
-                    ("at", "models/finance/fct_revenue.sql:42:7", Tone::Muted),
-                    ("error", "unknown column net_amount_usd", Tone::Error),
-                ],
-            ),
-        ],
-        limit: 2,
-        flag: "--verbose".to_owned(),
-    }
-}
 
 #[test]
 fn given_phase_lines_when_rendering_then_columns_align_and_rows_fit() {
@@ -230,122 +166,6 @@ fn given_ready_card_when_rendering_then_rows_match_the_screen() {
 }
 
 #[test]
-fn given_unavailable_warehouse_when_colouring_then_dot_is_amber_not_green() {
-    let facts: ScreenFacts = ScreenFacts {
-        style: CliStyle { use_color: true },
-        ..plain_facts(80)
-    };
-
-    let unavailable: String = render_ready_card(&ready_card(not_connected()), &facts)[4].clone();
-    let available: String = render_ready_card(&ready_card(connected()), &facts)[4].clone();
-
-    assert!(
-        unavailable.contains("\u{1b}[33m\u{25cb}\u{1b}[0m"),
-        "{unavailable:?}"
-    );
-    assert!(
-        available.contains("\u{1b}[32m\u{25cf}\u{1b}[0m"),
-        "{available:?}"
-    );
-}
-
-#[test]
-fn given_events_when_rendering_then_one_line_each_with_notes_below() {
-    let events = [
-        event(EventMark::Changed, "models/orders/int_orders.sql", "", None),
-        event(
-            EventMark::Changed,
-            "python/exports/partner_feed/fulfilment_partner_daily_export_node.py",
-            "",
-            None,
-        ),
-        event(
-            EventMark::Succeeded,
-            "gen 2 published",
-            "1 model changed",
-            millis(1_400),
-        ),
-        event(
-            EventMark::Restarted,
-            "location restarted",
-            "Python changed",
-            millis(3_900),
-        ),
-        failed_generation(),
-        event(
-            EventMark::Started,
-            "run nightly_group",
-            "started from UI",
-            None,
-        ),
-        event(
-            EventMark::Succeeded,
-            "run nightly_group",
-            "212 nodes",
-            millis(1_003_000),
-        ),
-    ];
-    let expected: [(usize, Vec<&str>); 2] = [
-        (
-            80,
-            vec![
-                "  09:41:03  ~ models/orders/int_orders.sql",
-                "  09:41:03  ~ python/exports/partner_feed/fulfilment_partner_daily_export_node.…",
-                "  09:41:03  ✓ gen 2 published                 1 model changed      1.4s",
-                "  09:41:03  ↻ location restarted              Python changed       3.9s",
-                "  09:41:03  ✗ gen 4 failed · still serving gen 3",
-                "            models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd",
-                "            r retry · l full log",
-                "  09:41:03  ▶ run nightly_group               started from UI",
-                "  09:41:03  ✓ run nightly_group               212 nodes         16m 43s",
-            ],
-        ),
-        (
-            120,
-            vec![
-                "  09:41:03  ~ models/orders/int_orders.sql",
-                "  09:41:03  ~ python/exports/partner_feed/fulfilment_partner_daily_export_node.py",
-                "  09:41:03  ✓ gen 2 published                 1 model changed      1.4s",
-                "  09:41:03  ↻ location restarted              Python changed       3.9s",
-                "  09:41:03  ✗ gen 4 failed · still serving gen 3",
-                "            models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd",
-                "            r retry · l full log",
-                "  09:41:03  ▶ run nightly_group               started from UI",
-                "  09:41:03  ✓ run nightly_group               212 nodes         16m 43s",
-            ],
-        ),
-    ];
-
-    for (columns, expected_rows) in expected {
-        let rows: Vec<String> = events
-            .iter()
-            .flat_map(|line| render_event_line(line, &plain_facts(columns)))
-            .collect();
-
-        assert_eq!(rows, expected_rows, "{columns} columns");
-    }
-}
-
-#[test]
-fn given_links_when_rendering_failed_generation_then_only_the_location_is_a_hyperlink() {
-    let facts: ScreenFacts = ScreenFacts {
-        links: true,
-        ..plain_facts(80)
-    };
-
-    let rows: Vec<String> = render_event_line(&failed_generation(), &facts);
-
-    assert_eq!(
-        rows[1],
-        "            \u{1b}]8;;file:///work/shop/models/finance/fct_revenue.sql\u{1b}\\models/finance/fct_revenue.sql:42:7\u{1b}]8;;\u{1b}\\  unknown column net_amount_usd"
-    );
-    assert_eq!(
-        visible(&rows[1]).trim_start(),
-        "models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd"
-    );
-}
-
-#[test]
 fn given_tree_group_when_rendering_then_rows_are_bounded_with_overflow_line() {
     let test_cases = [
         TreeGroupTestCase {
@@ -393,57 +213,6 @@ fn given_tree_group_when_rendering_then_rows_are_bounded_with_overflow_line() {
 }
 
 #[test]
-fn given_header_rule_and_hotkeys_when_rendering_then_match_the_screen() {
-    let facts: ScreenFacts = plain_facts(80);
-    let header: DevHeader = DevHeader {
-        version: "0.231.0".to_owned(),
-        project: "shop".to_owned(),
-        target: "dev".to_owned(),
-    };
-
-    let rows: Vec<String> = vec![
-        render_dev_header(&header, &facts),
-        render_frame_rule(Some("snowflake"), &facts),
-        render_frame_rule(None, &facts),
-        render_hotkey_bar(&hotkeys(), &facts),
-        render_hotkey_bar(&hotkeys(), &plain_facts(40)),
-    ];
-
-    assert_eq!(
-        rows,
-        vec![
-            "  sqlbuild dev  v0.231.0 · shop · target dev",
-            "  ── snowflake ─────────────────────────────────────────────────────────────────",
-            "  ──────────────────────────────────────────────────────────────────────────────",
-            "  o open UI · r recompile · s retry warehouse · l logs · q quit",
-            "  o open UI · r recompile · s retry war…",
-        ]
-    );
-}
-
-#[test]
-fn given_plain_mode_when_formatting_then_lines_are_stable_and_untimed_lines_have_no_suffix() {
-    let lines: Vec<String> = vec![
-        format_plain_line("control store ready", millis(100)),
-        format_plain_line("location 3f1c9a2e (target dev)", None),
-        format_plain_line("discovered 412 python nodes, 2280 models", millis(38_200)),
-        format_plain_line("published gen 1 b429729b", millis(1_700)),
-        format_plain_line("ready http://127.0.0.1:8000", None),
-    ];
-
-    assert_eq!(
-        lines,
-        vec![
-            "sqlbuild dev: control store ready (0.1s)",
-            "sqlbuild dev: location 3f1c9a2e (target dev)",
-            "sqlbuild dev: discovered 412 python nodes, 2280 models (38.2s)",
-            "sqlbuild dev: published gen 1 b429729b (1.7s)",
-            "sqlbuild dev: ready http://127.0.0.1:8000",
-        ]
-    );
-}
-
-#[test]
 fn given_durations_when_formatting_elapsed_then_units_change_at_minute_and_hour() {
     let test_cases = [
         ElapsedTestCase {
@@ -475,7 +244,7 @@ fn given_durations_when_formatting_elapsed_then_units_change_at_minute_and_hour(
 
     for test_case in test_cases {
         assert_eq!(
-            format_elapsed(test_case.elapsed),
+            elapsed_text(test_case.elapsed),
             test_case.expected_text,
             "{}",
             test_case.description
@@ -484,53 +253,224 @@ fn given_durations_when_formatting_elapsed_then_units_change_at_minute_and_hour(
 }
 
 #[test]
+fn given_a_warehouse_state_when_colouring_the_card_then_the_dot_matches_it() {
+    let test_cases = [
+        DotTestCase {
+            description: "a skipped sign-in is an amber hollow dot, never green",
+            warehouse: not_connected(),
+            expected_dot: "\u{1b}[33m\u{25cb}\u{1b}[0m",
+        },
+        DotTestCase {
+            description: "a connected warehouse is a green filled dot",
+            warehouse: connected(),
+            expected_dot: "\u{1b}[32m\u{25cf}\u{1b}[0m",
+        },
+    ];
+
+    for test_case in test_cases {
+        let rows: Vec<String> =
+            render_ready_card(&ready_card(test_case.warehouse), &colour_facts(80));
+
+        assert!(
+            rows[4].contains(test_case.expected_dot),
+            "{}: {:?}",
+            test_case.description,
+            rows[4]
+        );
+    }
+}
+
+#[test]
+fn given_events_when_rendering_then_one_line_each_with_notes_below() {
+    let test_cases = [
+        EventsTestCase {
+            description: "at 80 columns the long Python path is cut with an ellipsis",
+            facts: plain_facts(80),
+            expected_rows: vec![
+                "  09:41:03  ~ models/orders/int_orders.sql",
+                "  09:41:03  ~ python/exports/partner_feed/fulfilment_partner_daily_export_node.…",
+                "  09:41:03  ✓ gen 2 published                 1 model changed      1.4s",
+                "  09:41:03  ↻ location restarted              Python changed       3.9s",
+                "  09:41:03  ✗ gen 4 failed · still serving gen 3",
+                "            models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd",
+                "            r retry · l full log",
+                "  09:41:03  ▶ run nightly_group               started from UI",
+                "  09:41:03  ✓ run nightly_group               212 nodes         16m 43s",
+            ],
+        },
+        EventsTestCase {
+            description: "at 120 columns every path is shown whole and timings stay in their column",
+            facts: plain_facts(120),
+            expected_rows: vec![
+                "  09:41:03  ~ models/orders/int_orders.sql",
+                "  09:41:03  ~ python/exports/partner_feed/fulfilment_partner_daily_export_node.py",
+                "  09:41:03  ✓ gen 2 published                 1 model changed      1.4s",
+                "  09:41:03  ↻ location restarted              Python changed       3.9s",
+                "  09:41:03  ✗ gen 4 failed · still serving gen 3",
+                "            models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd",
+                "            r retry · l full log",
+                "  09:41:03  ▶ run nightly_group               started from UI",
+                "  09:41:03  ✓ run nightly_group               212 nodes         16m 43s",
+            ],
+        },
+        EventsTestCase {
+            description: "with links only the error location is a hyperlink; the visible text is unchanged",
+            facts: ScreenFacts {
+                links: true,
+                ..plain_facts(80)
+            },
+            expected_rows: vec![
+                "  09:41:03  ~ models/orders/int_orders.sql",
+                "  09:41:03  ~ python/exports/partner_feed/fulfilment_partner_daily_export_node.…",
+                "  09:41:03  ✓ gen 2 published                 1 model changed      1.4s",
+                "  09:41:03  ↻ location restarted              Python changed       3.9s",
+                "  09:41:03  ✗ gen 4 failed · still serving gen 3",
+                "            \u{1b}]8;;file:///work/shop/models/finance/fct_revenue.sql\u{1b}\\models/finance/fct_revenue.sql:42:7\u{1b}]8;;\u{1b}\\  unknown column net_amount_usd",
+                "            r retry · l full log",
+                "  09:41:03  ▶ run nightly_group               started from UI",
+                "  09:41:03  ✓ run nightly_group               212 nodes         16m 43s",
+            ],
+        },
+    ];
+
+    for test_case in test_cases {
+        let rows: Vec<String> = edited_events()
+            .iter()
+            .flat_map(|line| render_event_line(line, &test_case.facts))
+            .collect();
+
+        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
+    }
+}
+
+#[test]
+fn given_header_rule_and_hotkeys_when_rendering_then_match_the_screen() {
+    let test_cases = [
+        ChromeTestCase {
+            description: "at 80 columns the header, both rules and the hotkey bar are whole",
+            columns: 80,
+            expected_rows: vec![
+                "  sqlbuild dev  v0.231.0 · shop · target dev",
+                "  ── snowflake ─────────────────────────────────────────────────────────────────",
+                "  ──────────────────────────────────────────────────────────────────────────────",
+                "  o open UI · r recompile · s retry warehouse · l logs · q quit",
+            ],
+        },
+        ChromeTestCase {
+            description: "at 40 columns long rows end in an ellipsis and rules shrink to fit",
+            columns: 40,
+            expected_rows: vec![
+                "  sqlbuild dev  v0.231.0 · shop · targe…",
+                "  ── snowflake ─────────────────────────",
+                "  ──────────────────────────────────────",
+                "  o open UI · r recompile · s retry war…",
+            ],
+        },
+    ];
+
+    for test_case in test_cases {
+        let rows: Vec<String> = chrome_rows(&plain_facts(test_case.columns));
+
+        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
+    }
+}
+
+#[test]
+fn given_plain_mode_when_formatting_then_lines_are_stable_and_untimed_lines_have_no_suffix() {
+    let test_cases = [
+        PlainLineTestCase {
+            description: "a timed step ends with its time in brackets",
+            message: "control store ready",
+            elapsed: millis(100),
+            expected_line: "sqlbuild dev: control store ready (0.1s)",
+        },
+        PlainLineTestCase {
+            description: "an untimed line has no suffix, even when it ends in brackets itself",
+            message: "location 3f1c9a2e (target dev)",
+            elapsed: None,
+            expected_line: "sqlbuild dev: location 3f1c9a2e (target dev)",
+        },
+        PlainLineTestCase {
+            description: "longer steps keep tenths of a second",
+            message: "discovered 412 python nodes, 2280 models",
+            elapsed: millis(38_200),
+            expected_line: "sqlbuild dev: discovered 412 python nodes, 2280 models (38.2s)",
+        },
+        PlainLineTestCase {
+            description: "the ready line carries the URL and no time",
+            message: "ready http://127.0.0.1:8000",
+            elapsed: None,
+            expected_line: "sqlbuild dev: ready http://127.0.0.1:8000",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            format_plain_line(test_case.message, test_case.elapsed),
+            test_case.expected_line,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
 fn given_previous_rows_when_redrawing_then_moves_up_clears_and_draws_each_row_once() {
-    assert_eq!(
-        redraw_rows(3, &["a".to_owned(), "b".to_owned()]),
-        "\u{1b}[3F\u{1b}[Ja\nb\n"
-    );
-    assert_eq!(redraw_rows(0, &["a".to_owned()]), "\u{1b}[Ja\n");
+    let test_cases = [
+        RedrawTestCase {
+            description: "three drawn rows move the cursor up three lines before clearing",
+            previous: 3,
+            rows: vec!["a".to_owned(), "b".to_owned()],
+            expected_text: "\u{1b}[3F\u{1b}[Ja\nb\n",
+        },
+        RedrawTestCase {
+            description: "nothing drawn yet clears in place without moving",
+            previous: 0,
+            rows: vec!["a".to_owned()],
+            expected_text: "\u{1b}[Ja\n",
+        },
+        RedrawTestCase {
+            description: "clearing every row leaves no row behind",
+            previous: 2,
+            rows: Vec::new(),
+            expected_text: "\u{1b}[2F\u{1b}[J",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            redraw_rows(test_case.previous, &test_case.rows),
+            test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]
 fn given_any_width_when_rendering_every_piece_then_no_row_is_wider_than_the_screen() {
-    for columns in 8..=130 {
-        for colour in [false, true] {
-            let facts: ScreenFacts = ScreenFacts {
-                style: CliStyle { use_color: colour },
-                links: colour,
-                ..plain_facts(columns)
-            };
-            let mut rows: Vec<String> =
-                render_phase_lines(&starting_checklist(), PhaseLayout::TimeLast, &facts);
-            rows.extend(render_phase_lines(
-                &starting_checklist(),
-                PhaseLayout::TimeFirst,
-                &facts,
-            ));
-            rows.extend(render_ready_card(&ready_card(connected()), &facts));
-            rows.extend(render_ready_card(&ready_card(not_connected()), &facts));
-            rows.extend(render_event_line(&failed_generation(), &facts));
-            rows.extend(render_event_line(
-                &event(
-                    EventMark::Succeeded,
-                    "gen 2 published",
-                    "1 model changed",
-                    millis(1_400),
-                ),
-                &facts,
-            ));
-            rows.extend(render_tree_group(&semantic_group(5), &facts));
-            rows.push(render_frame_rule(Some("snowflake"), &facts));
-            rows.push(render_hotkey_bar(&hotkeys(), &facts));
+    let test_cases = [
+        WidthTestCase {
+            description: "uncoloured rows without links fit every width from 8 to 130",
+            colour: false,
+            expected_too_wide: Vec::new(),
+        },
+        WidthTestCase {
+            description: "colour and hyperlink escapes take no visible width",
+            colour: true,
+            expected_too_wide: Vec::new(),
+        },
+    ];
 
-            for row in rows {
-                let width: usize = cell_len(&visible(&row));
-                assert!(
-                    width <= columns,
-                    "{columns} columns, colour {colour}: {row:?} is {width} wide"
-                );
-            }
-        }
+    for test_case in test_cases {
+        let too_wide: Vec<String> = (8..=130)
+            .flat_map(|columns| rows_wider_than_screen(columns, test_case.colour))
+            .collect();
+
+        assert_eq!(
+            too_wide, test_case.expected_too_wide,
+            "{}",
+            test_case.description
+        );
     }
 }
