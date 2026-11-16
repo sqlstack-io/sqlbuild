@@ -12,8 +12,8 @@
 </script>
 
 {#if running}
-	<p class="syncing-note" role="status">
-		Syncing warehouse history… {running.position}/{running.kinds}. {what} fill in when it completes.
+	<p class="syncing-note" role="status" title="{what} fill in when it completes">
+		Syncing warehouse history · {running.position}/{running.kinds}
 	</p>
 {/if}
 

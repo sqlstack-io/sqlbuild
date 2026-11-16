@@ -32,7 +32,7 @@
 	}
 
 	function origin(t: ConnectionTest): string {
-		return t.trigger === 'publish' ? 'after the last deploy' : t.trigger === 'startup' ? 'on startup' : t.by ? `by ${t.by.name}` : 'manually';
+		return t.trigger === 'publish' ? 'on deploy' : t.trigger === 'startup' ? 'on startup' : t.by ? `by ${t.by.name}` : 'manual';
 	}
 </script>
 
