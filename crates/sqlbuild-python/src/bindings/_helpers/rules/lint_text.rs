@@ -18,7 +18,6 @@ use sqlbuild_rules::lint_text::models::{
 use crate::bindings::_helpers::rules::lint_pipeline::{
     LintViolationRow, NATIVE_ENGINE, ViolationClasses, project_relative_path,
 };
-use crate::bindings::models::Positional;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
@@ -27,6 +26,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_project::analysis::models::Positional;
 
 const FORMAT_UNSAFE_CODE: &str = "format-unsafe";
 const FORMAT_UNSAFE_REMEDIATION: &str = "Rewrite the unsupported SQL shape or report a minimal formatter reproduction. No header, SQL body, or fixture changes were written to this file.";

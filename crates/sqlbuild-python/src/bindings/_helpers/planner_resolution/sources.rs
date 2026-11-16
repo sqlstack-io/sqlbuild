@@ -5,7 +5,6 @@ use crate::bindings::_helpers::planner_resolution::values::{
     cursor_wrap, filtering_of, method, string,
 };
 use crate::bindings::_helpers::planner_strategy::values::input_error;
-use crate::bindings::_helpers::references::source_relations::render_source_read;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -17,6 +16,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::type_system::main::types_equal::types_equal;
+use sqlbuild_python_project::references::main::render_source_read::render_source_read;
 use sqlbuild_sqltext::resolution::main::column_name_key::column_name_key;
 use sqlbuild_sqltext::resolution::main::{
     reference_spans::reference_spans, source_alias::source_alias,

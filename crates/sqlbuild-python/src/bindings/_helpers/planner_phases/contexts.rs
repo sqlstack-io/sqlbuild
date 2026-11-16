@@ -7,7 +7,7 @@ use pyo3::{PyClass, pyclass::boolean_struct::True};
 use crate::bindings::_helpers::planner_phases::models::{
     PlannerIdentityContext, PlannerScopeResolution,
 };
-use crate::bindings::_helpers::planner_scope::retained::project_scope;
+use sqlbuild_python_project::planner_scope::main::project_scope::project_scope;
 
 #[pymethods]
 impl PlannerScopeResolution {

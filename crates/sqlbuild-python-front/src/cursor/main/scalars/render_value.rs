@@ -1,12 +1,16 @@
 //! A scalar in the existing cursor output format.
 
-use crate::cursor::_helpers::scalars;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::cursor::models::CursorSession;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use pyo3::pyfunction;
+use sqlbuild_cursor::algebra::main::render::render;
+use sqlbuild_cursor::algebra::models::Scalar;
 
 /// A scalar in the existing cursor output format.
-#[inline]
+#[pyfunction(name = "cursor_render")]
+#[pyo3(signature = (*, value))]
 pub fn render_value(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    scalars::render_value(value)
+    let session: CursorSession<'_> = CursorSession::new(value.py())?;
+    let scalar: Scalar = session.scalar(value)?;
+    session.checked(render(&scalar, &session))
 }

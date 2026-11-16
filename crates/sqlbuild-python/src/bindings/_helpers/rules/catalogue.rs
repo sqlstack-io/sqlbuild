@@ -13,7 +13,6 @@ use sqlbuild_rules::models::RulesConfig;
 use sqlbuild_rules::rule_catalogue::main::sorted_catalogue_order::sorted_catalogue_order;
 use sqlbuild_rules::rule_catalogue::models::{CatalogueRule, OptionKind, OptionSpec, OptionValue};
 
-use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
 use crate::bindings::_helpers::rules::builtin_catalogue::builtin_rules;
 use crate::bindings::_helpers::rules::config_json::asdict_json;
 use crate::bindings::_helpers::rules::custom_rule_evidence::verify_custom_rules as verify_rule_sources;
@@ -27,6 +26,7 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as record_field;
 use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_project::planner_scope::main::build_planner_scope::build_planner_scope;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
 const JSON_MODULE: &str = "json";

@@ -1,6 +1,5 @@
 //! The warehouse inspection phase: snapshot, migrations and inspection relations in one pass.
 
-use crate::bindings::_helpers::graph::views::compiled_graph_keys;
 use crate::bindings::_helpers::planner_entries::models::RelationsRequest;
 use crate::bindings::_helpers::planner_entries::relations::planner_relations_context;
 use crate::bindings::_helpers::planner_migrations::column_planning::plan_column_migrations;
@@ -13,15 +12,16 @@ use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::models::PlannerWarehouseState;
-use crate::bindings::_helpers::planner_phases::objects::native;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::fingerprint_cache::MigrationFingerprintCache;
 use crate::bindings::_helpers::planner_warehouse::snapshot::{SnapshotRequest, warehouse_snapshot};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::graph::main::project::compiled_graph_keys::compiled_graph_keys;
+use sqlbuild_python_project::planner_phases::main::native::native;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 use std::time::Instant;
 
 fn progress(runtime: &Bound<'_, PyAny>, message: &str) -> PyResult<()> {

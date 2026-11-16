@@ -5,11 +5,11 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use sqlbuild_analysis::compiled_project::models::SchemaColumnFact;
 
-use crate::bindings::_helpers::compiled_project::schema_facts::python_column_fact;
 use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, compile_error};
 use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::models::HeaderColumn;
+use sqlbuild_python_project::compiled_project::main::python_column_fact::python_column_fact;
 
 const MODEL_SCHEMA_KEY: &str = "model_schema";
 const NAME_FIELD: &str = "name";

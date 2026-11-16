@@ -1,9 +1,7 @@
 //! Provider classes under providers/.
 
 use crate::discovery::_helpers::python_files::imported_providers;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 
 /// Provider classes under providers/.
 #[inline]

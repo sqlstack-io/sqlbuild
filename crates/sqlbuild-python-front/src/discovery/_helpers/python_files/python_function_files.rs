@@ -1,30 +1,18 @@
 //! Python function files discovered natively, with CPython as the authority on syntax and values.
 
 use pyo3::exceptions::{PySyntaxError, PyTypeError, PyValueError};
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
-use pyo3::types::{
-    PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyStringMethods, PyTuple,
-};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_discovery::declaration_files::main::python_function_files::python_function_files;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyResult, Python};
+use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyStringMethods};
 use sqlbuild_discovery::key_checks::main::unsupported_keys_help::unsupported_keys_help;
-use sqlbuild_discovery::models::{DiscoveredFile, FileOutcome, ProjectRoot};
+use sqlbuild_discovery::models::{DiscoveredFile, FileOutcome};
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_pysource::udf_functions::constants::UDF_KEYS;
 use sqlbuild_pysource::udf_functions::main::udf_function::udf_function;
 use sqlbuild_pysource::udf_functions::models::{UdfFunction, UdfShape};
 
-use crate::discovery::_helpers::failures::raised::failure_error;
-use crate::discovery::_helpers::failures::raised::read_error;
-use crate::discovery::_helpers::failures::raised::stage_error;
+use crate::discovery::_helpers::failures::raised::{failure_error, read_error};
 use crate::discovery::_helpers::project::project_files::path_object;
 use crate::discovery::_helpers::records::declaration_records::path_class;
-use crate::discovery::_helpers::snapshots::native_classes::NativeProjectTree;
-use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
-use crate::discovery::_helpers::snapshots::snapshot::project_root;
-use crate::discovery::_helpers::snapshots::snapshot::project_tree;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -235,7 +223,7 @@ fn parsed_function<'py>(
     Ok((values, entry_point, warehouse_body(&module, &function)?))
 }
 
-fn function_record<'py>(
+pub(crate) fn function_record<'py>(
     project_dir: &Bound<'py, PyAny>,
     tree: &ProjectTree,
     file: DiscoveredFile<String>,
@@ -267,30 +255,4 @@ fn function_record<'py>(
             ("body_python", body_python),
         ],
     )
-}
-
-/// Discover the `@udf(...)` Python function files under `functions/python/`.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir))]
-pub(crate) fn discover_python_function_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    in_snapshot(project_dir, || {
-        let py: Python<'py> = project_dir.py();
-        let tree: Bound<'py, NativeProjectTree> = project_tree(project_dir)?;
-        let root: ProjectRoot = project_root(project_dir)?;
-        let inner: &ProjectTree = &tree.get().inner;
-        let files: Vec<DiscoveredFile<String>> = py
-            .detach(|| python_function_files(&root, inner))
-            .map_err(|failure| stage_error(inner, project_dir, failure))?;
-        let records: Vec<Bound<'py, PyAny>> = files
-            .into_iter()
-            .map(|file| function_record(project_dir, inner, file))
-            .collect::<PyResult<_>>()?;
-        PyTuple::new(py, records)
-    })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_python_function_files, module)?)
 }

@@ -30,8 +30,6 @@ use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::compile_driver::assembly::assemble_project;
 use crate::bindings::_helpers::compile_driver::selection_phases::resolve_analysis_model_names;
-use crate::bindings::_helpers::compiled_views::records::project_with;
-use crate::bindings::_helpers::contracts::contract_diagnostics::promotion_conflict_diagnostics;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_core::constants::TABLE_PROMOTION_MODE_SETTING_KEY;
@@ -43,6 +41,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::contracts::main::resolve_effective_collection_rendering::resolve_effective_collection_rendering;
+use sqlbuild_python_project::compiled_views::main::project::project_with::project_with;
+use sqlbuild_python_project::contracts::main::promotion_conflict_diagnostics::promotion_conflict_diagnostics;
 const LOCAL_CONFIG_FILENAME: &str = "sqlbuild_local.toml";
 /// Optional keywords of the project graph builders.
 const GRAPH_OPTIONAL: [&str; 7] = [

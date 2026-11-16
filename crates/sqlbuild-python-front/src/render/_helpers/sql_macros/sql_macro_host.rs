@@ -28,10 +28,10 @@ use sqlbuild_analysis::sql_macros::models::{
 use sqlbuild_analysis::sql_macros::types::{ConstantShape, SqlMacroHost, SqlMacroScope};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::render::_helpers::declarations::declaration_expansion::expand_declarations;
-use crate::render::_helpers::declarations::declaration_expansion::usage_visibility;
-use crate::render::models::DeclarationExpansion;
-use crate::render::models::ExpandedDeclarations;
+use crate::render::_helpers::declarations::declaration_expansion::{
+    expand_declarations, usage_visibility,
+};
+use crate::render::models::{DeclarationExpansion, ExpandedDeclarations};
 use crate::sqltext::main::declaration_scan::declaration_scan;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;

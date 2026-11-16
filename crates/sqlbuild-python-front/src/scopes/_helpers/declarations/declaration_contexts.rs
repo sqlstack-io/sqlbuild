@@ -1,10 +1,9 @@
 //! Declaration resolution contexts built natively from a Python scope lookup's positions.
 
-use crate::scopes::models::NativeDeclarationContexts;
 use std::collections::HashMap;
 
 use pyo3::FromPyObject;
-use pyo3::prelude::{Bound, Py, PyAny, PyModule, PyModuleMethods, PyResult};
+use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::types::PyDict;
 
 use sqlbuild_scopes::scope_index::models::VisibleEntry;
@@ -58,9 +57,4 @@ pub(crate) struct ContextParts<'py> {
     pub(crate) macro_records: Bound<'py, PyDict>,
     pub(crate) inaccessible: [Bound<'py, PyDict>; 3],
     pub(crate) visibility: [Bound<'py, PyDict>; 3],
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeDeclarationContexts>()?;
-    Ok(())
 }

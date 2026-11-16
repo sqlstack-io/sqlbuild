@@ -1,16 +1,16 @@
 //! The module file digests a macro call store records and checks before reuse.
 
+use crate::macro_bridge::main::text::text;
 use std::path::PathBuf;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyList, PyListMethods, PyString};
-use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_cache::module_digests::main::module_digests_metadata::module_digests_metadata as metadata_text;
 use sqlbuild_core::json::models::JsonValue;
 
-use crate::macro_bridge::_helpers::store_keys::text;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::cache::main::digest_files::digest_files;
 use sqlbuild_python_base::frontier::main::emit_error::emit_error;
@@ -48,7 +48,7 @@ pub(crate) fn digest_module_files<'py>(
 
 /// Encode module file digests for the store's metadata.
 #[pyfunction]
-fn module_digests_metadata<'py>(
+pub(crate) fn module_digests_metadata<'py>(
     py: Python<'py>,
     digests: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyBytes>> {
@@ -83,7 +83,7 @@ fn digest_row_check(row: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// Return the stored module digests when every module file still has them, else None.
 #[pyfunction]
 #[pyo3(signature = (*, metadata, known))]
-fn unchanged_module_digests<'py>(
+pub(crate) fn unchanged_module_digests<'py>(
     py: Python<'py>,
     metadata: &Bound<'py, PyAny>,
     known: &Bound<'py, PyAny>,
@@ -124,10 +124,4 @@ fn unchanged_module_digests<'py>(
     } else {
         None
     })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(digest_module_files, module)?)?;
-    module.add_function(wrap_pyfunction!(module_digests_metadata, module)?)?;
-    module.add_function(wrap_pyfunction!(unchanged_module_digests, module)?)
 }

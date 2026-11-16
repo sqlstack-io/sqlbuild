@@ -1,8 +1,5 @@
 //! Per-model plan entries from resolved change results and warehouse snapshot facts.
 
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_changes::actions::replaces_incremental_relation;
 use crate::bindings::_helpers::planner_changes::detect::detect_model_changes;
 use crate::bindings::_helpers::planner_entries::models::{
@@ -16,7 +13,6 @@ use crate::bindings::_helpers::planner_phases::full_refresh::{
     check_full_rebuild_allowed, describe_full_rebuild_cause, resolve_model_full_refresh,
 };
 use crate::bindings::_helpers::planner_phases::models::ModelEntryResults;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::cursor_ranges::{
     CursorWindowInputs, config_str, cursor_safety_configs, empty_cursor_inputs, microbatch_range,
     model_cursor_overrides, plan_cursor_bounds,
@@ -33,14 +29,10 @@ use crate::bindings::_helpers::planner_strategy::cursor_inputs::{
 use crate::bindings::_helpers::planner_strategy::lineage::reject_capped_watermark_inputs;
 use crate::bindings::_helpers::planner_strategy::microbatch_limits::apply_configured_microbatch_limits;
 use crate::bindings::_helpers::planner_strategy::model_entries::assemble_model_plan_entry;
-use crate::bindings::_helpers::planner_strategy::models::{
-    CursorInputLookups, ModelEntryDecisions,
-};
 use crate::bindings::_helpers::planner_strategy::strategy::{
     materialization_of, resolve_model_plan_action,
 };
 use crate::bindings::_helpers::planner_strategy::values::text;
-use crate::bindings::_helpers::semantic_shapes::source_bindings::source_binding_diagnostics;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -51,6 +43,11 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::discovery::main::failures::microbatch_guidance::microbatch_guidance;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::functions::functions;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_strategy::models::{CursorInputLookups, ModelEntryDecisions};
+use sqlbuild_python_project::semantic_shapes::main::source_binding_diagnostics::source_binding_diagnostics;
 
 const MICROBATCH_COMPLEXITY_CODE: &str = "MICROBATCH_CONCURRENCY_COMPLEXITY";
 
@@ -211,11 +208,8 @@ fn plan_model_from_change<'py>(
     } else {
         cursor_bounds
     };
-    let warnings = with_cursor_safety_warnings(
-        &entry_warnings.into_any(),
-        &model_reads::name_object(model)?,
-        &bounds,
-    )?;
+    let warnings =
+        with_cursor_safety_warnings(&entry_warnings.into_any(), &name_object(model)?, &bounds)?;
     Ok((entry, warnings))
 }
 
@@ -428,20 +422,22 @@ pub(crate) fn plan_entries<'py>(
         runtime_cursor_producer_names(&scope, &relations_context.source_map.bind(py).clone())?,
     )?;
     let functions_by_name = PyDict::new(py);
-    for function in project_reads::functions(&project)?.try_iter()? {
+    for function in functions(&project)?.try_iter()? {
         let function = function?;
-        functions_by_name.set_item(function_reads::name(&function)?, function)?;
+        functions_by_name.set_item(
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?,
+            function,
+        )?;
     }
     let settings = native_field(&project, "settings")?;
-    let scope_data = crate::bindings::_helpers::planner_scope::retained::scope_data(&scope)?;
+    let scope_data = sqlbuild_python_project::planner_scope::main::scope_data::scope_data(&scope)?;
     let context = Bound::new(
         py,
         ModelPlanContext {
             model_locations: relations_context.model_locations.clone_ref(py),
-            models_by_name:
-                crate::bindings::_helpers::native_host::model_lookup::ModelLookup::Native(
-                    scope_data.clone(),
-                ),
+            models_by_name: sqlbuild_python_project::native_host::models::ModelLookup::Native(
+                scope_data.clone(),
+            ),
             functions_by_name: functions_by_name.into_any().unbind(),
             seed_locations: relations_context.seed_locations.clone_ref(py),
             function_locations: relations_context.function_locations.clone_ref(py),

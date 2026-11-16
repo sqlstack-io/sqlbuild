@@ -1,9 +1,9 @@
 //! Executed-statement effects on the executor's cached relation metadata.
 
-use pyo3::prelude::{Bound, Py, PyAny, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyBool, PyFrozenSet};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_sqltext::ddl_effects::main::qualified_relation_name_key::qualified_relation_name_key as native_qualified_relation_name_key;
 use sqlbuild_sqltext::ddl_effects::main::relation_name_key::relation_name_key as native_relation_name_key;
@@ -20,7 +20,10 @@ static EFFECT_CLASS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 /// Which cached relation names `sql` may have changed, as a `StatementMetadataEffect`.
 #[pyfunction]
 #[pyo3(signature = (sql, /))]
-fn statement_metadata_effect<'py>(py: Python<'py>, sql: &str) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn statement_metadata_effect<'py>(
+    py: Python<'py>,
+    sql: &str,
+) -> PyResult<Bound<'py, PyAny>> {
     let effect: StatementMetadataEffect = py.detach(|| native_statement_metadata_effect(sql));
     let class: &Bound<'py, PyAny> = EFFECT_CLASS
         .get_or_try_init(py, || host_entry(py, EFFECT_MODEL).map(Bound::unbind))?
@@ -51,20 +54,13 @@ fn statement_metadata_effect<'py>(py: Python<'py>, sql: &str) -> PyResult<Bound<
 /// The invalidation key for one unquoted or quoted unqualified relation name.
 #[pyfunction]
 #[pyo3(signature = (name, /))]
-fn relation_name_key(name: &str) -> String {
+pub(crate) fn relation_name_key(name: &str) -> String {
     native_relation_name_key(name)
 }
 
 /// The key for the last part of a qualified name, or `None` when it cannot be parsed.
 #[pyfunction]
 #[pyo3(signature = (qualified, /))]
-fn qualified_relation_name_key(qualified: &str) -> Option<String> {
+pub(crate) fn qualified_relation_name_key(qualified: &str) -> Option<String> {
     native_qualified_relation_name_key(qualified)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(statement_metadata_effect, module)?)?;
-    module.add_function(wrap_pyfunction!(relation_name_key, module)?)?;
-    module.add_function(wrap_pyfunction!(qualified_relation_name_key, module)?)?;
-    Ok(())
 }

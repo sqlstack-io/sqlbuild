@@ -1,18 +1,23 @@
 //! `key`'s string value as its Python object, or `None` when absent or `None`.
 
-use crate::model_config::_helpers::config::typed_config;
+use crate::model_config::_helpers::config::typed_config::node;
+use crate::model_config::_helpers::config::typed_config::type_error;
+use crate::model_config::main::config::config_object::config_object;
 use crate::model_config::types::ConfigValues;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use crate::model_config::types::PyConfigNode;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use sqlbuild_model_config::config_values::main::checked_text::checked_text;
+use std::sync::Arc;
 
 /// `key`'s string value as its Python object, or `None` when absent or `None`.
-#[inline]
 pub fn config_text_object<'py>(
     py: Python<'py>,
     values: &ConfigValues<'_>,
     key: &str,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
-    typed_config::config_text_object(py, values, key)
+    let node: Arc<PyConfigNode> = node(values, key)?;
+    checked_text(key, Some(&node))
+        .map_err(|error| type_error(py, &error))?
+        .map(|value| config_object(py, value))
+        .transpose()
 }

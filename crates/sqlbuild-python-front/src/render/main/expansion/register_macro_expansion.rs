@@ -1,12 +1,10 @@
 //! Register the macro expansion functions and classes.
 
-use crate::render::_helpers::expansion::macro_expansion;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::render::models::NativeMacroExpansion;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 
 /// Register the macro expansion functions and classes.
-#[inline]
 pub fn register_macro_expansion(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    macro_expansion::register(module)
+    module.add_class::<NativeMacroExpansion>()?;
+    Ok(())
 }

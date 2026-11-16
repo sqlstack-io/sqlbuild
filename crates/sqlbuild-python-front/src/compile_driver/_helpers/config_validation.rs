@@ -1,13 +1,10 @@
 //! Validate loaded project and local configuration before discovery reads project files.
 
+use crate::compile_driver::main::session_warehouse_support::session_warehouse_support;
 use crate::compile_driver::models::ProjectConfiguration;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyString, PyTuple};
 use sqlbuild_config::project::main::unsupported_target_warehouse::unsupported_target_warehouse;
-
-use sqlbuild_host::entries::models::AdapterHost;
-
-use sqlbuild_python_base::boundary::main::call_with::call_with;
 
 use crate::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use crate::contracts::main::resolve_target_config::resolve_target_config;
@@ -15,7 +12,6 @@ use crate::discovery::main::project::resolve_config_file_path::resolve_config_fi
 use crate::discovery::main::project::validate_local_sql_analysis::validate_local_sql_analysis;
 use pyo3::IntoPyObjectExt;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -45,7 +41,9 @@ fn target_names(config: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
 }
 
 /// Reject a local SQL analysis opt-out the project forbids.
-fn reject_local_sql_analysis_opt_out(config: &ProjectConfiguration<'_, '_>) -> PyResult<()> {
+pub(crate) fn reject_local_sql_analysis_opt_out(
+    config: &ProjectConfiguration<'_, '_>,
+) -> PyResult<()> {
     let py: Python<'_> = config.project_dir.py();
     let local_settings: Bound<'_, PyAny> = native_field(config.local_config, "settings")?;
     let flags: Bound<'_, PyTuple> = PyTuple::new(
@@ -78,22 +76,6 @@ fn first_configured_group(config: &Bound<'_, PyAny>) -> PyResult<Option<(String,
     Ok(None)
 }
 
-/// Whether the adapter can switch warehouses per session, as the adapter host answers.
-pub(crate) fn session_warehouse_support(
-    py: Python<'_>,
-    adapter_name: &Bound<'_, PyAny>,
-    project_dir: &Bound<'_, PyAny>,
-) -> PyResult<bool> {
-    call_with(
-        &host_entry(py, AdapterHost::AdapterSupportsSessionWarehouse)?,
-        &[
-            ("adapter_name", adapter_name.clone()),
-            ("project_dir", project_dir.clone()),
-        ],
-    )?
-    .is_truthy()
-}
-
 fn reject_group(
     py: Python<'_>,
     (local, adapter_name): (bool, &Bound<'_, PyAny>),
@@ -120,7 +102,9 @@ fn reject_group(
 }
 
 /// Reject command-group warehouses under adapters without a session warehouse.
-fn reject_unsupported_target_warehouses(config: &ProjectConfiguration<'_, '_>) -> PyResult<()> {
+pub(crate) fn reject_unsupported_target_warehouses(
+    config: &ProjectConfiguration<'_, '_>,
+) -> PyResult<()> {
     let py: Python<'_> = config.project_dir.py();
     if let Some(group) = first_configured_group(config.project_config)? {
         let adapter_name: Bound<'_, PyAny> = native_field(config.project_config, "adapter")?;
@@ -153,7 +137,9 @@ fn reject_unsupported_target_warehouses(config: &ProjectConfiguration<'_, '_>) -
 }
 
 /// Resolve every configured target so invalid connections fail discovery.
-fn reject_invalid_target_connections(config: &ProjectConfiguration<'_, '_>) -> PyResult<()> {
+pub(crate) fn reject_invalid_target_connections(
+    config: &ProjectConfiguration<'_, '_>,
+) -> PyResult<()> {
     let py: Python<'_> = config.project_dir.py();
     let mut names: Vec<String> = target_names(config.project_config)?;
     names.extend(target_names(config.local_config)?);
@@ -180,20 +166,4 @@ fn reject_invalid_target_connections(config: &ProjectConfiguration<'_, '_>) -> P
         return Err(raised);
     }
     Ok(())
-}
-
-/// Validate the SQL analysis policy, target warehouses and target connections, in that order.
-pub(crate) fn reject_invalid_project_configuration(
-    config: &ProjectConfiguration<'_, '_>,
-) -> PyResult<()> {
-    reject_local_sql_analysis_opt_out(config)?;
-    reject_invalid_connection_configuration(config)
-}
-
-/// Validate the target warehouses and target connections a warehouse connection depends on.
-pub(crate) fn reject_invalid_connection_configuration(
-    config: &ProjectConfiguration<'_, '_>,
-) -> PyResult<()> {
-    reject_unsupported_target_warehouses(config)?;
-    reject_invalid_target_connections(config)
 }

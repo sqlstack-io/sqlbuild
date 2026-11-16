@@ -1,12 +1,10 @@
 //! `str(Path(...).stem)` of the path attribute `name`.
 
-use crate::discovery::_helpers::project::project_facts;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::path_stem::path_stem;
 
 /// `str(Path(...).stem)` of the path attribute `name`.
-#[inline]
 pub fn stem(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
-    project_facts::stem(owner, name)
+    path_stem(&native_field(owner, name)?)
 }

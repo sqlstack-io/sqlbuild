@@ -1,7 +1,10 @@
 //! Parsed MODEL header columns and audits built into the Python contract objects.
 
+use crate::model_config::main::config::config_object::config_object;
+use crate::model_config::main::headers::native_schema_column::native_schema_column;
+use crate::model_config::main::headers::thresholds::thresholds;
+use crate::model_config::main::model_nodes::contract_classes::contract_classes;
 use crate::model_config::models::ContractClasses;
-use crate::model_config::models::HeaderColumn;
 use crate::model_config::models::NativeColumnSpec;
 use crate::model_config::types::HeaderValue;
 use std::sync::OnceLock;
@@ -12,20 +15,14 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use pyo3::{IntoPyObject, IntoPyObjectExt};
 use sqlbuild_discovery::model_files::models::{NativeAudit, NativeColumn};
 use sqlbuild_discovery::models::LineColumnSpan;
-use sqlbuild_model_config::header_metadata::models::{
-    ParsedAudit, ParsedColumn, ParsedThresholds, ThresholdBound,
-};
+use sqlbuild_model_config::header_metadata::models::{ParsedAudit, ParsedColumn, ThresholdBound};
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
-use crate::model_config::_helpers::config::config_nodes::config_object;
 use crate::model_config::_helpers::config::typed_config::node_text;
-use crate::model_config::_helpers::model_nodes::contract_classes::contract_classes;
-use crate::model_config::models::HeaderAudits;
 use crate::model_config::models::PyNode;
 use crate::model_config::types::PyConfigNode;
 use crate::sqltext::main::authored_value_to_python::authored_value_to_python;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
-use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::all_specs::all_specs;
 use sqlbuild_python_base::records::types::RecordId;
 
@@ -111,22 +108,6 @@ pub(crate) enum ColumnFields {
     Projected,
 }
 
-/// The `SchemaColumn` a native column projects to when its location names `location`'s path.
-pub(crate) fn native_column_record<'py>(
-    py: Python<'py>,
-    column: &NativeColumn,
-    location: Option<(Bound<'py, PyAny>, LineColumnSpan)>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let location: Bound<'py, PyAny> = match location {
-        Some((path, span)) => location_record(py, path, span)?,
-        None => py.None().into_bound(py),
-    };
-    contract_object(
-        &record_class(py, RecordId::SchemaColumn)?,
-        column_values(py, column, location)?,
-    )
-}
-
 /// A native column's record fields, in declaration order.
 pub(crate) fn native_values<'py>(
     py: Python<'py>,
@@ -136,7 +117,7 @@ pub(crate) fn native_values<'py>(
 }
 
 /// A native column's record fields at `location`, in declaration order.
-fn column_values<'py>(
+pub(crate) fn column_values<'py>(
     py: Python<'py>,
     column: &NativeColumn,
     location: Bound<'py, PyAny>,
@@ -187,7 +168,7 @@ pub(crate) fn native_location<'py>(
 }
 
 /// `SourceLocation(path, line, column, end_line, end_column)`.
-fn location_record<'py>(
+pub(crate) fn location_record<'py>(
     py: Python<'py>,
     path: Bound<'py, PyAny>,
     span: LineColumnSpan,
@@ -281,14 +262,6 @@ pub(crate) fn schema_columns<'py>(
     Ok(columns)
 }
 
-pub(crate) fn audit_tuple<'py>(
-    py: Python<'py>,
-    classes: &ContractClasses<'py>,
-    parsed: &[ParsedAudit<PyNode<'py>>],
-) -> PyResult<Bound<'py, PyTuple>> {
-    PyTuple::new(py, audit_instances(py, classes, parsed)?)
-}
-
 /// The parsed audits as `SchemaAuditInstance` objects without a location, in order.
 pub(crate) fn audit_instances<'py, N: HeaderValue>(
     py: Python<'py>,
@@ -301,19 +274,6 @@ pub(crate) fn audit_instances<'py, N: HeaderValue>(
         audits.push(audit_instance(py, classes, audit, &no_location)?);
     }
     Ok(audits)
-}
-
-/// `audit.name or audit.definition_name` of the instance `audit` builds.
-pub(crate) fn parsed_audit_identity<N: HeaderValue>(
-    py: Python<'_>,
-    audit: &ParsedAudit<N>,
-) -> PyResult<String> {
-    if let Some(name) = &audit.name
-        && name.object(py)?.is_truthy()?
-    {
-        return name.exact_text(py);
-    }
-    audit.definition_name.exact_text(py)
 }
 
 /// `class(*values)`: the same record as keywords bind, given in `POSITIONAL_RECORDS` order.
@@ -358,7 +318,7 @@ fn mismatched_record() -> Option<&'static str> {
     None
 }
 
-fn optional<'py, N: HeaderValue>(
+pub(crate) fn optional<'py, N: HeaderValue>(
     py: Python<'py>,
     value: Option<&N>,
 ) -> PyResult<Bound<'py, PyAny>> {
@@ -375,43 +335,6 @@ pub(crate) fn schema_column<'py>(
     locations: &Bound<'py, PyDict>,
 ) -> PyResult<Bound<'py, PyAny>> {
     native_schema_column(py, classes, column, locations)?.project(py)
-}
-
-pub(crate) fn native_schema_column<'py, N: HeaderValue>(
-    py: Python<'py>,
-    classes: &ContractClasses<'py>,
-    column: &ParsedColumn<N>,
-    locations: &Bound<'py, PyDict>,
-) -> PyResult<HeaderColumn> {
-    let location = locations
-        .get_item(column.name.object(py)?)?
-        .unwrap_or_else(|| py.None().into_bound(py));
-    let audits = HeaderAudits::new(py, classes, &column.audits, &location)?;
-    let projected_audits = if classes
-        .schema_column
-        .is(&record_class(py, RecordId::SchemaColumn)?)
-    {
-        PyTuple::empty(py)
-    } else {
-        audits.project(py)?
-    };
-    let mut result = HeaderColumn::new(
-        &classes.schema_column,
-        [
-            column.name.object(py)?,
-            optional(py, column.column_type.as_ref())?,
-            optional(py, column.nullable.as_ref())?,
-            optional(py, column.description.as_ref())?,
-            PyDict::new(py).into_any(),
-            projected_audits.into_any(),
-            location,
-            optional(py, column.migrate_from.as_ref())?,
-        ],
-    )?;
-    if !matches!(result.fields, ColumnFields::Projected) {
-        result.audits = Some(audits);
-    }
-    Ok(result)
 }
 
 pub(crate) fn audit_instance<'py, N: HeaderValue>(
@@ -454,25 +377,7 @@ pub(crate) fn audit_instance<'py, N: HeaderValue>(
     )
 }
 
-/// `MeasurementThresholds` of `parsed`, or `None`.
-pub(crate) fn thresholds<'py>(
-    py: Python<'py>,
-    classes: &ContractClasses<'py>,
-    parsed: Option<&ParsedThresholds>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let Some(parsed) = parsed else {
-        return Ok(py.None().into_bound(py));
-    };
-    contract_object(
-        &classes.measurement_thresholds,
-        [
-            threshold_bound(py, classes, parsed.warn)?,
-            threshold_bound(py, classes, parsed.error)?,
-        ],
-    )
-}
-
-fn threshold_bound<'py>(
+pub(crate) fn threshold_bound<'py>(
     py: Python<'py>,
     classes: &ContractClasses<'py>,
     bound: Option<ThresholdBound>,

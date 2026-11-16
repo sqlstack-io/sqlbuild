@@ -2,8 +2,8 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::relation_naming::fitting;
+use sqlbuild_python_project::relation_naming::main::register_fitting::register_fitting;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    fitting::register(module)
+    register_fitting(module)
 }

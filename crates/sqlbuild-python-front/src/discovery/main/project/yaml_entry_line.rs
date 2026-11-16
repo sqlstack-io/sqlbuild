@@ -1,9 +1,13 @@
 //! The 1-based line of the outermost `- name: <name>` entry, if present.
 
-use crate::discovery::_helpers::project::locations;
+use pyo3::pyfunction;
+use sqlbuild_discovery::yaml_files::main::yaml_entry_lines::yaml_entry_lines;
 
 /// The 1-based line of the outermost `- name: <name>` entry, if present.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, contents, name))]
 pub fn yaml_entry_line(contents: &str, name: &str) -> Option<usize> {
-    locations::yaml_entry_line(contents, name)
+    yaml_entry_lines(contents)
+        .into_iter()
+        .find_map(|(entry, line)| (entry == name).then_some(line))
 }

@@ -1,10 +1,5 @@
 //! Convert project views into pure scenario dependency facts.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
 use crate::bindings::_helpers::planner_scenario::constants::SCENARIO_PLAN_GRAPH_VALIDATION;
 use crate::bindings::_helpers::planner_scenario::values::string;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, pyfunction};
@@ -15,6 +10,12 @@ use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
+use sqlbuild_python_project::compiled_views::main::project::sources::sources;
+use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
+use sqlbuild_python_project::graph::models::KeyCache;
 
 #[pyfunction]
 #[pyo3(signature = (*, scenario, project, sql_analysis_enabled=true, sql_analysis_dialect=None))]
@@ -37,25 +38,25 @@ pub(crate) fn plan_scenario_graph<'py>(
         dbt_refs: native_field(scenario, "dbt_ref_fixture_names")?.extract()?,
         ..ScenarioGraphInput::default()
     };
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         let deps = native_field(&model, "deps")?
             .try_iter()?
             .map(|dep| native_key(&dep?))
             .collect::<PyResult<_>>()?;
-        input
-            .models
-            .insert(model_reads::name_object(&model)?.extract()?, deps);
+        input.models.insert(name_object(&model)?.extract()?, deps);
     }
-    for source in project_reads::sources(project)?.try_iter()? {
-        input
-            .project_sources
-            .insert(source_reads::name(&source?)?.extract()?);
+    for source in sources(project)?.try_iter()? {
+        input.project_sources.insert(
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source?)?
+                .extract()?,
+        );
     }
-    for seed in project_reads::seeds(project)?.try_iter()? {
-        input
-            .project_seeds
-            .insert(seed_reads::name(&seed?)?.extract()?);
+    for seed in seeds(project)?.try_iter()? {
+        input.project_seeds.insert(
+            sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed?)?
+                .extract()?,
+        );
     }
     let output = graph(&input);
     input.targets.sort();

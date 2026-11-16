@@ -8,19 +8,20 @@ use sqlbuild_analysis::planner_warehouse::main::cursor_query_groups::cursor_quer
 use sqlbuild_analysis::planner_warehouse::models::CursorTagRequest;
 use sqlbuild_state::observations::constants::{CURSOR_MAX_KIND, SOURCE_COLUMNS_KIND};
 
-use crate::bindings::_helpers::compiled_views::{model_reads, project_reads};
 use crate::bindings::_helpers::consumption::relation_reads::relation;
 use crate::bindings::_helpers::observations::source_capture::take_source_capture;
-use crate::bindings::_helpers::planner_phases::objects::config_str;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_BOUNDED;
 use crate::bindings::_helpers::planner_warehouse::cursors::{adapter_cursor_sql, bound_task};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::native_host::main::append_observations::append_observations;
-use sqlbuild_python_front::native_host::models::ConsumptionConnection;
-use sqlbuild_python_front::native_host::models::Location;
 use sqlbuild_python_front::native_host::models::ObservationAppend;
+use sqlbuild_python_front::native_host::models::{ConsumptionConnection, Location};
+use sqlbuild_python_project::compiled_views::main::compiled_models::dep_rows::dep_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::planner_phases::main::config_str::config_str;
 
 /// Dependency kind of a source in a model's `dep_rows`.
 const SOURCE_DEPENDENCY: &str = "source";
@@ -43,9 +44,9 @@ fn cursor_reads(
 ) -> PyResult<Vec<CursorRead>> {
     let succeeded: HashSet<&str> = successful_models.iter().map(String::as_str).collect();
     let mut reads: Vec<CursorRead> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
-        let name: String = model_reads::name_object(&model)?.extract()?;
+        let name: String = name_object(&model)?.extract()?;
         if !succeeded.contains(name.as_str())
             || config_str(&model, "materialized")?.as_deref() != Some("incremental")
         {
@@ -54,7 +55,7 @@ fn cursor_reads(
         let Some(cursor_column) = config_str(&model, "cursor")? else {
             continue;
         };
-        let destination: Bound<'_, PyAny> = model_reads::destination(&model)?;
+        let destination: Bound<'_, PyAny> = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
         let qualified: Bound<'_, PyAny> = native_field(&destination, "qualified_name")?;
         if qualified.is_none() || native_field(&destination, "schema")?.is_none() {
             continue;
@@ -90,13 +91,13 @@ fn source_column_rows(
     if described.is_empty() {
         return Ok(BTreeMap::new());
     }
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model: Bound<'_, PyAny> = model?;
-        let destination: Bound<'_, PyAny> = model_reads::destination(&model)?;
+        let destination: Bound<'_, PyAny> = sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?;
         if native_field(&destination, "schema")?.is_none() {
             continue;
         }
-        let sources: Vec<String> = model_reads::dep_rows(&model)?
+        let sources: Vec<String> = dep_rows(&model)?
             .into_iter()
             .filter(|(kind, name)| kind == SOURCE_DEPENDENCY && described.contains_key(name))
             .map(|(_, name)| name)

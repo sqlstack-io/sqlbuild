@@ -1,6 +1,5 @@
 //! Assemble new and resumed old-name view steps from recorded facts.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::column_objects::{model, text};
 use crate::bindings::_helpers::planner_migrations::constants::{PENDING_ARCHIVE, PENDING_VIEW};
 use crate::bindings::_helpers::planner_migrations::models::OldNamePlanner;
@@ -9,7 +8,6 @@ use crate::bindings::_helpers::planner_migrations::old_name_objects::{
 };
 use crate::bindings::_helpers::planner_migrations::old_names::declared_column_aliases;
 use crate::bindings::_helpers::planner_migrations::old_names::old_name_view_skip_reason;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyBool, PyList, PyTuple};
@@ -21,6 +19,9 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::planner_phases::main::object::object;
 
 impl<'py> OldNamePlanner<'py> {
     pub(super) fn new(
@@ -117,7 +118,7 @@ impl<'py> OldNamePlanner<'py> {
         &self,
         item: &Bound<'py, PyAny>,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
-        let Some(history) = self.newest(&relation(&model_reads::destination(item)?)?, None)? else {
+        let Some(history) = self.newest(&relation(&destination(item)?)?, None)? else {
             return Ok(None);
         };
         if !native_field(&native_field(&history, "move")?, "destination_model")?
@@ -327,7 +328,7 @@ impl<'py> OldNamePlanner<'py> {
             py,
             RecordId::OldNameViewPlanEntry,
             &[
-                ("model_name", model_reads::name_object(item)?),
+                ("model_name", name_object(item)?),
                 (
                     "origin",
                     location(&self.runtime, &native_field(history, "old")?)?,

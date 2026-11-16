@@ -6,9 +6,7 @@ use sqlbuild_python_base::positional_record;
 
 use pyo3::FromPyObject;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyRef, PyResult, Python,
-};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyRef, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList};
 use sqlbuild_render::macro_calls::errors::ScanError;
 use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_sites as scan_sites;
@@ -16,11 +14,8 @@ use sqlbuild_render::macro_calls::main::splice_macro_calls::splice_macro_calls a
 use sqlbuild_render::macro_calls::models::{MacroCallScan, MacroCallSite};
 
 use crate::render::_helpers::calls::macro_call_classes::CallClass;
-use crate::render::_helpers::calls::macro_call_memo::MacroCallMemo;
-use crate::render::_helpers::calls::macro_call_memo::poisoned;
-use crate::render::_helpers::expansion::macro_evaluation::CallText;
-use crate::render::_helpers::expansion::macro_evaluation::Evaluation;
-use crate::render::_helpers::expansion::macro_evaluation::evaluate_call;
+use crate::render::_helpers::calls::macro_call_memo::{MacroCallMemo, poisoned};
+use crate::render::_helpers::expansion::macro_evaluation::{CallText, Evaluation, evaluate_call};
 use crate::render::_helpers::expansion::macro_expansion_facts::ResourceRef;
 use crate::render::_helpers::expansion::macro_generated_references::GeneratedReferenceClasses;
 use crate::render::models::SpanTuple;
@@ -252,11 +247,6 @@ pub(crate) fn raised(class: &Bound<'_, PyAny>, message: &str) -> PyErr {
         Ok(instance) => PyErr::from_value(instance),
         Err(error) => error,
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeMacroExpansion>()?;
-    Ok(())
 }
 
 /// Whether a macro's result calls any reference function.

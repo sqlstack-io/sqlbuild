@@ -1,41 +1,32 @@
 //! The static scope index built natively from discovered inputs, as the Python scope models.
 
+use crate::scopes::main::index::open_native_scope_index::open_native_scope_index;
 use crate::scopes::models::NativeScopeIndex;
 use std::collections::HashMap;
 
 use pyo3::exceptions::PyKeyError;
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
-use sqlbuild_scopes::scope_index::main::build_scope_index::build_scope_index;
+use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_scopes::scope_index::main::macro_source_digest::macro_source_digest;
 use sqlbuild_scopes::scope_index::main::normalize_scope_path::normalize_scope_path;
 use sqlbuild_scopes::scope_index::main::rejected_path_message::rejected_path_message;
 use sqlbuild_scopes::scope_index::models::{
     DeclarationIdentity, DeclarationInput, DeclarationKind, RejectedPath, ResourceIdentity,
-    ResourceInput, ResourceKind, ResourceRoot, ScopeDeferral, ScopeIndex, ScopeInputs, ScopeKind,
+    ResourceInput, ResourceKind, ResourceRoot, ScopeIndex, ScopeInputs, ScopeKind,
 };
 
-use crate::discovery::models::ModelFileTexts;
-use crate::discovery::models::NativeModelFile;
+use crate::discovery::models::{ModelFileTexts, NativeModelFile};
 use crate::scopes::_helpers::index::scope_lookup::scope_path_error;
-use crate::scopes::_helpers::index::scope_objects::field;
-use crate::scopes::_helpers::index::scope_objects::optional_item;
-use crate::scopes::_helpers::index::scope_objects::root_object;
-use crate::scopes::_helpers::index::scope_objects::value_of;
-use crate::scopes::_helpers::relationships::relationship_scan::ScenarioRow;
-use crate::scopes::_helpers::relationships::relationship_scan::TestFileRow;
+use crate::scopes::_helpers::index::scope_objects::{field, optional_item, root_object, value_of};
+use crate::scopes::_helpers::relationships::relationship_scan::{ScenarioRow, TestFileRow};
 use crate::scopes::models::ScopeClasses;
-use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::main::fields::path_stem::path_stem;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
-use sqlbuild_python_base::types::CompilerDetach;
 
 /// Why `UnindexableScopeError` is raised; discovery only yields normalized project paths.
 const UNINDEXABLE_SCOPE_MESSAGE: &str = "Native scope indexing could not place a discovered path or resource kind. Discovery always yields normalized project-relative paths, so this is a SQLBuild bug; please file an issue with the project layout";
@@ -75,15 +66,15 @@ struct Placement {
 }
 
 /// The builder's walk of discovered inputs: native inputs and the Python values beside them.
-struct Walk<'py> {
+pub(crate) struct Walk<'py> {
     classes: ScopeClasses<'py>,
-    inputs: ScopeInputs,
+    pub(crate) inputs: ScopeInputs,
     resource_identities: Vec<Bound<'py, PyAny>>,
     /// Each resource's kind and root, which pick its ownership root.
     resource_roots: Vec<(ResourceKind, ResourceRoot)>,
     declarations: Vec<DeclarationValues<'py>>,
     /// Whether every walked kind, scope and root parsed natively.
-    indexable: bool,
+    pub(crate) indexable: bool,
 }
 
 fn text(value: &Bound<'_, PyAny>) -> PyResult<String> {
@@ -308,7 +299,7 @@ impl<'py> Walk<'py> {
         ))
     }
 
-    fn add_models(&mut self, inputs: &Bound<'py, PyAny>) -> PyResult<()> {
+    pub(crate) fn add_models(&mut self, inputs: &Bound<'py, PyAny>) -> PyResult<()> {
         for model_file in items(inputs, "model_files")? {
             let header: Bound<'py, PyAny> = header_name(&model_file)?;
             let (model_name, path, folder): (String, String, String) =
@@ -390,7 +381,7 @@ impl<'py> Walk<'py> {
         )
     }
 
-    fn add_resources(&mut self, inputs: &Bound<'py, PyAny>) -> PyResult<()> {
+    pub(crate) fn add_resources(&mut self, inputs: &Bound<'py, PyAny>) -> PyResult<()> {
         for test_file in items(inputs, "test_files")? {
             let path: Bound<'py, PyAny> = native_field(&test_file, "relative_path")?;
             for block in items(&test_file, "blocks")? {
@@ -458,7 +449,7 @@ impl<'py> Walk<'py> {
         })
     }
 
-    fn add_declaration_files(&mut self, inputs: &Bound<'py, PyAny>) -> PyResult<()> {
+    pub(crate) fn add_declaration_files(&mut self, inputs: &Bound<'py, PyAny>) -> PyResult<()> {
         for enum_file in items(inputs, "enum_files")? {
             for declaration in items(&enum_file, "declarations")? {
                 let identity: Bound<'py, PyAny> = self.declaration_identity(
@@ -512,7 +503,7 @@ impl<'py> Walk<'py> {
         self.add_declaration(values, placement)
     }
 
-    fn add_named_declarations(&mut self, inputs: &Bound<'py, PyAny>) -> PyResult<()> {
+    pub(crate) fn add_named_declarations(&mut self, inputs: &Bound<'py, PyAny>) -> PyResult<()> {
         let audit_kind: String = DeclarationKind::Audit.as_str().to_owned();
         for audit_file in items(inputs, "audit_files")? {
             let stem_name: Bound<'py, PyAny> =
@@ -621,7 +612,7 @@ impl<'py> Walk<'py> {
         Ok((line, metadata))
     }
 
-    fn add_macros(
+    pub(crate) fn add_macros(
         &mut self,
         inputs: &Bound<'py, PyAny>,
         macros: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
@@ -701,7 +692,7 @@ fn resource_root<'py>(
     ))
 }
 
-fn materialise<'py>(walk: Walk<'py>, native: ScopeIndex) -> PyResult<NativeScopeIndex> {
+pub(crate) fn materialise<'py>(walk: Walk<'py>, native: ScopeIndex) -> PyResult<NativeScopeIndex> {
     let classes: &ScopeClasses<'py> = &walk.classes;
     let py: Python<'py> = classes.py();
     let mut resources: Vec<Bound<'py, PyAny>> = Vec::with_capacity(native.resources.len());
@@ -853,46 +844,13 @@ pub(crate) fn scenario_row(scenario: &Bound<'_, PyAny>) -> PyResult<ScenarioRow>
     ))
 }
 
-/// Python's `open_native_scope_index`: the natively built index of discovered inputs.
-#[pyfunction]
-#[pyo3(signature = (*, discovered_inputs, loaded_macros, static_macros = None))]
-pub(crate) fn open_native_scope_index(
-    py: Python<'_>,
-    discovered_inputs: &Bound<'_, PyAny>,
-    loaded_macros: &Bound<'_, PyAny>,
-    static_macros: Option<Bound<'_, PyAny>>,
-) -> PyResult<NativeScopeIndex> {
-    let static_macros: Bound<'_, PyAny> = match static_macros {
-        Some(static_macros) => static_macros,
-        None => PyTuple::empty(py).into_any(),
-    };
-    let static_macros: &Bound<'_, PyAny> = &static_macros;
-    let mut walk: Walk<'_> = Walk::new(py)?;
-    walk.add_models(discovered_inputs)?;
-    walk.add_resources(discovered_inputs)?;
-    walk.add_declaration_files(discovered_inputs)?;
-    walk.add_named_declarations(discovered_inputs)?;
-    walk.add_macros(discovered_inputs, (loaded_macros, static_macros))?;
-    if !walk.indexable {
-        return Err(unindexable(py)?);
-    }
-    let inputs: ScopeInputs = std::mem::take(&mut walk.inputs);
-    let built: Result<ScopeIndex, ScopeDeferral> = py
-        .compiler_detach(|| Ok(build_scope_index(inputs)))
-        .map_err(compiler_error)?;
-    let Ok(native) = built else {
-        return Err(unindexable(py)?);
-    };
-    materialise(walk, native)
-}
-
 /// Python's `build_scope_index`: the natively built, partially valid index of discovered inputs.
 #[pyfunction]
 #[pyo3(
     name = "build_scope_index",
     signature = (*, discovered_inputs, loaded_macros = None, static_macros = None)
 )]
-fn build_scope_index_binding(
+pub(crate) fn build_scope_index_binding(
     py: Python<'_>,
     discovered_inputs: &Bound<'_, PyAny>,
     loaded_macros: Option<Bound<'_, PyAny>>,
@@ -905,11 +863,4 @@ fn build_scope_index_binding(
     let native: NativeScopeIndex =
         open_native_scope_index(py, discovered_inputs, &loaded_macros, static_macros)?;
     Ok(native.index.clone_ref(py))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeScopeIndex>()?;
-    module.add_function(wrap_pyfunction!(open_native_scope_index, module)?)?;
-    module.add_function(wrap_pyfunction!(build_scope_index_binding, module)?)?;
-    Ok(())
 }

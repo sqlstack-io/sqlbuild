@@ -22,12 +22,6 @@ use sqlbuild_pysource::definition_locations::main::decorator_location::decorator
 use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
 use sqlbuild_sqltext::compiler::main::model_header_entry_span::model_header_entry_span;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    DiagnosticSettings, HookDescriptionRow, LoaderRow, PythonResourceRow, ResourceDiagnostics,
-    ScenarioDescriptionRow,
-};
-use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::seed_views::{SeedParts, SeedViews};
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::compile_context::main::delta::capture::capture;
 use sqlbuild_python_base::compile_context::main::delta::capturing::capturing;
@@ -35,6 +29,13 @@ use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 use sqlbuild_python_base::compile_context::models::DeltaInjection;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
+use sqlbuild_python_project::compiled_project::models::{
+    DiagnosticSettings, HookDescriptionRow, PythonResourceRow, ScenarioDescriptionRow,
+};
+use sqlbuild_python_project::compiled_project::types::{LoaderRow, ResourceDiagnostics};
+use sqlbuild_python_project::resource_views::models::SeedParts;
+use sqlbuild_python_project::resource_views::types::SeedViews;
 
 const MISSING_DESCRIPTION_CODE: &str = "P010";
 const DESCRIPTION_LENGTH_CODE: &str = "P027";
@@ -402,7 +403,7 @@ fn docstring_text(description: &Bound<'_, PyString>) -> String {
 /// A source's P010, falling back to its loader's description and naming the loader in help.
 fn source_description<'py>(
     diagnostics: &Diagnostics<'_, 'py>,
-    source: &crate::bindings::_helpers::compiled_views::source_views::SourceRecord,
+    source: &sqlbuild_python_project::resource_views::types::SourceRecord,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     let py: Python<'py> = diagnostics.py;
     let attached = source.attached();
@@ -449,7 +450,7 @@ fn source_description<'py>(
 /// A SQL or Python function's P010, located at its header or `@udf` decorator.
 fn function_description<'py>(
     diagnostics: &Diagnostics<'_, 'py>,
-    function: &crate::bindings::_helpers::compiled_views::function_views::FunctionRecord,
+    function: &sqlbuild_python_project::resource_views::types::FunctionRecord,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     let py: Python<'py> = diagnostics.py;
     let attached = &function.attached;

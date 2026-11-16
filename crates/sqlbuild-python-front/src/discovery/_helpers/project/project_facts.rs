@@ -1,26 +1,26 @@
 //! The facts cross-file validation reads, taken from Python's `DiscoveredProjectInputs`.
 
-use crate::discovery::models::ModelFileTexts;
-use crate::discovery::models::NativeModelFile;
+use crate::discovery::main::project::column_name::column_name;
+use crate::discovery::main::project::seed_csv_settings::seed_csv_settings;
+use crate::discovery::main::project::stem::stem;
 use crate::discovery::models::NodeRow;
+use crate::discovery::models::{ModelFileTexts, NativeModelFile};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTypeMethods};
 use sqlbuild_discovery::project_validation::errors::CsvDialectError;
 use sqlbuild_discovery::project_validation::models::{
     AuditFileFact, CsvSettings, DependencyFact, IntegrationLoaderFact, ModelFact, NamedPath,
-    NodeFact, NodeKind, ProjectFacts, SchemaFileFact, ScopedDeclarationsFact, SeedEntryFact,
-    SeedFileFact, SourceFact, SourceFileFact, TestBlockFact, TestFileFact,
+    NodeFact, NodeKind, SchemaFileFact, ScopedDeclarationsFact, SeedEntryFact, SeedFileFact,
+    SourceFact, SourceFileFact, TestBlockFact, TestFileFact,
 };
-use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::path_stem::path_stem;
 
 const CSV_MODULE: &str = "csv";
 /// `DeclarationKind.AUDIT`: a generic audit file.
 const GENERIC_AUDIT_KIND: &str = "audit";
 /// Each Python node kind and the discovered inputs field that lists it, in discovery order.
-const PYTHON_NODE_FIELDS: [(&str, &str); 4] = [
+pub(crate) const PYTHON_NODE_FIELDS: [(&str, &str); 4] = [
     ("loader", "loader_functions"),
     ("task", "task_functions"),
     ("asset", "asset_functions"),
@@ -31,65 +31,6 @@ const PRIVATE_SCOPE: &str = "private";
 
 /// `(SQL resource name, owning node index, decorated name)` of one dependency.
 pub(crate) type DependencyRow = (Option<String>, Option<usize>, Option<String>);
-
-/// The facts of `inputs`, with the Python nodes the facade has described.
-pub(crate) fn project_facts(
-    py: Python<'_>,
-    inputs: &Bound<'_, PyAny>,
-    nodes: Vec<NodeRow>,
-) -> PyResult<ProjectFacts> {
-    let mut declaration_files: Vec<ScopedDeclarationsFact> =
-        each(inputs, "enum_files", declarations_fact)?;
-    declaration_files.extend(each(inputs, "constant_files", declarations_fact)?);
-    let mut model_schemas: Vec<NamedPath> = Vec::new();
-    for schema in native_field(inputs, "model_schema_files")?.try_iter()? {
-        model_schemas.extend(each(&schema?, "declarations", named)?);
-    }
-    Ok(ProjectFacts {
-        models: each(inputs, "model_files", model_fact)?,
-        sql_functions: each(inputs, "sql_function_files", stem_named)?,
-        python_functions: each(inputs, "python_function_files", stem_named)?,
-        sql_hooks: each(inputs, "sql_hook_files", named)?,
-        seeds: each(inputs, "seed_files", seed_file_fact)?,
-        schemas: each(inputs, "schema_files", |schema| schema_fact(py, schema))?,
-        sources: each(inputs, "source_files", source_file_fact)?,
-        tests: each(inputs, "test_files", test_file_fact)?,
-        scenarios: each(inputs, "scenario_files", named)?,
-        audits: each(inputs, "audit_files", audit_fact)?,
-        declaration_files,
-        model_schemas,
-        materializations: each(inputs, "materialization_files", named)?,
-        nodes: nodes.into_iter().map(node_fact).collect::<PyResult<_>>()?,
-        hook_functions: each(inputs, "hook_functions", named)?,
-        event_exporters: each(inputs, "event_exporters", named)?,
-        providers: each(inputs, "providers", named)?,
-        path_default_keys: native_field(inputs, "project_config")?
-            .getattr("path_defaults")?
-            .try_iter()?
-            .map(|key| key?.extract())
-            .collect::<PyResult<_>>()?,
-        project_model_paths: injection().map(|injection| injection.project_model_paths.clone()),
-        csv_field_limit: Some(csv_field_limit(py)?),
-        orchestration: Vec::new(),
-    })
-}
-
-/// The discovered Python nodes by kind, name and path only, as the resource-name check reads them.
-pub(crate) fn named_node_rows(inputs: &Bound<'_, PyAny>) -> PyResult<Vec<NodeRow>> {
-    let mut rows: Vec<NodeRow> = Vec::new();
-    for (kind, name) in PYTHON_NODE_FIELDS {
-        rows.extend(each(inputs, name, |node| {
-            Ok(NodeRow {
-                kind: kind.to_owned(),
-                name: native_field(node, "name")?.extract()?,
-                path: text(node, "relative_path")?,
-                decorator_config: false,
-                depends_on: Vec::new(),
-            })
-        })?);
-    }
-    Ok(rows)
-}
 
 /// `read` applied to each item of the iterable attribute `name` of `owner`.
 pub(crate) fn each<T>(
@@ -104,21 +45,16 @@ pub(crate) fn each<T>(
     Ok(items)
 }
 
-fn text(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
+pub(crate) fn text(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
     Ok(native_field(owner, name)?.str()?.to_string())
 }
 
-fn optional_text(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {
+pub(crate) fn optional_text(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<Option<String>> {
     native_field(owner, name)?.extract()
 }
 
-/// `str(Path(...).stem)` of the path attribute `name`.
-pub(crate) fn stem(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
-    path_stem(&native_field(owner, name)?)
-}
-
 /// `(resource.name, str(resource.relative_path))`.
-fn named(resource: &Bound<'_, PyAny>) -> PyResult<NamedPath> {
+pub(crate) fn named(resource: &Bound<'_, PyAny>) -> PyResult<NamedPath> {
     Ok(NamedPath {
         name: native_field(resource, "name")?.extract()?,
         path: text(resource, "relative_path")?,
@@ -126,7 +62,7 @@ fn named(resource: &Bound<'_, PyAny>) -> PyResult<NamedPath> {
 }
 
 /// `(file.file_path.stem, str(file.relative_path))`; a native model file answers from its texts.
-fn stem_named(file: &Bound<'_, PyAny>) -> PyResult<NamedPath> {
+pub(crate) fn stem_named(file: &Bound<'_, PyAny>) -> PyResult<NamedPath> {
     if let Ok(model_file) = file.cast::<NativeModelFile>() {
         let texts: ModelFileTexts = model_file.get().path_texts(file.py())?;
         return Ok(NamedPath {
@@ -152,7 +88,7 @@ fn enum_value(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {
     native_field(&native_field(owner, name)?, "value")?.extract()
 }
 
-fn model_fact(model: &Bound<'_, PyAny>) -> PyResult<ModelFact> {
+pub(crate) fn model_fact(model: &Bound<'_, PyAny>) -> PyResult<ModelFact> {
     let mut local_declarations: Vec<NamedPath> = each(model, "enum_declarations", named)?;
     local_declarations.extend(each(model, "constant_declarations", named)?);
     Ok(ModelFact {
@@ -161,27 +97,10 @@ fn model_fact(model: &Bound<'_, PyAny>) -> PyResult<ModelFact> {
     })
 }
 
-fn seed_file_fact(seed: &Bound<'_, PyAny>) -> PyResult<SeedFileFact> {
+pub(crate) fn seed_file_fact(seed: &Bound<'_, PyAny>) -> PyResult<SeedFileFact> {
     Ok(SeedFileFact {
         file: stem_named(seed)?,
         absolute_path: text(seed, "file_path")?,
-    })
-}
-
-pub(crate) fn column_name(column: &Bound<'_, PyAny>) -> PyResult<String> {
-    native_field(column, "name")?.extract()
-}
-
-/// The CSV reader settings a seed declaration authors, without the dialect check.
-pub(crate) fn seed_csv_settings(entry: &Bound<'_, PyAny>) -> PyResult<CsvSettings> {
-    let settings: Bound<'_, PyAny> = native_field(entry, "csv_settings")?;
-    Ok(CsvSettings {
-        delimiter: optional_text(&settings, "delimiter")?,
-        quotechar: optional_text(&settings, "quotechar")?,
-        escapechar: optional_text(&settings, "escapechar")?,
-        doublequote: native_field(&settings, "doublequote")?.extract()?,
-        skipinitialspace: native_field(&settings, "skipinitialspace")?.extract()?,
-        dialect_error: None,
     })
 }
 
@@ -195,7 +114,7 @@ fn seed_entry_fact(py: Python<'_>, entry: &Bound<'_, PyAny>) -> PyResult<SeedEnt
     })
 }
 
-fn schema_fact(py: Python<'_>, schema: &Bound<'_, PyAny>) -> PyResult<SchemaFileFact> {
+pub(crate) fn schema_fact(py: Python<'_>, schema: &Bound<'_, PyAny>) -> PyResult<SchemaFileFact> {
     Ok(SchemaFileFact {
         path: text(schema, "relative_path")?,
         model_names: each(schema, "model_entries", column_name)?,
@@ -220,7 +139,7 @@ fn source_fact(entry: &Bound<'_, PyAny>) -> PyResult<SourceFact> {
     })
 }
 
-fn source_file_fact(file: &Bound<'_, PyAny>) -> PyResult<SourceFileFact> {
+pub(crate) fn source_file_fact(file: &Bound<'_, PyAny>) -> PyResult<SourceFileFact> {
     Ok(SourceFileFact {
         path: text(file, "relative_path")?,
         entries: each(file, "source_entries", source_fact)?,
@@ -234,7 +153,7 @@ fn test_block_fact(block: &Bound<'_, PyAny>) -> PyResult<TestBlockFact> {
     })
 }
 
-fn test_file_fact(file: &Bound<'_, PyAny>) -> PyResult<TestFileFact> {
+pub(crate) fn test_file_fact(file: &Bound<'_, PyAny>) -> PyResult<TestFileFact> {
     Ok(TestFileFact {
         file: relative_stem_named(file)?,
         blocks: each(file, "blocks", test_block_fact)?,
@@ -245,7 +164,7 @@ fn block_name(block: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     optional_text(block, "name")
 }
 
-fn audit_fact(file: &Bound<'_, PyAny>) -> PyResult<AuditFileFact> {
+pub(crate) fn audit_fact(file: &Bound<'_, PyAny>) -> PyResult<AuditFileFact> {
     Ok(AuditFileFact {
         file: relative_stem_named(file)?,
         generic: enum_value(file, "declaration_kind")? == GENERIC_AUDIT_KIND,
@@ -253,7 +172,7 @@ fn audit_fact(file: &Bound<'_, PyAny>) -> PyResult<AuditFileFact> {
     })
 }
 
-fn declarations_fact(file: &Bound<'_, PyAny>) -> PyResult<ScopedDeclarationsFact> {
+pub(crate) fn declarations_fact(file: &Bound<'_, PyAny>) -> PyResult<ScopedDeclarationsFact> {
     Ok(ScopedDeclarationsFact {
         private: enum_value(file, "scope_kind")? == PRIVATE_SCOPE,
         declarations: each(file, "declarations", named)?,
@@ -282,7 +201,7 @@ fn dependency_fact((sql_name, owner, decorated_name): DependencyRow) -> Dependen
     }
 }
 
-fn node_fact(node: NodeRow) -> PyResult<NodeFact> {
+pub(crate) fn node_fact(node: NodeRow) -> PyResult<NodeFact> {
     Ok(NodeFact {
         kind: node_kind(&node.kind)?,
         name: node.name,
@@ -321,7 +240,7 @@ fn csv_dialect_error(py: Python<'_>, csv: &CsvSettings) -> PyResult<Option<CsvDi
     }
 }
 
-fn csv_field_limit(py: Python<'_>) -> PyResult<usize> {
+pub(crate) fn csv_field_limit(py: Python<'_>) -> PyResult<usize> {
     py.import(CSV_MODULE)?
         .call_method0("field_size_limit")?
         .extract()

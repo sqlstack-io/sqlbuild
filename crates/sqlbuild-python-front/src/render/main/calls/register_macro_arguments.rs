@@ -1,12 +1,11 @@
 //! Register the macro arguments functions and classes.
 
-use crate::render::_helpers::calls::macro_arguments;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyModule;
-use pyo3::prelude::PyResult;
+use crate::render::_helpers::calls::macro_arguments::parse_macro_arguments;
+use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
+use pyo3::wrap_pyfunction;
 
 /// Register the macro arguments functions and classes.
-#[inline]
 pub fn register_macro_arguments(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    macro_arguments::register(module)
+    module.add_function(wrap_pyfunction!(parse_macro_arguments, module)?)?;
+    Ok(())
 }

@@ -1,6 +1,6 @@
 //! Public traits and type aliases of model config.
 
-use crate::model_config::_helpers::config::config_nodes::config_node;
+use crate::model_config::main::config::config_node::config_node;
 use crate::model_config::models::HostHandle;
 use crate::model_config::models::TypedConfigValues;
 use pyo3::prelude::Bound;

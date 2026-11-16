@@ -1,11 +1,15 @@
 //! Literal.
 
-use crate::native_host::_helpers::consumption_state;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use crate::native_host::_helpers::consumption_state::state_literal;
+use crate::native_host::_helpers::consumption_state::text;
+use pyo3::prelude::{PyResult, Python};
+use sqlbuild_state::freshness::constants::STRING_STATE_VALUE_TYPE;
 
 /// Literal.
-#[inline]
 pub fn literal(py: Python<'_>, value: Option<&str>) -> PyResult<String> {
-    consumption_state::literal(py, value)
+    state_literal(
+        py,
+        value.map(|value| text(py, value)),
+        STRING_STATE_VALUE_TYPE,
+    )
 }

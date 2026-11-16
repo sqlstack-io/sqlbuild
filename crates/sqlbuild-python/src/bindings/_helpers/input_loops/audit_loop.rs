@@ -22,10 +22,6 @@ use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::header_metadata::main::parse_measurement_policy::parse_measurement_policy;
 use sqlbuild_sqltext::sql_references::models::SqlReference;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    AuditBlockRow, AuditFileRow, AuditSettings,
-};
-use crate::bindings::_helpers::compiled_views::audit_views::{AttachedAudit, AuditHandles};
 use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, NativeModelLoop, compile_error, helped_compile_error,
 };
@@ -42,11 +38,15 @@ use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::model_config::main::headers::thresholds::thresholds;
-use sqlbuild_python_front::model_config::models::AuditInstance;
-use sqlbuild_python_front::model_config::models::HeaderAudits;
 use sqlbuild_python_front::model_config::models::HeaderColumns;
 use sqlbuild_python_front::model_config::models::NativeModelValidator;
 use sqlbuild_python_front::model_config::models::PyNode;
+use sqlbuild_python_front::model_config::models::{AuditInstance, HeaderAudits};
+use sqlbuild_python_project::compiled_project::models::{
+    AuditBlockRow, AuditFileRow, AuditSettings,
+};
+use sqlbuild_python_project::resource_views::models::AuditHandles;
+use sqlbuild_python_project::resource_views::types::AttachedAudit;
 
 const THRESHOLDS_KEY: &str = "thresholds";
 const MINIMUM_SAMPLES_KEY: &str = "minimum_samples";

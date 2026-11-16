@@ -1,11 +1,9 @@
 //! Native discovery results as the plain data the Python discovery facade materialises.
 
 use pyo3::exceptions::PyException;
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::PyTuple;
-use pyo3::{IntoPyObjectExt, pyfunction, pymethods, wrap_pyfunction};
+use pyo3::{IntoPyObjectExt, pyfunction, pymethods};
 use sqlbuild_discovery::model_files::main::parse_model_text::parse_model_text;
 use sqlbuild_discovery::model_files::models::{DiscoveredModelFile, ModelFileOptions};
 use sqlbuild_discovery::tree::models::ProjectTree;
@@ -14,12 +12,10 @@ use std::path::Path;
 use crate::discovery::_helpers::failures::raised::failure_error;
 use crate::discovery::_helpers::headers::header_declarations::model_header_declarations;
 use crate::discovery::_helpers::records::declaration_records::source_locations;
-use crate::discovery::_helpers::records::model_file_record::DiscoveredPaths;
-use crate::discovery::_helpers::records::model_file_record::ModelFileParts;
-use crate::discovery::_helpers::records::model_file_record::PendingModelFile;
-use crate::discovery::_helpers::snapshots::native_classes::ModelTextRequest;
-use crate::discovery::_helpers::snapshots::native_classes::NativeProjectTree;
-use crate::discovery::models::NativeModelFile;
+use crate::discovery::_helpers::records::model_file_record::{
+    DiscoveredPaths, ModelFileParts, PendingModelFile,
+};
+use crate::discovery::_helpers::snapshots::native_classes::{ModelTextRequest, NativeProjectTree};
 use crate::sqltext::main::map_to_python::map_to_python;
 use crate::sqltext::main::optional_authored_value_to_python::optional_authored_value_to_python;
 use sqlbuild_python_base::types::CompilerDetach;
@@ -96,7 +92,7 @@ pub(crate) fn model_record(
 
 /// Parse model contents as discovery does: `(header_values, query_sql, column locations)`.
 #[pyfunction]
-fn parse_model_contents(
+pub(crate) fn parse_model_contents(
     py: Python<'_>,
     request: ModelTextRequest,
     contents: String,
@@ -123,12 +119,4 @@ fn parse_model_contents(
             .into_any()
             .unbind(),
     ))
-}
-
-/// Whether native discovery reproduces the string semantics of this Python and Unicode version.
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeProjectTree>()?;
-    module.add_class::<NativeModelFile>()?;
-    module.add_function(wrap_pyfunction!(parse_model_contents, module)?)?;
-    Ok(())
 }

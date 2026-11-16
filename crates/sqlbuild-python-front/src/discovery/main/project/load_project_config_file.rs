@@ -1,17 +1,21 @@
 //! `load_project_config`: the validated `ProjectConfig` of `project_dir`.
 
-use crate::discovery::_helpers::project::project_config;
-use pyo3::prelude::Bound;
-use pyo3::prelude::Py;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
+use crate::discovery::_helpers::project::project_config::built;
+use crate::discovery::_helpers::project::project_config::files;
+use crate::discovery::_helpers::project::project_config::load_error;
+use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
+use pyo3::pyfunction;
+use sqlbuild_config::project::main::load_project_config::load_project_config;
 
 /// `load_project_config`: the validated `ProjectConfig` of `project_dir`.
-#[inline]
+#[pyfunction]
 pub fn load_project_config_file(
     py: Python<'_>,
     project_dir: &Bound<'_, PyAny>,
 ) -> PyResult<Py<PyAny>> {
-    project_config::load_project_config_file(py, project_dir)
+    let files = files(project_dir)?;
+    match load_project_config(&files.native) {
+        Ok(config) => built(py, config),
+        Err(failure) => Err(load_error(py, &failure, &files)?),
+    }
 }

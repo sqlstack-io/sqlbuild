@@ -22,9 +22,6 @@ use crate::bindings::_helpers::build_command::policies::enforce_model_execution_
 use crate::bindings::_helpers::clone::clone_pipeline::run_clone_pipeline_with_options;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::planner_scope::retained::{ScopeData, scope_data};
-use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
-use crate::bindings::_helpers::planner_selection::unit_tests::split_unit_test_selectors;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -34,6 +31,10 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_project::planner_scope::main::build_planner_scope::build_planner_scope;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::planner_scope::models::ScopeData;
+use sqlbuild_python_project::planner_selection::main::split_unit_test_selectors::split_unit_test_selectors;
 
 const VIEW_MATERIALIZATION: &str = "view";
 const RECREATED_TYPES: [&str; 2] = ["udf", "table_fn"];

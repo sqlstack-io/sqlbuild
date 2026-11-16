@@ -1,13 +1,8 @@
 //! Selected-scope validation that external source tables exist in the warehouse.
 
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::planner_phases::objects::{planner_error, tuple};
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::{
     MISSING_SOURCE_TABLE_CODE, RUN_BOUNDED, WILDCARD_TABLE_CHARACTER,
 };
-use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
@@ -27,6 +22,12 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::discovery::main::project::yaml_entry_line::yaml_entry_line;
+use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
+use sqlbuild_python_project::planner_phases::main::tuple::tuple;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
+use sqlbuild_python_project::resource_views::main::source_reads::source_file::source_file;
 use std::collections::HashMap;
 
 fn selected_source_readers(scope: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Vec<String>>> {
@@ -80,13 +81,14 @@ fn read_relation<'py>(
 }
 
 fn declaration_location(source: &Bound<'_, PyAny>) -> PyResult<String> {
-    let file = source_reads::source_file(source)?;
+    let file = source_file(source)?;
     let path: String = native_field(&file, "relative_path")?
         .call_method0("as_posix")?
         .extract()?;
     let line = yaml_entry_line(
         &native_field(&file, "contents")?.extract::<String>()?,
-        &source_reads::name(source)?.extract::<String>()?,
+        &sqlbuild_python_project::resource_views::main::source_reads::name::name(source)?
+            .extract::<String>()?,
     );
     Ok(match line {
         None => path,
@@ -106,13 +108,17 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     let read_map = native_field(relations, "source_read_map")?;
     let listed = native_field(relations, "listed_source_names")?;
     let mut unlisted: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>, Vec<String>)> = Vec::new();
-    for source in project_reads::sources(project)?.try_iter()? {
+    for source in sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
+        .try_iter()?
+    {
         let source = source?;
-        let name: String = source_reads::name(&source)?.extract()?;
+        let name: String =
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?
+                .extract()?;
         let Some(source_readers) = readers.get(&name).filter(|readers| !readers.is_empty()) else {
             continue;
         };
-        let declared = source_reads::source_entry(&source)?;
+        let declared = source_entry(&source)?;
         let entry = mapping_get_or(&read_map, &name, &declared)?;
         if !external_table(&declared)? || !external_table(&entry)? {
             continue;
@@ -162,7 +168,10 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
         }
         let role = native_field(&probe, "role")?;
         missing.push(MissingSourceTable {
-            source_name: source_reads::name(&source)?.extract()?,
+            source_name: sqlbuild_python_project::resource_views::main::source_reads::name::name(
+                &source,
+            )?
+            .extract()?,
             relation: String::new(),
             read_by,
             unreadable: status.eq("missing_or_unreadable")?,
@@ -183,9 +192,14 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
     }
     let message = missing_source_tables_message(&missing);
     let sources = PyDict::new(py);
-    for source in project_reads::sources(project)?.try_iter()? {
+    for source in sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
+        .try_iter()?
+    {
         let source = source?;
-        sources.set_item(source_reads::name(&source)?, source)?;
+        sources.set_item(
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?,
+            source,
+        )?;
     }
     for item in missing.iter_mut().take(10) {
         if let Some(source) = sources.get_item(&item.source_name)? {

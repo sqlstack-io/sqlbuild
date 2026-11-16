@@ -1,12 +1,16 @@
 //! One enum member value as a SQL scalar literal.
 
-use crate::render::_helpers::declarations::declaration_values;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::pyfunction;
+use pyo3::types::PyInt;
 
 /// One enum member value as a SQL scalar literal.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, value))]
 pub fn render_enum_member_value(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    declaration_values::render_enum_member_value(value)
+    if value.is_instance_of::<PyInt>() {
+        return value.str()?.extract();
+    }
+    let text: String = value.extract()?;
+    Ok(format!("'{}'", text.replace('\'', "''")))
 }

@@ -1,12 +1,14 @@
 //! The native model config build handed Python inputs once, and its results projected for Python.
 
+use crate::model_config::main::config::carried_node::carried_node;
+use crate::model_config::main::config::config_node::config_node;
+use crate::model_config::main::config::config_object::config_object;
 use crate::model_config::models::BuiltConfig;
-use crate::model_config::models::NativeModelConfigBuilder;
 use std::collections::HashMap;
 
 use pyo3::PyErr;
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods};
 use sqlbuild_discovery::model_files::main::config_value::config_value;
 use sqlbuild_discovery::model_files::models::{EntryFacts, HeaderFacts};
@@ -20,16 +22,10 @@ use sqlbuild_model_config::model_config_build::types::ConfigBuildHost;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
 use crate::authored_values::main::project_var_text::project_var_text;
-use crate::model_config::_helpers::config::config_errors::config_exception;
-use crate::model_config::_helpers::config::config_errors::native_config_error;
-use crate::model_config::_helpers::config::config_nodes::PyConfigEntries;
-use crate::model_config::_helpers::config::config_nodes::carried_node;
-use crate::model_config::_helpers::config::config_nodes::config_node;
-use crate::model_config::_helpers::config::config_nodes::config_object;
-use crate::model_config::_helpers::config::config_nodes::hook_entry;
-use crate::model_config::_helpers::config::config_nodes::is_exact_container;
+use crate::model_config::_helpers::config::config_nodes::{
+    PyConfigEntries, hook_entry, is_exact_container,
+};
 use crate::model_config::_helpers::config::typed_config::built_values;
-use crate::model_config::errors::NativeConfigError;
 use crate::model_config::models::HostHandle;
 use crate::model_config::types::PyConfigNode;
 
@@ -255,21 +251,4 @@ fn projected<'py>(
     value: Option<PyConfigNode>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     value.map(|value| config_object(py, &value)).transpose()
-}
-
-/// The Python exception a native config error raises as.
-pub(crate) fn raised_config_error(py: Python<'_>, error: ConfigError) -> PyErr {
-    let raised = || -> PyResult<PyErr> {
-        let error: Py<NativeConfigError> = native_config_error(py, error)?;
-        Ok(PyErr::from_value(config_exception(
-            error.bind(py).as_any(),
-            None,
-        )?))
-    };
-    raised().unwrap_or_else(|error| error)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<NativeModelConfigBuilder>()?;
-    Ok(())
 }

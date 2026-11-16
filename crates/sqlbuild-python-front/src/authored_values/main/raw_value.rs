@@ -2,9 +2,7 @@
 
 use crate::authored_values::_helpers::sql_values;
 use crate::authored_values::models::SqlValueClasses;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_model_config::sql_values::models::RawSqlValue;
 
 /// An authored Python value read by exact type, as `normalize_sql_value` dispatches.

@@ -3,9 +3,6 @@
 use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::planner_changes::results::native_enum;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
@@ -14,6 +11,9 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_front::contracts::main::matching_dynamic_families::matching_dynamic_families;
 use sqlbuild_python_front::model_config::main::config::config_text::config_text;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::language::language;
 
 use sqlbuild_analysis::planner_changes::constants::{
     CASE_FOLDING_DIALECT, EMPTY_FINGERPRINT_METADATA_JSON,
@@ -31,20 +31,14 @@ use sqlbuild_analysis::planner_changes::models::{
     SchemaFindingRow,
 };
 
-use crate::bindings::_helpers::compiled_views::model_reads::{inferred_rows, star_flags};
 use crate::bindings::_helpers::planner_changes::renames::origin_names;
 use crate::bindings::_helpers::planner_changes::results::{
     backfill_result, change_kind, planner_enum, replay_policy_error, schema_findings,
-};
-use crate::bindings::_helpers::planner_identity::hashing::{
-    baselined_function_definition_hash, baselined_model_query_hash,
 };
 use crate::bindings::_helpers::planner_identity::metadata::{
     compiled_function_fingerprint_sql, function_local_hashes, model_declared_columns_hash,
     model_version_identity_metadata_json,
 };
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::semantic_shapes::shapes::snapshot_validity_columns;
 use sqlbuild_project::types::InferredRow;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -55,6 +49,13 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::type_system::main::types_equal::types_equal as native_types_equal;
+use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::compiled_models::star_flags::star_flags;
+use sqlbuild_python_project::planner_identity::main::baselined_function_definition_hash::baselined_function_definition_hash;
+use sqlbuild_python_project::planner_identity::main::baselined_model_query_hash::baselined_model_query_hash;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::resource_views::main::function_reads::key::key;
+use sqlbuild_python_project::semantic_shapes::main::snapshot_validity_columns::snapshot_validity_columns;
 
 const CHANGES_LOGGER: &str = "sqlbuild.planner.changes";
 const REPLAY_CONFIG_KEY: &str = "replay_on_change";
@@ -114,20 +115,21 @@ pub(crate) fn detect_changes<'py>(
     let query_change_tracking: bool =
         native_field(&native_field(project, "settings")?, "query_change_tracking")?.is_truthy()?;
     let dialect: Option<String> = native_field(snapshot, "column_dialect")?.extract()?;
-    for function in project_reads::functions(project)?.try_iter()? {
+    for function in
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?
+            .try_iter()?
+    {
         let function: Bound<'py, PyAny> = function?;
-        let name: Bound<'py, PyAny> = function_reads::name(&function)?;
+        let name: Bound<'py, PyAny> =
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?;
         let fingerprint_sql: String = compiled_function_fingerprint_sql(&function)?;
         let mut arguments: Vec<(&str, Bound<'py, PyAny>)> = vec![(
             "fingerprint_sql",
             PyString::new(py, &fingerprint_sql).into_any(),
         )];
-        if selected
-            .selected
-            .contains(&crate::bindings::_helpers::graph::keys::native_key(
-                &function_reads::key(&function)?,
-            )?)
-        {
+        if selected.selected.contains(
+            &sqlbuild_python_project::graph::main::nodes::native_key::native_key(&key(&function)?)?,
+        ) {
             let reason: &str = if full_refresh {
                 "full_refresh"
             } else {
@@ -140,9 +142,7 @@ pub(crate) fn detect_changes<'py>(
                         &name.extract::<String>()?,
                         (
                             &fingerprint_sql,
-                            &function_reads::language(&function)?
-                                .str()?
-                                .extract::<String>()?,
+                            &language(&function)?.str()?.extract::<String>()?,
                             dialect.as_deref(),
                         ),
                         &fingerprint,
@@ -227,7 +227,7 @@ pub(crate) fn scope_model_changes<'py>(
         }
     };
     let function_local_hashes: Bound<'py, PyAny> = function_local_hashes(
-        &project_reads::functions(project)?,
+        &sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?,
         native_field(project, "sql_analysis_dialect")?
             .extract::<Option<String>>()?
             .as_deref(),
@@ -260,7 +260,7 @@ pub(crate) fn scope_model_changes<'py>(
         let Some(model) = scope.model(py, &key.1) else {
             continue;
         };
-        let name: Bound<'py, PyAny> = model_reads::name_object(&model)?;
+        let name: Bound<'py, PyAny> = name_object(&model)?;
         let expected: (Option<String>, Option<String>) = (
             lookup(&version_hashes, &name)?,
             lookup(&metadata_jsons, &name)?,
@@ -284,7 +284,7 @@ pub(crate) fn model_change<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = model.py();
     let snapshot: &Bound<'py, PyAny> = &pass.snapshot;
-    let model_name: Bound<'py, PyAny> = model_reads::name_object(model)?;
+    let model_name: Bound<'py, PyAny> = name_object(model)?;
     let columns_hash: String = model_declared_columns_hash(model)?;
     let base_metadata: String = match expected_metadata_json.filter(|text| !text.is_empty()) {
         Some(text) => text,
@@ -322,7 +322,7 @@ pub(crate) fn model_change<'py>(
             py,
             &model_name.extract::<String>()?,
             (
-                &model_reads::query_sql(model)?.extract::<String>()?,
+                &query_sql(model)?.extract::<String>()?,
                 dialect.extract::<Option<String>>()?.as_deref(),
             ),
             &fingerprint,
@@ -368,7 +368,7 @@ pub(crate) fn model_change<'py>(
     let renames: Bound<'py, PyAny> = native_field(snapshot, "reference_renames")?;
     let origins: Option<Vec<(String, String)>> = match (&compiled_query_hash, &recorded) {
         (Some(_), Some(recorded)) if definition_changed && renames.is_truthy()? => origin_names(
-            (model_reads::query_sql(model)?.extract()?, &fingerprint),
+            (query_sql(model)?.extract()?, &fingerprint),
             &renames,
             (&recorded.definition_hash, &dialect),
         )?,
@@ -477,7 +477,7 @@ fn log_query_check(
         &log_sql,
         &[
             ("logger", logger.clone()),
-            ("sql", model_reads::query_sql(model)?),
+            ("sql", query_sql(model)?),
             ("action", text("compiled_query")),
         ],
     )?;
@@ -508,7 +508,10 @@ fn model_schema_findings<'py>(
     for column in &validity {
         warehouse.retain(|(name, _)| !column.eq_ignore_ascii_case(name));
     }
-    let schema_entry: Bound<'py, PyAny> = model_reads::schema_entry(model)?;
+    let schema_entry: Bound<'py, PyAny> =
+        sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry(
+            model,
+        )?;
     let mut yml: Vec<(String, String)> = Vec::new();
     let mut type_enforcement: bool = false;
     let mut dynamic: Option<Bound<'py, PyAny>> = None;

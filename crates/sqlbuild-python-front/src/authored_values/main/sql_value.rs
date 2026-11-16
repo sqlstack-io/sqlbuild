@@ -1,17 +1,18 @@
 //! A Python `SqlValue` for a native one.
 
-use crate::authored_values::_helpers::sql_values;
+use crate::authored_values::_helpers::sql_values::logical_type;
+use crate::authored_values::_helpers::sql_values::payload;
 use crate::authored_values::models::SqlValueClasses;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_core::models::SqlValue;
 
 /// A Python `SqlValue` for a native one.
-#[inline]
 pub fn sql_value<'py>(
     value: &SqlValue,
     classes: &SqlValueClasses<'py>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    sql_values::sql_value(value, classes)
+    classes.sql_value.call1((
+        logical_type(&value.logical_type(), classes)?,
+        payload(value, classes)?,
+    ))
 }

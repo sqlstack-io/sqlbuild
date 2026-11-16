@@ -1,7 +1,7 @@
 //! Read-only warehouse evidence gathered once for all model migrations in one plan.
 
-use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
@@ -25,9 +25,7 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
-use sqlbuild_python_front::state_rows::constants::COLUMN_KIND;
-use sqlbuild_python_front::state_rows::constants::MODEL_KIND;
-use sqlbuild_python_front::state_rows::constants::OLD_NAME_KIND;
+use sqlbuild_python_front::state_rows::constants::{COLUMN_KIND, MODEL_KIND, OLD_NAME_KIND};
 use sqlbuild_python_front::state_rows::main::migrations::layout::layout;
 use sqlbuild_python_front::state_rows::main::migrations::old_name_views::old_name_views;
 use sqlbuild_python_front::state_rows::main::migrations::read_events::read_events;

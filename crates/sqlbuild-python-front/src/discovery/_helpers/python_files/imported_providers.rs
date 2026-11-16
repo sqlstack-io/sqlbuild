@@ -1,5 +1,7 @@
 //! Provider classes and lifecycle-event sinks from imported providers/ and sinks/ modules.
 
+use crate::discovery::main::python_files::provider_by_name::provider_by_name;
+use crate::discovery::main::python_files::provider_usages::provider_usages;
 use std::collections::HashSet;
 
 use pyo3::exceptions::PyRuntimeError;
@@ -9,15 +11,9 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyType};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::discovery::_helpers::python_files::imported_modules::ProjectDir;
-use crate::discovery::_helpers::python_files::imported_modules::discovered;
-use crate::discovery::_helpers::python_files::imported_modules::discovery_error;
-use crate::discovery::_helpers::python_files::imported_modules::discovery_error_from;
-use crate::discovery::_helpers::python_files::imported_modules::module_functions;
-use crate::discovery::_helpers::python_files::imported_modules::provider_by_name;
-use crate::discovery::_helpers::python_files::imported_modules::provider_usages;
-use crate::discovery::_helpers::python_files::imported_modules::shim;
-use crate::discovery::_helpers::python_files::imported_modules::tuple_of;
+use crate::discovery::_helpers::python_files::imported_modules::{
+    ProjectDir, discovered, discovery_error, discovery_error_from, module_functions, shim, tuple_of,
+};
 use crate::discovery::constants::ALLOW_MISSING_SECRETS_FLAG;
 use crate::discovery::models::SecretPolicy;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -45,7 +41,7 @@ const DEFAULT_ERROR_TYPE: &str = "validation_error";
 const DEFAULT_SETTINGS_ERROR: &str = "invalid provider settings";
 const RECALL_WRITER_UNINSTALLED: &str = "the native module registered no RecallWriter class";
 
-static RECALL_WRITER: PyOnceLock<Py<PyType>> = PyOnceLock::new();
+pub(crate) static RECALL_WRITER: PyOnceLock<Py<PyType>> = PyOnceLock::new();
 
 fn reject_invalid_identity(
     name: &Bound<'_, PyAny>,
@@ -362,11 +358,6 @@ pub(crate) fn discover_event_exporter_declarations<'py>(
     tuple_of(py, declarations)
 }
 
-/// Install the `RecallWriter` class sink parameters are recognised by, once, at registration.
-pub(crate) fn install_recall_writer(writer: &Bound<'_, PyType>) {
-    let _ = RECALL_WRITER.get_or_init(writer.py(), || writer.clone().unbind());
-}
-
 /// Each parameter of `function` with its annotation, and whether that annotation is `RecallWriter`.
 fn annotated_parameters<'py>(
     function: &Bound<'py, PyAny>,
@@ -388,7 +379,7 @@ fn annotated_parameters<'py>(
 }
 
 /// Whether `declaration`'s function takes a `RecallWriter`, making it a Recall replacement sink.
-fn takes_recall_writer(declaration: &Bound<'_, PyAny>) -> PyResult<bool> {
+pub(crate) fn takes_recall_writer(declaration: &Bound<'_, PyAny>) -> PyResult<bool> {
     Ok(
         annotated_parameters(&native_field(declaration, "function")?)?
             .iter()
@@ -468,32 +459,4 @@ pub(crate) fn bind_event_exporter_declarations<'py>(
         bound.push(discovered(py, RecordId::DiscoveredEventExporter, &pairs)?);
     }
     tuple_of(py, bound)
-}
-
-/// Validated lifecycle-event sink declarations under sinks/, bound to providers; Recall replacement sinks are left out.
-#[pyfunction]
-#[pyo3(signature = (*, project_dir, providers = None))]
-pub(crate) fn discover_event_exporter_functions<'py>(
-    project_dir: Bound<'py, PyAny>,
-    providers: Option<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = project_dir.py();
-    let project = ProjectDir {
-        path: project_dir.clone(),
-    };
-    if let Some(cached) = project.cached_extensions()? {
-        return cached.get_item(1);
-    }
-    let mut ordinary: Vec<Bound<'py, PyAny>> = Vec::new();
-    for declaration in discover_event_exporter_declarations(project_dir.clone())?.try_iter()? {
-        let declaration: Bound<'py, PyAny> = declaration?;
-        if !takes_recall_writer(&declaration)? {
-            ordinary.push(declaration);
-        }
-    }
-    bind_event_exporter_declarations(
-        tuple_of(py, ordinary)?,
-        providers.map_or_else(|| tuple_of(py, Vec::new()), Ok)?,
-        project_dir,
-    )
 }

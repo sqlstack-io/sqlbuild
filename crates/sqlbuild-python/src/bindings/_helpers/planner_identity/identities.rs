@@ -15,14 +15,9 @@ use sqlbuild_analysis::planner_identity::models::{GraphKey, IdentityGraph, Ident
 use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::planner_identity::hashing::{baselined_model_query_hash, graph_key};
 use crate::bindings::_helpers::planner_identity::metadata::{
     function_local_hashes, model_version_identity_metadata_json, seed_identity,
 };
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
@@ -31,6 +26,12 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::query_sql::query_sql;
+use sqlbuild_python_project::planner_identity::main::baselined_model_query_hash::baselined_model_query_hash;
+use sqlbuild_python_project::planner_identity::main::graph_key::graph_key;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 fn key_of(kind: &str, name: &str) -> GraphKey {
     GraphKey {
@@ -121,14 +122,24 @@ pub(crate) fn direct_model_version_identities<'py>(
     let mut graph = IdentityGraph::default();
     for function in functions.try_iter()? {
         let function: Bound<'py, PyAny> = function?;
-        let name: String = function_reads::name(&function)?.extract()?;
+        let name: String =
+            sqlbuild_python_project::resource_views::main::function_reads::name::name(&function)?
+                .extract()?;
         let Some(function_hash) = function_hashes.get_item(&name)? else {
             continue;
         };
         graph.nodes.insert(
-            graph_key(&function_reads::key(&function)?)?,
+            graph_key(
+                &sqlbuild_python_project::resource_views::main::function_reads::key::key(
+                    &function,
+                )?,
+            )?,
             IdentityNode {
-                upstream_keys: graph_keys(&function_reads::deps(&function)?)?,
+                upstream_keys: graph_keys(
+                    &sqlbuild_python_project::resource_views::main::function_reads::deps::deps(
+                        &function,
+                    )?,
+                )?,
                 local_hash: Some(function_hash.extract()?),
             },
         );
@@ -139,7 +150,8 @@ pub(crate) fn direct_model_version_identities<'py>(
         for seed in seeds.try_iter()? {
             let seed: Bound<'py, PyAny> = seed?;
             let (seed_hash, metadata_json): (String, String) = seed_identity(&seed)?;
-            let name: Bound<'py, PyAny> = seed_reads::name(&seed)?;
+            let name: Bound<'py, PyAny> =
+                sqlbuild_python_project::resource_views::main::seed_reads::name::name(&seed)?;
             seed_hashes.set_item(&name, &seed_hash)?;
             seed_metadata.set_item(&name, metadata_json)?;
         }
@@ -176,7 +188,7 @@ pub(crate) fn direct_model_version_identities<'py>(
         let Some(model) = scope.model(py, &order_key.name) else {
             continue;
         };
-        let name: String = model_reads::model_name(&model)?;
+        let name: String = model_name(&model)?;
         let metadata_json: String = model_version_identity_metadata_json(
             &model,
             Some(function_hashes.as_any()),
@@ -186,10 +198,7 @@ pub(crate) fn direct_model_version_identities<'py>(
         let query_fingerprint: String = baselined_model_query_hash(
             py,
             &name,
-            (
-                &model_reads::query_sql(&model)?.extract::<String>()?,
-                dialect.as_deref(),
-            ),
+            (&query_sql(&model)?.extract::<String>()?, dialect.as_deref()),
             &recorded_model,
         )?;
         let local_hash: String = model_local_identity_hash(&query_fingerprint, &metadata_json);
@@ -198,7 +207,11 @@ pub(crate) fn direct_model_version_identities<'py>(
         graph.nodes.insert(
             key_of(MODEL_RESOURCE, &name),
             IdentityNode {
-                upstream_keys: graph_keys(&model_reads::deps(&model)?)?,
+                upstream_keys: graph_keys(
+                    &sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps(
+                        &model,
+                    )?,
+                )?,
                 local_hash: Some(local_hash),
             },
         );
@@ -296,11 +309,15 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
     let local_hashes: Bound<'py, PyAny> = native_field(&identities, "model_local_hashes")?;
     for model in scope.models.values() {
         let model = model.bind(py);
-        let name: Bound<'py, PyAny> = model_reads::name_object(&model)?;
+        let name: Bound<'py, PyAny> = name_object(&model)?;
         graph.nodes.insert(
             key_of(MODEL_RESOURCE, &name.extract::<String>()?),
             IdentityNode {
-                upstream_keys: graph_keys(&model_reads::deps(&model)?)?,
+                upstream_keys: graph_keys(
+                    &sqlbuild_python_project::compiled_views::main::compiled_models::deps::deps(
+                        &model,
+                    )?,
+                )?,
                 local_hash: mapping_get(&local_hashes, &name)?.extract()?,
             },
         );
@@ -339,7 +356,7 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
         let Some(model) = scope.model(py, &order_key.name) else {
             continue;
         };
-        let name: Bound<'py, PyAny> = model_reads::name_object(&model)?;
+        let name: Bound<'py, PyAny> = name_object(&model)?;
         if mapping_get(&local_hashes, &name)?.is_none() {
             continue;
         }

@@ -1,41 +1,28 @@
 //! Read and append migration state events through the adapter's execute callable.
 
+use crate::state_rows::main::event_rows::presumed_utc::presumed_utc;
+use crate::state_rows::main::migrations::layout::layout;
+use crate::state_rows::main::migrations::read_events::read_events;
 use pyo3::exceptions::PyException;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyString, PyTuple, PyTupleMethods};
-use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_state::events::main::recorded_renames::recorded_renames;
 use sqlbuild_state::events::models::RecordedRenameKey;
 
 use crate::state_rows::_helpers::event_rows::events::relation as event_relation;
-use crate::state_rows::_helpers::event_rows::timestamps::presumed_utc;
-use crate::state_rows::_helpers::migrations::migration_objects::event_order;
-use crate::state_rows::_helpers::migrations::migration_objects::layout;
-use crate::state_rows::_helpers::migrations::migration_objects::state_error;
-use crate::state_rows::_helpers::migrations::migration_projections::old_name_views;
-use crate::state_rows::_helpers::migrations::migration_rows::decoded_events;
-use crate::state_rows::_helpers::migrations::migration_rows::read_statement;
+use crate::state_rows::_helpers::migrations::migration_objects::{event_order, state_error};
 use crate::state_rows::_helpers::migrations::migration_rows::write_statements;
-use crate::state_rows::constants::COLUMN_KIND;
-use crate::state_rows::constants::LOGGING_MODULE;
-use crate::state_rows::constants::MIGRATION_LOGGER;
-use crate::state_rows::constants::MIGRATION_WRITE_ATTEMPTS;
-use crate::state_rows::constants::MIGRATION_WRITE_RETRY_BASE_SECONDS;
-use crate::state_rows::constants::MIGRATION_WRITE_RETRY_MESSAGE;
-use crate::state_rows::constants::MODEL_KIND;
-use crate::state_rows::constants::OLD_NAME_KIND;
-use crate::state_rows::constants::TIME_MODULE;
-use crate::state_rows::models::EventTable;
-use crate::state_rows::models::EventTableLayout;
-use crate::state_rows::models::StateAccess;
+use crate::state_rows::constants::{
+    COLUMN_KIND, LOGGING_MODULE, MIGRATION_LOGGER, MIGRATION_WRITE_ATTEMPTS,
+    MIGRATION_WRITE_RETRY_BASE_SECONDS, MIGRATION_WRITE_RETRY_MESSAGE, TIME_MODULE,
+};
+use crate::state_rows::models::{EventTable, EventTableLayout, StateAccess};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
-fn execute<'py>(access: &StateAccess<'py>, sql: &str) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn execute<'py>(access: &StateAccess<'py>, sql: &str) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = access.execute.py();
     call_with(
         &access.execute,
@@ -46,7 +33,11 @@ fn execute<'py>(access: &StateAccess<'py>, sql: &str) -> PyResult<Bound<'py, PyA
     )
 }
 
-fn unreadable(layout: &EventTableLayout, schema: &Bound<'_, PyAny>, error: PyErr) -> PyErr {
+pub(crate) fn unreadable(
+    layout: &EventTableLayout,
+    schema: &Bound<'_, PyAny>,
+    error: PyErr,
+) -> PyErr {
     let py: Python<'_> = schema.py();
     let describe = |value: &Bound<'_, PyAny>| -> String {
         value.str().map(|text| text.to_string()).unwrap_or_default()
@@ -60,56 +51,6 @@ fn unreadable(layout: &EventTableLayout, schema: &Bound<'_, PyAny>, error: PyErr
     let wrapped: PyErr = state_error(py, &message);
     wrapped.set_cause(py, Some(error));
     wrapped
-}
-
-/// Every event of `layout`'s table this version reads from one schema, from `stored` columns when known.
-pub(crate) fn read_events<'py>(
-    access: &StateAccess<'py>,
-    layout: &EventTableLayout,
-    (database, schema): (Bound<'py, PyAny>, Bound<'py, PyAny>),
-    stored: Option<&[String]>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = schema.py();
-    let (sql, columns): (String, Vec<String>) = read_statement(
-        layout,
-        &access.render_qualified_name,
-        (database, schema.clone()),
-        stored,
-    )?;
-    let rows: Bound<'py, PyAny> =
-        match execute(access, &sql).and_then(|cursor| cursor.call_method0("fetchall")) {
-            Ok(rows) => rows,
-            Err(error) if error.is_instance_of::<PyException>(py) => {
-                return Err(unreadable(layout, &schema, error));
-            }
-            Err(error) => return Err(error),
-        };
-    decoded_events(layout.table, &rows, &columns)
-}
-
-/// The column names of one schema's old-name view state table, as the adapter lists them.
-pub(crate) fn stored_old_name_columns<'py>(
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
-    (database, schema): (Bound<'py, PyAny>, Bound<'py, PyAny>),
-) -> PyResult<Vec<String>> {
-    let py: Python<'py> = adapter.py();
-    let columns: Bound<'py, PyAny> = call_with(
-        &native_field(adapter, "get_columns")?,
-        &[
-            ("connection", connection.clone()),
-            ("database", database),
-            ("schema", schema),
-            (
-                "name",
-                PyString::new(py, OLD_NAME_VIEW_TABLE_NAME).into_any(),
-            ),
-        ],
-    )?;
-    columns
-        .try_iter()?
-        .map(|column| native_field(&column?, "name")?.extract())
-        .collect()
 }
 
 fn subject(table: EventTable, event: &Bound<'_, PyAny>) -> PyResult<String> {
@@ -203,7 +144,7 @@ pub(crate) fn access<'py>(request: &Request<'_, 'py>) -> PyResult<StateAccess<'p
     })
 }
 
-fn stored_names(stored: Option<Bound<'_, PyAny>>) -> PyResult<Option<Vec<String>>> {
+pub(crate) fn stored_names(stored: Option<Bound<'_, PyAny>>) -> PyResult<Option<Vec<String>>> {
     match stored {
         Some(stored) if !stored.is_none() => stored
             .try_iter()?
@@ -217,7 +158,9 @@ fn stored_names(stored: Option<Bound<'_, PyAny>>) -> PyResult<Option<Vec<String>
 /// Every event of one migration state table this version reads from one schema.
 #[pyfunction(name = "read_migration_state_events")]
 #[pyo3(signature = (**request))]
-fn read_state_events<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn read_state_events<'py>(
+    request: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyTuple>> {
     let request = Request::new("read_migration_state_events", request)?;
     let stored: Option<Vec<String>> = stored_names(request.optional("stored_columns")?)?;
     read_events(
@@ -228,32 +171,12 @@ fn read_state_events<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Boun
     )
 }
 
-/// The old-name view history of every recorded move in a schema that holds both state tables.
-#[pyfunction(name = "read_old_name_view_histories")]
-#[pyo3(signature = (**request))]
-pub(crate) fn read_histories<'py>(
-    request: Option<&Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let request = Request::new("read_old_name_view_histories", request)?;
-    let access: StateAccess<'py> = access(&request)?;
-    let location = || -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-        Ok((request.get("database")?, request.get("schema")?))
-    };
-    let stored: Option<Vec<String>> = stored_names(Some(request.get("stored_columns")?))?;
-    let moves: Bound<'py, PyTuple> = read_events(&access, &layout(MODEL_KIND)?, location()?, None)?;
-    let facts: Bound<'py, PyTuple> = read_events(
-        &access,
-        &layout(OLD_NAME_KIND)?,
-        location()?,
-        stored.as_deref(),
-    )?;
-    old_name_views(moves.as_any(), facts.as_any())
-}
-
 /// Renames recorded on the relation at or after `since`, oldest first.
 #[pyfunction(name = "read_recorded_column_renames")]
 #[pyo3(signature = (**request))]
-fn read_renames<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyTuple>> {
+pub(crate) fn read_renames<'py>(
+    request: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyTuple>> {
     let request = Request::new("read_recorded_column_renames", request)?;
     let py: Python<'py> = request.py();
     let relation: Bound<'py, PyAny> = request.get("relation")?;
@@ -289,25 +212,10 @@ fn read_renames<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py
     PyTuple::new(py, selected)
 }
 
-/// The column names of one schema's old-name view state table.
-#[pyfunction(name = "stored_old_name_view_columns")]
-#[pyo3(signature = (*, adapter, connection, database, schema))]
-pub(crate) fn stored_columns_binding<'py>(
-    adapter: &Bound<'py, PyAny>,
-    connection: &Bound<'py, PyAny>,
-    database: Bound<'py, PyAny>,
-    schema: Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    PyTuple::new(
-        adapter.py(),
-        stored_old_name_columns(adapter, connection, (database, schema))?,
-    )
-}
-
 /// Create the state table from adapter DDL when given, then append the event unless recorded.
 #[pyfunction(name = "write_migration_state_event")]
 #[pyo3(signature = (**request))]
-fn write_state_event(request: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
+pub(crate) fn write_state_event(request: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
     let request = Request::new("write_migration_state_event", request)?;
     let create_table_sql: Option<String> = request.get("create_table_sql")?.extract()?;
     let attempts: i64 = match request.optional("attempts")? {
@@ -323,13 +231,4 @@ fn write_state_event(request: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
         create_table_sql.as_deref(),
         attempts,
     )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(read_state_events, module)?)?;
-    module.add_function(wrap_pyfunction!(read_histories, module)?)?;
-    module.add_function(wrap_pyfunction!(read_renames, module)?)?;
-    module.add_function(wrap_pyfunction!(stored_columns_binding, module)?)?;
-    module.add_function(wrap_pyfunction!(write_state_event, module)?)?;
-    Ok(())
 }

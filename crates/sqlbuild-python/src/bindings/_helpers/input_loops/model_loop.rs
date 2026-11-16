@@ -31,23 +31,6 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::AttachedSqlTests;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditSettings;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::FunctionRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::FunctionSettings;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::ScenarioRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::SourceRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::SourceSettings;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::SqlTestSettings;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::TestFileRow;
-use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::audit_views::AttachedAudit;
-use crate::bindings::_helpers::compiled_views::function_views::AttachedFunction;
-use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
-use crate::bindings::_helpers::compiled_views::source_views::{
-    AttachedSource, NativeSourceInput, retain_sources,
-};
 use crate::bindings::_helpers::input_loops::audit_loop::{AttachmentOwner, attached_audits};
 use crate::bindings::_helpers::input_loops::function_loop::{
     attached_functions, checked_table_function_arities,
@@ -95,8 +78,7 @@ use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::cache::models::NativeParseStore;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::types::CompilerDetach;
-use sqlbuild_python_front::discovery::models::ModelFileTexts;
-use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::discovery::models::{ModelFileTexts, NativeModelFile};
 use sqlbuild_python_front::model_config::main::config::raised_config_exception::raised_config_exception;
 use sqlbuild_python_front::model_config::models::ConfigClasses;
 use sqlbuild_python_front::model_config::models::ContractClasses;
@@ -104,18 +86,34 @@ use sqlbuild_python_front::model_config::models::NativeModelValidator;
 use sqlbuild_python_front::render::main::calls::span_row::span_row;
 use sqlbuild_python_front::render::main::declarations::expand_declarations::expand_declarations;
 use sqlbuild_python_front::render::models::ConstantRendering;
-use sqlbuild_python_front::render::models::DeclarationExpansion;
 use sqlbuild_python_front::render::models::DeclarationExpansionClasses;
-use sqlbuild_python_front::render::models::ExpandedDeclarations;
-use sqlbuild_python_front::render::models::ExpansionConsumer;
-use sqlbuild_python_front::render::models::SqlCallOrigin;
-use sqlbuild_python_front::render::models::SqlMacroSource;
+use sqlbuild_python_front::render::models::{
+    DeclarationExpansion, ExpandedDeclarations, ExpansionConsumer,
+};
+use sqlbuild_python_front::render::models::{SqlCallOrigin, SqlMacroSource};
 use sqlbuild_python_front::render::types::SpanRow;
 use sqlbuild_python_front::sqltext::main::declaration_scan::declaration_scan;
 use sqlbuild_python_front::sqltext::main::interpolation_batch::interpolation_batch;
 use sqlbuild_python_front::sqltext::models::InterpolationRow as SqlInterpolationRow;
 use sqlbuild_python_front::sqltext::models::InterpolationSources;
 use sqlbuild_python_front::sqltext::models::LexicalSyntaxInput;
+use sqlbuild_python_project::compiled_project::models::AuditFileRow;
+use sqlbuild_python_project::compiled_project::models::AuditSettings;
+use sqlbuild_python_project::compiled_project::models::FunctionRow;
+use sqlbuild_python_project::compiled_project::models::FunctionSettings;
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
+use sqlbuild_python_project::compiled_project::models::ScenarioRow;
+use sqlbuild_python_project::compiled_project::models::SqlTestSettings;
+use sqlbuild_python_project::compiled_project::models::TestFileRow;
+use sqlbuild_python_project::compiled_project::types::AttachedSqlTests;
+use sqlbuild_python_project::compiled_project::types::SourceRow;
+use sqlbuild_python_project::compiled_project::types::SourceSettings;
+use sqlbuild_python_project::compiled_views::models::NativeModelInput;
+use sqlbuild_python_project::resource_views::main::source_views::retain_sources::retain_sources;
+use sqlbuild_python_project::resource_views::models::NativeSourceInput;
+use sqlbuild_python_project::resource_views::types::AttachedAudit;
+use sqlbuild_python_project::resource_views::types::AttachedFunction;
+use sqlbuild_python_project::resource_views::types::AttachedSource;
 
 const MATERIALIZED_KEY: &str = "materialized";
 const CURSOR_KEY: &str = "cursor";

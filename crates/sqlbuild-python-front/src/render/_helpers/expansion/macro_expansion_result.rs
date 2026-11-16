@@ -1,20 +1,19 @@
 //! Expand one authored SQL string's macros into a `MacroExpansionResult`.
 
+use crate::render::main::calls::span_row::span_row;
+use crate::render::main::expansion::macro_expansion_classes::macro_expansion_classes;
 use crate::render::models::ExpansionRequest;
 use pyo3::IntoPyObject;
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyStringMethods, PyTuple};
-use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::discovery::main::failures::explicit_references_help::explicit_references_help;
-use crate::render::_helpers::calls::macro_call_rows::span_row;
 use crate::render::_helpers::declarations::declaration_values::resolved_declaration_context;
 use crate::render::_helpers::expansion::macro_expansion::expanded;
-use crate::render::models::ExpansionOutput;
-use crate::render::models::NativeMacroExpansion;
-use crate::render::models::StateInput;
+use crate::render::models::{ExpansionOutput, NativeMacroExpansion, StateInput};
 use crate::render::types::SpanRow;
 use crate::sqltext::main::extract_references::extract_references;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -48,7 +47,7 @@ const BUILTINS_MODULE: &str = "builtins";
 const MACRO_TOKEN: &str = "@";
 const GENERATED_ALLOWED: &str = "macro-generated references";
 
-static EXPANSION_CLASSES: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
+pub(crate) static EXPANSION_CLASSES: PyOnceLock<Py<PyDict>> = PyOnceLock::new();
 
 fn generated_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let help: Bound<'_, PyAny> =
@@ -82,7 +81,7 @@ fn generated_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     )
 }
 
-fn built_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+pub(crate) fn built_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let declaration_kind: Bound<'_, PyAny> = record_class(py, RecordId::DeclarationKind)?;
     let ref_kind: Bound<'_, PyAny> = host_entry(py, UserCodeHost::SqlResourceRefKind)?;
     let ref_kinds: Bound<'_, PyDict> = PyDict::new(py);
@@ -141,13 +140,6 @@ fn built_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
             ("float_type", imported(py, BUILTINS_MODULE, "float")?),
         ],
     )
-}
-
-/// The classes, enums and helpers the native expansion builds facts and errors from, built once.
-pub(crate) fn macro_expansion_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
-    EXPANSION_CLASSES
-        .get_or_try_init(py, || built_classes(py).map(Bound::unbind))
-        .map(|classes| classes.bind(py).clone())
 }
 
 /// `tuple(dict.fromkeys(items))`: the items without repeats, in first-seen order.
@@ -293,8 +285,4 @@ pub(crate) fn expand_sql_macros<'py>(
         declarations: optional(arguments.value("declarations")?),
         consumer: optional(arguments.value("consumer")?),
     })
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(expand_sql_macros, module)?)
 }

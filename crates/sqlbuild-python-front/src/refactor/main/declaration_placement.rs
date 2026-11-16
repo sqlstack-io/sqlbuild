@@ -1,9 +1,7 @@
 //! Where scope placement puts declarations once every `(model, destination)` moves together.
 
 use crate::refactor::_helpers::refactor_facts;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use sqlbuild_refactor::refactoring::models::DeclarationPlacement;
 use std::collections::BTreeSet;
 

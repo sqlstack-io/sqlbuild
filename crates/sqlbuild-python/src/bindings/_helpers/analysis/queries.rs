@@ -5,6 +5,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_project::analysis::main::register_binding_catalog::register_binding_catalog;
+use sqlbuild_python_project::references::main::register_explicit_references::register_explicit_references;
 
 #[pyfunction]
 fn query_fingerprint(py: Python<'_>, sql: &str, dialect: &str) -> PyResult<String> {
@@ -27,9 +29,9 @@ fn parse_warehouse_type(py: Python<'_>, spelling: &str, dialect: &str) -> PyResu
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    crate::bindings::_helpers::analysis::binding_catalog::register(module)?;
+    register_binding_catalog(module)?;
     crate::bindings::_helpers::analysis::required_columns::register(module)?;
-    crate::bindings::_helpers::references::explicit_references::register(module)?;
+    register_explicit_references(module)?;
     crate::bindings::_helpers::analysis::binding_locations::register(module)?;
     module.add_function(wrap_pyfunction!(query_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(parse_warehouse_type, module)?)?;

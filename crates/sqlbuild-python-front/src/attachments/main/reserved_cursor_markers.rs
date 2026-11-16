@@ -1,9 +1,11 @@
 //! The reserved executor bound markers no authored SQL may contain.
 
-use crate::attachments::_helpers::cursor_intrinsics;
+use crate::attachments::_helpers::cursor_intrinsics::RESERVED_CURSOR_MARKERS;
 
 /// The reserved executor bound markers no authored SQL may contain.
-#[inline]
 pub fn reserved_cursor_markers() -> Vec<String> {
-    cursor_intrinsics::reserved_cursor_markers()
+    RESERVED_CURSOR_MARKERS
+        .iter()
+        .map(|marker| (*marker).to_owned())
+        .collect()
 }

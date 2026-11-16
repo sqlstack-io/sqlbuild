@@ -1,28 +1,16 @@
 //! Clone planning: destination and origin entries, and deferred-clone graph traversal.
 
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::graph::keys::KeyCache;
-use crate::bindings::_helpers::graph::node_set::PyNodeSet;
-use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
-use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_entries::values::{
     native, planner_model, planner_type, string,
 };
-use crate::bindings::_helpers::planner_identity::graph::{execution_deps, execution_order};
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::locations::build_function_locations;
 use crate::bindings::_helpers::planner_resolution::locations::build_model_locations;
 use crate::bindings::_helpers::planner_resolution::locations::build_seed_locations;
 use crate::bindings::_helpers::planner_resolution::models::ModelSqlRequest;
 use crate::bindings::_helpers::planner_resolution::orchestration::resolve_function_sql;
 use crate::bindings::_helpers::planner_resolution::orchestration::{Resolution, resolve_model_sql};
-use crate::bindings::_helpers::planner_selection::selectors::resolve_graph_selection;
 use crate::bindings::_helpers::planner_strategy::strategy::materialization_of;
 use crate::bindings::_helpers::planner_warehouse::source_columns::gather_source_columns;
 use pyo3::PyRef;
@@ -41,6 +29,20 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_node_of::config_node_of;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::compiled_models::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;
+use sqlbuild_python_project::graph::main::project::edge_dict::edge_dict;
+use sqlbuild_python_project::graph::models::KeyCache;
+use sqlbuild_python_project::graph::models::NativeProjectGraph;
+use sqlbuild_python_project::graph::models::PyNodeSet;
+use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
+use sqlbuild_python_project::planner_identity::main::execution_order::execution_order;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_selection::main::resolve_graph_selection::resolve_graph_selection;
+use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;
+use sqlbuild_python_project::resource_views::main::source_reads::source_entry::source_entry;
 
 const ENABLED_KEY: &str = "enabled";
 
@@ -125,7 +127,7 @@ struct CloneResolution<'py> {
 
 /// Whether a selected, enabled model is recreated from its SQL rather than copied.
 fn recreated_view(model: &Bound<'_, PyAny>, selected: &Bound<'_, PyAny>) -> PyResult<bool> {
-    Ok(selected.contains(model_reads::model_key(model)?)?
+    Ok(selected.contains(model_key(model)?)?
         && !disabled_model(model)?
         && materialization_of(model)?.eq(VIEW_MATERIALIZATION)?)
 }
@@ -140,15 +142,20 @@ fn resolved_source_entries<'py>(
     let source_type = enum_member(py, RecordId::CompiledResourceType, "SOURCE")?;
     let read = PySet::empty(py)?;
     let mut readers: Vec<Bound<'py, PyAny>> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
         if recreated_view(&model, &selected)? {
             readers.push(model);
         }
     }
-    for function in project_reads::functions(project)?.try_iter()? {
+    for function in
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?
+            .try_iter()?
+    {
         let function = function?;
-        if selected.contains(function_reads::key(&function)?)? {
+        if selected.contains(
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
+        )? {
             readers.push(function);
         }
     }
@@ -163,8 +170,10 @@ fn resolved_source_entries<'py>(
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
     for source in native_field(source_project, "sources")?.try_iter()? {
         let source = source?;
-        if read.contains(source_reads::name(&source)?)? {
-            entries.push(source_reads::source_entry(&source)?);
+        if read.contains(
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?,
+        )? {
+            entries.push(source_entry(&source)?);
         }
     }
     tuple_of(py, entries)
@@ -176,18 +185,25 @@ fn clone_resolution<'py>(
     (adapter, connection): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<CloneResolution<'py>> {
     let py = project.py();
-    let model_locations = object(py, build_model_locations(&project_reads::models(project)?)?)?;
-    let seed_locations = object(py, build_seed_locations(&project_reads::seeds(project)?)?)?;
+    let model_locations = object(py, build_model_locations(&compiled_models(project)?)?)?;
+    let seed_locations = object(
+        py,
+        build_seed_locations(
+            &sqlbuild_python_project::compiled_views::main::project::seeds::seeds(project)?,
+        )?,
+    )?;
     let function_locations = object(
         py,
-        build_function_locations(&project_reads::functions(project)?)?,
+        build_function_locations(
+            &sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?,
+        )?,
     )?;
     let source_map = PyDict::new(py);
     for source in native_field(source_project, "sources")?.try_iter()? {
         let source = source?;
         source_map.set_item(
-            source_reads::name(&source)?,
-            source_reads::source_entry(&source)?,
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?,
+            source_entry(&source)?,
         )?;
     }
     let source_warehouse_columns = object(
@@ -223,8 +239,8 @@ fn model_entry<'py>(
         py,
         RecordId::ModelPlanEntry,
         &[
-            ("key", model_reads::model_key(model)?),
-            ("name", model_reads::name_object(model)?),
+            ("key", model_key(model)?),
+            ("name", name_object(model)?),
             ("relative_path", native_field(model, "relative_path")?),
             ("materialization_type", materialization_type),
             ("action", planner_type(py, RecordId::PlanAction, action)?),
@@ -232,7 +248,7 @@ fn model_entry<'py>(
                 "reason",
                 planner_type(py, RecordId::PlanReason, "NO_CHANGE")?,
             ),
-            ("destination", model_reads::destination(model)?),
+            ("destination", sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(model)?),
             ("fingerprint_query_sql", string(py, "")),
             ("resolved_sql", resolved_sql),
             ("logical_ddl", string(py, "")),
@@ -248,17 +264,27 @@ fn clone_model_entries<'py>(
     let py = project.py();
     let selected = native_field(plan, "selected_keys")?;
     let entries = PyDict::new(py);
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
-        if !selected.contains(model_reads::model_key(&model)?)? || disabled_model(&model)? {
+        if !selected.contains(model_key(&model)?)? || disabled_model(&model)? {
             continue;
         }
         let materialization_type = materialization_of(&model)?;
         let resolved_sql = if materialization_type.eq(VIEW_MATERIALIZATION)? {
             let functions = PyDict::new(py);
-            for function in project_reads::functions(project)?.try_iter()? {
+            for function in
+                sqlbuild_python_project::compiled_views::main::project::functions::functions(
+                    project,
+                )?
+                .try_iter()?
+            {
                 let function = function?;
-                functions.set_item(function_reads::name(&function)?, function)?;
+                functions.set_item(
+                    sqlbuild_python_project::resource_views::main::function_reads::name::name(
+                        &function,
+                    )?,
+                    function,
+                )?;
             }
             let context = Bound::new(
                 py,
@@ -303,7 +329,7 @@ fn clone_model_entries<'py>(
             string(py, "")
         };
         entries.set_item(
-            model_reads::model_key(&model)?,
+            model_key(&model)?,
             model_entry(&model, materialization_type, resolved_sql)?,
         )?;
     }
@@ -317,11 +343,14 @@ fn clone_source_entries<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
     let entries = PyDict::new(py);
-    for source in project_reads::sources(project)?.try_iter()? {
+    for source in sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
+        .try_iter()?
+    {
         let source = source?;
-        let entry = source_reads::source_entry(&source)?;
-        if !selected.contains(source_reads::key(&source)?)?
-            || !native_field(&entry, "managed")?.is_truthy()?
+        let entry = source_entry(&source)?;
+        if !selected.contains(
+            sqlbuild_python_project::resource_views::main::source_reads::key::key(&source)?,
+        )? || !native_field(&entry, "managed")?.is_truthy()?
             || native_field(&entry, "loader")?.is_none()
             || !native_field(&entry, "expression")?.is_none()
         {
@@ -352,13 +381,23 @@ fn clone_source_entries<'py>(
             }),
         )?;
         entries.set_item(
-            source_reads::key(&source)?,
+            sqlbuild_python_project::resource_views::main::source_reads::key::key(&source)?,
             planner_model(
                 py,
                 RecordId::CloneSourcePlanEntry,
                 &[
-                    ("key", source_reads::key(&source)?),
-                    ("name", source_reads::name(&source)?),
+                    (
+                        "key",
+                        sqlbuild_python_project::resource_views::main::source_reads::key::key(
+                            &source,
+                        )?,
+                    ),
+                    (
+                        "name",
+                        sqlbuild_python_project::resource_views::main::source_reads::name::name(
+                            &source,
+                        )?,
+                    ),
                     ("destination", destination),
                 ],
             )?,
@@ -375,9 +414,14 @@ fn clone_function_entries<'py>(
     let py = project.py();
     let selected = native_field(plan, "selected_keys")?;
     let entries = PyDict::new(py);
-    for function in project_reads::functions(project)?.try_iter()? {
+    for function in
+        sqlbuild_python_project::compiled_views::main::project::functions::functions(project)?
+            .try_iter()?
+    {
         let function = function?;
-        if !selected.contains(function_reads::key(&function)?)? {
+        if !selected.contains(
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
+        )? {
             continue;
         }
         let body_sql = resolve_function_sql(
@@ -427,7 +471,10 @@ fn clone_function_entries<'py>(
                 ("packages", field("packages")?),
             ],
         )?;
-        entries.set_item(function_reads::key(&function)?, entry)?;
+        entries.set_item(
+            sqlbuild_python_project::resource_views::main::function_reads::key::key(&function)?,
+            entry,
+        )?;
     }
     in_order(&entries, &native_field(plan, "execution_order")?)
 }
@@ -438,17 +485,17 @@ fn seed_entry<'py>(seed: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
         py,
         RecordId::SeedPlanEntry,
         &[
-            ("key", seed_reads::key(seed)?),
-            ("name", seed_reads::name(seed)?),
-            ("destination", seed_reads::destination(seed)?),
+            ("key", sqlbuild_python_project::resource_views::main::seed_reads::key::key(seed)?),
+            ("name", sqlbuild_python_project::resource_views::main::seed_reads::name::name(seed)?),
+            ("destination", sqlbuild_python_project::resource_views::main::seed_reads::destination::destination(seed)?),
             (
                 "file_path",
-                native_field(&seed_reads::seed_file(seed)?, "file_path")?,
+                native_field(&seed_file(seed)?, "file_path")?,
             ),
             ("columns", PyTuple::empty(py).into_any()),
             (
                 "csv_settings",
-                native_field(&seed_reads::schema_entry(seed)?, "csv_settings")?,
+                native_field(&schema_entry(seed)?, "csv_settings")?,
             ),
         ],
     )
@@ -461,7 +508,9 @@ fn seed_entries<'py>(
     wanted: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for seed in project_reads::seeds(project)?.try_iter()? {
+    for seed in
+        sqlbuild_python_project::compiled_views::main::project::seeds::seeds(project)?.try_iter()?
+    {
         let seed = seed?;
         if wanted.contains(native_field(&seed, field)?)? {
             entries.push(seed_entry(&seed)?);
@@ -476,9 +525,9 @@ fn origin_model_entries<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in compiled_models(project)?.try_iter()? {
         let model = model?;
-        if !selected_names.contains(model_reads::name_object(&model)?)? || disabled_model(&model)? {
+        if !selected_names.contains(name_object(&model)?)? || disabled_model(&model)? {
             continue;
         }
         let materialization_type = materialization_of(&model)?;
@@ -503,12 +552,18 @@ fn origin_source_entries<'py>(
     let py = project.py();
     let mut keys: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut order: Vec<Bound<'py, PyAny>> = Vec::new();
-    for source in project_reads::sources(project)?.try_iter()? {
+    for source in sqlbuild_python_project::compiled_views::main::project::sources::sources(project)?
+        .try_iter()?
+    {
         let source = source?;
-        if selected_names.contains(source_reads::name(&source)?)? {
-            keys.push(source_reads::key(&source)?);
+        if selected_names.contains(
+            sqlbuild_python_project::resource_views::main::source_reads::name::name(&source)?,
+        )? {
+            keys.push(
+                sqlbuild_python_project::resource_views::main::source_reads::key::key(&source)?,
+            );
         }
-        order.push(source_reads::key(&source)?);
+        order.push(sqlbuild_python_project::resource_views::main::source_reads::key::key(&source)?);
     }
     clone_source_entries(
         project,

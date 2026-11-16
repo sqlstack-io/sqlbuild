@@ -1,23 +1,20 @@
 //! Static declaration visibility of scope targets and authored paths over a `ScopeLookup`.
 
-use pyo3::prelude::{
-    Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_scopes::scope_index::main::normalize_scope_path::normalize_scope_path;
 use sqlbuild_scopes::scope_index::main::rejected_path_message::rejected_path_message;
 use sqlbuild_scopes::scope_index::models::{
     OwnershipRoot, OwnershipRootKind, RejectedPath, ResourceIdentity, ResourceKind, ResourceRecord,
 };
 
-use crate::scopes::_helpers::index::scope_lookup::NativeScopeLookup;
-use crate::scopes::_helpers::index::scope_lookup::ResolvedRows;
-use crate::scopes::_helpers::index::scope_lookup::TargetRows;
-use crate::scopes::_helpers::index::scope_lookup::scope_path_error;
-use crate::scopes::_helpers::index::scope_objects::qualified_row;
-use crate::scopes::_helpers::index::scope_objects::read_resource;
-use crate::scopes::_helpers::index::scope_objects::tuple_attribute;
+use crate::scopes::_helpers::index::scope_lookup::{
+    NativeScopeLookup, ResolvedRows, TargetRows, scope_path_error,
+};
+use crate::scopes::_helpers::index::scope_objects::{
+    qualified_row, read_resource, tuple_attribute,
+};
 use crate::scopes::models::ScopeClasses;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -101,7 +98,7 @@ fn target_query<'py>(
 /// `query_target`: the `ScopeTargetQuery` of `target`; invalid text raises the scope error.
 #[pyfunction]
 #[pyo3(name = "query_scope_target", signature = (*, lookup, target))]
-fn scope_query_target(
+pub(crate) fn scope_query_target(
     py: Python<'_>,
     lookup: &Bound<'_, PyAny>,
     target: &Bound<'_, PyAny>,
@@ -124,7 +121,7 @@ fn resolved(
 /// Python's `resolve_scope_visibility`: visible facts and inaccessible reasons per target.
 #[pyfunction]
 #[pyo3(signature = (*, lookup, target))]
-fn resolve_scope_visibility(
+pub(crate) fn resolve_scope_visibility(
     py: Python<'_>,
     lookup: &Bound<'_, PyAny>,
     target: &Bound<'_, PyAny>,
@@ -135,7 +132,7 @@ fn resolve_scope_visibility(
 /// Python's `resolve_scope_declaration_visibility`: visible facts and inaccessible identities.
 #[pyfunction]
 #[pyo3(signature = (*, lookup, target))]
-fn resolve_scope_declaration_visibility(
+pub(crate) fn resolve_scope_declaration_visibility(
     py: Python<'_>,
     lookup: &Bound<'_, PyAny>,
     target: &Bound<'_, PyAny>,
@@ -208,7 +205,7 @@ fn resolved_visibility(
 /// Visible and inaccessible declarations for an authored path, including declaration files.
 #[pyfunction]
 #[pyo3(name = "resolve_scope_path_visibility", signature = (*, lookup, path))]
-fn scope_resolve_path_visibility(
+pub(crate) fn scope_resolve_path_visibility(
     py: Python<'_>,
     lookup: &Bound<'_, PyAny>,
     path: &Bound<'_, PyAny>,
@@ -260,15 +257,4 @@ fn scope_resolve_path_visibility(
                 .collect(),
         )?,
     ))
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(scope_query_target, module)?)?;
-    module.add_function(wrap_pyfunction!(resolve_scope_visibility, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        resolve_scope_declaration_visibility,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(scope_resolve_path_visibility, module)?)?;
-    Ok(())
 }

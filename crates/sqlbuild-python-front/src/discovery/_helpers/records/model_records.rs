@@ -1,46 +1,36 @@
 //! SQL model files discovered natively and built as Python discovery records.
 
-use crate::discovery::models::ModelFileSelection;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyString, PyTuple};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::IntoPyObject;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::PyString;
 use sqlbuild_discovery::model_files::main::discover_model_files::discover_model_files as discover_models;
 use sqlbuild_discovery::model_files::main::model_file_stem::model_file_stem;
 use sqlbuild_discovery::model_files::models::{DiscoveredModelFile, ModelFileOptions};
 use sqlbuild_discovery::models::{DiscoveredFile, FileOutcome, StageFailure};
 use std::path::Path;
 
-use crate::discovery::_helpers::failures::faults::FileFaults;
-use crate::discovery::_helpers::failures::faults::record_tuple;
-use crate::discovery::_helpers::failures::raised::failure_error;
-use crate::discovery::_helpers::failures::raised::read_error;
-use crate::discovery::_helpers::failures::raised::stage_error;
-use crate::discovery::_helpers::project::project_files::model_record;
-use crate::discovery::_helpers::project::project_files::path_object;
+use crate::discovery::_helpers::failures::raised::{failure_error, read_error, stage_error};
+use crate::discovery::_helpers::project::project_files::{model_record, path_object};
 use crate::discovery::_helpers::records::model_file_record::DiscoveredPaths;
 use crate::discovery::_helpers::snapshots::native_classes::NativeProjectTree;
-use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
-use crate::discovery::_helpers::snapshots::snapshot::project_root;
-use crate::discovery::_helpers::snapshots::snapshot::project_tree;
-use sqlbuild_discovery::model_files::main::model_file_options::model_file_options;
+use crate::discovery::_helpers::snapshots::snapshot::{in_snapshot, project_root, project_tree};
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const PATHLIB_MODULE: &str = "pathlib";
 const STEM_ATTRIBUTE: &str = "stem";
 
 /// One discovered model file: its relative path and record, or the error building it raises.
-type ModelItem<'py> = (RelativePath<'py>, PyResult<Bound<'py, PyAny>>);
+pub(crate) type ModelItem<'py> = (RelativePath<'py>, PyResult<Bound<'py, PyAny>>);
 
 /// A discovered file's relative path: native text, or the Python path already built for it.
-enum RelativePath<'py> {
+pub(crate) enum RelativePath<'py> {
     Native(String),
     Python(Bound<'py, PyAny>),
 }
 
 impl<'py> RelativePath<'py> {
-    fn object(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    pub(crate) fn object(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match self {
             Self::Native(relative) => Path::new(relative).into_pyobject(py),
             Self::Python(relative) => Ok(relative.clone()),
@@ -48,7 +38,7 @@ impl<'py> RelativePath<'py> {
     }
 
     /// The model's name, its file stem.
-    fn name(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    pub(crate) fn name(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match self {
             Self::Native(relative) => Ok(PyString::new(py, model_file_stem(relative)).into_any()),
             Self::Python(relative) => native_field(relative, STEM_ATTRIBUTE),
@@ -57,7 +47,7 @@ impl<'py> RelativePath<'py> {
 }
 
 /// Discover every model file natively, each as its record or the error it raises when built.
-fn model_items<'py>(
+pub(crate) fn model_items<'py>(
     project_dir: &Bound<'py, PyAny>,
     options: &ModelFileOptions,
 ) -> PyResult<Vec<ModelItem<'py>>> {
@@ -105,82 +95,4 @@ fn model_items<'py>(
         }
         Ok(items)
     })
-}
-
-/// The (selected) model files; `extraction` is `(implicit alias columns, output locations)`.
-pub(crate) fn discovered_model_files<'py>(
-    project_dir: &Bound<'py, PyAny>,
-    extraction: (bool, bool),
-    selection: ModelFileSelection<'py>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let py: Python<'py> = project_dir.py();
-    let options: ModelFileOptions = model_file_options(
-        extraction,
-        sqlbuild_python_base::compile_context::main::delta::injection::injection()
-            .map(|injection| std::sync::Arc::new(injection.model_paths.clone())),
-    );
-    let items: Vec<ModelItem<'py>> = model_items(project_dir, &options)?;
-    let faults = FileFaults {
-        project_dir: project_dir.clone(),
-        on_fault: selection.on_fault.filter(|on_fault| !on_fault.is_none()),
-    };
-    let selected: Option<Bound<'py, PyAny>> = selection
-        .selected_model_names
-        .filter(|selected| !selected.is_none());
-    let mut records: Vec<Bound<'py, PyAny>> = Vec::with_capacity(items.len());
-    for (relative_path, built) in items {
-        if let Some(selected) = &selected
-            && !selected.contains(relative_path.name(py)?)?
-        {
-            continue;
-        }
-        match built {
-            Ok(record) => records.push(record),
-            Err(error) => {
-                records.extend(faults.kept(&relative_path.object(py)?, Err(error))?);
-            }
-        }
-    }
-    record_tuple(py, records)
-}
-
-/// Discover the (selected) model files natively, reporting failing files to `on_fault`.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn discover_model_files<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "discover_model_files",
-        options,
-        (
-            &[
-                "project_dir",
-                "extract_implicit_alias_columns",
-                "extract_output_column_locations",
-            ],
-            &["selected_model_names", "on_fault"],
-        ),
-    )?;
-    discovered_model_files(
-        &arguments.value("project_dir")?,
-        (
-            arguments
-                .value("extract_implicit_alias_columns")?
-                .extract()?,
-            arguments
-                .value("extract_output_column_locations")?
-                .extract()?,
-        ),
-        ModelFileSelection {
-            selected_model_names: Some(arguments.value("selected_model_names")?),
-            on_fault: Some(arguments.value("on_fault")?),
-        },
-    )
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_model_files, module)?)
 }

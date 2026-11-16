@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.235.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.234.0...v0.235.0) (2026-11-16)
+
+
+### Features
+
+* replace_key for delete_insert and templates inside quoted config arguments ([#1518](https://github.com/sqlstack-io/sqlbuild/issues/1518)) ([7155c2d](https://github.com/sqlstack-io/sqlbuild/commit/7155c2dd0ee7a2968a1c69e66b4170853c0ad19f))
+
 ## [0.234.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.233.1...v0.234.0) (2026-11-16)
 
 

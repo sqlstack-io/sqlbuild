@@ -2,7 +2,6 @@
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::old_name_objects::relation;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -17,12 +16,14 @@ use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::compiled_models::schema_entry::schema_entry;
 
 pub(crate) fn declared_column_aliases<'py>(
     py: Python<'py>,
     model: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let schema = model_reads::schema_entry(model)?;
+    let schema = schema_entry(model)?;
     let mut columns: Vec<(String, Option<String>)> = Vec::new();
     if !schema.is_none() {
         for column in native_field(&schema, "columns")?.try_iter()? {
@@ -88,7 +89,7 @@ pub(crate) fn old_name_claim_errors<'py>(
     let mut errors: Vec<Bound<'py, PyAny>> = Vec::new();
     for model in arguments.value("selected")?.try_iter()? {
         let model = model?;
-        let name = model_reads::name_object(&model)?;
+        let name = name_object(&model)?;
         let existing = arguments
             .value("snapshot")?
             .getattr("existing_relations")?
@@ -101,7 +102,7 @@ pub(crate) fn old_name_claim_errors<'py>(
         if !kind.eq("view")? {
             continue;
         }
-        let destination = relation(&model_reads::destination(&model)?)?;
+        let destination = relation(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?)?;
         for view in arguments.value("views")?.try_iter()? {
             let view = view?;
             if native_field(&view, "destination_model")?.eq(&name)?
@@ -155,11 +156,11 @@ pub(crate) fn old_name_view_skip_reason<'py>(
     let mut reuser: Option<String> = None;
     for model in arguments.value("models")?.try_iter()? {
         let model = model?;
-        if relation(&model_reads::destination(&model)?)?
+        if relation(&sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(&model)?)?
             .call_method1("matches", (&old,))?
             .is_truthy()?
         {
-            reuser = Some(model_reads::name_object(&model)?.extract()?);
+            reuser = Some(name_object(&model)?.extract()?);
             break;
         }
     }

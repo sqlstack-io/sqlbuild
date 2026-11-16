@@ -1,16 +1,14 @@
 //! Model description resolution for header-only tooling, without importing project Python.
 
-use pyo3::prelude::{Bound, PyAny, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyCFunction, PyDict, PyFrozenSet};
-use pyo3::{pyfunction, wrap_pyfunction};
+use crate::discovery::main::project::load_project_config_file::load_project_config_file;
+use crate::discovery::main::records::discover_model_schema_files::discover_model_schema_files;
+use crate::discovery::main::records::discovered_model_files::discovered_model_files;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use pyo3::pyfunction;
+use pyo3::types::PyCFunction;
 
-use crate::discovery::_helpers::project::project_config::load_project_config_file;
-use crate::discovery::_helpers::records::declaration_records::discover_model_schema_files;
-use crate::discovery::_helpers::records::model_records::discovered_model_files;
 use crate::discovery::_helpers::snapshots::snapshot::in_snapshot;
 use crate::discovery::models::ModelFileSelection;
-use crate::model_config::main::model_nodes::externally_described_models::externally_described_models as described_models;
-use crate::render::main::declarations::public_model_schema_index::public_model_schema_index;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::types::RecordId;
@@ -58,19 +56,4 @@ pub(crate) fn discover_model_description_inputs<'py>(
             ],
         )
     })
-}
-
-/// Model files that `[defaults]`, `[path_defaults]` or a model schema describe.
-pub(crate) fn externally_described_models<'py>(
-    project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let py: Python<'py> = project_dir.py();
-    let inputs: Bound<'py, PyAny> = discover_model_description_inputs(project_dir)?;
-    let schemas: Bound<'py, PyDict> = public_model_schema_index(inputs.clone())?;
-    PyFrozenSet::new(py, described_models(inputs, schemas)?)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(discover_model_description_inputs, module)?)?;
-    Ok(())
 }

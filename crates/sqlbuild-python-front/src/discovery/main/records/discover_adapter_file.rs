@@ -1,12 +1,26 @@
 //! Detect a project-level adapter.py without importing it.
 
-use crate::discovery::_helpers::records::declaration_records;
-use pyo3::prelude::Bound;
-use pyo3::prelude::PyAny;
-use pyo3::prelude::PyResult;
+use crate::discovery::_helpers::records::declaration_records::path_class;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::pyfunction;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Detect a project-level adapter.py without importing it.
-#[inline]
+#[pyfunction]
+#[pyo3(signature = (*, project_dir))]
 pub fn discover_adapter_file<'py>(project_dir: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    declaration_records::discover_adapter_file(project_dir)
+    let py: Python<'py> = project_dir.py();
+    let file_path: Bound<'py, PyAny> = project_dir.div("adapter.py")?;
+    if !file_path.call_method0("is_file")?.is_truthy()? {
+        return Ok(py.None().into_bound(py));
+    }
+    new_record_with(
+        py,
+        RecordId::DiscoveredAdapterFile,
+        &[
+            ("file_path", file_path),
+            ("relative_path", path_class(py)?.call1(("adapter.py",))?),
+        ],
+    )
 }
