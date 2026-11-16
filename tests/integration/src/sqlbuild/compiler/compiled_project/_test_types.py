@@ -312,6 +312,14 @@ class SnapshotDeclarationRejectionTestCase:
 
 
 @dataclass(frozen=True)
+class SnapshotRetryTestCase:
+    description: str
+    tables: str
+    expected_on_failure: dict[str, int]
+    expected_warnings: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class SnapshotDiscoveryTestCase:
     description: str
     files: dict[str, str]

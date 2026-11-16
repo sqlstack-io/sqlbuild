@@ -123,9 +123,9 @@ pub(crate) fn run_controls(run: &RunFile) -> RunControls {
             files::Overlap::Queue => Overlap::Queue,
             files::Overlap::Skip => Overlap::Skip,
         },
-        on_failure: run.on_failure.map(|policy| OnFailure {
-            retries: policy.retries,
-            retry_delay_seconds: policy.retry_delay_seconds,
+        on_failure: run.retry.map(|policy| OnFailure {
+            retries: policy.attempts,
+            retry_delay_seconds: policy.delay_seconds,
         }),
     }
 }

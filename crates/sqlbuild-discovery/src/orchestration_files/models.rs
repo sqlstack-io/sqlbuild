@@ -27,11 +27,18 @@ pub enum InitialStatus {
     Paused,
 }
 
-/// Reruns from failure, `retries` times, `retry_delay_seconds` apart.
+/// A `[retry]` table: rerun from failure up to `attempts` times, `delay_seconds` apart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct OnFailure {
-    pub retries: u8,
-    pub retry_delay_seconds: u32,
+pub struct RetryPolicy {
+    pub attempts: u8,
+    pub delay_seconds: u32,
+}
+
+/// A deprecated name a file still uses, where it is written and what replaces it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Deprecation {
+    pub message: String,
+    pub position: FilePosition,
 }
 
 /// A 1-based line and column in a declaration file.
@@ -75,7 +82,10 @@ pub struct RunFile {
     pub overlap: Overlap,
     pub concurrency_groups: Vec<String>,
     pub schedule: Option<ScheduleFile>,
-    pub on_failure: Option<OnFailure>,
+    /// `[retry]`, or the deprecated `[on_failure]` it replaces.
+    pub retry: Option<RetryPolicy>,
+    /// Deprecated names the file uses, in file order.
+    pub deprecations: Vec<Deprecation>,
 }
 
 /// One `orchestration/jobs/**.toml` file.

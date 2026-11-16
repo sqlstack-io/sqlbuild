@@ -480,7 +480,7 @@ export type QueueWait =
 	| { kind: 'upstream_job'; runId: string; jobKey: string }
 	/** A child run waits for its group run to start. */
 	| { kind: 'group_parent'; runId: string }
-	/** A retry of a failed run waits out the job's `on_failure` delay. */
+	/** A retry of a failed run waits out the job's `[retry]` delay. */
 	| { kind: 'retry_delay'; attempt: number; dueAt: Iso };
 
 export type QueueEntry = {
@@ -654,7 +654,7 @@ export type RerunMode = 'all' | 'from_failure' | 'selected';
 
 /** What a schedule tick or sensor request does while a run of the job is active; people's runs always queue. */
 export type OverlapPolicy = 'queue' | 'skip';
-/** A failed or partial run reruns from failure up to `retries` times, `retryDelaySeconds` after the last ended. */
+/** A job's `[retry]`: a failed or partial run reruns from failure up to `retries` (`attempts`) times, `retryDelaySeconds` (`delay_seconds`) after the last ended. */
 export type OnFailure = { retries: number; retryDelaySeconds: number };
 export type JobKind = 'job' | 'group';
 

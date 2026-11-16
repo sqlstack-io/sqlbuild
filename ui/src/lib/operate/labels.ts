@@ -81,7 +81,7 @@ function delayText(seconds: number): string {
 	return `${seconds} s`;
 }
 
-/** An `on_failure` policy in words, e.g. "Retry twice, 5 min apart" or "Retry once after 15 min". */
+/** A `[retry]` policy in words, e.g. "Retry twice, 5 min apart" or "Retry once after 15 min". */
 export function onFailureText(policy: OnFailure): string {
 	const times = policy.retries === 1 ? 'once' : policy.retries === 2 ? 'twice' : `${policy.retries} times`;
 	if (!policy.retryDelaySeconds) return `Retry ${times} at once`;
@@ -168,7 +168,7 @@ export function waitTechnical(wait: QueueWait): string {
 		case 'group_parent':
 			return `group run ${wait.runId} not running yet`;
 		case 'retry_delay':
-			return `on_failure retry ${wait.attempt}, not before ${wait.dueAt}`;
+			return `retry ${wait.attempt}, not before ${wait.dueAt}`;
 	}
 }
 

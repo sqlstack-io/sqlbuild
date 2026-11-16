@@ -39,6 +39,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotProcessReuseTestCase,
     SnapshotProvidersTestCase,
     SnapshotRejectionTestCase,
+    SnapshotRetryTestCase,
     SnapshotScheduleTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
@@ -952,6 +953,64 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         "30 3 * * *"
     )
     assert second["nodes"] == first["nodes"]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotRetryTestCase(
+            description="current retry names",
+            tables="[retry]\nattempts = 3\ndelay_seconds = 900\n",
+            expected_on_failure={"retries": 3, "retry_delay_seconds": 900},
+            expected_warnings=(),
+        ),
+        SnapshotRetryTestCase(
+            description="deprecated on_failure names",
+            tables="[on_failure]\nretries = 2\nretry_delay_seconds = 600\n",
+            expected_on_failure={"retries": 2, "retry_delay_seconds": 600},
+            expected_warnings=(
+                "Warning: orchestration/jobs/daily_build_job.toml:6:1: "
+                "`[on_failure]` is deprecated; rename it to `[retry]`",
+                "Warning: orchestration/jobs/daily_build_job.toml:7:11: "
+                "`retries` is deprecated; rename it to `attempts`",
+                "Warning: orchestration/jobs/daily_build_job.toml:8:23: "
+                "`retry_delay_seconds` is deprecated; rename it to `delay_seconds`",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_job_retry_table_when_compiling_then_both_names_publish_one_policy_and_old_ones_warn(
+    tmp_path: Path, capfd: pytest.CaptureFixture[str], test_case: SnapshotRetryTestCase
+) -> None:
+    text: str = "".join(f"{key} = {value}\n" for key, value in _DAILY_BUILD.items())
+    write_files(
+        project_dir=tmp_path,
+        files=TYPE_PROOF_FILES
+        | {"orchestration/jobs/daily_build_job.toml": text + "\n" + test_case.tables},
+    )
+    capfd.readouterr()
+    discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
+    warnings: list[str] = [
+        line for line in capfd.readouterr().err.splitlines() if line.startswith("Warning: ")
+    ]
+    snapshot: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=build_compiled_project(
+                discovered_inputs=discovered,
+                adapter=DuckDbAdapter(),
+                resolved_connection={"database": "warehouse", "schema": "main"},
+            ),
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            discovered_inputs=discovered,
+        ).to_json()
+    )
+
+    assert snapshot["documents"]["jobs"]["daily_build_job"]["on_failure"] == (
+        test_case.expected_on_failure
+    )
+    assert tuple(warnings) == test_case.expected_warnings
 
 
 @pytest.mark.parametrize(

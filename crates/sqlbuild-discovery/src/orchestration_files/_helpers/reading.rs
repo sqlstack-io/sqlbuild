@@ -6,13 +6,14 @@ use sqlbuild_core::text::main::close_matches::close_matches;
 use toml::Spanned;
 use toml::de::DeTable;
 
-use crate::orchestration_files::_helpers::raw::{RawOnFailure, RawRun, RawSchedule};
+use crate::orchestration_files::_helpers::raw::{RawRetry, RawRun, RawSchedule};
 use crate::orchestration_files::constants::{
-    CONCURRENCY_KEY, RETRIES_RANGE, RETRY_DELAY_RANGE, SUGGESTION_CUTOFF,
+    CONCURRENCY_KEY, RETRIES_RANGE, RETRY_ATTEMPTS_KEY, RETRY_DELAY_KEY, RETRY_DELAY_RANGE,
+    RETRY_TABLE, SUGGESTION_CUTOFF,
 };
 use crate::orchestration_files::errors::FileError;
 use crate::orchestration_files::models::{
-    FilePosition, OnFailure, Positioned, RunFile, ScheduleFile, ScheduleSource,
+    Deprecation, FilePosition, Positioned, RetryPolicy, RunFile, ScheduleFile, ScheduleSource,
 };
 
 /// The 1-based line and character column of byte `offset` in `text`.
@@ -121,38 +122,122 @@ fn schedule(text: &str, raw: Spanned<RawSchedule>) -> Result<ScheduleFile, FileE
     })
 }
 
-fn on_failure(text: &str, raw: Spanned<RawOnFailure>) -> Result<OnFailure, FileError> {
-    let start: usize = raw.span().start;
-    let raw: RawOnFailure = raw.into_inner();
-    let invalid = |field: &str, (low, high): (i64, i64)| {
+/// A retry key's value under its current name and under its deprecated name.
+type RetryValues = (Option<Spanned<i64>>, Option<Spanned<i64>>);
+
+/// One whole number of a retry table, within `range`, by the name it is written under.
+fn retry_number<T: TryFrom<i64>>(
+    text: &str,
+    (table, keys, values): (&str, (&str, &str), RetryValues),
+    range: (i64, i64),
+    deprecations: &mut Vec<Deprecation>,
+) -> Result<Option<T>, FileError> {
+    let (key, value) = match values {
+        (Some(_), Some(deprecated)) => {
+            return Err(error_at(
+                text,
+                deprecated.span().start,
+                format!(
+                    "{table} sets both `{}` and its deprecated name `{}`; keep only `{}`",
+                    keys.0, keys.1, keys.0
+                ),
+            ));
+        }
+        (Some(current), None) => (keys.0, current),
+        (None, Some(deprecated)) => {
+            deprecations.push(Deprecation {
+                message: format!("`{}` is deprecated; rename it to `{}`", keys.1, keys.0),
+                position: position(text, deprecated.span().start),
+            });
+            (keys.1, deprecated)
+        }
+        (None, None) => return Ok(None),
+    };
+    let start: usize = value.span().start;
+    let number: i64 = value.into_inner();
+    let invalid = || {
         error_at(
             text,
             start,
-            format!("on_failure {field} must be a whole number from {low} to {high}"),
+            format!(
+                "{table} {key} must be a whole number from {} to {}",
+                range.0, range.1
+            ),
         )
     };
-    let retries_range: (i64, i64) = (i64::from(RETRIES_RANGE.0), i64::from(RETRIES_RANGE.1));
-    if !(retries_range.0..=retries_range.1).contains(&raw.retries) {
-        return Err(invalid("retries", retries_range));
+    if !(range.0..=range.1).contains(&number) {
+        return Err(invalid());
     }
-    let delay_range: (i64, i64) = (
-        i64::from(RETRY_DELAY_RANGE.0),
-        i64::from(RETRY_DELAY_RANGE.1),
-    );
-    if !(delay_range.0..=delay_range.1).contains(&raw.retry_delay_seconds) {
-        return Err(invalid("retry_delay_seconds", delay_range));
-    }
-    let retries: u8 = u8::try_from(raw.retries).map_err(|_| invalid("retries", retries_range))?;
-    let retry_delay_seconds: u32 = u32::try_from(raw.retry_delay_seconds)
-        .map_err(|_| invalid("retry_delay_seconds", delay_range))?;
-    Ok(OnFailure {
-        retries,
-        retry_delay_seconds,
-    })
+    T::try_from(number).map(Some).map_err(|_| invalid())
+}
+
+/// `[retry]`, or the deprecated `[on_failure]`, checked; every deprecated name it uses is recorded.
+fn retry(
+    text: &str,
+    (current, deprecated): (Option<Spanned<RawRetry>>, Option<Spanned<RawRetry>>),
+    deprecations: &mut Vec<Deprecation>,
+) -> Result<Option<RetryPolicy>, FileError> {
+    let (table, raw) = match (current, deprecated) {
+        (Some(_), Some(deprecated)) => {
+            return Err(error_at(
+                text,
+                deprecated.span().start,
+                format!(
+                    "`[{}]` and its deprecated name `[{}]` are both set; keep only `[{}]`",
+                    RETRY_TABLE.0, RETRY_TABLE.1, RETRY_TABLE.0
+                ),
+            ));
+        }
+        (Some(current), None) => (RETRY_TABLE.0, current),
+        (None, Some(deprecated)) => {
+            deprecations.push(Deprecation {
+                message: format!(
+                    "`[{}]` is deprecated; rename it to `[{}]`",
+                    RETRY_TABLE.1, RETRY_TABLE.0
+                ),
+                position: position(text, deprecated.span().start),
+            });
+            (RETRY_TABLE.1, deprecated)
+        }
+        (None, None) => return Ok(None),
+    };
+    let start: usize = raw.span().start;
+    let raw: RawRetry = raw.into_inner();
+    let attempts: Option<u8> = retry_number(
+        text,
+        (table, RETRY_ATTEMPTS_KEY, (raw.attempts, raw.retries)),
+        (i64::from(RETRIES_RANGE.0), i64::from(RETRIES_RANGE.1)),
+        deprecations,
+    )?;
+    let delay_seconds: Option<u32> = retry_number(
+        text,
+        (
+            table,
+            RETRY_DELAY_KEY,
+            (raw.delay_seconds, raw.retry_delay_seconds),
+        ),
+        (
+            i64::from(RETRY_DELAY_RANGE.0),
+            i64::from(RETRY_DELAY_RANGE.1),
+        ),
+        deprecations,
+    )?;
+    let attempts: u8 = attempts.ok_or_else(|| {
+        error_at(
+            text,
+            start,
+            format!("{table} needs `{}`", RETRY_ATTEMPTS_KEY.0),
+        )
+    })?;
+    Ok(Some(RetryPolicy {
+        attempts,
+        delay_seconds: delay_seconds.unwrap_or(RETRY_DELAY_RANGE.0),
+    }))
 }
 
 /// The fields jobs and groups share, checked.
 pub(crate) fn run_file(text: &str, raw: RawRun) -> Result<RunFile, FileError> {
+    let mut deprecations: Vec<Deprecation> = Vec::new();
     let owner: Option<Positioned<String>> = raw
         .owner
         .map(|owner| nonblank(text, owner, "owner"))
@@ -180,9 +265,7 @@ pub(crate) fn run_file(text: &str, raw: RawRun) -> Result<RunFile, FileError> {
             .schedule
             .map(|value| schedule(text, value))
             .transpose()?,
-        on_failure: raw
-            .on_failure
-            .map(|value| on_failure(text, value))
-            .transpose()?,
+        retry: retry(text, (raw.retry, raw.on_failure), &mut deprecations)?,
+        deprecations,
     })
 }
