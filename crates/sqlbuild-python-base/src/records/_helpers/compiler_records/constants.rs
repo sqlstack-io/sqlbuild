@@ -394,6 +394,7 @@ const R_COMPILE_PIPELINE_OPTIONS: RecordSpec = RecordSpec {
         FieldSpec::new("external_sql_reference_resolver", FieldDefault::None),
         FieldSpec::new("resolve_python_run_selectors", FieldDefault::False),
         FieldSpec::new("no_cache", FieldDefault::False),
+        FieldSpec::new("verbose", FieldDefault::False),
         FieldSpec::new("max_microbatches", FieldDefault::None),
         FieldSpec::new("concurrency", FieldDefault::None),
         FieldSpec::new("selection_diagnostics", FieldDefault::False),

@@ -44,9 +44,10 @@ const DEFAULT_SECTION_ENTRIES: i64 = 50;
 const ERROR_SEVERITY: &str = "error";
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 /// Request fields passed to the compile pipeline under the same name.
-const PIPELINE_FIELDS: [&str; 11] = [
+const PIPELINE_FIELDS: [&str; 12] = [
     "no_sql_validation",
     "no_cache",
+    "verbose",
     "defer_to",
     "defer_sources_to",
     "cursor_overrides",

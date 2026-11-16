@@ -1,6 +1,6 @@
 //! Build and evaluate the built-in rules request natively from compiled-project rows.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
@@ -18,18 +18,23 @@ use sqlbuild_rules::constants::API_VERSION;
 use sqlbuild_rules::engine::main::build_models::build_models;
 use sqlbuild_rules::engine::main::evaluate_rows::evaluate_rows;
 use sqlbuild_rules::engine::main::finalize_rows::finalize_rows;
+use sqlbuild_rules::engine::main::json_grain_skipped_models::json_grain_skipped_models;
+use sqlbuild_rules::engine::main::json_grains::json_grains;
+use sqlbuild_rules::engine::main::needs_json_grains::needs_json_grains;
 use sqlbuild_rules::engine::main::project_model_rows::project_model_rows;
 use sqlbuild_rules::errors::RowsError;
 use sqlbuild_rules::models::{
-    Declaration, DeclarationMember, EvaluateRequest, Fault, Model, ModelRow, ModelRowsContext,
-    RowsEvaluation, RowsRequest, RulesConfig,
+    Declaration, DeclarationMember, EvaluateRequest, Fault, LineageColumn, Model, ModelRow,
+    ModelRowsContext, RowsEvaluation, RowsRequest, RulesConfig,
 };
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::compiled_views::audit_views::NativeCompiledAudit;
+use crate::bindings::_helpers::compiled_views::model_reads::native_model;
 use crate::bindings::_helpers::compiled_views::records::compiled_project_facts;
 use crate::bindings::_helpers::compiled_views::records::declaration_rows;
+use crate::bindings::_helpers::compiled_views::relation_keys::project_relation_keys;
 use crate::bindings::_helpers::rules::config_json::asdict_json;
 use crate::bindings::_helpers::rules::early_builtin_rules::EarlyBuiltinRules;
 use crate::bindings::_helpers::rules::fact_replay::{project_attribute, project_models};
@@ -293,10 +298,8 @@ fn built_request(
         Some(facts) => facts.clone(),
         None => compiled_project_facts(&project)?,
     };
-    let names: Vec<String> = project_models(&project)?
-        .into_iter()
-        .map(|model| model.name)
-        .collect();
+    let models = project_models(&project)?;
+    let names: Vec<String> = models.iter().map(|model| model.name.clone()).collect();
     let sql_tests: Vec<Bound<'_, PyAny>> = project_attribute(&project, "sql_tests")?
         .try_iter()?
         .collect::<PyResult<_>>()?;
@@ -320,8 +323,17 @@ fn built_request(
             .iter()
             .map(finding_fault)
             .collect::<PyResult<_>>()?;
-        let model_rows: Vec<ModelRow> =
+        let mut model_rows: Vec<ModelRow> =
             project_model_rows(facts.borrow().facts(), &names).map_err(value_error)?;
+        if needs_json_grains(&request).map_err(value_error)? {
+            let lineage: Vec<Option<Vec<LineageColumn>>> = models
+                .iter()
+                .map(|entry| model_lineage(&entry.model))
+                .collect::<PyResult<_>>()?;
+            let keys: BTreeMap<String, Vec<Vec<String>>> =
+                project_relation_keys(&project)?.into_iter().collect();
+            json_grains(&mut model_rows, lineage, &keys);
+        }
         request.models = built_models(&rows, &request, model_rows)?;
         let request: EvaluateRequest =
             crate::bindings::_helpers::compile_delta::rules_rows::whole_project_request(request)?;
@@ -365,6 +377,7 @@ fn evaluated<'py>(
     early: Option<(EarlyBuiltinRules, &AtomicBool)>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let request: RowsRequest = taken_rows(request)?;
+    let skipped: Vec<(String, String)> = json_grain_skipped_models(&request.request.models);
     let evaluation: Result<RowsEvaluation, RowsError> = match early {
         None => py
             .compiler_detach(|| Ok(evaluate_rows(request)))
@@ -407,6 +420,7 @@ fn evaluated<'py>(
             ),
             ("built_in_ms", evaluation.built_in_ms.into_bound_py_any(py)?),
             ("reused", evaluation.reused.into_bound_py_any(py)?),
+            ("skipped_models", PyTuple::new(py, skipped)?.into_any()),
         ],
     )
 }
@@ -520,6 +534,30 @@ fn built_models(
         fallback,
     );
     built.map_err(|message| python_error.take().unwrap_or_else(|| value_error(message)))
+}
+
+/// The model's lineage columns, or `None` when it has no kept lineage.
+fn model_lineage(model: &Bound<'_, PyAny>) -> PyResult<Option<Vec<LineageColumn>>> {
+    let Some(view) = native_model(model)? else {
+        return Ok(None);
+    };
+    let Some(rows) = view.lineage_rows(model.py())? else {
+        return Ok(None);
+    };
+    let mut columns: Vec<LineageColumn> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let aggregated: bool = row.aggregated();
+        let mut sources: Vec<(String, String)> = Vec::with_capacity(row.sources.len());
+        for (resource, name, _) in row.sources {
+            sources.push((resource, name));
+        }
+        columns.push(LineageColumn {
+            aggregated,
+            output: row.output_column,
+            sources,
+        });
+    }
+    Ok(Some(columns))
 }
 
 fn declarations(rows: Vec<DeclarationRowPy<'_>>) -> PyResult<Vec<Declaration>> {

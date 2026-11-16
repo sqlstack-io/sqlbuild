@@ -210,6 +210,19 @@ _BUILT_IN_RULES_OFF: tuple[str, str, str] = (
     'select = ["XSQBR"]',
 )
 _RULE_READ_MORE: str = "delta compile fell back: a custom rule read more than the changed models"
+_PERFORMANCE_RULES_ON: tuple[str, str, str] = (
+    "sqlbuild_project.toml",
+    'select = ["SQBR", "SQLCLEAN", "XSQBR"]',
+    'select = ["SQBR", "SQBRPERFORMANCE101", "SQBRPERFORMANCE102", "SQLCLEAN", "XSQBR"]',
+)
+_SNOWFLAKE_ADAPTER: tuple[str, str, str] = (
+    "sqlbuild_project.toml",
+    'adapter = "duckdb"',
+    'adapter = "snowflake"',
+)
+_JSON_GRAINS_READ_ACROSS: str = (
+    "delta compile fell back: SQBRPERFORMANCE102 compares keys and readers across models"
+)
 _FAMILY_TYPE_EDIT: tuple[str, str, str] = (_CATEGORY_PIVOT_PATH, "type DOUBLE", "type VARCHAR")
 _FAMILIES_CHANGED: str = "delta compile fell back: a model's dynamic column families changed"
 _EXAMPLE_TRACKED_VARIABLE: str = "SQLBUILD_ORDERS_EXAMPLE"
@@ -534,6 +547,22 @@ def test_given_project_shape_when_compiling_an_edit_then_it_prints_what_a_full_c
             edits=(_BODY_EDIT,),
             env={DELTA_COMPILE_VERIFY_ENV_VAR: "1"},
             expected_stderr_line=_RULE_READ_MORE,
+        ),
+        DeltaCompileVerifyTestCase(
+            description="the performance rules off Snowflake keep the delta",
+            files=(),
+            stored_edits=(_PERFORMANCE_RULES_ON,),
+            edits=(_BODY_EDIT,),
+            env={DELTA_COMPILE_VERIFY_ENV_VAR: "1"},
+            expected_stderr_line=DELTA_VERIFIED_LINE,
+        ),
+        DeltaCompileVerifyTestCase(
+            description="SQBRPERFORMANCE102 on Snowflake names why it fell back",
+            files=(),
+            stored_edits=(_PERFORMANCE_RULES_ON, _SNOWFLAKE_ADAPTER),
+            edits=(_BODY_EDIT,),
+            env={DELTA_COMPILE_VERIFY_ENV_VAR: "1"},
+            expected_stderr_line=_JSON_GRAINS_READ_ACROSS,
         ),
         DeltaCompileVerifyTestCase(
             description="a new tracked variable names what changed",

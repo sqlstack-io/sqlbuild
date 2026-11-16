@@ -1176,6 +1176,15 @@ class SqlRuleCacheSequenceTestCase:
 
 
 @dataclass(frozen=True)
+class PerformanceRulesIntegrationTestCase:
+    """One compile of the DuckShop performance-rules fixture, optionally with one model added."""
+
+    description: str
+    extra_models: dict[str, str]
+    expected_findings: tuple[tuple[str, str, int, int], ...]
+
+
+@dataclass(frozen=True)
 class NamedSelectorIntegrationTestCase:
     """One compile of the DuckShop named-selector fixture under a `[rules]` table."""
 

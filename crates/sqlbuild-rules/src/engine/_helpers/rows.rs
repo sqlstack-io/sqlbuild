@@ -104,6 +104,7 @@ fn build_model(row: ModelRow, inputs: &ModelInputs<'_, '_>) -> Result<Model, Str
         empty_input_only_test_count: 0,
         payload_digest: None,
         stripped: false,
+        json_grain: row.json_grain,
     })
 }
 

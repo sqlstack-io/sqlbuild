@@ -12,6 +12,7 @@ from scripts.cold_compile_performance._helpers.dense_project import (
     dense_test_path,
     write_dense_compile_project,
 )
+from scripts.cold_compile_performance.constants import DENSE_ALL_RULE_SELECT
 from scripts.cold_compile_performance.main.require_compile_memory_scope import (
     require_compile_memory_scope,
 )
@@ -97,7 +98,11 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
     wall_budget: float = test_case.expected_max_wall_seconds * measure_runner_calibration().factor
     print(f"dense cold models={test_case.model_count} wall_budget={wall_budget:.2f}s", flush=True)
     project_dir: Path = tmp_path / "dense_orders"
-    write_dense_compile_project(project_dir=project_dir, model_count=test_case.model_count)
+    write_dense_compile_project(
+        project_dir=project_dir,
+        model_count=test_case.model_count,
+        rule_select=DENSE_ALL_RULE_SELECT,
+    )
     config: RulesConfig = load_rules_config(project_dir=project_dir)
     catalogue: tuple[Rule, ...] = build_rule_catalogue(
         config=config, project_dir=project_dir, include_custom=True

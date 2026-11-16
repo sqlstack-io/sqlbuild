@@ -152,7 +152,9 @@ with `SQBR`. The `SQBRPYTHON` Rules check the project's Python: annotations, imp
 shape and the layout of `python/`. They run only when `select` names `SQBRPYTHON` or one of its
 codes; see [Python Rules](/docs/concepts/rules/python-rules). `SQBRORCHESTRATION101` keeps job and
 sensor selections from listing nodes one by one; see
-[Orchestration Rules](/docs/concepts/rules/orchestration-rules).
+[Orchestration Rules](/docs/concepts/rules/orchestration-rules). The `SQBRPERFORMANCE` Rules find
+Snowflake JSON payloads that repeat on every row; they run only when `select` names their codes. See
+[Performance Rules](/docs/concepts/rules/performance-rules).
 
 Projects can define custom Python Rules under `rules/**/*.py`. Their codes begin with `XSQBR`, for
 example `XSQBRARCH001`. Custom Rules use the same selection, findings, exceptions, execution order,
@@ -247,6 +249,9 @@ Rules add about 14% to a cold compile and nothing to a warm one. See
   </Card>
   <Card title="Published-layer Rules" icon="layer-group" href="/docs/concepts/rules/published-layer-rules">
     Keep each domain's published layer free of consumer-specific variants.
+  </Card>
+  <Card title="Performance Rules" icon="rocket" href="/docs/concepts/rules/performance-rules">
+    Catch Snowflake JSON payloads copied onto every row of a finer grain.
   </Card>
   <Card title="Execution and caching" icon="gauge-high" href="/docs/concepts/rules/execution-and-caching">
     Learn evaluation order, focused execution, and dependency-aware reuse.
