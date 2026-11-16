@@ -13,7 +13,9 @@ select = ["SQBRPERFORMANCE101", "SQBRPERFORMANCE102"]
 ```
 
 Both Rules are off by default: selecting the `SQBRPERFORMANCE` family alone does not run them. They
-run on the Snowflake dialect.
+run on the Snowflake dialect. There, selecting `SQBRPERFORMANCE102` makes every edit compile the
+whole project, because a [delta compile](/docs/cli/compile#compiling-after-an-edit) cannot recheck
+the models that read or are read by the edited ones.
 
 | Code | Name | Reports |
 |---|---|---|

@@ -294,6 +294,7 @@ Compile runs in full instead when:
   a model-subject Rule must run again for a model that was not edited (for example because it reads
   an edited upstream file), or reads more for an edited model than that model's SQL, columns,
   contract and grain, project files and the source list;
+- the project selects `SQBRPERFORMANCE102` on the Snowflake dialect;
 - the previous compile failed its Rules, since that compile writes no SQL tests, functions or
   audits to `target/compiled/`, or it reported other errors or warnings in files the edit didn't
   change;
