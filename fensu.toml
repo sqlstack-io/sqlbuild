@@ -1809,8 +1809,8 @@ reason = "Python passes each of these records as one positional tuple; extract_b
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
 path = "crates/sqlbuild-python-project/src/compiled_views/models.rs"
-symbols = ["AnalysisProjections", "CompiledProjections", "ModelInputHandles", "InputProjections", "NativeProjectView"]
-reason = "AnalysisProjections, CompiledProjections, ModelInputHandles, InputProjections, NativeProjectView implement Debug manually because they cache Python projections in PyOnceLocks, directly or through the projections they hold, which do not implement Debug; other models derive it."
+symbols = ["AnalysisProjections", "CompiledProjections", "ModelInputHandles", "InputProjections", "NativeProjectView", "SchemaHandles"]
+reason = "AnalysisProjections, CompiledProjections, ModelInputHandles, InputProjections, NativeProjectView implement Debug manually because they cache Python projections in PyOnceLocks, directly or through the projections they hold, which do not implement Debug; SchemaHandles implements it manually so the user-authored audit arguments its specs carry stay out of logs; other models derive it."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
@@ -2664,7 +2664,6 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/assembly.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/compiled_tests.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/workspace_commands/commands.rs=5",
-    "crates/sqlbuild-python/src/bindings/models.rs=0",
 ]
 
 [targets.rust.rule_options.XSB073]
@@ -2925,7 +2924,6 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_command/test_command.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/assembly.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/sql_test_glue/compiled_tests.rs=8",
-    "crates/sqlbuild-python/src/bindings/models.rs=0",
 ]
 
 [targets.rust.rule_options.XSB075]
@@ -3213,10 +3211,6 @@ paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/model_input
 reason = "Each borrows its own record from the compiled project owner by index; only the borrow-and-read shape is alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/getters.rs"]
-reason = "Each matches its own native class's attribute names to its own getters; only the cast-and-dispatch shape is alike."
-
-[[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-project/src/compiled_project/_helpers/project.rs", "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_models/compiled_model_view.rs", "crates/sqlbuild-python/src/bindings/_helpers/input_loops/audit_loop.rs", "crates/sqlbuild-python/src/bindings/_helpers/input_loops/resource_diagnostics.rs", "crates/sqlbuild-python/src/bindings/_helpers/plan_output/python_identity.rs"]
 reason = "Each reads an optional text value from its own Python mapping; consolidating these readers across the binding crates is a separate change."
 
@@ -3235,14 +3229,6 @@ reason = "Each records its own per-resource fact into its own resource list by i
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-project/src/compiled_project/models.rs"]
 reason = "Each returns a view of its own resource list by index after its own bounds check."
-
-[[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-project/src/analysis_session/models.rs", "crates/sqlbuild-python-project/src/compiled_project/models.rs", "crates/sqlbuild-python-project/src/compiled_views/models.rs"]
-reason = "Each positional record converts its own fields; models.rs holds only records, so these are the conversions positional_record! writes, written out once per record."
-
-[[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/getters.rs"]
-reason = "Each matches its own native class's attribute names to its own getters; only the cast-and-dispatch shape is alike."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-front/src/render/_helpers/expansion/macro_modules.rs", "crates/sqlbuild-python-project/src/graph/_helpers/project/project_graph.rs", "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_selection.rs"]
@@ -3279,10 +3265,6 @@ reason = "Each converts the declaration row of its own consumer into its own dec
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-analysis/src/assembly/analysis_session/_helpers/session.rs", "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_models/compiled_model_view.rs"]
 reason = "The analysis session and the compiled model view each build lineage inputs from their own row types."
-
-[[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-project/src/compiled_views/models.rs"]
-reason = "Each getter reads its own cached projection through the view's shared read helper."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-project/src/compiled_views/models.rs"]

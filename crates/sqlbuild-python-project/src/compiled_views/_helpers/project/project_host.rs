@@ -5,6 +5,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use crate::compiled_views::models::AnalysisProjections;
 use crate::compiled_views::models::CompiledProjections;
 use crate::compiled_views::models::ModelInputHandles;
+use crate::compiled_views::models::SchemaHandles;
 use crate::resource_views::models::AuditProjections;
 use crate::resource_views::models::FunctionProjections;
 use crate::resource_views::models::SeedHandles;
@@ -14,6 +15,14 @@ impl Debug for ModelInputHandles {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> FmtResult {
         formatter
             .debug_struct("ModelInputHandles")
+            .finish_non_exhaustive()
+    }
+}
+
+impl Debug for SchemaHandles {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> FmtResult {
+        formatter
+            .debug_struct("SchemaHandles")
             .finish_non_exhaustive()
     }
 }

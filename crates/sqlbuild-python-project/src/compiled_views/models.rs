@@ -1012,7 +1012,6 @@ pub struct InputViewClasses<'py> {
 }
 
 /// A model schema's header columns and specs, which carry user-authored audit arguments.
-#[derive(Debug)]
 pub struct SchemaHandles {
     pub columns: Arc<HeaderColumns>,
     pub audits: Arc<HeaderAudits>,
