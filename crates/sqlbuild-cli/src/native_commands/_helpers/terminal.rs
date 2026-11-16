@@ -1,20 +1,18 @@
 //! The process's terminal: its width, colour support and stream writes.
 
 use std::io::{self, BufRead, IsTerminal, Read, Write};
-use std::sync::Mutex;
 
 use sqlbuild_orchestration::store::errors::ControlError;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::argv_host::python_int;
 use crate::native_commands::constants::{
-    BROKEN_PIPE_EXCEPTION, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE, EXIT_FLUSH_FAILURE_STATUS,
-    CI_VARIABLE, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, NO_PROGRESS_VARIABLE, PASSWORD_INPUT_BYTES, PYTHON_STDOUT_BUFFER_SIZE,
-    UNCAUGHT_EXCEPTION_STATUS,
+    BROKEN_PIPE_EXCEPTION, CI_VARIABLE, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE,
+    EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, NO_PROGRESS_VARIABLE,
+    PASSWORD_INPUT_BYTES, PYTHON_STDOUT_BUFFER_SIZE, UNCAUGHT_EXCEPTION_STATUS,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::LostStdout;
-use crate::native_commands::types::StderrCapture;
 
 /// `int(os.environ["COLUMNS"])`, `0` when unset or not an integer; beyond 64 bits is Python's.
 fn columns_variable() -> Result<i64, PythonNeeded> {
@@ -146,36 +144,11 @@ pub(crate) fn lost_stdout(total: usize, error: &io::Error) -> LostStdout {
     }
 }
 
-/// Where stderr lines go while the `sqb dev` screen owns the terminal; `None` writes them.
-static STDERR_CAPTURE: Mutex<Option<StderrCapture>> = Mutex::new(None);
-
-/// Send this process's stderr lines to `capture` instead of the terminal, or write them again with `None`.
-pub(crate) fn capture_stderr(capture: Option<StderrCapture>) {
-    if let Ok(mut current) = STDERR_CAPTURE.lock() {
-        *current = capture;
-    }
-}
-
-/// Hand stderr text to the capture, if one is installed; true when it took the text.
-fn captured(text: &str) -> bool {
-    let Ok(current) = STDERR_CAPTURE.lock() else {
-        return false;
-    };
-    let Some(capture) = current.as_ref() else {
-        return false;
-    };
-    for line in text.lines() {
-        capture(line.to_owned());
-    }
-    true
-}
-
 /// Write each text in order and flush it; errors on stderr are ignored, as Python's are.
 pub(crate) fn write_output(writes: &[(Stream, &str)]) -> Option<LostStdout> {
     let encoded: Vec<(Stream, Vec<u8>)> = writes
         .iter()
         .filter(|(_, text)| !text.is_empty())
-        .filter(|(stream, text)| *stream == Stream::Stdout || !captured(text))
         .map(|(stream, text)| (*stream, console_bytes(text)))
         .collect();
     let total: usize = encoded

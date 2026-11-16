@@ -40,7 +40,13 @@ pub(super) fn message_text(message: &ScreenMessage) -> String {
     };
     let outcome: String = finished.map_or_else(
         || "running".to_owned(),
-        |(ok, elapsed)| format!("{} {}s", ["failed", "ok"][usize::from(ok)], elapsed.as_secs()),
+        |(ok, elapsed)| {
+            format!(
+                "{} {}s",
+                ["failed", "ok"][usize::from(ok)],
+                elapsed.as_secs()
+            )
+        },
     );
     format!("{name} | {detail} | {outcome}")
 }

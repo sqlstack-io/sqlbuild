@@ -10,6 +10,3 @@ pub(crate) type LocationPublication = (
     Option<DateTime<Utc>>,
     Vec<WarehouseStateLocation>,
 );
-
-/// Receives each stderr line while the `sqb dev` screen owns the terminal.
-pub(crate) type StderrCapture = Box<dyn Fn(String) + Send>;

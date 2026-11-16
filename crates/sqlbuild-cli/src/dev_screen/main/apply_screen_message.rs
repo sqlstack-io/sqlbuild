@@ -27,13 +27,7 @@ pub(crate) fn apply_screen_message(
         }
         ScreenMessage::Child(event) => child_event(screen, event, now, clock),
         ScreenMessage::Location(location) => located(screen, location),
-        ScreenMessage::Triggers(triggers) => (
-            DevScreen {
-                triggers,
-                ..screen
-            },
-            Vec::new(),
-        ),
+        ScreenMessage::Triggers(triggers) => (DevScreen { triggers, ..screen }, Vec::new()),
         ScreenMessage::Warehouse { adapter, state } => {
             let (screen, closing, lines) = warehouse_settled(screen, (adapter, state), now, clock);
             raw = closing;

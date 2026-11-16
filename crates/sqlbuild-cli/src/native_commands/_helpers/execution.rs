@@ -68,6 +68,10 @@ use crate::compute_logs::main::finish_capture::finish_capture;
 use crate::compute_logs::main::open_log_root::open_log_root;
 use crate::compute_logs::main::start_capture::start_capture;
 use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
+use crate::dev_screen::models::{DevStep, ScreenMessage};
+use crate::dev_screen::types::DevScreenParts;
+use crate::dev_session::main::run_dev_session::run_dev_session;
+use crate::dev_session::models::{DevProject, LocationPipes};
 use crate::native_commands::_helpers::decision::{
     control_database, control_database_variable, text,
 };
@@ -103,10 +107,6 @@ use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
 use crate::workers::main::terminate_child::terminate_child;
 use crate::workers::models::{Launchers, Workers};
-use crate::dev_screen::models::{DevStep, ScreenMessage};
-use crate::dev_screen::types::DevScreenParts;
-use crate::dev_session::main::run_dev_session::run_dev_session;
-use crate::dev_session::models::{DevProject, LocationPipes};
 
 /// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`.
 pub(crate) async fn run_development_roles(
@@ -135,20 +135,27 @@ pub(crate) async fn run_development_roles(
     tasks.spawn(serve_api(
         store.clone(),
         listener,
-        (ApiAuthentication {
-            login: HumanLogin::Development(scope),
-            ..ApiAuthentication::default()
-        }, (Vec::new(), adhoc_planner()), ServerFacts {
-            version: env!("CARGO_PKG_VERSION").into(),
-            scheduler,
-            ..ServerFacts::default()
-        }),
-        (move || {
-            drop(api_ready.send(ScreenMessage::Finished {
-                step: DevStep::Api,
-                detail: address.to_string(),
-            }));
-        }, development_stopped(shutdown.clone())),
+        (
+            ApiAuthentication {
+                login: HumanLogin::Development(scope),
+                ..ApiAuthentication::default()
+            },
+            (Vec::new(), adhoc_planner()),
+            ServerFacts {
+                version: env!("CARGO_PKG_VERSION").into(),
+                scheduler,
+                ..ServerFacts::default()
+            },
+        ),
+        (
+            move || {
+                drop(api_ready.send(ScreenMessage::Finished {
+                    step: DevStep::Api,
+                    detail: address.to_string(),
+                }));
+            },
+            development_stopped(shutdown.clone()),
+        ),
     ));
     start_platform_roles(&mut tasks, (&store, &shutdown), Default::default())?;
     let (location, pipes) = development_location_role(
@@ -259,22 +266,25 @@ fn development_location_role(
         stdout,
         stderr,
     };
-    Ok((async move {
-        tokio::select! {
-            result = child.wait() => {
-                result?;
-                Err(ControlError::Invalid("development code location stopped unexpectedly".into()))
-            },
-            () = development_stopped(shutdown) => {
-                terminate_child(&mut child)?;
-                match tokio::time::timeout(Duration::from_secs(10), child.wait()).await {
-                    Ok(result) => { result?; },
-                    Err(_) => child.kill().await?,
-                }
-                Ok(())
-            },
-        }
-    }, pipes))
+    Ok((
+        async move {
+            tokio::select! {
+                result = child.wait() => {
+                    result?;
+                    Err(ControlError::Invalid("development code location stopped unexpectedly".into()))
+                },
+                () = development_stopped(shutdown) => {
+                    terminate_child(&mut child)?;
+                    match tokio::time::timeout(Duration::from_secs(10), child.wait()).await {
+                        Ok(result) => { result?; },
+                        Err(_) => child.kill().await?,
+                    }
+                    Ok(())
+                },
+            }
+        },
+        pipes,
+    ))
 }
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
@@ -933,7 +943,8 @@ pub(crate) async fn check_location_connection(
 ) -> Result<Option<(bool, u64, Vec<PathBuf>)>, ControlError> {
     let mut command = location_child(options, script);
     command.args(["debug", "--target", &options.target, "--json"]);
-    if !connect {
+    // Under `sqb dev` the foreground check already connected; `connect` is its verdict, so never sign in twice.
+    if !connect || options.dev_events {
         command.arg("--no-connection");
     }
     let mut child = command.stdout(Stdio::piped()).spawn()?;

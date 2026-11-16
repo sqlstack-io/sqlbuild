@@ -57,7 +57,8 @@ pub(super) fn startup() -> Vec<ScreenMessage> {
         },
         ScreenMessage::Finished {
             step: DevStep::ControlStore,
-            detail: "sqlite \u{b7} /home/analyst/projects/shop/.sqlbuild/control.sqlite3".to_owned(),
+            detail: "sqlite \u{b7} /home/analyst/projects/shop/.sqlbuild/control.sqlite3"
+                .to_owned(),
         },
         ScreenMessage::Location(LOCATION_ID.to_owned()),
         ScreenMessage::Started {
@@ -191,7 +192,12 @@ pub(super) fn checklist(control_store: &str, width: usize) -> Vec<String> {
         row("\u{2713}", "API", "127.0.0.1:8000", "0.1s"),
         row("\u{2713}", "Scheduler", "41 paused", "0.1s"),
         row("\u{2713}", "Discover project", "", "0.1s"),
-        row("\u{2713}", "Compile snapshot", "412 python nodes, 2280 models", "0.1s"),
+        row(
+            "\u{2713}",
+            "Compile snapshot",
+            "412 python nodes, 2280 models",
+            "0.1s",
+        ),
         row("\u{2713}", "Publish", "gen 1 \u{b7} b429729b", "0.1s"),
         row("\u{280b}", "Warehouse", "duckdb \u{b7} connecting", "0.0s"),
     ]

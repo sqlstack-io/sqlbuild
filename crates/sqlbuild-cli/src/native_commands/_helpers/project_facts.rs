@@ -2,9 +2,9 @@
 
 use std::path::Path;
 
+use sqlbuild_config::models::ConfigValue;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
 use sqlbuild_config::project::main::project_config_paths::project_config_paths;
-use sqlbuild_config::models::ConfigValue;
 use sqlbuild_config::project::models::{Built, ConfigPaths};
 use sqlbuild_orchestration::store::errors::ControlError;
 

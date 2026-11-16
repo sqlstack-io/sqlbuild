@@ -3,8 +3,8 @@
 use std::collections::VecDeque;
 use std::time::Instant;
 
-use crate::dev_screen::constants::STEPS;
 use crate::dev_screen::_helpers::transitions::pending;
+use crate::dev_screen::constants::STEPS;
 use crate::dev_screen::models::{DevScreen, ScreenSetup};
 
 /// Every step pending, the warehouse unknown and nothing drawn yet.

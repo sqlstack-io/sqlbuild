@@ -33,7 +33,12 @@ fn given_a_debug_report_when_read_then_the_adapter_and_warehouse_state_follow_it
                 configured,
                 json!([
                     row("database", None, "/missing/warehouse.duckdb", ""),
-                    row("connection test", Some("ERROR"), "", "IO Error: Cannot open file"),
+                    row(
+                        "connection test",
+                        Some("ERROR"),
+                        "",
+                        "IO Error: Cannot open file"
+                    ),
                     row("query test", Some("SKIP"), "", "connection failed"),
                 ]),
             ),
@@ -45,7 +50,12 @@ fn given_a_debug_report_when_read_then_the_adapter_and_warehouse_state_follow_it
             report: report(
                 json!([
                     row("project", Some("OK"), "shop", "loaded"),
-                    row("adapter", Some("ERROR"), "", "adapter package is not installed"),
+                    row(
+                        "adapter",
+                        Some("ERROR"),
+                        "",
+                        "adapter package is not installed"
+                    ),
                 ]),
                 json!([]),
             ),
@@ -63,7 +73,11 @@ fn given_a_debug_report_when_read_then_the_adapter_and_warehouse_state_follow_it
     for test_case in test_cases {
         let (adapter, state) = connection_outcome(test_case.report.as_bytes());
 
-        assert_eq!(adapter, test_case.expected_adapter, "{}", test_case.description);
+        assert_eq!(
+            adapter, test_case.expected_adapter,
+            "{}",
+            test_case.description
+        );
         assert_eq!(
             state_text(&state),
             test_case.expected_state,
@@ -99,7 +113,11 @@ fn given_debug_stderr_when_split_then_only_complete_sqlbuild_rows_leave_the_clie
     for test_case in test_cases {
         let (client, rows) = split_debug_output(test_case.chunk);
 
-        assert_eq!(client, test_case.expected_client, "{}", test_case.description);
+        assert_eq!(
+            client, test_case.expected_client,
+            "{}",
+            test_case.description
+        );
         assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
     }
 }

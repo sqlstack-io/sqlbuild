@@ -150,7 +150,8 @@ fn given_a_session_when_each_message_is_applied_then_the_terminal_shows_stable_u
 }
 
 #[test]
-fn given_keys_after_ready_when_pressed_then_they_ask_for_actions_and_l_shows_the_newest_log_lines() {
+fn given_keys_after_ready_when_pressed_then_they_ask_for_actions_and_l_shows_the_newest_log_lines()
+{
     let flood: Vec<ScreenMessage> = (0..=LOG_RING_LINES)
         .map(|index| ScreenMessage::Log(format!("log line {index}")))
         .collect();

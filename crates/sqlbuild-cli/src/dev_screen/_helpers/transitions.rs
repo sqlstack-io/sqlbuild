@@ -181,7 +181,12 @@ pub(crate) fn child_event(
             generation,
             message,
             position,
-        } => failed(screen, (generation, &message, position.as_ref()), now, clock),
+        } => failed(
+            screen,
+            (generation, &message, position.as_ref()),
+            now,
+            clock,
+        ),
     }
 }
 
@@ -451,7 +456,10 @@ pub(crate) fn logged(mut screen: DevScreen, line: String) -> Printed {
 }
 
 /// What a key asks for; `l` toggles the log and opens it with the lines kept so far.
-pub(crate) fn key_pressed(mut screen: DevScreen, key: char) -> (DevScreen, Vec<String>, ScreenAction) {
+pub(crate) fn key_pressed(
+    mut screen: DevScreen,
+    key: char,
+) -> (DevScreen, Vec<String>, ScreenAction) {
     if !screen.live {
         return (screen, Vec::new(), ScreenAction::None);
     }

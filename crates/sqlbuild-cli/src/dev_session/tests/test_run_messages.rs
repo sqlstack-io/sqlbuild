@@ -13,7 +13,12 @@ fn given_runs_since_the_last_poll_when_read_then_each_start_and_end_is_reported_
             description: "the first read only records the runs that already exist",
             seen: None,
             runs: vec![
-                run(2, ("running", "schedule"), (Some("orders_daily"), None), (5, 3)),
+                run(
+                    2,
+                    ("running", "schedule"),
+                    (Some("orders_daily"), None),
+                    (5, 3),
+                ),
                 run(1, ("success", "manual"), (Some("customers"), None), (40, 2)),
             ],
             expected_messages: Vec::new(),
@@ -22,8 +27,18 @@ fn given_runs_since_the_last_poll_when_read_then_each_start_and_end_is_reported_
             description: "new runs start oldest first; a run that started and ended between polls reports both",
             seen: seen(&[]),
             runs: vec![
-                run(3, ("running", "schedule"), (Some("orders_daily"), None), (5, 3)),
-                run(2, ("failed", "sensor"), (None, Some("new_orders_file")), (12, 4)),
+                run(
+                    3,
+                    ("running", "schedule"),
+                    (Some("orders_daily"), None),
+                    (5, 3),
+                ),
+                run(
+                    2,
+                    ("failed", "sensor"),
+                    (None, Some("new_orders_file")),
+                    (12, 4),
+                ),
             ],
             expected_messages: vec![
                 "new_orders_file | started from sensor | running".to_owned(),
@@ -36,7 +51,12 @@ fn given_runs_since_the_last_poll_when_read_then_each_start_and_end_is_reported_
             seen: seen(&[(3, RunStatus::Running), (4, RunStatus::Running)]),
             runs: vec![
                 run(4, ("warn", "manual"), (None, None), (90, 5)),
-                run(3, ("running", "schedule"), (Some("orders_daily"), None), (5, 3)),
+                run(
+                    3,
+                    ("running", "schedule"),
+                    (Some("orders_daily"), None),
+                    (5, 3),
+                ),
             ],
             expected_messages: vec!["adhoc | 5 nodes | ok 90s".to_owned()],
         },

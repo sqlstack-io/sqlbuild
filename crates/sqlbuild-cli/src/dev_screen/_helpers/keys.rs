@@ -78,9 +78,7 @@ fn read_keys(gate: &KeyGate, cooked: &Termios, keys: &UnboundedSender<ScreenMess
             gate.reading.store(true, Ordering::SeqCst);
         }
         match rustix::io::read(std::io::stdin(), &mut byte) {
-            Ok(1) => drop(keys.send(ScreenMessage::Key(
-                char::from(byte[0]).to_ascii_lowercase(),
-            ))),
+            Ok(1) => drop(keys.send(ScreenMessage::Key(char::from(byte[0]).to_ascii_lowercase()))),
             Ok(_) => {}
             Err(_) => std::thread::sleep(Duration::from_millis(100)),
         }

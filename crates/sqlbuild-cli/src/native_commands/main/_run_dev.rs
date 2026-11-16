@@ -21,9 +21,11 @@ use crate::dev_screen::main::start_dev_screen::start_dev_screen;
 use crate::dev_screen::models::{DevScreenHandle, DevStep, ScreenMessage, ScreenSetup};
 use crate::native_commands::_helpers::decision::{control_address, flag, text};
 use crate::native_commands::_helpers::execution::run_development_roles;
-use crate::native_commands::_helpers::project_facts::{development_target, project_directory_name, project_name};
+use crate::native_commands::_helpers::project_facts::{
+    development_target, project_directory_name, project_name,
+};
+use crate::native_commands::_helpers::terminal::{live_screen, stderr_columns};
 use crate::native_commands::constants::SCREEN_INDENT;
-use crate::native_commands::_helpers::terminal::{capture_stderr, live_screen, stderr_columns};
 use crate::server_config::models::ServerSection;
 
 pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
@@ -45,10 +47,6 @@ pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
         finish,
         task,
     } = start_dev_screen(screen_setup(&project, &target));
-    let capture = messages.clone();
-    capture_stderr(Some(Box::new(move |line| {
-        drop(capture.send(ScreenMessage::Log(line)));
-    })));
     let result: Result<(), ControlError> = async {
         drop(messages.send(ScreenMessage::Started {
             step: DevStep::ControlStore,
@@ -79,7 +77,6 @@ pub(super) async fn run_dev(namespace: &Namespace) -> Result<(), ControlError> {
         .await
     }
     .await;
-    capture_stderr(None);
     let _ = finish.send(result.is_err());
     drop(task.await);
     result

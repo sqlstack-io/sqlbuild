@@ -32,10 +32,7 @@ pub(crate) fn elapsed_since(started: Option<Instant>, now: Instant) -> Option<Du
 /// The rows redrawn in place: header and checklist, with the client's framed output under them.
 pub(crate) fn live_rows(screen: &DevScreen, now: Instant) -> Vec<String> {
     if screen.ready {
-        return vec![
-            String::new(),
-            render_hotkey_bar(&hotkeys(), &screen.facts),
-        ];
+        return vec![String::new(), render_hotkey_bar(&hotkeys(), &screen.facts)];
     }
     let lines: Vec<PhaseLine> = screen
         .steps

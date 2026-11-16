@@ -89,4 +89,3 @@ pub(crate) async fn login(
         "CLI sign-in expired; start sqb login again",
     ))
 }
-

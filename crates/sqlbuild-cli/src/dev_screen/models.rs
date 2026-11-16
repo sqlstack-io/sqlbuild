@@ -28,7 +28,10 @@ pub(crate) enum DevStep {
 #[derive(Clone, Debug)]
 pub(crate) enum ScreenMessage {
     /// A step began; `detail` says what it waits on, such as `snowflake \u{b7} waiting for sign-in`.
-    Started { step: DevStep, detail: String },
+    Started {
+        step: DevStep,
+        detail: String,
+    },
     Finished {
         step: DevStep,
         detail: String,
