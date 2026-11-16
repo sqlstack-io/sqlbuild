@@ -28,7 +28,7 @@ use crate::native_commands::main::_location_compiler::run_location_compiler;
 use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::main::_location_work::run_location_work;
 use crate::native_commands::models::{
-    LocationCompileRequest, LocationMetadataSync, LocationServe, LocationWatch,
+    LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
 };
 
 pub(super) async fn run_location(
@@ -59,7 +59,7 @@ async fn watch_location(
     options: &LocationServe,
     script: &Path,
     (bearer, client, poll): (&str, &LocationWorkClient, &LocationWorkPoll),
-    requests: mpsc::Sender<LocationCompileRequest>,
+    requests: mpsc::Sender<LocationRuntimeRequest>,
 ) -> Result<(), ControlError> {
     let mut watch = location_watch(&options.project_dir);
     let mut work_at = Instant::now() + Duration::from_secs(2);
@@ -88,7 +88,7 @@ async fn watch_location(
         (watch, ready) = observe_location_inputs(&options.project_dir, watch);
         if !ready {
             let Some(idle) = poll_location(
-                (options, script),
+                (options, script, &requests),
                 (client, poll, published_generation),
                 (watch, work_at, metadata),
                 stopped.as_mut(),
@@ -159,7 +159,7 @@ async fn watch_location(
                 .as_ref()
                 .is_some_and(|sync| sync.locations.is_empty())
                 && report_changed_build(
-                    (options, script, &watch),
+                    (options, &requests, &watch),
                     (client, poll.session_id, generation),
                     stopped.as_mut(),
                 )
@@ -184,7 +184,7 @@ async fn watch_location(
 
 /// Named work and metadata share one idle turn without transferring interpreter ownership.
 async fn poll_location(
-    (options, script): (&LocationServe, &Path),
+    (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
     (client, poll, generation): (&LocationWorkClient, &LocationWorkPoll, Option<i64>),
     (mut watch, mut work_at, mut metadata): (LocationWatch, Instant, Option<LocationMetadataSync>),
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -193,7 +193,7 @@ async fn poll_location(
     if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
         if Instant::now() >= work_at {
             let Some((files, sync)) = run_location_work(
-                (options, script),
+                (options, script, runtime),
                 (client, poll, &watch),
                 generation,
                 stopped.as_mut(),
@@ -224,7 +224,7 @@ async fn poll_location(
                 && state.idle
                 && state.take_replan()
                 && report_changed_build(
-                    (options, script, &watch),
+                    (options, runtime, &watch),
                     (client, poll.session_id, state.generation),
                     stopped.as_mut(),
                 )

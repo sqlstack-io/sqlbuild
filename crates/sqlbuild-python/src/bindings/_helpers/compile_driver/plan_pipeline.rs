@@ -47,11 +47,24 @@ pub(crate) fn run_compile_pipeline<'py>(
         options,
         (&["discovered_inputs", "adapter"], &["options", "hooks"]),
     )?;
-    let discovered: Bound<'py, PyAny> = arguments.value("discovered_inputs")?;
-    let adapter: Bound<'py, PyAny> = arguments.value("adapter")?;
-    let options: Bound<'py, PyAny> =
-        apply_unit_test_selectors(&arguments.value("options")?, &discovered)?;
-    let hooks: Bound<'py, PyAny> = arguments.value("hooks")?;
+    planned_project(
+        (
+            &arguments.value("discovered_inputs")?,
+            &arguments.value("adapter")?,
+        ),
+        (&arguments.value("options")?, arguments.value("hooks")?),
+        None,
+    )
+}
+
+/// Compile unless `held` is a `CompiledProjectPhaseResult` for these inputs, then gate on rules and plan.
+pub(crate) fn planned_project<'py>(
+    (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (options, hooks): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
+    held: Option<&Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = discovered.py();
+    let options: Bound<'py, PyAny> = apply_unit_test_selectors(options, discovered)?;
     let hooks: Bound<'py, PyAny> = if hooks.is_none() {
         host::entry(py, ExecutorHost::ConnectionHooks)?.call0()?
     } else {
@@ -60,22 +73,38 @@ pub(crate) fn run_compile_pipeline<'py>(
     let on_progress: Bound<'py, PyAny> = native_field(&hooks, "on_progress")?;
     let expansion_reuse: Bound<'py, EarlySqlLint> =
         Bound::new(py, EarlySqlLint::new(false, false))?;
-    let on_inputs_ready: Bound<'py, PyAny> =
-        EarlySqlLint::inputs_ready_hook(&expansion_reuse, GENERIC_DIALECT, &adapter);
-    let compiled: Bound<'py, PyAny> = compiled_phase(
-        (&discovered, &adapter),
-        &options,
-        &on_progress,
-        Some(&on_inputs_ready),
-    )?;
+    let compiled: Bound<'py, PyAny> = match held {
+        Some(held) => {
+            progress(
+                &on_progress,
+                "Planning from the published compiled project.",
+            )?;
+            let configured: Bound<'py, PyAny> = native_field(&options, "connection_config")?;
+            if configured.is_none() {
+                held.clone()
+            } else {
+                replaced(held, &[("connection_config", configured)])?
+            }
+        }
+        None => {
+            let on_inputs_ready: Bound<'py, PyAny> =
+                EarlySqlLint::inputs_ready_hook(&expansion_reuse, GENERIC_DIALECT, adapter);
+            compiled_phase(
+                (discovered, adapter),
+                &options,
+                &on_progress,
+                Some(&on_inputs_ready),
+            )?
+        }
+    };
     let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
     let graph: Bound<'py, PyAny> = project_graph(&project)?;
     run_rules_gate(
-        (&discovered, &adapter, expansion_reuse.as_any()),
+        (discovered, adapter, expansion_reuse.as_any()),
         (&options, &on_progress),
         (&project, &graph),
     )?;
-    planned((&discovered, &adapter), (&options, &hooks), &compiled)
+    planned((discovered, adapter), (&options, &hooks), &compiled)
 }
 
 /// Run the configured rules and stop the command when any of them finds a fault.

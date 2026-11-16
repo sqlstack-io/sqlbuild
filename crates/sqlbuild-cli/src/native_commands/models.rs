@@ -177,6 +177,20 @@ pub(crate) struct LocationCompileRequest {
     pub(crate) reply: tokio::sync::oneshot::Sender<Result<Option<LocationPublication>, String>>,
 }
 
+/// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.
+#[derive(Debug)]
+pub(crate) struct LocationPlanRequest {
+    pub(crate) request: serde_json::Value,
+    pub(crate) reply: tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
+}
+
+/// Work for the task that owns the warm runtime interpreter.
+#[derive(Debug)]
+pub(crate) enum LocationRuntimeRequest {
+    Publish(LocationCompileRequest),
+    Plan(LocationPlanRequest),
+}
+
 /// Only its owner (the compiler task or one metadata synchronization) uses this interpreter's stdio.
 #[derive(Debug)]
 pub(crate) struct LocationCompiler {

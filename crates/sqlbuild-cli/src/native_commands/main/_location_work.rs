@@ -10,6 +10,7 @@ use sqlbuild_orchestration::platform::models::{
     LocationWork, LocationWorkClient, LocationWorkOutcome, LocationWorkPoll, LocationWorkResult,
 };
 use sqlbuild_orchestration::store::errors::ControlError;
+use tokio::sync::mpsc;
 use tokio::time::Instant;
 use uuid::Uuid;
 
@@ -19,11 +20,11 @@ use crate::native_commands::_helpers::paths::location_files;
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
-use crate::native_commands::models::{LocationServe, LocationWatch};
+use crate::native_commands::models::{LocationRuntimeRequest, LocationServe, LocationWatch};
 
 /// Retry the exact completed result without rerunning it; `true` asks the metadata loop to sync.
 pub(super) async fn run_location_work(
-    (options, script): (&LocationServe, &Path),
+    (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
     (client, poll, watch): (&LocationWorkClient, &LocationWorkPoll, &LocationWatch),
     generation: Option<i64>,
     stopped: impl Future<Output = Result<(), ControlError>>,
@@ -59,7 +60,13 @@ pub(super) async fn run_location_work(
             }
         };
         let copy = (client, poll.session_id, claim.generation);
-        let checked = perform_work((options, script), claim.request.work, copy, expires).await?;
+        let checked = perform_work(
+            (options, script, runtime),
+            claim.request.work,
+            copy,
+            expires,
+        )
+        .await?;
         let Some((outcome, local_files)) = checked else {
             drop(write_output(&[(
                 Stream::Stderr,
@@ -123,7 +130,7 @@ pub(super) async fn run_location_work(
 
 /// One named operation; `None` means it stopped at shutdown or its lease ended.
 async fn perform_work(
-    (options, script): (&LocationServe, &Path),
+    (options, script, runtime): (&LocationServe, &Path, &mpsc::Sender<LocationRuntimeRequest>),
     work: LocationWork,
     copy: (&LocationWorkClient, Uuid, i64),
     expires: impl Future<Output = Result<(), ControlError>>,
@@ -154,7 +161,7 @@ async fn perform_work(
             selection,
             settings,
             ..
-        } => plan_location((options, script), (&selection, &settings), copy, expires)
+        } => plan_location((options, runtime), (&selection, &settings), copy, expires)
             .await?
             .map(|document| (LocationWorkOutcome::Plan { document }, Vec::new())),
     })

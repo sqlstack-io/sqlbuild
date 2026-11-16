@@ -27,6 +27,7 @@ use crate::bindings::_helpers::location_command::snapshot::{
     build_orchestration_snapshot, orchestration_snapshot,
 };
 use crate::bindings::_helpers::location_command::snapshot_connection::add_connection;
+use crate::bindings::_helpers::location_command::types::HeldProject;
 use crate::bindings::_helpers::location_command::worker::{blocked_nodes, execute_worker};
 use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
@@ -111,11 +112,14 @@ fn metadata(
     })
 }
 
+/// A compiled snapshot, its blocked nodes and the compile's `CompiledProjectPhaseResult`.
+type CompiledSnapshot<'py> = (NativeOrchestrationSnapshot, NodeKeys, Bound<'py, PyAny>);
+
 fn compile_location<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
     input: &SnapshotInput,
-) -> PyResult<(NativeOrchestrationSnapshot, ProjectAdapter<'py>, NodeKeys)> {
+) -> PyResult<(CompiledSnapshot<'py>, ProjectAdapter<'py>)> {
     status(py, "Discovering location project...")?;
     let project = project_adapter(
         py,
@@ -123,9 +127,9 @@ fn compile_location<'py>(
         ProjectInputs::DiscoveredDeferringSecrets,
     )?;
     status(py, "Location project discovered. Compiling snapshot...")?;
-    let (snapshot, blocked) = compile_snapshot(py, arguments, (input, &project), None)?;
+    let compiled = compile_snapshot(py, arguments, (input, &project), None)?;
     status(py, "Location snapshot compiled.")?;
-    Ok((snapshot, project, blocked))
+    Ok((compiled, project))
 }
 
 /// Compile the discovered project into a snapshot, with a run's variables when it carries them.
@@ -134,7 +138,7 @@ pub(super) fn compile_snapshot<'py>(
     arguments: &KeywordArguments<'py>,
     (input, project): (&SnapshotInput, &ProjectAdapter<'py>),
     vars: Option<&Bound<'py, PyAny>>,
-) -> PyResult<(NativeOrchestrationSnapshot, NodeKeys)> {
+) -> PyResult<CompiledSnapshot<'py>> {
     let ProjectAdapter {
         project_dir,
         discovered,
@@ -166,7 +170,8 @@ pub(super) fn compile_snapshot<'py>(
                 .is_some_and(|action| action == EXECUTE_ACTION),
         ),
     )?;
-    Ok((snapshot, blocked_nodes(&project)?))
+    let blocked = blocked_nodes(&project)?;
+    Ok((snapshot, blocked, compiled))
 }
 
 pub(super) fn location_arguments<'py>(
@@ -190,14 +195,17 @@ pub(super) fn location_arguments<'py>(
     )
 }
 
-pub(super) fn publish_location(
-    py: Python<'_>,
-    arguments: &KeywordArguments<'_>,
-) -> PyResult<(
+/// A published record, its earliest calendar refresh and the state locations its nodes write.
+pub(super) type Published = (
     SnapshotRecord,
     Option<DateTime<Utc>>,
     Vec<WarehouseStateLocation>,
-)> {
+);
+
+pub(super) fn publish_location<'py>(
+    py: Python<'py>,
+    arguments: &KeywordArguments<'py>,
+) -> PyResult<(Published, HeldProject<'py>)> {
     if arguments
         .value("action")?
         .extract::<Option<String>>()?
@@ -219,7 +227,7 @@ pub(super) fn publish_location(
         .value("project_dir")?
         .extract::<std::path::PathBuf>()?;
     let input = metadata(py, arguments, &directory)?;
-    let (mut snapshot, project, _) = compile_location(py, arguments, &input)?;
+    let ((mut snapshot, _, compiled), project) = compile_location(py, arguments, &input)?;
     add_connection(
         &mut snapshot.input,
         (&project, &arguments.value("selected_target")?),
@@ -269,7 +277,10 @@ pub(super) fn publish_location(
             PyValueError::new_err(message)
         })?;
     status(py, "Location snapshot published.")?;
-    Ok((record, refresh_at, locations.into_iter().collect()))
+    Ok((
+        (record, refresh_at, locations.into_iter().collect()),
+        (project.discovered, compiled),
+    ))
 }
 
 /// One-shot publication and the supervisor's private stdio runtime share the same compiler path.
@@ -305,7 +316,7 @@ pub(crate) fn run_location<'py>(
             arguments.value("run_id")?.extract::<String>()?,
             arguments.value("claim_id")?.extract::<String>()?,
         );
-        let (snapshot, project, blocked) = compile_location(py, &arguments, &input)?;
+        let ((snapshot, blocked, _), project) = compile_location(py, &arguments, &input)?;
         return execute_worker(
             py,
             (&snapshot, project, blocked),
@@ -322,7 +333,7 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
-        let (record, _, _) = publish_location(py, &arguments)?;
+        let ((record, _, _), _) = publish_location(py, &arguments)?;
         let output = serde_json::to_string(&record)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         write_console(py, "stdout", &format!("{output}\n")).map_err(|error| {
