@@ -1,5 +1,6 @@
 //! DAG artifact loading and SQLBuild selectors resolved over a DAG artifact mapping.
 
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 use std::collections::BTreeSet;
 
 use pyo3::exceptions::PyOSError;
@@ -18,7 +19,6 @@ use sqlbuild_host::entries::models::ThirdPartyHost;
 
 use crate::bindings::_helpers::planner_selection::carrier::Carrier;
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
@@ -100,9 +100,9 @@ fn selection_error(py: Python<'_>, error: DagSelectionError, raw: &str) -> PyErr
         DagSelectionError::UnitTest(selector) => {
             carrier.error(unit_test_selector_rejection(&selector))
         }
-        DagSelectionError::Input(message) => host_entry(py, ThirdPartyHost::DagsterDagInputError)
-            .and_then(|class| class.call1((message,)))
-            .map_or_else(|failure| failure, PyErr::from_value),
+        DagSelectionError::Input(message) => {
+            host_error(py, ThirdPartyHost::DagsterDagInputError, &message)
+        }
     }
 }
 

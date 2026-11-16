@@ -2,20 +2,15 @@
 
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::PyTuple;
-use pyo3::wrap_pyfunction;
 use sqlbuild_host::entries::main::host_entry_labels::host_entry_labels;
 
-use crate::bindings::_helpers::native_host::orchestration_declarations::declaration_site;
-use crate::bindings::_helpers::native_host::synced_copy::WarehouseAccessRefusedError;
+use sqlbuild_python_base::warehouse_access::main::register_synced_copy::register_synced_copy;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add(
         "HOST_ENTRIES",
         PyTuple::new(module.py(), host_entry_labels())?,
     )?;
-    module.add(
-        "WarehouseAccessRefusedError",
-        module.py().get_type::<WarehouseAccessRefusedError>(),
-    )?;
-    module.add_function(wrap_pyfunction!(declaration_site, module)?)
+    register_synced_copy(module)?;
+    sqlbuild_python_base::orchestration_reads::main::register_orchestration_declarations::register_orchestration_declarations(module)
 }

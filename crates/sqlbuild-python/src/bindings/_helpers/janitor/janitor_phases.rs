@@ -3,8 +3,8 @@
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
-use crate::bindings::_helpers::native_host::connections::connection_failure;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use std::time::Instant;
 
 use pyo3::IntoPyObject;
@@ -13,9 +13,6 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods};
 
 use crate::bindings::_helpers::build_progress::progress_reporters::{
     ConnectionProgressReporter, PlanningProgressReporter,
-};
-use crate::bindings::_helpers::build_progress::transient_status::{
-    TransientStatusReporter, status_reporter,
 };
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
@@ -26,6 +23,8 @@ use crate::bindings::_helpers::janitor::janitor_planning::{
 use crate::bindings::_helpers::janitor::janitor_usage::{UsageSettings, check_janitor_usage};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
+use sqlbuild_python_base::build_progress::models::TransientStatusReporter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

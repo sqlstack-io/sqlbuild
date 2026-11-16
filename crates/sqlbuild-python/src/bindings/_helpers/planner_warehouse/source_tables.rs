@@ -3,7 +3,6 @@
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::discovery::locations::yaml_entry_line;
-use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::planner_phases::objects::{planner_error, tuple};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::{
@@ -27,6 +26,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use std::collections::HashMap;
 
 fn selected_source_readers(scope: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Vec<String>>> {

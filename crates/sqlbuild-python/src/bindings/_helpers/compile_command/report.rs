@@ -14,14 +14,13 @@ use sqlbuild_core::cli_text::models::{
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::compile_command::surrogates::SurrogateText;
-use crate::bindings::_helpers::compile_outputs::json_report::{
-    emit_json_report, emit_orjson_report,
-};
 use crate::bindings::_helpers::discovery::constants::SQL_HOOK_OUTPUT_FIELDS;
 use crate::bindings::_helpers::discovery::hook_entries::hook_entries;
 use crate::bindings::_helpers::semantic_shapes::coverage::semantic_coverage;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::compile_outputs::main::emit_json_report::emit_json_report;
+use sqlbuild_python_base::compile_outputs::main::emit_orjson_report::emit_orjson_report;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
@@ -170,7 +169,7 @@ impl<'py> ReportInputs<'py> {
             return Ok(PyDict::new(py));
         }
         let reasons: Bound<'py, PyDict> = semantic_coverage(&self.project)?;
-        if crate::bindings::_helpers::compile_context::delta::injection().is_some() {
+        if sqlbuild_python_base::compile_context::main::delta::injection::injection().is_some() {
             return Ok(reasons);
         }
         let Some(names) = self.selected_names(MODEL_TYPE)? else {

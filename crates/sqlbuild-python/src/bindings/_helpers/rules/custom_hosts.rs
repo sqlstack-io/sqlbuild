@@ -1,5 +1,6 @@
 //! Run planned custom-rule invocations across isolated host processes and merge their results.
 
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -36,7 +37,6 @@ use crate::bindings::_helpers::rules::custom_host_observation::{
 };
 use crate::bindings::_helpers::rules::custom_host_payload::write_payload;
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;
 
 const HOST_INPUTS: [&str; 3] = ["target", "rules-cache", "host-inputs"];
@@ -445,8 +445,5 @@ fn text(path: &Path) -> String {
 }
 
 pub(crate) fn rules_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::Rules).and_then(|class| class.call1((message,))) {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::Rules, &message)
 }

@@ -3,6 +3,4 @@ pub(crate) mod effective_config;
 pub(crate) mod exception_types;
 pub(crate) mod model_contracts;
 pub(crate) mod registration;
-pub(crate) mod resource_identities;
 pub(crate) mod spec_resolution;
-pub(crate) mod state_literals;

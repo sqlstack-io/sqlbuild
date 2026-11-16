@@ -9,7 +9,6 @@ use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
 use crate::bindings::_helpers::model_config::typed_config::{
     config_node_of, config_text_is, config_text_object, config_value, model_values,
 };
-use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_resolution::cursor_model::{
@@ -33,6 +32,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 
 const APPEND_STRATEGY: &str = "append";
 

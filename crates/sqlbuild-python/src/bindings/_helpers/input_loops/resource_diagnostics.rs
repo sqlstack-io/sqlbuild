@@ -22,9 +22,6 @@ use sqlbuild_pysource::definition_locations::main::decorator_location::decorator
 use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
 use sqlbuild_sqltext::compiler::main::model_header_entry_span::model_header_entry_span;
 
-use crate::bindings::_helpers::compile_context::delta::{
-    DeltaInjection, capture, capturing, injection,
-};
 use crate::bindings::_helpers::compiled_project::attachment_inputs::{
     DiagnosticSettings, HookDescriptionRow, LoaderRow, PythonResourceRow, ResourceDiagnostics,
     ScenarioDescriptionRow,
@@ -33,6 +30,10 @@ use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::seed_views::{SeedParts, SeedViews};
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::compile_context::main::delta::capture::capture;
+use sqlbuild_python_base::compile_context::main::delta::capturing::capturing;
+use sqlbuild_python_base::compile_context::main::delta::injection::injection;
+use sqlbuild_python_base::compile_context::models::DeltaInjection;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MISSING_DESCRIPTION_CODE: &str = "P010";

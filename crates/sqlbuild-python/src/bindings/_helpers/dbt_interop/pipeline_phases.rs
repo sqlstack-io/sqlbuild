@@ -4,7 +4,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::build_command::support::{boolean, emit, none, text, tuple};
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
@@ -17,6 +16,11 @@ use crate::bindings::_helpers::dbt_interop::runtime_execution::execute_dbt_comma
 use crate::bindings::_helpers::dbt_interop::sqlbuild_work::execute_dbt_sqlbuild_work;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_command::main::boolean::boolean;
+use sqlbuild_python_base::build_command::main::emit::emit;
+use sqlbuild_python_base::build_command::main::none::none;
+use sqlbuild_python_base::build_command::main::text::text;
+use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

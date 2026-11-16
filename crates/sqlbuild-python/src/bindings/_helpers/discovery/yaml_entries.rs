@@ -349,9 +349,9 @@ pub(crate) fn parse_sources_document<'py>(
             parse_error(py, error, SOURCE_PARSE_ERROR).unwrap_or_else(|error| error)
         })?;
     let referenced: Option<std::collections::BTreeSet<String>> =
-        crate::bindings::_helpers::compile_context::delta::injection()
+        sqlbuild_python_base::compile_context::main::delta::injection::injection()
             .and_then(|injection| injection.source_names.clone());
-    crate::bindings::_helpers::compile_context::delta::record_source_reads(
+    sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads(
         loaded_sources(&sources).iter().map(String::as_str),
     );
     let mut built: Vec<Bound<'py, PyAny>> = Vec::with_capacity(sources.len());

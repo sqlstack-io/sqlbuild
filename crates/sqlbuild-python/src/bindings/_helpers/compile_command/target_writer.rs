@@ -27,9 +27,6 @@ use crate::bindings::_helpers::compile_command::test_artifact_cache::{
     IdentityContext, artifact_identity_payload, artifact_record_key_payload, identity_context,
     payload_digests, read_cache, write_cache, yield_interpreter,
 };
-use crate::bindings::_helpers::compile_driver::stage_work::{
-    SQL_TEST_ARTIFACT_PLANS, SQL_TEST_MODEL_CHAINS, count_stage,
-};
 use crate::bindings::_helpers::compile_outputs::artifacts::{
     publish_staged_artifacts, remove_stale_artifacts,
 };
@@ -46,6 +43,9 @@ use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::compile_driver::constants::SQL_TEST_ARTIFACT_PLANS;
+use sqlbuild_python_base::compile_driver::constants::SQL_TEST_MODEL_CHAINS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::main::log_debug_message::log_debug_message;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
@@ -677,7 +677,7 @@ fn write_static_tests<'py>(
         }
     }
     let cache_dir: Bound<'py, PyAny> = native_field(project, "compile_cache_dir")?;
-    if crate::bindings::_helpers::compile_context::delta::injection().is_some() {
+    if sqlbuild_python_base::compile_context::main::delta::injection::injection().is_some() {
         let mut kept: HashMap<String, SqlTestArtifactRecord> = read_cache(&cache_dir)?;
         for (key, record) in records.drain(..) {
             kept.insert(key, record);
@@ -698,7 +698,7 @@ pub(crate) fn write_static_target<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = target_dir.py();
     let remove_stale_files: bool = prepared_target(target_dir)?
-        && crate::bindings::_helpers::compile_context::delta::injection().is_none();
+        && sqlbuild_python_base::compile_context::main::delta::injection::injection().is_none();
     let mut batch: ArtifactBatch = ArtifactBatch::new(remove_stale_files, prepared.recorder);
     let mut managed: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut managed_models: Vec<PathBuf> = Vec::new();
@@ -866,7 +866,9 @@ pub(crate) fn write_rule_failed_models<'py>(
             };
         models.push((relative_path, query_sql));
     }
-    if let Some(injection) = crate::bindings::_helpers::compile_context::delta::injection() {
+    if let Some(injection) =
+        sqlbuild_python_base::compile_context::main::delta::injection::injection()
+    {
         models.extend(models_not_rerun(
             &target,
             &models,
@@ -910,7 +912,7 @@ fn models_not_rerun(
         let path: PathBuf = native_model_output_path(&compiled_dir, relative_path);
         let Ok(text) = std::fs::read_to_string(&path) else {
             return Err(
-                crate::bindings::_helpers::compile_context::delta::delta_unsupported(
+                sqlbuild_python_base::compile_context::main::delta::delta_unsupported::delta_unsupported(
                     "the stored compile's SQL for a model it did not rerun is unreadable",
                 ),
             );

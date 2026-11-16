@@ -2,8 +2,9 @@
 
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
-use crate::bindings::_helpers::compile_driver::stage_work::{COMPILED_VIEW_FALLBACKS, count_stage};
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
+use sqlbuild_python_base::compile_driver::constants::COMPILED_VIEW_FALLBACKS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MODELS_FIELD: &str = "models";

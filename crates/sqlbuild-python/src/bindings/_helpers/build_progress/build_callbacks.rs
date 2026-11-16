@@ -25,16 +25,27 @@ use crate::bindings::_helpers::build_progress::plan_facts::{BuildPlanFacts, buil
 use crate::bindings::_helpers::build_progress::result_text::{
     function_text, load_text, model_text, optional, seed_text, test_text, text,
 };
-use crate::bindings::_helpers::build_progress::terminal::{
-    CLEAR_LINE, HIDE_CURSOR, SHOW_CURSOR, SPINNER_FRAMES, SPINNER_TICK_SECONDS, claim,
-    consume_terminal, flush, join_spinner, projector, release, shared_lines, start_spinner,
-    terminal_columns, tty_flag, write,
-};
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_progress::constants::CLEAR_LINE;
+use sqlbuild_python_base::build_progress::constants::HIDE_CURSOR;
+use sqlbuild_python_base::build_progress::constants::SHOW_CURSOR;
+use sqlbuild_python_base::build_progress::constants::SPINNER_FRAMES;
+use sqlbuild_python_base::build_progress::constants::SPINNER_TICK_SECONDS;
+use sqlbuild_python_base::build_progress::main::terminal::claim::claim;
+use sqlbuild_python_base::build_progress::main::terminal::consume_terminal::consume_terminal;
+use sqlbuild_python_base::build_progress::main::terminal::flush::flush;
+use sqlbuild_python_base::build_progress::main::terminal::join_spinner::join_spinner;
+use sqlbuild_python_base::build_progress::main::terminal::projector::projector;
+use sqlbuild_python_base::build_progress::main::terminal::release::release;
+use sqlbuild_python_base::build_progress::main::terminal::shared_lines::shared_lines;
+use sqlbuild_python_base::build_progress::main::terminal::start_spinner::start_spinner;
+use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
+use sqlbuild_python_base::build_progress::main::terminal::tty_flag::tty_flag;
+use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 

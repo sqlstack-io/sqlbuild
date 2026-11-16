@@ -21,12 +21,14 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
-use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    ImportedDeclarations, imported_declarations, module_declarations, run_controls, run_resources,
-};
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     CalendarRequest, compile_calendars, compile_sensors,
 };
+use sqlbuild_python_base::orchestration_reads::main::imported_declarations::imported_declarations;
+use sqlbuild_python_base::orchestration_reads::main::module_declarations::module_declarations;
+use sqlbuild_python_base::orchestration_reads::main::run_controls::run_controls;
+use sqlbuild_python_base::orchestration_reads::main::run_resources::run_resources;
+use sqlbuild_python_base::orchestration_reads::models::ImportedDeclarations;
 use sqlbuild_rules::dsl_headers::main::description_line_count::description_line_count;
 use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
 use sqlbuild_rules::lint_text::models::FormatSettings;

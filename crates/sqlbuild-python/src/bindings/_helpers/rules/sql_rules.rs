@@ -154,7 +154,7 @@ pub(crate) fn run_planned_sql_rules<'py>(
     let project_files: Option<Vec<LintFile>> = if !identities.is_empty()
         && run.prepared().is_none()
         && !run.model_selection
-        && crate::bindings::_helpers::compile_context::delta::injection().is_none()
+        && sqlbuild_python_base::compile_context::main::delta::injection::injection().is_none()
     {
         Some(lint_sources(&run.project_dir, None, None)?)
     } else {
@@ -391,7 +391,7 @@ fn linted_files(
     let py: Python<'_> = run.project.py();
     let project_dir: &Path = &run.project_dir;
     let prepared = prepared_result(run, py);
-    if crate::bindings::_helpers::compile_context::delta::injection().is_some() {
+    if sqlbuild_python_base::compile_context::main::delta::injection::injection().is_some() {
         return crate::bindings::_helpers::compile_delta::lint_hooks::changed_files(project_dir);
     }
     Ok(match prepared {

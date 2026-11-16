@@ -35,8 +35,6 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::{ReferenceExtraction, SqlReference};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::cache::sql_test_scan_store::SqlTestScanStore;
-use crate::bindings::_helpers::compile_context::delta::record_test_source_reads;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::{
     SqlTestSettings, TestBlockRow, TestCaseRow, TestFileRow,
 };
@@ -51,6 +49,8 @@ use crate::bindings::_helpers::input_loops::source_loop::{
     AuthoredExpansion, expanded_authored_sql, scoped_declarations,
 };
 use crate::bindings::_helpers::render::sql_macro_tests::without_with_list_calls;
+use sqlbuild_python_base::cache::models::SqlTestScanStore;
+use sqlbuild_python_base::compile_context::main::delta::record_test_source_reads::record_test_source_reads;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MODEL_MODE: &str = "model";

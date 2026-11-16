@@ -30,7 +30,6 @@ use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 
 use crate::bindings::_helpers::analysis_session::query_columns::query_columns_error;
 use crate::bindings::_helpers::attachments::function_headers::parsed_header;
-use crate::bindings::_helpers::compile_context::delta::record_source_reads;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::{
     FunctionRow, FunctionSettings,
 };
@@ -50,6 +49,7 @@ use sqlbuild_project::models::DestinationFact;
 use sqlbuild_project::models::PythonRuntime;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_project::types::NamedTypeRow;
+use sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads;
 
 const PRESERVE_TARGET_VALUE: &str = "preserve";
 const GENERIC_DIALECT: &str = "generic";

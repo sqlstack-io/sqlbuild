@@ -9,15 +9,15 @@ use crate::bindings::_helpers::analysis_session::session::{
     FamilyRow, NativeModelAnalysisSession, PivotRequestRow, prove_dynamic_column_contracts,
 };
 use crate::bindings::_helpers::compile_driver::assembly_analysis::AnalysisContext;
-use crate::bindings::_helpers::compile_driver::stage_work::{
-    PIVOT_PROOFS, SESSION_PIVOT_PROOFS, count_stage,
-};
 use crate::bindings::_helpers::model_config::header_families::HeaderFamilies;
 use crate::bindings::_helpers::project_assembly::models::{NativeModelFacts, NativeProjectFacts};
 use crate::bindings::_helpers::project_assembly::native_resources::assemble_native_project_resources;
 use crate::bindings::_helpers::project_assembly::syntax_checks::model_syntax_checks;
 use crate::bindings::_helpers::project_assembly::syntax_checks::standalone_pivot_rows;
 use pyo3::IntoPyObjectExt;
+use sqlbuild_python_base::compile_driver::constants::PIVOT_PROOFS;
+use sqlbuild_python_base::compile_driver::constants::SESSION_PIVOT_PROOFS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

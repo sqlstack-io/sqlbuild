@@ -1,5 +1,6 @@
 //! The ingestr command line for one declarative ingestr source, built from its runtime values.
 
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 use std::collections::BTreeMap;
 
 use pyo3::prelude::{
@@ -38,9 +39,7 @@ const LIST_FIELDS: [&str; 2] = ["primary_key", "extra_args"];
 
 /// An `IngestrIntegrationError`, or the failure to construct one.
 fn ingestr_error(py: Python<'_>, message: String) -> PyErr {
-    host_entry(py, INGESTR_ERROR)
-        .and_then(|class| class.call1((message,)))
-        .map_or_else(|error| error, PyErr::from_value)
+    host_error(py, INGESTR_ERROR, &message)
 }
 
 /// The source's ingestr config, raising when the source declares no valid one.

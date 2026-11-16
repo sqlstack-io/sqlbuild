@@ -1,8 +1,7 @@
 use sqlbuild_cache::project_reuse::types::ImageSections;
-use sqlbuild_config::models::ConfigValue;
 
-use crate::bindings::_helpers::compile_context::delta::ModelCoverage;
 use crate::bindings::_helpers::compile_delta::image::ProjectImage;
+use sqlbuild_python_base::compile_context::models::ModelCoverage;
 
 /// A stored report, a delta report and what splicing the delta into the stored one gives.
 pub(crate) struct SpliceTestCase {
@@ -14,14 +13,6 @@ pub(crate) struct SpliceTestCase {
     pub(crate) sources: Option<&'static [&'static str]>,
     /// The spliced report, or `None` when the reports must not line up.
     pub(crate) expected_report: Option<&'static str>,
-}
-
-/// A loaded YAML document kept by the delta compile's document store.
-pub(crate) struct DocumentTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) document: ConfigValue,
-    /// How many truncations of the stored document still read back as it.
-    pub(crate) expected_truncations_read: usize,
 }
 
 /// Stored image bytes damaged before they are read back.

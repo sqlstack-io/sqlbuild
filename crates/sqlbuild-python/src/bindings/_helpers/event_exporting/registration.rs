@@ -5,13 +5,15 @@ use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyResult, wr
 use crate::bindings::_helpers::event_exporting::dispatcher::{
     EventExporterDispatcher, stop_event_exporter_threads,
 };
-use crate::bindings::_helpers::event_exporting::models::{
-    BoundEventExporter, EventExportSummary, EventExporterAccounting, EventExporterCounts,
-    EventExporterFailure,
-};
+use crate::bindings::_helpers::event_exporting::policy;
 use crate::bindings::_helpers::event_exporting::workers::DispatcherWorker;
-use crate::bindings::_helpers::event_exporting::{policy, scope};
 use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::event_exporting::main::register_scope::register_scope;
+use sqlbuild_python_base::event_exporting::models::BoundEventExporter;
+use sqlbuild_python_base::event_exporting::models::EventExportSummary;
+use sqlbuild_python_base::event_exporting::models::EventExporterAccounting;
+use sqlbuild_python_base::event_exporting::models::EventExporterCounts;
+use sqlbuild_python_base::event_exporting::models::EventExporterFailure;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<EventExporterCounts>()?;
@@ -25,5 +27,5 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(hook.clone())?;
     imported(module.py(), "atexit", "register")?.call1((hook,))?;
     policy::register(module)?;
-    scope::register(module)
+    register_scope(module)
 }

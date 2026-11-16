@@ -4477,15 +4477,24 @@ dependencies = [
 name = "sqlbuild-python-base"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "mimalloc",
  "pyo3",
+ "rusqlite",
+ "rustc-hash",
+ "serde",
  "serde_json",
+ "sha2 0.10.9",
  "sqlbuild-analysis",
+ "sqlbuild-cache",
  "sqlbuild-config",
  "sqlbuild-core",
  "sqlbuild-discovery",
  "sqlbuild-host",
+ "sqlbuild-model-config",
+ "sqlbuild-orchestration",
  "sqlbuild-rules",
+ "sqlbuild-state",
 ]
 
 [[package]]
