@@ -48,10 +48,10 @@ use crate::bindings::_helpers::input_loops::model_loop_calls::{
 use crate::bindings::_helpers::input_loops::source_loop::{
     AuthoredExpansion, expanded_authored_sql, scoped_declarations,
 };
-use crate::bindings::_helpers::render::sql_macro_tests::without_with_list_calls;
 use sqlbuild_python_base::cache::models::SqlTestScanStore;
 use sqlbuild_python_base::compile_context::main::delta::record_test_source_reads::record_test_source_reads;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::render::main::sql_macros::without_with_list_calls::without_with_list_calls;
 
 const MODEL_MODE: &str = "model";
 const MACRO_MODE: &str = "macro";

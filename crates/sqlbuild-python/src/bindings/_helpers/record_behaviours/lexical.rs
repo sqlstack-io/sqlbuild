@@ -10,9 +10,10 @@ use sqlbuild_sqltext::sql_scan::main::reads_differently_from_generic::reads_diff
 use sqlbuild_sqltext::sql_scan::main::unsupported_line_comment_prefixes::unsupported_line_comment_prefixes;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::sqltext::lexical_syntax::{record_syntax, sorted_texts};
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::sqltext::main::record_syntax::record_syntax;
+use sqlbuild_python_front::sqltext::main::sorted_texts::sorted_texts;
 
 /// `SqlLexicalSyntax.line_comment_prefixes` position.
 const LINE_COMMENT_PREFIXES_FIELD: usize = 5;

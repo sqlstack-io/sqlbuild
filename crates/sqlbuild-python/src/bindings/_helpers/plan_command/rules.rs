@@ -11,7 +11,6 @@ use sqlbuild_rules::rule_catalogue::models::RuleListing;
 
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use crate::bindings::_helpers::rules::catalogue::build_rule_catalogue;
@@ -28,6 +27,8 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_rules::rule_results::main::format_skipped_models::format_skipped_models;
 
 const LIST_ACTION: &str = "list";
 const SHOW_ACTION: &str = "show";
@@ -235,6 +236,12 @@ fn run_rule_selection(
     )?;
     if let Some(note) = format_skipped_type_proof_rules(
         native_field(&result, "skipped_type_proof_rules")?.extract()?,
+    ) {
+        print_line(py, &format!("note: {note}"), true)?;
+    }
+    if let Some(note) = format_skipped_models(
+        &native_field(&result, "skipped_models")?.extract::<Vec<_>>()?,
+        false,
     ) {
         print_line(py, &format!("note: {note}"), true)?;
     }

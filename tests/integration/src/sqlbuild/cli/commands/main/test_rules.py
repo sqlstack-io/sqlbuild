@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import time
 from collections.abc import Callable
@@ -36,6 +37,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     ImplicitAliasRuleIntegrationTestCase,
     NamedSelectorIntegrationTestCase,
     NumericRangeDecisionIntegrationTestCase,
+    PerformanceRulesIntegrationTestCase,
     ProjectRuleScratchStateTestCase,
     PythonRuleCacheSequenceTestCase,
     PythonRulesIntegrationTestCase,
@@ -215,6 +217,15 @@ _EARLY_LINT_SLOW_EXPANSION_S: float = 0.5
 _EARLY_LINT_EXPANSION_DELAYS_S: dict[str, float] = {"orders": 0.0}
 _EARLY_LINT_FINDINGS: tuple[tuple[str, str, int | None, int | None], ...] = (
     ("SQLCLEAN005", "models/order_cents.sql", 2, 119),
+)
+
+
+_PERFORMANCE_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/performance_rules")
+_PERFORMANCE_EXPECTED: dict[str, Any] = json.loads(
+    (_PERFORMANCE_FIXTURE / "expected_findings.json").read_text(encoding="utf-8")
+)
+_PERFORMANCE_FINDINGS: tuple[tuple[str, str, int, int], ...] = tuple(
+    (code, path, line, column) for code, path, line, column in _PERFORMANCE_EXPECTED["findings"]
 )
 
 
@@ -3692,3 +3703,49 @@ def test_given_orchestration_selections_when_compiling_then_named_selector_limit
         == test_case.expected_findings
     )
     assert test_case.expected_text in json.dumps(diagnostics)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PerformanceRulesIntegrationTestCase(
+            description="copied payloads are reported and the rest of the fixture passes",
+            extra_models={},
+            expected_findings=_PERFORMANCE_FINDINGS,
+        ),
+        PerformanceRulesIntegrationTestCase(
+            description="a second reader ends the published-view exemption",
+            extra_models={
+                "models/order_line_counts.sql": (
+                    'MODEL (description "Lines per order.");\n'
+                    "SELECT order_id, COUNT(*) AS line_count\n"
+                    'FROM __ref("shop__mart__order_lines")\nGROUP BY order_id\n'
+                ),
+            },
+            expected_findings=(
+                *_PERFORMANCE_FINDINGS,
+                ("SQBRPERFORMANCE102", "models/shop__mart__order_lines.sql", 11, 3),
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_json_copies_when_compiling_then_performance_rules_report_them(
+    test_case: PerformanceRulesIntegrationTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Both performance Rules run end to end; models without lineage are counted, not reported."""
+    shutil.copytree(_PERFORMANCE_FIXTURE, tmp_path, dirs_exist_ok=True)
+    for relative_path, sql in test_case.extra_models.items():
+        (tmp_path / relative_path).write_text(sql, encoding="utf-8")
+
+    exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
+    captured: CaptureResult[str] = capsys.readouterr()
+    diagnostics: list[dict[str, Any]] = json.loads(captured.out)["diagnostics"]
+
+    assert exit_code == 1
+    assert tuple(
+        sorted((item["code"], item["path"], item["line"], item["column"]) for item in diagnostics)
+    ) == tuple(sorted(test_case.expected_findings))
+    assert _PERFORMANCE_EXPECTED["skipped_note"] in captured.err

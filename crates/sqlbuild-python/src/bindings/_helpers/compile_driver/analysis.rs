@@ -11,7 +11,6 @@ use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph_with_analysis_selection;
 use crate::bindings::_helpers::contracts::contract_diagnostics::evaluate_model_contracts;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::lineage::project_lineage::build_project_column_lineage;
 use crate::bindings::_helpers::planner_selection::selectors::select_project_graph;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
@@ -36,6 +35,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 
 const RICH_LINEAGE: &str = "rich";
 const FAST_LINEAGE: &str = "fast";
@@ -305,6 +305,10 @@ fn analyzed<'py>(
             (
                 "custom_rule_timings",
                 native_field(&rules_result, "custom_rule_timings")?,
+            ),
+            (
+                "skipped_models",
+                native_field(&rules_result, "skipped_models")?,
             ),
         ],
     )

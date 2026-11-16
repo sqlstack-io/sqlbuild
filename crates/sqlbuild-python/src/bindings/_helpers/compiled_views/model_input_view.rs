@@ -20,14 +20,17 @@ use crate::bindings::_helpers::compiled_views::compiled_model_view::{
 };
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::compiled_views::relation_keys::{RelationKeyRow, relation_key_row};
-use crate::bindings::_helpers::discovery::model_file_record::{NativeModelFile, projected_text};
-use crate::bindings::_helpers::model_config::header_audits::HeaderAudits;
-use crate::bindings::_helpers::model_config::header_families::{HeaderFamilies, family_specs};
-use crate::bindings::_helpers::model_config::header_metadata::HeaderColumns;
-use crate::bindings::_helpers::render::macro_call_rows::{SpanRow, span_tuple};
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_front::discovery::main::records::projected_text::projected_text;
+use sqlbuild_python_front::discovery::models::NativeModelFile;
+use sqlbuild_python_front::model_config::main::headers::family_specs::family_specs;
+use sqlbuild_python_front::model_config::models::HeaderAudits;
+use sqlbuild_python_front::model_config::models::HeaderColumns;
+use sqlbuild_python_front::model_config::models::HeaderFamilies;
+use sqlbuild_python_front::render::main::calls::span_tuple::span_tuple;
+use sqlbuild_python_front::render::types::SpanRow;
 
 const MODEL_RELATION_KIND: &str = "ref";
 

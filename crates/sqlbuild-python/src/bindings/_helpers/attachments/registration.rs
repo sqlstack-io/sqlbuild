@@ -2,13 +2,13 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::attachments::{
-    ceremonial_select, cursor_intrinsics, reference_markers,
-};
+use sqlbuild_python_front::attachments::main::register_ceremonial_select::register_ceremonial_select;
+use sqlbuild_python_front::attachments::main::register_cursor_intrinsics::register_cursor_intrinsics;
+use sqlbuild_python_front::attachments::main::register_reference_markers::register_reference_markers;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    cursor_intrinsics::register(module)?;
-    ceremonial_select::register(module)?;
-    reference_markers::register(module)?;
+    register_cursor_intrinsics(module)?;
+    register_ceremonial_select(module)?;
+    register_reference_markers(module)?;
     Ok(())
 }

@@ -11,8 +11,8 @@ use sqlbuild_discovery::models::LineColumnSpan;
 use sqlbuild_model_config::header_metadata::models::{ParsedThresholds, ThresholdBound};
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
-use crate::bindings::_helpers::model_config::header_metadata::native_column_record;
 use crate::bindings::_helpers::rules::custom_hosts::rules_error;
+use sqlbuild_python_front::model_config::main::headers::native_column_record::native_column_record;
 
 /// One native header column with the text of the path its location names.
 #[derive(Debug, Serialize, Deserialize)]

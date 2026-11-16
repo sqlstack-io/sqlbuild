@@ -1,9 +1,6 @@
 //! Selected-model inspection and untyped override conversion.
 
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::model_config::typed_config::{
-    config_text_is, config_text_object, model_values,
-};
 use crate::bindings::_helpers::planner_resolution::values::{method, string};
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -18,6 +15,9 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 const MATERIALIZED_KEY: &str = "materialized";
 const CURSOR_KEY: &str = "cursor";

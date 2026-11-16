@@ -1,0 +1,37 @@
+[package]
+name = "sqlbuild-python-front"
+description = "The front layer of the sqlbuild._native bindings: discovery, model configuration, scopes, rendering and SQL text."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+chrono.workspace = true
+chrono-tz.workspace = true
+pyo3.workspace = true
+serde_json.workspace = true
+sqlbuild-analysis.workspace = true
+sqlbuild-attachments.workspace = true
+sqlbuild-cache.workspace = true
+sqlbuild-cli.workspace = true
+sqlbuild-config.workspace = true
+sqlbuild-core.workspace = true
+sqlbuild-cursor.workspace = true
+sqlbuild-discovery.workspace = true
+sqlbuild-host.workspace = true
+sqlbuild-model-config.workspace = true
+sqlbuild-orchestration.workspace = true
+sqlbuild-pysource.workspace = true
+sqlbuild-python-base.workspace = true
+sqlbuild-refactor.workspace = true
+sqlbuild-render.workspace = true
+sqlbuild-scopes.workspace = true
+sqlbuild-sqltext.workspace = true
+sqlbuild-state.workspace = true
+stacker.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

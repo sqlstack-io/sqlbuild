@@ -9,10 +9,6 @@ use sqlbuild_analysis::planner_strategy::models::{CursorInputColumnCheck, Cursor
 
 use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::cursor::scalars::parse_value;
-use crate::bindings::_helpers::model_config::typed_config::{
-    config_cursor_bound, config_text_object, config_value, model_values,
-};
 use crate::bindings::_helpers::planner_identity::metadata::or_empty;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_strategy::constants::{
@@ -31,6 +27,11 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cursor::main::scalars::parse_value::parse_value;
+use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound;
+use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
+use sqlbuild_python_front::model_config::main::config::config_value::config_value;
+use sqlbuild_python_front::model_config::main::config::model_values::model_values;
 
 /// Whether a model is incremental with a cursor column.
 fn incremental_cursor_flag(

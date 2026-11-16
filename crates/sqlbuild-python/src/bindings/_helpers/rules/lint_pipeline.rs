@@ -44,9 +44,6 @@ use sqlbuild_rules::project_tree::main::project_real_path::project_real_path;
 use sqlbuild_rules::project_tree::main::project_real_paths::project_real_paths;
 use sqlclean::sql_lint::main::fill_finding_path::fill_finding_path;
 
-use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
-use crate::bindings::_helpers::render::authored_sql::{AuthoredExpansion, expand_with_inputs};
-use crate::bindings::_helpers::render::macro_call_rows::SpanRow;
 use crate::bindings::_helpers::rules::dsl_headers::header_violations;
 use crate::bindings::_helpers::rules::native_header_parser::{
     FUNCTION_KIND, HeaderFailure, NativeHeaderParser, external_identifiers,
@@ -60,6 +57,10 @@ use sqlbuild_python_base::records::main::fields::field::field as record_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_front::render::main::declarations::expand_with_inputs::expand_with_inputs;
+use sqlbuild_python_front::render::models::AuthoredExpansion;
+use sqlbuild_python_front::render::models::SqlExpansionInputs;
+use sqlbuild_python_front::render::types::SpanRow;
 
 pub(crate) const NATIVE_ENGINE: &str = "native";
 const HEADER_ENGINE: &str = "sqlbuild";

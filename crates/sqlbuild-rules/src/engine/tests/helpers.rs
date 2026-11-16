@@ -11,15 +11,16 @@ use crate::engine::main::answer_speculative_rows::answer_speculative_rows;
 use crate::engine::main::discard_speculative_rows::discard_speculative_rows;
 use crate::engine::main::retained_request::retained_request;
 use crate::models::{
-    Column, Declaration, DeclarationMember, DynamicColumnFamily, EvaluateRequest, Fault, Model,
-    Reference, RetainedRows, RowsEvaluation, RowsRequest, RulesConfig, SpeculativeAnswer,
-    SpeculativeRows,
+    Column, Declaration, DeclarationMember, DynamicColumnFamily, EvaluateRequest, Fault,
+    GrainColumn, JsonGrain, LineageColumn, Model, ModelRow, Reference, RetainedRows,
+    RowsEvaluation, RowsRequest, RulesConfig, SpeculativeAnswer, SpeculativeRows,
 };
 
 use crate::engine::_helpers::evaluation::evaluate_json;
 use crate::engine::_helpers::evaluation::evaluate_request as evaluate_parsed;
 use crate::engine::_helpers::evaluation::parse_parts;
 use crate::engine::main::finalize_rows::finalize_rows;
+use crate::engine::main::json_grains::json_grains;
 use crate::engine::tests::test_types;
 
 pub(crate) fn request(project_dir: &TempDir, config: &Value) -> String {
@@ -645,6 +646,26 @@ pub(crate) fn query_facts_faults(
     request["models"][0]["enum_columns"] = json!(test_case.enum_columns);
     request["models"][0]["config"] = json!({"contract": "enforced"});
     request["models"][0]["columns"] = test_case.columns.clone();
+    evaluated_faults(&request)
+}
+
+/// One model named `name` with `json_grain`, evaluated with `select` under `dialect`.
+pub(crate) fn json_grain_faults(
+    test_case: &test_types::JsonGrainTestCase,
+) -> Result<Vec<(String, u64, u64, String)>, String> {
+    let project_dir = TempDir::new().map_err(|error| error.to_string())?;
+    let config = json!({"select": test_case.select, "cache": {"enabled": false}});
+    let mut request: Value =
+        serde_json::from_str(&request(&project_dir, &config)).map_err(|error| error.to_string())?;
+    request["dialect"] = json!(test_case.dialect);
+    request["models"][0]["name"] = json!(test_case.name);
+    request["models"][0]["query_sql"] = json!(test_case.query_sql);
+    request["models"][0]["authored_sql"] = json!(test_case.query_sql);
+    request["models"][0]["json_grain"] = test_case.json_grain.clone();
+    evaluated_faults(&request)
+}
+
+fn evaluated_faults(request: &Value) -> Result<Vec<(String, u64, u64, String)>, String> {
     let result: Value = serde_json::from_str(&evaluate_json(&request.to_string())?)
         .map_err(|error| error.to_string())?;
     let faults = result["faults"]
@@ -734,6 +755,20 @@ pub(crate) fn every_field_model() -> Model {
         empty_input_only_test_count: 0,
         payload_digest: Some("digest".to_owned()),
         stripped: false,
+        json_grain: Some(JsonGrain {
+            model_keys: vec![vec!["order_id".to_owned(), "line_id".to_owned()]],
+            columns: vec![GrainColumn {
+                name: "order_json".to_owned(),
+                data_type: Some("VARIANT".to_owned()),
+                inputs: vec!["ref:orders".to_owned()],
+            }],
+            input_keys: BTreeMap::from([(
+                "ref:orders".to_owned(),
+                vec![vec!["order_id".to_owned()]],
+            )]),
+            readers: vec!["shop__mart_v__orders".to_owned()],
+            skipped: Some("no lineage".to_owned()),
+        }),
     }
 }
 
@@ -854,4 +889,117 @@ pub(crate) fn finalize_cross_joins(exceptions: Value) -> Result<Vec<Fault>, Stri
         &[CROSS_JOIN_CODE.to_owned()],
         findings,
     )
+}
+
+/// A `json_grain` fact for a payload copied from `orders` onto order lines.
+pub(crate) fn payload_grain(input_key: Value, readers: Value) -> Value {
+    json!({
+        "model_keys": [["order_id", "line_no"]],
+        "columns": [{"name": "payload", "data_type": "VARIANT", "inputs": ["ref:orders"]}],
+        "input_keys": {"ref:orders": [input_key]},
+        "readers": readers,
+    })
+}
+
+/// A model row with `references` to other models and `inferred` column types.
+pub(crate) fn grain_row(name: &str, references: &[&str], inferred: &[(&str, &str)]) -> ModelRow {
+    ModelRow {
+        name: name.to_owned(),
+        references: references
+            .iter()
+            .map(|name| Reference {
+                ref_kind: "ref".to_owned(),
+                ref_name: (*name).to_owned(),
+                ref_package: None,
+            })
+            .collect(),
+        inferred_columns: inferred
+            .iter()
+            .map(|(name, kind)| ((*name).to_owned(), Some((*kind).to_owned())))
+            .collect(),
+        ..ModelRow::default()
+    }
+}
+
+fn grain_lineage(output: &str, sources: &[(&str, &str)], aggregated: bool) -> LineageColumn {
+    LineageColumn {
+        output: output.to_owned(),
+        sources: sources
+            .iter()
+            .map(|(kind, name)| ((*kind).to_owned(), (*name).to_owned()))
+            .collect(),
+        aggregated,
+    }
+}
+
+/// One declared key of `key`'s columns.
+pub(crate) fn grain_keys(key: &[&str]) -> Vec<Vec<String>> {
+    vec![key.iter().map(|column| (*column).to_owned()).collect()]
+}
+
+pub(crate) fn grain_column(name: &str, data_type: &str, inputs: &[&str]) -> GrainColumn {
+    GrainColumn {
+        name: name.to_owned(),
+        data_type: Some(data_type.to_owned()),
+        inputs: inputs.iter().map(|input| (*input).to_owned()).collect(),
+    }
+}
+
+/// Grains `json_grains` builds for four order models, by model name.
+pub(crate) fn built_json_grains() -> BTreeMap<String, Option<JsonGrain>> {
+    let mut rows = vec![
+        grain_row(
+            "order_lines_enriched",
+            &["orders", "order_lines"],
+            &[
+                ("payload", "VARIANT"),
+                ("items", "ARRAY(VARCHAR)"),
+                ("region", "object"),
+                ("total", "NUMBER(38,0)"),
+                ("payloads", "ARRAY"),
+                ("arrayish", "ARRAYLIKE"),
+            ],
+        ),
+        grain_row("orders", &[], &[("payload", "VARIANT")]),
+        grain_row("unkeyed", &["orders"], &[("payload", "VARIANT")]),
+        grain_row("untyped", &[], &[]),
+    ];
+    let lineage = vec![
+        Some(vec![
+            grain_lineage(
+                "PAYLOAD",
+                &[("model", "orders"), ("table_fn", "explode")],
+                false,
+            ),
+            grain_lineage("items", &[("source", "shop.raw_orders")], false),
+            grain_lineage("region", &[("seed", "countries")], false),
+            grain_lineage("total", &[("model", "orders")], false),
+            grain_lineage("payloads", &[("model", "orders")], true),
+            grain_lineage("arrayish", &[("model", "orders")], false),
+        ]),
+        None,
+        Some(vec![grain_lineage(
+            "payload",
+            &[("model", "orders")],
+            false,
+        )]),
+        Some(vec![grain_lineage(
+            "payload",
+            &[("model", "orders")],
+            false,
+        )]),
+    ];
+    let declared: BTreeMap<String, Vec<Vec<String>>> = BTreeMap::from([
+        (
+            "ref:order_lines_enriched".to_owned(),
+            grain_keys(&["order_id", "line_no"]),
+        ),
+        ("ref:orders".to_owned(), grain_keys(&["order_id"])),
+        ("ref:untyped".to_owned(), grain_keys(&["id"])),
+        ("seed:countries".to_owned(), grain_keys(&["country_code"])),
+    ]);
+    json_grains(&mut rows, lineage, &declared);
+    rows.into_iter()
+        .map(|row| (row.name, row.json_grain))
+        .collect()
 }

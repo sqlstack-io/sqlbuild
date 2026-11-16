@@ -36,7 +36,6 @@ use crate::bindings::_helpers::change_selection::base_snapshot::{
 use crate::bindings::_helpers::change_selection::selection::{
     ChangedProject, changed_project, tests_and_models, with_since_section,
 };
-use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
@@ -70,6 +69,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 
 /// Why `--since` selected each test, by inspection label.
 type SelectionReasons = HashMap<String, Vec<String>>;

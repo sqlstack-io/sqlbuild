@@ -27,12 +27,10 @@ use crate::bindings::_helpers::compile_driver::analysis_cache::analysis_cache_co
 use crate::bindings::_helpers::compile_driver::assembly::{AssemblyRequest, AssemblyStage};
 use crate::bindings::_helpers::compiled_views::model_input_view::attached_schema;
 use crate::bindings::_helpers::compiled_views::source_views::read_source_view;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::project_assembly::declared_relations::{
     DeclaredRelations, DeclaredShapes, declared_relations,
 };
 use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
-use crate::bindings::_helpers::sqltext::lexical_syntax::optional_record_syntax;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::compile_context::models::PythonProcessClock;
@@ -48,6 +46,8 @@ use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::sqltext::main::optional_record_syntax::optional_record_syntax;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 use std::collections::HashMap;
 

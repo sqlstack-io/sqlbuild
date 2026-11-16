@@ -95,6 +95,8 @@ pub(crate) struct ExpressionItem {
     pub(crate) start: Option<usize>,
     /// The normalized characters from the expression's first token to its last, alias excluded.
     pub(crate) span: Option<(usize, usize)>,
+    /// The FLATTEN elements the expression copies whole.
+    pub(crate) whole_values: Vec<WholeValue>,
 }
 
 #[derive(Debug)]
@@ -112,7 +114,27 @@ pub(crate) enum RelationFacts {
         alias: Option<String>,
     },
     DynamicPivot,
+    /// A `LATERAL FLATTEN(...)` or `TABLE(FLATTEN(...))` item and the column path it reads.
+    Flatten {
+        alias: Option<String>,
+        input: Option<FlattenInput>,
+    },
     Other,
+}
+
+/// The column path a FLATTEN reads: `o.value:lines` is qualifier `o`, column `value`, key `lines`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct FlattenInput {
+    pub(crate) qualifier: String,
+    pub(crate) column: String,
+    pub(crate) key: Option<String>,
+}
+
+/// An `<alias>.value` a select item copies whole, less the keys `OBJECT_DELETE` removes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct WholeValue {
+    pub(crate) qualifier: String,
+    pub(crate) removed: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]

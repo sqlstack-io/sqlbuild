@@ -67,8 +67,10 @@ def dense_column_count(index: int) -> int:
     return 256 + (rank - 990) * 24
 
 
-def write_dense_compile_project(*, project_dir: Path, model_count: int) -> None:
-    """Write a deterministic query-heavy project without external inputs or services."""
+def write_dense_compile_project(
+    *, project_dir: Path, model_count: int, rule_select: str = DENSE_RULE_SELECT
+) -> None:
+    """Write a deterministic query-heavy project; the default rules leave delta compiles on."""
 
     project_dir.mkdir(parents=True)
     domains: str = ", ".join(
@@ -77,7 +79,7 @@ def write_dense_compile_project(*, project_dir: Path, model_count: int) -> None:
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "dense_orders"\nadapter = "snowflake"\n'
         '[defaults]\ndatabase = "warehouse"\nschema = "analytics"\n'
-        f"[rules]\n{DENSE_RULE_SELECT}\ndomains = [{domains}]\n",
+        f"[rules]\n{rule_select}\ndomains = [{domains}]\n",
         encoding="utf-8",
     )
     source_count: int = max(1, model_count * 24 // 100)

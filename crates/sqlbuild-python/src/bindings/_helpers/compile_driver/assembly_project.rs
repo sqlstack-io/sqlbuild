@@ -25,12 +25,6 @@ use crate::bindings::_helpers::compile_driver::assembly_models::{
 };
 use crate::bindings::_helpers::compile_driver::assembly_sql_tests::assembled_sql_tests;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::contracts::spec_resolution::{
-    resolve_effective_adapter_name, resolve_effective_scenario_config,
-};
-use crate::bindings::_helpers::model_config::template_data::early_model_templates;
-use crate::bindings::_helpers::scopes::scope_errors::report_scope_index_errors;
-use crate::bindings::_helpers::scopes::scope_validation::scope_index_with_compile_usages;
 use crate::bindings::_helpers::semantic_checks::stage::{
     SemanticCompletion, completed_semantic_project,
 };
@@ -44,6 +38,11 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::contracts::main::resolve_effective_scenario_config::resolve_effective_scenario_config;
+use sqlbuild_python_front::model_config::main::config::early_model_templates::early_model_templates;
+use sqlbuild_python_front::scopes::main::checks::scope_index_with_compile_usages::scope_index_with_compile_usages;
+use sqlbuild_python_front::scopes::main::reports::report_scope_index_errors::report_scope_index_errors;
 
 const SOURCE_SLOT: &str = "source";
 const SEED_SLOT: &str = "seed";

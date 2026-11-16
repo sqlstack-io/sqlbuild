@@ -10195,6 +10195,7 @@ class CompilePipelineOptions(NativeRecord):
     external_sql_reference_resolver: ExternalSqlReferenceResolver | None
     resolve_python_run_selectors: bool
     no_cache: bool
+    verbose: bool
     max_microbatches: int | None
     concurrency: int | None
     selection_diagnostics: bool
@@ -10221,6 +10222,7 @@ class CompilePipelineOptions(NativeRecord):
         external_sql_reference_resolver: ExternalSqlReferenceResolver | None = ...,
         resolve_python_run_selectors: bool = ...,
         no_cache: bool = ...,
+        verbose: bool = ...,
         max_microbatches: int | None = ...,
         concurrency: int | None = ...,
         selection_diagnostics: bool = ...,
@@ -10960,6 +10962,7 @@ class RulesRunResult(NativeRecord):
     cache_misses: int
     skipped_type_proof_rules: tuple[str, ...]
     custom_rule_timings: tuple[tuple[str, int], ...]
+    skipped_models: tuple[tuple[str, str], ...]
     def __init__(
         self,
         findings: tuple[Finding, ...],
@@ -10972,6 +10975,7 @@ class RulesRunResult(NativeRecord):
         cache_misses: int = ...,
         skipped_type_proof_rules: tuple[str, ...] = ...,
         custom_rule_timings: tuple[tuple[str, int], ...] = ...,
+        skipped_models: tuple[tuple[str, str], ...] = ...,
     ) -> None: ...
 
 class CustomRulesOutcome(NativeRecord):
@@ -16117,6 +16121,7 @@ class RulesResult(NativeRecord):
     custom_ms: int
     custom_cpu_ms: int
     custom_rule_timings: tuple[tuple[str, int], ...]
+    skipped_models: tuple[tuple[str, str], ...]
     def __init__(
         self,
         findings: tuple[Finding, ...],
@@ -16128,6 +16133,7 @@ class RulesResult(NativeRecord):
         custom_ms: int = ...,
         custom_cpu_ms: int = ...,
         custom_rule_timings: tuple[tuple[str, int], ...] = ...,
+        skipped_models: tuple[tuple[str, str], ...] = ...,
     ) -> None: ...
 
 class RuleFile(NativeRecord):

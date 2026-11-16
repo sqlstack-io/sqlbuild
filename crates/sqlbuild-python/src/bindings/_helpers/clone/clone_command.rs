@@ -27,9 +27,6 @@ use crate::bindings::_helpers::clone::clone_pipeline::{ClonePipeline, timed_clon
 use crate::bindings::_helpers::clone::clone_progress::{clone_item_text, write_line};
 use crate::bindings::_helpers::command_runtime::connection::resolve_target_connection_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::planner_entries::clone_plans::PhaseTimings;
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
@@ -48,6 +45,9 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
+use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
+use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 
 const CLONE_LOGGER: &str = "sqlbuild.clone";
 /// The clone phase that copies relations into the destination.

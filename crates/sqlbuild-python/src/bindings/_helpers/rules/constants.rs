@@ -25,7 +25,7 @@ pub(crate) const CUSTOM_HOST_ABANDONED_SUFFIX: &str = ".abandoned";
 /// Marker file whose presence tells split custom hosts the run was cancelled.
 pub(crate) const CUSTOM_HOST_CANCELLED_MARKER: &str = "cancelled";
 /// Rules that need proven column types and are skipped without SQL analysis.
-pub(crate) const TYPE_PROOF_RULE_CODES: [&str; 1] = ["SQBRCONTRACT105"];
+pub(crate) const TYPE_PROOF_RULE_CODES: [&str; 2] = ["SQBRCONTRACT105", "SQBRPERFORMANCE102"];
 /// Runtime identity custom-rule hosts and their cache entries record.
 pub(crate) const CUSTOM_HOST_RUNTIME_VERSION: &str = "sqlbuild-rules-custom-v3";
 

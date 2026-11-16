@@ -18,7 +18,6 @@ use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspe
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
@@ -37,6 +36,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
 
 const COMMAND_NAME: &str = "plan";
 const DEFAULT_SECTION_ENTRIES: i64 = 50;
@@ -44,9 +44,10 @@ const DEFAULT_SECTION_ENTRIES: i64 = 50;
 const ERROR_SEVERITY: &str = "error";
 const CONNECTION_TIMING: [&str; 2] = ["connection_count", "elapsed_seconds"];
 /// Request fields passed to the compile pipeline under the same name.
-const PIPELINE_FIELDS: [&str; 11] = [
+const PIPELINE_FIELDS: [&str; 12] = [
     "no_sql_validation",
     "no_cache",
+    "verbose",
     "defer_to",
     "defer_sources_to",
     "cursor_overrides",

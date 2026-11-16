@@ -11,7 +11,6 @@ use crate::bindings::_helpers::analysis_session::model_analyses::ModelAnalyses;
 use crate::bindings::_helpers::analysis_session::profile_inputs::profile_dialect;
 use crate::bindings::_helpers::analysis_session::query_columns::ColumnsRow;
 use crate::bindings::_helpers::analysis_session::stage_functions::query_column_rows;
-use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_sql;
 use crate::bindings::_helpers::compile_driver::assembly_analysis::{
     AnalysisContext, model_stem, selected_for_analysis,
 };
@@ -22,12 +21,13 @@ use crate::bindings::_helpers::project_assembly::syntax_checks::model_placeholde
 use crate::bindings::_helpers::project_assembly::syntax_validation::{
     ParseOptions, validate_hook_sql_syntax, validate_sql_syntax,
 };
-use crate::bindings::_helpers::render::macro_calls::top_level_macro_call_names;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
+use sqlbuild_python_front::render::main::calls::top_level_macro_call_names::top_level_macro_call_names;
 
 const NATIVE_FAILURE_PREFIX: &str = "NativeCompilerError: ";
 const HOOK_NAMES: [&str; 2] = ["pre_hooks", "post_hooks"];

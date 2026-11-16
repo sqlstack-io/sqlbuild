@@ -8,6 +8,8 @@ mod evaluation;
 mod helpers;
 #[path = "tests/test_incremental_rules.rs"]
 mod incremental_rules;
+#[path = "tests/test_json_grains.rs"]
+mod json_grains;
 #[path = "tests/test_published_layers.rs"]
 mod published_layers;
 #[path = "tests/test_query_facts.rs"]

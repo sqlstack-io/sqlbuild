@@ -13,7 +13,6 @@ use crate::bindings::_helpers::analysis::schema_request::{
     SchemaRequestParts, schema_validation_request,
 };
 use crate::bindings::_helpers::analysis_session::stage_functions::infer_native_query_columns;
-use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_sql;
 use crate::bindings::_helpers::semantic_shapes::constants::SOURCE_REBINDING_ANALYSES;
 use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
 use crate::bindings::_helpers::semantic_shapes::shapes::{
@@ -30,6 +29,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::attachments::main::analysis_cursor_sql::analysis_cursor_sql;
 use sqlbuild_sqltext::resolution::main::unquoted_column_name::unquoted_column_name;
 
 const BINDING_UNKNOWN_TABLE_INTERNAL_CODE: &str = "B000";
