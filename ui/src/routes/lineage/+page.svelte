@@ -7,6 +7,7 @@
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FolderNode from '$lib/components/lineage/folder-node.svelte';
 	import FolderIcon from '@lucide/svelte/icons/folder';
+	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import NodeFieldsPopover from '$lib/components/lineage/node-fields-popover.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -599,7 +600,7 @@
 <AppTopbar title="Lineage">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
 	{#if app.client.supports('launchAdhocRun')}
-		{#if changedCount}<GatedButton requires="run.adhoc" variant="stale" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build {changedCount} changed</GatedButton>{/if}
+		{#if changedCount}<GatedButton requires="run.adhoc" variant="stale" onclick={() => goto(to(CHANGED_PLAN_HREF))}><HammerIcon />Build {changedCount} changed</GatedButton>{/if}
 		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
 	{/if}
 </AppTopbar>

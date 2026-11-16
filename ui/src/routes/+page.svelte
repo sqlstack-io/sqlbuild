@@ -3,6 +3,7 @@
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
+	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import AlertCircleIcon from '@lucide/svelte/icons/circle-alert';
@@ -160,7 +161,7 @@
 								<span class="issue-actions">
 									{#if view.build}
 										{@const build = view.build}
-										<GatedButton requires="run.adhoc" size="xs" variant={build.variant} onclick={() => goto(to(build.href))}>{build.label}</GatedButton>
+										<GatedButton requires="run.adhoc" size="xs" variant={build.variant} onclick={() => goto(to(build.href))}>{#if build.variant === 'stale'}<HammerIcon />{/if}{build.label}</GatedButton>
 									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>
