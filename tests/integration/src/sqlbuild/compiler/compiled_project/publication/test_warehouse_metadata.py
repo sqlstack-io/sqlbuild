@@ -43,6 +43,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     CatalogConnectionTestCase,
     FingerprintHistoryTestCase,
     NewestVersionsTestCase,
+    PageBytesTestCase,
     StateEventsTestCase,
     SyncPacingTestCase,
     WarehouseHistoryTestCase,
@@ -228,7 +229,7 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
     for column in legacy_columns:
         _ = adapter.execute(connection=connection, sql=f"ALTER TABLE {table} DROP COLUMN {column}")
     adapter.close(connection)
-    pages: list[dict[str, Any]] = warehouse_history_pages(project, fixture["kind"])
+    pages: list[dict[str, Any]] = warehouse_history_pages(project, fixture["kind"], limit=100)
     rows: list[dict[str, Any]] = []
     for page in pages:
         rows.extend(page["records"])
@@ -244,7 +245,7 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
     )
     assert rows[-1] == expected | fixture["last_record"] | dict.fromkeys(legacy_columns)
     recent_pages: list[dict[str, Any]] = warehouse_history_pages(
-        project, fixture["kind"], fixture["later_time"]
+        project, fixture["kind"], fixture["later_time"], limit=100
     )
     recent_rows: list[dict[str, Any]] = []
     for page in recent_pages:
@@ -550,7 +551,7 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
             assert predecessor.execute("PRAGMA journal_mode=DELETE").fetchone() == (journal_mode,)
 
     def page(after: list[str | None] | None = None, observed_since: str | None = None) -> Any:
-        return warehouse_history_page(project, "source_freshness", after, observed_since)
+        return warehouse_history_page(project, "source_freshness", after, observed_since, limit=100)
 
     old: dict[str, Any] = page()
     assert len(old["records"]) == 1 and old["records"][0]["event_id"] is None
@@ -1058,7 +1059,11 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
         project_dir=project,
         files={"models/orders.sql": "MODEL (description 'Orders.'); SELECT 17 AS amount"},
     )
-    with snapshot_api(tmp_path / "control") as api:
+    # Every build of the one node stays, so the overlap, not retention, decides what is mirrored.
+    with snapshot_api(
+        tmp_path / "control",
+        server_arguments=("--state-history-retention-versions", "65535"),
+    ) as api:
         control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
         log: Path = tmp_path / "location.log"
         with location_process(
@@ -1604,8 +1609,7 @@ def test_given_a_served_location_when_a_sync_has_many_pages_then_pages_run_back_
             assert paced == test_case.added_rows, test_case.description
             assert elapsed < test_case.expected_max_seconds, (
                 f"{test_case.description}: {elapsed:.1f} s for "
-                f"{test_case.added_rows // 100} pages; a tick per page needs at least "
-                f"{test_case.added_rows / 400:.0f} s"
+                f"{test_case.added_rows} rows; pages must run back to back"
             )
 
             calls.write_text("")
@@ -1686,3 +1690,48 @@ def test_given_many_builds_per_node_when_a_full_read_has_a_version_limit_then_on
             break
 
     assert {node: sorted(found) for node, found in runs.items()} == test_case.expected_runs
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PageBytesTestCase("DuckDB wide builds", "duckdb", "database", 24, 1_000_000, 3),
+        PageBytesTestCase("SQLite wide builds", "sqlite", "path", 24, 1_000_000, 3),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_wide_builds_when_reading_large_pages_then_the_byte_budget_ends_each_page_and_no_row_is_lost(
+    test_case: PageBytesTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    definition: str = base64.b64encode(
+        ("SELECT 1 /*" + "x" * test_case.definition_bytes + "*/").encode()
+    ).decode()
+    for index in range(test_case.wide_rows):
+        _ = adapter.execute(
+            connection=connection,
+            sql=(
+                "INSERT INTO main._sqlbuild_fingerprints SELECT node_type,"
+                f"'inventory_{index:03}',target_database,target_schema,target_name,"
+                f"'wide-run-{index:03}',definition_hash,version_hash,schema_fingerprint,"
+                f"'{definition}',metadata_json_b64,ts "
+                "FROM main._sqlbuild_fingerprints WHERE run_id='legacy-run'"
+            ),
+        )
+    adapter.close(connection)
+
+    pages: list[dict[str, Any]] = warehouse_history_pages(project, "fingerprints")
+
+    runs: list[str] = [record["run_id"] for page in pages for record in page["records"]]
+    assert sorted(runs) == sorted(
+        ["legacy-run"] + [f"wide-run-{index:03}" for index in range(test_case.wide_rows)]
+    ), "every build arrives exactly once across byte-bounded pages"
+    assert len(pages) >= test_case.expected_min_pages, [len(page["records"]) for page in pages]
+    for page in pages:
+        encoded: int = len(json.dumps(page["records"]).encode())
+        assert encoded <= 8 * 1024 * 1024 + 2 * test_case.definition_bytes, encoded

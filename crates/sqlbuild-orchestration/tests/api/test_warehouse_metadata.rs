@@ -25,6 +25,7 @@ use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
 
 #[test]
@@ -193,7 +194,7 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             let mut invalid_id = batch.clone();
             invalid_id["records"][0]["event_id"] = json!(" ");
             let mut oversized = batch.clone();
-            oversized["records"] = json!(vec![record.clone(); 101]);
+            oversized["records"] = json!(vec![record.clone(); MAX_HISTORY_PAGE_RECORDS + 1]);
             let mut unknown = batch.clone();
             unknown["records"][0]["status"] = json!("success");
             let foreign = url.replace(&location.to_string(), &other.to_string());

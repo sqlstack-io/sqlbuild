@@ -2,7 +2,12 @@
 
 use crate::warehouse_metadata::models::WarehouseHistoryKind;
 
+/// Statistics relations sampled per page, and other bounded statistics work; each sample is a query.
 pub const MAX_HISTORY_RECORDS: usize = 100;
+/// Rows of one state-table or catalog page; the reply's byte budget usually ends a page first.
+pub const MAX_HISTORY_PAGE_RECORDS: usize = 2000;
+/// Encoded records one page carries before the reader ends it, far below the API body bound.
+pub const HISTORY_PAGE_BYTES: usize = 8 * 1024 * 1024;
 pub(crate) const CATALOG_MIRROR: &str = "sqb_warehouse_catalog";
 pub(crate) const DEFAULT_STATISTICS_RETENTION_DAYS: u16 = 90;
 /// Builds and check results a SQLite store keeps per node or check unless configured.

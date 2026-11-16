@@ -12,6 +12,7 @@ use crate::store::main::{
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
+use crate::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use crate::warehouse_metadata::models::{MetadataBatch, WarehouseWatermarkRead};
 
 pub(crate) async fn fingerprint_history(
@@ -114,7 +115,7 @@ pub(crate) async fn fingerprint_history(
     let mut stale = batch.clone();
     stale["generation"] = json!(2);
     let mut oversized = batch.clone();
-    oversized["records"] = json!(vec![record.clone(); 101]);
+    oversized["records"] = json!(vec![record.clone(); MAX_HISTORY_PAGE_RECORDS + 1]);
     let mut blank = batch.clone();
     blank["records"][0]["event_id"] = json!(" ");
     let mut foreign = batch.clone();

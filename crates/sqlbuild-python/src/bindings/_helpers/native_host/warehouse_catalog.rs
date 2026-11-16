@@ -4,7 +4,7 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
-use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     CatalogRead, WarehouseCatalogColumn, WarehouseCatalogRecord, WarehouseHistoryPage,
     WarehouseHistoryRecord,
@@ -18,13 +18,13 @@ pub(crate) fn read_catalog(
     (adapter, connection): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     request: &CatalogRead,
 ) -> PyResult<WarehouseHistoryPage> {
-    let limit = request.limit.unwrap_or(MAX_HISTORY_RECORDS);
+    let limit = request.limit.unwrap_or(MAX_HISTORY_PAGE_RECORDS);
     if request.observed_since.is_some() {
         return Err(PyValueError::new_err(
             "catalog observations require full scans, not timestamp watermarks",
         ));
     }
-    if limit == 0 || limit > MAX_HISTORY_RECORDS {
+    if limit == 0 || limit > MAX_HISTORY_PAGE_RECORDS {
         return Err(PyValueError::new_err(
             "metadata page limit is outside the supported bounds",
         ));

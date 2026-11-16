@@ -37,7 +37,9 @@ use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::main::set_release_version::set_release_version;
 use sqlbuild_orchestration::store::models::ControlStore;
-use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use sqlbuild_orchestration::warehouse_metadata::constants::{
+    MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
+};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind,
     WarehouseHistoryPage, WarehouseStateLocation, WarehouseSyncDueRead, WarehouseWatermarkRead,
@@ -353,7 +355,7 @@ pub(crate) fn metadata_sync(
         reconcile: true,
         reconcile_at: Instant::now(),
         reconcile_seconds,
-        limit: MAX_HISTORY_RECORDS,
+        limit: MAX_HISTORY_PAGE_RECORDS,
         statistics_limit: MAX_HISTORY_RECORDS,
         pending: None,
         next_at: Instant::now(),
@@ -372,7 +374,7 @@ pub(crate) fn metadata_sync(
 }
 
 pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, ControlError> {
-    if state.index == 0 && state.source_after.is_none() && state.limit == MAX_HISTORY_RECORDS {
+    if state.index == 0 && state.source_after.is_none() && state.limit == MAX_HISTORY_PAGE_RECORDS {
         drop(write_output(&[(
             Stream::Stderr,
             "Reading warehouse history for automatic synchronization...\n",
@@ -590,7 +592,7 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
     state.scan_id = Uuid::now_v7();
     state.observed_since = None;
     state.watermark_loaded = false;
-    state.limit = MAX_HISTORY_RECORDS;
+    state.limit = MAX_HISTORY_PAGE_RECORDS;
     if state.index == state.locations.len() * WarehouseHistoryKind::ALL.len() {
         state.index = 0;
         if state.reconcile {

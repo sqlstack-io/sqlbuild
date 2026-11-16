@@ -157,7 +157,7 @@ fn given_a_version_limit_when_reading_history_then_only_each_identitys_newest_ro
             limit: 5,
             newest: Some(NewestVersions {
                 partition: &["node_name"],
-                tie_breakers: &["run_id"],
+                observation: &["event_id", "run_id"],
                 versions: 3,
             }),
         },
@@ -165,16 +165,15 @@ fn given_a_version_limit_when_reading_history_then_only_each_identitys_newest_ro
 
     assert_eq!(
         sql,
-        Ok(
-            "SELECT node_name, run_id, ts, event_id FROM (SELECT *, ROW_NUMBER() OVER \
-            (PARTITION BY node_name ORDER BY ts DESC, run_id DESC, event_id DESC) AS sqb_version \
-            FROM s.t) AS sqb_versions WHERE sqb_version <= 3 ORDER BY \
+        Ok("SELECT node_name, run_id, ts, event_id FROM (SELECT *, DENSE_RANK() OVER \
+            (PARTITION BY node_name ORDER BY sqb_first_at DESC, event_id DESC, run_id DESC) AS sqb_version \
+            FROM (SELECT *, MIN(ts) OVER (PARTITION BY node_name, event_id, run_id) AS sqb_first_at \
+            FROM s.t) AS sqb_observations) AS sqb_versions WHERE sqb_version <= 3 ORDER BY \
             CASE WHEN node_name IS NULL THEN 0 ELSE 1 END, encode(node_name), \
             CASE WHEN run_id IS NULL THEN 0 ELSE 1 END, encode(run_id), \
             CASE WHEN ts IS NULL THEN 0 ELSE 1 END, ts, \
             CASE WHEN event_id IS NULL THEN 0 ELSE 1 END, encode(event_id) LIMIT 5"
-                .to_owned()
-        ),
-        "the rank keeps the newest three rows of each node and is never projected"
+            .to_owned()),
+        "copies of one build share a rank, so the newest three builds of each node arrive whole"
     );
 }

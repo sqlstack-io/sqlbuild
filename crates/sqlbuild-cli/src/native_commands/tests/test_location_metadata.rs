@@ -1,4 +1,6 @@
-use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use sqlbuild_orchestration::warehouse_metadata::constants::{
+    MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
+};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseStateLocation,
 };
@@ -56,7 +58,7 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             (
                 WarehouseHistoryKind::Statistics,
                 test_case.expected_statistics_limit,
-                MAX_HISTORY_RECORDS,
+                MAX_HISTORY_PAGE_RECORDS,
             ),
             "{description}",
             description = test_case.description

@@ -1,7 +1,8 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
 use crate::state_tables::constants::{
-    EVENT_ID_KEY_PROJECTION, MISSING_EVENT_ID_KEY, NEWEST_VERSION_COLUMN, SQLSERVER_ADAPTER,
+    EVENT_ID_KEY_PROJECTION, MISSING_EVENT_ID_KEY, NEWEST_FIRST_COLUMN, NEWEST_VERSION_COLUMN,
+    SQLSERVER_ADAPTER,
 };
 use crate::state_tables::models::HistoryRead;
 
@@ -84,20 +85,21 @@ pub fn read_history_sql(
     }
     let source = match newest {
         Some(newest) => {
-            let mut order = vec![format!("{timestamp_column} DESC")];
+            let partition = newest.partition.join(", ");
+            let mut order = vec![format!("{NEWEST_FIRST_COLUMN} DESC")];
             order.extend(
                 newest
-                    .tie_breakers
+                    .observation
                     .iter()
-                    .chain(has_event_id.then_some(&"event_id"))
                     .map(|column| format!("{column} DESC")),
             );
             filters.push(format!("{NEWEST_VERSION_COLUMN} <= {}", newest.versions));
             format!(
-                "(SELECT *, ROW_NUMBER() OVER (PARTITION BY {} ORDER BY {}) AS {NEWEST_VERSION_COLUMN} \
-                 FROM {qualified_name}) AS sqb_versions",
-                newest.partition.join(", "),
-                order.join(", ")
+                "(SELECT *, DENSE_RANK() OVER (PARTITION BY {partition} ORDER BY {}) AS {NEWEST_VERSION_COLUMN} \
+                 FROM (SELECT *, MIN({timestamp_column}) OVER (PARTITION BY {partition}, {}) AS {NEWEST_FIRST_COLUMN} \
+                 FROM {qualified_name}) AS sqb_observations) AS sqb_versions",
+                order.join(", "),
+                newest.observation.join(", ")
             )
         }
         None => qualified_name.to_owned(),

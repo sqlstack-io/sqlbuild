@@ -15,7 +15,9 @@ use sqlbuild_core::constants::{
     RESOURCE_COSTS_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
 };
 use sqlbuild_core::models::SqlValue;
-use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use sqlbuild_orchestration::warehouse_metadata::constants::{
+    HISTORY_PAGE_BYTES, MAX_HISTORY_PAGE_RECORDS,
+};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     ConsumptionRead, NodeResultsRead, WarehouseHistoryPage, WarehouseHistoryRead,
     WarehouseHistoryRecord, WarehouseStateLocation,
@@ -75,6 +77,10 @@ pub(crate) struct HistoryStream<'py> {
     next_after: Vec<Option<String>>,
     /// Rows the bounded SELECT can still return; at zero the next page reads from its cursor.
     remaining: usize,
+    /// Rows fetched but not delivered, because the last page reached its byte budget.
+    carried: std::collections::VecDeque<Bound<'py, PyAny>>,
+    /// The cursor returned fewer rows than asked for, so the table has no more rows.
+    drained: bool,
     qualified: String,
     columns: Vec<String>,
     timestamp: String,
@@ -329,8 +335,8 @@ fn read_page<'py>(
             OBSERVED_AT_COLUMN,
         ),
     };
-    let limit = limit.unwrap_or(MAX_HISTORY_RECORDS);
-    if limit == 0 || limit > MAX_HISTORY_RECORDS {
+    let limit = limit.unwrap_or(MAX_HISTORY_PAGE_RECORDS);
+    if limit == 0 || limit > MAX_HISTORY_PAGE_RECORDS {
         return Err(PyValueError::new_err(
             "metadata page limit is outside the supported bounds",
         ));
@@ -509,12 +515,15 @@ fn read_page<'py>(
         })
         .collect();
     let projection: Vec<&str> = projection.iter().map(String::as_str).collect();
-    let newest =
-        newest_versions(request).map(|(partition, tie_breakers, versions)| NewestVersions {
-            partition,
-            tie_breakers,
-            versions,
-        });
+    let newest = newest_versions(request).map(|(partition, versions)| NewestVersions {
+        partition,
+        observation: match request {
+            WarehouseHistoryRead::AuditResults(_) => &["result_id"],
+            _ if has_event_id => &["event_id", "run_id"],
+            _ => &["run_id"],
+        },
+        versions,
+    });
     let window = if session.local {
         limit
     } else {
@@ -547,6 +556,8 @@ fn read_page<'py>(
         cursor,
         next_after: Vec::new(),
         remaining: window,
+        carried: std::collections::VecDeque::new(),
+        drained: false,
         qualified,
         columns: columns.iter().map(|column| (*column).to_owned()).collect(),
         timestamp: timestamp.to_owned(),
@@ -558,31 +569,54 @@ fn read_page<'py>(
     Ok((page, stream))
 }
 
-/// Fetch one page from the scan's result; a full page keeps the stream open for the next.
+/// Fetch one page from the scan's result, ending it at `limit` rows or the page's byte budget.
+///
+/// Rows fetched past the budget wait in the stream for the next page. A local database file's
+/// stream is never kept, so a page ending early is read again from its cursor.
 fn stream_page<'py>(
     py: Python<'py>,
     (session, request): (&HistorySession<'py>, &WarehouseHistoryRead),
     mut stream: HistoryStream<'py>,
     limit: usize,
 ) -> PyResult<(WarehouseHistoryPage, Option<HistoryStream<'py>>)> {
-    let columns: Vec<&str> = stream.columns.iter().map(String::as_str).collect();
+    let columns: Vec<String> = stream.columns.clone();
+    let columns: Vec<&str> = columns.iter().map(String::as_str).collect();
     let tuple = py.import("builtins")?.getattr("tuple")?;
     let mut records: Vec<WarehouseHistoryRecord> = Vec::new();
     let mut next_after = None;
     let mut read_count = 0;
-    let fetch = limit.min(stream.remaining);
-    for row in stream
-        .cursor
-        .call_method1("fetchmany", (fetch,))?
-        .try_iter()?
-    {
-        read_count += 1;
-        let row = tuple.call1((row?,))?;
+    let mut bytes = 0;
+    while read_count < limit {
+        let Some(row) = stream.carried.pop_front() else {
+            if stream.drained || stream.remaining == 0 {
+                break;
+            }
+            let fetch = (limit - read_count).min(stream.remaining);
+            let rows: Vec<Bound<'py, PyAny>> = stream
+                .cursor
+                .call_method1("fetchmany", (fetch,))?
+                .try_iter()?
+                .map(|row| tuple.call1((row?,)))
+                .collect::<PyResult<_>>()?;
+            stream.remaining -= rows.len();
+            stream.drained = rows.len() < fetch;
+            stream.carried.extend(rows);
+            continue;
+        };
         let record = decode_record(
             py,
             (request, &row, &stream.qualified),
             (&columns, &stream.timestamp),
         )?;
+        let size = serde_json::to_vec(&record)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?
+            .len();
+        if read_count > 0 && bytes + size > HISTORY_PAGE_BYTES {
+            stream.carried.push_front(row);
+            break;
+        }
+        bytes += size;
+        read_count += 1;
         let mut cursor = vec![None; stream.cursor_indexes.len()];
         for (index, value) in cursor.iter_mut().enumerate() {
             let raw = row.get_item(stream.cursor_indexes[index])?;
@@ -616,13 +650,18 @@ fn stream_page<'py>(
         }
         next_after = Some(cursor);
     }
-    stream.remaining -= read_count;
+    let more_rows = !stream.carried.is_empty() || !stream.drained;
     let open = match &next_after {
-        Some(after) if read_count == fetch && stream.remaining > 0 => {
-            stream.next_after.clone_from(after);
-            Some(stream)
+        Some(after) if more_rows && (!stream.carried.is_empty() || stream.remaining > 0) => {
+            if session.local {
+                discard_stream(&session.connection, Some(stream))?;
+                None
+            } else {
+                stream.next_after.clone_from(after);
+                Some(stream)
+            }
         }
-        Some(_) if read_count == fetch => {
+        Some(_) if more_rows => {
             discard_stream(&session.connection, Some(stream))?;
             None
         }
@@ -671,31 +710,17 @@ fn discard_stream(
     Ok(())
 }
 
-/// A full read of builds or check results keeps each node's or check's newest rows only.
+/// A full read of builds or check results keeps each node's or check's newest ones only.
 ///
-/// Returns the identity columns, the columns ordering rows with one timestamp, and the count.
-fn newest_versions(
-    request: &WarehouseHistoryRead,
-) -> Option<(&'static [&'static str], &'static [&'static str], u16)> {
+/// Returns the identity columns and the count.
+fn newest_versions(request: &WarehouseHistoryRead) -> Option<(&'static [&'static str], u16)> {
     match request {
-        WarehouseHistoryRead::Fingerprints(read) if read.observed_since.is_none() => {
-            read.newest_versions.map(|versions| {
-                (
-                    FINGERPRINT_IDENTITY_COLUMNS.as_slice(),
-                    ["run_id"].as_slice(),
-                    versions,
-                )
-            })
-        }
-        WarehouseHistoryRead::AuditResults(read) if read.observed_since.is_none() => {
-            read.newest_versions.map(|versions| {
-                (
-                    ["binding_key"].as_slice(),
-                    ["result_id"].as_slice(),
-                    versions,
-                )
-            })
-        }
+        WarehouseHistoryRead::Fingerprints(read) if read.observed_since.is_none() => read
+            .newest_versions
+            .map(|versions| (FINGERPRINT_IDENTITY_COLUMNS.as_slice(), versions)),
+        WarehouseHistoryRead::AuditResults(read) if read.observed_since.is_none() => read
+            .newest_versions
+            .map(|versions| (["binding_key"].as_slice(), versions)),
         _ => None,
     }
 }

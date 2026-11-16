@@ -229,6 +229,16 @@ class NewestVersionsTestCase:
 
 
 @dataclass(frozen=True)
+class PageBytesTestCase:
+    description: str
+    adapter_name: str
+    connection_key: str
+    wide_rows: int
+    definition_bytes: int
+    expected_min_pages: int
+
+
+@dataclass(frozen=True)
 class CatalogConnectionTestCase:
     description: str
     adapter_name: str

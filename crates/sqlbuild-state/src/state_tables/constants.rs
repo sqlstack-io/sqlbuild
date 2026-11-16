@@ -8,3 +8,5 @@ pub(crate) const MISSING_EVENT_ID_KEY: &str = "NULL";
 pub(crate) const EVENT_ID_KEY_PROJECTION: &str = ", event_id AS sqb_event_id_key";
 /// The rank a newest-versions read filters on; never projected, so it never reaches a record.
 pub(crate) const NEWEST_VERSION_COLUMN: &str = "sqb_version";
+/// When an observation's first copy was written, so its copies share one rank.
+pub(crate) const NEWEST_FIRST_COLUMN: &str = "sqb_first_at";
