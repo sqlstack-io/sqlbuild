@@ -39,11 +39,16 @@ const ITEMS = [
 	{ list: '/admin/roles', link: 'a[href*="/admin/roles/"]' }
 ];
 
+/** The mock's large job group (src/lib/api/mock/big-group.ts). */
+const BIG_GROUP = 'warehouse_nightly';
+
 const awkward = (path: string) => `${path}${path.includes('?') ? '&' : '?'}mock&awkward`;
 
 async function settle(page: Page) {
 	await page.waitForLoadState('networkidle');
 	await page.waitForTimeout(500);
+	// A graph shows once its first fit is done, after its data loads; the layout check fails one still hidden.
+	await page.waitForFunction(() => !document.querySelector('.graph-canvas.unfitted'), null, { timeout: 10_000 }).catch(() => {});
 }
 
 async function checkLayout(page: Page, label: string) {
@@ -54,6 +59,8 @@ async function checkLayout(page: Page, label: string) {
 		if (document.documentElement.scrollWidth > width + 1) problems.push(`page is ${document.documentElement.scrollWidth}px wide in a ${width}px window`);
 		// Page headers and toolbars stay inside the window.
 		for (const el of document.querySelectorAll<HTMLElement>('.app-topbar, .list-toolbar, .head, .toolbar, article > header, .page-body-inner > header')) {
+			// Cards on a graph's canvas pan out of view by design; the canvas clips them.
+			if (el.closest('.svelte-flow')) continue;
 			const box = el.getBoundingClientRect();
 			if (box.width && box.right > width + 1) problems.push(`${el.className.split(' ')[0]} ends at ${Math.round(box.right)}px`);
 			for (const child of el.querySelectorAll<HTMLElement>('*')) {
@@ -62,6 +69,27 @@ async function checkLayout(page: Page, label: string) {
 					problems.push(`${el.className.split(' ')[0]}: "${(child.textContent ?? '').trim().slice(0, 40)}" ends at ${Math.round(c.right)}px`);
 					break;
 				}
+			}
+		}
+		// Every graph has finished its first fit: an unfitted graph stays hidden.
+		if (document.querySelector('.graph-canvas.unfitted')) problems.push('a graph never fitted');
+		// A graph opens with its card titles readable: at least 11 px on screen. (A graph with the library's
+		// own controls is drawn whole at any zoom, as Lineage's very large graphs are.)
+		for (const canvas of document.querySelectorAll<HTMLElement>('.graph-canvas:not(.unfitted)')) {
+			if (!canvas.querySelector('.fit-control')) continue;
+			const scale = /scale\(([\d.]+)\)/.exec(canvas.querySelector<HTMLElement>('.svelte-flow__viewport')?.style.transform ?? '');
+			const title = canvas.querySelector('.svelte-flow__node .name');
+			if (!scale || !title) continue;
+			const px = parseFloat(getComputedStyle(title).fontSize) * Number(scale[1]);
+			if (px < 10.95) problems.push(`card titles show at ${px.toFixed(1)} px`);
+		}
+		// Every scroll area has the themed scrollbar, not the browser's default.
+		for (const el of [document.documentElement, ...document.querySelectorAll<HTMLElement>('body *')]) {
+			const style = getComputedStyle(el);
+			const scrolls = (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1) || (/(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 1);
+			if (scrolls && style.scrollbarColor === 'auto') {
+				problems.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} scrolls with the default scrollbar`);
+				break;
 			}
 		}
 		for (const table of document.querySelectorAll<HTMLTableElement>('table.sb-table')) {
@@ -159,6 +187,37 @@ for (const width of WIDTHS) {
 				await checkStickyHeaders(page, path);
 			});
 		}
+
+		test('the large mock group draws its direct waits only and opens on its cards', async ({ page }) => {
+			await page.goto(awkward(`/jobs/${BIG_GROUP}`));
+			await settle(page);
+			await checkLayout(page, BIG_GROUP);
+			const drawn = () =>
+				page.evaluate(() => {
+					const pane = document.querySelector('.svelte-flow')!.getBoundingClientRect();
+					const rect = (s: string) => [...document.querySelectorAll<HTMLElement>(s)].map((n) => n.getBoundingClientRect());
+					const cards = rect('.svelte-flow__node[data-id^="member:"], .svelte-flow__node[data-id^="jobfolder:"]');
+					const inside = cards.filter((c) => c.width && c.left >= pane.left && c.right <= pane.right && c.top >= pane.top && c.bottom <= pane.bottom);
+					return { members: rect('.svelte-flow__node[data-id^="member:"]').length, folders: rect('.svelte-flow__node[data-id^="jobfolder:"]').length, cards: cards.length, edges: document.querySelectorAll('.svelte-flow__edge').length, inside: inside.length };
+				});
+			// A group this large opens by folder, closed, with a line per pair of folders.
+			let found = await drawn();
+			expect(found.folders, 'closed folders drawn').toBeGreaterThan(1);
+			expect(found.edges, 'lines between folders').toBeLessThanOrEqual(2 * found.cards);
+			expect(found.inside, 'cards wholly in view after load').toBeGreaterThan(0);
+			// Without folders: every member, and only the waits no other wait implies, at most two lines per member.
+			await page.getByRole('button', { name: 'Folders' }).click();
+			await expect.poll(async () => (await drawn()).members).toBeGreaterThanOrEqual(40);
+			found = await drawn();
+			expect(found.edges, 'lines drawn').toBeLessThanOrEqual(2 * found.members);
+			// The shared toolbar: Expand all opens members in place, Reset closes them and brings folders back.
+			const boxes = () => page.locator('.svelte-flow__node-memberBox').count();
+			await page.getByRole('button', { name: 'Expand all' }).click();
+			await expect.poll(boxes).toBeGreaterThan(0);
+			await page.getByRole('button', { name: 'Reset' }).click();
+			await expect.poll(boxes).toBe(0);
+			await expect.poll(async () => (await drawn()).folders).toBeGreaterThan(1);
+		});
 
 		for (const { list, link } of ITEMS) {
 			test(`the first item of ${list} fits and lines up`, async ({ page }) => {

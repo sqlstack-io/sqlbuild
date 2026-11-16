@@ -30,7 +30,7 @@
 		<button class="head folder-head nodrag" title="Close {folder.folder}" aria-expanded="true" onclick={() => folder.ontoggle?.(folder.folder)}>
 			<ChevronDownIcon size={14} class="chevron" />
 			<span class="name" title={folder.folder}>{folder.label}</span>
-			<span class="faint">· {plural(folder.nodeCount, 'node')}{#if folder.stale} · <span class="stale">{folder.stale} stale</span>{/if}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>
+			<span class="faint">· {plural(folder.nodeCount, folder.noun ?? 'node')}{#if folder.stale} · <span class="stale">{folder.stale} stale</span>{/if}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>
 		</button>
 	{:else}
 	<div class="head">

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Lives inside <SvelteFlow> so it can access the flow context, and exposes
+	// Lives inside the graph canvas so it can access the flow context, and exposes
 	// fitView() upward so the parent can reset pan+zoom after re-layout.
 	// `fitFloor` keeps these fits readable on a large graph; zooming out by hand can still go below it.
 	// With `readable`, a graph too large to show whole at `fitFloor` is shown at `fitFloor` instead,
@@ -7,7 +7,7 @@
 	// `fitted` turns true once a fit has been painted; graphs stay hidden until then, so the first
 	// frame never shows cards at unlaid-out positions that then jump into place.
 	import { useStore, useSvelteFlow, useViewport, type Viewport } from '@xyflow/svelte';
-	import { fitViewport, largestBox, type Rect } from './fit';
+	import { firstCard, fitViewport, largestBox, type Rect } from './fit';
 	import { unzoom } from './hit-area';
 
 	let {
@@ -49,7 +49,7 @@
 		const left = Math.min(...rects.map((r) => r.x));
 		const topY = Math.min(...rects.map((r) => r.y));
 		const bounds = { x: left, y: topY, width: Math.max(...rects.map((r) => r.x + r.width)) - left, height: Math.max(...rects.map((r) => r.y + r.height)) - topY };
-		void flow.setViewport(fitViewport(bounds, width, height, { minZoom: fitFloor, focus: largestBox(rects) }), { duration });
+		void flow.setViewport(fitViewport(bounds, width, height, { minZoom: fitFloor, focus: largestBox(rects), start: firstCard(rects) }), { duration });
 		return true;
 	}
 
@@ -62,9 +62,13 @@
 			return;
 		}
 		// Until the graph has been shown, fit without animating, so it appears already in place. A fit waits
-		// until the flow can run it, so each try is bounded by a frame; after 20 the graph shows regardless.
+		// until the flow can run it, so each try is bounded by a frame; after 20 the graph shows regardless,
+		// and the fit keeps trying for a while (the pane may not have its size yet) unless the view moves.
 		void (async () => {
-			for (let attempt = 0; attempt < 20 && !fitted; attempt++) {
+			const start = { ...vp.current };
+			for (let attempt = 0; attempt < 600; attempt++) {
+				const moved = fitted && (vp.current.x !== start.x || vp.current.y !== start.y || vp.current.zoom !== start.zoom);
+				if (moved) return;
 				const done = readable ? readableFit(0) : await Promise.race([flow.fitView({ padding: 0.08, maxZoom: 1, minZoom: fitFloor, ...opts, duration: 0 }), frame().then(() => false)]);
 				if (done) {
 					await frame();
@@ -72,9 +76,9 @@
 					fitted = true;
 					return;
 				}
+				if (attempt === 19) fitted = true;
 				await frame();
 			}
-			fitted = true;
 		})();
 	};
 	setViewport = (v) => flow.setViewport(v);

@@ -162,8 +162,4 @@
 		padding: 16px;
 		color: var(--muted-foreground);
 	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
-	}
 </style>

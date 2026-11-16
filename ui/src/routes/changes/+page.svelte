@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
 	import { plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -59,6 +60,7 @@
 		{ value: 'roles', label: 'Roles' },
 		{ value: 'environment', label: 'Environment' }
 	];
+	const byArea = $derived(countBy(all, (c) => areaOptions.filter((o) => hasArea(c, o.value)).map((o) => o.value)));
 </script>
 
 <AppTopbar title="Changes">
@@ -67,7 +69,7 @@
 
 <ListToolbar loading={changes.data === undefined} bind:query placeholder="Search nodes, commits, authors" total="{filtered.length} of {all.length} deploys">
 	{#snippet filters()}
-		<SegmentedFilter loading={changes.data === undefined} bind:value={area} options={areaOptions.map((o) => ({ ...o, count: all.filter((c) => hasArea(c, o.value)).length }))} />
+		<SegmentedFilter loading={changes.data === undefined} bind:value={area} options={areaOptions.map((o) => ({ ...o, count: byArea.get(o.value) ?? 0 }))} />
 	{/snippet}
 </ListToolbar>
 

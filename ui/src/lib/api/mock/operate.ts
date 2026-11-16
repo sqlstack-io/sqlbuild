@@ -21,6 +21,7 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import { CI_ACCOUNT, DEMO_USER, OPS_USER, SCHEDULER, SENSOR_DAEMON } from './principals';
+import { BIG_GROUP, bigGroupFile, bigGroupSelect, bigGroupShape } from './big-group';
 import { resolveSelection, writeSetOf } from './operate-graph';
 import type { RunEnd, RunRecord, RunScript } from './run-detail';
 
@@ -309,6 +310,52 @@ export const JOB_DEFS: JobDef[] = [
 		)
 	}
 ];
+
+// A large group of small jobs, to see how a big group draws (see big-group.ts).
+const BIG = bigGroupShape();
+JOB_DEFS.push(
+	...BIG.members.map(
+		(key): JobDef => ({
+			key,
+			kind: 'job',
+			description: `Warehouse step ${key.replace('_', ' ')}`,
+			select: bigGroupSelect(key),
+			exclude: [],
+			members: [],
+			overlap: 'queue',
+			onFailure: null,
+			concurrencyGroups: [],
+			priority: 0,
+			sourceFile: bigGroupFile(key),
+			settings: {},
+			targets: null,
+			owner: 'data-platform',
+			criticalNodes: [],
+			declaration: decl(bigGroupFile(key), 1, `${key} = job("${key}", select="${bigGroupSelect(key)}")`)
+		})
+	),
+	{
+		key: BIG_GROUP,
+		kind: 'group',
+		description: 'Every warehouse step, in stages',
+		select: null,
+		exclude: [],
+		members: BIG.members,
+		overlap: 'queue',
+		onFailure: null,
+		concurrencyGroups: [],
+		priority: 0,
+		sourceFile: 'orchestration/warehouse.py',
+		settings: {},
+		targets: null,
+		owner: 'data-platform',
+		criticalNodes: [],
+		declaration: decl('orchestration/warehouse.py', 60, `${BIG_GROUP} = job_group("${BIG_GROUP}", jobs=[...])`)
+	}
+);
+
+/** Waits a group declares instead of those its members' lineage gives: the big group's whole upstreams. */
+export const DECLARED_WAITS: Record<string, ReadonlyMap<string, string[]>> = { [BIG_GROUP]: BIG.waits };
 
 export function jobDef(key: string | null): JobDef | undefined {
 	return key ? JOB_DEFS.find((j) => j.key === key) : undefined;

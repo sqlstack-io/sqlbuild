@@ -6,12 +6,12 @@
 	// Focused, model-scoped lineage graph for the catalog detail page.
 	// Shows the selected node's neighborhood with adjustable upstream/downstream
 	// depth, lets you select nodes, and Execute acts on the current selection.
-	import '@xyflow/svelte/dist/style.css';
 	import PlayIcon from '@lucide/svelte/icons/play';
-	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
+	import type { Node, Edge } from '@xyflow/svelte';
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import { READABLE_ZOOM } from '$lib/lineage/fit';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import { layoutGraph } from '$lib/lineage/layout';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { tick } from 'svelte';
 
 	import { app } from '$lib/state/app.svelte';
@@ -194,41 +194,21 @@
 	</div>
 
 	<!-- graph -->
-	<div class="sb-flow relative min-h-0 flex-1" class:unfitted={!fitted && nodes.length > 0} style="background: var(--sb-inset)">
-		<SvelteFlow
+	<div class="relative flex min-h-0 flex-1">
+		<GraphCanvas
 			bind:nodes
 			bind:edges
+			bind:fit={fitFn}
+			bind:fitted
+			readable={false}
+			fitOnInit
 			{nodeTypes}
-			fitView
-			fitViewOptions={{ minZoom: 0.3 }}
-			minZoom={0.1}
+			fitViewOptions={{ minZoom: READABLE_ZOOM }}
 			elementsSelectable
 			nodesDraggable
 			multiSelectionKey={['Shift', 'Meta', 'Control']}
 			selectionKey="Shift"
-			proOptions={{ hideAttribution: true }}
-		>
-			<FlowController bind:fitView={fitFn} bind:fitted fitFloor={0.3} />
-			<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-			<Controls />
-		</SvelteFlow>
+		/>
 	</div>
 </div>
 
-<style>
-	.unfitted :global(.svelte-flow__viewport),
-	.unfitted :global(.svelte-flow__controls) {
-		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
-		opacity: 0;
-	}
-	.sb-flow :global(.svelte-flow__controls-button) {
-		background: var(--card);
-		border-bottom: 1px solid var(--border);
-	}
-	.sb-flow :global(.svelte-flow__controls-button svg) {
-		fill: var(--muted-foreground);
-	}
-	.sb-flow :global(.svelte-flow__attribution) {
-		display: none;
-	}
-</style>

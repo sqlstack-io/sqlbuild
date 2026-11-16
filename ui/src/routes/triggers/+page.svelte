@@ -37,6 +37,7 @@
 	let kind = $state<TriggerKind[]>([]);
 	let stateFilter = $state<(TriggerState | 'set_in_ui')[]>([]);
 	const all = $derived(triggers.data ?? []);
+	const byType = $derived(countBy(all, (t) => t.type));
 	const kindSet = $derived(new Set(kind));
 	const byKind = $derived(countBy(all, (t) => t.kind));
 	/** Any of the chosen states; "set in UI" matches a trigger whose state differs from its code. */
@@ -142,8 +143,8 @@
 			bind:value={type}
 			options={[
 				{ value: 'all', label: 'All' },
-				{ value: 'schedule', label: 'Schedules', count: all.filter((t) => t.type === 'schedule').length },
-				{ value: 'sensor', label: 'Sensors', count: all.filter((t) => t.type === 'sensor').length }
+				{ value: 'schedule', label: 'Schedules', count: byType.get('schedule') ?? 0 },
+				{ value: 'sensor', label: 'Sensors', count: byType.get('sensor') ?? 0 }
 			]}
 		/>
 		<ChoiceFilter multiple label="Kind" bind:values={kind} options={(Object.keys(triggerKindLabel) as TriggerKind[]).map((k) => ({ value: k, label: triggerKindLabel[k], count: byKind.get(k) ?? 0 }))} />

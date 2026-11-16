@@ -7,7 +7,6 @@
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import PlayIcon from '@lucide/svelte/icons/play';
-	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
 	import { openRow, to } from '$lib/paths';
 	import { goto } from '$app/navigation';
@@ -42,7 +41,7 @@
 	const memberJobs = createResource(async (client, scope) => {
 		if (job.data?.kind !== 'group') return null;
 		const jobs = await client.listJobs(scope);
-		return new Map<string, MemberInfo>(jobs.map((j) => [j.key, { nodeCount: j.nodeCount, lastRun: j.lastRun, description: j.description, nodes: j.nodes }]));
+		return new Map<string, MemberInfo>(jobs.map((j) => [j.key, { nodeCount: j.nodeCount, lastRun: j.lastRun, description: j.description, nodes: j.nodes, sourceFile: j.sourceFile }]));
 	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
@@ -114,9 +113,6 @@
 </script>
 
 <AppTopbar title="Jobs">
-	{#if def?.kind === 'group'}
-		<Button variant="ghost" size="icon-bar" aria-pressed={details.open} onclick={details.toggle} title={details.open ? 'Hide details' : 'Show details'} aria-label="Toggle details"><PanelRightIcon /></Button>
-	{/if}
 	{#if picked.length && def?.kind === 'job'}
 		<Button variant="ghost" onclick={clearSelection}>Clear selection</Button>
 		<GatedButton size="bar" requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run all but {picked.length}</GatedButton>
@@ -178,9 +174,12 @@
 				<div class="canvas">
 					{#if def.kind === 'group' && !def.groupMembers?.length}
 						<p class="faint graph-wait">{def.groupMembers ? 'This group has no member jobs.' : "The server doesn't report this group's member jobs."}</p>
+					{:else if def.kind === 'group' && !memberJobs.data}
+						<!-- Members are drawn once the jobs list says where each is declared, so the graph opens by folder rather than redrawing. -->
+						<div class="graph-wait">{#if memberJobs.error}<p class="msg err">Couldn't load the member jobs: {memberJobs.error}</p>{:else}<Loading />{/if}</div>
 					{:else if def.kind === 'group'}
 						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
-						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} bind:selection={memberSelection} />
+						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} bind:selection={memberSelection} details={{ open: details.open, toggle: details.toggle }} />
 					{:else if catalog.data}
 						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} onselect={(keys) => (picked = keys)} />
 					{:else}
@@ -203,9 +202,12 @@
 						<InspectorSection title="Waits for">
 							{#if memberWaits.length}
 								{#each memberWaits as w (w.upstream)}
-									<div class="wait">
+									<div class="wait" class:implied={w.through !== undefined}>
+										{#if w.through !== undefined}<span class="faint">Also after</span>{/if}
 										<a class="mono" href={to(`/jobs/${w.upstream}`)}>{w.upstream}</a>
-										{#if w.reasons.length}
+										{#if w.through !== undefined}
+											{#if w.through}<span class="faint">(through <a class="mono" href={to(`/jobs/${w.through}`)}>{w.through}</a>)</span>{/if}
+										{:else if w.reasons.length}
 											<ul class="reasons">
 												{#each w.reasons as r (`${r.from}>${r.to}`)}
 													<li><a class="mono" href={to(`/catalog/${r.to}`)} title={r.to}>{shortName(r.to)}</a> reads <a class="mono" href={to(`/catalog/${r.from}`)} title={r.from}>{shortName(r.from)}</a></li>
@@ -442,6 +444,9 @@
 	.wait + .wait {
 		margin-top: 10px;
 	}
+	.wait.implied + .wait.implied {
+		margin-top: 3px;
+	}
 	.reasons {
 		margin-top: 4px;
 		padding-left: 12px;
@@ -512,9 +517,5 @@
 	}
 	a:hover {
 		color: var(--primary);
-	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
 	}
 </style>
