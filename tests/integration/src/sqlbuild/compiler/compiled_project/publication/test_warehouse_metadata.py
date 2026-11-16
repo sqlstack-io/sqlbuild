@@ -1123,7 +1123,7 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                             assert observed <= expected, (table, stage, observed)
                             remaining |= observed != expected
                     remaining |= (
-                        log.read_text().count("Warehouse history synchronization completed.")
+                        log.read_text().count("Warehouse history synchronization completed")
                         < stage["completed_cycles"]
                     )
                     time.sleep(0.05)
@@ -1143,19 +1143,17 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                     datetime.fromisoformat(report["received_at"]) for report in reports
                 )
             time.sleep(6)
-            completed: int = log.read_text().count("Warehouse history synchronization completed.")
+            completed: int = log.read_text().count("Warehouse history synchronization completed")
             time.sleep(12)
             assert (
-                log.read_text().count("Warehouse history synchronization completed.") == completed
+                log.read_text().count("Warehouse history synchronization completed") == completed
             ), "an idle location read the warehouse without a run ending"
             work: dict[str, Any] = wait_for_location_work(
                 api, request_warehouse_sync(control), location, log
             )
             assert work["result_json"]["outcome"] == {"kind": "sync_started"}
             deadline = time.monotonic() + 45
-            while (
-                log.read_text().count("Warehouse history synchronization completed.") == completed
-            ):
+            while log.read_text().count("Warehouse history synchronization completed") == completed:
                 assert location.poll() is None, log.read_text()
                 assert time.monotonic() < deadline, log.read_text()
                 time.sleep(0.05)

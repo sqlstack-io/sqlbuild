@@ -148,3 +148,11 @@ pub(crate) struct NewestVersionsTestCase {
     pub(crate) server_limit: Option<u16>,
     pub(crate) expected: Option<u16>,
 }
+
+pub(crate) struct ReadFailureTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) script: std::path::PathBuf,
+    pub(crate) kind: WarehouseHistoryKind,
+    pub(crate) expected: fn(&crate::native_commands::models::ReadFailure) -> bool,
+    pub(crate) expected_line: &'static str,
+}

@@ -56,6 +56,12 @@ pub enum LocationHealth {
         failure: Option<WarehouseSyncFailure>,
         records_sent: u64,
         elapsed_millis: u64,
+        /// Why a read failed, in closed terms; the location's log has the warehouse's message.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        read_failure: Option<WarehouseReadFailure>,
+        /// Rows, or statistics relations, the failed read asked for.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page_limit: Option<u64>,
     },
 }
 
@@ -68,6 +74,18 @@ pub enum WarehouseSyncFailure {
     Delivery,
     /// Another process, such as a DuckDB build, holds the warehouse file; the sync waits for it.
     Busy,
+}
+
+/// What went wrong reading one page, without the warehouse's message, which may name hosts or users.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WarehouseReadFailure {
+    /// The metadata reader process did not start.
+    ReaderStart {},
+    /// The reader could not connect to the warehouse, or the read raised an error.
+    ReadError {},
+    /// The reader did not answer within this many seconds.
+    TimedOut { seconds: u64 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

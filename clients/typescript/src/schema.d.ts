@@ -1994,6 +1994,12 @@ export interface components {
             /** @enum {string} */
             kind: "warehouse_sync";
             location: components["schemas"]["WarehouseStateLocation"];
+            /**
+             * Format: int64
+             * @description Rows, or statistics relations, the failed read asked for.
+             */
+            page_limit?: number | null;
+            read_failure?: null | components["schemas"]["WarehouseReadFailure"];
             /** Format: int64 */
             records_sent: number;
             table: components["schemas"]["WarehouseHistoryKind"];
@@ -3590,6 +3596,19 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
             value: string;
+        };
+        /** @description What went wrong reading one page, without the warehouse's message, which may name hosts or users. */
+        WarehouseReadFailure: {
+            /** @enum {string} */
+            kind: "reader_start";
+        } | {
+            /** @enum {string} */
+            kind: "read_error";
+        } | {
+            /** @enum {string} */
+            kind: "timed_out";
+            /** Format: int64 */
+            seconds: number;
         };
         /** @description One estimated query cost observation of a run, resource and warehouse; refreshes append. */
         WarehouseResourceCostRecord: {

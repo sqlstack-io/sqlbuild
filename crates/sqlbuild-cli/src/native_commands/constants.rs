@@ -92,6 +92,10 @@ pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
 pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 /// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.
 pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
+/// Seconds a state-table or catalog page may take; its byte budget bounds the transfer.
+pub(crate) const METADATA_PAGE_SECONDS: u64 = 120;
+/// Seconds added to a statistics page's allowance for each relation it samples.
+pub(crate) const STATISTICS_RELATION_SECONDS: u64 = 1;
 /// A metadata reader that ignores end of input this long after a synchronization is killed.
 pub(crate) const METADATA_READER_CLOSE_SECONDS: u64 = 5;
 /// How often a location asks git whether `HEAD` moved.

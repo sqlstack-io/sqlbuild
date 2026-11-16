@@ -407,6 +407,35 @@ Details:
   haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
 
+### Follow a sync
+
+The location prints a line as it finishes each of its 14 kinds of history, then a summary:
+
+```text
+Reading warehouse history for automatic synchronization...
+Warehouse history 1/14: fingerprints, 1,204 rows in 0.8 s
+Warehouse history 2/14: source freshness, unchanged in 0.1 s
+...
+Warehouse history synchronization completed: 14 kinds, 31,204 rows in 12.8 s.
+```
+
+A page holds up to 2,000 rows and ends early at 8 MiB, so wide rows make smaller pages. A failed
+read prints which kind failed, the page size and why, then retries a smaller page:
+
+```text
+Warehouse history read failed for statistics (100-relation page): no reply within 130 s. Sync incomplete; retaining mirror and retrying a smaller page.
+```
+
+| Cause | Printed as |
+| --- | --- |
+| The location couldn't start its reader | `the metadata reader did not start:` and the error |
+| The warehouse refused the connection or the query | The warehouse's message |
+| No reply in time | `no reply within N s`: 120 s for a page, or 30 s plus 1 s per relation for a statistics page |
+
+The location's page shows the same failure as **Warehouse sync failing**, with the kind, the cause
+and the page size. It leaves out the warehouse's message, which can name hosts or users; read it in
+the location's log.
+
 ## Skip overlapping runs and retry failures
 
 Declare who owns a job, whether scheduled requests wait for a running copy, and how often a failed

@@ -11,11 +11,13 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::native_commands::_helpers::execution::{
-    history_request, metadata_sync, safety_sync_seconds,
+    history_request, metadata_sync, read_metadata_page, rows_text, safety_sync_seconds, scan_line,
 };
+use crate::native_commands::main::_location_metadata::read_failure_line;
+use crate::native_commands::models::{LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
-    MetadataRetryTestCase, NewestVersionsTestCase, SafetySyncIdleTestCase,
+    MetadataRetryTestCase, NewestVersionsTestCase, ReadFailureTestCase, SafetySyncIdleTestCase,
     SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
 
@@ -424,4 +426,121 @@ fn given_a_state_history_limit_when_requesting_history_then_only_full_reads_of_b
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_page_size_are_reported()
+ {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let reader = |name: &str, body: &str| {
+        let path = directory.path().join(name);
+        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).expect("reader script");
+        let mut permissions = std::fs::metadata(&path).expect("metadata").permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
+        std::fs::set_permissions(&path, permissions).expect("executable");
+        path
+    };
+    let test_cases = [
+        ReadFailureTestCase {
+            description: "a reader that cannot start names the start failure",
+            script: directory.path().join("missing-reader"),
+            kind: WarehouseHistoryKind::Fingerprints,
+            expected: |failure| matches!(failure, ReadFailure::ReaderStart(_)),
+            expected_line: "Warehouse history read failed for fingerprints (2000-row page): the metadata reader did not start:",
+        },
+        ReadFailureTestCase {
+            description: "a read error carries the warehouse's message",
+            script: reader(
+                "erroring-reader",
+                r#"read line; echo '{"error":"permission denied for table _sqlbuild_audit_results"}'; read line"#,
+            ),
+            kind: WarehouseHistoryKind::AuditResults,
+            expected: |failure| {
+                *failure
+                    == ReadFailure::Read(
+                        "permission denied for table _sqlbuild_audit_results".into(),
+                    )
+            },
+            expected_line: "Warehouse history read failed for audit results (2000-row page): permission denied for table _sqlbuild_audit_results.",
+        },
+        ReadFailureTestCase {
+            description: "a reader that never answers times out after the page allowance",
+            script: reader("silent-reader", "read line; sleep 30"),
+            kind: WarehouseHistoryKind::Catalog,
+            expected: |failure| *failure == ReadFailure::TimedOut(1),
+            expected_line: "Warehouse history read failed for catalog (2000-row page): no reply within 1 s.",
+        },
+    ];
+    for test_case in test_cases {
+        let options = LocationServe {
+            project_dir: directory.path().to_path_buf(),
+            server_url: "http://127.0.0.1:1".into(),
+            location_id: uuid::Uuid::nil(),
+            target: "development".into(),
+            image_id: None,
+            metadata_reconcile_seconds: 3600,
+            safety_sync_seconds: 0,
+        };
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.index = WarehouseHistoryKind::ALL
+            .iter()
+            .position(|kind| *kind == test_case.kind)
+            .expect("kind is listed");
+        state.page_seconds = 1;
+        let (state, page) = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(read_metadata_page(
+                (&options, &test_case.script),
+                state,
+                std::future::pending(),
+            ))
+            .expect("no control error")
+            .expect("not stopped");
+        let failure = page.expect_err(test_case.description);
+        assert!(
+            (test_case.expected)(&failure),
+            "{}: {failure:?}",
+            test_case.description
+        );
+        let line = read_failure_line(&state, &failure);
+        assert!(
+            line.starts_with(test_case.expected_line),
+            "{}: {line}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_completed_table_when_reporting_progress_then_the_line_names_its_position_rows_and_time()
+{
+    let mut state = metadata_sync((one_location(), 1), (3600, 0));
+    state.index = 2;
+    state.progress.scan_rows = 31_204;
+    let line = scan_line(&state, 14);
+    assert!(
+        line.starts_with("Warehouse history 3/14: audit results, 31,204 rows in "),
+        "{line}"
+    );
+    state.progress.scan_unchanged = true;
+    assert!(scan_line(&state, 14).contains("audit results, unchanged in "));
+    assert_eq!(
+        [
+            rows_text(0),
+            rows_text(1),
+            rows_text(999),
+            rows_text(1_640),
+            rows_text(1_234_567)
+        ],
+        [
+            "0 rows",
+            "1 row",
+            "999 rows",
+            "1,640 rows",
+            "1,234,567 rows"
+        ]
+        .map(String::from)
+    );
 }

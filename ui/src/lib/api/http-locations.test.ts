@@ -105,7 +105,16 @@ describe('warehouseSyncOf', () => {
 		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z' });
 	});
 
-	it('clears the error once the failing table syncs again', () => {
+	it('says why a read failed and on what page size, without the warehouse message', () => {
+		const timedOut = sync('2026-11-08T12:03:00Z', 'statistics', 'read');
+		const health = { ...timedOut.report.health, read_failure: { kind: 'timed_out' as const, seconds: 130 }, page_limit: 100 };
+		expect(warehouseSyncOf([{ ...timedOut, report: { ...timedOut.report, health } }])?.lastError).toBe('statistics: failed while reading the warehouse: no reply within 130 s, on a page of 100 relations');
+		const erroring = sync('2026-11-08T12:04:00Z', 'catalog', 'read');
+		const error = { ...erroring.report.health, read_failure: { kind: 'read_error' as const }, page_limit: 2000 };
+		expect(warehouseSyncOf([{ ...erroring, report: { ...erroring.report, health: error } }])?.lastError).toBe('catalog: failed while reading the warehouse: the warehouse returned an error; the location’s log has it, on a page of 2,000 rows');
+	});
+
+		it('clears the error once the failing table syncs again', () => {
 		expect(warehouseSyncOf([sync('2026-11-08T12:05:00Z', 'catalog', null), sync('2026-11-08T12:03:00Z', 'catalog', 'read')])?.lastError).toBeNull();
 	});
 });

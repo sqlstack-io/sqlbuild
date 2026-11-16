@@ -544,7 +544,7 @@ def wait_for_idle_sync(process: subprocess.Popen[bytes], log: Path) -> None:
 
     deadline: float = time.monotonic() + 45
     text: str = log.read_text()
-    while text.rfind("synchronization completed.") < text.rfind("Reading warehouse history"):
+    while text.rfind("synchronization completed") < text.rfind("Reading warehouse history"):
         assert process.poll() is None, text
         assert time.monotonic() < deadline, text
         time.sleep(0.05)

@@ -129,10 +129,21 @@ const SYNC_STAGE: Record<Exclude<Wire['WarehouseSyncFailure'], 'busy'>, string> 
 	delivery: 'sending results to the server'
 };
 
-/** What held up a table's newest sync; a build holding the warehouse file is a wait, not a failure. */
-const syncProblemOf = (failure: Wire['WarehouseSyncFailure']) => (failure === 'busy' ? 'Waiting for a build that holds the warehouse file' : `Failed while ${SYNC_STAGE[failure]}`);
-
 type Sync = Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: 'warehouse_sync' }> } };
+type SyncHealth = Sync['report']['health'];
+
+/** Why a read failed and on what page size, e.g. "no reply within 30 s, on a page of 100 relations"; empty for other failures. */
+function readCauseOf(health: SyncHealth): string {
+	const cause = health.read_failure;
+	if (!cause) return '';
+	const reason = cause.kind === 'timed_out' ? `no reply within ${cause.seconds} s` : cause.kind === 'reader_start' ? 'the metadata reader didn’t start' : 'the warehouse returned an error; the location’s log has it';
+	const page = health.page_limit ? `, on a page of ${health.page_limit.toLocaleString('en-US')} ${health.table === 'statistics' ? 'relations' : 'rows'}` : '';
+	return `: ${reason}${page}`;
+}
+
+/** What held up a table's newest sync; a build holding the warehouse file is a wait, not a failure. */
+const syncProblemOf = (health: SyncHealth & { failure: Wire['WarehouseSyncFailure'] }) =>
+	health.failure === 'busy' ? 'Waiting for a build that holds the warehouse file' : `Failed while ${SYNC_STAGE[health.failure]}${readCauseOf(health)}`;
 
 /** Sync reports newest first, and the newest of each table. */
 function syncsOf(observations: Wire['LocationHealthObservation'][]): { syncs: Sync[]; newest: Map<string, Sync> } {
@@ -151,7 +162,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 			at: received_at,
 			recordsSent: health.records_sent,
 			elapsedMs: health.elapsed_millis,
-			failure: health.failure ? syncProblemOf(health.failure) : null,
+			failure: health.failure ? syncProblemOf({ ...health, failure: health.failure }) : null,
 			waiting: health.failure === 'busy',
 			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null
 		}))
@@ -171,7 +182,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][]): WarehouseSync | null {
 	const { syncs, newest } = syncsOf(observations);
 	if (!syncs.length) return null;
-	const failing = [...newest.values()].flatMap(({ report: { health } }) => (health.failure && health.failure !== 'busy' ? [`${health.table}: failed while ${SYNC_STAGE[health.failure]}`] : []));
+	const failing = [...newest.values()].flatMap(({ report: { health } }) => (health.failure && health.failure !== 'busy' ? [`${health.table}: failed while ${SYNC_STAGE[health.failure]}${readCauseOf(health)}`] : []));
 	return {
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,
 		lastError: failing.length ? failing.sort().join('\n') : null,

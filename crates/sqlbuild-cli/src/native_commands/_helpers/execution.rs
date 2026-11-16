@@ -26,7 +26,7 @@ use sqlbuild_orchestration::platform::main::report_remote_location_health::repor
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
-    WarehouseSyncFailure,
+    WarehouseReadFailure, WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
@@ -77,9 +77,10 @@ use crate::native_commands::_helpers::terminal::{
 };
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_OVERLAP_SECONDS,
-    METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS, METADATA_RECONCILE_SECONDS,
-    METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS, METADATA_SYNC_CHECK_SECONDS,
-    SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    METADATA_PAGE_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
+    METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
+    METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, STATISTICS_RELATION_SECONDS,
+    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -88,7 +89,8 @@ use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
-    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
+    MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ReadFailure, ScanToken,
+    SyncProgress,
 };
 use crate::native_commands::types::LocationPublication;
 use crate::server_config::models::ServerSection;
@@ -370,6 +372,8 @@ pub(crate) fn metadata_sync(
         mirror_holds_rows: false,
         reader: None,
         state_history_versions: None,
+        page_seconds: METADATA_PAGE_SECONDS,
+        progress: SyncProgress::new(),
     }
 }
 
@@ -512,6 +516,7 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
     let Some(pending) = state.pending.take() else {
         return state;
     };
+    state.progress.scan_rows += pending.batch.records.len() as u64;
     state.source_after = pending.next_source_after;
     if state.kind() == WarehouseHistoryKind::Statistics {
         state.statistics = None;
@@ -536,6 +541,43 @@ pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> Loca
         state = next_scan(state);
     }
     state
+}
+
+/// One table's line as its scan completes, e.g. `Warehouse history 3/14: audit results, 1,204 rows in 0.8 s`.
+pub(crate) fn scan_line(state: &LocationMetadataSync, scans: usize) -> String {
+    let namespace = if state.locations.len() > 1 {
+        let location = state.location();
+        match &location.database {
+            Some(database) => format!(" in {database}.{}", location.schema),
+            None => format!(" in {}", location.schema),
+        }
+    } else {
+        String::new()
+    };
+    let read = if state.progress.scan_unchanged {
+        "unchanged".to_owned()
+    } else {
+        rows_text(state.progress.scan_rows)
+    };
+    format!(
+        "Warehouse history {}/{scans}: {}{namespace}, {read} in {:.1} s\n",
+        state.index + 1,
+        state.kind().as_str().replace('_', " "),
+        state.progress.scan_started.elapsed().as_secs_f64()
+    )
+}
+
+/// A row count with thousands separators, e.g. `31,204 rows`.
+pub(crate) fn rows_text(rows: u64) -> String {
+    let digits = rows.to_string();
+    let mut grouped = String::new();
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            grouped.push(',');
+        }
+        grouped.push(digit);
+    }
+    format!("{grouped} {}", if rows == 1 { "row" } else { "rows" })
 }
 
 /// The mirror's watermark bounds an incremental scan and shows whether the mirror holds rows.
@@ -588,6 +630,12 @@ pub(crate) async fn load_watermark(
 
 /// Move to the next scan; after the last one the synchronization completes and waits for a run.
 pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync {
+    let scans = state.locations.len() * WarehouseHistoryKind::ALL.len();
+    drop(write_output(&[(Stream::Stderr, &scan_line(&state, scans))]));
+    state.progress.sync_rows += state.progress.scan_rows;
+    state.progress.scan_rows = 0;
+    state.progress.scan_unchanged = false;
+    state.progress.scan_started = Instant::now();
     state.index += 1;
     state.scan_id = Uuid::now_v7();
     state.observed_since = None;
@@ -604,7 +652,12 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
         state.safety_at = Instant::now() + Duration::from_secs(state.safety_seconds);
         drop(write_output(&[(
             Stream::Stderr,
-            "Warehouse history synchronization completed.\n",
+            &format!(
+                "Warehouse history synchronization completed: {scans} {}, {} in {:.1} s.\n",
+                if scans == 1 { "kind" } else { "kinds" },
+                rows_text(state.progress.sync_rows),
+                state.progress.sync_started.elapsed().as_secs_f64()
+            ),
         )]));
     }
     state
@@ -615,6 +668,19 @@ pub(crate) async fn metadata_health(
     state: &LocationMetadataSync,
     (client, poll): (&LocationWorkClient, &LocationWorkPoll),
     (started, failure): (Instant, Option<WarehouseSyncFailure>),
+) {
+    report_metadata_health(state, (client, poll), (started, failure, None)).await;
+}
+
+/// A failed read also reports its closed cause and the page size it asked for.
+pub(crate) async fn report_metadata_health(
+    state: &LocationMetadataSync,
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    (started, failure, read_failure): (
+        Instant,
+        Option<WarehouseSyncFailure>,
+        Option<WarehouseReadFailure>,
+    ),
 ) {
     let report = LocationHealthReport {
         event_id: Uuid::now_v7(),
@@ -630,6 +696,8 @@ pub(crate) async fn metadata_health(
                 .as_ref()
                 .map_or(0, |page| page.batch.records.len()) as u64,
             elapsed_millis: started.elapsed().as_millis() as u64,
+            page_limit: read_failure.map(|_| page_limit(state) as u64),
+            read_failure,
         },
     };
     if let Err(error) = client.report_health(&report).await {
@@ -1220,12 +1288,18 @@ pub(crate) async fn stop_location_runtime(
     Ok(())
 }
 
-/// An outer absence means shutdown; an inner absence is a failed read, never an empty table.
+/// An outer absence means shutdown; an inner error is a failed read, never an empty table.
 pub(crate) async fn read_metadata_page(
     (options, script): (&LocationServe, &Path),
     mut state: LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(LocationMetadataSync, Option<WarehouseHistoryPage>)>, ControlError> {
+) -> Result<
+    Option<(
+        LocationMetadataSync,
+        Result<WarehouseHistoryPage, ReadFailure>,
+    )>,
+    ControlError,
+> {
     state.busy = false;
     if let Some(statistics) = &state.statistics
         && statistics.names.is_empty()
@@ -1236,16 +1310,22 @@ pub(crate) async fn read_metadata_page(
             change_token: None,
             unchanged: false,
         };
-        return Ok(Some((state, Some(page))));
+        return Ok(Some((state, Ok(page))));
     }
     let request = history_request(&state)?;
     let reader = match state.reader.take() {
         Some(reader) => reader,
         None => match open_location_runtime(options, script, Vec::new()) {
             Ok(reader) => reader,
-            Err(_) => return Ok(Some((state, None))),
+            Err(error) => {
+                return Ok(Some((
+                    state,
+                    Err(ReadFailure::ReaderStart(error.to_string())),
+                )));
+            }
         },
     };
+    let seconds = read_timeout_seconds(&state);
     tokio::pin!(stopped);
     tokio::select! {
         result = &mut stopped => {
@@ -1253,24 +1333,48 @@ pub(crate) async fn read_metadata_page(
             Ok(None)
         },
         result = tokio::time::timeout(
-            Duration::from_secs(METADATA_POLL_SECONDS),
+            Duration::from_secs(seconds),
             exchange_metadata_read(reader, request),
         ) => match result {
             Ok((reader, Ok(MetadataReply::Page(page)))) => {
                 state.reader = Some(reader);
-                Ok(Some((state, page)))
+                Ok(Some((state, Ok(page))))
             }
             Ok((reader, Ok(MetadataReply::Busy))) => {
                 state.busy = true;
                 state.reader = Some(reader);
-                Ok(Some((state, None)))
+                Ok(Some((state, Err(ReadFailure::Busy))))
             }
-            Ok((reader, Err(_))) => {
+            Ok((reader, Ok(MetadataReply::Failed(message)))) => {
+                state.reader = Some(reader);
+                Ok(Some((state, Err(ReadFailure::Read(message)))))
+            }
+            Ok((reader, Err(error))) => {
                 stop_location_runtime(Some(reader)).await?;
-                Ok(Some((state, None)))
+                Ok(Some((state, Err(ReadFailure::Read(error.to_string())))))
             }
-            Err(_) => Ok(Some((state, None))),
+            Err(_) => Ok(Some((state, Err(ReadFailure::TimedOut(seconds))))),
         },
+    }
+}
+
+/// How long one page may take: a statistics page queries each relation it samples, so it scales
+/// with the relations asked for; any other page is bounded by its byte budget and gets a fixed
+/// allowance that also covers resuming a suspended warehouse.
+pub(crate) fn read_timeout_seconds(state: &LocationMetadataSync) -> u64 {
+    if state.kind() == WarehouseHistoryKind::Statistics {
+        METADATA_POLL_SECONDS + STATISTICS_RELATION_SECONDS * state.statistics_limit as u64
+    } else {
+        state.page_seconds
+    }
+}
+
+/// The page size a read asked for: statistics relations, or rows of any other table.
+pub(crate) fn page_limit(state: &LocationMetadataSync) -> usize {
+    if state.kind() == WarehouseHistoryKind::Statistics {
+        state.statistics_limit
+    } else {
+        state.limit
     }
 }
 
@@ -1306,7 +1410,8 @@ pub(crate) async fn close_metadata_reader(
     Ok(state)
 }
 
-/// A reply of `null` means the reader's read failed and it dropped its warehouse session.
+/// A reply of `{"error": ...}`, or `null` from an older reader, means the read failed and the
+/// reader dropped its warehouse session.
 async fn exchange_metadata_read(
     mut reader: LocationCompiler,
     request: Vec<u8>,
@@ -1334,6 +1439,12 @@ async fn exchange_metadata_read(
             .map_err(|_| ControlError::Invalid("invalid location reply".into()))?;
         if reply.get("busy") == Some(&serde_json::Value::Bool(true)) {
             return Ok(MetadataReply::Busy);
+        }
+        if reply.is_null() {
+            return Ok(MetadataReply::Failed("the reader read no page".into()));
+        }
+        if let Some(message) = reply.get("error").and_then(serde_json::Value::as_str) {
+            return Ok(MetadataReply::Failed(message.to_owned()));
         }
         serde_json::from_value(reply)
             .map(MetadataReply::Page)
