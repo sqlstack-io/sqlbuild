@@ -6,6 +6,9 @@ import type { ApiClient } from '../client';
 
 /** Fields that name or identify an item: copies get a long, unique value. */
 const NAMES = ['id', 'key', 'name', 'jobKey', 'runId', 'eventId', 'nodeKey', 'migrationEventId', 'invocationId', 'runKey', 'table', 'group', 'displayName'];
+/** Fields that point at another item, such as a check's node: copies point at one of `REFERENCED` long names, shared by a few rows each, so a filter over them has thousands of options. */
+const REFS = ['node'];
+const REFERENCED = 2000;
 /** Fields of free text: made very long. */
 const TEXTS = ['description', 'select', 'summary', 'message', 'title', 'text', 'cadence', 'className', 'sourceFile', 'path'];
 const FILLER = ' with a deliberately long tail of words that keeps going well past any column width a list could give it';
@@ -17,6 +20,10 @@ export function stretch<T>(items: readonly T[], count: number): T[] {
 	return Array.from({ length: Math.max(count, items.length) }, (_, i) => {
 		const copy = { ...(items[i % items.length] as Record<string, unknown>) };
 		for (const field of NAMES) if (i >= items.length && typeof copy[field] === 'string') copy[field] = `${copy[field]}${LONG_ID}_${i}`;
+		// The same reference number always names the same item, so there are at most `REFERENCED` of them.
+		const ref = i % REFERENCED;
+		const base = items[ref % items.length] as Record<string, unknown>;
+		for (const field of REFS) if (i >= items.length && typeof copy[field] === 'string' && typeof base[field] === 'string') copy[field] = ref < items.length ? base[field] : `${base[field]}${LONG_ID}_${ref}`;
 		for (const field of TEXTS) if (typeof copy[field] === 'string' && copy[field]) copy[field] = `${copy[field]}${FILLER}`;
 		return copy as T;
 	});
