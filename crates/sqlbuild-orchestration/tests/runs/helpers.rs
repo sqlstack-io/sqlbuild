@@ -469,3 +469,30 @@ pub(crate) async fn cache_lookup(
     .expect("cached value");
     (*value, built.get())
 }
+
+/// A selection evaluation as `(count, page, next offset, refusal message)`.
+pub(crate) fn selection_outcome(
+    evaluation: &crate::runs::models::SelectionEvaluation,
+) -> (u64, Vec<String>, Option<u32>, Option<String>) {
+    (
+        evaluation.count,
+        evaluation.keys.clone(),
+        evaluation.next_offset,
+        evaluation
+            .error
+            .as_ref()
+            .map(|problem| problem.message.clone()),
+    )
+}
+
+/// An expected selection in [`selection_outcome`]'s owned form.
+pub(crate) fn owned_selection(
+    (count, keys, next, error): crate::runs::tests::test_types::ExpectedSelection,
+) -> (u64, Vec<String>, Option<u32>, Option<String>) {
+    (
+        count,
+        keys.iter().map(|key| (*key).to_owned()).collect(),
+        next,
+        error.map(str::to_owned),
+    )
+}

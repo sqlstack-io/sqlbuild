@@ -10,7 +10,7 @@ use sqlbuild_analysis::graph::models::{GraphResource, JobSelection, ProjectGraph
 use sqlbuild_analysis::planner_selection::models::UnitTestSelectorNames;
 use sqlbuild_analysis::python_selection::main::published_python_graph::published_python_graph;
 use sqlbuild_analysis::python_selection::models::{PublishedPythonNode, PythonSelectionGraph};
-use sqlbuild_orchestration::runs::models::PlannerResource;
+use sqlbuild_orchestration::runs::models::{PlannerResource, SelectionVocabulary};
 use sqlbuild_orchestration::runs::types::PublishedJobs;
 
 use crate::adhoc::constants::SQL_TEST_KIND;
@@ -32,6 +32,8 @@ pub(crate) struct IndexedPublication {
     pub(crate) python: PythonIndex,
     /// No Python nodes, for commands that do not run them.
     pub(crate) no_python: PythonIndex,
+    /// The values each selector type takes, built when first asked for.
+    pub(crate) vocabulary: OnceLock<SelectionVocabulary>,
 }
 
 /// The Python nodes a command may select, as the unified selector reads them.
@@ -89,6 +91,7 @@ impl IndexedPublication {
         Self {
             graph: build_project_graph(&graph_resources),
             with_jobs: [OnceLock::new(), OnceLock::new()],
+            vocabulary: OnceLock::new(),
             no_python: PythonIndex {
                 names: Vec::new(),
                 graph: published_python_graph(&[]),

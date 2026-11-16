@@ -11,10 +11,14 @@ use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
 use sqlbuild_analysis::python_selection::models::SqlSelectionGraph;
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
-use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource, PublicationCache};
+use sqlbuild_orchestration::runs::models::{
+    CommandPlan, PlannerResource, PublicationCache, SelectionProblem, SelectionVocabulary,
+};
 use sqlbuild_orchestration::runs::types::{CommandPlanner, PreparedPublication, PublishedJobs};
 
+use crate::adhoc::_helpers::evaluation::{evaluate, vocabulary};
 use crate::adhoc::_helpers::publication::IndexedPublication;
+use crate::adhoc::models::Refusal;
 
 use crate::adhoc::constants::{
     ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, CHANGED_COUNTS_DEST, CHANGED_DEST, COMMAND_DEST,
@@ -85,6 +89,14 @@ impl PreparedPublication for IndexedPublication {
             selection,
             settings,
         })
+    }
+
+    fn evaluate(&self, select: &str, exclude: &str) -> Result<Vec<String>, Box<SelectionProblem>> {
+        evaluate(self, (select, exclude))
+    }
+
+    fn vocabulary(&self) -> SelectionVocabulary {
+        self.vocabulary.get_or_init(|| vocabulary(self)).clone()
     }
 }
 
@@ -253,11 +265,11 @@ fn flag_of(dest: &str) -> String {
 }
 
 /// Exact `kind:name` keys, as `sqb build` would select them from this publication.
-fn resolve(
+pub(crate) fn resolve(
     publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
-) -> Result<BTreeSet<String>, String> {
+) -> Result<BTreeSet<String>, Refusal> {
     let selected: BTreeSet<String> = resolved(publication, select, exclude, false)?;
     if selected.is_empty() {
         return Err("the selectors match no nodes in the current publication".into());
@@ -266,18 +278,17 @@ fn resolve(
 }
 
 /// [`resolve`] with `test:` and unit-test names selecting `sql_test:` keys, as `sqb test` does.
-fn resolve_with_tests(
+pub(crate) fn resolve_with_tests(
     (verb, python): (&str, bool),
     publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
-) -> Result<BTreeSet<String>, String> {
+) -> Result<BTreeSet<String>, Refusal> {
     let split = split_unit_test_selectors(
         SelectorGroups { select, exclude },
         &publication.names,
         UNIT_TEST_VERBS.contains(&verb),
-    )
-    .map_err(|error| format!("{}: {}", error.code, error.message))?;
+    )?;
     if !split.excluded_test_names.is_empty() {
         return Err(
             "an ad-hoc run cannot exclude unit tests; select the unit tests to run instead".into(),
@@ -306,7 +317,7 @@ fn resolved(
     select: &[String],
     exclude: &[String],
     include_python: bool,
-) -> Result<BTreeSet<String>, String> {
+) -> Result<BTreeSet<String>, Refusal> {
     let python = publication.python(include_python);
     let selectors: Vec<String> = select.iter().chain(exclude).cloned().collect();
     let node_names: Vec<&str> = python.names.iter().map(String::as_str).collect();
@@ -325,8 +336,7 @@ fn resolved(
         &python.graph,
         select,
         exclude,
-    )
-    .map_err(|error| format!("{}: {}", error.code, error.message))?;
+    )?;
     Ok(selection
         .sql_keys
         .into_iter()
@@ -345,7 +355,7 @@ fn managed_sources(
     publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
-) -> Result<BTreeSet<String>, String> {
+) -> Result<BTreeSet<String>, Refusal> {
     let unmanaged: BTreeSet<&str> = publication
         .resources
         .iter()
@@ -367,7 +377,7 @@ fn freshness_sources(
     publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
-) -> Result<BTreeSet<String>, String> {
+) -> Result<BTreeSet<String>, Refusal> {
     let selected: BTreeSet<String> = upstream_sources(
         &publication.resources,
         &resolved(publication, select, &[], false)?,

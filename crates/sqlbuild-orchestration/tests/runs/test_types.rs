@@ -191,6 +191,63 @@ pub(crate) struct ExactKeyPublication {
 }
 
 impl crate::runs::types::PreparedPublication for ExactKeyPublication {
+    /// Exact keys only: each token names one published key, and an unknown one is refused with its position.
+    fn evaluate(
+        &self,
+        select: &str,
+        exclude: &str,
+    ) -> Result<Vec<String>, Box<crate::runs::models::SelectionProblem>> {
+        let known = |field: crate::runs::models::SelectionField, text: &str| {
+            let mut keys: std::collections::BTreeSet<String> = Default::default();
+            for token in text.split(' ').filter(|token| !token.is_empty()) {
+                if !self.resources.iter().any(|resource| resource.key == token) {
+                    let start = text.find(token).unwrap_or_default();
+                    return Err(Box::new(crate::runs::models::SelectionProblem {
+                        code: Some("S007".into()),
+                        message: format!("unknown selector name '{token}'"),
+                        help: None,
+                        location: Some(crate::runs::models::SelectionLocation {
+                            field,
+                            token: token.to_owned(),
+                            start: u32::try_from(start).unwrap_or_default(),
+                            end: u32::try_from(start + token.len()).unwrap_or_default(),
+                        }),
+                        suggestions: Vec::new(),
+                    }));
+                }
+                keys.insert(token.to_owned());
+            }
+            Ok(keys)
+        };
+        let selected = known(crate::runs::models::SelectionField::Select, select)?;
+        let excluded = known(crate::runs::models::SelectionField::Exclude, exclude)?;
+        let selected = if select.trim().is_empty() {
+            self.resources
+                .iter()
+                .map(|resource| resource.key.clone())
+                .collect()
+        } else {
+            selected
+        };
+        Ok(selected.difference(&excluded).cloned().collect())
+    }
+
+    /// One entry per published kind.
+    fn vocabulary(&self) -> crate::runs::models::SelectionVocabulary {
+        let mut kinds: std::collections::BTreeMap<String, u64> = Default::default();
+        for resource in &self.resources {
+            let kind = resource.key.split_once(':').map_or("", |(kind, _)| kind);
+            *kinds.entry(kind.to_owned()).or_default() += 1;
+        }
+        crate::runs::models::SelectionVocabulary {
+            kinds: kinds
+                .into_iter()
+                .map(|(value, count)| crate::runs::models::VocabularyEntry { value, count })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
     fn plan(&self, command: &[String]) -> Result<crate::runs::models::CommandPlan, String> {
         let (resources, jobs) = (&self.resources, &self.jobs);
         let mut plan = crate::runs::models::CommandPlan {
@@ -396,4 +453,22 @@ pub(crate) struct NewerPublicationTestCase {
     pub(crate) added_node: &'static str,
     pub(crate) expected_before_error: &'static str,
     pub(crate) expected_after_selection: &'static [&'static str],
+}
+
+/// A selection's count, page of keys, next offset and refusal message.
+pub(crate) type ExpectedSelection = (
+    u64,
+    &'static [&'static str],
+    Option<u32>,
+    Option<&'static str>,
+);
+
+/// One person's selection request: the count, page, next offset and refusal message it returns, or the HTTP status refusing it.
+pub(crate) struct SelectionRequestTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) person: AdhocPerson,
+    pub(crate) select: &'static str,
+    pub(crate) exclude: &'static str,
+    pub(crate) limit: Option<u32>,
+    pub(crate) expected_outcome: Result<ExpectedSelection, u16>,
 }

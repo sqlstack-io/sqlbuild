@@ -8,6 +8,8 @@ use serde_json::Value;
 use tokio::sync::OnceCell;
 use uuid::Uuid;
 
+use crate::authorization::main::authorize_person::authorize_person;
+use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::constants::PUBLICATIONS_PER_TARGET;
 use crate::runs::models::{CachedPublication, PlannerResource, SnapshotSlot, SnapshotSlots};
@@ -18,7 +20,8 @@ use crate::snapshots::main::read_snapshot_keys::read_snapshot_keys;
 use crate::snapshots::main::writer_nodes::writer_nodes;
 use crate::snapshots::models::{SnapshotNode, SnapshotRecord};
 use crate::store::errors::ControlError;
-use crate::store::models::ControlTransaction;
+use crate::store::main::{begin::begin, commit::commit};
+use crate::store::models::{ControlStore, ControlTransaction, TransactionMode};
 
 /// Graph kinds in the order the CLI builds its project graph: models, sources, seeds, then functions.
 const GRAPH_KINDS: [&str; 5] = ["model", "source", "seed", "udf", "table_fn"];
@@ -58,6 +61,30 @@ pub(crate) async fn current_publication(
     )
     .await?;
     Ok((transaction, Some((snapshot, publication))))
+}
+
+/// The current publication for a person with view on every one of its nodes, as the node catalog requires; a denial is audited.
+pub(crate) async fn viewed_publication(
+    store: &ControlStore,
+    (planner, credentials): (&dyn CommandPlanner, (&AuditContext, Uuid)),
+    (location_id, target): (Uuid, &str),
+    default_role: DefaultRole,
+) -> Result<Option<(SnapshotRecord, Arc<CachedPublication>)>, ControlError> {
+    let transaction = begin(store, TransactionMode::Write).await?;
+    let (transaction, current) =
+        current_publication(transaction, planner, (location_id, target)).await?;
+    let scope = PermissionScope {
+        action: Action::View,
+        location_id: Some(location_id),
+        target: Some(target.into()),
+        nodes: current
+            .as_ref()
+            .map(|(_, publication)| publication.node_keys.clone())
+            .unwrap_or_default(),
+    };
+    let (transaction, _) = authorize_person(transaction, credentials, &scope, default_role).await?;
+    commit(transaction).await?;
+    Ok(current)
 }
 
 /// One snapshot's prepared publication, read from the store only by the first request that needs it.

@@ -200,6 +200,14 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_operations::column_lineage),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/selection",
+            get(crate::api::_helpers::resources::person_selection::evaluate),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/selection/vocabulary",
+            get(crate::api::_helpers::resources::person_selection::vocabulary),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/catalog",
             get(crate::api::_helpers::resources::person_operations::catalog),
         )
