@@ -20,8 +20,9 @@ describe('toProviders', () => {
 						{ kind: 'sink', name: 'order_events' },
 						{ kind: 'event_exporter', name: 'run_events' }
 					],
+					nodes: ['task:publish_orders'],
 					jobs: ['order_exports'],
-					job_nodes: { order_exports: ['publish_orders'] }
+					job_nodes: { order_exports: ['task:publish_orders'] }
 				}
 			]
 		};
@@ -30,6 +31,12 @@ describe('toProviders', () => {
 		expect(provider.settings[0]).toEqual({ name: 'api_key', type: 'SecretStr', required: true, secret: true, env: 'FULFILLMENT_API_KEY', description: null, missing: true });
 		expect(provider.usedBy.map((c) => `${c.kind}:${c.name}`)).toEqual(['task:publish_orders', 'sink:order_events', 'event_exporter:run_events']);
 		expect(provider.jobs).toEqual(['order_exports']);
-		expect(provider.jobNodes).toEqual({ order_exports: ['publish_orders'] });
+		expect(provider.nodes).toEqual(['task:publish_orders']);
+		expect(provider.jobNodes).toEqual({ order_exports: ['task:publish_orders'] });
+	});
+
+	it('defaults the nodes to none when the server leaves them out', () => {
+		const [provider] = toProviders({ providers: [{ name: 'chat', class: 'providers.chat.Chat', description: '', path: 'providers/chat.py', settings: [], used_by: [] }] });
+		expect([provider.nodes, provider.jobs, provider.jobNodes]).toEqual([[], [], {}]);
 	});
 });

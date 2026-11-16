@@ -306,6 +306,8 @@ export type ProviderConnection = {
 	sourceFile: string;
 	settings: ProviderSetting[];
 	usedBy: ProviderConsumer[];
+	/** Keys of the snapshot nodes that run the provider's consumers, e.g. `source:orders`. */
+	nodes: string[];
 	/** Jobs whose selection includes a node that uses the provider. */
 	jobs: string[];
 	/** Each of those jobs with the provider's nodes it runs. */

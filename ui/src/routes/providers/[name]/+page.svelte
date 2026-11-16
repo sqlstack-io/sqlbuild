@@ -9,11 +9,16 @@
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
-	import { consumerKindLabel, usedCount } from '../utils';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { usedCount } from '../utils';
+	import UsedByGraph from './used-by-graph.svelte';
 
 	const name = $derived(page.params.name ?? '');
 	const providers = createResource((client, scope) => client.listProviders(scope));
 	const provider = $derived(providers.data?.find((p) => p.name === name) ?? null);
+	// Node kinds come from the Catalog where it lists the node, e.g. a source with a loader is a loader.
+	const catalog = useCatalogNodes();
+	const kindByKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n.kind as string])));
 
 	type Tab = 'settings' | 'uses';
 	let tab = $state<Tab>('settings');
@@ -74,40 +79,8 @@
 						{/if}
 					</div>
 				{:else}
-					<div class="flex flex-col gap-6 p-6">
-						{#if !usedCount(provider)}
-							<p class="text-muted-foreground text-[12.5px]">Nothing uses this provider yet.</p>
-						{/if}
-						{#if provider.usedBy.length}
-							<div>
-								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Code · {provider.usedBy.length}</div>
-								<div class="flex flex-wrap gap-1.5">
-									{#each provider.usedBy as c (c.kind + c.name)}
-										<span class="flex items-center gap-2 rounded-[2px] border border-border px-2.5 py-1.5 font-mono text-[12px]">{c.name}<span class="text-muted-foreground font-sans text-[11px]">{consumerKindLabel[c.kind]}</span></span>
-									{/each}
-								</div>
-							</div>
-						{/if}
-						{#if provider.jobs.length}
-							<div>
-								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Jobs that run this code · {provider.jobs.length}</div>
-								<table class="sb-list used-by">
-									<thead><tr><th>Job</th><th>Nodes using this provider</th></tr></thead>
-									<tbody>
-										{#each provider.jobs as j (j)}
-											<tr>
-												<td><a href={to(`/jobs/${j}`)}>{j}</a></td>
-												<td>
-													<div class="flex flex-wrap gap-x-3 gap-y-1">
-														{#each provider.jobNodes[j] ?? [] as n (n)}<a class="font-mono" href={to(`/catalog/${n}`)}>{n}</a>{:else}<span class="text-muted-foreground">—</span>{/each}
-													</div>
-												</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
-							</div>
-						{/if}
+					<div class="p-6">
+						<UsedByGraph {provider} catalogKind={(key) => kindByKey.get(key) ?? null} />
 					</div>
 				{/if}
 			</div>
@@ -128,15 +101,8 @@
 </div>
 
 <style>
-	.settings,
-	.used-by {
+	.settings {
 		max-width: 960px;
-	}
-	.used-by td:first-child {
-		width: 260px;
-	}
-	.used-by a:hover {
-		text-decoration: underline;
 	}
 	.secret {
 		display: inline-flex;

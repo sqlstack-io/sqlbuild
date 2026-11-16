@@ -6,7 +6,9 @@ import {
 	foldersToOpen,
 	inSelection,
 	lineageGraph,
+	lineageNodesHref,
 	parseFolders,
+	parseNodes,
 	selectionStubs,
 	stubFolder,
 	stubLabel,
@@ -95,5 +97,30 @@ describe('lineage graph', () => {
 		const graph = lineageGraph(nodes, { grouped: false, open: new Set(), selected: [], staleOnly: true, tree });
 		expect(graph.nodes.map((n) => n.id)).toEqual(['model:orders']);
 		expect(graph.edges).toEqual([]);
+	});
+});
+
+describe('picked nodes', () => {
+	const known = new Set(nodes.map((n) => n.key));
+
+	it('reads known keys from the URL, without repeats', () => {
+		expect(parseNodes('model:orders,model:returns, model:inventory,model:orders', known)).toEqual(['model:orders', 'model:inventory']);
+		expect(parseNodes(null, known)).toEqual([]);
+	});
+
+	it('links to the Lineage with the keys', () => {
+		expect(lineageNodesHref(['source:shop__orders', 'model:orders'])).toBe('/lineage?nodes=source%3Ashop__orders,model%3Aorders');
+		expect(parseNodes(new URL(`http://x${lineageNodesHref(['model:orders'])}`).searchParams.get('nodes'), known)).toEqual(['model:orders']);
+	});
+
+	it('draws only the picked nodes, with stubs for lineage outside them', () => {
+		const graph = lineageGraph(nodes, { grouped: false, open: new Set(), selected: [], picked: new Set(['model:orders', 'model:inventory']), tree });
+		expect(graph.nodes.map((n) => n.id)).toEqual(['model:orders', 'model:inventory', 'stub:downstream:inventory', 'stub:downstream:marts', 'stub:upstream:staging']);
+		expect(graph.edges.map((e) => e.id).sort()).toEqual([
+			'model:inventory-stub:downstream:inventory',
+			'model:orders-model:inventory',
+			'model:orders-stub:downstream:marts',
+			'stub:upstream:staging-model:orders'
+		]);
 	});
 });

@@ -53,7 +53,7 @@
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
 	import { MAX_DRAWN, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
-	import { FOLDERS_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
+	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
 	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
 
 	let browserOpen = $state(false);
@@ -88,6 +88,9 @@
 	// Folders picked in the side list: the canvas draws only them, with stubs for lineage outside them.
 	// Kept in the URL so a reload or a shared link shows the same folders.
 	let selectedFolders = $state<string[]>([]);
+	// Nodes picked elsewhere, such as a provider's code from its Used by tab, drawn instead of folders.
+	// Also kept in the URL; picking folders replaces them.
+	let pickedNodes = $state<string[]>([]);
 	// "Show the N out of date" from the too-many card: only nodes that are out of date.
 	let staleOnly = $state(false);
 	// "Pick folders" highlights the side list until a folder is picked.
@@ -96,7 +99,7 @@
 	let tooMany = $state(false);
 	let tooManyCount = $state(0);
 	const graphOf = (data: CatalogNode[]) =>
-		lineageGraph(data, { grouped, open: expanded, selected: selectedFolders, staleOnly, tree: folderTree(data), onclose: closeFolder, onadd: addFolder });
+		lineageGraph(data, { grouped, open: expanded, selected: selectedFolders, picked: new Set(pickedNodes), staleOnly, tree: folderTree(data), onclose: closeFolder, onadd: addFolder });
 	/** Shows the graph, or the cap's message instead of a graph too large to lay out. */
 	function draw(graph: { nodes: Node[]; edges: Edge[] }, selected: ReadonlySet<string>) {
 		tooMany = tooManyToDraw(graph);
@@ -126,9 +129,10 @@
 						if (!latest || initialised) return;
 						initialised = true;
 						const focus = latest.find((n) => n.key === initialFocus) ?? null;
-						grouped = latest.length > GROUPED_ABOVE;
 						const latestTree = folderTree(latest);
-						selectedFolders = parseFolders(page.url.searchParams.get(FOLDERS_PARAM), latestTree);
+						pickedNodes = parseNodes(page.url.searchParams.get(NODES_PARAM), new Set(latest.map((n) => n.key)));
+						grouped = (pickedNodes.length || latest.length) > GROUPED_ABOVE;
+						selectedFolders = pickedNodes.length ? [] : parseFolders(page.url.searchParams.get(FOLDERS_PARAM), latestTree);
 						if (selectedFolders.length) {
 							expanded = new Set([...expanded, ...foldersToOpen(latestTree, selectedFolders)]);
 							treeOpen = new Set(selectedFolders.flatMap((f) => foldersToOpen(latestTree, [f]).filter((open) => open !== f)));
@@ -180,19 +184,34 @@
 		treeOpen = treeOpen.has(folder) ? withFolderClosed(treeOpen, folder) : new Set([...treeOpen, folder]);
 	}
 
-	/** Draws only the given folders, or every folder when empty, and keeps the choice in the URL. */
+	/** Draws only the given folders, or every folder when empty, and keeps the choice in the URL. Picked nodes give way to folders. */
 	function setFolderSelection(next: string[]) {
 		selectedFolders = next;
+		pickedNodes = [];
 		pickHighlight = false;
 		const url = new URL(page.url);
 		const param = foldersParam(next);
 		if (param) url.searchParams.set(FOLDERS_PARAM, param);
 		else url.searchParams.delete(FOLDERS_PARAM);
+		url.searchParams.delete(NODES_PARAM);
 		if (url.search !== page.url.search) void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
 		regroup({ expanded: new Set([...expanded, ...foldersToOpen(tree, next)]) });
 	}
-	/** Adds a folder to what is drawn: a stub's click, Ctrl/⌘-click or a tree checkbox. */
+	/** Draws the picked nodes and keeps them in the URL. */
+	function setPickedNodes(next: string[]) {
+		pickedNodes = next;
+		const url = new URL(page.url);
+		url.searchParams.set(NODES_PARAM, next.join(','));
+		if (url.search !== page.url.search) void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+		regroup({});
+	}
+	/** Adds a folder to what is drawn: a stub's click, Ctrl/⌘-click or a tree checkbox. With picked nodes, a stub adds its folder's nodes to them. */
 	function addFolder(folder: string) {
+		if (pickedNodes.length) {
+			const add = catalogNodes.filter((n) => inSelection(tree, n.key, [folder])).map((n) => n.key);
+			setPickedNodes([...new Set([...pickedNodes, ...add])]);
+			return;
+		}
 		setFolderSelection(withFolderAdded(selectedFolders, folder));
 	}
 	/** A click on a tree folder draws only it; Ctrl/⌘-click adds or removes it. */
@@ -431,6 +450,7 @@
 	const outOfDateCount = $derived(catalogNodes.filter((c) => (c.stale?.length ?? 0) > 0).length);
 	/** The toolbar chip's text, e.g. "orders, inventory"; empty when every folder is drawn. */
 	const selectionLabel = $derived.by(() => {
+		if (pickedNodes.length) return `${pickedNodes.length.toLocaleString('en')} picked node${pickedNodes.length === 1 ? '' : 's'}`;
 		const parts = selectedFolders.length > 3 ? [...selectedFolders.slice(0, 3), `${selectedFolders.length - 3} more`] : [...selectedFolders];
 		if (staleOnly) parts.push(`${outOfDateCount.toLocaleString('en')} out of date`);
 		return parts.join(', ');
@@ -491,7 +511,7 @@
 	// from the catalog, as an edge to a closed folder doesn't name the node it reaches
 	const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id;
 	// A narrowed graph leaves out neighbours and draws stubs in their place, so it lists from the catalog too.
-	const fromCatalog = $derived(grouped || selectedFolders.length > 0 || staleOnly);
+	const fromCatalog = $derived(grouped || selectedFolders.length > 0 || pickedNodes.length > 0 || staleOnly);
 	const upstream = $derived(
 		!primary ? [] : fromCatalog ? (catalogByKey.get(primary.id)?.upstream ?? []) : edges.filter((e) => e.target === primary.id).map((e) => nameOf(e.source))
 	);
@@ -544,7 +564,8 @@
 			const outsideStale = staleOnly && !listedNode.stale?.length;
 			if (outsideStale) staleOnly = false;
 			const own = tree.chains.get(id)?.at(-1);
-			if (outsideFolders && own) setFolderSelection(withFolderAdded(selectedFolders, own));
+			if (pickedNodes.length && !pickedNodes.includes(id)) setPickedNodes([...pickedNodes, id]);
+			else if (outsideFolders && own) setFolderSelection(withFolderAdded(selectedFolders, own));
 			else if (outsideStale) regroup({});
 		}
 		await selectModel(id, true);

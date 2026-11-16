@@ -9,6 +9,18 @@ import { folderGraph, folderTree, standInOf, type FolderTree } from './folder-gr
 /** The URL parameter holding the selected folders, comma-separated. */
 export const FOLDERS_PARAM = 'folders';
 
+/** The URL parameter holding nodes picked elsewhere, e.g. a provider's code, comma-separated keys. */
+export const NODES_PARAM = 'nodes';
+
+/** The picked node keys the catalog knows, from the URL parameter, in order and without repeats. */
+export function parseNodes(param: string | null, known: ReadonlySet<string>): string[] {
+	if (!param) return [];
+	return [...new Set(param.split(',').map((k) => k.trim()))].filter((k) => k && known.has(k));
+}
+
+/** A link to the Lineage drawing only the given nodes. */
+export const lineageNodesHref = (keys: readonly string[]): string => `/lineage?${NODES_PARAM}=${keys.map(encodeURIComponent).join(',')}`;
+
 /** Whether `folder` is `other` or a folder inside it. */
 const within = (folder: string, other: string) => folder === other || folder.startsWith(`${other}/`);
 
@@ -72,11 +84,14 @@ export type Stub = {
 
 export const stubId = (direction: Stub['direction'], folder: string) => `stub:${direction}:${folder}`;
 
-/** Direct lineage between the selection and other folders, one stub per folder and direction. */
-export function selectionStubs(nodes: readonly CatalogNode[], tree: FolderTree, selected: readonly string[]): Stub[] {
-	if (!selected.length) return [];
+/**
+ * Direct lineage between the selection and other folders, one stub per folder and direction. The
+ * selection is the selected folders, or the picked nodes when `picked` is given.
+ */
+export function selectionStubs(nodes: readonly CatalogNode[], tree: FolderTree, selected: readonly string[], picked?: ReadonlySet<string>): Stub[] {
+	if (!selected.length && !picked?.size) return [];
 	const keys = new Set(nodes.map((n) => n.key));
-	const inside = new Set(nodes.filter((n) => inSelection(tree, n.key, selected)).map((n) => n.key));
+	const inside = new Set(nodes.filter((n) => (picked ? picked.has(n.key) : inSelection(tree, n.key, selected))).map((n) => n.key));
 	const stubs = new Map<string, { stub: Stub; members: Set<string>; targets: Set<string> }>();
 	const note = (direction: Stub['direction'], outsider: string, target: string) => {
 		const folder = stubFolder(tree.chains.get(outsider) ?? [], selected);
@@ -109,6 +124,8 @@ export type LineageGraphOptions = {
 	open: ReadonlySet<string>;
 	/** The selected folders; empty draws every folder. */
 	selected: readonly string[];
+	/** Picked nodes, drawn instead of the selected folders, with stubs for lineage outside them. */
+	picked?: ReadonlySet<string>;
 	/** Only nodes that are out of date. */
 	staleOnly?: boolean;
 	tree?: FolderTree;
@@ -121,9 +138,11 @@ export type LineageGraphOptions = {
  * direction for lineage outside them; by folder or node by node. `staleOnly` narrows to nodes that
  * are out of date, without stubs.
  */
-export function lineageGraph(data: CatalogNode[], { grouped, open, selected, staleOnly = false, tree = folderTree(data), onclose, onadd }: LineageGraphOptions): { nodes: Node[]; edges: Edge[] } {
+export function lineageGraph(data: CatalogNode[], { grouped, open, selected, picked, staleOnly = false, tree = folderTree(data), onclose, onadd }: LineageGraphOptions): { nodes: Node[]; edges: Edge[] } {
 	let shown = data;
-	if (selected.length) shown = shown.filter((n) => inSelection(tree, n.key, selected));
+	const picking = !!picked?.size;
+	if (picking) shown = shown.filter((n) => picked!.has(n.key));
+	else if (selected.length) shown = shown.filter((n) => inSelection(tree, n.key, selected));
 	if (staleOnly) shown = shown.filter((n) => (n.stale?.length ?? 0) > 0);
 	const narrowed = shown.length !== data.length;
 	const shownTree = narrowed ? folderTree(shown) : tree;
@@ -139,8 +158,8 @@ export function lineageGraph(data: CatalogNode[], { grouped, open, selected, sta
 			graph = { nodes: graph.nodes, edges: graph.edges.filter((e) => keys.has(e.source)) };
 		}
 	}
-	if (!selected.length || staleOnly) return graph;
-	const stubs = selectionStubs(data, tree, selected);
+	if ((!selected.length && !picking) || staleOnly) return graph;
+	const stubs = picking ? selectionStubs(data, tree, [], picked) : selectionStubs(data, tree, selected);
 	const stubNodes: Node[] = stubs.map((s) => ({
 		id: s.id,
 		type: 'stub',

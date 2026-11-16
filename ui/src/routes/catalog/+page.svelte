@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { openRow, to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
+	import XIcon from '@lucide/svelte/icons/x';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import { NODES_PARAM } from '$lib/lineage/folder-selection';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import type { CatalogNode } from '$lib/api';
@@ -33,6 +36,14 @@
 	let kindFilter = $state<'all' | KindTab>(parseKindTab(params.get('kind')) ?? 'all');
 	let groupFilter = $state(params.get('group') ?? '');
 	let statusFilter = $state<StatusFilter | ''>(params.get('stale') ? 'stale' : '');
+	// Nodes picked elsewhere, such as a provider's code from its Used by tab.
+	let picked = $state<ReadonlySet<string>>(new Set((params.get(NODES_PARAM) ?? '').split(',').filter(Boolean)));
+	function clearPicked() {
+		picked = new Set();
+		const url = new URL(page.url);
+		url.searchParams.delete(NODES_PARAM);
+		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+	}
 
 	const matchesStatus = (n: CatalogNode, f: StatusFilter | '') =>
 		!f ||
@@ -52,6 +63,7 @@
 
 	const filtered = $derived(
 		all.filter((n) => {
+			if (picked.size && !picked.has(n.key)) return false;
 			if (kindFilter !== 'all' && kindTabOf(n.kind) !== kindFilter) return false;
 			// A filter whose control is hidden, for example from a shared link, never narrows the list.
 			if (groups.length > 1 && groupFilter && topFolder(n) !== groupFilter) return false;
@@ -104,6 +116,7 @@
 		: []}
 >
 	{#snippet filters()}
+		{#if picked.size}<Button variant="outline" size="sm" class="mr-1.5" onclick={clearPicked} title="Show every node">{picked.size} picked<XIcon /></Button>{/if}
 		<SegmentedFilter loading={catalog.data === undefined}
 			bind:value={kindFilter}
 			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: kindTabLabel[k], count: all.filter((n) => kindTabOf(n.kind) === k).length }))]}
