@@ -69,6 +69,15 @@ async function checkLayout(page: Page, label: string) {
 				}
 			}
 		}
+		// Every scroll area has the themed scrollbar, not the browser's default.
+		for (const el of [document.documentElement, ...document.querySelectorAll<HTMLElement>('body *')]) {
+			const style = getComputedStyle(el);
+			const scrolls = (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1) || (/(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 1);
+			if (scrolls && style.scrollbarColor === 'auto') {
+				problems.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} scrolls with the default scrollbar`);
+				break;
+			}
+		}
 		for (const table of document.querySelectorAll<HTMLTableElement>('table.sb-table')) {
 			const rows = table.tBodies[0]?.rows ?? [];
 			if (rows.length > maxRows) problems.push(`a list draws ${rows.length} rows`);

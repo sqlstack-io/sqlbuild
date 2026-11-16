@@ -1419,28 +1419,6 @@
 	.inspector-panel {
 		height: 100%;
 	}
-	/* thin styled scrollbars */
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
-	}
-	.sb-scroll::-webkit-scrollbar {
-		width: 9px;
-		height: 9px;
-	}
-	.sb-scroll::-webkit-scrollbar-track {
-		background: transparent;
-	}
-	.sb-scroll::-webkit-scrollbar-thumb {
-		background: var(--border-strong);
-		border-radius: 2px;
-		border: 2px solid transparent;
-		background-clip: content-box;
-	}
-	.sb-scroll::-webkit-scrollbar-thumb:hover {
-		background: var(--muted-foreground);
-		background-clip: content-box;
-	}
 	/* inspector resize handle */
 	.sb-inspector-handle::after {
 		content: '';
