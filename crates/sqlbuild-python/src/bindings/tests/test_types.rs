@@ -78,3 +78,12 @@ pub(crate) struct CacheKeyTestCase {
     pub(crate) changed: &'static [(&'static str, &'static str)],
     pub(crate) expected_same_key: bool,
 }
+
+/// A listing over the synced copy's relations and the `schema.name` of each relation it returns.
+pub(crate) struct SyncedRelationsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) database: Option<&'static str>,
+    pub(crate) schemas: Option<&'static [&'static str]>,
+    pub(crate) names: Option<&'static [&'static str]>,
+    pub(crate) expected_relations: &'static [&'static str],
+}
