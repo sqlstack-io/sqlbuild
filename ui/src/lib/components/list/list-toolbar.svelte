@@ -3,7 +3,9 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import type { Snippet } from 'svelte';
 
-	export type ToolbarCount = { tone: string; count: number; label: string };
+	/** `reserve` keeps a zero count's space (invisible, ahead of the others), so a count that comes and
+	 *  goes as rows are switched doesn't change the toolbar's width and wrap it onto another row. */
+	export type ToolbarCount = { tone: string; count: number; label: string; reserve?: boolean };
 
 	let {
 		query = $bindable(''),
@@ -36,8 +38,8 @@
 	{#if filters}<div class="list-filters">{@render filters()}</div>{/if}
 	{#if actions}{@render actions()}{/if}
 	<div class="list-summary" class:invisible={loading}>
-		{#each counts.filter((c) => c.count > 0) as c (c.label)}
-			<span title="{c.count} {c.label}"><i style:background={c.tone}></i>{c.count} {c.label}</span>
+		{#each counts.filter((c) => c.count > 0 || c.reserve) as c (c.label)}
+			<span class:reserved={c.count === 0} aria-hidden={c.count === 0 ? 'true' : undefined} title="{c.count} {c.label}"><i style:background={c.tone}></i>{c.count} {c.label}</span>
 		{/each}
 		<b>{total}</b>
 	</div>
@@ -111,6 +113,10 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
+	}
+	.list-summary span.reserved {
+		order: -1;
+		visibility: hidden;
 	}
 	.list-summary i {
 		width: 7px;

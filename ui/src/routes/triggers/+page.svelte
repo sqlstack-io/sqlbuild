@@ -104,9 +104,9 @@
 	placeholder="Search schedules, sensors and jobs"
 	total="{filtered.length} of {all.length} schedules and sensors"
 	counts={[
-		{ tone: 'var(--sb-success)', count: runningCount, label: 'on' },
-		{ tone: 'var(--sb-text-faint)', count: all.length - runningCount, label: 'paused' },
-		{ tone: 'var(--sb-warning)', count: overriddenCount, label: 'switched from what the code says' }
+		{ tone: 'var(--sb-success)', count: runningCount, label: 'on', reserve: true },
+		{ tone: 'var(--sb-text-faint)', count: all.length - runningCount, label: 'paused', reserve: true },
+		{ tone: 'var(--sb-warning)', count: overriddenCount, label: 'switched from what the code says', reserve: true }
 	]}
 >
 	{#snippet filters()}
@@ -150,8 +150,8 @@
 				<th>Name</th>
 				<th>Kind</th>
 				<th>Runs</th>
-				<th>Status</th>
-				<th>Next run</th>
+				<th class="status-col">Status</th>
+				<th class="next-col">Next run</th>
 				<th title="What happened the last time it was due (its last tick)">Last time due</th>
 				<th>Last run</th>
 			</tr>
@@ -194,7 +194,7 @@
 					<td>
 						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Runs its own code</span>{/if}
 					</td>
-					<td>
+					<td class="status-col">
 						<span class:muted={t.state === 'paused'}>{t.state === 'running' ? 'On' : 'Paused'}</span>
 						{#if t.state !== t.defaultState}
 							<div class="cell-desc override" title="Someone switched it here; the code says {t.defaultState}">
@@ -209,7 +209,7 @@
 							<div class="cell-desc">as in the code</div>
 						{/if}
 					</td>
-					<td class="muted" title={t.nextDueAt ? formatStamp(t.nextDueAt) : undefined}>{nextDue(t)}</td>
+					<td class="muted next-col" title={t.nextDueAt ? formatStamp(t.nextDueAt) : undefined}>{nextDue(t)}</td>
 					<td class="muted" title={t.lastTick ? `${tickOutcomeHelp[t.lastTick.outcome]}${t.lastTick.reason ? `\n${t.lastTick.reason}` : ''}` : undefined}>
 						{#if t.lastTick}
 							<span class="tick" style:--c={tickOutcomeTone[t.lastTick.outcome]}>{tickOutcomeText[t.lastTick.outcome]}</span>
@@ -240,6 +240,18 @@
 <style>
 	.check-col {
 		width: 44px;
+	}
+	/* Switching a trigger changes what these two cells say. Their widths fit every variant and they never
+	   wrap, so a switch can't resize the columns or change the row's height and move the page. */
+	.status-col {
+		width: 200px;
+		min-width: 200px;
+		white-space: nowrap;
+	}
+	.next-col {
+		width: 190px;
+		min-width: 190px;
+		white-space: nowrap;
 	}
 	.type-cell {
 		display: inline-flex;
