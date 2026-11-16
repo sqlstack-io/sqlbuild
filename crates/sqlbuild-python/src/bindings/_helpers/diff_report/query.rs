@@ -16,9 +16,9 @@ use sqlbuild_cli::diff_report::types::PhaseSeconds;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
+use crate::bindings::_helpers::compile_attachment::target::effective_target_namespace;
 use crate::bindings::_helpers::diff_report::support::{
-    call, cli_error, error_text, none, object, progress_line,
+    call, cli_error, error_text, object, progress_line,
 };
 use crate::bindings::_helpers::diff_report::tolerances::cli_tolerance_overrides;
 use sqlbuild_analysis::diff_selection::main::raw_query_shape::raw_query_shape;
@@ -30,7 +30,6 @@ use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cl
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
@@ -38,7 +37,6 @@ use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_con
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 
 const GENERIC_DIALECT: &str = "generic";
-pub(crate) const NAMESPACELESS_ADAPTERS: [&str; 2] = ["duckdb", "motherduck"];
 
 fn failure(py: Python<'_>, message: String, code: &str, help: Option<&str>) -> PyErr {
     cli_error(
@@ -197,29 +195,11 @@ pub(crate) fn prepare_query_diff<'py>(
             ],
         )?),
     )?;
-    let database: Bound<'py, PyAny> = if NAMESPACELESS_ADAPTERS.contains(&adapter_name.as_str()) {
-        none(py)
-    } else {
-        mapping_get(&config, "database")?
-    };
-    let namespace: Bound<'py, PyAny> = build_effective_target_namespace(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("discovered_inputs", discovered.clone()),
-                ("selected_target", selected_target.clone()),
-                ("connection_database", database.clone()),
-                ("connection_schema", mapping_get(&config, "schema")?),
-                (
-                    "default_database",
-                    adapter.call_method0("default_database")?,
-                ),
-                ("default_schema", adapter.call_method0("default_schema")?),
-            ],
-        )?),
-    )
-    .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
+    let namespace: Bound<'py, PyAny> = effective_target_namespace(
+        (discovered, &selected_target),
+        (&adapter_name, &config, &adapter),
+    )?
+    .into_any();
     let ResolvedNamespace {
         target_name,
         database,

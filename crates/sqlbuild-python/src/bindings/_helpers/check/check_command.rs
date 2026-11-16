@@ -7,6 +7,9 @@ use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pi
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
+use crate::bindings::_helpers::compile_driver::targets::{
+    TargetSettingsValues, project_target_settings,
+};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use pyo3::prelude::{
@@ -70,6 +73,7 @@ struct Prepared<'py> {
     relation_targets: Bound<'py, PyAny>,
     relation_refs: Bound<'py, PyAny>,
     defaults: (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    target_config: TargetSettingsValues,
     project_relations: Bound<'py, PyAny>,
 }
 
@@ -354,7 +358,13 @@ fn prepare<'py>(
             )?),
         )?,
     )?;
+    let target_config: TargetSettingsValues = project_target_settings(
+        &discovered,
+        &project,
+        (&native_field(invocation, "connection_config")?, &adapter),
+    )?;
     Ok(Prepared {
+        target_config,
         check_functions: PyTuple::new(py, check_functions)?.into_any(),
         lifecycle_plan,
         relation_targets,
@@ -405,6 +415,7 @@ fn node_runtime<'py>(
         ("target", native_field(&project, "effective_target_name")?),
         ("vars", native_field(&project, "effective_vars")?),
         ("is_reload", PyBool::new(py, false).to_owned().into_any()),
+        ("target_config", prepared.target_config.record(py)?),
         ("default_database", prepared.defaults.0.clone()),
         ("default_schema", prepared.defaults.1.clone()),
         ("relation_targets", prepared.relation_targets.clone()),
@@ -493,6 +504,7 @@ fn run_checks<'py>(
         validation_refs: prepared.relation_refs.clone(),
         project_relations: prepared.project_relations.clone(),
         providers: providers.clone(),
+        target_config: Some(prepared.target_config.clone()),
     })?;
     record_run_state(
         invocation,
@@ -673,10 +685,13 @@ pub(crate) fn run_check_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
     require_used_secrets(&discovered, &uses)?;
     let session: Bound<'_, PyAny> = call_with(
         &host_entry(py, UserCodeHost::BuildProviderSession)?,
-        &[(
-            "discovered_providers",
-            native_field(&invocation, "discovered_inputs")?.getattr("providers")?,
-        )],
+        &[
+            (
+                "discovered_providers",
+                native_field(&invocation, "discovered_inputs")?.getattr("providers")?,
+            ),
+            ("setup_context", prepared.target_config.setup_context(py)?),
+        ],
     )?;
     let outcome: PyResult<i32> = (|| {
         let results: Vec<Bound<'_, PyAny>> = execute(

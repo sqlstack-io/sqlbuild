@@ -422,6 +422,7 @@ def _build_context(
         statement_recorder=statement_recorder,
         run_state=run_state,
         result_store=result_store,
+        target_config=runtime.target_config,
         default_database=runtime.default_database,
         default_schema=runtime.default_schema,
         relation_targets=runtime.resolved_relation_targets,

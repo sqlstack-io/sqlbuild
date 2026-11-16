@@ -6,7 +6,6 @@ use std::path::Path;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
-use serde_json::Value;
 use sqlbuild_analysis::definition_changes::constants::{
     MACRO_KIND, MODEL_KIND, SCENARIO_KIND, SEED_KIND, SOURCE_KIND, TABLE_FUNCTION_KIND,
     TEST_FILE_KIND,
@@ -20,6 +19,7 @@ use sqlbuild_analysis::definition_changes::main::selection_report::selection_rep
 use sqlbuild_analysis::definition_changes::models::{
     DefinitionChanges, DefinitionSnapshot, ExecutedItem, SelectedItem,
 };
+use sqlbuild_core::json::main::with_section::with_section;
 
 use crate::bindings::_helpers::change_selection::base_snapshot::BaseComparison;
 use crate::bindings::_helpers::change_selection::definition_snapshot::{
@@ -311,17 +311,12 @@ pub(crate) fn with_since_section(payload: String, since: Option<&str>) -> PyResu
         return Ok(payload);
     };
     let invalid = |error: serde_json::Error| PyValueError::new_err(error.to_string());
-    let mut document: Value = serde_json::from_str(&payload).map_err(invalid)?;
-    if let Value::Object(fields) = &mut document {
-        fields.insert(
-            SINCE_SECTION.to_owned(),
-            serde_json::from_str(since).map_err(invalid)?,
-        );
-    }
-    Ok(format!(
-        "{}\n",
-        serde_json::to_string_pretty(&document).map_err(invalid)?
-    ))
+    with_section(
+        &payload,
+        SINCE_SECTION,
+        serde_json::from_str(since).map_err(invalid)?,
+    )
+    .map_err(invalid)
 }
 
 /// The project's compiled tests and models by name.

@@ -3,4 +3,5 @@
 pub(crate) mod orchestration_sensors;
 pub(crate) mod registration;
 pub(crate) mod resource_costs_state;
+pub(crate) mod statement_report;
 pub(crate) mod warehouse_metadata;

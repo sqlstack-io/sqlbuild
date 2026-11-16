@@ -2,10 +2,11 @@
 
 use std::collections::{HashMap, HashSet};
 
+use pyo3::exceptions::PyException;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{PyDict, PyString, PyStringMethods};
+use pyo3::types::{PyBool, PyDict, PyString, PyStringMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
 use sqlbuild_analysis::assembly::target_checks::constants::{
@@ -43,12 +44,16 @@ const DEFAULTS_HELP_PURPOSE: &str = "to set project-wide defaults";
 const NAMED_TARGET_HELP_PURPOSE: &str = "to build this target into that schema";
 use crate::bindings::_helpers::compile_attachment::target::resolved_target;
 use pyo3::IntoPyObjectExt;
+
+use crate::bindings::_helpers::compile_attachment::target::effective_target_namespace;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
-use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::{ErrorId, RecordId};
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
@@ -342,7 +347,10 @@ fn target_namespaces(
     let mut namespaces: Vec<Namespace> = Vec::new();
     for source_entry in managed_sources {
         let namespace: Namespace = managed_source_namespace(
-            source_entry,
+            (
+                native_field(source_entry, "database")?,
+                native_field(source_entry, "schema")?,
+            ),
             (&target_config, &connection, &effective_vars),
             adapter,
         )?;
@@ -366,28 +374,28 @@ fn first_truthy<'py>(
     fallback()
 }
 
-/// `_managed_source_namespace`: the database and schema a managed source loads into.
-fn managed_source_namespace(
-    source_entry: &Bound<'_, PyAny>,
+/// `_managed_source_namespace`: the database and schema a managed source with these own values loads into.
+fn managed_source_namespace<'py>(
+    (source_database, source_schema): (Bound<'py, PyAny>, Bound<'py, PyAny>),
     (target_config, connection, effective_vars): (
-        &Bound<'_, PyAny>,
-        &Bound<'_, PyAny>,
-        &Bound<'_, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
     ),
-    adapter: &Bound<'_, PyAny>,
+    adapter: &Bound<'py, PyAny>,
 ) -> PyResult<Namespace> {
-    let py: Python<'_> = source_entry.py();
-    let database: Bound<'_, PyAny> = first_truthy(
+    let py: Python<'py> = adapter.py();
+    let database: Bound<'py, PyAny> = first_truthy(
         &[
-            native_field(source_entry, "database")?,
+            source_database,
             native_field(target_config, "database")?,
             mapping_get(connection, "database")?,
         ],
         || adapter.call_method0("default_database"),
     )?;
-    let schema: Bound<'_, PyAny> = first_truthy(
+    let schema: Bound<'py, PyAny> = first_truthy(
         &[
-            native_field(source_entry, "schema")?,
+            source_schema,
             native_field(target_config, "loader_schema")?,
             native_field(target_config, "schema")?,
             mapping_get(connection, "schema")?,
@@ -406,6 +414,136 @@ fn managed_source_namespace(
         Ok(Some(value.str()?.to_cow()?.into_owned()))
     };
     Ok((part("database")?, part("schema")?))
+}
+
+/// The active target's locations as SQLBuild resolves them; `preserve` stays as written until `record`.
+#[derive(Clone)]
+pub(crate) struct TargetSettingsValues {
+    name: Option<String>,
+    database: Option<String>,
+    schema: Option<String>,
+    loader_schema: Option<String>,
+}
+
+impl TargetSettingsValues {
+    /// The `TargetSettings` record: a `preserve` location reads `None` with its flag set.
+    pub(crate) fn record<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let located = |value: &Option<String>| -> PyResult<Bound<'py, PyAny>> {
+            value
+                .as_deref()
+                .filter(|value| *value != PRESERVE_TARGET_VALUE)
+                .into_bound_py_any(py)
+        };
+        let preserved = |value: &Option<String>| -> Bound<'py, PyAny> {
+            PyBool::new(py, value.as_deref() == Some(PRESERVE_TARGET_VALUE))
+                .to_owned()
+                .into_any()
+        };
+        new_record_with(
+            py,
+            RecordId::TargetSettings,
+            &[
+                ("name", self.name.clone().into_bound_py_any(py)?),
+                ("database", located(&self.database)?),
+                ("schema", located(&self.schema)?),
+                ("loader_schema", located(&self.loader_schema)?),
+                ("database_preserved", preserved(&self.database)),
+                ("schema_preserved", preserved(&self.schema)),
+            ],
+        )
+    }
+
+    /// The `ctx` a provider's `setup` receives in a command with these settings.
+    pub(crate) fn setup_context<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        new_record_with(
+            py,
+            RecordId::ProviderSetupContext,
+            &[("target_config", self.record(py)?)],
+        )
+    }
+}
+
+/// The target `target_name` with its resolved locations; `loader_schema` is `None` when it resolves only inside a model, such as a `${CTX:...}` schema.
+pub(crate) fn target_settings<'py>(
+    (discovered, target_name): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (database, schema): (Option<String>, Option<String>),
+    (connection, effective_vars, adapter): (
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+    ),
+) -> PyResult<TargetSettingsValues> {
+    let py: Python<'py> = adapter.py();
+    let target_config: Bound<'py, PyAny> = if target_name.is_none() {
+        new_record(py, RecordId::TargetConfig, (), None)?
+    } else {
+        resolve_target_config(
+            py,
+            &native_field(discovered, "project_config")?,
+            &native_field(discovered, "local_config")?,
+            target_name,
+        )?
+    };
+    let none: Bound<'py, PyAny> = py.None().into_bound(py);
+    let loader_schema: Option<String> = match managed_source_namespace(
+        (none.clone(), none),
+        (&target_config, connection, effective_vars),
+        adapter,
+    ) {
+        Ok((_, schema)) => schema,
+        Err(error) if error.is_instance_of::<PyException>(py) => None,
+        Err(error) => return Err(error),
+    };
+    Ok(TargetSettingsValues {
+        name: target_name.extract()?,
+        database,
+        schema,
+        loader_schema,
+    })
+}
+
+/// The selected target's settings, with its database and schema resolved as `sqb debug` resolves them.
+pub(crate) fn selected_target_settings<'py>(
+    (discovered, selected_target): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    adapter_name: &str,
+    (connection, effective_vars, adapter): (
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+    ),
+) -> PyResult<TargetSettingsValues> {
+    let namespace: Bound<'py, PyTuple> = effective_target_namespace(
+        (discovered, selected_target),
+        (adapter_name, connection, adapter),
+    )?;
+    target_settings(
+        (discovered, &namespace.get_item(0)?),
+        (
+            namespace.get_item(2)?.extract()?,
+            namespace.get_item(3)?.extract()?,
+        ),
+        (connection, effective_vars, adapter),
+    )
+}
+
+/// `target_settings` of a compiled project's target.
+pub(crate) fn project_target_settings<'py>(
+    discovered: &Bound<'py, PyAny>,
+    project: &Bound<'py, PyAny>,
+    (connection, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<TargetSettingsValues> {
+    target_settings(
+        (discovered, &native_field(project, "effective_target_name")?),
+        (
+            native_field(project, "effective_target_database")?.extract()?,
+            native_field(project, "effective_target_schema")?.extract()?,
+        ),
+        (
+            connection,
+            &native_field(project, "effective_vars")?,
+            adapter,
+        ),
+    )
 }
 
 /// A managed source's `database` and `schema` with project vars expanded and no context templates.

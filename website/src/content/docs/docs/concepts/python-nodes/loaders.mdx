@@ -234,6 +234,7 @@ Every loader function receives a `LoaderContext` as its first argument. It provi
 | `current_cursor_value` | `object \| None` | Current `MAX(cursor_column)` from the destination, or `None` if the table does not exist or has no cursor column |
 | `run_id` | `str` | Unique identifier for this execution run |
 | `target` | `str \| None` | Active target name (e.g. `dev`, `prod`) |
+| `target_config` | `TargetSettings` | The active target's database, schema and loader schema ([Target settings](/docs/concepts/python-nodes/overview#target-settings)) |
 | `vars` | `dict` | Project variables (merged from project, target, and local config) |
 | `is_reload` | `bool` | `True` when `--reload` was passed |
 | `start_cursor_ts` | `datetime \| None` | Timestamp cursor start override from `--start-cursor-ts` |

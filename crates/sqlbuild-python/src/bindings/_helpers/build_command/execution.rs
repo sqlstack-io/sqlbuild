@@ -27,6 +27,7 @@ use crate::bindings::_helpers::check::check_core::{
 use crate::bindings::_helpers::check::check_results::write_check_results;
 use crate::bindings::_helpers::command_runtime::warehouses::describe_connection_warehouse;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
+use crate::bindings::_helpers::compile_driver::targets::project_target_settings;
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
 use crate::bindings::_helpers::sql_test_command::timeouts::{TimeoutKind, resolve_run_timeout};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -359,6 +360,15 @@ pub(crate) fn execute_build_plan<'py>(
                 preparation.concurrency.into_pyobject(py)?.into_any(),
             ),
             ("loader_is_reload", request("reload_sources")?),
+            (
+                "target_config",
+                project_target_settings(
+                    &context.get("discovered_inputs")?,
+                    &project,
+                    (&connection_config, &adapter),
+                )?
+                .record(py)?,
+            ),
             ("start_cursor_ts", start_ts.clone()),
             ("end_cursor_ts", end_ts.clone()),
             ("start_cursor_int", start_int.clone()),
@@ -635,6 +645,15 @@ fn check_runtime<'py>(
             (
                 "is_reload",
                 native_field(&context.request, "reload_sources")?,
+            ),
+            (
+                "target_config",
+                project_target_settings(
+                    &context.get("discovered_inputs")?,
+                    &project,
+                    (&context.get("connection_config")?, &adapter),
+                )?
+                .record(py)?,
             ),
             (
                 "default_database",

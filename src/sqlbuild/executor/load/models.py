@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlbuild._native import DiscoveredLoaderFunction, SourceEntry
+from sqlbuild._native import DiscoveredLoaderFunction, SourceEntry, TargetSettings
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import ColumnInfo, LifeCycleEvent
@@ -149,6 +149,7 @@ class LoaderContext(DependencyResultReader):
     runtime_dir: Path = Path("target")
     on_progress: Callable[[str], None] | None = None
     relation_guard: RuntimeRelationGuard | None = field(default=None, repr=False)
+    target_config: TargetSettings | None = None
 
     def execute_sql(self, sql: str) -> Any:
         if self.relation_guard is not None:
@@ -281,6 +282,7 @@ class LoadRuntimeParams:
     target: str | None
     vars: dict[str, object]
     is_reload: bool
+    target_config: TargetSettings | None = None
     runtime_dir: Path = Path("target")
     start_cursor_ts: datetime | None = None
     end_cursor_ts: datetime | None = None

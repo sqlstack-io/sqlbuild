@@ -661,6 +661,12 @@ class NativeSqlTestArtifact(NativeRecord):
     ) -> None: ...
     def __replace__(self, **changes: Any) -> NativeSqlTestArtifact: ...
 
+class ProviderSetupContext(NativeRecord):
+    """What a provider's setup receives: the active target's resolved settings."""
+
+    target_config: TargetSettings | None
+    def __init__(self, target_config: TargetSettings | None = ...) -> None: ...
+
 class RelationFixtureDiagnostic(NativeRecord):
     """One statically provable invalid fixture condition."""
 
@@ -11898,6 +11904,25 @@ class TargetDiffConfig(NativeRecord):
     def __init__(
         self,
         max_full_rows: int | Literal["unlimited"] | None = ...,
+    ) -> None: ...
+
+class TargetSettings(NativeRecord):
+    """The active target's database and schemas, resolved as SQLBuild uses them."""
+
+    name: str | None
+    database: str | None
+    schema: str | None
+    loader_schema: str | None
+    database_preserved: bool
+    schema_preserved: bool
+    def __init__(
+        self,
+        name: str | None = ...,
+        database: str | None = ...,
+        schema: str | None = ...,
+        loader_schema: str | None = ...,
+        database_preserved: bool = ...,
+        schema_preserved: bool = ...,
     ) -> None: ...
 
 class TargetWarehousesConfig(NativeRecord):

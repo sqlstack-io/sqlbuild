@@ -132,6 +132,7 @@ def build_model_hook_run(
         destination=context.entry.destination,
         run_id=context.run_id,
         target=context.effective_target_name,
+        target_config=context.target_config,
         effective_vars=context.effective_vars if effective_vars is None else effective_vars,
         statement_recorder=statement_recorder,
         providers=context.providers,
