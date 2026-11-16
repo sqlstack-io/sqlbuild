@@ -111,7 +111,9 @@ FROM __ref("stg_forecast_lines")
 
 A delta holding version `2026-06` deletes every `2026-06` row and inserts the new ones. Other
 versions keep their rows. A model sets `unique_key` or `replace_key`, not both, and `replace_key`
-is valid only with `delete_insert` and not with `incremental_mode microbatch`. Rules that need a proven key, such as `SQLCLEAN018`, use
+is valid only with `delete_insert` and not with `incremental_mode microbatch`. BigQuery rejects
+`replace_key` with `A012` when planning; replace groups on Snowflake, Databricks, PostgreSQL or
+DuckDB. Rules that need a proven key, such as `SQLCLEAN018`, use
 `unique_key` and never `replace_key`.
 
 ### merge

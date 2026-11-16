@@ -5,6 +5,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
 
+use sqlbuild_analysis::planner_strategy::main::group_replacement_refusal::group_replacement_refusal;
 use sqlbuild_analysis::planner_strategy::main::materialization_type::materialization_type;
 use sqlbuild_analysis::planner_strategy::main::microbatch_lookback::microbatch_lookback;
 use sqlbuild_analysis::planner_strategy::main::physical_layout_warning::physical_layout_warning;
@@ -24,8 +25,9 @@ use crate::bindings::_helpers::model_config::typed_config::{
     config_text_tuple, config_value, model_values,
 };
 use crate::bindings::_helpers::planner_strategy::constants::{
-    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, MICROBATCH_MODE,
-    PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE, TABLE_RECREATING_ACTIONS,
+    CUSTOM_MATERIALIZATION, DDL_SEPARATOR, ENFORCED_CONTRACT, GROUP_REPLACEMENT_UNSUPPORTED_CODE,
+    MICROBATCH_MODE, PHYSICAL_STORAGE_DIALECT, PHYSICAL_STORAGE_UNSUPPORTED_CODE,
+    TABLE_RECREATING_ACTIONS,
 };
 use crate::bindings::_helpers::planner_strategy::cursor_types::{
     cursor_type_warning_record, warehouse_column_types,
@@ -659,6 +661,25 @@ pub(crate) fn assemble_model_plan_entry<'py>(
     )?;
     let unique_key: Bound<'py, PyTuple> = string_list(&values.0, "unique_key")?;
     let replace_key: Bound<'py, PyTuple> = string_list(&values.0, "replace_key")?;
+    if let Some(refusal) = group_replacement_refusal(
+        &model_reads::model_name(model)?,
+        (
+            &native_field(&request.adapter, "adapter_name")?
+                .str()?
+                .to_string(),
+            native_field(&request.adapter, "sql_analysis_dialect_name")?
+                .extract::<Option<String>>()?
+                .as_deref(),
+        ),
+        !replace_key.is_empty()?,
+    ) {
+        return Err(input_error(
+            py,
+            ErrorId::CompileInput,
+            &refusal,
+            Some(GROUP_REPLACEMENT_UNSUPPORTED_CODE),
+        ));
+    }
     let merge_exclude: Bound<'py, PyTuple> =
         config_text_tuple(py, &values, "merge_exclude_columns")?
             .unwrap_or_else(|| PyTuple::empty(py));
