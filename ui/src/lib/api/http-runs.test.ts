@@ -135,6 +135,7 @@ describe('run queue', () => {
 							{ kind: 'write_claim', run_id: null, node_key: 'model.orders', other_nodes: 3 },
 							{ kind: 'earlier_run', run_id: 'urgent', limit: 'warehouse' },
 							{ kind: 'upstream_job', run_id: 'stage', job_key: 'staging' },
+							{ kind: 'upstream_job', run_id: 'retry', job_key: 'partner_export', attempt: 2 },
 							{ kind: 'job_running', run_id: 'same' },
 							{ kind: 'write_claim', run_id: 'same', node_key: 'model.customers', other_nodes: 0 }
 						]
@@ -151,7 +152,8 @@ describe('run queue', () => {
 		expect(entries[1].waits).toEqual([
 			{ kind: 'write_claim', runId: null, nodeKey: 'model.orders', otherNodes: 3 },
 			{ kind: 'earlier_run', runId: 'urgent', limit: 'warehouse' },
-			{ kind: 'upstream_job', runId: 'stage', jobKey: 'staging' },
+			{ kind: 'upstream_job', runId: 'stage', jobKey: 'staging', attempt: null },
+			{ kind: 'upstream_job', runId: 'retry', jobKey: 'partner_export', attempt: 2 },
 			{ kind: 'job_running', runId: 'same' }
 		]);
 	});
@@ -236,12 +238,16 @@ describe('run Recall reads', () => {
 			event('statement_completed', { duration_ms: 1500, affected_rows: 1, resource_id: `["${inv}","model:orders"]`, statement_id: 's1' }),
 			event('resource_attempt_failed', { severity: 'error', error_type: 'ExecutionFailed', error_code: 'R002', resource_id: `["${inv}","model:orders"]` }),
 			event('operation_started'),
-			event('location_health', { invocation_id: 'scheduler/r1' })
+			event('location_health', { invocation_id: 'scheduler/r1' }),
+			event('run_member_retrying', { invocation_id: 'scheduler/r1', message: 'partner_export_job failed, retrying in 15 min (attempt 2 of 3)' }),
+			event('run_member_recovered', { invocation_id: 'scheduler/r1', message: 'partner_export_job succeeded on attempt 2' })
 		].flatMap((e) => toRunEvent(e, 'r1') ?? []);
 		expect(mapped.map((e) => [e.type, e.producer, e.level, e.nodeKey, e.statementId, e.message])).toEqual([
 			['claimed', 'scheduler', 'info', null, null, ''],
 			['statement_completed', 'sqb', 'info', 'model:orders', 's1', '1.5 s · 1 row'],
-			['resource_attempt_failed', 'sqb', 'error', 'model:orders', null, 'ExecutionFailed: R002']
+			['resource_attempt_failed', 'sqb', 'error', 'model:orders', null, 'ExecutionFailed: R002'],
+			['member_retrying', 'scheduler', 'info', null, null, 'partner_export_job failed, retrying in 15 min (attempt 2 of 3)'],
+			['member_recovered', 'scheduler', 'info', null, null, 'partner_export_job succeeded on attempt 2']
 		]);
 	});
 

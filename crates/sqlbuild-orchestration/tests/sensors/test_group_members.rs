@@ -10,17 +10,19 @@ use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::runs::main::{
-    advance_groups::advance_groups, claim_next_run::claim_next_run, list_runs::list_runs,
-    request_job_run::request_job_run,
+    advance_groups::advance_groups, change_run::change_run, claim_next_run::claim_next_run,
+    list_runs::list_runs, request_job_run::request_job_run,
 };
-use crate::runs::models::{JobRunRequest, NodeOutcome, RunOutcome, RunStatus};
+use crate::runs::models::{
+    JobRunRequest, NodeOutcome, RunChange, RunChangeRequest, RunOutcome, RunStatus,
+};
 use crate::runs::tests::claim_helpers::finish;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::{
     begin_sensor_evaluation::begin_sensor_evaluation,
     complete_builtin_sensor::complete_builtin_sensor,
 };
-use crate::sensors::tests::test_types::GroupMemberSensorTestCase;
+use crate::sensors::tests::test_types::{GroupMemberSensorTestCase, SensorTestCase};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -227,5 +229,228 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
             );
             close_test_store(fixture).await;
         });
+    }
+}
+
+#[test]
+fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_final_attempt_fires()
+{
+    let test_cases = [
+        SensorTestCase {
+            description: "SQLite member retry fires once",
+            backend: Backend::Sqlite,
+            expected_runs: 3,
+        },
+        SensorTestCase {
+            description: "PostgreSQL member retry fires once",
+            backend: Backend::Postgres,
+            expected_runs: 3,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = crate::runs::tests::helpers::snapshot(location);
+            input.documents.insert("jobs".into(), json!({
+                "staging_job": {"description": "Stage customers and products", "selection": ["customers", "products"],
+                    "on_failure": {"retries": 1, "retry_delay_seconds": 0}},
+                "report_job": {"description": "Report on inventory", "selection": ["inventory"]}
+            }));
+            input.documents.insert(
+                "groups".into(),
+                json!({"nightly_job_group": {
+                    "description": "Stage", "selection": ["customers", "products"],
+                    "jobs": {"staging_job": []}
+                }}),
+            );
+            let mut sensors = serde_json::Map::new();
+            for (name, kind, nodes) in [
+                ("staging_success", "success", None),
+                ("staging_failed", "failed", None),
+                ("staging_completed", "completed", None),
+                (
+                    "staging_executed",
+                    "completed",
+                    Some(["customers", "products"]),
+                ),
+            ] {
+                let mut when =
+                    json!({"kind": "run_event", "job_key": "staging_job", "kinds": [kind]});
+                if let Some(nodes) = nodes {
+                    when["executed_successfully"] = json!(nodes);
+                }
+                sensors.insert(
+                    name.into(),
+                    json!({
+                        "description": "Report when staging ends", "job_key": "report_job",
+                        "when": when, "minimum_interval_seconds": 1
+                    }),
+                );
+            }
+            input.documents.insert("triggers".into(), json!(sensors));
+            publish_snapshot(store, &input).await.expect("publish");
+            let context = AuditContext {
+                actor: "test-admin".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            request_job_run(
+                store,
+                (&context, None),
+                &JobRunRequest {
+                    run_id: Uuid::now_v7(),
+                    location_id: location,
+                    target: "development".into(),
+                    job_key: "nightly_job_group".into(),
+                    reason: "Build the nightly group".into(),
+                    priority: 0,
+                    window: None,
+                    full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
+                },
+            )
+            .await
+            .expect("request group");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::new();
+            let scope = (location, "development");
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("start group");
+            let first = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim staging")
+                .expect("staging ready");
+            let worker = crate::runs::models::RunAuthority::Worker {
+                run_id: first.request.run_id,
+                claim_id: first.claim_id,
+            };
+            for change in [
+                RunChange::Started,
+                RunChange::NodeStarted {
+                    node_key: "products".into(),
+                },
+                node_finished("products", NodeOutcome::Success),
+                RunChange::NodeStarted {
+                    node_key: "customers".into(),
+                },
+                node_finished("customers", NodeOutcome::Failed),
+                RunChange::Finished {
+                    outcome: RunOutcome::Partial,
+                    reason: "customers failed".into(),
+                    exit_code: Some(1),
+                },
+            ] {
+                change_run(
+                    store,
+                    worker,
+                    &RunChangeRequest {
+                        event_id: Uuid::now_v7(),
+                        run_id: first.request.run_id,
+                        claim_id: Some(first.claim_id),
+                        change,
+                    },
+                )
+                .await
+                .expect("first attempt");
+            }
+            let triggers = list_triggers(store, location, "development")
+                .await
+                .expect("triggers");
+            let evaluate = async || {
+                let mut fired: BTreeMap<String, usize> = BTreeMap::new();
+                for trigger in &triggers {
+                    let Some(requested) =
+                        begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                            .await
+                            .expect("begin evaluation")
+                    else {
+                        continue;
+                    };
+                    let count = complete_builtin_sensor(store, &lease, &requested)
+                        .await
+                        .expect("complete evaluation");
+                    *fired.entry(trigger.name.clone()).or_default() += count;
+                }
+                fired.retain(|_, count| *count > 0);
+                fired
+            };
+            assert!(
+                evaluate().await.is_empty(),
+                "{}: an attempt the group retries fires nothing",
+                test_case.description
+            );
+            let second = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim retry")
+                .expect("retry ready");
+            assert_eq!(second.request.selection, ["customers".to_owned()].into());
+            let worker = crate::runs::models::RunAuthority::Worker {
+                run_id: second.request.run_id,
+                claim_id: second.claim_id,
+            };
+            for change in [
+                RunChange::Started,
+                RunChange::NodeStarted {
+                    node_key: "customers".into(),
+                },
+                node_finished("customers", NodeOutcome::Success),
+                RunChange::Finished {
+                    outcome: RunOutcome::Success,
+                    reason: "retry succeeded".into(),
+                    exit_code: Some(0),
+                },
+            ] {
+                change_run(
+                    store,
+                    worker,
+                    &RunChangeRequest {
+                        event_id: Uuid::now_v7(),
+                        run_id: second.request.run_id,
+                        claim_id: Some(second.claim_id),
+                        change,
+                    },
+                )
+                .await
+                .expect("second attempt");
+            }
+            tokio::time::sleep(Duration::from_millis(1100)).await;
+            let fired = evaluate().await;
+            assert_eq!(
+                fired,
+                BTreeMap::from([
+                    ("staging_completed".to_owned(), 1),
+                    ("staging_executed".to_owned(), 1),
+                    ("staging_success".to_owned(), 1),
+                ]),
+                "{}: the final attempt fires once, and nodes built by earlier attempts count",
+                test_case.description
+            );
+            assert_eq!(fired.values().sum::<usize>(), test_case.expected_runs);
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+fn node_finished(node_key: &str, outcome: NodeOutcome) -> RunChange {
+    RunChange::NodeFinished {
+        node_key: node_key.into(),
+        outcome,
+        rows_affected: None,
+        error_code: None,
+        skipped_because_of: None,
+        error_message: None,
     }
 }

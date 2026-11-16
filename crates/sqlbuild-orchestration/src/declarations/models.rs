@@ -276,7 +276,7 @@ pub struct JobDetailRecord {
     pub cursor_type: Option<String>,
     pub owner: Option<String>,
     pub overlap: Overlap,
-    /// A member job's own policy applies only when it runs alone; inside a group run the group's applies.
+    /// Also applies to the job inside a group run: the group retries it while the members that depend on it wait.
     pub on_failure: Option<OnFailure>,
 }
 

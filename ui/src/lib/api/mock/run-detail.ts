@@ -277,7 +277,9 @@ const LEVEL: Record<RunEvent['type'], RunEventLevel> = {
 	launched: 'info',
 	cancel_requested: 'warn',
 	presumed_failed: 'error',
-	terminated: 'info'
+	terminated: 'info',
+	member_retrying: 'warn',
+	member_recovered: 'info'
 };
 
 export function invocationId(run: Run, attempt = 1): string {

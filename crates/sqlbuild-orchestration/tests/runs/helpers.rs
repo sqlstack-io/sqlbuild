@@ -110,6 +110,7 @@ pub(crate) fn request(
         concurrency_groups: BTreeSet::new(),
         narrowing: None,
         retry: None,
+        member_attempt: None,
     }
 }
 

@@ -392,7 +392,7 @@ delay_seconds = 600
 | --- | --- | --- | --- |
 | `owner` | Any non-blank text | None | Shown on the job's page and in the job list |
 | `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
-| `retry` | `attempts` from 1 to 10, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or the attempts run out |
+| `retry` | `attempts` from 1 to 10, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, up to `attempts` more times, until it succeeds |
 
 A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
 creates no run. A sensor check lists the requests it skipped the same way.
@@ -410,9 +410,16 @@ Details:
   paused, still queues.
 - A retry waits in the queue until its delay ends, and the run list shows it as a rerun of the run
   that failed. Cancelling a run stops its retries.
-- A group retries at group level, with the group's own `[retry]`: each retry is one rerun of the
-  group's failed and skipped nodes. A member job's `[retry]` applies only when that job runs on
-  its own.
+- A member job's `[retry]` also applies inside a group run. When the member fails, the group runs it
+  again after `delay_seconds`, inside the same group run, and the jobs that depend on it wait
+  instead of skipping. The group keeps its concurrency slots meanwhile.
+- A group's own `[retry]` is a final sweep: after the group run ends `failed` or `partial`, it
+  queues one new linked rerun of the group's failed and skipped nodes.
+- So a retry of a whole run, a job's or a group's, is a new linked run, and a retry of a member
+  stays inside its group run.
+- Sensors and alerts see a member's final attempt only. The group run's timeline shows each retry,
+  such as `orders_job failed, retrying in 15 min (attempt 2 of 3)`, the member's row shows its
+  attempt, and the run's header counts the members it retried.
 - `[retry]` was called `[on_failure]`, with `retries` and `retry_delay_seconds`. The old names still
   load, with a deprecation warning.
 - An invalid value is a `D017` error at its line, such as

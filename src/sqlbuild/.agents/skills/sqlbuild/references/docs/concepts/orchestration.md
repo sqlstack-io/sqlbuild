@@ -152,6 +152,10 @@ on_failure = "skip"
 - `[dependencies.<job>]` overrides the group's settings for one member, and must name a job in
   `jobs`. Overrides live in the group file because a job can belong to several groups.
 - A member skipped by `skip` counts as failed for the jobs that depend on it.
+- A member job's own `[retry]` runs it again inside the group run, and the jobs that depend on it
+  wait for its final attempt before `on_failure` applies. A group's `[retry]` reruns the whole
+  group's failures once the group run ends; see
+  [Retry failures](../cli/server.md#skip-overlapping-runs-and-retry-failures).
 - `wait_for = "node"`, which would start each node as soon as the nodes it reads are built, is not
   available yet; `sqb compile` refuses it.
 

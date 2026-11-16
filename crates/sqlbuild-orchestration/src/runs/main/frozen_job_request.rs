@@ -100,6 +100,7 @@ pub(crate) async fn frozen_job_request(
             concurrency_groups: definition.concurrency_groups,
             narrowing,
             retry: None,
+            member_attempt: None,
         },
     ))
 }

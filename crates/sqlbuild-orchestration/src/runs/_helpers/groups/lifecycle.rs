@@ -201,8 +201,39 @@ async fn finish_group(
     let parent = &group.parent;
     let parent_id = parent.request_json.run_id;
     let (mut transaction, rows) = query(transaction,
-        "SELECT n.* FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id WHERE r.parent_run_id=$1 AND n.kind='node' ORDER BY r.run_id, n.node_key",
+        "SELECT n.*, r.rerun_of_run_id AS previous_attempt FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
+         WHERE r.parent_run_id=$1 AND n.kind='node' ORDER BY r.run_id, n.node_key",
         vec![Parameter::Id(parent_id)]).await?;
+    let mut latest: BTreeMap<(Uuid, String), (usize, RunNodeRecord)> = BTreeMap::new();
+    let previous: BTreeMap<Uuid, Uuid> = rows
+        .iter()
+        .filter_map(|row| {
+            let run: Uuid = serde_json::from_value(row.get("run_id")?.clone()).ok()?;
+            let earlier: Uuid =
+                serde_json::from_value(row.get("previous_attempt")?.clone()).ok()?;
+            Some((run, earlier))
+        })
+        .collect();
+    let runs: BTreeSet<Uuid> = rows
+        .iter()
+        .filter_map(|row| serde_json::from_value(row.get("run_id")?.clone()).ok())
+        .collect();
+    for row in rows {
+        let run: Uuid = serde_json::from_value(row["run_id"].clone())
+            .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        let (mut first, mut attempt) = (run, 1);
+        while let Some(earlier) = previous
+            .get(&first)
+            .filter(|earlier| runs.contains(*earlier))
+        {
+            (first, attempt) = (*earlier, attempt + 1);
+        }
+        let node: RunNodeRecord = decode_row(row)?;
+        let key = (first, node.node_key.clone());
+        if latest.get(&key).is_none_or(|(seen, _)| attempt > *seen) {
+            latest.insert(key, (attempt, node));
+        }
+    }
     let mut nodes: BTreeMap<String, RunNodeRecord> = BTreeMap::new();
     let rank = |status: &str| match status {
         "failed" => 5,
@@ -212,8 +243,7 @@ async fn finish_group(
         "success" => 1,
         _ => 0,
     };
-    for row in rows {
-        let node: RunNodeRecord = decode_row(row)?;
+    for (_, node) in latest.into_values() {
         if nodes
             .get(&node.node_key)
             .is_none_or(|previous| rank(&node.status) > rank(&previous.status))

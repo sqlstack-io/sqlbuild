@@ -8,6 +8,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import type { RunDetailState } from './state.svelte';
+	import { attemptLabel } from './utils';
 
 	let { view }: { view: RunDetailState } = $props();
 
@@ -36,6 +37,10 @@
 							<i style:background={runStatusTone[r.run.status]}></i>
 							<span class="mono">{shortRunId(r.run.id)}</span>
 							{#if r.role === 'Job run' && r.run.jobKey}<span>{r.run.jobKey}</span>{/if}
+							{#if r.role === 'Job run'}
+								{@const attempt = attemptLabel(r.run, d.children)}
+								{#if attempt}<span class="faint" data-testid="member-attempt">{attempt}</span>{/if}
+							{/if}
 							<span class="faint">{runStatusLabel[r.run.status].toLowerCase()}</span>
 						</a>
 					</li>

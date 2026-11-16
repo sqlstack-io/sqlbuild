@@ -762,6 +762,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			tickScheduledFor: tick != null ? new Date(tick).toISOString() : null,
 			runKey: seed.runKey ?? null,
 			rerunOfRunId: seed.rerunOf ?? null,
+			memberAttempt: null,
 			narrowing: null,
 			window: null,
 			requestedBy: seed.by,

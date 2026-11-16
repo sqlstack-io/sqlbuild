@@ -166,9 +166,12 @@ pub struct RunRequest {
     /// Set on an automatic retry of a failed run, which is not claimed before `not_before`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<RunRetry>,
+    /// Which attempt of its member job a group child is, from the second on; the first leaves it unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member_attempt: Option<u8>,
 }
 
-/// Which retry of the job's `on_failure` policy a run is, and when it may start.
+/// Which retry of the job's `[retry]` policy a run is, and when it may start.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunRetry {
@@ -293,6 +296,13 @@ pub struct RunRecord {
     /// Set only when listing the queue: where the run stands and what it waits on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queue: Option<RunQueueState>,
+    /// Which attempt of its member job a group child is, once the group retried it; absent for a first attempt and for every other run.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_member_attempt"
+    )]
+    pub member_attempt: Option<u8>,
 }
 
 /// A queued run's place in claim order within its location and target, and what holds it back.
@@ -311,7 +321,13 @@ pub enum QueueWait {
     /// Its group run has not started yet, or is stopping.
     GroupParent { run_id: Uuid },
     /// A job this one runs after in the same group has not finished.
-    UpstreamJob { run_id: Uuid, job_key: String },
+    UpstreamJob {
+        run_id: Uuid,
+        job_key: String,
+        /// The upstream job's attempt when the group is retrying it; absent for its first attempt.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        attempt: Option<u8>,
+    },
     /// Another run of the same job is running.
     JobRunning { run_id: Uuid },
     /// Another run holds write claims on nodes this run writes.
@@ -394,6 +410,9 @@ pub struct RunEventRecord {
     pub outcome: Option<String>,
     pub row_count: Option<i64>,
     pub affected_rows: Option<i64>,
+    /// A summary the scheduler writes for a group run's member events, such as a member retry; never error or SQL text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 /// Warehouse statement metadata of a run: kind, timing, counts and outcome, never the SQL text.

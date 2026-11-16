@@ -67,6 +67,8 @@ export type Run = {
 	/** Sensor run requests are de-duplicated by run key. */
 	runKey: string | null;
 	rerunOfRunId: string | null;
+	/** A group member's attempt once its group retried it, from 2; null for a first attempt and every other run. */
+	memberAttempt: number | null;
 	/** How a person narrowed this run of a job, as typed; null when it runs the whole job. */
 	narrowing: { select: string[]; exclude: string[] } | null;
 	/** The cursor window a backfill processes, inclusive; null for every other run. */
@@ -259,7 +261,9 @@ export const SCHEDULER_FACTS = [
 	'launched',
 	'cancel_requested',
 	'presumed_failed',
-	'terminated'
+	'terminated',
+	'member_retrying',
+	'member_recovered'
 ] as const;
 export type SchedulerFact = (typeof SCHEDULER_FACTS)[number];
 
@@ -477,7 +481,8 @@ export type QueueWait =
 	/** An earlier queued run takes the same limit, so it goes first. */
 	| { kind: 'earlier_run'; runId: string | null; limit: string }
 	| { kind: 'job_running'; runId: string }
-	| { kind: 'upstream_job'; runId: string; jobKey: string }
+	/** `attempt` is set while the group retries that job: its attempt number, from 2. */
+	| { kind: 'upstream_job'; runId: string; jobKey: string; attempt: number | null }
 	/** A child run waits for its group run to start. */
 	| { kind: 'group_parent'; runId: string }
 	/** A retry of a failed run waits out the job's `[retry]` delay. */

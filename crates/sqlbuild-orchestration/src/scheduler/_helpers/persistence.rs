@@ -70,6 +70,7 @@ pub(crate) async fn persist_ticks(
                 concurrency_groups: trigger.job_json.concurrency_groups.clone(),
                 narrowing: None,
                 retry: None,
+                member_attempt: None,
             };
             transaction = queue_run(transaction, &request).await?;
         }

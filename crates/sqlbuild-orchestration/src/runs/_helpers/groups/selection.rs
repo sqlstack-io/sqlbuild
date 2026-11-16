@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::declarations::models::DependencyFailure;
 use crate::runs::_helpers::groups::context::load_group;
+use crate::runs::constants::SUPERSEDED_CHILD;
 use crate::runs::models::{GroupContext, GroupRun, QueueWait, RunRequest, RunStatus};
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
@@ -59,6 +60,7 @@ pub(crate) async fn child_waits(
                 || QueueWait::UpstreamJob {
                     run_id: child.request_json.run_id,
                     job_key: job_key.clone(),
+                    attempt: child.request_json.member_attempt,
                 },
             )
         })
@@ -128,8 +130,9 @@ pub(crate) async fn skipped_nodes(
         return Ok((transaction, BTreeMap::new()));
     }
     let (transaction, rows) = query(transaction,
-        "SELECT n.node_key, n.status, n.skipped_because_of FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
-         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.kind='node' AND n.status IN ('failed','skipped','cancelled')",
+        &format!("SELECT n.node_key, n.status, n.skipped_because_of FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
+         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.kind='node' AND n.status IN ('failed','skipped','cancelled') \
+         AND NOT {SUPERSEDED_CHILD}"),
         vec![Parameter::Id(parent_id), Parameter::Id(request.run_id)]).await?;
     let failures: BTreeMap<String, String> = rows
         .into_iter()

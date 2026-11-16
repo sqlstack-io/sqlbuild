@@ -137,7 +137,7 @@ export function describeWait(wait: QueueWait): WaitPart[] {
 		case 'job_running':
 			return [{ text: 'Waiting: ' }, runLink(wait.runId), { text: ' of the same job is running' }];
 		case 'upstream_job':
-			return [{ text: 'Waiting for ' }, { text: wait.jobKey || shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' to finish first' }];
+			return [{ text: 'Waiting for ' }, { text: wait.jobKey || shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: wait.attempt ? ' (retrying)' : ' to finish first' }];
 		case 'group_parent':
 			return [{ text: 'Waiting for its group run ' }, { text: shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' to start' }];
 		case 'retry_delay':
@@ -164,7 +164,7 @@ export function waitTechnical(wait: QueueWait): string {
 		case 'job_running':
 			return `job already running in ${wait.runId}`;
 		case 'upstream_job':
-			return `upstream job ${wait.jobKey} (${wait.runId}) still active`;
+			return `upstream job ${wait.jobKey} (${wait.runId}) still active${wait.attempt ? `, attempt ${wait.attempt}` : ''}`;
 		case 'group_parent':
 			return `group run ${wait.runId} not running yet`;
 		case 'retry_delay':

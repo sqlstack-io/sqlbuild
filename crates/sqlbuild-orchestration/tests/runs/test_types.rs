@@ -326,3 +326,12 @@ pub(crate) struct GroupDependencyTestCase {
     pub(crate) expected_marts: MemberReaction,
     pub(crate) expected_inventory: MemberReaction,
 }
+
+pub(crate) struct GroupMemberRetryTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The failing member's `retry_delay_seconds`.
+    pub(crate) delay_seconds: u32,
+    /// The member events the group run's timeline shows, in order.
+    pub(crate) expected_messages: &'static [&'static str],
+}

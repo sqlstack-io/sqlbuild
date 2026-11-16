@@ -20,6 +20,8 @@ mod test_faults;
 mod test_group_admission;
 #[path = "test_group_dependencies.rs"]
 mod test_group_dependencies;
+#[path = "test_group_retries.rs"]
+mod test_group_retries;
 #[path = "test_groups.rs"]
 mod test_groups;
 #[path = "test_job_detail.rs"]

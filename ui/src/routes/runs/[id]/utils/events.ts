@@ -59,6 +59,9 @@ export function eventSummary(e: RunEvent): string {
 			return `Query failed: ${e.message}`;
 		case 'audit_completed':
 			return `Checks: ${e.message}`;
+		case 'member_retrying':
+		case 'member_recovered':
+			return e.message;
 	}
 }
 
