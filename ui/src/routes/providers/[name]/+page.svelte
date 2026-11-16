@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Loading from '$lib/components/loading.svelte';
@@ -49,7 +50,7 @@
 		<div class="text-muted-foreground px-6 py-4 text-[13px]">No provider named <code>{name}</code> in {app.location?.name ?? 'this location'}.</div>
 	{:else if provider}
 		<div class="flex min-h-0 flex-1">
-			<div class="min-h-0 flex-1 overflow-auto">
+			<PageBody padding="0">
 				<PageTabs
 					bind:value={tab}
 					tabs={[
@@ -86,7 +87,7 @@
 						<UsedByGraph {provider} catalogKind={(key) => kindByKey.get(key) ?? null} />
 					</div>
 				{/if}
-			</div>
+			</PageBody>
 
 			<aside class="w-[300px] shrink-0 overflow-auto border-l border-border p-5">
 				<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Provider</div>

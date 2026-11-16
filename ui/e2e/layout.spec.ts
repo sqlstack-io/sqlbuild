@@ -82,10 +82,34 @@ async function checkLayout(page: Page, label: string) {
 	expect(found, label).toEqual([]);
 }
 
-/** Scrolls each list with a sticky header and checks that just above its header is the header or the top bar, never a row. */
+/**
+ * Scrolls each list with a sticky header and checks that just above its header is the header or the
+ * top bar, never a row; then the same for sticky headers in each page body, such as the overview's
+ * timeline header, which must never show the page's content through a gap above it.
+ */
 async function checkStickyHeaders(page: Page, label: string) {
 	const found = await page.evaluate(async () => {
 		const problems: string[] = [];
+		const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+		for (const body of document.querySelectorAll<HTMLElement>('.page-body')) {
+			if (body.scrollHeight <= body.clientHeight) continue;
+			const sticky = [...body.querySelectorAll<HTMLElement>('*')].filter((el) => getComputedStyle(el).position === 'sticky');
+			if (!sticky.length) continue;
+			body.scrollTop = body.scrollHeight;
+			await frame();
+			const top = body.getBoundingClientRect().top;
+			for (const el of sticky) {
+				const box = el.getBoundingClientRect();
+				// Only headers stuck near the top of the scrolled body; others scrolled away with their section.
+				if (!box.width || !box.height || box.top < top - 1 || box.top > top + 48) continue;
+				const hit = document.elementFromPoint(box.left + Math.min(box.width / 2, 200), box.top - 1);
+				// Just above a stuck header is the top bar or a toolbar outside the body, or another sticky header.
+				if (hit && body.contains(hit) && !sticky.some((s) => s.contains(hit))) {
+					problems.push(`page content shows ${Math.round(box.top - top)}px above a sticky ${el.tagName.toLowerCase()}.${el.className.split(' ')[0]}`);
+				}
+			}
+			body.scrollTop = 0;
+		}
 		for (const scroller of document.querySelectorAll<HTMLElement>('.sb-table-scroll:not(.embedded)')) {
 			if (scroller.scrollHeight <= scroller.clientHeight) continue;
 			scroller.scrollTop = 2000;

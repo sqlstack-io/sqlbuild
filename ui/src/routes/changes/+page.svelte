@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
@@ -194,7 +195,7 @@
 	</article>
 {/snippet}
 
-<div class="feed sb-scroll">
+<PageBody padding="18px 24px 48px">
 	{#if changes.error}<div class="msg err">Couldn't load the change feed: {changes.error}</div>{/if}
 	{#each rows as row (row.key)}
 		{#if row.kind === 'deploy'}
@@ -211,15 +212,9 @@
 	{:else}
 		{#if changes.data === undefined && !changes.error}<div class="msg"><Loading lines={4} /></div>{:else}<div class="msg">{all.length ? 'No deploys match the filter.' : 'Nothing has been deployed to this location yet.'}</div>{/if}
 	{/each}
-</div>
+</PageBody>
 
 <style>
-	.feed {
-		min-height: 0;
-		flex: 1;
-		overflow-y: auto;
-		padding: 18px 24px 48px;
-	}
 	.deploy {
 		margin-bottom: 12px;
 		border: 1px solid var(--panel-border);

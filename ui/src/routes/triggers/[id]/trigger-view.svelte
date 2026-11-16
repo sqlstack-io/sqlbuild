@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import { to } from '$lib/paths';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import type { TriggerState } from '$lib/api';
@@ -77,7 +78,7 @@
 			<div class="warning"><TriangleAlertIcon size={14} /> {t.warning}</div>
 		{/if}
 		<div class="flex min-h-0 flex-1">
-			<div class="main sb-scroll">
+			<PageBody padding="18px 24px">
 				{#if isSchedule}
 					<section>
 						<h3 title="Each time it was due (a tick) and what happened">Times due · {t.ticks.length}</h3>
@@ -92,7 +93,7 @@
 						<CodePreview file="{t.declaration.sourceFile}:{t.declaration.line}" code={t.declaration.code} language="text" maxLines={20} />
 					</section>
 				{/if}
-			</div>
+			</PageBody>
 
 			<aside class="rail sb-scroll">
 				<h3>How it works</h3>
@@ -199,12 +200,6 @@
 		background: color-mix(in srgb, var(--sb-warning) 7%, transparent);
 		color: var(--sb-warning);
 		font-size: 12.5px;
-	}
-	.main {
-		min-width: 0;
-		flex: 1;
-		overflow: auto;
-		padding: 18px 24px;
 	}
 	section {
 		margin-bottom: 24px;

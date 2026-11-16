@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -36,12 +37,12 @@
 			...(app.client.supports('listSsoMappings') ? [{ value: 'sso' as const, label: 'SSO mappings', count: rs.sso.data?.length }] : [])
 		]}
 	/>
-	<div class="min-h-0 flex-1 overflow-auto">
+	<PageBody padding="0">
 		{#if tab === 'roles' || !app.client.supports('listSsoMappings')}
 			<RolesTab {rs} />
 		{:else}
 			<SsoTab {rs} />
 		{/if}
-	</div>
+	</PageBody>
 {/if}
 

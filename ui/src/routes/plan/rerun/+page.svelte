@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
@@ -136,7 +137,7 @@
 	{#if loadError}<p class="problem-bar">{loadError}</p>{/if}
 
 	<div class="body">
-		<div class="main sb-scroll">
+		<PageBody padding="14px 24px" inner="flex min-h-full flex-col">
 			{#if !details.data}
 				<div class="loading" role="status"><RotateCwIcon size={14} class="animate-spin" /> Loading the run…</div>
 			{:else if single && first}
@@ -171,7 +172,7 @@
 					{/snippet}
 				</DataTable>
 			{/if}
-		</div>
+		</PageBody>
 		<aside class="rail sb-scroll">
 			<h3>Permissions</h3>
 			{#each needs as action (action)}
@@ -231,14 +232,6 @@
 		display: flex;
 		min-height: 0;
 		flex: 1;
-	}
-	.main {
-		display: flex;
-		min-width: 0;
-		flex: 1;
-		flex-direction: column;
-		overflow: auto;
-		padding: 14px 24px;
 	}
 	.loading {
 		display: flex;

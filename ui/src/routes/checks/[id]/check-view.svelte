@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -96,7 +97,7 @@
 
 	{#if c}
 		<div class="flex min-h-0 flex-1">
-			<div class="main sb-scroll">
+			<PageBody padding="18px 24px">
 				{#if c.description}<p class="description">{c.description}</p>{/if}
 				<Panel title="Recent results" note="Last {c.history.length} times it ran">
 					<OutcomeStrip outcomes={[...c.history].reverse().map((e) => e.outcome)} tones={checkOutcomeTone} caption="Last {c.history.length} results" />
@@ -154,7 +155,7 @@
 						{#if sqlError}<div class="msg err">{sqlError}</div>{/if}
 					{/if}
 				</Panel>
-			</div>
+			</PageBody>
 			<aside class="rail sb-scroll">
 				<h3>Definition</h3>
 				<KeyValues
@@ -214,12 +215,6 @@
 	}
 	.err {
 		color: var(--sb-error);
-	}
-	.main {
-		min-width: 0;
-		flex: 1;
-		overflow: auto;
-		padding: 18px 24px;
 	}
 	.description {
 		margin: 0 0 18px;

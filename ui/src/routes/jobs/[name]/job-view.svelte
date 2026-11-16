@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -335,9 +336,9 @@
 				{/snippet}
 			</DataTable>
 		{:else if def.declaration}
-			<div class="main sb-scroll">
+			<PageBody padding="12px 24px">
 				<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={200} />
-			</div>
+			</PageBody>
 		{/if}
 	{/if}
 </div>
@@ -414,12 +415,6 @@
 		height: 100%;
 		padding: 14px 24px;
 		background: var(--sb-inset);
-	}
-	.main {
-		min-width: 0;
-		flex: 1;
-		overflow: auto;
-		padding: 12px 24px;
 	}
 	.rail {
 		width: 320px;

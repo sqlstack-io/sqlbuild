@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Loading from '$lib/components/loading.svelte';
@@ -64,7 +65,7 @@
 		{#if role.data === null && !role.loading}
 			<p class="muted px-6 py-4">No role named <code>{name}</code> in {app.location?.name}. Project roles only exist in the locations deployed from that project.</p>
 		{:else if r}
-			<div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-10">
+			<PageBody padding="20px 24px 40px">
 				<div class="columns">
 					<div class="min-w-0">
 						<p class="desc">{r.description}</p>
@@ -181,7 +182,7 @@
 						</Panel>
 					</div>
 				</div>
-			</div>
+			</PageBody>
 		{:else if role.error}
 			<p class="err px-6 py-4">Couldn't load: {role.error}</p>
 		{:else}

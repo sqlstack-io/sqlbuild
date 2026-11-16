@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -44,7 +45,7 @@
 	<RefreshButton onclick={() => connections.refresh()} />
 </AppTopbar>
 
-<div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-12">
+<PageBody padding="20px 24px 48px">
 	{#if connections.error}
 		<p class="err">Couldn't load connections: {connections.error} <Button variant="link" size="inline" class="ml-2" onclick={() => connections.refresh()}>Retry</Button></p>
 	{/if}
@@ -117,7 +118,7 @@
 	{:else}
 		{#if connections.data}<p class="muted">No location you can see in full has reported yet.</p>{:else if !connections.error}<Loading />{/if}
 	{/each}
-</div>
+</PageBody>
 
 <style>
 	.err {

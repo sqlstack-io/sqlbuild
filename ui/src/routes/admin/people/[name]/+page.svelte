@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
@@ -95,7 +96,7 @@
 		{#if d.accounts.data && !account}
 			<p class="muted px-6 py-4">No person named <code>{name}</code>. They appear here after they first sign in.</p>
 		{:else if account}
-			<div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-10">
+			<PageBody padding="20px 24px 40px">
 				<div class="columns">
 					<div class="min-w-0">
 						<Panel title="Roles" help="What they've been given; SSO, policy-file and built-in roles are locked here.">
@@ -145,7 +146,7 @@
 						</Panel>
 					</div>
 				</div>
-			</div>
+			</PageBody>
 		{:else}
 			<div class="px-6 py-4"><Loading /></div>
 		{/if}

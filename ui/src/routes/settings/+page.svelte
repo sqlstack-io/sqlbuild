@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import AccessChecker from '$lib/components/admin/access-checker.svelte';
@@ -29,7 +30,7 @@
 
 <AppTopbar title="Settings" />
 
-<div class="min-h-0 flex-1 overflow-auto px-6 pt-5">
+<PageBody padding="20px 24px 0">
 	<div class="columns" class:single={!admin}>
 		{#if admin}<div>
 			<Panel title="Server" help="Read-only; set in the server config and at start-up.">
@@ -105,7 +106,7 @@
 			{/if}
 		</div>
 	</div>
-</div>
+</PageBody>
 
 <style>
 	.columns {

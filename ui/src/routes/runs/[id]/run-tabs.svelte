@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import PageTabs from '$lib/components/platform/page-tabs.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -45,7 +46,7 @@
 	{/if}
 </div>
 
-<div class="body sb-scroll">
+<PageBody padding="0">
 	{#if view.tab === 'statements'}
 		<StatementsTab {statements} total={view.statements.length} {grouped} />
 	{:else if view.tab === 'cost'}
@@ -57,7 +58,7 @@
 	{:else}
 		<LogTab entries={shownEntries} {grouped} bind:printed runId={view.run?.id ?? ''} filteredBy={view.selected} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
-</div>
+</PageBody>
 
 <style>
 	.err {
@@ -88,14 +89,5 @@
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 		font-weight: 500;
-	}
-	.body {
-		min-height: 0;
-		flex: 1;
-		overflow: auto;
-	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
 	}
 </style>

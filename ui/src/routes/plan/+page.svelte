@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -346,7 +347,7 @@
 
 	<div class="body">
 		<div class="stage">
-		<div class="main sb-scroll" class:stale={!!shown && (!!problem || !fresh || (planning && !!plan))}>
+		<PageBody class={!!shown && (!!problem || !fresh || (planning && !!plan)) ? 'plan-main stale' : 'plan-main'} padding="14px 24px" inner="flex min-h-full flex-col">
 			{#if shown?.verb}
 				<div class="summary">
 					{#if shown.verb !== 'build'}
@@ -394,7 +395,7 @@
 					{/snippet}
 				</DataTable>
 			{/if}
-		</div>
+		</PageBody>
 
 		{#if waiting}
 			<div class="overlay" role="status" data-testid="plan-loading">
@@ -510,16 +511,10 @@
 		min-width: 0;
 		flex: 1;
 	}
-	.main {
-		display: flex;
-		min-width: 0;
-		flex: 1;
-		flex-direction: column;
-		overflow: auto;
-		padding: 14px 24px;
+	:global(.plan-main) {
 		transition: opacity 0.15s;
 	}
-	.main.stale {
+	:global(.plan-main.stale) {
 		opacity: 0.55;
 	}
 	.problem-bar {
@@ -619,9 +614,5 @@
 	}
 	a:hover {
 		color: var(--primary);
-	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
 	}
 </style>

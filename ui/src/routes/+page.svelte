@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
@@ -103,7 +104,7 @@
 
 
 <!-- Padding sits on an inner box: sticky headers stick below a scroller's own padding, so rows would show through above them. -->
-<div class="min-h-0 flex-1 overflow-y-auto"><div class="px-5 pb-16 pt-[18px]">
+<PageBody padding="18px 20px 64px">
 	{#if overview.error}<div class="error-note mb-[14px]">{overview.error}</div>{/if}
 	{#if partial}
 		<section class="surface-panel partial">
@@ -311,7 +312,7 @@
 			<OverviewCost />
 		</div>
 	{/if}
-</div></div>
+</PageBody>
 
 <style>
 	.health, .metric-strip, .surface-panel { box-shadow: var(--panel-shadow); border: 1px solid var(--panel-border); border-radius: 2px; background: var(--card); }

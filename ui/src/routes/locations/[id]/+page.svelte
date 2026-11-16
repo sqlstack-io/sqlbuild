@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageBody from '$lib/components/page-body.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { page } from '$app/state';
@@ -167,7 +168,7 @@
 			</details>
 		</header>
 
-		<div class="min-h-0 flex-1 overflow-auto p-6">
+		<PageBody padding="24px">
 			<div id="problems">
 				<Panel
 					title="Problems"
@@ -191,7 +192,7 @@
 					<LocationTokens locationId={detail.id} />
 				</Panel>
 			{/if}
-		</div>
+		</PageBody>
 	{/if}
 </div>
 
