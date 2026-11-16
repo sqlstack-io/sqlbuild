@@ -3,6 +3,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -41,6 +42,7 @@ use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pi
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
+use crate::bindings::_helpers::native_host::statement_report::StatementReport;
 use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
@@ -56,6 +58,7 @@ use crate::bindings::_helpers::sql_test_command::timeouts::{
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_command::main::emit::emit;
 use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
 use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -657,6 +660,7 @@ pub(crate) fn timeout_record<'py>(
 fn complete(
     invocation: &Bound<'_, PyAny>,
     (results, since_json): (&[SqlTestExecutionResult<Bound<'_, PyAny>>], Option<&str>),
+    started: Instant,
 ) -> PyResult<(i32, String)> {
     let py: Python<'_> = invocation.py();
     let mut failures: Vec<TestFailure> = Vec::new();
@@ -676,18 +680,19 @@ fn complete(
     let style: CliStyle = CliStyle {
         use_color: invocation.getattr("use_color")?.is_truthy()?,
     };
-    stream.call_method1(
-        "write",
-        (render_test_completion(
-            (passed, results.len()),
-            &failures,
-            style,
-        ),),
-    )?;
-    stream.call_method0("flush")?;
+    let completion: String = render_test_completion((passed, results.len()), &failures, style);
+    emit(&stream, &completion)?;
+    let report: Option<StatementReport> = StatementReport::of_invocation(invocation, started)?;
+    if let Some(line) = report.as_ref().and_then(StatementReport::line) {
+        emit(&stream, &format!("\n{line}\n"))?;
+    }
+    let payload: String = with_since_section(test_execution_json(py, results)?, since_json)?;
     Ok((
         test_exit_code(passed, results.len()),
-        with_since_section(test_execution_json(py, results)?, since_json)?,
+        match report {
+            Some(report) => report.with_section(&payload)?,
+            None => payload,
+        },
     ))
 }
 
@@ -801,6 +806,7 @@ fn run_sql_tests<'py>(
     (modules, resolve): (Option<Vec<String>>, bool),
 ) -> PyResult<(i32, Vec<String>, Option<String>)> {
     let py: Python<'py> = request.py();
+    let started: Instant = Instant::now();
     let inspect_only: bool = native_field(request, "inspect")?.is_truthy()?;
     let stream: Bound<'_, PyAny> = invocation.getattr("progress_stream")?;
     let project_dir: Bound<'_, PyAny> = native_field(invocation, "effective_project_dir")?;
@@ -895,7 +901,8 @@ fn run_sql_tests<'py>(
         &pipeline.getattr("plan_output")?,
         &results,
     )?;
-    let (code, payload): (i32, String) = complete(invocation, (&results, since_json.as_deref()))?;
+    let (code, payload): (i32, String) =
+        complete(invocation, (&results, since_json.as_deref()), started)?;
     Ok((code, python_tests, Some(payload)))
 }
 

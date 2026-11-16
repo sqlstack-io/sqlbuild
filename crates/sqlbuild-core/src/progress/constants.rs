@@ -127,3 +127,6 @@ pub(crate) const AUDIT_OUTCOME_STATUSES: [(&str, &str); 5] = [
     ("insufficient", "INSUFFICIENT"),
     ("skipped", "SKIP"),
 ];
+
+/// Where reported statement compile and execution time comes from.
+pub(crate) const STATEMENT_TIMING_SOURCE: &str = "snowflake_query_history";

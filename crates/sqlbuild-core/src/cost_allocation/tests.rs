@@ -4,5 +4,7 @@ mod allocation;
 mod decimal;
 #[path = "tests/helpers.rs"]
 mod helpers;
+#[path = "tests/test_statement_timings.rs"]
+mod statement_timings;
 #[path = "tests/test_types.rs"]
 mod test_types;

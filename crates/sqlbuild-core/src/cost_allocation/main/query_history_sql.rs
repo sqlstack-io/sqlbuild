@@ -1,18 +1,8 @@
 //! `query_history_sql`: the Snowflake `QUERY_HISTORY` read of one end-time window.
 
+use crate::cost_allocation::_helpers::history_function::query_history_function;
 use crate::cost_allocation::_helpers::query_text::query_text_expression;
-use crate::cost_allocation::constants::QUERY_HISTORY_FUNCTION;
 use crate::cost_allocation::models::QueryHistoryWindow;
-
-fn query_history_function(database: Option<&str>) -> String {
-    match database {
-        None => QUERY_HISTORY_FUNCTION.to_owned(),
-        Some(database) => format!(
-            "\"{}\".{QUERY_HISTORY_FUNCTION}",
-            database.to_uppercase().replace('"', "\"\"")
-        ),
-    }
-}
 
 /// Query-history SQL for queries ending after `start`, and before `end` when it is bounded.
 pub fn query_history_sql(window: &QueryHistoryWindow<'_>) -> String {

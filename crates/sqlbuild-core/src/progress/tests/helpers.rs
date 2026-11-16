@@ -115,3 +115,26 @@ pub(super) fn audit_rows(test_case: &AuditRowTestCase) -> Vec<String> {
     }
     lines
 }
+
+/// A statement event of `kind`, inside the `orders` attempt `attempt_id` or outside any resource.
+pub(super) fn statement_event(
+    (event_id, event_type): (&str, &str),
+    (statement_id, kind, query_id): (&str, &str, Option<&str>),
+    attempt_id: Option<&str>,
+) -> ProgressEvent {
+    ProgressEvent {
+        event_id: event_id.to_owned(),
+        event_type: event_type.to_owned(),
+        resource_id: attempt_id.map(|_| "model:orders".to_owned()),
+        resource_attempt_id: attempt_id.map(str::to_owned),
+        statement_id: Some(statement_id.to_owned()),
+        payload: ProgressPayload {
+            resource_name: attempt_id.map(|_| "orders".to_owned()),
+            resource_kind: attempt_id.map(|_| "table".to_owned()),
+            statement_kind: kind.to_owned(),
+            query_id: query_id.map(str::to_owned),
+            ..ProgressPayload::default()
+        },
+        ..ProgressEvent::default()
+    }
+}

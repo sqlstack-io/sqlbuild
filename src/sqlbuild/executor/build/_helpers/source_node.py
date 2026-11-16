@@ -72,6 +72,7 @@ def execute_build_source_node(
         runtime=LoadRuntimeParams(
             run_id=runtime.run_id,
             target=runtime.target,
+            target_config=runtime.target_config,
             vars=runtime.effective_vars or {},
             is_reload=runtime.loader_is_reload,
             runtime_dir=runtime.runtime_dir,

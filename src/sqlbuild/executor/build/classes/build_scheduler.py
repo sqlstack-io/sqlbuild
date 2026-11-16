@@ -64,7 +64,6 @@ from sqlbuild.executor.build._helpers.retention import (
     reconcile_model_retention,
 )
 from sqlbuild.executor.build._helpers.scheduler import (
-    _build_worker_failure_completion,
     _build_worker_success_completion,
     _dispatch_model,
     _model_execution_resource_kind,
@@ -453,6 +452,7 @@ class BuildScheduler:
             self._connection_pool.put(connection)
 
     def _run_concurrent(self) -> None:
+        escaped: BaseException | None = None
         with ThreadPoolExecutor(max_workers=self._max_concurrency) as pool:
             self._report_scheduler_state()
             while self._ready or self._in_flight:
@@ -518,8 +518,16 @@ class BuildScheduler:
 
                 completion: NodeCompletion = self._completion_queue.get()
                 self._in_flight.discard(completion.key)
-                self._handle_completion(key=completion.key, result=completion.result)
+                if completion.error is not None:
+                    if escaped is None:
+                        escaped = completion.error
+                    self._stop = True
+                    continue
+                if completion.result is not None:
+                    self._handle_completion(key=completion.key, result=completion.result)
             self._report_scheduler_state()
+        if escaped is not None:
+            raise escaped
 
     def _report_scheduler_state(self) -> None:
         callback: Callable[[SchedulerState], None] | None = self._callbacks.on_scheduler_state
@@ -548,7 +556,7 @@ class BuildScheduler:
             completion_queue=self._completion_queue,
             execute=lambda connection: self._execute_node(key=key, connection=connection),
             build_success=_build_worker_success_completion,
-            build_failure=_build_worker_failure_completion,
+            build_failure=NodeCompletion,
         )
 
     def _is_concurrent_microbatch(self, key: CompiledObjectKey) -> bool:
@@ -575,7 +583,7 @@ class BuildScheduler:
                 key=key, pool=pool, connection=connection
             ),
             build_success=_build_worker_success_completion,
-            build_failure=_build_worker_failure_completion,
+            build_failure=NodeCompletion,
         )
 
     def _execute_concurrent_microbatch_node(
@@ -1210,6 +1218,7 @@ class BuildScheduler:
                             hook_functions=self._plan.hook_functions,
                             enforce_explicit_references=self._plan.enforce_explicit_references,
                             effective_target_name=self._target,
+                            target_config=self._runtime.target_config,
                             effective_vars=self._effective_vars,
                             providers=self._providers,
                             python_identity_recorder=self._python_identity_recorder,

@@ -150,6 +150,23 @@ const R_TARGET_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("catalog_connection", FieldDefault::None),
     ],
 };
+const R_TARGET_SETTINGS: RecordSpec = RecordSpec {
+    name: "TargetSettings",
+    doc: "The active target's database and schemas, resolved as SQLBuild uses them.",
+    fields: &[
+        FieldSpec::new("name", FieldDefault::None),
+        FieldSpec::new("database", FieldDefault::None),
+        FieldSpec::new("schema", FieldDefault::None),
+        FieldSpec::new("loader_schema", FieldDefault::None),
+        FieldSpec::new("database_preserved", FieldDefault::False),
+        FieldSpec::new("schema_preserved", FieldDefault::False),
+    ],
+};
+const R_PROVIDER_SETUP_CONTEXT: RecordSpec = RecordSpec {
+    name: "ProviderSetupContext",
+    doc: "What a provider's setup receives: the active target's resolved settings.",
+    fields: &[FieldSpec::new("target_config", FieldDefault::None)],
+};
 const R_LOCAL_TARGET_CONFIG: RecordSpec = RecordSpec {
     name: "LocalTargetConfig",
     doc: "Local developer overrides for one named target.",
@@ -729,6 +746,8 @@ pub(crate) const CONTRACT_RECORDS: &[RecordSpec] = &[
     R_TARGET_DIFF_CONFIG,
     R_TARGET_WAREHOUSES_CONFIG,
     R_TARGET_CONFIG,
+    R_TARGET_SETTINGS,
+    R_PROVIDER_SETUP_CONTEXT,
     R_LOCAL_TARGET_CONFIG,
     R_SETTINGS_CONFIG,
     R_SCOPES_CONFIG,

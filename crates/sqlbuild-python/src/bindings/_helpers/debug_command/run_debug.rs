@@ -33,11 +33,9 @@ use crate::bindings::_helpers::command_runtime::warehouse_scope::command_warehou
 use crate::bindings::_helpers::command_runtime::warehouses::{
     CommandScope, WarehouseInputs, apply_warehouse, command_scope, find_authored, resolve_warehouse,
 };
-use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
-use crate::bindings::_helpers::diff_report::query::NAMESPACELESS_ADAPTERS;
+use crate::bindings::_helpers::compile_attachment::target::effective_target_namespace;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
-use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
@@ -308,41 +306,14 @@ fn build_report(
     })?;
     let connection_config: Bound<'_, PyDict> =
         effective_connection(&context, (&adapter_name, &base_connection))?.cast_into()?;
-    let namespace_adapter: String = adapter_name.str()?.extract()?;
-    let namespaceless: bool = NAMESPACELESS_ADAPTERS.contains(&namespace_adapter.as_str());
-    let namespace: Bound<'_, PyTuple> = build_effective_target_namespace(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("discovered_inputs", context.discovered_inputs.clone()),
-                ("selected_target", context.selected_target.clone()),
-                (
-                    "connection_database",
-                    connection_config
-                        .get_item("database")?
-                        .filter(|_| !namespaceless)
-                        .unwrap_or_else(|| py.None().into_bound(py)),
-                ),
-                (
-                    "connection_schema",
-                    connection_config
-                        .get_item("schema")?
-                        .unwrap_or_else(|| py.None().into_bound(py)),
-                ),
-                (
-                    "default_database",
-                    context.adapter.call_method0("default_database")?,
-                ),
-                (
-                    "default_schema",
-                    context.adapter.call_method0("default_schema")?,
-                ),
-            ],
-        )?),
-    )
-    .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?
-    .cast_into()?;
+    let namespace: Bound<'_, PyTuple> = effective_target_namespace(
+        (&context.discovered_inputs, &context.selected_target),
+        (
+            &adapter_name.str()?.extract::<String>()?,
+            connection_config.as_any(),
+            &context.adapter,
+        ),
+    )?;
     let target_config: Bound<'_, PyAny> = namespace.get_item(1)?;
     let connection_name: Option<String> = if target_config.is_none() {
         None
