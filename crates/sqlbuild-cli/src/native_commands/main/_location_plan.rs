@@ -36,6 +36,8 @@ pub(super) async fn plan_location(
         consumption: settings
             .get("changed")
             .is_some_and(|changed| !matches!(changed, Value::Null | Value::Bool(false))),
+        versioned: false,
+        known_version: None,
     };
     let copy = match client.preview_copy(&options.target, &read).await {
         Ok(copy) => copy,

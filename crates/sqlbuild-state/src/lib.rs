@@ -1,4 +1,4 @@
-//! Warehouse state rows SQLBuild appends: event IDs, event SQL and source freshness versions.
+//! Warehouse state rows SQLBuild appends, and the warehouse state a plan reads.
 
 #![forbid(unsafe_code)]
 
@@ -11,3 +11,4 @@ pub mod microbatches;
 pub mod observations;
 pub mod resource_costs;
 pub mod state_tables;
+pub mod warehouse_state;

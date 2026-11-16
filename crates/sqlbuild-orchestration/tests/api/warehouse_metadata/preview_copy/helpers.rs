@@ -159,6 +159,8 @@ pub(crate) async fn preview_copy_scope(
         session_id: preview_session,
         generation: 1,
         consumption: false,
+        versioned: false,
+        known_version: None,
     };
     let copy = || async {
         outbound
@@ -202,9 +204,67 @@ pub(crate) async fn preview_copy_scope(
         .await
         .expect("copy body");
     assert!(
-        unsynced.consumption.is_empty() && older_location.get("consumption").is_none(),
-        "a read that does not ask for consumption never carries the field, which older locations reject"
+        unsynced.consumption.is_empty()
+            && ["consumption", "version", "unchanged"]
+                .iter()
+                .all(|field| older_location.get(field).is_none()),
+        "a read that asks for neither consumption nor versions never carries the fields, which older locations reject"
     );
+    let versioned = |known_version: Option<String>| PreviewCopyRead {
+        versioned: true,
+        known_version,
+        ..read.clone()
+    };
+    let current = outbound
+        .preview_copy("preview", &versioned(None))
+        .await
+        .expect("versioned copy");
+    let held = outbound
+        .preview_copy("preview", &versioned(current.version.clone()))
+        .await
+        .expect("copy at the held version");
+    assert_eq!(
+        (
+            current.version.is_some() && !current.unchanged,
+            ours(&current) == ours(&unsynced),
+            held.unchanged,
+            held.version == current.version,
+            ours(&held),
+        ),
+        (true, true, true, true, (vec![], vec![], vec![], vec![])),
+        "a versioned read names its version; the same version again reads no records"
+    );
+    post(
+        client,
+        (&metadata, bearer),
+        batch(
+            "fingerprints",
+            vec![fingerprint(
+                "copy-run-3",
+                "SELECT 3 AS id",
+                "2026-03-01T12:00:00Z",
+            )],
+        ),
+    )
+    .await;
+    let changed = outbound
+        .preview_copy("preview", &versioned(current.version.clone()))
+        .await
+        .expect("copy after a mirrored write");
+    assert_eq!(
+        (
+            changed.unchanged,
+            changed.version != current.version,
+            ours(&changed).0,
+        ),
+        (
+            false,
+            true,
+            vec![("copy-run-3".into(), "SELECT 3 AS id".into())]
+        ),
+        "a mirrored write moves the version, so the held copy is read again"
+    );
+    let before_sync: Option<String> = changed.version.clone();
     let with_consumption = outbound
         .preview_copy(
             "preview",
@@ -264,6 +324,15 @@ pub(crate) async fn preview_copy_scope(
         copy().await.synced_at,
         None,
         "consumption never synced cleanly"
+    );
+    assert_ne!(
+        outbound
+            .preview_copy("preview", &versioned(before_sync.clone()))
+            .await
+            .expect("copy after a clean sync")
+            .version,
+        before_sync,
+        "a clean sync can move `synced_at`, so it moves the version"
     );
     for report in [
         sync_report(preview_session, "consumption", None),
@@ -325,6 +394,8 @@ pub(crate) async fn preview_copy_scope(
                 session_id,
                 generation: 1,
                 consumption: false,
+                versioned: false,
+                known_version: None,
             },
         )
         .await

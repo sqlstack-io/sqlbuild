@@ -480,6 +480,12 @@ pub struct PreviewCopyRead {
     /// Whether the copy carries consumption history; sent only when set, as older servers reject it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub consumption: bool,
+    /// Whether the location holds copies by mirror version; sent only when set, as older servers reject it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub versioned: bool,
+    /// The mirror version of the copy the location holds; an unchanged mirror returns no records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub known_version: Option<String>,
 }
 
 /// The newest successful build of a node, which a `cursor_max` observation must come from.
@@ -514,6 +520,12 @@ pub struct PreviewCopy {
     /// Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub consumption: Vec<WarehouseConsumptionRecord>,
+    /// The mirror version these records were read at; sent only to a versioned read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Set when the mirror is still at the read's known version: the records are left out.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unchanged: bool,
 }
 
 /// Private interpreter input; cursor values are data and receive adapter literal rendering.

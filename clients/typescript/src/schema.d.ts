@@ -2770,6 +2770,10 @@ export interface components {
             relations: components["schemas"]["WarehouseCatalogRecord"][];
             /** Format: date-time */
             synced_at?: string | null;
+            /** @description Set when the mirror is still at the read's known version: the records are left out. */
+            unchanged?: boolean;
+            /** @description The mirror version these records were read at; sent only to a versioned read. */
+            version?: string | null;
         };
         /** @description A location asks for the mirrored copy a plan preview plans from, as its fenced reader. */
         PreviewCopyRead: {
@@ -2777,8 +2781,12 @@ export interface components {
             consumption?: boolean;
             /** Format: int64 */
             generation: number;
+            /** @description The mirror version of the copy the location holds; an unchanged mirror returns no records. */
+            known_version?: string | null;
             /** Format: uuid */
             session_id: string;
+            /** @description Whether the location holds copies by mirror version; sent only when set, as older servers reject it. */
+            versioned?: boolean;
         };
         /** @description The newest successful build of a node, which a `cursor_max` observation must come from. */
         PreviewLatestRun: {
