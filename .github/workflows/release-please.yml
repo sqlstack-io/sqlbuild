@@ -185,6 +185,7 @@ jobs:
           RELEASE_PR: ${{ needs.release-please.outputs.release_pr }}
           REQUEST_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
+          set -uo pipefail
           head_sha="$(git rev-parse HEAD)"
           recovery="rerun the failed Release Please job to re-check"
           post_status() {
@@ -231,29 +232,25 @@ jobs:
             workflow="${workflows[${index}]}"
             context="${contexts[${index}]}"
             run_id=""
-            for _ in {1..30}; do
+            # A dispatched run can take minutes to appear in the run list, and a failed lookup
+            # is retried rather than read as "not started yet".
+            for _ in {1..60}; do
               run_id="$(gh run list --workflow "${workflow}" --branch "${RELEASE_BRANCH}" \
                 --event workflow_dispatch --limit 50 \
                 --json databaseId,headSha,displayTitle,createdAt \
-                --jq ".[] | select(.headSha == \"${head_sha}\"
+                --jq "[.[] | select(.headSha == \"${head_sha}\"
                   and (.displayTitle | endswith(\" [${REQUEST_ID}]\"))
-                  and .createdAt >= \"${dispatched_after}\") | .databaseId" | head -n 1)"
+                  and .createdAt >= \"${dispatched_after}\") | .databaseId] | first // empty")" \
+                || run_id=""
               [[ -n "${run_id}" ]] && break
-              sleep 2
+              sleep 10
             done
             if [[ -z "${run_id}" ]]; then
               post_status failure "${context}" "Trusted release check did not start"
               fail_verify "${context} did not start"
             fi
             run_url="$(gh run view "${run_id}" --json url --jq .url)"
-            # gh run watch exits non-zero for a run that finished before it started, so only
-            # watch a run still in progress and decide from the conclusion either way.
-            if [[ "$(gh run view "${run_id}" --json status --jq .status)" != "completed" ]]; then
-              gh run watch "${run_id}" --interval 30 >/dev/null || true
-            fi
-            conclusion="$(gh run view "${run_id}" --json status,conclusion \
-              --jq 'if .status == "completed" then .conclusion else "" end')"
-            if [[ "${conclusion}" == "success" ]]; then
+            if gh run watch "${run_id}" --exit-status --interval 30; then
               post_status success "${context}" "Trusted release check passed" "${run_url}"
             else
               post_status failure "${context}" "Trusted release check failed" "${run_url}"
