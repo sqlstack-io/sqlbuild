@@ -4,8 +4,8 @@ use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
-use crate::authorization::main::decide_person_scopes::decide_person_scopes;
-use crate::credentials::models::{Action, PermissionScope};
+use crate::credentials::models::Action;
+use crate::snapshots::main::holds_on_nodes::holds_on_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -20,16 +20,15 @@ pub(crate) async fn holds_on_current_nodes(
         "SELECT n.node_key FROM sqb_snapshot_nodes n JOIN sqb_current_snapshots c ON c.snapshot_id=n.snapshot_id \
          WHERE c.location_id=$1 AND c.target=$2",
         vec![Parameter::Id(location_id), Parameter::Text(target.into())]).await?;
-    let scope = PermissionScope {
-        action,
-        location_id: Some(location_id),
-        target: Some(target.into()),
-        nodes: current
-            .iter()
-            .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
-            .collect::<BTreeSet<String>>(),
-    };
-    let (transaction, refusals) =
-        decide_person_scopes(transaction, principal_id, (target, &[scope])).await?;
-    Ok((transaction, refusals.as_deref() == Some(&[None])))
+    let nodes = current
+        .iter()
+        .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
+        .collect::<BTreeSet<String>>();
+    holds_on_nodes(
+        transaction,
+        principal_id,
+        (action, location_id, target),
+        nodes,
+    )
+    .await
 }

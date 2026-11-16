@@ -165,15 +165,34 @@ pub(crate) struct AdhocCommandTestCase {
 /// The CLI's planner reduced to exact node keys, `--full-refresh`, `--no-load-sources` and `--warehouse NAME`.
 pub(crate) struct ExactKeyPlanner;
 
+/// Every test's publications share one cache; snapshot IDs and scopes are unique per test.
+static EXACT_KEY_PUBLICATIONS: crate::runs::models::PublicationCache =
+    crate::runs::models::PublicationCache::new();
+
 impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
-    fn plan(
+    fn prepare(
         &self,
-        command: &[String],
-        (resources, jobs): (
-            &[crate::runs::models::PlannerResource],
-            &crate::runs::types::PublishedJobs,
-        ),
-    ) -> Result<crate::runs::models::CommandPlan, String> {
+        resources: Vec<crate::runs::models::PlannerResource>,
+        jobs: crate::runs::types::PublishedJobs,
+    ) -> std::sync::Arc<dyn crate::runs::types::PreparedPublication> {
+        std::sync::Arc::new(ExactKeyPublication { resources, jobs })
+    }
+
+    fn publications(&self) -> &crate::runs::models::PublicationCache {
+        &EXACT_KEY_PUBLICATIONS
+    }
+}
+
+/// One publication as [`ExactKeyPlanner`] prepared it.
+#[derive(Debug)]
+pub(crate) struct ExactKeyPublication {
+    resources: Vec<crate::runs::models::PlannerResource>,
+    jobs: crate::runs::types::PublishedJobs,
+}
+
+impl crate::runs::types::PreparedPublication for ExactKeyPublication {
+    fn plan(&self, command: &[String]) -> Result<crate::runs::models::CommandPlan, String> {
+        let (resources, jobs) = (&self.resources, &self.jobs);
         let mut plan = crate::runs::models::CommandPlan {
             verb: command.first().cloned().unwrap_or_default(),
             selection: Default::default(),
@@ -343,4 +362,38 @@ pub(crate) struct RoundTripGroupTestCase {
     pub(crate) expected_waits: serde_json::Value,
     /// The order the group launches its members in.
     pub(crate) expected_order: &'static [&'static str],
+}
+
+/// Lookups of `(location and target, snapshot)` by small numbers, and which ones built their value.
+pub(crate) struct CacheLookupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) lookups: &'static [(u8, u8)],
+    pub(crate) expected_built: &'static [bool],
+}
+
+/// Two first lookups of one snapshot, the first still building when the second arrives.
+pub(crate) struct ConcurrentLookupTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) first_value: u8,
+    pub(crate) second_value: u8,
+    /// The value each lookup got, how many builds ran and whether both share one value.
+    pub(crate) expected_outcome: (u8, u8, usize, bool),
+}
+
+/// A lookup whose build fails, then another of the same snapshot.
+pub(crate) struct FailedBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) failure: &'static str,
+    pub(crate) retried_value: u8,
+    /// The failed lookup's error and the retried lookup's value.
+    pub(crate) expected_outcome: (Option<&'static str>, Option<u8>),
+}
+
+/// A command checked before and after a publication adds the node it names.
+pub(crate) struct NewerPublicationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) command: &'static [&'static str],
+    pub(crate) added_node: &'static str,
+    pub(crate) expected_before_error: &'static str,
+    pub(crate) expected_after_selection: &'static [&'static str],
 }

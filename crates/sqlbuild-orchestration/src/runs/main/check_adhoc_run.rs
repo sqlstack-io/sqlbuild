@@ -1,12 +1,15 @@
 //! A dry run resolves and decides a command exactly as a launch would, but queues and audits nothing.
 
+use std::collections::BTreeSet;
+
 use uuid::Uuid;
 
 use crate::credentials::models::{Action, AuditContext};
-use crate::runs::_helpers::requests::adhoc::{frozen_adhoc_request, permission_decisions};
+use crate::runs::_helpers::publications::current_publication;
+use crate::runs::_helpers::requests::adhoc::{frozen_publication_request, permission_decisions};
 use crate::runs::models::{AdhocCheck, AdhocCheckRequest};
 use crate::runs::types::CommandPlanner;
-use crate::snapshots::main::holds_on_current_nodes::holds_on_current_nodes;
+use crate::snapshots::main::holds_on_nodes::holds_on_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
@@ -19,19 +22,37 @@ pub async fn check_adhoc_run(
     request: &AdhocCheckRequest,
 ) -> Result<AdhocCheck, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, viewing) = holds_on_current_nodes(
+    let (transaction, current) =
+        current_publication(transaction, planner, (request.location_id, &request.target)).await?;
+    let nodes: BTreeSet<String> = current
+        .as_ref()
+        .map(|(_, publication)| publication.node_keys.clone())
+        .unwrap_or_default();
+    let (transaction, viewing) = holds_on_nodes(
         transaction,
         principal_id,
         (Action::View, request.location_id, &request.target),
+        nodes,
     )
     .await?;
-    let (transaction, frozen) = if viewing {
-        frozen_adhoc_request(transaction, (context, planner), (request, Uuid::nil())).await?
-    } else {
-        (
+    let (transaction, frozen) = match current {
+        Some((snapshot, publication)) if viewing => {
+            frozen_publication_request(
+                transaction,
+                context,
+                (snapshot.snapshot_id, &publication),
+                (request, Uuid::nil()),
+            )
+            .await?
+        }
+        None if viewing => (
+            transaction,
+            Err("this target has no publication yet".to_owned()),
+        ),
+        _ => (
             transaction,
             Err("view on every node of this target is required".to_owned()),
-        )
+        ),
     };
     let (verb, frozen) = match frozen {
         Ok(frozen) => frozen,

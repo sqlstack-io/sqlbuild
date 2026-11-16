@@ -1,22 +1,20 @@
 //! Parse a command with the CLI's table, keep only allowed flags and resolve selectors to exact node keys.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use serde_json::{Value as Json, json};
-use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
-use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
-use sqlbuild_analysis::graph::main::build_project_graph::build_project_graph;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
-use sqlbuild_analysis::graph::models::{GraphResource, JobSelection};
 use sqlbuild_analysis::planner_selection::main::split_unit_test_selectors::split_unit_test_selectors;
-use sqlbuild_analysis::planner_selection::models::{SelectorGroups, UnitTestSelectorNames};
-use sqlbuild_analysis::python_selection::main::published_python_graph::published_python_graph;
+use sqlbuild_analysis::planner_selection::models::SelectorGroups;
 use sqlbuild_analysis::python_selection::main::python_run_key::python_run_key;
 use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection::resolve_python_sql_run_selection;
-use sqlbuild_analysis::python_selection::models::{PublishedPythonNode, SqlSelectionGraph};
+use sqlbuild_analysis::python_selection::models::SqlSelectionGraph;
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
-use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource};
-use sqlbuild_orchestration::runs::types::{CommandPlanner, PublishedJobs};
+use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource, PublicationCache};
+use sqlbuild_orchestration::runs::types::{CommandPlanner, PreparedPublication, PublishedJobs};
+
+use crate::adhoc::_helpers::publication::IndexedPublication;
 
 use crate::adhoc::constants::{
     ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, CHANGED_COUNTS_DEST, CHANGED_DEST, COMMAND_DEST,
@@ -30,22 +28,42 @@ use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
 use crate::argv::models::{ArgvSettings, Namespace, TypeFailure, Value};
 use crate::argv::types::ArgvHost;
 
-/// The planner `sqb server` is built with.
-pub(crate) struct CliPlanner;
+/// The planner `sqb server` is built with; it keeps the publications it indexed.
+pub(crate) struct CliPlanner {
+    publications: PublicationCache,
+}
+
+impl CliPlanner {
+    pub(crate) const fn new() -> Self {
+        Self {
+            publications: PublicationCache::new(),
+        }
+    }
+}
 
 impl CommandPlanner for CliPlanner {
-    fn plan(
+    fn prepare(
         &self,
-        command: &[String],
-        publication: (&[PlannerResource], &PublishedJobs),
-    ) -> Result<CommandPlan, String> {
+        resources: Vec<PlannerResource>,
+        jobs: PublishedJobs,
+    ) -> Arc<dyn PreparedPublication> {
+        Arc::new(IndexedPublication::new(resources, jobs))
+    }
+
+    fn publications(&self) -> &PublicationCache {
+        &self.publications
+    }
+}
+
+impl PreparedPublication for IndexedPublication {
+    fn plan(&self, command: &[String]) -> Result<CommandPlan, String> {
         let (verb, mut selectors, settings) = command_parts(command)?;
         let mut select: Vec<String> = selectors.remove("select").unwrap_or_default();
         select.extend(selectors.remove("positional_select").unwrap_or_default());
         let exclude: Vec<String> = selectors.remove("exclude").unwrap_or_default();
         let selection: BTreeSet<String> = match verb.as_str() {
             SEED_VERB => {
-                let seeds: BTreeSet<String> = resolve(publication, &select, &exclude)?
+                let seeds: BTreeSet<String> = resolve(self, &select, &exclude)?
                     .into_iter()
                     .filter(|key| key.starts_with("seed:"))
                     .collect();
@@ -54,12 +72,12 @@ impl CommandPlanner for CliPlanner {
                 }
                 seeds
             }
-            FRESHNESS_VERB => freshness_sources(publication, &select, &exclude)?,
-            LOAD_VERB => managed_sources(publication, &select, &exclude)?,
+            FRESHNESS_VERB => freshness_sources(self, &select, &exclude)?,
+            LOAD_VERB => managed_sources(self, &select, &exclude)?,
             _ => {
                 let python = verb == BUILD_VERB
                     && settings.get(INCLUDE_PYTHON_DEST) != Some(&Json::Bool(false));
-                resolve_with_tests((&verb, python), publication, &select, &exclude)?
+                resolve_with_tests((&verb, python), self, &select, &exclude)?
             }
         };
         Ok(CommandPlan {
@@ -236,7 +254,7 @@ fn flag_of(dest: &str) -> String {
 
 /// Exact `kind:name` keys, as `sqb build` would select them from this publication.
 fn resolve(
-    publication: (&[PlannerResource], &PublishedJobs),
+    publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
@@ -250,26 +268,13 @@ fn resolve(
 /// [`resolve`] with `test:` and unit-test names selecting `sql_test:` keys, as `sqb test` does.
 fn resolve_with_tests(
     (verb, python): (&str, bool),
-    (resources, jobs): (&[PlannerResource], &PublishedJobs),
+    publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let names = UnitTestSelectorNames {
-        tests: resources
-            .iter()
-            .filter(|resource| is_sql_test(resource))
-            .map(|resource| name_of(&resource.key).to_owned())
-            .collect(),
-        resources: resources
-            .iter()
-            .filter(|resource| !is_sql_test(resource))
-            .map(|resource| name_of(&resource.key).to_owned())
-            .chain(jobs.keys().cloned())
-            .collect(),
-    };
     let split = split_unit_test_selectors(
         SelectorGroups { select, exclude },
-        &names,
+        &publication.names,
         UNIT_TEST_VERBS.contains(&verb),
     )
     .map_err(|error| format!("{}: {}", error.code, error.message))?;
@@ -279,7 +284,7 @@ fn resolve_with_tests(
         );
     }
     let mut keys: BTreeSet<String> = if split.models_selected {
-        resolved((resources, jobs), &split.select, &split.exclude, python)?
+        resolved(publication, &split.select, &split.exclude, python)?
     } else {
         BTreeSet::new()
     };
@@ -295,120 +300,54 @@ fn resolve_with_tests(
     Ok(keys)
 }
 
-fn is_sql_test(resource: &PlannerResource) -> bool {
-    resource.key.split_once(':').map(|(kind, _)| kind) == Some(SQL_TEST_KIND)
-}
-
 /// The published keys the selectors match; Python nodes only when the command runs them, round trips allowed because the launched command enforces the project's setting.
 fn resolved(
-    (resources, jobs): (&[PlannerResource], &PublishedJobs),
+    publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
     include_python: bool,
 ) -> Result<BTreeSet<String>, String> {
-    let (mut python, sql): (Vec<&PlannerResource>, Vec<&PlannerResource>) = resources
-        .iter()
-        .filter(|resource| !is_sql_test(resource))
-        .partition(|resource| python_kind(&resource.key).is_some());
-    if !include_python {
-        python.clear();
-    }
-    let graph_resources: Vec<GraphResource> = sql
-        .iter()
-        .filter_map(|resource| graph_resource(resource))
-        .collect();
-    let mut graph = build_project_graph(&graph_resources);
+    let python = publication.python(include_python);
     let selectors: Vec<String> = select.iter().chain(exclude).cloned().collect();
-    let node_names: Vec<&str> = python
-        .iter()
-        .map(|resource| name_of(&resource.key))
-        .collect();
-    if selectors_need_jobs(&graph, &selectors, &node_names) {
-        graph = attach_jobs(graph, published_jobs(jobs, include_python));
-    }
-    let sources: Vec<(String, Option<String>)> = sql
-        .iter()
-        .filter(|resource| resource.key.starts_with("source:"))
-        .map(|resource| (name_of(&resource.key).to_owned(), resource.loader.clone()))
-        .collect();
-    let nodes: Vec<PublishedPythonNode> = python
-        .iter()
-        .filter_map(|resource| published_python_node(resource))
-        .collect();
-    let python_graph = published_python_graph(&nodes);
+    let node_names: Vec<&str> = python.names.iter().map(String::as_str).collect();
+    let graph = if selectors_need_jobs(&publication.graph, &selectors, &node_names) {
+        publication.graph_with_jobs(include_python)
+    } else {
+        &publication.graph
+    };
+    let sources = &publication.sources;
     let selection = resolve_python_sql_run_selection(
         SqlSelectionGraph {
-            graph: &graph,
-            sources: &sources,
+            graph,
+            sources,
             allow_warehouse_round_trips: true,
         },
-        &python_graph,
+        &python.graph,
         select,
         exclude,
     )
     .map_err(|error| format!("{}: {}", error.code, error.message))?;
-    let kinds: BTreeMap<&str, &str> = nodes
-        .iter()
-        .map(|node| (node.name.as_str(), node.kind.as_str()))
-        .collect();
     Ok(selection
         .sql_keys
         .into_iter()
         .map(|(kind, name)| format!("{kind}:{name}"))
-        .chain(
-            selection.python_node_names.iter().filter_map(|name| {
-                Some(python_run_key(&sources, (kinds.get(name.as_str())?, name)))
-            }),
-        )
+        .chain(selection.python_node_names.iter().filter_map(|name| {
+            Some(python_run_key(
+                sources,
+                (python.kinds.get(name.as_str())?, name),
+            ))
+        }))
         .collect())
-}
-
-/// The Python node kind of a published key, such as `task` for `task:export_orders`.
-fn python_kind(key: &str) -> Option<&'static str> {
-    let (kind, _) = key.split_once(':')?;
-    PYTHON_NODE_KINDS.into_iter().find(|python| *python == kind)
-}
-
-fn published_python_node(resource: &PlannerResource) -> Option<PublishedPythonNode> {
-    Some(PublishedPythonNode {
-        name: name_of(&resource.key).to_owned(),
-        kind: python_kind(&resource.key)?.to_owned(),
-        tags: resource.tags.clone(),
-        folder: resource.folder.clone().unwrap_or_else(|| ".".to_owned()),
-        deps: resource
-            .deps
-            .iter()
-            .filter_map(|dep| object_key(dep))
-            .collect(),
-    })
-}
-
-fn name_of(key: &str) -> &str {
-    key.split_once(':').map_or(key, |(_, name)| name)
-}
-
-/// Published jobs as already-resolved graph selections.
-fn published_jobs(jobs: &PublishedJobs, include_python: bool) -> BTreeMap<String, JobSelection> {
-    let mut selections: BTreeMap<String, JobSelection> = BTreeMap::new();
-    for (name, keys) in jobs {
-        let keys: Vec<(String, String)> = keys
-            .iter()
-            .filter(|key| include_python || python_kind(key).is_none())
-            .filter_map(|key| object_key(key))
-            .collect();
-        selections.insert(name.clone(), JobSelection::Resolved { keys });
-    }
-    selections
 }
 
 /// Managed sources `sqb load` runs; a source only a loader writes is not published as a resource but is managed.
 fn managed_sources(
-    publication: (&[PlannerResource], &PublishedJobs),
+    publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
     let unmanaged: BTreeSet<&str> = publication
-        .0
+        .resources
         .iter()
         .filter(|resource| resource.loader.is_none())
         .map(|resource| resource.key.as_str())
@@ -425,16 +364,21 @@ fn managed_sources(
 
 /// Sources `sqb freshness` observes: selected or upstream sources, less those the exclusions reach.
 fn freshness_sources(
-    publication: (&[PlannerResource], &PublishedJobs),
+    publication: &IndexedPublication,
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let selected: BTreeSet<String> =
-        upstream_sources(publication.0, &resolved(publication, select, &[], false)?);
+    let selected: BTreeSet<String> = upstream_sources(
+        &publication.resources,
+        &resolved(publication, select, &[], false)?,
+    );
     let excluded: BTreeSet<String> = if exclude.is_empty() {
         BTreeSet::new()
     } else {
-        upstream_sources(publication.0, &resolved(publication, exclude, &[], false)?)
+        upstream_sources(
+            &publication.resources,
+            &resolved(publication, exclude, &[], false)?,
+        )
     };
     let sources: BTreeSet<String> = selected.difference(&excluded).cloned().collect();
     if sources.is_empty() {
@@ -464,24 +408,4 @@ fn upstream_sources(resources: &[PlannerResource], keys: &BTreeSet<String>) -> B
         .filter(|key| key.starts_with("source:"))
         .map(str::to_owned)
         .collect()
-}
-
-/// A published node as the selector graph sees it; keys without a kind are not selectable.
-fn graph_resource(resource: &PlannerResource) -> Option<GraphResource> {
-    Some(GraphResource {
-        key: object_key(&resource.key)?,
-        deps: resource
-            .deps
-            .iter()
-            .map(String::as_str)
-            .filter_map(object_key)
-            .collect(),
-        tags: resource.tags.clone(),
-        folder: resource.folder.clone(),
-    })
-}
-
-fn object_key(key: &str) -> Option<(String, String)> {
-    key.split_once(':')
-        .map(|(kind, name)| (kind.to_owned(), name.to_owned()))
 }

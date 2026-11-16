@@ -38,6 +38,8 @@ mod test_monitor;
 mod test_node_errors;
 #[path = "test_permissions.rs"]
 mod test_permissions;
+#[path = "test_publication_cache.rs"]
+mod test_publication_cache;
 #[path = "test_requests.rs"]
 mod test_requests;
 #[path = "test_reruns.rs"]

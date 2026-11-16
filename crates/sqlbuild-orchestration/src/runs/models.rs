@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::credentials::models::Action;
-use crate::runs::types::CommandPlanner;
+use crate::runs::types::{CommandPlanner, PreparedPublication};
+use crate::snapshots::models::WriterNode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -884,4 +885,59 @@ impl Default for RunLogRetention {
             count: crate::runs::constants::DEFAULT_RUN_LOG_RETENTION_COUNT,
         }
     }
+}
+
+/// Prepared publications by snapshot ID; snapshots never change, so an entry stays valid until evicted.
+#[derive(Debug)]
+pub struct PublicationCache {
+    pub(crate) slots: std::sync::Mutex<SnapshotSlots<CachedPublication>>,
+}
+
+impl PublicationCache {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            slots: std::sync::Mutex::new(SnapshotSlots::new()),
+        }
+    }
+}
+
+impl Default for PublicationCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Values built once per snapshot, least recently used first out within each location and target.
+#[derive(Debug)]
+pub(crate) struct SnapshotSlots<T> {
+    /// Counts lookups, so a larger `used` is more recent.
+    pub(crate) clock: u64,
+    pub(crate) slots: Vec<SnapshotSlot<T>>,
+}
+
+impl<T> SnapshotSlots<T> {
+    pub(crate) const fn new() -> Self {
+        Self {
+            clock: 0,
+            slots: Vec::new(),
+        }
+    }
+}
+
+/// One snapshot's value, built by the first request that needs it while later ones wait.
+#[derive(Debug)]
+pub(crate) struct SnapshotSlot<T> {
+    pub(crate) scope: (Uuid, String),
+    pub(crate) snapshot_id: Uuid,
+    pub(crate) used: u64,
+    pub(crate) cell: std::sync::Arc<tokio::sync::OnceCell<std::sync::Arc<T>>>,
+}
+
+/// What every plan of one publication shares: the planner's index, each node's write-set facts and every node key.
+#[derive(Debug)]
+pub(crate) struct CachedPublication {
+    pub(crate) prepared: std::sync::Arc<dyn PreparedPublication>,
+    pub(crate) writers: BTreeMap<String, WriterNode>,
+    pub(crate) node_keys: BTreeSet<String>,
 }

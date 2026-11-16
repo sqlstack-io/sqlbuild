@@ -136,8 +136,12 @@ async fn narrowed(
             command.extend(tokens.iter().cloned());
         }
     }
-    let (transaction, plan) =
-        publication_plan(transaction, (planner, snapshot_id), &command).await?;
+    let (transaction, plan) = publication_plan(
+        transaction,
+        (planner, (request.location_id, &request.target), snapshot_id),
+        &command,
+    )
+    .await?;
     let plan = plan.map_err(ControlError::Invalid)?;
     let narrowed: BTreeSet<String> = selection.intersection(&plan.selection).cloned().collect();
     if narrowed.is_empty() {
