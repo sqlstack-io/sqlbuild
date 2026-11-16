@@ -220,18 +220,17 @@ async fn poll_location(
             let Some(state) = metadata.as_mut() else {
                 return Ok(None);
             };
-            if syncing
-                && state.idle
-                && state.take_replan()
-                && report_changed_build(
+            if syncing && state.idle && state.take_replan() {
+                let Some(reported) = report_changed_build(
                     (options, runtime, &watch),
                     (client, poll.session_id, state.generation),
                     stopped.as_mut(),
                 )
                 .await?
-                .is_none()
-            {
-                return Ok(None);
+                else {
+                    return Ok(None);
+                };
+                state.planned(reported);
             }
         }
     }

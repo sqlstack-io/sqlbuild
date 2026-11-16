@@ -50,7 +50,7 @@ pub(in crate::native_commands) fn changed_build_nodes(
     Ok((changed, downstream))
 }
 
-/// Plan and report; `None` when stopped first. A plan of edited, unpublished files, a failed plan or a refused report leaves the server's count as it was.
+/// Plan and report; whether the server took the count, or `None` when stopped first.
 pub(super) async fn report_changed_build(
     (options, runtime, watch): (
         &LocationServe,
@@ -59,19 +59,19 @@ pub(super) async fn report_changed_build(
     ),
     (client, session_id, generation): (&LocationWorkClient, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<()>, ControlError> {
+) -> Result<Option<bool>, ControlError> {
     let published = || {
         location_files(&options.project_dir, &watch.rules, &watch.local_files) == watch.observed.0
     };
     let report = |message: &str| drop(write_output(&[(Stream::Stderr, message)]));
     if !published() {
-        return Ok(Some(()));
+        return Ok(Some(false));
     }
     let settings = match changed_build_settings() {
         Ok(settings) => settings,
         Err(error) => {
             report(&format!("Could not plan what changed: {error}\n"));
-            return Ok(Some(()));
+            return Ok(Some(false));
         }
     };
     report("Planning what changed from the synced warehouse copy...\n");
@@ -87,13 +87,13 @@ pub(super) async fn report_changed_build(
     };
     if !published() {
         report("Project files changed while planning what changed; not reported.\n");
-        return Ok(Some(()));
+        return Ok(Some(false));
     }
     let (changed, downstream) = match changed_build_nodes(&document) {
         Ok(nodes) => nodes,
         Err(error) => {
             report(&format!("Could not plan what changed: {error}\n"));
-            return Ok(Some(()));
+            return Ok(Some(false));
         }
     };
     let counts = format!("{} changed, {} downstream", changed.len(), downstream.len());
@@ -103,9 +103,16 @@ pub(super) async fn report_changed_build(
         changed,
         downstream,
     };
-    match client.report_changed_build(&options.target, &request).await {
-        Ok(_) => report(&format!("Planned what changed: {counts}.\n")),
-        Err(error) => report(&format!("Reporting what changed failed: {error}\n")),
-    }
-    Ok(Some(()))
+    Ok(Some(
+        match client.report_changed_build(&options.target, &request).await {
+            Ok(_) => {
+                report(&format!("Planned what changed: {counts}.\n"));
+                true
+            }
+            Err(error) => {
+                report(&format!("Reporting what changed failed: {error}\n"));
+                false
+            }
+        },
+    ))
 }

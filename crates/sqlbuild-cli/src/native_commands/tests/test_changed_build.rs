@@ -73,25 +73,30 @@ fn given_a_changed_plan_document_when_read_then_runs_split_into_changed_and_down
 }
 
 #[test]
-fn given_completed_syncs_when_deciding_to_replan_then_only_a_new_publication_or_an_applied_change_replans()
+fn given_completed_syncs_when_deciding_to_replan_then_a_publication_an_applied_change_or_a_failed_plan_replans()
  {
     let started = Utc::now();
-    let complete = |mut state: LocationMetadataSync, applied: bool| {
+    let complete = |mut state: LocationMetadataSync, (applied, reported): (bool, bool)| {
         state.begin_sync(started);
         state.applied |= applied;
         let mut state = acknowledge_complete_pages(state, WarehouseHistoryKind::ALL.len());
         assert!(state.idle, "the sync completed");
         let replan = state.take_replan();
+        state.planned(reported || !replan);
         (state, replan)
     };
     let mut state = metadata_sync((one_location(), 1), (3600, 0));
     state.applied = true;
-    let (state, after_publication) = complete(state, false);
-    let (state, unchanged) = complete(state, false);
-    let (_, changed) = complete(state, true);
+    let (state, after_publication) = complete(state, (false, true));
+    let (state, unchanged) = complete(state, (false, true));
+    let (state, failed) = complete(state, (true, false));
+    let (state, retried) = complete(state, (false, true));
+    let (_, settled) = complete(state, (false, true));
     assert_eq!(
-        [after_publication, unchanged, changed],
-        [true, false, true],
-        "the sync after a publication replans; a sync that applied nothing leaves the count; one that changed the copy replans"
+        [after_publication, unchanged, failed, retried, settled],
+        [true, false, true, true, false],
+        "the sync after a publication replans; a sync that applied nothing leaves the count; one \
+         that changed the copy replans; a plan that did not reach the server is retried after the \
+         next sync, then the count settles"
     );
 }

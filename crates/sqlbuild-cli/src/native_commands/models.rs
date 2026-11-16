@@ -329,6 +329,11 @@ impl LocationMetadataSync {
         replan
     }
 
+    /// After a plan `take_replan` asked for; one that did not reach the server waits for the next sync.
+    pub(crate) fn planned(&mut self, reported: bool) {
+        self.replan |= !reported;
+    }
+
     /// A person asked for a sync: start one now when idle, or one more after the current one.
     pub(crate) fn request_sync(&mut self) {
         self.cycle_started_at = None;
