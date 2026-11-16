@@ -1714,3 +1714,63 @@ def plan_from_copy(
     outcome: dict[str, Any] = result["result_json"]["outcome"]
     assert outcome["kind"] == "plan", outcome
     return refused, outcome["document"]
+
+
+def changed_build_and_plan_from_copy(
+    tmp_path: Path, project: Path, selection: list[str]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Serve `project` until its first sync completes.
+
+    Returns the changed build the location published after that sync and the location's
+    `--changed` plan of `selection` from the same synced copy.
+    """
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+    started: datetime = datetime.now(UTC)
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "development", 1, location, log)
+        synced: datetime = max(
+            datetime.fromisoformat(report["received_at"])
+            for report in wait_for_warehouse_sync_health(
+                api,
+                {"failure": None, "tables": ["catalog", "consumption", "fingerprints"]},
+                location,
+                log,
+                after=started,
+            )
+        )
+        deadline: float = time.monotonic() + 45
+        published: tuple[str, str] | None = None
+        while published is None or datetime.fromisoformat(published[0]) <= synced:
+            assert location.poll() is None, log.read_text()
+            assert time.monotonic() < deadline, log.read_text()
+            time.sleep(0.05)
+            with closing(sqlite3.connect(control)) as database:
+                published = database.execute(
+                    "SELECT reported_at, report_json FROM sqb_changed_builds"
+                ).fetchone()
+        request_id: str = request_plan(control, selection, {"changed": True})
+        result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
+    outcome: dict[str, Any] = result["result_json"]["outcome"]
+    assert outcome["kind"] == "plan", outcome
+    return json.loads(published[1]), outcome["document"]

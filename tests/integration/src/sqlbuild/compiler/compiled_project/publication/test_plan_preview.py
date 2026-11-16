@@ -14,6 +14,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     PlanPreviewTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    changed_build_and_plan_from_copy,
     live_plan,
     plan_from_copy,
     run_sqb,
@@ -263,3 +264,31 @@ def test_given_an_edited_model_when_a_changed_plan_is_requested_then_the_copy_na
         tmp_path / "location.log"
     ).read_text()
     assert preview["changed"] == json.loads(live_run.stdout)["changed"]
+
+
+def test_given_an_edited_model_when_the_location_plans_what_changed_then_it_publishes_what_the_changed_plan_runs(
+    tmp_path: Path,
+) -> None:
+    project: Path = tmp_path / "project"
+    summary: str = (
+        'MODEL (description "Order count summary.", materialized table);\n\n'
+        'SELECT order_count FROM __ref("order_count")\n'
+    )
+    write_files(project_dir=project, files=_PROJECT_FILES | {"models/order_summary.sql": summary})
+    built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
+    assert built.returncode == 0, built.stderr
+    edited: str = _PROJECT_FILES["models/order_count.sql"].replace(
+        "AS order_count", "AS order_count, 1 AS batch"
+    )
+    write_files(project_dir=project, files={"models/order_count.sql": edited})
+    # The selection the server freezes `sqb build --changed` to: every node a build runs.
+    selection: list[str] = sorted([*_SELECTION, "model:order_summary", "seed:raw_orders"])
+
+    published, plan = changed_build_and_plan_from_copy(tmp_path, project, selection)
+
+    runs: list[dict[str, Any]] = plan["changed"]["runs"]
+    assert published == {
+        "changed": [run["node"] for run in runs if run["downstream_of"] is None],
+        "downstream": [run["node"] for run in runs if run["downstream_of"] is not None],
+    }, (tmp_path / "location.log").read_text()
+    assert published == {"changed": ["model:order_count"], "downstream": ["model:order_summary"]}
