@@ -70,7 +70,7 @@ def dense_column_count(index: int) -> int:
 def write_dense_compile_project(
     *, project_dir: Path, model_count: int, rule_select: str = DENSE_RULE_SELECT
 ) -> None:
-    """Write a deterministic query-heavy project without external inputs or services."""
+    """Write a deterministic query-heavy project; the default rules leave delta compiles on."""
 
     project_dir.mkdir(parents=True)
     domains: str = ", ".join(

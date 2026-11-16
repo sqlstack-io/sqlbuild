@@ -6,9 +6,6 @@ COMPILE_MEASUREMENT_FIELD_COUNT: int = 6
 DENSE_RULE_SELECT: str = (
     'select = ["SQBR", "SQBRPYTHON", "SQBRPYTHON306", "SQBRPYTHON507", "SQLCLEAN", "XSQBR"]'
 )
-# SQBRPERFORMANCE102 compares models across the project, so a Snowflake compile that selects it
-# never takes the delta path. Edit and base/head benchmarks leave the opt-in performance rules
-# out; the all-rules benchmarks select them.
 DENSE_ALL_RULE_SELECT: str = DENSE_RULE_SELECT.replace(
     '"SQBR", ', '"SQBR", "SQBRPERFORMANCE101", "SQBRPERFORMANCE102", '
 )
