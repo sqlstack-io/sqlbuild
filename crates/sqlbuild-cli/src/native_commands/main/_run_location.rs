@@ -23,6 +23,7 @@ use crate::native_commands::_helpers::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::main::_location_changed_build::report_changed_build;
 use crate::native_commands::main::_location_compiler::run_location_compiler;
 use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::main::_location_work::run_location_work;
@@ -152,6 +153,16 @@ async fn watch_location(
             };
             checked = true;
             watch = exclude_location_databases(&options.project_dir, files, watch);
+            if report_changed_build(
+                (options, script, &watch),
+                (client, poll.session_id, generation),
+                stopped.as_mut(),
+            )
+            .await?
+            .is_none()
+            {
+                return Ok(());
+            }
         } else {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
             tokio::select! {
@@ -193,6 +204,7 @@ async fn poll_location(
             }
         }
         if let Some(state) = metadata.take() {
+            let syncing = !state.idle;
             metadata = sync_location_metadata(
                 state,
                 (options, script, &watch),
@@ -200,7 +212,19 @@ async fn poll_location(
                 stopped.as_mut(),
             )
             .await?;
-            if metadata.is_none() {
+            let Some(state) = &metadata else {
+                return Ok(None);
+            };
+            if syncing
+                && state.idle
+                && report_changed_build(
+                    (options, script, &watch),
+                    (client, poll.session_id, state.generation),
+                    stopped.as_mut(),
+                )
+                .await?
+                .is_none()
+            {
                 return Ok(None);
             }
         }

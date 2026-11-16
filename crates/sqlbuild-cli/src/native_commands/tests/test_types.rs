@@ -168,3 +168,10 @@ pub(super) struct SyncCompletionTestCase {
     pub(super) safety_explicit: bool,
     pub(super) expected_next_in_seconds: Option<i64>,
 }
+
+#[derive(Debug)]
+pub(super) struct ChangedBuildNodesTestCase {
+    pub(super) description: &'static str,
+    pub(super) document: serde_json::Value,
+    pub(super) expected: Result<(Vec<&'static str>, Vec<&'static str>), &'static str>,
+}

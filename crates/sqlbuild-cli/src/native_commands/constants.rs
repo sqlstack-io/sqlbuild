@@ -117,6 +117,8 @@ pub(crate) const PASSWORD_INPUT_BYTES: u64 = 4096;
 
 /// The command a location runs to answer a plan request.
 pub(crate) const PLAN_COMMAND: &str = "plan";
+/// The command behind the web UI's "Build what changed": `sqb build --changed` with the project's default options.
+pub(crate) const CHANGED_BUILD_COMMAND: [&str; 2] = ["build", "--changed"];
 /// How much `sqb plan --json` output a location reads; model diffs over the server's cap are dropped.
 pub(crate) const PLAN_OUTPUT_BYTES: usize =
     8 * sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;

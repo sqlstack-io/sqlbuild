@@ -1,5 +1,7 @@
 #[path = "tests/test_argv_host.rs"]
 mod argv_host;
+#[path = "tests/test_changed_build.rs"]
+mod changed_build;
 #[path = "tests/test_decision.rs"]
 mod decision;
 #[path = "tests/helpers.rs"]

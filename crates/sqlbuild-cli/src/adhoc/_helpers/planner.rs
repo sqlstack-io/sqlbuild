@@ -39,52 +39,7 @@ impl CommandPlanner for CliPlanner {
         command: &[String],
         publication: (&[PlannerResource], &PublishedJobs),
     ) -> Result<CommandPlan, String> {
-        let verb = command
-            .first()
-            .ok_or_else(|| "enter a command, such as build --select orders".to_owned())?;
-        if !ADHOC_VERBS.contains(&verb.as_str()) {
-            return Err(format!(
-                "sqb {verb} is not available as an ad-hoc run; use build, test, seed, audit, freshness or load"
-            ));
-        }
-        let parsed = parse(command)?;
-        let bare = parse(std::slice::from_ref(verb))?;
-        let mut selectors: BTreeMap<&str, Vec<String>> = BTreeMap::new();
-        let mut settings: BTreeMap<String, Json> = BTreeMap::new();
-        for (dest, value) in &parsed.entries {
-            if bare.value(dest) == *value || dest == COMMAND_DEST {
-                continue;
-            }
-            if let Some(selector) = SELECTOR_DESTS.iter().find(|name| **name == dest) {
-                selectors.insert(selector, texts(value));
-                continue;
-            }
-            if dest == CHANGED_COUNTS_DEST {
-                settings.insert(CHANGED_DEST.to_owned(), json!(texts(value)));
-                continue;
-            }
-            if dest == CHANGED_DEST && settings.contains_key(CHANGED_DEST) {
-                continue;
-            }
-            let setting = setting(dest, value)?;
-            if dest == VARS_DEST && setting.as_object().is_some_and(serde_json::Map::is_empty) {
-                continue;
-            }
-            settings.insert(dest.clone(), setting);
-        }
-        if verb == LOAD_VERB {
-            for (dest, value) in LOAD_BUILD_SETTINGS {
-                settings.insert(dest.to_owned(), json!(value));
-            }
-            if settings.get(RELOAD_DEST) == Some(&Json::Bool(true)) {
-                settings.remove(LOAD_SOURCES_DEST);
-            }
-        }
-        if verb == BUILD_VERB || verb == LOAD_VERB {
-            job_settings_arguments(&settings)?;
-        } else {
-            command_settings_arguments(verb, &settings)?;
-        }
+        let (verb, mut selectors, settings) = command_parts(command)?;
         let mut select: Vec<String> = selectors.remove("select").unwrap_or_default();
         select.extend(selectors.remove("positional_select").unwrap_or_default());
         let exclude: Vec<String> = selectors.remove("exclude").unwrap_or_default();
@@ -104,15 +59,78 @@ impl CommandPlanner for CliPlanner {
             _ => {
                 let python = verb == BUILD_VERB
                     && settings.get(INCLUDE_PYTHON_DEST) != Some(&Json::Bool(false));
-                resolve_with_tests((verb, python), publication, &select, &exclude)?
+                resolve_with_tests((&verb, python), publication, &select, &exclude)?
             }
         };
         Ok(CommandPlan {
-            verb: verb.clone(),
+            verb,
             selection,
             settings,
         })
     }
+}
+
+/// A command's verb, selectors by destination and validated settings.
+type CommandParts = (
+    String,
+    BTreeMap<&'static str, Vec<String>>,
+    BTreeMap<String, Json>,
+);
+
+/// Parse `command` and keep only allowed flags, as an ad-hoc run or plan freezes it before resolving selectors.
+fn command_parts(command: &[String]) -> Result<CommandParts, String> {
+    let verb = command
+        .first()
+        .ok_or_else(|| "enter a command, such as build --select orders".to_owned())?;
+    if !ADHOC_VERBS.contains(&verb.as_str()) {
+        return Err(format!(
+            "sqb {verb} is not available as an ad-hoc run; use build, test, seed, audit, freshness or load"
+        ));
+    }
+    let parsed = parse(command)?;
+    let bare = parse(std::slice::from_ref(verb))?;
+    let mut selectors: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
+    let mut settings: BTreeMap<String, Json> = BTreeMap::new();
+    for (dest, value) in &parsed.entries {
+        if bare.value(dest) == *value || dest == COMMAND_DEST {
+            continue;
+        }
+        if let Some(selector) = SELECTOR_DESTS.iter().find(|name| **name == dest) {
+            selectors.insert(*selector, texts(value));
+            continue;
+        }
+        if dest == CHANGED_COUNTS_DEST {
+            settings.insert(CHANGED_DEST.to_owned(), json!(texts(value)));
+            continue;
+        }
+        if dest == CHANGED_DEST && settings.contains_key(CHANGED_DEST) {
+            continue;
+        }
+        let setting = setting(dest, value)?;
+        if dest == VARS_DEST && setting.as_object().is_some_and(serde_json::Map::is_empty) {
+            continue;
+        }
+        settings.insert(dest.clone(), setting);
+    }
+    if verb == LOAD_VERB {
+        for (dest, value) in LOAD_BUILD_SETTINGS {
+            settings.insert(dest.to_owned(), json!(value));
+        }
+        if settings.get(RELOAD_DEST) == Some(&Json::Bool(true)) {
+            settings.remove(LOAD_SOURCES_DEST);
+        }
+    }
+    if verb == BUILD_VERB || verb == LOAD_VERB {
+        job_settings_arguments(&settings)?;
+    } else {
+        command_settings_arguments(verb, &settings)?;
+    }
+    Ok((verb.clone(), selectors, settings))
+}
+
+/// The validated settings `command` freezes to, the same as a run or plan request of it gets; selectors are not resolved.
+pub(crate) fn command_settings(command: &[String]) -> Result<BTreeMap<String, Json>, String> {
+    command_parts(command).map(|(_, _, settings)| settings)
 }
 
 /// Whole numbers convert as the parser needs them; `--vars` must be a JSON object; paths stay text so the refusal can name them.

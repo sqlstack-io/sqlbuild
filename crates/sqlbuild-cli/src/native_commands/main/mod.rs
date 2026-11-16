@@ -1,4 +1,5 @@
 pub(super) mod _cost_report_options;
+pub(super) mod _location_changed_build;
 pub(super) mod _location_compiler;
 pub(super) mod _location_metadata;
 pub(super) mod _location_plan;
