@@ -4,8 +4,8 @@ use pyo3::prelude::{PyResult, Python};
 use sqlbuild_core::query_command::main::render_query_text::render_query_text;
 use sqlbuild_core::query_command::models::{QueryDisplay, QueryLayout};
 
-use crate::bindings::_helpers::build_progress::terminal::terminal_columns;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_is_tty;
+use sqlbuild_python_base::build_progress::main::terminal::terminal_columns::terminal_columns;
+use sqlbuild_python_base::presentation_text::main::stdout_is_tty::stdout_is_tty;
 
 /// The format that always prints one record per row.
 pub(crate) const LONG_FORMAT: &str = "long";

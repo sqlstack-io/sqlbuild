@@ -17,7 +17,6 @@ use sqlbuild_cli::diff_report::models::{
 use sqlbuild_cli::diff_report::types::DiffNamedValue;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::build_command::support::{boolean, text};
 use crate::bindings::_helpers::compile_driver::diff::run_diff_pipeline;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::dagster_invocation::access::string_tuple as texts;
@@ -30,6 +29,8 @@ use crate::bindings::_helpers::review_command::planning::ReviewSettings;
 use crate::bindings::_helpers::review_command::support::review_error;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::build_command::main::boolean::boolean;
+use sqlbuild_python_base::build_command::main::text::text;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 

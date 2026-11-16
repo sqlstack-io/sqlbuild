@@ -1,5 +1,6 @@
 //! Project column lineage in FAST or RICH mode, and direct semantic uses, from a project view.
 
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::collections::HashMap;
 
 use pyo3::prelude::{
@@ -32,7 +33,6 @@ use crate::bindings::_helpers::lineage::project_schema::{
 use crate::bindings::_helpers::project_assembly::syntax_checks::model_placeholders;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::types::CompilerDetach;
@@ -335,12 +335,11 @@ fn output_columns(classes: &LineageClasses<'_>, facts: &Bound<'_, PyAny>) -> PyR
 }
 
 fn unknown_dialect_error(py: Python<'_>, dialect: &str) -> PyErr {
-    match error_class(py, ErrorId::UnknownLineageDialect)
-        .and_then(|class| class.call1((format!("Unknown dialect: {dialect}"),)))
-    {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(
+        py,
+        ErrorId::UnknownLineageDialect,
+        &format!("Unknown dialect: {dialect}"),
+    )
 }
 
 fn rich_lineage<'py>(

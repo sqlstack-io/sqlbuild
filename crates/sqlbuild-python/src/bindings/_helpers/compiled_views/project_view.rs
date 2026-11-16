@@ -9,7 +9,6 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple, PyTupleMethods};
 use pyo3::{pyclass, pymethods};
 
-use crate::bindings::_helpers::compile_driver::stage_work::{LINEAGE_GRAPH_BUILDS, count_stage};
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::{
     NativeCompiledModel, model_graph_row,
@@ -23,6 +22,8 @@ use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSourc
 use crate::bindings::_helpers::graph::project_graph::{
     NativeProjectGraph, ResourceRow, project_graph,
 };
+use sqlbuild_python_base::compile_driver::constants::LINEAGE_GRAPH_BUILDS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const MODELS_FIELD: &str = "models";

@@ -12,9 +12,9 @@ use sqlbuild_sqltext::sql_references::models::{
 };
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::compile_context::diagnostic_collector::report_compile_diagnostic;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::compile_context::main::diagnostic_collector::report_compile_diagnostic::report_compile_diagnostic;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;

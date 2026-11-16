@@ -1,5 +1,6 @@
 //! Every discovered model file attached as a model input by the native model loop.
 
+use sqlbuild_python_base::compile_context::main::diagnostic_collector::report_compile_diagnostic_function::report_compile_diagnostic_function;
 use std::path::PathBuf;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -237,11 +238,15 @@ pub(crate) fn build_model_inputs<'py>(
         vec![
             (
                 "report_diagnostic",
-                pyo3::wrap_pyfunction!(crate::bindings::_helpers::compile_context::diagnostic_collector::report_compile_diagnostic, py)?.into_any(),
+                report_compile_diagnostic_function(py)?.into_any(),
             ),
             (
                 "record_template_reads",
-                pyo3::wrap_pyfunction!(crate::bindings::_helpers::model_config::template_data::record_template_reads, py)?.into_any(),
+                pyo3::wrap_pyfunction!(
+                    crate::bindings::_helpers::model_config::template_data::record_template_reads,
+                    py
+                )?
+                .into_any(),
             ),
             (
                 "visible_declarations",

@@ -13,13 +13,14 @@ use sqlbuild_core::cli_text::main::format_phase_line::format_phase_line;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_discovery::python_paths::main::python_test_paths::python_test_paths;
 
-use crate::bindings::_helpers::build_progress::terminal::{flush, write};
 use crate::bindings::_helpers::compile_driver::pipeline_entries::project_graph;
 use crate::bindings::_helpers::graph::python_node_graph::{
     python_node_graph, run_selection_from_inputs,
 };
 use crate::bindings::_helpers::graph::python_selection::python_node_names;
 use crate::bindings::_helpers::planner_selection::unit_tests::split_project_unit_test_selectors;
+use sqlbuild_python_base::build_progress::main::terminal::flush::flush;
+use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::native_host::main::flush_console::flush_console;
 use sqlbuild_python_base::native_host::main::module_installed::module_installed;
 use sqlbuild_python_base::native_host::main::python_executable::python_executable;

@@ -20,7 +20,6 @@ use crate::bindings::_helpers::freshness::observation::{
 };
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
 use crate::bindings::_helpers::freshness::support::text;
-use crate::bindings::_helpers::native_host::synced_copy::WarehouseAccessRefusedError;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::state_rows::freshness::{age_policy, equivalent};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -31,6 +30,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::warehouse_access::main::is_warehouse_access_refused::is_warehouse_access_refused;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const NO_CONFIG_MESSAGE: &str = "no freshness config and adapter metadata unavailable";
@@ -39,7 +39,7 @@ pub(crate) const PREVIEW_MESSAGE: &str = "a plan preview does not observe source
 
 /// The message of an adapter, freshness observation or preview access error, if it is one.
 fn handled_message<'py>(py: Python<'py>, error: &PyErr) -> PyResult<Option<Bound<'py, PyAny>>> {
-    if error.is_instance_of::<WarehouseAccessRefusedError>(py) {
+    if is_warehouse_access_refused(py, error) {
         return Ok(Some(text(py, PREVIEW_MESSAGE)));
     }
     let value: Bound<'py, PyAny> = error.value(py).clone().into_any();

@@ -16,10 +16,10 @@ use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql;
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 use sqlbuild_state::state_tables::models::TableColumn;
 
-use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
 use crate::bindings::_helpers::state_rows::freshness::record_event_id;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 

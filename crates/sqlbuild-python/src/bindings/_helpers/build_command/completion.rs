@@ -16,9 +16,6 @@ use crate::bindings::_helpers::build_command::execution::{
     Outcome, Preparation, write_run_context,
 };
 use crate::bindings::_helpers::build_command::invocation::BuildContext;
-use crate::bindings::_helpers::build_command::support::{
-    boolean, emit, joined, none, text, utc_now,
-};
 use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
 use crate::bindings::_helpers::build_progress::result_text::build_result_text;
 use crate::bindings::_helpers::check::check_results::check_result_text;
@@ -37,6 +34,12 @@ use sqlbuild_core::build_progress::models::PythonNodeText;
 use sqlbuild_core::check_command::models::{CheckResultText, CheckStatus};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::build_command::main::boolean::boolean;
+use sqlbuild_python_base::build_command::main::emit::emit;
+use sqlbuild_python_base::build_command::main::joined::joined;
+use sqlbuild_python_base::build_command::main::none::none;
+use sqlbuild_python_base::build_command::main::text::text;
+use sqlbuild_python_base::build_command::main::utc_now::utc_now;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

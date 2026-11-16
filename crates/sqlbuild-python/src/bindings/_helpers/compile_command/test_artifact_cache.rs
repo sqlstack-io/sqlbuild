@@ -12,8 +12,9 @@ use sqlbuild_cache::digest::main::bytes_digest::bytes_digest;
 use sqlbuild_cache::digest::main::hex_digest::hex_digest;
 use sqlbuild_core::json::models::JsonValue;
 
-use crate::bindings::_helpers::compile_outputs::json_report::{orjson_sorted, orjson_value};
 use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::compile_outputs::main::orjson_sorted::orjson_sorted;
+use sqlbuild_python_base::compile_outputs::main::orjson_value::orjson_value;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::types::RecordId;
 

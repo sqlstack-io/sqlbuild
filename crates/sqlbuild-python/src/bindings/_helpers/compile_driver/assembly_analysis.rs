@@ -23,12 +23,8 @@ use crate::bindings::_helpers::analysis_session::profile_inputs::{
     ADAPTER_RULE_ID, nullability_rules, text_pairs,
 };
 use crate::bindings::_helpers::analysis_session::stage_functions::expression_source_shapes;
-use crate::bindings::_helpers::compile_context::compile_timings::PythonProcessClock;
 use crate::bindings::_helpers::compile_driver::analysis_cache::analysis_cache_context;
 use crate::bindings::_helpers::compile_driver::assembly::{AssemblyRequest, AssemblyStage};
-use crate::bindings::_helpers::compile_driver::stage_work::{
-    EXPRESSION_SHAPES, MODEL_ANALYSIS, count_stage,
-};
 use crate::bindings::_helpers::compiled_views::model_input_view::attached_schema;
 use crate::bindings::_helpers::compiled_views::source_views::read_source_view;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
@@ -39,6 +35,10 @@ use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, f
 use crate::bindings::_helpers::sqltext::lexical_syntax::optional_record_syntax;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::compile_context::models::PythonProcessClock;
+use sqlbuild_python_base::compile_driver::constants::EXPRESSION_SHAPES;
+use sqlbuild_python_base::compile_driver::constants::MODEL_ANALYSIS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::main::log_warning_message::log_warning_message;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;

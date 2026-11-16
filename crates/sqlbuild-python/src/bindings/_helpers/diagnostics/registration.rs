@@ -2,11 +2,14 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
-use crate::bindings::_helpers::diagnostics::{console_records, log_records, redaction, trackers};
+use sqlbuild_python_base::diagnostics::main::register_console_records::register_console_records;
+use sqlbuild_python_base::diagnostics::main::register_log_records::register_log_records;
+use sqlbuild_python_base::diagnostics::main::register_redaction::register_redaction;
+use sqlbuild_python_base::diagnostics::main::register_trackers::register_trackers;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    console_records::register(module)?;
-    log_records::register(module)?;
-    redaction::register(module)?;
-    trackers::register(module)
+    register_console_records(module)?;
+    register_log_records(module)?;
+    register_redaction(module)?;
+    register_trackers(module)
 }

@@ -10,7 +10,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::scenario_command::main::format_captured_at::format_captured_at;
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::compile_context::input_reads::{context_read, environment_read};
 use crate::bindings::_helpers::model_config::config_errors::config_exception;
 use crate::bindings::_helpers::model_config::config_templates::{
     TemplateOutcome, TemplateSources, expand_config_templates, lone_surrogate_site,
@@ -20,6 +19,8 @@ use crate::bindings::_helpers::model_config::unicode_environment::unicode_enviro
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::compile_context::main::input_reads::context_read::context_read;
+use sqlbuild_python_base::compile_context::main::input_reads::environment_read::environment_read;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::types::ErrorId;
 

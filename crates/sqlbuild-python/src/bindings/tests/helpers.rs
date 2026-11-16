@@ -3,22 +3,21 @@ use std::path::{Path, PathBuf};
 
 use sqlbuild_analysis::assembly::analysis_session::models::DynamicFamily;
 use sqlbuild_cache::project_reuse::types::ImageSections;
-use sqlbuild_config::models::ConfigValue;
 
 use crate::bindings::_helpers::change_selection::base_cache::cache_key_with;
 use sqlbuild_rules::models::{EvaluateRequest, RetainedRows};
 
 use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
-use crate::bindings::_helpers::compile_context::delta::BaseRules;
-use crate::bindings::_helpers::compile_context::delta::ModelCoverage;
-use crate::bindings::_helpers::compile_context::delta::PendingRules;
-use crate::bindings::_helpers::compile_context::delta::{
-    CapturedDiagnostic, CapturedModel, CapturedTest,
-};
 use crate::bindings::_helpers::compile_delta::image::{
     FACTS_SECTION, GATE_SECTION, IMAGE_FORMAT, ImageRelations, ImageRules, ProjectImage,
     RULE_DIGESTS_SECTION,
 };
+use sqlbuild_python_base::compile_context::models::BaseRules;
+use sqlbuild_python_base::compile_context::models::CapturedDiagnostic;
+use sqlbuild_python_base::compile_context::models::CapturedModel;
+use sqlbuild_python_base::compile_context::models::CapturedTest;
+use sqlbuild_python_base::compile_context::models::ModelCoverage;
+use sqlbuild_python_base::compile_context::models::PendingRules;
 
 /// The rows of a request without models: a zero model count.
 const RULE_ROWS: [u8; 8] = [0; 8];
@@ -239,11 +238,6 @@ pub(crate) fn without_rule_digests(sections: &mut ImageSections) {
 /// The names in `values`, as a set.
 pub(crate) fn names(values: &[&str]) -> BTreeSet<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
-}
-
-/// A YAML string value.
-pub(crate) fn text(value: &str) -> ConfigValue {
-    ConfigValue::String(value.to_owned())
 }
 
 /// One model's semantic coverage facts.

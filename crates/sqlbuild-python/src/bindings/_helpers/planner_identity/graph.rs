@@ -1,5 +1,6 @@
 //! Planner execution edges, their injected origins, stable execution order and buildability over compiled keys.
 
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{
@@ -31,7 +32,6 @@ use crate::bindings::_helpers::references::explicit_references::{
     GateRow, HookRow, native_execution_gate_edges,
 };
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
@@ -258,10 +258,7 @@ pub(crate) fn build_downstream_deps<'py>(
 }
 
 fn planner_input_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::PlannerInput).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::PlannerInput, &message)
 }
 
 fn edge_origins<'py>(

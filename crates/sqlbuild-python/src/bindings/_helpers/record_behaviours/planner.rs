@@ -3,6 +3,7 @@
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 
 use sqlbuild_core::migration_values::main::migration_decision_traits::migration_decision_traits;
 use sqlbuild_core::migration_values::main::model_migration_blocks_build::model_migration_blocks_build as blocks_build;
@@ -13,7 +14,6 @@ use crate::bindings::_helpers::cursor::scalars::parse_value;
 use sqlbuild_python_base::boundary::main::call_argument::call_argument;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -157,10 +157,7 @@ pub(crate) fn column_migration_blocks_build(entry: &Bound<'_, PyAny>) -> PyResul
 
 /// The `PlannerInputError` carrying `message`.
 fn planner_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::PlannerInput).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::PlannerInput, &message)
 }
 
 /// A `--*-cursor-ts` value: text checked as an ISO timestamp and parsed, others unchanged.

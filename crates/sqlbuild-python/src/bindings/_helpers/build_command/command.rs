@@ -18,10 +18,8 @@ use crate::bindings::_helpers::build_command::planning::{
     compile_build_plan, enforce_build_plan_policies, run_defer_clone_prephase,
     write_compile_target, write_plan_text,
 };
-use crate::bindings::_helpers::build_command::support::{frozenset, tuple};
 use crate::bindings::_helpers::check::check_core::relevant_check_functions;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
-use crate::bindings::_helpers::diagnostics::trackers::BuildPhaseTimingTracker;
 use crate::bindings::_helpers::discovery::provider_secrets::{
     consumer_uses, provider_uses, require_used_secrets, sink_uses,
 };
@@ -32,6 +30,9 @@ use crate::bindings::_helpers::observations::source_capture::{
 use crate::bindings::_helpers::recall::console::write_stderr;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::build_command::main::frozenset::frozenset;
+use sqlbuild_python_base::build_command::main::tuple::tuple;
+use sqlbuild_python_base::diagnostics::models::BuildPhaseTimingTracker;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 

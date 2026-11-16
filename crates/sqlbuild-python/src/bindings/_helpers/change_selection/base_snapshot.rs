@@ -26,8 +26,9 @@ use crate::bindings::_helpers::change_selection::base_compile::NOTES_EXTENSION;
 use crate::bindings::_helpers::change_selection::environment_nodes::with_base_dependencies;
 use crate::bindings::_helpers::compile_command::runtime_identity::interpreter_values;
 use crate::bindings::_helpers::discovery::project_config::configured_git_base_ref;
-use crate::bindings::_helpers::planner_identity::json_values::{COMPACT, sorted_dumps};
 use crate::bindings::_helpers::scenario_command::setup::{cli_user_error, flush, write};
+use sqlbuild_python_base::planner_identity::constants::COMPACT;
+use sqlbuild_python_base::planner_identity::main::sorted_dumps::sorted_dumps;
 
 const CACHE_DIRECTORY: [&str; 2] = ["target", "since"];
 /// Where base compiles work when the project's cache directory cannot be created.

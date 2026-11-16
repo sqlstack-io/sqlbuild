@@ -16,7 +16,6 @@ use sqlbuild_core::format_command::main::render_lint_text::render_lint_text;
 use sqlbuild_core::format_command::models::LintReport;
 use sqlbuild_rules::lint_text::main::scan_fixture_null_candidates::scan_fixture_null_candidates;
 
-use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::format_command::config::{FormatConfig, format_config, lint_config};
 use crate::bindings::_helpers::format_command::files::FormatChange;
@@ -24,13 +23,14 @@ use crate::bindings::_helpers::format_command::report::lint_report;
 use crate::bindings::_helpers::format_command::run::{FormatOutcome, FormatRequest, run_format};
 use crate::bindings::_helpers::format_command::selection::{LintInputs, resolve_lint_inputs};
 use crate::bindings::_helpers::format_command::stages::quote_fixable_file_count;
-use crate::bindings::_helpers::frontier::encoder::emit_error;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
+use sqlbuild_python_base::frontier::main::emit_error::emit_error;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const SQL_ANALYSIS_SETTING_KEY: &str = "sql_analysis";

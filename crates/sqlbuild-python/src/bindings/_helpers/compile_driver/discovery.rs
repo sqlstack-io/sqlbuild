@@ -10,7 +10,6 @@ use crate::bindings::_helpers::compile_driver::config_validation::{
     ProjectConfiguration, reject_invalid_project_configuration,
 };
 use crate::bindings::_helpers::compile_driver::integration_loaders::integration_loader_functions;
-use crate::bindings::_helpers::compile_driver::stage_work::{PROJECT_DISCOVERIES, count_stage};
 use crate::bindings::_helpers::discovery::constants::{
     ALLOW_MISSING_SECRETS_ENV, ALLOW_MISSING_SECRETS_SETTING, TRUE_ENV_VALUES,
 };
@@ -43,13 +42,15 @@ use crate::bindings::_helpers::discovery::sql_test_records::{
 use crate::bindings::_helpers::discovery::yaml_records::{
     discover_schema_files, discover_source_files,
 };
-use crate::bindings::_helpers::event_exporting::scope::configure_discovered_event_exporters;
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, produced};
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::compile_driver::constants::PROJECT_DISCOVERIES;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
+use sqlbuild_python_base::event_exporting::main::configure_discovered_event_exporters::configure_discovered_event_exporters;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -286,7 +287,7 @@ fn assembled_inputs<'py>(
     )?
     .is_truthy()?
     {
-        crate::bindings::_helpers::compile_context::delta::stop_capture();
+        sqlbuild_python_base::compile_context::main::delta::stop_capture::stop_capture();
     }
     let sql_analysis_override: &Bound<'py, PyAny> = request.sql_analysis_enabled_override.bind(py);
     let sql_analysis_enabled: Bound<'py, PyAny> = if !sql_analysis_override.is_none() {

@@ -12,9 +12,9 @@ use sqlbuild_core::load_command::main::render_load_spinner_line::render_load_spi
 use sqlbuild_core::load_command::models::{LoadResultText, LoadSpinnerRow, LoadStatus};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
-use crate::bindings::_helpers::build_progress::terminal::start_spinner;
-use crate::bindings::_helpers::build_progress::transient_lines::shared_transient_line_coordinator;
+use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
+use sqlbuild_python_base::build_progress::main::terminal::start_spinner::start_spinner;
+use sqlbuild_python_base::build_progress::main::transient_lines::shared_transient_line_coordinator::shared_transient_line_coordinator;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;

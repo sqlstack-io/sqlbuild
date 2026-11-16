@@ -2,22 +2,19 @@
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyFloat};
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 
 use sqlbuild_model_config::header_metadata::main::check_measurement_contract::check_measurement_contract;
 use sqlbuild_model_config::header_metadata::main::check_threshold_bound::check_threshold_bound;
 use sqlbuild_model_config::header_metadata::main::check_threshold_pair::check_threshold_pair;
 use sqlbuild_model_config::header_metadata::models::{ThresholdBound, ThresholdInput};
 
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
 /// The `MeasurementAuditError` carrying `message`.
 fn measurement_error(py: Python<'_>, message: &str) -> PyErr {
-    match error_class(py, ErrorId::MeasurementAudit).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::MeasurementAudit, message)
 }
 
 /// How Python's threshold validation sees one limit value.

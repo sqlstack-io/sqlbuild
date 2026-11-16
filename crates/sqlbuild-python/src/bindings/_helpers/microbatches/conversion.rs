@@ -1,5 +1,6 @@
 //! Microbatch events, scopes and intervals read from their Python shapes.
 
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -11,17 +12,11 @@ use sqlbuild_state::microbatches::models::{BoundInterval, CursorBound};
 
 use crate::bindings::_helpers::cursor::conversion::CursorSession;
 use crate::bindings::_helpers::cursor::scalars::as_scalar;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// `MicrobatchStateError(message)`.
 pub(crate) fn state_error(py: Python<'_>, message: &str) -> PyErr {
-    match host_entry(py, ExecutorHost::MicrobatchStateError)
-        .and_then(|class| class.call1((message,)))
-    {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    host_error(py, ExecutorHost::MicrobatchStateError, message)
 }
 
 /// `str(value)` of a string enum member or string.

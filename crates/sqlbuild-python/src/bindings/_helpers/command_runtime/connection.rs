@@ -1,5 +1,6 @@
 //! Connection config resolution for CLI commands.
 
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 use std::path::PathBuf;
 
 use pyo3::prelude::{
@@ -26,7 +27,6 @@ use crate::bindings::_helpers::dbt_interop::profile_connection::resolve_raw_dbt_
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const ATTACH_KEY: &str = "attach";
@@ -68,12 +68,11 @@ fn warn(py: Python<'_>, message: &str) -> PyResult<()> {
 }
 
 fn dbt_profile_error(py: Python<'_>) -> PyErr {
-    match host_entry(py, ThirdPartyHost::DbtProfileError)
-        .and_then(|class| class.call1((DBT_PROFILE_REQUIRES_PROJECT,)))
-    {
-        Ok(instance) => PyErr::from_value(instance),
-        Err(error) => error,
-    }
+    host_error(
+        py,
+        ThirdPartyHost::DbtProfileError,
+        DBT_PROFILE_REQUIRES_PROJECT,
+    )
 }
 
 /// The config with a referenced dbt profile resolved and user overrides kept on top.

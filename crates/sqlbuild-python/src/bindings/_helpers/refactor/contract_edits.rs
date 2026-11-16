@@ -6,6 +6,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use sqlbuild_refactor::refactoring::errors::{RefactorError, RefactorErrorKind};
 use sqlbuild_refactor::refactoring::main::edit_model_contract::edit_model_contract;
 use sqlbuild_refactor::refactoring::main::edit_source_contract::edit_source_contract;
@@ -16,7 +17,6 @@ use sqlbuild_refactor::refactoring::types::PhysicalColumn;
 
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
@@ -43,10 +43,7 @@ fn edit_row(result: Result<ContractEdit, RefactorError>) -> PyResult<EditRow> {
 
 /// `ContractAdoptionError(message)`.
 fn adoption_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::ContractAdoption).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::ContractAdoption, &message)
 }
 
 /// `(edited contents, ownership conflict)`, raising the edit's adoption failure.

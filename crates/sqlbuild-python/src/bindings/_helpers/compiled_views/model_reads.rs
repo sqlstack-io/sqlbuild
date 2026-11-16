@@ -2,11 +2,12 @@
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::bindings::_helpers::compile_driver::stage_work::{COMPILED_VIEW_FALLBACKS, count_stage};
 use crate::bindings::_helpers::compiled_views::compiled_model_view::{
     DeclaredRow, LineageInput, NativeCompiledModel,
 };
 use sqlbuild_project::types::InferredRow;
+use sqlbuild_python_base::compile_driver::constants::COMPILED_VIEW_FALLBACKS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// One lineage output with its transform kind and confidence values, and its sources.

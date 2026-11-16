@@ -23,11 +23,11 @@ use crate::bindings::_helpers::fingerprints::storage_sql::{
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 
-use crate::bindings::_helpers::native_host::state_column_evolution::ensure_event_id_column;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::warehouse_access::main::ensure_event_id_column::ensure_event_id_column;
 const TIME_MODULE: &str = "time";
 const LOGGING_MODULE: &str = "logging";
 const LOGGER_NAME: &str = "sqlbuild.fingerprints";
