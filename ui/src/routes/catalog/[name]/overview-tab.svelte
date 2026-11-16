@@ -195,7 +195,7 @@
 	.drift-hint:not(:disabled):hover { background: var(--sb-hover); }
 	.drift-hint :global(svg) { flex: 0 0 auto; color: var(--sb-stale); }
 	.drift-hint.changed_upstream { border-style: dashed; }
-	.drift-hint.behind { border-color: color-mix(in srgb, var(--sb-warning) 35%, var(--border)); }
-	.drift-hint.behind :global(svg) { color: var(--sb-warning); }
+	.drift-hint.behind { border-color: color-mix(in srgb, var(--sb-behind) 35%, var(--border)); }
+	.drift-hint.behind :global(svg) { color: var(--sb-behind); }
 	.drift-hint em { margin-left: auto; color: var(--primary); font-style: normal; white-space: nowrap; }
 </style>

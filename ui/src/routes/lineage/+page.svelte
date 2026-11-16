@@ -599,7 +599,7 @@
 <AppTopbar title="Lineage">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
 	{#if app.client.supports('launchAdhocRun')}
-		{#if changedCount}<GatedButton requires="run.adhoc" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build <span class="changed-count">{changedCount} changed</span></GatedButton>{/if}
+		{#if changedCount}<GatedButton requires="run.adhoc" variant="stale" onclick={() => goto(to(CHANGED_PLAN_HREF))}>Build {changedCount} changed</GatedButton>{/if}
 		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
 	{/if}
 </AppTopbar>
@@ -1067,10 +1067,6 @@
 	.toolbar-action:hover {
 		background: var(--sb-hover);
 		color: var(--foreground);
-	}
-	.changed-count {
-		color: var(--sb-stale);
-		font-weight: 500;
 	}
 	.status-summary {
 		display: flex;
@@ -1715,10 +1711,10 @@
 		border-style: dashed;
 	}
 	.drift-hint.behind {
-		border-color: color-mix(in srgb, var(--sb-warning) 35%, var(--border));
+		border-color: color-mix(in srgb, var(--sb-behind) 35%, var(--border));
 	}
 	.drift-hint.behind :global(svg) {
-		color: var(--sb-warning);
+		color: var(--sb-behind);
 	}
 	.drift-hint:disabled {
 		cursor: default;

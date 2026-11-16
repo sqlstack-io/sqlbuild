@@ -23,8 +23,11 @@ export type AttentionView = {
 	href: string;
 	action: string;
 	consequences: Consequence[];
-	/** The one build an out-of-date alert offers: `sqb build --changed` when anything changed, else a rebuild of the nodes behind. */
-	build?: { label: string; href: string };
+	/**
+	 * The one build an out-of-date alert offers: `sqb build --changed` when anything changed, else a rebuild of the nodes behind.
+	 * Purple means "needs building": solid for changed nodes, outlined for nodes only behind.
+	 */
+	build?: { label: string; href: string; variant: 'stale' | 'stale-outline' };
 };
 
 /** A heartbeat gap shorter than this reads as a pause, not an outage: the run carries on when its worker reports again. */
@@ -85,7 +88,9 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				href: '/catalog?stale=1',
 				action: 'View in catalog',
 				consequences: [],
-				build: item.changed.length ? { label: 'Build what changed', href: CHANGED_PLAN_HREF } : { label: `Rebuild ${all.length}`, href: planHref(all) }
+				build: item.changed.length
+					? { label: 'Build what changed', href: CHANGED_PLAN_HREF, variant: 'stale' }
+					: { label: `Rebuild ${all.length}`, href: planHref(all), variant: 'stale-outline' }
 			};
 		}
 		case 'stale_sources':

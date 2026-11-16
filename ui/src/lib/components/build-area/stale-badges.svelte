@@ -37,9 +37,10 @@
 		border: 1px dashed color-mix(in srgb, var(--sb-stale) 55%, transparent);
 		background: transparent;
 	}
+	/* Behind only: lighter purple, so it reads as needing a build but less urgently than a change. */
 	.badge.behind {
-		background: color-mix(in srgb, var(--sb-warning) 13%, transparent);
-		color: var(--sb-warning);
+		background: color-mix(in srgb, var(--sb-behind) 12%, transparent);
+		color: var(--sb-behind);
 	}
 	.none {
 		color: var(--muted-foreground);

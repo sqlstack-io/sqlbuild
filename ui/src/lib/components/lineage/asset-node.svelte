@@ -202,8 +202,8 @@
 		font-weight: 500;
 	}
 	.drift.behind {
-		background: color-mix(in srgb, var(--sb-warning) 14%, transparent);
-		color: var(--sb-warning);
+		background: color-mix(in srgb, var(--sb-behind) 12%, transparent);
+		color: var(--sb-behind);
 	}
 	.when.first::before {
 		content: none;

@@ -97,7 +97,7 @@
 	counts={showBuildState
 		? [
 				{ tone: 'var(--sb-stale)', count: counts.changed, label: 'changed' },
-				{ tone: 'var(--sb-warning)', count: counts.behind, label: 'behind' },
+				{ tone: 'var(--sb-behind)', count: counts.behind, label: 'behind' },
 				{ tone: 'var(--sb-error)', count: counts.failed, label: 'failed' }
 			]
 		: []}

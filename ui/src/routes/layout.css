@@ -57,6 +57,8 @@
 	--sb-error: #c74757;
 	--sb-running: #2677d9;
 	--sb-stale: #7756b9;
+	/* Needs building: changed nodes use --sb-stale; nodes only behind an upstream rebuild use this lighter purple. */
+	--sb-behind: #a089d3;
 	--sb-secondary: #16826f;
 	--sb-text-faint: #98a0ad;
 	--sb-surface-low: #f7f8fa;
@@ -132,6 +134,7 @@
 	--sb-error: #f47089;
 	--sb-running: #69aaf6;
 	--sb-stale: #a78bfa;
+	--sb-behind: #8a77c4;
 	--sb-secondary: #4dd6c4;
 	--sb-text-faint: #626975;
 	--sb-surface-low: #080a0d;

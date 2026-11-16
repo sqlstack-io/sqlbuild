@@ -71,7 +71,7 @@
 	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
 	const loaded = $derived(data !== null);
 	const healthTone = $derived(
-		!loaded ? 'var(--sb-text-faint)' : issues.some((i) => i.view.tone === 'error') ? 'var(--sb-error)' : issues.some((i) => i.view.tone === 'warning' || i.view.tone === 'stale') ? 'var(--sb-warning)' : 'var(--sb-success)'
+		!loaded ? 'var(--sb-text-faint)' : issues.some((i) => i.view.tone === 'error') ? 'var(--sb-error)' : issues.some((i) => i.view.tone === 'warning') ? 'var(--sb-warning)' : issues.some((i) => i.view.tone === 'stale') ? 'var(--sb-stale)' : 'var(--sb-success)'
 	);
 	const latest = $derived(data?.latestRun ?? null);
 	const latestText = $derived(latest ? `Last run ${runStatusLabel[latest.status].toLowerCase()} ${formatAgo(latest.endedAt, app.now)}` : 'No runs yet');
@@ -127,7 +127,7 @@
 						<div class="health-facts">
 							<!-- The out-of-date alert below already counts these. -->
 							{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
-							{#if m.stale?.behind && !staleListed}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
+							{#if m.stale?.behind && !staleListed}<span><i class="status-dot behind"></i><b>{m.stale.behind}</b> behind</span>{/if}
 							{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
 						</div>
 					{/if}
@@ -159,7 +159,7 @@
 								<span class="issue-actions">
 									{#if view.build}
 										{@const build = view.build}
-										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(to(build.href))}>{build.label}</GatedButton>
+										<GatedButton requires="run.adhoc" size="xs" variant={build.variant} onclick={() => goto(to(build.href))}>{build.label}</GatedButton>
 									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>
@@ -262,7 +262,7 @@
 								</span>
 								<b>{g.current}/{g.total}</b>
 								<b class:stale-text={g.changed}>{g.changed || '—'}</b>
-								<b class:warn-text={g.behind}>{g.behind || '—'}</b>
+								<b class:behind-text={g.behind}>{g.behind || '—'}</b>
 								<b class:error-text={g.failed}>{g.failed || '—'}</b>
 							</a>
 						{:else}
@@ -376,6 +376,7 @@
 	.warning { background: var(--sb-warning); }
 	.error { background: var(--sb-error); }
 	.stale { background: var(--sb-stale); }
+	.behind { box-shadow: inset 0 0 0 1.5px var(--sb-stale); background: color-mix(in srgb, var(--sb-stale) 25%, transparent); }
 	.groups { padding: 6px 0 8px; }
 	.group-row { display: grid; grid-template-columns: 110px minmax(80px, 1fr) 60px 64px 56px 52px; align-items: center; gap: 12px; padding: 7px 16px; font-size: 12.5px; }
 	a.group-row:hover { background: var(--sb-hover); }
@@ -388,7 +389,7 @@
 	.stale-segment { background: var(--sb-stale); }
 	.fail-segment { background: var(--sb-error); }
 	.stale-text { color: var(--sb-stale) !important; }
-	.warn-text { color: var(--sb-warning) !important; }
+	.behind-text { color: var(--sb-behind) !important; }
 	.error-text { color: var(--sb-error) !important; }
 	.empty { padding: 18px 16px; color: var(--muted-foreground); font-size: 12.5px; }
 	.partial { max-width: 640px; padding: 18px 20px; font-size: 13px; }
