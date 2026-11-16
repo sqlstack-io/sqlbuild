@@ -22,6 +22,7 @@
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel } from '$lib/build-area/labels';
 	import { checkValue, kindLabel, outcomeOf, parseOutcomeFilter, type OutcomeFilter } from './utils';
+	import { countBy } from '$lib/list/count-by';
 
 	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
 	const all = $derived(checks.data ?? []);
@@ -45,13 +46,16 @@
 			return !q || [c.name, c.node ?? '', c.column ?? '', kindLabel(c)].some((s) => s.toLowerCase().includes(q));
 		})
 	);
+	const byBucket = $derived(countBy(all, bucket));
 	const counts = $derived({
 		all: all.length,
-		failing: all.filter((c) => bucket(c) === 'failing').length,
-		warn: all.filter((c) => bucket(c) === 'warn').length,
-		pass: all.filter((c) => bucket(c) === 'pass').length,
-		other: all.filter((c) => bucket(c) === 'other').length
+		failing: byBucket.get('failing') ?? 0,
+		warn: byBucket.get('warn') ?? 0,
+		pass: byBucket.get('pass') ?? 0,
+		other: byBucket.get('other') ?? 0
 	});
+	const byAttachment = $derived(countBy(all, (c) => c.attachment));
+	const byNode = $derived(countBy(all, (c) => c.node));
 	const outcomeOptions: { value: OutcomeFilter; label: string }[] = [
 		{ value: 'all', label: 'All' },
 		{ value: 'failing', label: 'Failing' },
@@ -98,8 +102,8 @@
 >
 	{#snippet filters()}
 		<SegmentedFilter loading={checks.data === undefined} bind:value={outcomeFilter} options={outcomeOptions.map((o) => ({ ...o, count: counts[o.value] }))} />
-		<ChoiceFilter label="Attached to" bind:value={attachment} options={(['model', 'source', 'seed', 'end'] as CheckAttachment[]).map((a) => ({ value: a, label: attachmentLabel[a], count: all.filter((c) => c.attachment === a).length }))} />
-		<ChoiceFilter label="Node" bind:value={nodeFilter} options={nodes.map((n) => ({ value: n, label: n, count: all.filter((c) => c.node === n).length }))} />
+		<ChoiceFilter label="Attached to" bind:value={attachment} options={(['model', 'source', 'seed', 'end'] as CheckAttachment[]).map((a) => ({ value: a, label: attachmentLabel[a], count: byAttachment.get(a) ?? 0 }))} />
+		<ChoiceFilter label="Node" bind:value={nodeFilter} options={nodes.map((n) => ({ value: n, label: n, count: byNode.get(n) ?? 0 }))} />
 	{/snippet}
 </ListToolbar>
 
