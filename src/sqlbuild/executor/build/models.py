@@ -196,7 +196,7 @@ class BuildIndexes:
 
 @dataclass(frozen=True)
 class NodeCompletion:
-    """Result of a single node execution passed back from a worker to the scheduler."""
+    """A node's result, or the error that escaped it, passed back from a worker."""
 
     key: CompiledObjectKey
     result: (
@@ -205,7 +205,9 @@ class NodeCompletion:
         | FunctionExecutionResult
         | SqlTestExecutionResult
         | LoadExecutionResult
-    )
+        | None
+    ) = None
+    error: BaseException | None = None
 
 
 @dataclass(frozen=True)
