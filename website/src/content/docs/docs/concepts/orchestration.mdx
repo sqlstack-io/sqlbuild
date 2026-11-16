@@ -165,10 +165,15 @@ on_new_orders = sensor(
 | Condition | Starts a run for |
 | --- | --- |
 | `platform_event(kinds=[...])` | Server events, such as an overdue tick |
-| `run_event(job="...", kinds=[...])` | Outcomes of another job or group, optionally only when `executed_successfully` nodes ran and succeeded |
+| `run_event(job="...", kinds=[...])` | Outcomes of another job or group, including the job's runs inside groups, optionally only when `executed_successfully` nodes ran and succeeded |
 | `node_event(select="...", kinds=[...])` | Each success, failure or recovery of the selected nodes in any run |
 | `source_new_data(select="...")` | Each new version of the selected sources |
 | `source_stale(select="...", after_seconds=...)` | Each source version older than `after_seconds` |
+
+A `run_event` on a job also fires for that job's runs inside a job group. Each member of a group
+run ends with its own outcome as soon as it finishes, while the rest of the group may still be
+running, and `executed_successfully` checks that member's nodes. Moving a job into a group therefore
+keeps every sensor that watches it. A sensor on the group fires once, when the whole group run ends.
 
 A sensor without `when` decorates a function that polls and returns `RunRequest(run_key=...)`
 values or a `SkipReason`. A sensor also takes `minimum_interval_seconds` (default 30),

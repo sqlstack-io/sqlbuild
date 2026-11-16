@@ -1,0 +1,231 @@
+//! A member job's outcome inside a group run is a run event of that job, as soon as the member ends.
+
+use std::collections::BTreeMap;
+use std::time::Duration;
+
+use serde_json::json;
+use uuid::Uuid;
+
+use crate::credentials::models::AuditContext;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::declarations::main::list_triggers::list_triggers;
+use crate::runs::main::{
+    advance_groups::advance_groups, claim_next_run::claim_next_run, list_runs::list_runs,
+    request_job_run::request_job_run,
+};
+use crate::runs::models::{JobRunRequest, NodeOutcome, RunOutcome, RunStatus};
+use crate::runs::tests::claim_helpers::finish;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::sensors::main::{
+    begin_sensor_evaluation::begin_sensor_evaluation,
+    complete_builtin_sensor::complete_builtin_sensor,
+};
+use crate::sensors::tests::test_types::GroupMemberSensorTestCase;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
+
+#[test]
+fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_outcome_fires_once_while_the_group_runs()
+ {
+    let test_cases = [
+        GroupMemberSensorTestCase {
+            description: "SQLite member succeeds",
+            backend: Backend::Sqlite,
+            staging: (NodeOutcome::Success, RunOutcome::Success),
+            expected_firing: &["staging_success"],
+            expected_after_marts: &["staging_success"],
+        },
+        GroupMemberSensorTestCase {
+            description: "PostgreSQL member succeeds",
+            backend: Backend::Postgres,
+            staging: (NodeOutcome::Success, RunOutcome::Success),
+            expected_firing: &["staging_success"],
+            expected_after_marts: &["staging_success"],
+        },
+        GroupMemberSensorTestCase {
+            description: "SQLite member fails and its dependent is skipped",
+            backend: Backend::Sqlite,
+            staging: (NodeOutcome::Failed, RunOutcome::Failed),
+            expected_firing: &["staging_failed"],
+            expected_after_marts: &["marts_failed", "staging_failed"],
+        },
+        GroupMemberSensorTestCase {
+            description: "PostgreSQL member fails and its dependent is skipped",
+            backend: Backend::Postgres,
+            staging: (NodeOutcome::Failed, RunOutcome::Failed),
+            expected_firing: &["staging_failed"],
+            expected_after_marts: &["marts_failed", "staging_failed"],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = crate::runs::tests::helpers::snapshot(location);
+            input.nodes.get_mut("orders").expect("orders").definition["deps"] =
+                json!(["customers"]);
+            input.documents.insert(
+                "jobs".into(),
+                json!({
+                    "staging_job": {"description": "Stage customers", "selection": ["customers"]},
+                    "marts_job": {"description": "Build orders", "selection": ["orders"]},
+                    "report_job": {"description": "Report on inventory", "selection": ["inventory"]}
+                }),
+            );
+            input.documents.insert(
+                "groups".into(),
+                json!({"nightly_job_group": {
+                    "description": "Stage then build orders", "selection": ["customers", "orders"],
+                    "jobs": {"staging_job": [], "marts_job": ["staging_job"]}
+                }}),
+            );
+            let mut sensors = serde_json::Map::new();
+            for (name, job, kind) in [
+                ("staging_success", "staging_job", "success"),
+                ("staging_failed", "staging_job", "failed"),
+                ("marts_failed", "marts_job", "failed"),
+                ("group_completed", "nightly_job_group", "completed"),
+            ] {
+                sensors.insert(
+                    name.into(),
+                    json!({
+                        "description": "Report when a job ends", "job_key": "report_job",
+                        "when": {"kind": "run_event", "job_key": job, "kinds": [kind]},
+                        "minimum_interval_seconds": 1
+                    }),
+                );
+            }
+            input.documents.insert("triggers".into(), json!(sensors));
+            publish_snapshot(store, &input).await.expect("publish");
+            let context = AuditContext {
+                actor: "test-admin".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let group = Uuid::now_v7();
+            request_job_run(
+                store,
+                (&context, None),
+                &JobRunRequest {
+                    run_id: group,
+                    location_id: location,
+                    target: "development".into(),
+                    job_key: "nightly_job_group".into(),
+                    reason: "Build the nightly group".into(),
+                    priority: 0,
+                    window: None,
+                    full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
+                },
+            )
+            .await
+            .expect("request group");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::new();
+            let scope = (location, "development");
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("start group");
+            let staging = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim staging")
+                .expect("staging ready");
+            assert_eq!(staging.request.job_key.as_deref(), Some("staging_job"));
+            finish(store, &staging, test_case.staging).await;
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("advance group");
+
+            let triggers = list_triggers(store, location, "development")
+                .await
+                .expect("triggers");
+            let mut fired: BTreeMap<String, usize> = BTreeMap::new();
+            let evaluate = async |fired: &mut BTreeMap<String, usize>| {
+                for trigger in &triggers {
+                    let Some(requested) =
+                        begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                            .await
+                            .expect("begin evaluation")
+                    else {
+                        continue;
+                    };
+                    let count = complete_builtin_sensor(store, &lease, &requested)
+                        .await
+                        .expect("complete evaluation");
+                    *fired.entry(trigger.name.clone()).or_default() += count;
+                }
+            };
+            evaluate(&mut fired).await;
+            let firing: Vec<&str> = fired
+                .iter()
+                .filter(|(_, count)| **count > 0)
+                .map(|(name, _)| name.as_str())
+                .collect();
+            assert_eq!(
+                firing, test_case.expected_firing,
+                "{}: the member's outcome fires before the group ends",
+                test_case.description
+            );
+            assert!(
+                fired.values().all(|count| *count <= 1),
+                "{}: {fired:?}",
+                test_case.description
+            );
+            let runs = list_runs(store, scope, 100).await.expect("runs");
+            assert_eq!(
+                runs.iter()
+                    .find(|record| record.run_id == group)
+                    .expect("group")
+                    .status,
+                RunStatus::Running,
+                "{}: the group is still running",
+                test_case.description
+            );
+
+            let marts = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim marts")
+                .expect("marts ready");
+            assert_eq!(marts.request.job_key.as_deref(), Some("marts_job"));
+            let marts_outcome = if test_case.staging.1 == RunOutcome::Success {
+                (NodeOutcome::Success, RunOutcome::Success)
+            } else {
+                (NodeOutcome::Skipped, RunOutcome::Failed)
+            };
+            finish(store, &marts, marts_outcome).await;
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("finish group");
+            tokio::time::sleep(Duration::from_millis(1100)).await;
+            evaluate(&mut fired).await;
+            let mut expected: Vec<&str> = test_case.expected_after_marts.to_vec();
+            expected.push("group_completed");
+            expected.sort_unstable();
+            let firing: Vec<&str> = fired
+                .iter()
+                .filter(|(_, count)| **count > 0)
+                .map(|(name, _)| name.as_str())
+                .collect();
+            assert_eq!(firing, expected, "{}", test_case.description);
+            assert!(
+                fired.values().all(|count| *count <= 1),
+                "{}: each outcome fires once: {fired:?}",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}

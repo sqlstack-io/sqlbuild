@@ -1,5 +1,5 @@
 #[path = "claims/helpers.rs"]
-mod claim_helpers;
+pub(crate) mod claim_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
 #[path = "monitor/helpers.rs"]
