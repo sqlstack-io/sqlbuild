@@ -43,6 +43,7 @@ use crate::compiled_views::main::model_inputs::view_classes::view_classes;
 use crate::compiled_views::types::DeclaredRow;
 use crate::compiled_views::types::LineageInput;
 use crate::compiled_views::types::ModelInputRecord;
+use crate::compiled_views::types::RelationKeyTuple;
 use crate::graph::main::project::project_graph::project_graph;
 use crate::graph::models::NativeProjectGraph;
 use crate::graph::models::ResourceRow;
@@ -1656,17 +1657,7 @@ pub struct RelationKeyRow {
 
 impl<'py> pyo3::FromPyObject<'py> for RelationKeyRow {
     fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
-        let (kind, name, materialized, mode, strategy, has_cursor, unique_key, columns, audits): (
-            String,
-            String,
-            String,
-            String,
-            String,
-            bool,
-            Option<Vec<String>>,
-            Vec<(String, Vec<String>, bool)>,
-            Vec<(String, Option<String>)>,
-        ) = pyo3::types::PyAnyMethods::extract(value)?;
+        let (kind, name, materialized, mode, strategy, has_cursor, unique_key, columns, audits): RelationKeyTuple = pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
             kind,
             name,

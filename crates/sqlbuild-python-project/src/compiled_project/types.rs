@@ -25,3 +25,24 @@ pub type ResourceDiagnostics<'py> = (
     Vec<Bound<'py, PyAny>>,
     Vec<Bound<'py, PyAny>>,
 );
+
+/// The tuple Python sends for a `FunctionSettings`, in field order.
+pub type FunctionSettingsTuple = (
+    String,
+    bool,
+    (Option<String>, Option<String>),
+    Option<(Option<String>, Option<String>)>,
+    bool,
+    Py<PyAny>,
+);
+
+/// The tuple Python sends for a `TestBlockRow`, in field order.
+pub type TestBlockTuple = (
+    Py<PyAny>,
+    Option<String>,
+    String,
+    String,
+    Vec<String>,
+    Vec<TestCaseRow>,
+    Option<(usize, usize)>,
+);

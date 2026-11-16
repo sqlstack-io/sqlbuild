@@ -1792,14 +1792,32 @@ reason = "Python passes the expansion state as one five-item tuple; StateInput r
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
+path = "crates/sqlbuild-python-project/src/analysis_session/types.rs"
+symbols = ["PivotRequestTuple"]
+reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS012"
+path = "crates/sqlbuild-python-project/src/compiled_project/types.rs"
+symbols = ["FunctionSettingsTuple", "TestBlockTuple"]
+reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS012"
+path = "crates/sqlbuild-python-project/src/compiled_views/types.rs"
+symbols = ["RelationKeyTuple"]
+reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/analysis_session/models.rs"
-symbols = ["FamilyRow::extract_bound", "PivotRequestRow::extract_bound"]
+symbols = ["FamilyRow::extract_bound"]
 reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS012"
 path = "crates/sqlbuild-python-project/src/compiled_project/models.rs"
-symbols = ["FunctionRow::extract_bound", "FunctionSettings::extract_bound", "TestBlockRow::extract_bound", "TestFileRow::extract_bound", "ScenarioRow::extract_bound", "AuditBlockRow::extract_bound", "AuditFileRow::extract_bound", "PythonResourceRow::extract_bound", "ScenarioDescriptionRow::extract_bound", "HookDescriptionRow::extract_bound", "ProofPy::extract_bound", "AnalysisPy::extract_bound"]
+symbols = ["FunctionRow::extract_bound", "TestFileRow::extract_bound", "ScenarioRow::extract_bound", "AuditBlockRow::extract_bound", "AuditFileRow::extract_bound", "PythonResourceRow::extract_bound", "ScenarioDescriptionRow::extract_bound", "HookDescriptionRow::extract_bound", "ProofPy::extract_bound", "AnalysisPy::extract_bound"]
 reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
@@ -1807,12 +1825,6 @@ rule = "FPRSS201"
 path = "crates/sqlbuild-python-project/src/compiled_views/models.rs"
 symbols = ["AnalysisProjections", "CompiledProjections", "ModelInputHandles", "InputProjections", "NativeProjectView", "SchemaHandles"]
 reason = "AnalysisProjections, CompiledProjections, ModelInputHandles, InputProjections, NativeProjectView implement Debug manually because they cache Python projections in PyOnceLocks, directly or through the projections they hold, which do not implement Debug; SchemaHandles implements it manually so the user-authored audit arguments its specs carry stay out of logs; other models derive it."
-
-[[targets.rust.rule_exceptions]]
-rule = "FPRSS012"
-path = "crates/sqlbuild-python-project/src/compiled_views/models.rs"
-symbols = ["RelationKeyRow::extract_bound"]
-reason = "Python passes each of these records as one positional tuple; extract_bound reads it in a single tuple extraction and names each position, as the positional record it replaces did."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"

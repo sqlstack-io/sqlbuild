@@ -11,10 +11,12 @@ use crate::compiled_project::_helpers::project::INPUT_CLASSES_UNSET;
 use crate::compiled_project::_helpers::project::ModelTextsPy;
 use crate::compiled_project::_helpers::project::NamedType;
 use crate::compiled_project::types::AttachedSqlTests;
+use crate::compiled_project::types::FunctionSettingsTuple;
 use crate::compiled_project::types::LoaderRow;
 use crate::compiled_project::types::ResourceDiagnostics;
 use crate::compiled_project::types::SourceRow;
 use crate::compiled_project::types::SourceSettings;
+use crate::compiled_project::types::TestBlockTuple;
 use crate::compiled_project::types::TestCaseRow;
 use crate::compiled_views::models::CompiledViewClasses;
 use crate::compiled_views::models::NativeCompiledModel;
@@ -122,14 +124,8 @@ pub struct FunctionSettings {
 
 impl<'py> pyo3::FromPyObject<'py> for FunctionSettings {
     fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
-        let (adapter_name, validate, defaults, target, inherit, kind): (
-            String,
-            bool,
-            (Option<String>, Option<String>),
-            Option<(Option<String>, Option<String>)>,
-            bool,
-            Py<PyAny>,
-        ) = pyo3::types::PyAnyMethods::extract(value)?;
+        let (adapter_name, validate, defaults, target, inherit, kind): FunctionSettingsTuple =
+            pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
             adapter_name,
             validate,
@@ -155,15 +151,8 @@ pub struct TestBlockRow {
 
 impl<'py> pyo3::FromPyObject<'py> for TestBlockRow {
     fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
-        let (block, name, sql_body, mode, parameters, cases, sql_body_span): (
-            Py<PyAny>,
-            Option<String>,
-            String,
-            String,
-            Vec<String>,
-            Vec<TestCaseRow>,
-            Option<(usize, usize)>,
-        ) = pyo3::types::PyAnyMethods::extract(value)?;
+        let (block, name, sql_body, mode, parameters, cases, sql_body_span): TestBlockTuple =
+            pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
             block,
             name,

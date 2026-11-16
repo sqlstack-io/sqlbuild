@@ -15,6 +15,7 @@ use crate::analysis_session::_helpers::session::internal_error;
 use crate::analysis_session::_helpers::session::outcome_row;
 use crate::analysis_session::_helpers::session::pivot_model;
 use crate::analysis_session::_helpers::session::step_row;
+use crate::analysis_session::types::PivotRequestTuple;
 use pyo3::prelude::Bound;
 use pyo3::prelude::Py;
 use pyo3::prelude::PyAny;
@@ -56,7 +57,7 @@ use std::sync::Mutex;
 
 /// Reuse inference for identical fixture SQL under an equal, catalog-free profile.
 #[pyclass(module = "sqlbuild._native", frozen)]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FixtureColumnInferences {
     pub(crate) by_profile: Mutex<Vec<(Py<PyAny>, Py<PyDict>)>>,
 }
@@ -262,14 +263,7 @@ impl<'py> pyo3::FromPyObject<'py> for PivotRequestRow {
             column_nullability,
             families_by_table,
             models,
-        ): (
-            String,
-            Shapes,
-            Shapes,
-            Shapes,
-            Vec<(String, Vec<FamilyRow>)>,
-            Vec<PivotModelRow>,
-        ) = pyo3::types::PyAnyMethods::extract(value)?;
+        ): PivotRequestTuple = pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
             dialect,
             column_types,

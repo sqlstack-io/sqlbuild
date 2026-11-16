@@ -17,7 +17,7 @@ use crate::compiled_project::models::NativeCompiledProject;
 use crate::compiled_views::models::NativeCompiledModel;
 use crate::compiled_views::models::NativeProjectView;
 use crate::compiled_views::types::ModelInputRecord;
-use crate::project_snapshot::_helpers::snapshot::snapshot::{
+use crate::project_snapshot::_helpers::snapshot::snapshot_project::{
     dependency_keys, destination, insert_node,
 };
 use sqlbuild_python_front::attachments::main::analysis_cursor_splices::analysis_cursor_splices;

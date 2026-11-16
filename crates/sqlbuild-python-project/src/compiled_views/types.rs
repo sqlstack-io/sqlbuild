@@ -17,3 +17,16 @@ pub type ModelInputRecord = project_models::ModelInputRecord<PyProjectHost>;
 
 /// Declared keys by `kind:name` identity, in identity order.
 pub type RelationKeys = Vec<(String, Vec<Vec<String>>)>;
+
+/// The tuple Python sends for a `RelationKeyRow`, in field order.
+pub type RelationKeyTuple = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    bool,
+    Option<Vec<String>>,
+    Vec<(String, Vec<String>, bool)>,
+    Vec<(String, Option<String>)>,
+);
