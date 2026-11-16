@@ -168,7 +168,9 @@
 								<span class="issue-actions">
 									{#if view.build}
 										{@const build = view.build}
-										<GatedButton requires="run.adhoc" size="sm" variant={build.variant} onclick={() => goto(to(build.href))}>{#if build.variant === 'stale'}<HammerIcon class="size-3.5" />{/if}{build.label}</GatedButton>
+										<GatedButton requires="run.adhoc" size="sm" variant={build.variant} hint={build.tooltip ?? undefined} onclick={() => goto(to(build.href))}
+											>{#if build.variant === 'stale'}<HammerIcon class="size-3.5" />{/if}<span>{build.label}{#if build.extra}<span class="label-extra">{build.extra}</span>{/if}</span></GatedButton
+										>
 									{/if}
 									<a href={to(view.href)}>{view.action} →</a>
 								</span>

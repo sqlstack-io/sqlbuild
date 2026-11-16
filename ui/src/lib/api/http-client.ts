@@ -689,10 +689,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const read = await Promise.all(
 				locations.map(async (location) => {
 					const { locationId, target } = parseLocationKey(location.id);
-					const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
-					if (response.status === 401) onUnauthorized();
+					const [[{ data, response }, snapshot], totals] = await Promise.all([
+						locationHealth(location.id),
+						http.GET('/api/control/locations/{location_id}/targets/{target}/mirrored-totals', { params: { path: { location_id: locationId, target } } })
+					]);
 					if (response.status === 403) healthRefused.add(location.id);
-					return data ? [toWarehouseConnection(location, data)] : [];
+					return data ? [toWarehouseConnection(location, data, snapshot, totals.data ?? null)] : [];
 				})
 			);
 			return read.flat();

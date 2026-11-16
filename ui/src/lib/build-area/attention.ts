@@ -6,7 +6,7 @@ import { eventKindLabel, problemHref } from '$lib/platform/labels';
 import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
 import { shortName } from '$lib/build-area/labels';
-import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
+import { CHANGED_PLAN_HREF, changedBuildLabel, planHref } from '$lib/run/command';
 
 export type AttentionTone = 'error' | 'warning' | 'stale' | 'info';
 
@@ -27,7 +27,7 @@ export type AttentionView = {
 	 * The one build an out-of-date alert offers: `sqb build --changed` when anything changed, else a rebuild of the nodes behind.
 	 * Purple means "needs building": solid for changed nodes, outlined for nodes only behind.
 	 */
-	build?: { label: string; href: string; variant: 'stale' | 'stale-outline' };
+	build?: { label: string; extra: string | null; tooltip: string | null; href: string; variant: 'stale' | 'stale-outline' };
 };
 
 /** A heartbeat gap shorter than this reads as a pause, not an outage: the run carries on when its worker reports again. */
@@ -106,8 +106,9 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				action: 'View in catalog',
 				consequences: [],
 				build: item.changed.length
-					? { label: 'Build what changed', href: CHANGED_PLAN_HREF, variant: 'stale' }
-					: { label: `Rebuild ${all.length}`, href: planHref(all), variant: 'stale-outline' }
+					? // The server does not report how many downstream nodes the plan runs yet, so the brackets stay off.
+						{ ...changedBuildLabel(new Set(item.changed).size, null, 'banner'), href: CHANGED_PLAN_HREF, variant: 'stale' }
+					: { label: `Rebuild ${all.length}`, extra: null, tooltip: null, href: planHref(all), variant: 'stale-outline' }
 			};
 		}
 		case 'stale_sources':

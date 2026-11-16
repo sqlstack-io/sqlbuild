@@ -608,6 +608,7 @@ def wait_for_location_health(
     *,
     minimum_reports: int = 1,
 ) -> dict[str, Any]:
+    """Wait for reports matching every field of `health`; fields it leaves out may differ."""
     deadline: float = time.monotonic() + 15 + 30 * (minimum_reports - 1)
     key: tuple[str, str] = (target, json.dumps(health, sort_keys=True))
     observations: dict[tuple[str, str], dict[str, dict[str, Any]]] = {}
@@ -616,9 +617,10 @@ def wait_for_location_health(
         assert time.monotonic() < deadline, log.read_text()
         for report in reversed(location_health_reports(api)):
             event_id: str = report["report"]["event_id"]
+            reported: dict[str, Any] = report["report"]["health"]
             observed_key: tuple[str, str] = (
                 report["report"]["target"],
-                json.dumps(report["report"]["health"], sort_keys=True),
+                json.dumps({name: reported.get(name) for name in health}, sort_keys=True),
             )
             observations.setdefault(observed_key, {})[event_id] = report
         time.sleep(0.02)

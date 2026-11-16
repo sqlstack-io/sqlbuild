@@ -530,6 +530,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/mirrored-totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonMirroredTotals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/node-states": {
         parameters: {
             query?: never;
@@ -1709,6 +1725,26 @@ export interface components {
             rejected_sha256: string;
             table: components["schemas"]["Table"];
         };
+        /**
+         * @description When a location checks its warehouse connection on its own.
+         * @enum {string}
+         */
+        ConnectionCheckTrigger: "startup" | "publish";
+        /** @description A target's connection settings as its location publishes them: names only, never a secret. */
+        ConnectionDetails: {
+            account?: string | null;
+            /** @description The adapter, such as `snowflake`, `postgres` or `duckdb`. */
+            adapter: string;
+            /** @description How the location signs in, by name only, such as `key_pair`, `password` or `oauth`. */
+            auth_method?: string | null;
+            /** @description The database the connection opens by default. */
+            database?: string | null;
+            /** @description The server host, or for a file database its path. */
+            host?: string | null;
+            role?: string | null;
+            user?: string | null;
+            warehouse?: string | null;
+        };
         /** @description What the UI needs first: how people sign in, and what this person may see and do. */
         ControlBootstrap: {
             access: components["schemas"]["PersonAccess"];
@@ -1973,11 +2009,17 @@ export interface components {
             /** @enum {string} */
             kind: "compile_failed";
         } | {
+            /**
+             * Format: int64
+             * @description How long the check took; absent from older locations.
+             */
+            elapsed_millis?: number | null;
             /** Format: int64 */
             generation: number;
             healthy: boolean;
             /** @enum {string} */
             kind: "connection";
+            trigger?: null | components["schemas"]["ConnectionCheckTrigger"];
         } | {
             /** Format: int64 */
             generation: number;
@@ -1994,6 +2036,11 @@ export interface components {
             /** @enum {string} */
             kind: "warehouse_sync";
             location: components["schemas"]["WarehouseStateLocation"];
+            /**
+             * Format: date-time
+             * @description On the report that completes a sync, when the next safety sync is due unless a run ends first; absent otherwise and from older locations.
+             */
+            next_sync_at?: string | null;
             /**
              * Format: int64
              * @description Rows, or statistics relations, the failed read asked for.
@@ -2201,6 +2248,12 @@ export interface components {
             model: string;
             physical_generation_id: string;
             target_name: string;
+        };
+        /** @description How many records the server holds for one mirrored state table of a target. */
+        MirroredTotal: {
+            /** Format: int64 */
+            records: number;
+            table: components["schemas"]["WarehouseHistoryKind"];
         };
         MutationResponse: {
             applied: boolean;
@@ -2679,6 +2732,7 @@ export interface components {
         PublishedSnapshot: {
             /** @description Added, changed and removed nodes and roles, in publication order. */
             changes: components["schemas"]["PublishedChange"][];
+            connection?: null | components["schemas"]["ConnectionDetails"];
             /** @description Digest of the lock file, Python and `sqb` versions; a change means dependencies changed. */
             environment_hash: string;
             /** Format: int64 */
@@ -5080,6 +5134,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["MicrobatchCoverage"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonMirroredTotals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records the server mirrors of each state table of this target, in sync order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MirroredTotal"][];
                 };
             };
             /** @description Session rejected */

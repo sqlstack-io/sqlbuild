@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
@@ -25,8 +25,9 @@ use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::{
-    LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
-    WarehouseReadFailure, WarehouseSyncFailure, WarehouseSyncProgress,
+    ConnectionCheckTrigger, LocationHealth, LocationHealthReport, LocationWorkClient,
+    LocationWorkPoll, RetentionPolicies, WarehouseReadFailure, WarehouseSyncFailure,
+    WarehouseSyncProgress,
 };
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
@@ -684,6 +685,22 @@ pub(crate) fn next_scan(mut state: LocationMetadataSync) -> LocationMetadataSync
     state
 }
 
+/// When the next safety sync is due, if this report's page completes the sync: the last page of the last scan, without failure.
+///
+/// None where no timed sync follows: the interval is off, or reads wake billed compute and the
+/// interval is only the default, so the next run or a request syncs instead.
+pub(crate) fn completed_sync_next_at(
+    state: &LocationMetadataSync,
+    failure: Option<WarehouseSyncFailure>,
+    now: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    let completes = sync_progress(state, failure.is_none()).completed;
+    (completes && state.safety_seconds > 0 && !state.defers_safety_sync())
+        .then(|| i64::try_from(state.safety_seconds).ok())
+        .flatten()
+        .and_then(|seconds| now.checked_add_signed(chrono::Duration::seconds(seconds)))
+}
+
 /// Operational cost is elapsed IO time, not an estimate of warehouse billing.
 pub(crate) async fn metadata_health(
     state: &LocationMetadataSync,
@@ -703,6 +720,7 @@ pub(crate) async fn report_metadata_health(
         Option<WarehouseReadFailure>,
     ),
 ) {
+    let next_sync_at = completed_sync_next_at(state, failure, Utc::now());
     let report = LocationHealthReport {
         event_id: Uuid::now_v7(),
         session_id: poll.session_id,
@@ -720,6 +738,7 @@ pub(crate) async fn report_metadata_health(
             page_limit: read_failure.map(|_| page_limit(state) as u64),
             read_failure,
             progress: Some(sync_progress(state, failure.is_none())),
+            next_sync_at,
         },
     };
     if let Err(error) = client.report_health(&report).await {
@@ -906,10 +925,11 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
 }
 
+/// Check the connection after a publication: the first in a process is its startup check.
 pub(crate) async fn check_published_location(
     options: &LocationServe,
     script: &Path,
-    (bearer, session_id, generation): (&str, Uuid, i64),
+    (bearer, session_id, generation, trigger): (&str, Uuid, i64, ConnectionCheckTrigger),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Vec<PathBuf>>, ControlError> {
     drop(write_output(&[(
@@ -917,14 +937,21 @@ pub(crate) async fn check_published_location(
         "Checking location connection with sqb debug...\n",
     )]));
     tokio::pin!(stopped);
+    let started = Instant::now();
     let Some((connected, missing, files)) =
         check_location_connection(options, script, stopped.as_mut()).await?
     else {
         return Ok(None);
     };
+    let health = LocationHealth::Connection {
+        generation,
+        healthy: connected,
+        trigger: Some(trigger),
+        elapsed_millis: Some(u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)),
+    };
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
-        () = report_location_health(options, bearer, session_id, LocationHealth::Connection { generation, healthy: connected }) => {},
+        () = report_location_health(options, bearer, session_id, health) => {},
     }
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },

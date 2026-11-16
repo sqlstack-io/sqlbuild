@@ -43,6 +43,12 @@ pub enum LocationHealth {
     Connection {
         generation: i64,
         healthy: bool,
+        /// Why the location checked; absent from older locations, which checked only after publishing.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        trigger: Option<ConnectionCheckTrigger>,
+        /// How long the check took; absent from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        elapsed_millis: Option<u64>,
     },
     /// How many provider secret settings the location's environment leaves unset.
     ProviderSecrets {
@@ -65,7 +71,20 @@ pub enum LocationHealth {
         /// Where the synchronization this report belongs to has got to; absent from older locations.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         progress: Option<WarehouseSyncProgress>,
+        /// On the report that completes a sync, when the next safety sync is due unless a run ends first; absent otherwise and from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        next_sync_at: Option<DateTime<Utc>>,
     },
+}
+
+/// When a location checks its warehouse connection on its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionCheckTrigger {
+    /// The first check after the location process starts and publishes.
+    Startup,
+    /// After the location published a later snapshot.
+    Publish,
 }
 
 /// Closed failure stages keep warehouse errors and credentials out of health observations.
@@ -114,6 +133,13 @@ pub struct LocationHealthReport {
     pub session_id: Uuid,
     pub target: String,
     pub health: LocationHealth,
+}
+
+/// How many records the server holds for one mirrored state table of a target.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MirroredTotal {
+    pub table: WarehouseHistoryKind,
+    pub records: u64,
 }
 
 /// Narrows a location's health history to one target, so other targets' traffic cannot crowd it out.
@@ -178,6 +204,7 @@ impl LocationState {
                 LocationHealth::Connection {
                     generation,
                     healthy,
+                    ..
                 } if connection.is_none_or(|(at, _, _)| seen > at) => {
                     connection = Some((seen, generation, healthy));
                 }

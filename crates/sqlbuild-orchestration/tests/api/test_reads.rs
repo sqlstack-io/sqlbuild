@@ -382,6 +382,12 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 json!({"order_support": {"description": "Answer order questions", "grants": [{"nodes": ["tag:orders"],
                     "permissions": ["view"], "resolved_nodes": {"tag:orders": ["orders"]}}]}}),
             );
+            let connection = json!({"adapter": "postgres", "account": null, "host": "db.example.com",
+                "user": "orders", "role": null, "warehouse": null, "database": "orders",
+                "auth_method": "password"});
+            extra
+                .documents
+                .insert("connection".into(), connection.clone());
             publish_snapshot(store, &extra)
                 .await
                 .expect("second publication");
@@ -404,6 +410,11 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 json!([{"change_kind": "removed", "subject_key": "products"},
                     {"change_kind": "added", "subject_key": "role:order_support"}]),
                 "only the subjects that changed; a role assigner sees the role's name"
+            );
+            assert_eq!(
+                [json!(history[0].connection), json!(history[1].connection)],
+                [connection.clone(), json!(null)],
+                "each publication carries the connection settings it was published with"
             );
             let viewer = create_principal(store, &audit, "orders-viewer")
                 .await
@@ -436,6 +447,21 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 json!([{"change_kind": "removed", "subject_key": "products"},
                     {"change_kind": "added", "subject_key": "role:"}]),
                 "a viewer sees that a role changed, not which"
+            );
+            assert_eq!(
+                json!(
+                    list_person_snapshots(
+                        store,
+                        (&audit, viewer),
+                        ((location_id, "development"), 1),
+                        DefaultRole::None,
+                    )
+                    .await
+                    .expect("viewer snapshots")[0]
+                        .connection
+                ),
+                connection,
+                "everyone who can view the location sees its connection settings"
             );
             let run = (location_id, "development", claim.request.run_id);
             let execution = format!("worker/{}/execution", claim.claim_id);

@@ -1,4 +1,5 @@
 pub(super) mod _publish_snapshot;
+pub mod connection_details;
 pub mod current_snapshot;
 pub mod current_snapshot_record;
 pub(crate) mod holds_on_current_nodes;

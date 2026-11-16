@@ -133,8 +133,8 @@ export type ConnectionTest = {
 	at: Iso;
 	durationMs: number;
 	/**
-	 * `publish` when the location ran it after publishing a snapshot; `startup` when `sqb dev` ran it on
-	 * starting (not reported by the server yet); `manual` for Test connection.
+	 * `publish` when the location ran it after publishing a snapshot; `startup` when the location ran it on
+	 * starting (`sqb dev` or `sqb location serve`); `manual` for Test connection.
 	 */
 	trigger: 'publish' | 'startup' | 'manual';
 	by: Principal | null;
@@ -250,13 +250,13 @@ export type WarehouseConnection = {
 	id: string;
 	location: string;
 	target: string;
-	/** Published connection settings; null until the location publishes them (not reported by the server yet). */
+	/** Published connection settings; null until the location publishes them with a snapshot. */
 	details: ConnectionDetails | null;
 	/** Where SQLBuild's own tables are read back from; null before a sync reports it. */
 	stateLocation: { database: string | null; schema: string } | null;
-	/** The newest recorded connection check: after a deploy, or on startup once the server records it. */
+	/** The newest recorded connection check: on startup, after a deploy, or a manual test. */
 	lastTest: ConnectionTest | null;
-	/** When the next background state history sync is due; null when not reported (not reported by the server yet). */
+	/** When the next background state history sync is due; null while a sync runs or when not reported. */
 	nextSyncAt: Iso | null;
 	/** The newest sync of each SQLBuild table, in table order. */
 	tables: WarehouseTableSync[];
@@ -273,7 +273,7 @@ export type WarehouseTableSync = {
 	waiting: boolean;
 	/** The newest sync of the table that succeeded. */
 	lastSyncedAt: Iso | null;
-	/** Records mirrored for the table in total; null when not reported (not reported by the server yet). */
+	/** Records the server mirrors of the table in total; null when not reported. */
 	mirroredTotal: number | null;
 };
 

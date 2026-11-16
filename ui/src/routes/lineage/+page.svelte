@@ -32,7 +32,7 @@
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
-	import { CHANGED_PLAN_HREF, planHref } from '$lib/run/command';
+	import { CHANGED_PLAN_HREF, changedBuildLabel, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
 	import { scaleGraph } from '$lib/mock/scale-graph';
 	import { layoutDag } from '$lib/lineage/graph-layout';
@@ -447,6 +447,8 @@
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
 	/** Nodes whose own definition changed, which `sqb build --changed` starts from. */
 	const changedCount = $derived(catalogNodes.filter((c) => c.stale?.some((r) => r.reason === 'changed')).length);
+	// The server does not report how many downstream nodes the plan runs yet, so the brackets stay off.
+	const changedLabel = $derived(changedBuildLabel(changedCount, null, 'bar'));
 	const outOfDateCount = $derived(catalogNodes.filter((c) => (c.stale?.length ?? 0) > 0).length);
 	/** The toolbar chip's text, e.g. "orders, inventory"; empty when every folder is drawn. */
 	const selectionLabel = $derived.by(() => {
@@ -751,7 +753,9 @@
 <AppTopbar title="Lineage">
 	<RefreshButton onclick={() => catalog.refresh()} />
 	{#if app.client.supports('launchAdhocRun')}
-		{#if changedCount}<GatedButton size="bar" requires="run.adhoc" variant="stale" onclick={() => goto(to(CHANGED_PLAN_HREF))}><HammerIcon />Build {changedCount} changed</GatedButton>{/if}
+		{#if changedCount}<GatedButton size="bar" requires="run.adhoc" variant="stale" hint={changedLabel.tooltip} onclick={() => goto(to(CHANGED_PLAN_HREF))}
+				><HammerIcon /><span>{changedLabel.label}{#if changedLabel.extra}<span class="label-extra">{changedLabel.extra}</span>{/if}</span></GatedButton
+			>{/if}
 		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(runSelection)))}><PlayIcon class="size-3.5 fill-current stroke-none" />Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
 	{/if}
 </AppTopbar>

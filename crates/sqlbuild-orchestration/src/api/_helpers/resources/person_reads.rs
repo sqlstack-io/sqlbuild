@@ -24,9 +24,10 @@ use crate::node_states::main::read_person_node_states::read_person_node_states;
 use crate::node_states::models::{CachedJson, NodeStateCache, NodeStatesRecord};
 use crate::platform::main::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::read_person_location_health::read_person_location_health;
+use crate::platform::main::read_person_mirrored_totals::read_person_mirrored_totals;
 use crate::platform::main::read_person_problems::read_person_problems;
 use crate::platform::models::{
-    LocationHealthObservation, PersonPlatformEventPage, PlatformProblems,
+    LocationHealthObservation, MirroredTotal, PersonPlatformEventPage, PlatformProblems,
 };
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::{
@@ -607,6 +608,28 @@ pub(crate) async fn health(
 ) -> Result<Json<Vec<LocationHealthObservation>>, ApiError> {
     Ok(Json(
         read_person_location_health(
+            &store,
+            (&context, principal),
+            (location_id, &target),
+            default_role,
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/mirrored-totals", operation_id = "readPersonMirroredTotals",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = Vec<MirroredTotal>, description = "Records the server mirrors of each state table of this target, in sync order"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn mirrored_totals(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<MirroredTotal>>, ApiError> {
+    Ok(Json(
+        read_person_mirrored_totals(
             &store,
             (&context, principal),
             (location_id, &target),

@@ -1,4 +1,4 @@
-//! A person browses a target's publications only with view on every current node, like its jobs.
+//! A person browses a target's publications, with their connection settings, only with view on every current node, like its jobs.
 
 use std::collections::BTreeMap;
 
@@ -8,9 +8,12 @@ use uuid::Uuid;
 use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::person_assigns_roles::person_assigns_roles;
 use crate::credentials::models::{AuditContext, DefaultRole};
-use crate::snapshots::models::{PublishedChange, PublishedSnapshot};
+use crate::snapshots::constants::CONNECTION_DOCUMENT;
+use crate::snapshots::models::{ConnectionDetails, PublishedChange, PublishedSnapshot};
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};
+use crate::store::main::{
+    begin::begin, commit::commit, decode_row::decode_row, decompress::decompress, query::query,
+};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::store::types::Row;
 
@@ -41,6 +44,12 @@ pub async fn list_person_snapshots(
         "SELECT c.snapshot_id, c.change_kind, c.subject_key FROM sqb_snapshot_changes c \
          WHERE c.snapshot_id IN (SELECT s.snapshot_id FROM sqb_snapshots s WHERE s.location_id=$1 AND s.target=$2 \
            ORDER BY s.generation DESC LIMIT $3) ORDER BY c.snapshot_id, c.change_seq",
+        scope.clone()).await?;
+    let (transaction, connected) = query(transaction,
+        &format!("SELECT d.snapshot_id, b.body FROM sqb_snapshot_documents d JOIN sqb_documents b \
+         ON b.document_hash=d.document_hash WHERE d.kind='{CONNECTION_DOCUMENT}' AND d.snapshot_id IN \
+         (SELECT s.snapshot_id FROM sqb_snapshots s WHERE s.location_id=$1 AND s.target=$2 \
+           ORDER BY s.generation DESC LIMIT $3)"),
         scope).await?;
     let (transaction, names_roles) = person_assigns_roles(transaction, credentials).await?;
     commit(transaction).await?;
@@ -53,11 +62,18 @@ pub async fn list_person_snapshots(
         }
         changes.entry(snapshot_id).or_default().push(change);
     }
+    let mut connections: BTreeMap<Uuid, ConnectionDetails> = BTreeMap::new();
+    for row in connected {
+        let details = serde_json::from_slice(&decompress(&row["body"])?)
+            .map_err(|error| ControlError::Invalid(format!("connection document: {error}")))?;
+        connections.insert(id_of(&row)?, details);
+    }
     published
         .into_iter()
         .map(|row| {
             let mut snapshot = snapshot_of(row)?;
             snapshot.changes = changes.remove(&snapshot.snapshot_id).unwrap_or_default();
+            snapshot.connection = connections.remove(&snapshot.snapshot_id);
             Ok(snapshot)
         })
         .collect()
@@ -78,6 +94,7 @@ fn snapshot_of(row: Row) -> Result<PublishedSnapshot, ControlError> {
         sqb_version: text("sqb_version").unwrap_or_default(),
         published_at,
         changes: Vec::new(),
+        connection: None,
     })
 }
 

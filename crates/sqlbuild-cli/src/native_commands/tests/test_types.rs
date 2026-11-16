@@ -156,3 +156,15 @@ pub(crate) struct ReadFailureTestCase {
     pub(crate) expected: fn(&crate::native_commands::models::ReadFailure) -> bool,
     pub(crate) expected_line: &'static str,
 }
+
+#[derive(Debug)]
+pub(super) struct SyncCompletionTestCase {
+    pub(super) description: &'static str,
+    pub(super) acknowledged_scans: usize,
+    pub(super) more_pages: bool,
+    pub(super) failure: Option<sqlbuild_orchestration::platform::models::WarehouseSyncFailure>,
+    pub(super) safety_seconds: u64,
+    pub(super) reads_wake_compute: bool,
+    pub(super) safety_explicit: bool,
+    pub(super) expected_next_in_seconds: Option<i64>,
+}

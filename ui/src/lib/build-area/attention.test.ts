@@ -70,9 +70,15 @@ describe('overview alerts', () => {
 
 	it('offers one build: what changed when anything changed, else a rebuild of the nodes behind', () => {
 		const build = (changed: string[], behind: string[]) => attentionViews([{ kind: 'stale_models', changed, behind }], now)[0].view.build;
-		expect(build(['model:a'], ['model:a', 'model:b'])).toEqual({ label: 'Build what changed', href: CHANGED_PLAN_HREF, variant: 'stale' });
+		expect(build(['model:a'], ['model:a', 'model:b'])).toEqual({
+			label: 'Build 1 changed',
+			extra: null,
+			tooltip: 'Plan a build of the 1 changed node and the downstream nodes it reaches. You review the plan before anything runs.',
+			href: CHANGED_PLAN_HREF,
+			variant: 'stale'
+		});
 		// `--changed` would build nothing when nodes are only behind, so the rebuild names them.
-		expect(build([], ['model:b', 'model:c'])).toEqual({ label: 'Rebuild 2', href: planHref(['model:b', 'model:c']), variant: 'stale-outline' });
+		expect(build([], ['model:b', 'model:c'])).toEqual({ label: 'Rebuild 2', extra: null, tooltip: null, href: planHref(['model:b', 'model:c']), variant: 'stale-outline' });
 	});
 
 	it('states how many nodes are out of date, counting a node both changed and behind once', () => {

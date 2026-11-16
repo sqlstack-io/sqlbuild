@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionTestOf, firstSyncPending, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { connectionDetailsOf, connectionTestOf, firstSyncPending, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -36,6 +36,16 @@ describe('location health', () => {
 		const observations = [seen(5, { kind: 'connection', generation: 2, healthy: false }), seen(60, { kind: 'connection', generation: 1, healthy: true })];
 		expect(healthOf(observations, now).health).toBe('degraded');
 		expect(connectionTestOf(observations)).toMatchObject({ outcome: 'failed', at: at(5) });
+	});
+
+	it('records the startup check with its duration, and an older location\'s check as after publishing', () => {
+		expect(connectionTestOf([seen(5, { kind: 'connection', generation: 1, healthy: true, trigger: 'startup', elapsed_millis: 410 })])).toMatchObject({
+			outcome: 'ok',
+			trigger: 'startup',
+			durationMs: 410,
+			message: 'Connected on startup'
+		});
+		expect(connectionTestOf([seen(5, { kind: 'connection', generation: 2, healthy: false })])).toMatchObject({ trigger: 'publish', durationMs: 0, message: 'Could not connect after publishing' });
 	});
 });
 
@@ -96,6 +106,49 @@ describe('warehouseSyncOf', () => {
 			['catalog', '2026-11-08T12:02:00Z', null, '2026-11-08T12:02:00Z'],
 			['statistics', '2026-11-08T12:03:00Z', 'Failed while reading the warehouse', '2026-11-08T12:01:00Z']
 		]);
+	});
+
+	it('counts the records mirrored of each table, and names the next sync from the report that completed one', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const completed = sync('2026-11-08T12:03:00Z', 'statistics', null);
+		const observations = [{ ...completed, report: { ...completed.report, health: { ...completed.report.health, next_sync_at: '2026-11-08T12:33:00Z' } } }, sync('2026-11-08T12:02:00Z', 'catalog', null)];
+		const connection = toWarehouseConnection(location, observations, null, [
+			{ table: 'catalog', records: 120 },
+			{ table: 'statistics', records: 4_800 }
+		]);
+		expect(connection.tables.map((t) => [t.table, t.mirroredTotal])).toEqual([
+			['catalog', 120],
+			['statistics', 4_800]
+		]);
+		expect(connection.nextSyncAt).toBe('2026-11-08T12:33:00Z');
+		const running = toWarehouseConnection(location, [sync('2026-11-08T12:40:00Z', 'catalog', null), ...observations]);
+		expect([running.nextSyncAt, running.tables[0].mirroredTotal]).toEqual([null, null]);
+	});
+
+	it('shows the connection settings published with the newest snapshot, and none before it publishes them', () => {
+		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+		const published = {
+			snapshot_id: 'snap-1',
+			generation: 3,
+			git_dirty: false,
+			environment_hash: 'env',
+			sqb_version: '1.0.0',
+			published_at: '2026-11-08T12:00:00Z',
+			changes: [],
+			connection: { adapter: 'snowflake', account: 'orders-account', user: 'orders_loader', role: 'LOADER', warehouse: 'ORDERS_WH', database: 'ORDERS', auth_method: 'key_pair' }
+		};
+		expect(toWarehouseConnection(location, [], published).details).toEqual({
+			adapter: 'snowflake',
+			account: 'orders-account',
+			host: null,
+			user: 'orders_loader',
+			role: 'LOADER',
+			warehouse: 'ORDERS_WH',
+			database: 'ORDERS',
+			authMethod: 'key_pair'
+		});
+		expect(connectionDetailsOf({ ...published, connection: null })).toBeNull();
+		expect(toWarehouseConnection(location, []).details).toBeNull();
 	});
 
 	it('shows a build holding the warehouse file as a wait, not a failure', () => {
