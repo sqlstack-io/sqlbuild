@@ -22,6 +22,7 @@ use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionPro
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
+use crate::bindings::_helpers::compile_driver::targets::selected_target_settings;
 use crate::bindings::_helpers::load::load_progress::{
     LoadCallbackRelay, LoadProgressReporter, load_result_text,
 };
@@ -79,6 +80,7 @@ struct Preparation<'py> {
     cursor_overrides: Bound<'py, PyAny>,
     provider_session: Bound<'py, PyAny>,
     project_relations: Bound<'py, PyAny>,
+    target_config: Bound<'py, PyAny>,
 }
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
@@ -361,7 +363,13 @@ fn prepare<'py>(
             native_field(discovered, "providers")?,
         )],
     )?;
+    let target_config: Bound<'py, PyAny> = selected_target_settings(
+        (discovered, &native_field(request, "selected_target")?),
+        &adapter_name.extract::<String>()?,
+        (&connection_config, &runtime.1, &adapter),
+    )?;
     Ok(Preparation {
+        target_config,
         adapter_name: adapter_name.extract()?,
         project_relations: project_relations(invocation, &adapter)?,
         adapter,
@@ -395,6 +403,7 @@ fn runtime_params<'py>(
             ("target", target_name.clone()),
             ("vars", effective_vars.clone()),
             ("is_reload", native_field(request, "reload")?),
+            ("target_config", preparation.target_config.clone()),
             (
                 "start_cursor_ts",
                 cursor_timestamp(&native_field(overrides, "start_ts")?)?,

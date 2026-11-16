@@ -14,6 +14,7 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
+use crate::bindings::_helpers::compile_driver::targets::project_target_settings;
 use crate::bindings::_helpers::graph::python_lifecycle::build_python_sql_run_lifecycle;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::planner_scope::loaders::build_intermediate_source_map;
@@ -259,6 +260,7 @@ struct RuntimeParts<'a, 'py> {
     project: &'a Bound<'py, PyAny>,
     reload: bool,
     defaults: (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    target_config: Bound<'py, PyAny>,
     relations: (Bound<'py, PyAny>, Bound<'py, PyAny>),
     inputs: &'a LifecycleInputs<'py>,
 }
@@ -282,6 +284,7 @@ fn node_runtime<'py>(
             ),
             ("vars", native_field(parts.project, "effective_vars")?),
             ("is_reload", boolean(py, parts.reload)),
+            ("target_config", parts.target_config.clone()),
             ("default_database", parts.defaults.0.clone()),
             ("default_schema", parts.defaults.1.clone()),
             ("start_cursor_ts", start_ts.clone()),
@@ -441,6 +444,11 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                 adapter.call_method0("default_schema")
             })?,
         ),
+        target_config: project_target_settings(
+            &discovered,
+            &project,
+            (&connection_config, &adapter),
+        )?,
         relations: (relation_targets, project_relations),
         inputs,
     };

@@ -38,7 +38,12 @@ const READ_SIDE_OPTIONS: (&[&str], &[&str]) = (
         "lifecycle_plan",
         "relation_targets",
     ],
-    &["validation_refs", "project_relations", "providers"],
+    &[
+        "validation_refs",
+        "project_relations",
+        "providers",
+        "target_config",
+    ],
 );
 
 fn user_error(py: Python<'_>, message: String) -> PyErr {
@@ -263,6 +268,7 @@ pub(crate) struct ReadSideInputs<'py> {
     pub(crate) validation_refs: Bound<'py, PyAny>,
     pub(crate) project_relations: Bound<'py, PyAny>,
     pub(crate) providers: Bound<'py, PyAny>,
+    pub(crate) target_config: Bound<'py, PyAny>,
 }
 
 fn reference_kind(reference: &Bound<'_, PyAny>) -> PyResult<String> {
@@ -454,6 +460,7 @@ fn node_runtime<'py>(inputs: &ReadSideInputs<'py>) -> PyResult<Bound<'py, PyAny>
             ("target", native_field(&project, "effective_target_name")?),
             ("vars", native_field(&project, "effective_vars")?),
             ("is_reload", false.into_pyobject(py)?.to_owned().into_any()),
+            ("target_config", inputs.target_config.clone()),
             (
                 "default_database",
                 inputs.adapter.call_method0("default_database")?,
@@ -541,6 +548,7 @@ fn run_check_read_side_dependencies<'py>(
         validation_refs: arguments.value("validation_refs")?,
         project_relations: arguments.value("project_relations")?,
         providers: arguments.value("providers")?,
+        target_config: arguments.value("target_config")?,
     })
 }
 

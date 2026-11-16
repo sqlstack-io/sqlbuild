@@ -7,6 +7,7 @@ use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pi
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
+use crate::bindings::_helpers::compile_driver::targets::project_target_settings;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::graph::algorithms::transitive_closure_many;
 use crate::bindings::_helpers::graph::execution_gates::sql_ref_key;
@@ -70,6 +71,7 @@ struct Prepared<'py> {
     relation_targets: Bound<'py, PyAny>,
     relation_refs: Bound<'py, PyAny>,
     defaults: (Bound<'py, PyAny>, Bound<'py, PyAny>),
+    target_config: Bound<'py, PyAny>,
     project_relations: Bound<'py, PyAny>,
 }
 
@@ -354,7 +356,13 @@ fn prepare<'py>(
             )?),
         )?,
     )?;
+    let target_config: Bound<'py, PyAny> = project_target_settings(
+        &discovered,
+        &project,
+        (&native_field(invocation, "connection_config")?, &adapter),
+    )?;
     Ok(Prepared {
+        target_config,
         check_functions: PyTuple::new(py, check_functions)?.into_any(),
         lifecycle_plan,
         relation_targets,
@@ -405,6 +413,7 @@ fn node_runtime<'py>(
         ("target", native_field(&project, "effective_target_name")?),
         ("vars", native_field(&project, "effective_vars")?),
         ("is_reload", PyBool::new(py, false).to_owned().into_any()),
+        ("target_config", prepared.target_config.clone()),
         ("default_database", prepared.defaults.0.clone()),
         ("default_schema", prepared.defaults.1.clone()),
         ("relation_targets", prepared.relation_targets.clone()),
@@ -493,6 +502,7 @@ fn run_checks<'py>(
         validation_refs: prepared.relation_refs.clone(),
         project_relations: prepared.project_relations.clone(),
         providers: providers.clone(),
+        target_config: prepared.target_config.clone(),
     })?;
     record_run_state(
         invocation,
