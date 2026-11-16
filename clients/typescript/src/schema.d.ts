@@ -2611,6 +2611,10 @@ export interface components {
             class: string;
             /** @description The class docstring. */
             description: string;
+            /** @description Each of those jobs with the provider's nodes it selects, in node order. */
+            job_nodes?: {
+                [key: string]: string[];
+            };
             /** @description Jobs whose selection includes one of those nodes. */
             jobs?: string[];
             name: string;

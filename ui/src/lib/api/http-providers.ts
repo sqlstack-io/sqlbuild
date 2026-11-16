@@ -11,6 +11,7 @@ export function toProviders(wire: Wire['ProvidersRead']): ProviderConnection[] {
 		sourceFile: p.path,
 		settings: p.settings.map((s) => ({ name: s.name, type: s.type, required: s.required, secret: s.secret, env: s.env, description: s.description ?? null, missing: s.missing ?? false })),
 		usedBy: p.used_by.map((c) => ({ kind: c.kind as ProviderConsumer['kind'], name: c.name })),
-		jobs: p.jobs ?? []
+		jobs: p.jobs ?? [],
+		jobNodes: p.job_nodes ?? {}
 	}));
 }

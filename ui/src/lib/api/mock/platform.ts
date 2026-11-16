@@ -392,7 +392,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				setting('api_key', 'SecretStr', 'ORDERS_API_KEY', 'API key', { required: true })
 			],
 			usedBy: [{ kind: 'loader', name: 'raw__orders' }],
-			jobs: ['load_sources', 'nightly_all']
+			jobs: ['load_sources', 'nightly_all'],
+			jobNodes: { load_sources: ['raw__orders'], nightly_all: ['raw__orders'] }
 		},
 		{
 			name: 'export_bucket',
@@ -410,7 +411,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				{ kind: 'task', name: 'export_revenue_csv' },
 				{ kind: 'sink', name: 'run_log_archive' }
 			],
-			jobs: ['revenue_refresh', 'reporting_exports']
+			jobs: ['revenue_refresh', 'reporting_exports'],
+			jobNodes: { revenue_refresh: ['export_revenue_csv'], reporting_exports: ['export_revenue_csv'] }
 		},
 		{
 			name: 'support_desk',
@@ -423,7 +425,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				setting('token', 'SecretStr', 'SUPPORT_DESK_TOKEN', 'Access token', { required: true })
 			],
 			usedBy: [{ kind: 'loader', name: 'raw__support_tickets' }],
-			jobs: ['load_sources']
+			jobs: ['load_sources'],
+			jobNodes: { load_sources: ['raw__support_tickets'] }
 		},
 		{
 			name: 'chat_webhook',
@@ -435,7 +438,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				setting('timeout_seconds', 'int', 'CHAT_WEBHOOK_TIMEOUT_SECONDS', 'Request timeout')
 			],
 			usedBy: [],
-			jobs: []
+			jobs: [],
+			jobNodes: {}
 		}
 	];
 

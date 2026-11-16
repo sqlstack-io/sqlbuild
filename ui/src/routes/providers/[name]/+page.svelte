@@ -91,11 +91,21 @@
 						{#if provider.jobs.length}
 							<div>
 								<div class="text-[var(--sb-text-faint)] mb-2 text-[12px] font-medium">Jobs that run this code · {provider.jobs.length}</div>
-								<div class="flex flex-wrap gap-1.5">
-									{#each provider.jobs as j (j)}
-										<a href={to(`/jobs/${j}`)} class="bg-secondary hover:bg-[var(--sb-hover)] rounded-[2px] border border-border px-2.5 py-1.5 text-[12px]">{j}</a>
-									{/each}
-								</div>
+								<table class="sb-list used-by">
+									<thead><tr><th>Job</th><th>Nodes using this provider</th></tr></thead>
+									<tbody>
+										{#each provider.jobs as j (j)}
+											<tr>
+												<td><a href={to(`/jobs/${j}`)}>{j}</a></td>
+												<td>
+													<div class="flex flex-wrap gap-x-3 gap-y-1">
+														{#each provider.jobNodes[j] ?? [] as n (n)}<a class="font-mono" href={to(`/catalog/${n}`)}>{n}</a>{:else}<span class="text-muted-foreground">—</span>{/each}
+													</div>
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
 							</div>
 						{/if}
 					</div>
@@ -118,8 +128,15 @@
 </div>
 
 <style>
-	.settings {
+	.settings,
+	.used-by {
 		max-width: 960px;
+	}
+	.used-by td:first-child {
+		width: 260px;
+	}
+	.used-by a:hover {
+		text-decoration: underline;
 	}
 	.secret {
 		display: inline-flex;

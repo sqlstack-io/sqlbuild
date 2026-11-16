@@ -272,6 +272,8 @@ export type ProviderConnection = {
 	usedBy: ProviderConsumer[];
 	/** Jobs whose selection includes a node that uses the provider. */
 	jobs: string[];
+	/** Each of those jobs with the provider's nodes it runs. */
+	jobNodes: Record<string, string[]>;
 };
 
 // ---- maintenance (synced warehouse state tables) ----
