@@ -181,7 +181,7 @@ fn planned_output<'py>(
     )?;
     let entries = build_planner_entry_results(
         (runtime, &warehouse),
-        (overrides, &deferral),
+        overrides,
         (&inspection_scope, &reconciliation),
         &source_freshness,
     )?;

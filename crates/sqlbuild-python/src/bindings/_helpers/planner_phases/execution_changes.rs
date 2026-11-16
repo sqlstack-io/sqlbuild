@@ -5,9 +5,8 @@ use crate::bindings::_helpers::command_runtime::concurrency::resolve_configured_
 use crate::bindings::_helpers::planner_entries::contexts::default_microbatch_limit_action;
 use crate::bindings::_helpers::planner_entries::model_entries::plan_entries;
 use crate::bindings::_helpers::planner_entries::models::{
-    PlanEntriesRequest, PlanEntryBuildInputs, RelationsRequest,
+    PlanEntriesRequest, PlanEntryBuildInputs,
 };
-use crate::bindings::_helpers::planner_entries::relations::planner_relations_context;
 use crate::bindings::_helpers::planner_identity::identities::merge_recomputed_model_changes;
 use crate::bindings::_helpers::planner_identity::identities::with_honest_model_write_hashes;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
@@ -86,30 +85,18 @@ fn planned_concurrency(
     .limit)
 }
 
-/// Model plan entries for the pruned execution scope, with the freshness and override inputs they need.
+/// Model plan entries for the execution scope, over the relations the warehouse phase resolved for it,
+/// with the freshness and override inputs they need.
 pub(crate) fn build_planner_entry_results<'py>(
     (runtime, warehouse): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    (overrides, deferral): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    overrides: &Bound<'py, PyAny>,
     (execution_scope, reconciliation): (&Bound<'py, PyAny>, &ChangeReconciliation<'py>),
     source_freshness: &Bound<'py, PyAny>,
 ) -> PyResult<ModelEntryResults<'py>> {
     let py = runtime.py();
     let project = runtime_field(runtime, |runtime| &runtime.project)?;
     let config = runtime_field(runtime, |runtime| &runtime.project_config)?;
-    let relations = planner_relations_context(RelationsRequest {
-        project: project.clone(),
-        adapter: runtime_field(runtime, |runtime| &runtime.adapter)?,
-        connection: runtime_field(runtime, |runtime| &runtime.connection)?,
-        scope: execution_scope.clone(),
-        deferral: deferral.clone(),
-        project_config: config.clone(),
-        local_config: runtime_field(runtime, |runtime| &runtime.local_config)?,
-        known_source_columns: native_field(
-            &native_field(warehouse, "inspection_relations")?,
-            "source_warehouse_columns",
-        )?,
-        relation_keys: py.None().into_bound(py),
-    })?;
+    let relations = native_field(warehouse, "inspection_relations")?;
     let propagation = native_field(source_freshness, "propagation")?;
     let blocked = if propagation.is_none() {
         PyFrozenSet::empty(py)?.into_any()
