@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::api::_helpers::authentication::bearer::require_location;
 use crate::api::errors::ApiError;
+use crate::api::models::ServerFacts;
 use crate::credentials::models::TokenIdentity;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::ingest::ingest_audit_results::ingest_audit_results;
@@ -28,8 +29,8 @@ use crate::warehouse_metadata::main::location_reads::read_sync_due::read_sync_du
 use crate::warehouse_metadata::main::location_reads::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
     MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
-    WarehouseHistoryKind, WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse,
-    WarehouseWatermarkRead,
+    WarehouseHistoryKind, WarehouseRetention, WarehouseSyncDue, WarehouseSyncDueRead,
+    WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata", operation_id = "report_metadata",
@@ -102,6 +103,23 @@ pub(crate) async fn watermark(
     Ok(Json(
         read_watermark(&store, (location_id, &target), &request).await?,
     ))
+}
+
+/// How much state history a full read delivers; older servers answer 404 and the location reads it all.
+#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/metadata/retention", operation_id = "read_metadata_retention",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = WarehouseRetention),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
+    security(("bearer" = [])))]
+pub(crate) async fn retention(
+    (State(store), Extension(facts)): (State<ControlStore>, Extension<ServerFacts>),
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, _target)): Path<(Uuid, String)>,
+) -> Result<Json<WarehouseRetention>, ApiError> {
+    require_location(&identity, location_id)?;
+    Ok(Json(WarehouseRetention {
+        state_history_versions: facts.state_history.kept_versions(&store),
+    }))
 }
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/sync-due",

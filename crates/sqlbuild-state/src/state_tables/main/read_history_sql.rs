@@ -1,7 +1,8 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
 use crate::state_tables::constants::{
-    EVENT_ID_KEY_PROJECTION, MISSING_EVENT_ID_KEY, SQLSERVER_ADAPTER,
+    EVENT_ID_KEY_PROJECTION, MISSING_EVENT_ID_KEY, NEWEST_FIRST_COLUMN, NEWEST_VERSION_COLUMN,
+    SQLSERVER_ADAPTER,
 };
 use crate::state_tables::models::HistoryRead;
 
@@ -19,6 +20,7 @@ pub fn read_history_sql(
         adapter,
         has_event_id,
         limit,
+        newest,
     } = read;
     let mut projection = columns.join(", ");
     projection.push_str(if !has_event_id {
@@ -81,6 +83,27 @@ pub fn read_history_sql(
     if let Some(since) = observed_since {
         filters.push(format!("{timestamp_column} >= {since}"));
     }
+    let source = match newest {
+        Some(newest) => {
+            let partition = newest.partition.join(", ");
+            let mut order = vec![format!("{NEWEST_FIRST_COLUMN} DESC")];
+            order.extend(
+                newest
+                    .observation
+                    .iter()
+                    .map(|column| format!("{column} DESC")),
+            );
+            filters.push(format!("{NEWEST_VERSION_COLUMN} <= {}", newest.versions));
+            format!(
+                "(SELECT *, DENSE_RANK() OVER (PARTITION BY {partition} ORDER BY {}) AS {NEWEST_VERSION_COLUMN} \
+                 FROM (SELECT *, MIN({timestamp_column}) OVER (PARTITION BY {partition}, {}) AS {NEWEST_FIRST_COLUMN} \
+                 FROM {qualified_name}) AS sqb_observations) AS sqb_versions",
+                order.join(", "),
+                newest.observation.join(", ")
+            )
+        }
+        None => qualified_name.to_owned(),
+    };
     let filter = if filters.is_empty() {
         String::new()
     } else {
@@ -104,7 +127,7 @@ pub fn read_history_sql(
         format!(" LIMIT {limit}")
     };
     Ok(format!(
-        "SELECT {head}{projection} FROM {qualified_name}{filter} ORDER BY {}{tail}",
+        "SELECT {head}{projection} FROM {source}{filter} ORDER BY {}{tail}",
         order.join(", ")
     ))
 }

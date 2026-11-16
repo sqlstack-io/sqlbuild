@@ -1147,6 +1147,16 @@
        },
        {
         "kind": "store",
+        "options": [
+         "--state-history-retention-versions"
+        ],
+        "dest": "control_state_history_retention_versions",
+        "type": "int",
+        "help": "builds of each node and results of each check to mirror from the warehouse; older ones are deleted, the latest always stays (default: 5 on SQLite, 20 on PostgreSQL)",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": ["--trusted-proxy-config"],
         "dest": "control_trusted_proxy_config",
         "help": {"suppress": true},

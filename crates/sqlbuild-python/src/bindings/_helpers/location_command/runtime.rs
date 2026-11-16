@@ -12,7 +12,9 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 
 use crate::bindings::_helpers::boundary::python_calls::within;
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
-use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
+use crate::bindings::_helpers::location_command::constants::{
+    DUCKDB_LOCK_CONFLICT, METADATA_ERROR_CHARS,
+};
 use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::{
@@ -64,6 +66,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             PyValueError::new_err("runtime received an invalid metadata read")
                         })?;
                     let mut busy = false;
+                    let mut failure: Option<String> = None;
                     if session.is_none() {
                         let arguments = location_arguments(py, Some(options.clone()))?;
                         session = match open_history_session(py, &arguments) {
@@ -71,10 +74,9 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             Err(error) => {
                                 busy = error.to_string().contains(DUCKDB_LOCK_CONFLICT);
                                 if !busy {
-                                    write_stderr(
-                                        py,
-                                        "Warehouse connection for metadata reads failed.\n",
-                                    )?;
+                                    failure = Some(format!(
+                                        "warehouse connection for metadata reads failed: {error}"
+                                    ));
                                 } else if !reported_busy {
                                     write_stderr(
                                         py,
@@ -92,7 +94,10 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                     stream = open;
                                     Some(page)
                                 }
-                                Err(_) => None,
+                                Err(error) => {
+                                    failure = Some(error.to_string());
+                                    None
+                                }
                             }
                         }
                         None => None,
@@ -105,17 +110,16 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     reported_busy = busy;
                     if busy {
                         serde_json::to_string(&serde_json::json!({ "busy": true }))
-                    } else {
-                        if page.is_none() {
-                            if let Some(opened) = session.take() {
-                                drop(close_history_session(opened, None));
-                            }
-                            write_stderr(
-                                py,
-                                "Warehouse metadata read failed. No page delivered.\n",
-                            )?;
-                        }
+                    } else if let Some(page) = page {
                         serde_json::to_string(&page)
+                    } else {
+                        if let Some(opened) = session.take() {
+                            drop(close_history_session(opened, None));
+                        }
+                        let message = failure.unwrap_or_else(|| "no page was read".into());
+                        serde_json::to_string(&serde_json::json!({
+                            "error": message.chars().take(METADATA_ERROR_CHARS).collect::<String>()
+                        }))
                     }
                 } else {
                     let evaluation: SensorEvaluationRequest = serde_json::from_value(request)

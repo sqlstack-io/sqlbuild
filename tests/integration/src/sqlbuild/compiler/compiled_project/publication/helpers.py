@@ -442,8 +442,19 @@ def warehouse_history_page(
     table: str,
     after: list[str | None] | None = None,
     observed_since: str | None = None,
+    newest_versions: int | None = None,
+    limit: int | None = None,
 ) -> Any:
     """Exercise the real isolated reader without a server, state database or declaration import."""
+    read: dict[str, Any] = {
+        "location": {"database": None, "schema": "main"},
+        "after": after,
+        "observed_since": observed_since,
+    }
+    if newest_versions is not None:
+        read["newest_versions"] = newest_versions
+    if limit is not None:
+        read["limit"] = limit
     result: subprocess.CompletedProcess[str] = subprocess.run(
         [
             str(Path(sys.executable).with_name("sqb")),
@@ -458,16 +469,7 @@ def warehouse_history_page(
             "--target",
             "development",
         ],
-        input=json.dumps(
-            {
-                table: {
-                    "location": {"database": None, "schema": "main"},
-                    "after": after,
-                    "observed_since": observed_since,
-                }
-            }
-        )
-        + "\n",
+        input=json.dumps({table: read}) + "\n",
         text=True,
         capture_output=True,
         timeout=20,
@@ -478,14 +480,16 @@ def warehouse_history_page(
 
 
 def warehouse_history_pages(
-    project: Path, table: str, observed_since: str | None = None
+    project: Path, table: str, observed_since: str | None = None, limit: int | None = None
 ) -> list[dict[str, Any]]:
     """Follow bounded source pages, including empty filtered pages with a continuation."""
     pages: list[dict[str, Any]] = []
     after: list[str | None] | None = None
     more: bool = True
     while more:
-        page: dict[str, Any] = warehouse_history_page(project, table, after, observed_since)
+        page: dict[str, Any] = warehouse_history_page(
+            project, table, after, observed_since, limit=limit
+        )
         assert page is not None
         pages.append(page)
         after = page["next_after"]
@@ -540,7 +544,7 @@ def wait_for_idle_sync(process: subprocess.Popen[bytes], log: Path) -> None:
 
     deadline: float = time.monotonic() + 45
     text: str = log.read_text()
-    while text.rfind("synchronization completed.") < text.rfind("Reading warehouse history"):
+    while text.rfind("synchronization completed") < text.rfind("Reading warehouse history"):
         assert process.poll() is None, text
         assert time.monotonic() < deadline, text
         time.sleep(0.05)
@@ -590,7 +594,7 @@ def wait_for_warehouse_sync_health(
         health = report["report"]["health"]
         assert health["generation"] == 1
         assert health["location"] == {"database": None, "schema": "main"}
-        assert 0 <= health["records_sent"] <= 100
+        assert 0 <= health["records_sent"] <= 2000
         assert health["elapsed_millis"] > 0
     return reports
 

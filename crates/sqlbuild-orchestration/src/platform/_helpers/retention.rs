@@ -20,7 +20,11 @@ use crate::snapshots::main::prune_snapshots::prune_snapshots;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query, write::write};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
-use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use crate::warehouse_metadata::constants::{
+    MAX_HISTORY_RECORDS, SQLITE_RECLAIM_FREE_SHARE, SQLITE_RECLAIM_MIN_FREE_PAGES,
+    SQLITE_RECLAIM_STEP_PAGES,
+};
+use crate::warehouse_metadata::main::ingest::prune_state_history::prune_state_history;
 use crate::warehouse_metadata::main::ingest::prune_statistics::prune_statistics;
 
 /// Old evaluation phases go once a later attempt of the same sensor exists.
@@ -68,12 +72,16 @@ pub(crate) async fn retain(
         statistics,
         snapshots,
         run_logs,
+        state_history,
     }: RetentionPolicies,
     sinks: &[String],
 ) -> Result<i64, ControlError> {
     prune_run_logs(store, run_logs).await?;
     prune_snapshots(store, snapshots).await?;
     while prune_statistics(store, statistics).await? == MAX_HISTORY_RECORDS {
+        tokio::task::yield_now().await;
+    }
+    while prune_state_history(store, state_history).await?.1 {
         tokio::task::yield_now().await;
     }
     drain(store, PLATFORM_EVENTS, |now| {
@@ -227,6 +235,45 @@ pub(crate) async fn wal_checkpoint(store: &ControlStore) -> Result<(), ControlEr
         connection.busy_timeout(Duration::from_millis(CHECKPOINT_READER_WAIT_MS))?;
         connection.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
         Ok(())
+    })
+    .await?
+}
+
+/// Return a SQLite store's free pages to the disk, so the file shrinks after pruning.
+///
+/// A store in incremental auto-vacuum mode frees a bounded step of pages each pass. Any other
+/// store is vacuumed once into that mode when much of its file is free. Returns whether pages
+/// were freed. PostgreSQL reclaims space itself.
+pub(crate) async fn reclaim_sqlite_space(store: &ControlStore) -> Result<bool, ControlError> {
+    let ControlStore::Sqlite(path) = store else {
+        return Ok(false);
+    };
+    let path = path.clone();
+    tokio::task::spawn_blocking(move || {
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, true)?;
+        connection.busy_timeout(Duration::from_millis(CHECKPOINT_READER_WAIT_MS))?;
+        let pragma = |name: &str| -> rusqlite::Result<i64> {
+            connection.query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))
+        };
+        let free = pragma("freelist_count")?;
+        if free == 0 {
+            return Ok(false);
+        }
+        if pragma("auto_vacuum")? == 2 {
+            connection.execute_batch(&format!(
+                "PRAGMA incremental_vacuum({SQLITE_RECLAIM_STEP_PAGES})"
+            ))?;
+            return Ok(true);
+        }
+        let pages = pragma("page_count")?;
+        if free < SQLITE_RECLAIM_MIN_FREE_PAGES
+            || (free as f64) < (pages as f64) * SQLITE_RECLAIM_FREE_SHARE
+        {
+            return Ok(false);
+        }
+        connection.execute_batch("PRAGMA auto_vacuum=INCREMENTAL; VACUUM")?;
+        Ok(true)
     })
     .await?
 }

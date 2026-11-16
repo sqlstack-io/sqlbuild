@@ -1106,6 +1106,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How much state history a full read delivers; older servers answer 404 and the location reads it all. */
+        get: operations["read_metadata_retention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/statistics-due": {
         parameters: {
             query?: never;
@@ -1977,6 +1994,13 @@ export interface components {
             /** @enum {string} */
             kind: "warehouse_sync";
             location: components["schemas"]["WarehouseStateLocation"];
+            /**
+             * Format: int64
+             * @description Rows, or statistics relations, the failed read asked for.
+             */
+            page_limit?: number | null;
+            progress?: null | components["schemas"]["WarehouseSyncProgress"];
+            read_failure?: null | components["schemas"]["WarehouseReadFailure"];
             /** Format: int64 */
             records_sent: number;
             table: components["schemas"]["WarehouseHistoryKind"];
@@ -3253,6 +3277,11 @@ export interface components {
              * @description Publications kept per location target.
              */
             snapshots_kept: number;
+            /**
+             * Format: int64
+             * @description Builds of each node, and results of each check, the store mirrors from the warehouse.
+             */
+            state_history_versions: number;
             /** Format: int64 */
             statistics_days: number;
         };
@@ -3569,6 +3598,19 @@ export interface components {
             state_schema: string;
             value: string;
         };
+        /** @description What went wrong reading one page, without the warehouse's message, which may name hosts or users. */
+        WarehouseReadFailure: {
+            /** @enum {string} */
+            kind: "reader_start";
+        } | {
+            /** @enum {string} */
+            kind: "read_error";
+        } | {
+            /** @enum {string} */
+            kind: "timed_out";
+            /** Format: int64 */
+            seconds: number;
+        };
         /** @description One estimated query cost observation of a run, resource and warehouse; refreshes append. */
         WarehouseResourceCostRecord: {
             /** Format: int64 */
@@ -3605,6 +3647,11 @@ export interface components {
             warehouse_name: string;
             warehouse_size: string;
             warehouse_type?: string | null;
+        };
+        /** @description The newest versions per node or check a full read of state history needs to deliver. */
+        WarehouseRetention: {
+            /** Format: int32 */
+            state_history_versions: number;
         };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
@@ -3644,6 +3691,31 @@ export interface components {
          * @enum {string}
          */
         WarehouseSyncFailure: "watermark" | "read" | "delivery" | "busy";
+        /** @description How far one synchronization has got, so people see it running and when it completed. */
+        WarehouseSyncProgress: {
+            /** @description This report's page was the synchronization's last, so it has completed. */
+            completed: boolean;
+            /**
+             * Format: int64
+             * @description Milliseconds since the synchronization began.
+             */
+            elapsed_millis: number;
+            /**
+             * Format: int64
+             * @description Kinds the synchronization reads: 14 for each state schema.
+             */
+            kinds: number;
+            /**
+             * Format: int64
+             * @description The reported kind's position in the synchronization, from 1.
+             */
+            position: number;
+            /**
+             * Format: int64
+             * @description Rows the synchronization has delivered, this report's included.
+             */
+            rows: number;
+        };
         WarehouseSyncResponse: {
             applied: boolean;
         };
@@ -6651,6 +6723,42 @@ export interface operations {
             };
             /** @description Reader generation fenced */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_metadata_retention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseRetention"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

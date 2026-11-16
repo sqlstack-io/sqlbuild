@@ -128,6 +128,13 @@ pub(crate) struct WarehouseMetadataTestCase {
     pub(crate) expected_observations: usize,
 }
 
+pub(crate) struct StateHistoryRetentionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) configured: Option<u16>,
+    pub(crate) expected_versions: u16,
+}
+
 pub(crate) struct PasswordApiTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

@@ -1,4 +1,6 @@
-use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use sqlbuild_orchestration::warehouse_metadata::constants::{
+    MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
+};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseStateLocation,
 };
@@ -8,11 +10,17 @@ use sqlbuild_config::project::models::ControlConfig;
 use std::time::Duration;
 use tokio::time::Instant;
 
-use crate::native_commands::_helpers::execution::{metadata_sync, safety_sync_seconds};
+use crate::native_commands::_helpers::execution::{
+    history_request, metadata_sync, read_metadata_page, rows_text, safety_sync_setting, scan_line,
+    sync_progress,
+};
+use crate::native_commands::constants::METADATA_SAFETY_SYNC_SECONDS;
+use crate::native_commands::main::_location_metadata::read_failure_line;
+use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{acknowledge_complete_pages, one_location};
 use crate::native_commands::tests::test_types::{
-    MetadataRetryTestCase, SafetySyncIdleTestCase, SafetySyncSettingTestCase,
-    SyncCoalescingTestCase, UnchangedScanTestCase,
+    MetadataRetryTestCase, NewestVersionsTestCase, ReadFailureTestCase, SafetySyncIdleTestCase,
+    SafetySyncSettingTestCase, SyncCoalescingTestCase, UnchangedScanTestCase,
 };
 
 #[test]
@@ -54,7 +62,7 @@ fn given_failed_metadata_read_when_back_at_statistics_then_page_shrinks_until_sc
             (
                 WarehouseHistoryKind::Statistics,
                 test_case.expected_statistics_limit,
-                MAX_HISTORY_RECORDS,
+                MAX_HISTORY_PAGE_RECORDS,
             ),
             "{description}",
             description = test_case.description
@@ -344,12 +352,13 @@ fn given_safety_sync_settings_when_resolving_then_flag_beats_environment_beats_p
         },
     ];
     for test_case in test_cases {
-        let resolved = safety_sync_seconds(test_case.flag, test_case.environment, || {
+        let resolved = safety_sync_setting(test_case.flag, test_case.environment, || {
             Ok(ControlConfig {
                 sync_at_least_every_seconds: test_case.project,
                 ..ControlConfig::default()
             })
-        });
+        })
+        .map(|seconds| seconds.unwrap_or(METADATA_SAFETY_SYNC_SECONDS));
         assert_eq!(
             resolved,
             test_case.expected_seconds.map_err(str::to_owned),
@@ -357,4 +366,262 @@ fn given_safety_sync_settings_when_resolving_then_flag_beats_environment_beats_p
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_a_state_history_limit_when_requesting_history_then_only_full_reads_of_builds_and_checks_carry_it()
+ {
+    let test_cases = [
+        NewestVersionsTestCase {
+            description: "a first read of builds stops at the limit",
+            kind: WarehouseHistoryKind::Fingerprints,
+            incremental: false,
+            server_limit: Some(5),
+            expected: Some(5),
+        },
+        NewestVersionsTestCase {
+            description: "a first read of check results stops at the limit",
+            kind: WarehouseHistoryKind::AuditResults,
+            incremental: false,
+            server_limit: Some(20),
+            expected: Some(20),
+        },
+        NewestVersionsTestCase {
+            description: "an incremental read delivers every new build; pruning bounds the store",
+            kind: WarehouseHistoryKind::Fingerprints,
+            incremental: true,
+            server_limit: Some(5),
+            expected: None,
+        },
+        NewestVersionsTestCase {
+            description: "other tables are never limited",
+            kind: WarehouseHistoryKind::NodeResults,
+            incremental: false,
+            server_limit: Some(5),
+            expected: None,
+        },
+        NewestVersionsTestCase {
+            description: "a server without the setting gets the full history",
+            kind: WarehouseHistoryKind::Fingerprints,
+            incremental: false,
+            server_limit: None,
+            expected: None,
+        },
+    ];
+    for test_case in test_cases {
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.index = WarehouseHistoryKind::ALL
+            .iter()
+            .position(|kind| *kind == test_case.kind)
+            .expect("kind is listed");
+        state.state_history_versions = test_case.server_limit;
+        if test_case.incremental {
+            state.observed_since = Some(Utc::now());
+        }
+        let request: serde_json::Value =
+            serde_json::from_slice(&history_request(&state).expect("request")).expect("JSON");
+        assert_eq!(
+            request[test_case.kind.as_str()]
+                .get("newest_versions")
+                .and_then(serde_json::Value::as_u64),
+            test_case.expected.map(u64::from),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_failing_metadata_read_when_the_page_fails_then_the_cause_kind_and_page_size_are_reported()
+ {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let reader = |name: &str, body: &str| {
+        let path = directory.path().join(name);
+        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).expect("reader script");
+        let mut permissions = std::fs::metadata(&path).expect("metadata").permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
+        std::fs::set_permissions(&path, permissions).expect("executable");
+        path
+    };
+    let test_cases = [
+        ReadFailureTestCase {
+            description: "a reader that cannot start names the start failure",
+            script: directory.path().join("missing-reader"),
+            kind: WarehouseHistoryKind::Fingerprints,
+            expected: |failure| matches!(failure, ReadFailure::ReaderStart(_)),
+            expected_line: "Warehouse history read failed for fingerprints (2000-row page): the metadata reader did not start:",
+        },
+        ReadFailureTestCase {
+            description: "a read error carries the warehouse's message",
+            script: reader(
+                "erroring-reader",
+                r#"read line; echo '{"error":"permission denied for table _sqlbuild_audit_results"}'; read line"#,
+            ),
+            kind: WarehouseHistoryKind::AuditResults,
+            expected: |failure| {
+                *failure
+                    == ReadFailure::Read(
+                        "permission denied for table _sqlbuild_audit_results".into(),
+                    )
+            },
+            expected_line: "Warehouse history read failed for audit results (2000-row page): permission denied for table _sqlbuild_audit_results.",
+        },
+        ReadFailureTestCase {
+            description: "a reader that never answers times out after the page allowance",
+            script: reader("silent-reader", "read line; sleep 30"),
+            kind: WarehouseHistoryKind::Catalog,
+            expected: |failure| *failure == ReadFailure::TimedOut(1),
+            expected_line: "Warehouse history read failed for catalog (2000-row page): no reply within 1 s.",
+        },
+    ];
+    for test_case in test_cases {
+        let options = LocationServe {
+            project_dir: directory.path().to_path_buf(),
+            server_url: "http://127.0.0.1:1".into(),
+            location_id: uuid::Uuid::nil(),
+            target: "development".into(),
+            image_id: None,
+            metadata_reconcile_seconds: 3600,
+            safety_sync_seconds: 0,
+            safety_sync_explicit: false,
+        };
+        let mut state = metadata_sync((one_location(), 1), (3600, 0));
+        state.index = WarehouseHistoryKind::ALL
+            .iter()
+            .position(|kind| *kind == test_case.kind)
+            .expect("kind is listed");
+        state.page_seconds = 1;
+        let (state, page) = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(read_metadata_page(
+                (&options, &test_case.script),
+                state,
+                std::future::pending(),
+            ))
+            .expect("no control error")
+            .expect("not stopped");
+        let failure = page.expect_err(test_case.description);
+        assert!(
+            (test_case.expected)(&failure),
+            "{}: {failure:?}",
+            test_case.description
+        );
+        let line = read_failure_line(&state, &failure);
+        assert!(
+            line.starts_with(test_case.expected_line),
+            "{}: {line}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_completed_table_when_reporting_progress_then_the_line_names_its_position_rows_and_time()
+{
+    let mut state = metadata_sync((one_location(), 1), (3600, 0));
+    state.index = 2;
+    state.progress.scan_rows = 31_204;
+    let line = scan_line(&state, 14);
+    assert!(
+        line.starts_with("Warehouse history 3/14: audit results, 31,204 rows in "),
+        "{line}"
+    );
+    state.progress.scan_unchanged = true;
+    assert!(scan_line(&state, 14).contains("audit results, unchanged in "));
+    assert_eq!(
+        [
+            rows_text(0),
+            rows_text(1),
+            rows_text(999),
+            rows_text(1_640),
+            rows_text(1_234_567)
+        ],
+        [
+            "0 rows",
+            "1 row",
+            "999 rows",
+            "1,640 rows",
+            "1,234,567 rows"
+        ]
+        .map(String::from)
+    );
+}
+
+#[test]
+fn given_a_delivered_page_when_reporting_health_then_progress_completes_only_on_the_last_kinds_last_page()
+ {
+    let page = |more: bool| LocationMetadataPage {
+        batch: serde_json::from_value(serde_json::json!({
+            "kind": "statistics",
+            "session_id": uuid::Uuid::nil(),
+            "generation": 1,
+            "records": [{}, {}, {}],
+        }))
+        .expect("batch"),
+        next_source_after: more.then(|| vec![Some("inventory".into())]),
+    };
+    let mut state = metadata_sync((one_location(), 1), (3600, 0));
+    state.progress.sync_rows = 100;
+    state.progress.scan_rows = 20;
+    state.index = WarehouseHistoryKind::ALL.len() - 1;
+    state.pending = Some(page(true));
+    let progress = sync_progress(&state, true);
+    assert_eq!(
+        (
+            progress.position,
+            progress.kinds,
+            progress.rows,
+            progress.completed
+        ),
+        (14, 14, 123, false),
+        "a page with more to come leaves the sync running"
+    );
+    state.pending = Some(page(false));
+    assert!(
+        sync_progress(&state, true).completed,
+        "the last page completes the sync"
+    );
+    assert!(
+        !sync_progress(&state, false).completed,
+        "a failed report never completes it"
+    );
+    state.index = 2;
+    assert!(
+        !sync_progress(&state, true).completed,
+        "an earlier kind's last page does not"
+    );
+}
+
+#[test]
+fn given_an_adapter_whose_reads_wake_compute_when_idle_then_only_runs_requests_or_a_set_interval_sync()
+ {
+    let idle = |wakes: bool, explicit: bool| {
+        let mut state = metadata_sync((one_location(), 1), (3600, 1800));
+        state.cycle_started_at = Some(Utc::now());
+        state.safety_at = Instant::now() - Duration::from_secs(1);
+        state.reads_wake_compute = wakes;
+        state.safety_explicit = explicit;
+        state
+    };
+    assert!(
+        !idle(true, false).sync_due(None),
+        "the default interval never wakes compute on a timer"
+    );
+    assert!(
+        idle(false, false).sync_due(None),
+        "metadata-only reads keep the default interval"
+    );
+    assert!(
+        idle(true, true).sync_due(None),
+        "an interval someone set still applies"
+    );
+    assert!(
+        idle(true, false).sync_due(Some(Utc::now() + chrono::Duration::seconds(1))),
+        "a run that ended still syncs"
+    );
+    let mut requested = idle(true, false);
+    requested.request_sync();
+    assert!(requested.sync_due(None), "a request still syncs");
 }

@@ -28,6 +28,7 @@
 	import ChecksTab from './checks-tab.svelte';
 	import WarehouseTab from './warehouse-tab.svelte';
 	import HistoryTab from './history-tab.svelte';
+	import SyncingNote from '$lib/components/platform/syncing-note.svelte';
 	import { upstreamNote, type Tab } from './utils';
 
 	let { name }: { name: string } = $props();
@@ -164,12 +165,15 @@
 					<ColumnLineage focal={name} models={colLineage.data.models} colEdges={colLineage.data.edges} modelSql={colLineage.data.sql} modelColExpr={colLineage.data.expressions} />
 				{/if}
 			{:else if tab === 'runs'}
+				<SyncingNote what="Builds and costs" />
 				<RunsTab node={n} costs={costs.data ?? []} costDays={COST_DAYS} />
 			{:else if tab === 'checks'}
+				<SyncingNote what="Check results" />
 				<ChecksTab node={n} />
 			{:else if tab === 'warehouse' && n.warehouse}
 				<WarehouseTab warehouse={n.warehouse} microbatch={n.microbatch} />
 			{:else if tab === 'history' && n.history}
+				<SyncingNote what="History" />
 				<HistoryTab node={n} history={n.history} />
 			{/if}
 		</div>

@@ -183,6 +183,7 @@ audit_days = 730
 snapshot_count = 20
 run_log_days = 7
 run_log_count = 100
+state_history_versions = 10
 ```
 
 | Data | `[retention]` key | Option | Default | Range |
@@ -192,6 +193,7 @@ run_log_count = 100
 | Published snapshots per location and target | `snapshot_count` | `--snapshot-retention-count` | `10` | `1`–`65535` |
 | Logs of finished runs | `run_log_days` | `--run-log-retention-days` | `14` | `1`–`65535` |
 | Finished runs per location and target that keep their logs | `run_log_count` | `--run-log-retention-count` | `200` | `1`–`65535` |
+| Builds and check results kept for each node | `state_history_versions` | `--state-history-retention-versions` | `5` on SQLite, `20` on PostgreSQL | `1`–`65535` |
 | Skipped and covered schedule ticks | None | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
@@ -218,6 +220,24 @@ is older than `run_log_days` or when more than `run_log_count` newer runs
 have finished in its location and target, whichever comes first. The run itself, its node results,
 and the run history the scheduler recorded stay, so run lists, node status and history are
 unchanged; only the run's log, statements and SQL are no longer shown. A running run keeps its log.
+
+Locations copy the builds and check results recorded in the warehouse's
+`_sqlbuild_fingerprints` and `_sqlbuild_audit_results` tables into the control database. The
+server keeps the newest `state_history_versions` builds of each node and results of each check,
+and always keeps the latest one:
+
+- A location's first read of a table, and its periodic full re-read, take only the newest
+  `state_history_versions` rows of each node or check from the warehouse.
+- Builds and results that arrive later are added, and older ones are deleted in small batches about
+  once a minute.
+- A SQLite control database gives the freed space back to the disk, so the file shrinks. A file
+  created by an older release is vacuumed once, when at least a quarter of it is free; after that,
+  space is freed a little at a time.
+
+The PostgreSQL default matches the janitor's
+[`direct_state_history_versions`](/docs/cli/janitor#state-history-pruning), so with the janitor
+running the server keeps what the warehouse keeps. [`sqb dev`](/docs/cli/dev/) has no
+`server.toml` and uses the SQLite default.
 
 The **Server** panel on the **Settings** page shows the control database's size on disk and both
 run log limits, and each `heartbeat` [platform event](#receive-platform-events) carries the size as
@@ -346,7 +366,7 @@ The location starts the sync within a few seconds, and the top bar shows when it
 | --- | --- | --- | --- |
 | `[control] server` | `SQLBUILD_CONTROL_SERVER` | none | HTTPS origin of the server, as `sqb login --server` takes it |
 | `[control] location` | `SQLBUILD_CONTROL_LOCATION` | none | Location name a signed-in `sqb build` asks to sync |
-| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"` | Longest a location waits between syncs; `"0"` or `"off"` turns it off |
+| `[control] sync_at_least_every` | `SQLBUILD_CONTROL_SYNC_AT_LEAST_EVERY` | `"30m"`, or off on Databricks, ClickHouse and MotherDuck | Longest a location waits between syncs; `"0"` or `"off"` turns it off. See [warehouse cost](#warehouse-cost-of-an-always-on-location) |
 | none | `SQLBUILD_CONTROL_CA_CERT` | none | Extra trusted PEM CA certificate for the server |
 
 An environment variable overrides the project file. `sqb location serve --sync-at-least-every`
@@ -368,6 +388,62 @@ Details:
 - A sync reads the warehouse and never writes to it. On Snowflake, it skips state tables that
   haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
 - `[control]` holds no secrets. The session stays in the login `sqb login` saved for that server.
+
+### Warehouse cost of an always-on location
+
+A location syncs when it starts, after each run ends, when someone asks, and on the
+`sync_at_least_every` interval. Which reads need running compute depends on the adapter:
+
+| Adapter | Reads that need running compute | Interval sync while idle |
+| --- | --- | --- |
+| Snowflake | Reading a state table that changed since the last sync. Change checks, the catalog (`SHOW TABLES`, `SHOW VIEWS`, `SHOW COLUMNS`), statistics (`SHOW OBJECTS`) and existence checks run in cloud services | Every 30 minutes. A sync with nothing new resumes no warehouse; one after another writer changed a state table resumes it once |
+| BigQuery | None to resume, but every sync queries each state table and is billed for the bytes it reads | Every 30 minutes |
+| Databricks | Every read, including the catalog and existence checks, runs on the SQL warehouse | Off: a stopped warehouse would start each time |
+| ClickHouse | Every read is a query, which wakes an idle ClickHouse Cloud service | Off |
+| MotherDuck | Every read runs on MotherDuck compute | Off |
+| PostgreSQL, SQL Server | The server is always running; a serverless database that pauses when idle wakes on connection | Every 30 minutes; set `sync_at_least_every = "off"` for one that pauses |
+| DuckDB, SQLite | None; the location reads the file | Every 30 minutes |
+
+Where the interval is off, an idle location syncs only after a run ends or when someone asks, with
+**Sync now**, `sqb control sync` or a signed-in `sqb build`. A run has just used the warehouse, so
+the sync after it rarely resumes anything. Set `sync_at_least_every` to turn the interval back on.
+
+### Follow a sync
+
+The location prints a line as it finishes each of its 14 kinds of history, then a summary:
+
+```text
+Reading warehouse history for automatic synchronization...
+Warehouse history 1/14: fingerprints, 1,204 rows in 0.8 s
+Warehouse history 2/14: source freshness, unchanged in 0.1 s
+...
+Warehouse history synchronization completed: 14 kinds, 31,204 rows in 12.8 s.
+```
+
+A page holds up to 2,000 rows and ends early at 8 MiB, so wide rows make smaller pages. A failed
+read prints which kind failed, the page size and why, then retries a smaller page:
+
+```text
+Warehouse history read failed for statistics (100-relation page): no reply within 130 s. Sync incomplete; retaining mirror and retrying a smaller page.
+```
+
+| Cause | Printed as |
+| --- | --- |
+| The location couldn't start its reader | `the metadata reader did not start:` and the error |
+| The warehouse refused the connection or the query | The warehouse's message |
+| No reply in time | `no reply within N s`: 120 s for a page, or 30 s plus 1 s per relation for a statistics page |
+
+The location's page shows a running sync, for example
+`syncing history 9/14 · catalog · 1,640 rows`, and the last full sync's kinds, rows and time.
+
+A location is ready as soon as it has compiled and published; nothing waits for the sync. Lineage,
+jobs, the catalog and code work at once. Plan previews, node history, check results and costs read
+the server's copy of the warehouse, so until the location's first sync completes they show
+**Syncing warehouse history…** and fill in when it does.
+
+The location's page shows a failure as **Warehouse sync failing**, with the kind, the cause
+and the page size. It leaves out the warehouse's message, which can name hosts or users; read it in
+the location's log.
 
 ## Skip overlapping runs and retry failures
 

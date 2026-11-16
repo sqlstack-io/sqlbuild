@@ -171,6 +171,8 @@ class DatabricksAdapter(
     execution_duration_limit_seconds: ClassVar[int | None] = CANCELLABLE_DURATION_LIMIT_SECONDS
     statement_cancellation_is_asynchronous: ClassVar[bool] = True
     adapter_name: ClassVar[str] = BuiltinAdapter.DATABRICKS.value
+    # Every metadata query runs on the SQL warehouse, which a stopped warehouse must start for.
+    history_reads_wake_compute: ClassVar[bool] = True
     sql_analysis_dialect_name: ClassVar[str | None] = "databricks"
     sql_lexical_syntax: ClassVar[SqlLexicalSyntax] = SqlLexicalSyntax(
         backslash_escape_quotes=frozenset({"'", '"'}),

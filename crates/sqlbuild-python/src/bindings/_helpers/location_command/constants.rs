@@ -34,3 +34,5 @@ pub(crate) const JOB_RUN_COUNTS: [&str; 2] = ["definition", "source_data"];
 pub(crate) const SQL_TEST_NODE_KIND: &str = "sql_test";
 /// The setting-row field the published providers document leaves out: secret matching reads it, the UI does not.
 pub(crate) const SNAPSHOT_HIDDEN_SETTING: &str = "alias";
+/// Characters of a failed metadata read's message the reader returns; the location prints it.
+pub(crate) const METADATA_ERROR_CHARS: usize = 2000;

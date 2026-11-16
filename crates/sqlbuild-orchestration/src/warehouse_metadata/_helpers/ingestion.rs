@@ -7,8 +7,10 @@ use crate::platform::main::require_instance::require_instance;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Change, ControlStore, ControlTransaction, Parameter, TransactionMode};
-use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
-use crate::warehouse_metadata::models::{MetadataBatch, MetadataScan, WarehouseSyncResponse};
+use crate::warehouse_metadata::constants::{MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS};
+use crate::warehouse_metadata::models::{
+    MetadataBatch, MetadataScan, WarehouseHistoryKind, WarehouseSyncResponse,
+};
 
 pub(crate) async fn begin_ingestion(
     store: &ControlStore,
@@ -128,9 +130,14 @@ pub(crate) fn validate_fields(
     invalid_scope: bool,
 ) -> Result<(), ControlError> {
     let kind = batch.kind.as_str().replace('_', " ");
-    if batch.generation < 1 || batch.records.len() > MAX_HISTORY_RECORDS || invalid_identity {
+    let most = if batch.kind == WarehouseHistoryKind::Statistics {
+        MAX_HISTORY_RECORDS
+    } else {
+        MAX_HISTORY_PAGE_RECORDS
+    };
+    if batch.generation < 1 || batch.records.len() > most || invalid_identity {
         return Err(ControlError::Invalid(format!(
-            "{kind} sync needs a positive generation, at most {MAX_HISTORY_RECORDS} records and nonempty state identities"
+            "{kind} sync needs a positive generation, at most {most} records and nonempty state identities"
         )));
     }
     if invalid_scope

@@ -13,7 +13,9 @@ use sqlbuild_orchestration::runs::models::RunLogRetention;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
 use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::warehouse_metadata::models::StatisticsRetention;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    StateHistoryRetention, StatisticsRetention,
+};
 use uuid::Uuid;
 
 use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
@@ -299,6 +301,14 @@ pub(crate) fn control_api_settings(
         Some(count) => SnapshotRetention::count(count)?,
         None => SnapshotRetention::default(),
     };
+    let state_history = match retention_setting(
+        namespace,
+        "state-history-retention-versions",
+        ("state_history_versions", retention.state_history_versions),
+    )? {
+        Some(versions) => StateHistoryRetention::versions(versions)?,
+        None => StateHistoryRetention::default(),
+    };
     let defaults = RunLogRetention::default();
     let run_logs = RunLogRetention::new(
         retention_setting(
@@ -323,6 +333,7 @@ pub(crate) fn control_api_settings(
             statistics,
             snapshots,
             run_logs,
+            state_history,
         },
     ))
 }

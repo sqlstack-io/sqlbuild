@@ -11,7 +11,7 @@ use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 use crate::snapshots::models::SnapshotRetention;
 use crate::warehouse_metadata::models::{
-    StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
+    StateHistoryRetention, StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
 };
 
 /// Every retention horizon one server's maintenance role enforces.
@@ -21,6 +21,7 @@ pub struct RetentionPolicies {
     pub statistics: StatisticsRetention,
     pub snapshots: SnapshotRetention,
     pub run_logs: RunLogRetention,
+    pub state_history: StateHistoryRetention,
 }
 
 /// One pooled outbound connection; the location never receives a store handle.
@@ -55,6 +56,15 @@ pub enum LocationHealth {
         failure: Option<WarehouseSyncFailure>,
         records_sent: u64,
         elapsed_millis: u64,
+        /// Why a read failed, in closed terms; the location's log has the warehouse's message.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        read_failure: Option<WarehouseReadFailure>,
+        /// Rows, or statistics relations, the failed read asked for.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page_limit: Option<u64>,
+        /// Where the synchronization this report belongs to has got to; absent from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        progress: Option<WarehouseSyncProgress>,
     },
 }
 
@@ -67,6 +77,34 @@ pub enum WarehouseSyncFailure {
     Delivery,
     /// Another process, such as a DuckDB build, holds the warehouse file; the sync waits for it.
     Busy,
+}
+
+/// How far one synchronization has got, so people see it running and when it completed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseSyncProgress {
+    /// The reported kind's position in the synchronization, from 1.
+    pub position: u64,
+    /// Kinds the synchronization reads: 14 for each state schema.
+    pub kinds: u64,
+    /// Rows the synchronization has delivered, this report's included.
+    pub rows: u64,
+    /// Milliseconds since the synchronization began.
+    pub elapsed_millis: u64,
+    /// This report's page was the synchronization's last, so it has completed.
+    pub completed: bool,
+}
+
+/// What went wrong reading one page, without the warehouse's message, which may name hosts or users.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WarehouseReadFailure {
+    /// The metadata reader process did not start.
+    ReaderStart {},
+    /// The reader could not connect to the warehouse, or the read raised an error.
+    ReadError {},
+    /// The reader did not answer within this many seconds.
+    TimedOut { seconds: u64 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

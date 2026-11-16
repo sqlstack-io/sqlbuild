@@ -72,6 +72,7 @@ pub(crate) async fn run_control(
                 statistics: facts.statistics,
                 snapshots: facts.snapshots,
                 run_logs: facts.run_logs,
+                state_history: facts.state_history,
             },
         )?;
     }

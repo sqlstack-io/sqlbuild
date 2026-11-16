@@ -639,7 +639,7 @@ keep_in_use = false
 | `archive_retention_days` | `14` | How many days an archive is kept before it is deleted. `0` deletes it in the same run. |
 | `delete_tracked_only` | `true` | Only clean relations that appear in fingerprint tracking |
 | `exclude_patterns` | `[]` | Glob patterns for relations to skip |
-| `direct_state_history_versions` | `20` | How many state-history rows to keep per identity in `_sqlbuild_fingerprints` and `_sqlbuild_source_freshness`, and how many builds of each model and seed to keep in `_sqlbuild_consumption` |
+| `direct_state_history_versions` | `20` | How many state-history rows to keep per identity in `_sqlbuild_fingerprints` and `_sqlbuild_source_freshness`, how many builds of each model and seed to keep in `_sqlbuild_consumption`, and how many results of each check to keep in `_sqlbuild_audit_results` |
 | `in_use_window` | `"7d"` | How far back the janitor looks for reads of each relation it would archive. A fixed duration such as `"7d"` or `"36h"`. See [Relations in use](../cli/janitor.md#relations-in-use) |
 | `keep_in_use` | `false` | Keep relations read within `in_use_window` instead of archiving them. `--keep-in-use` turns it on for one run. Stops with `C503` when usage can't be read in full |
 

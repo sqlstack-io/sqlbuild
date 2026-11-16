@@ -152,6 +152,8 @@ pub(crate) struct LocationServe {
     pub(crate) metadata_reconcile_seconds: u32,
     /// Seconds between safety syncs of an idle location; `0` turns them off.
     pub(crate) safety_sync_seconds: u64,
+    /// A flag, the environment or the project set the interval, rather than the default.
+    pub(crate) safety_sync_explicit: bool,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -230,15 +232,63 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) mirror_holds_rows: bool,
     /// One warm runtime interpreter and warehouse session serve every page of a synchronization.
     pub(crate) reader: Option<LocationCompiler>,
+    /// The server's state-history limit, read as each synchronization begins; `None` from older servers.
+    pub(crate) state_history_versions: Option<u16>,
+    /// Seconds a state-table or catalog page may take before the read counts as failed.
+    pub(crate) page_seconds: u64,
+    /// Progress of the current synchronization, for its per-table lines and summary.
+    pub(crate) progress: SyncProgress,
+    /// The adapter's history reads start or wake billed compute, as the reader reports.
+    pub(crate) reads_wake_compute: bool,
+    /// Someone set the safety interval, so it applies even where reads wake compute.
+    pub(crate) safety_explicit: bool,
+}
+
+/// Rows delivered and time taken by the current synchronization and its current table.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SyncProgress {
+    pub(crate) sync_started: tokio::time::Instant,
+    pub(crate) scan_started: tokio::time::Instant,
+    pub(crate) sync_rows: u64,
+    pub(crate) scan_rows: u64,
+    /// The current table's change token showed it unchanged, so nothing was read.
+    pub(crate) scan_unchanged: bool,
+}
+
+impl SyncProgress {
+    pub(crate) fn new() -> Self {
+        let now = tokio::time::Instant::now();
+        Self {
+            sync_started: now,
+            scan_started: now,
+            sync_rows: 0,
+            scan_rows: 0,
+            scan_unchanged: false,
+        }
+    }
 }
 
 /// The metadata reader's answer to one read.
 #[derive(Debug)]
 pub(crate) enum MetadataReply {
-    /// A page, or `None` when the read failed.
-    Page(Option<WarehouseHistoryPage>),
+    Page(WarehouseHistoryPage),
     /// Another process holds the warehouse file; nothing was read.
     Busy,
+    /// The read failed with this message, such as the warehouse's error.
+    Failed(String),
+}
+
+/// Why a page was not read, with the detail printed to the location's log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ReadFailure {
+    /// Another process holds the warehouse file; the sync waits, nothing failed.
+    Busy,
+    /// The metadata reader process did not start.
+    ReaderStart(String),
+    /// The reader could not connect, the read raised an error, or the reader broke off.
+    Read(String),
+    /// The reader did not answer within this many seconds.
+    TimedOut(u64),
 }
 
 /// A table's change token after a complete read, and what that read proves about the mirror.
@@ -261,18 +311,29 @@ impl LocationMetadataSync {
     }
 
     /// Whether an idle location starts its one outstanding sync: first, requested, after a run, or safety.
+    ///
+    /// The safety interval does not apply by default where history reads wake billed compute.
     pub(crate) fn sync_due(&self, runs_ended_at: Option<DateTime<Utc>>) -> bool {
         let ran = match (self.cycle_started_at, runs_ended_at) {
             (None, _) => true,
             (Some(started_at), Some(ended_at)) => ended_at >= started_at,
             (Some(_), None) => false,
         };
-        ran || (self.safety_seconds > 0 && tokio::time::Instant::now() >= self.safety_at)
+        ran || (self.safety_seconds > 0
+            && !self.defers_safety_sync()
+            && tokio::time::Instant::now() >= self.safety_at)
+    }
+
+    /// An idle location never wakes billed compute on the default interval alone; the next run
+    /// or a request syncs instead.
+    pub(crate) fn defers_safety_sync(&self) -> bool {
+        self.reads_wake_compute && !self.safety_explicit
     }
 
     /// Start the sync `sync_due` asked for, at server time `now`.
     pub(crate) fn begin_sync(&mut self, now: DateTime<Utc>) {
         self.idle = false;
+        self.progress = SyncProgress::new();
         self.cycle_started_at = Some(now);
         self.next_at = tokio::time::Instant::now();
     }
@@ -310,6 +371,17 @@ impl LocationMetadataSync {
         ((recorded.reconciled || !self.reconciling())
             && (self.mirror_holds_rows || !recorded.delivered))
             .then_some(recorded.token.as_str())
+    }
+
+    /// The newest versions a full read of builds or check results delivers; incremental reads take all.
+    pub(crate) fn newest_versions(&self) -> Option<u16> {
+        (self.observed_since.is_none()
+            && matches!(
+                self.kind(),
+                WarehouseHistoryKind::Fingerprints | WarehouseHistoryKind::AuditResults
+            ))
+        .then_some(self.state_history_versions)
+        .flatten()
     }
 
     pub(crate) fn kind(&self) -> WarehouseHistoryKind {

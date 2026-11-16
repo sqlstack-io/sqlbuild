@@ -48,4 +48,11 @@ sqb dev --triggers
   for a server other people or machines connect to.
 - The control store keeps runs, trigger changes and history between sessions. Delete
   `.sqlbuild/control.sqlite3` to start again from nothing.
+- The UI is ready once the project compiles and publishes. The location then reads SQLBuild's
+  history from the warehouse and prints a line per kind; plan previews, history and costs show
+  **Syncing warehouse history…** until that first sync completes. See
+  [Follow a sync](server.md#follow-a-sync).
+- The control store keeps the newest 5 builds of each node and results of each check that it copies
+  from the warehouse; older ones are deleted and the file shrinks. See
+  [retention](server.md#set-retention).
 - Stop it with Ctrl+C; it prints `Development services stopped successfully`.

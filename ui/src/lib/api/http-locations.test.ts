@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionTestOf, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { connectionTestOf, firstSyncPending, healthOf, instancesOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -80,7 +80,7 @@ describe('warehouseSyncOf', () => {
 			sync('2026-11-08T12:01:00Z', 'catalog', null),
 			sync('2026-11-08T12:00:00Z', 'statistics', 'delivery')
 		]);
-		expect(result).toEqual({ lastSyncedAt: '2026-11-08T12:02:00Z', lastError: 'catalog: failed while reading the warehouse', lastReportedAt: '2026-11-08T12:03:00Z' });
+		expect(result).toEqual({ lastSyncedAt: '2026-11-08T12:02:00Z', lastError: 'catalog: failed while reading the warehouse', lastReportedAt: '2026-11-08T12:03:00Z', syncing: null, completed: null });
 	});
 
 	it("gives each table its newest sync, the time it last synced cleanly, and where the state tables are read from", () => {
@@ -102,10 +102,34 @@ describe('warehouseSyncOf', () => {
 		const location = { id: 'loc:development', name: 'Orders', health: null, lastSeenAt: null, target: { name: 'development', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
 		const observations = [sync('2026-11-08T12:03:00Z', 'catalog', 'busy'), sync('2026-11-08T12:01:00Z', 'catalog', null)];
 		expect(toWarehouseConnection(location, observations).tables.map((t) => [t.failure, t.waiting, t.lastSyncedAt])).toEqual([['Waiting for a build that holds the warehouse file', true, '2026-11-08T12:01:00Z']]);
-		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z' });
+		expect(warehouseSyncOf(observations)).toEqual({ lastSyncedAt: '2026-11-08T12:01:00Z', lastError: null, lastReportedAt: '2026-11-08T12:03:00Z', syncing: null, completed: null });
 	});
 
-	it('clears the error once the failing table syncs again', () => {
+	it('says why a read failed and on what page size, without the warehouse message', () => {
+		const timedOut = sync('2026-11-08T12:03:00Z', 'statistics', 'read');
+		const health = { ...timedOut.report.health, read_failure: { kind: 'timed_out' as const, seconds: 130 }, page_limit: 100 };
+		expect(warehouseSyncOf([{ ...timedOut, report: { ...timedOut.report, health } }])?.lastError).toBe('statistics: failed while reading the warehouse: no reply within 130 s, on a page of 100 relations');
+		const erroring = sync('2026-11-08T12:04:00Z', 'catalog', 'read');
+		const error = { ...erroring.report.health, read_failure: { kind: 'read_error' as const }, page_limit: 2000 };
+		expect(warehouseSyncOf([{ ...erroring, report: { ...erroring.report, health: error } }])?.lastError).toBe('catalog: failed while reading the warehouse: the warehouse returned an error; the location’s log has it, on a page of 2,000 rows');
+	});
+
+		it('shows a running sync and the newest completed one, and a first sync as pending until it completes', () => {
+		const at = (time: string, table: 'catalog' | 'statistics', position: number, rows: number, completed: boolean) => {
+			const report = sync(time, table, null);
+			return { ...report, report: { ...report.report, health: { ...report.report.health, progress: { position, kinds: 14, rows, elapsed_millis: 12_800, completed } } } };
+		};
+		const now = Date.parse('2026-11-08T12:10:30Z');
+		const first = warehouseSyncOf([at('2026-11-08T12:10:00Z', 'catalog', 13, 1640, false)]);
+		expect(first?.syncing).toEqual({ position: 13, kinds: 14, table: 'catalog', rows: 1640 });
+		expect(firstSyncPending(first, now)).toBe(true);
+		expect(firstSyncPending(first, now + 60 * 60_000)).toBe(false);
+		const later = warehouseSyncOf([at('2026-11-08T12:10:00Z', 'catalog', 13, 10, false), at('2026-11-08T12:00:00Z', 'statistics', 14, 31_204, true)]);
+		expect(later?.completed).toEqual({ at: '2026-11-08T12:00:00Z', kinds: 14, rows: 31_204, elapsedMs: 12_800 });
+		expect(firstSyncPending(later, now)).toBe(false);
+	});
+
+		it('clears the error once the failing table syncs again', () => {
 		expect(warehouseSyncOf([sync('2026-11-08T12:05:00Z', 'catalog', null), sync('2026-11-08T12:03:00Z', 'catalog', 'read')])?.lastError).toBeNull();
 	});
 });
