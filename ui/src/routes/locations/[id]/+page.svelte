@@ -171,7 +171,7 @@
 			<div id="problems">
 				<Panel
 					title="Problems"
-					note={history ? 'Overdue schedules, failed deploys, runs that couldn’t start, connection tests and warehouse syncs that failed' : 'Late schedules, and the location no longer checking in'}
+					help={history ? 'Overdue schedules, failed deploys, runs that couldn’t start, connection tests and warehouse syncs that failed.' : 'Late schedules, and the location no longer checking in.'}
 				>
 					{#snippet actions()}
 						{#if history}<SegmentedFilter
@@ -187,7 +187,7 @@
 			</div>
 
 			{#if app.can('location.manage') && app.client.supports('listLocationTokens')}
-				<Panel title="Access tokens" note="Lets this location's processes connect to the server. Can't do anything else.">
+				<Panel title="Access tokens" help="Lets this location's processes connect to the server. Can't do anything else.">
 					<LocationTokens locationId={detail.id} />
 				</Panel>
 			{/if}

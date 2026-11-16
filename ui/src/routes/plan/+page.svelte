@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { appPath, to } from '$lib/paths';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	// Every Run button opens this page with its command. A build is planned by the location (`sqb plan`)
 	// from the server's synced copy of the warehouse metadata; other verbs show the server's dry run.
 	// Nothing is queued until Run is pressed.
@@ -353,7 +354,7 @@
 					<div class="graph"><ScopeGraph keys={graphKeys} catalog={catalog.data} onselect={() => {}} /></div>
 				{/if}
 			{:else if tab === 'checks' && shown?.verb === 'build' && plan}
-				<p class="faint graph-note">These checks run after the models they check, and a failing error check stops what depends on it.</p>
+				<p class="faint graph-note">{planChecks.length} {planChecks.length === 1 ? 'check' : 'checks'} <HelpTip text="Checks run after the models they check, and a failing error check stops what depends on it." /></p>
 				<table class="nodes">
 					<tbody>
 						{#each planChecks as c (c.id)}

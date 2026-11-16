@@ -17,6 +17,8 @@
 	const settings = createResource((client) => (admin ? client.serverSettings() : Promise.resolve(null)));
 	const s = $derived(settings.data ?? null);
 
+	const LOGIN_DOCS = 'https://sqlbuild.com/docs/cli/login/';
+
 	const authLabel: Record<AuthMode, string> = {
 		oidc: 'Single sign-on (OIDC)',
 		trusted_proxy: 'Company proxy sign-in',
@@ -30,7 +32,7 @@
 <div class="min-h-0 flex-1 overflow-auto px-6 pt-5">
 	<div class="columns" class:single={!admin}>
 		{#if admin}<div>
-			<Panel title="Server" note="Read-only; set in the server config and at start-up">
+			<Panel title="Server" help="Read-only; set in the server config and at start-up.">
 				{#if settings.error}
 					<p class="err">Couldn't load: {settings.error}</p>
 				{:else if s}
@@ -71,7 +73,7 @@
 		</div>{/if}
 
 		<div>
-			<Panel title="Your access" note="What your roles allow; the server checks every action">
+			<Panel title="Your access" help="What your roles allow; the server checks every action. On the command line, sign in with sqb login: it opens this browser and keeps a short-lived session, so you don't need an API token." docs={LOGIN_DOCS}>
 				{#if app.user}
 					<KeyValues
 						rows={[
@@ -92,11 +94,10 @@
 							{/each}
 						</tbody>
 					</table>
-					<p class="cli">On the command line, sign in with <code>sqb login</code>: it opens this browser and keeps a short-lived session, so you don't need an API token.</p>
 				{/if}
 			</Panel>
 			{#if app.client.supports('explainAccess')}
-				<Panel title="Why can or can't I?" note="Paste a denial ID from an error, or pick an action">
+				<Panel title="Why can or can't I?" help="Paste a denial ID from an error, or pick an action.">
 					<AccessChecker sampleDecision="dec-5r2w9j" />
 				</Panel>
 			{/if}
@@ -105,15 +106,6 @@
 </div>
 
 <style>
-	.cli {
-		margin-top: 12px;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
-	.cli code {
-		font-family: var(--font-mono);
-		font-size: 12px;
-	}
 	.columns {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

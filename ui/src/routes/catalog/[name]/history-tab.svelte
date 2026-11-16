@@ -41,7 +41,7 @@
 	</Panel>
 
 	{#if h.oldNameViews.length}
-		<Panel title="Views under the old name" note="Kept so queries that use the old name keep working">
+		<Panel title="Views under the old name" help="Kept so queries that use the old name keep working.">
 			<table class="sb-list">
 				<thead><tr><th>Old name</th><th>Status</th><th>Kept for</th><th>Renamed columns</th><th>History</th></tr></thead>
 				<tbody>

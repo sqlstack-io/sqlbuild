@@ -91,7 +91,7 @@
 					<OutcomeStrip outcomes={[...c.history].reverse().map((e) => e.outcome)} tones={checkOutcomeTone} caption="Last {c.history.length} results" />
 				</Panel>
 
-				<Panel title="History" note="Read back from the warehouse, so results of builds from the command line show too">
+				<Panel title="History" help="Read back from the warehouse, so results of builds from the command line show too.">
 					<table class="sb-list">
 						<thead>
 							<tr><th>Checked</th><th>Outcome</th><th class="num">{c.evaluationMode === 'measurement' ? 'Measured' : 'Violations'}</th><th>Run</th><th>Evidence</th></tr>

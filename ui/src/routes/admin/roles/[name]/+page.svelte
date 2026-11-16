@@ -63,7 +63,7 @@
 						<p class="desc">{r.description}</p>
 
 						{#if r.source === 'built_in'}
-							<Panel title="What it allows" note="On every node, in the locations it's given">
+							<Panel title="What it allows" help="On every node, in the locations it's given.">
 								<ul class="actions">
 									{#each ownActions as a (a)}<li><PermissionName action={a} risk /></li>{/each}
 								</ul>
@@ -103,7 +103,7 @@
 								{/if}
 							</Panel>
 
-							<Panel title="Additions" note="Approved actions on top of the base role">
+							<Panel title="Additions" help="Approved actions on top of the base role.">
 								<table class="sb-list static framed">
 									<thead>
 										<tr>
@@ -137,7 +137,7 @@
 							</Panel>
 
 							{#if r.selectors.length}
-								<Panel title="What the selectors match today" note="Selectors can match more nodes as the project grows, so watch the growth">
+								<Panel title="What the selectors match today" help="Selectors can match more nodes as the project grows, so watch the growth.">
 									<ul class="selectors">
 										{#each r.selectors as s (s.selector)}
 											<li>
@@ -163,7 +163,7 @@
 						{/if}
 
 						{#if r.definition}
-							<Panel title="Definition" note="As the location published it; change it in the project's roles file">
+							<Panel title="Definition" help="As the location published it; change it in the project's roles file.">
 								<CodePreview file={r.definedIn ?? 'published roles document'} code={r.definition} language="text" maxLines={24} />
 							</Panel>
 						{/if}

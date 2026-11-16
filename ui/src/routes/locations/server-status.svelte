@@ -1,4 +1,5 @@
 <script lang="ts">
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import ProblemList from '$lib/components/platform/problem-list.svelte';
 	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
@@ -82,11 +83,10 @@
 				{/if}
 				{#if h.heartbeat}
 					<div>
-						<h4>Heartbeat</h4>
+						<h4>Heartbeat <HelpTip text="The server sends a heartbeat event every {h.heartbeat.intervalSeconds}s. If it stops arriving where you forward events, the server is down." /></h4>
 						<p class:warn={late}>
 							{h.heartbeat.lastEmittedAt ? `Sent ${formatAgo(h.heartbeat.lastEmittedAt, app.now)}` : 'Never sent'}{late ? ' — late' : ''}
 						</p>
-						<p class="faint">The server sends a heartbeat event every {h.heartbeat.intervalSeconds}s. If it stops arriving where you forward events, the server is down.</p>
 					</div>
 				{/if}
 				{#if h.sink !== undefined}
@@ -99,7 +99,7 @@
 							</p>
 							{#if h.sink.lastError}<p class="err">{h.sink.lastError}</p>{/if}
 						{:else}
-							<p class="faint">Not set up. Sensors still see every problem; forwarding pushes them out without code.</p>
+							<p class="faint">Not set up. <HelpTip text="Sensors still see every problem; forwarding pushes them out without code." /></p>
 						{/if}
 					</div>
 				{/if}

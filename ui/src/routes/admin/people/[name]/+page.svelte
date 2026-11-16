@@ -98,7 +98,7 @@
 			<div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-10">
 				<div class="columns">
 					<div class="min-w-0">
-						<Panel title="Roles" note="What they've been given; SSO, policy-file and built-in roles are locked here">
+						<Panel title="Roles" help="What they've been given; SSO, policy-file and built-in roles are locked here.">
 							{#if app.can('role.assign')}
 								<AssignmentList principal={account} assignments={d.assignments.data ?? []} rolesByLocation={d.rolesByLocation} onchange={changed} />
 							{:else}
@@ -106,7 +106,7 @@
 							{/if}
 						</Panel>
 
-						{#if showsAccess}<Panel title="Effective access" note="Every action in every location, after adding up all their roles">
+						{#if showsAccess}<Panel title="Effective access" help="Every action in every location, after adding up all their roles.">
 							{#if !canExplain}
 								<p class="muted">Requires “Give roles” (role.assign) or “See the audit log” (audit.view).</p>
 							{:else if access.data}
@@ -120,7 +120,7 @@
 
 						{#if canExplain && showsChecker}
 							<div bind:this={checkerEl}>
-								<Panel title="Why?" note="Pick a mark above, or check any action">
+								<Panel title="Why?" help="Pick a mark above, or check any action.">
 									<AccessChecker principals={[account]} initial={why ?? { principal: account.name }} lockPrincipal />
 								</Panel>
 							</div>

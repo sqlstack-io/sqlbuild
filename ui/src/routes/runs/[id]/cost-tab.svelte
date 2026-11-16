@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { RunCostBreakdown } from '$lib/api';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import { CREDIT_PRICE_HINT } from '$lib/operate/cost';
 	import { costSummary, formatQueryCost, formatSpan } from './utils';
 
@@ -16,7 +17,7 @@
 
 <div class="cost" data-testid="run-cost">
 	<div class="total">
-		<span class="label">Estimated query cost</span>
+		<span class="label">Estimated query cost{#if counted}&nbsp;<HelpTip text="Estimated from the warehouse's query history: each query's share of its warehouse's credits. Idle time and the 60-second minimum are not included." />{/if}</span>
 		<strong>{summary.text}</strong>
 		{#if summary.note}<span class="note">{summary.note}</span>{/if}
 		{#if counted && cost.usd == null}
@@ -65,7 +66,6 @@
 				{/each}
 			</tbody>
 		</table>
-		<p class="foot">Estimated from the warehouse's query history: each query's share of its warehouse's credits. Idle time and the 60-second minimum are not included.</p>
 	{:else if cost.status === 'none'}
 		<p class="foot">Cost appears after the location syncs this run's query history from a Snowflake warehouse. Other warehouses show duration only.</p>
 	{/if}
