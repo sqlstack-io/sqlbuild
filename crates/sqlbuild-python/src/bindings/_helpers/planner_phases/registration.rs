@@ -2,19 +2,16 @@
 
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
+use sqlbuild_python_project::planner_scope::main::resolve_planner_scopes_function::resolve_planner_scopes_function;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<crate::bindings::_helpers::planner_phases::models::PlannerRuntime>()?;
     module
         .add_class::<crate::bindings::_helpers::planner_phases::models::PlannerWarehouseState>()?;
-    module
-        .add_class::<crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution>()?;
+    module.add_class::<sqlbuild_python_project::planner_scope::models::PlannerScopeResolution>()?;
     module
         .add_class::<crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext>()?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes,
-        module
-    )?)?;
+    module.add_function(resolve_planner_scopes_function(module)?)?;
     module.add_function(wrap_pyfunction!(
         crate::bindings::_helpers::planner_phases::identities::planner_identity_work_info,
         module

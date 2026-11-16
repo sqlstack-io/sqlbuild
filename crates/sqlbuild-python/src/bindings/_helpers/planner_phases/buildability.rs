@@ -2,7 +2,6 @@
 
 use crate::bindings::_helpers::planner_phases::constants::MISSING_UPSTREAM_CODE;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
-use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
 use crate::bindings::_helpers::planner_warehouse::source_tables::check_selected_source_tables_exist;
@@ -16,6 +15,7 @@ use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::planner_identity::main::execution_origins::execution_origins;
 use sqlbuild_python_project::planner_phases::main::planner_error::planner_error;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use sqlbuild_python_project::resource_views::main::seed_reads::external::external;
 use sqlbuild_python_project::resource_views::main::seed_reads::key::key;
 

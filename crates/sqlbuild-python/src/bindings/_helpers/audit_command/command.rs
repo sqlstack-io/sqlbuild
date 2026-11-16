@@ -22,7 +22,6 @@ use crate::bindings::_helpers::build_progress::progress_text::write_execution_he
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
-use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::planner_entries::command_plans::build_audit_command_plan;
 use crate::bindings::_helpers::result_output::documents::{
@@ -42,6 +41,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_front::cost_context::models::CostContext;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 

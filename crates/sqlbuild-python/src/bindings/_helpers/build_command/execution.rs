@@ -31,7 +31,6 @@ use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line
 use crate::bindings::_helpers::consumption::recorder::{
     ConsumptionRecorder, Prepared, held_back_text, prepare as prepare_consumption, run_reason_text,
 };
-use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::freshness::publication::append_freshness_records;
 use crate::bindings::_helpers::observations::publication::append_build_observations;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
@@ -56,6 +55,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cost_context::models::CostContext;
 use sqlbuild_python_front::cursor::main::overrides::cursor_integer::cursor_integer;
 use sqlbuild_python_front::cursor::main::overrides::cursor_timestamp::cursor_timestamp;
 use sqlbuild_python_front::native_host::main::recorder_callbacks::recorder_callbacks;

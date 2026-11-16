@@ -20,7 +20,6 @@ use crate::bindings::_helpers::planner_phases::identities::{
 };
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::PlannerRuntime;
-use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::models::{
     PlanOutputContext, PlanWarningContext, PlannedModelEntries, StoragePolicyContext,
 };
@@ -30,7 +29,6 @@ use crate::bindings::_helpers::planner_phases::output_assembly::{
     base_plan_output,
 };
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
-use crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes;
 use crate::bindings::_helpers::planner_phases::warehouse_state::gather_planner_warehouse_state;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
 use crate::bindings::_helpers::planner_warehouse::source_freshness::build_planner_source_freshness_result;
@@ -44,7 +42,9 @@ use sqlbuild_python_base::build_command::main::utc_now::utc_now;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::planner_scope::main::resolve_planner_scopes::resolve_planner_scopes;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use std::time::Instant;
 
 const INSPECTION_CATALOG: AdapterHost = AdapterHost::OpenInspectionCatalog;

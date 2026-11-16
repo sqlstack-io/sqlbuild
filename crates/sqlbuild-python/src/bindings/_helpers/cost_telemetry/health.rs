@@ -8,7 +8,7 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::PyTypeMethods;
 use pyo3::{pyclass, pymethods};
 
-use crate::bindings::_helpers::cost_telemetry::values::process_object;
+use sqlbuild_python_front::cost_context::main::process_object::process_object;
 
 const HEALTH_ATTRIBUTE: &str = "COST_TELEMETRY_HEALTH";
 

@@ -10,7 +10,6 @@ use crate::bindings::_helpers::planner_entries::values::{
 };
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
 use crate::bindings::_helpers::planner_identity::metadata::build_seed_identity;
-use crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes;
 use crate::bindings::_helpers::planner_strategy::audit_entries::build_selected_audit_entries;
 use crate::bindings::_helpers::planner_strategy::model_entries::extract_seed_columns;
 use crate::bindings::_helpers::planner_strategy::strategy::materialization_of;
@@ -33,6 +32,7 @@ use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
 use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_scope::main::resolve_planner_scopes::resolve_planner_scopes;
 use sqlbuild_python_project::resource_views::main::function_reads::deps::deps;
 use sqlbuild_python_project::resource_views::main::seed_reads::schema_entry::schema_entry;
 use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_file;

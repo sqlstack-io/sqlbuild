@@ -4,10 +4,11 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 
 use crate::bindings::_helpers::planner_phases::models::{
-    PlannerIdentityContext, PlannerRuntime, PlannerScopeResolution, PlannerWarehouseState,
+    PlannerIdentityContext, PlannerRuntime, PlannerWarehouseState,
 };
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
+use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use sqlbuild_python_project::planner_scope::models::RetainedScope;
 
 /// The getter readers of this module's native pyclasses.

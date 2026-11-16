@@ -5,7 +5,6 @@ use crate::bindings::_helpers::planner_identity::identities::direct_model_versio
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::models::IdentityWork;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
-use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::sync::PyOnceLock;
@@ -21,6 +20,7 @@ use sqlbuild_python_project::compiled_views::main::project::functions::functions
 use sqlbuild_python_project::compiled_views::main::project::seeds::seeds;
 use sqlbuild_python_project::planner_phases::main::native::native;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use std::collections::{BTreeMap, HashSet};
 
 static IDENTITY_WORK: PyOnceLock<Py<IdentityWork>> = PyOnceLock::new();

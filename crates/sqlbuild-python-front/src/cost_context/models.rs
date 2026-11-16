@@ -1,42 +1,23 @@
-//! `CostContext`: the per-resource cost attribution context, held in a Python `ContextVar`.
+//! Public records of cost context.
 
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::sync::PyOnceLock;
+use crate::cost_context::_helpers::context::{
+    DEFAULT_ATTEMPT, DEFAULT_PHASE, current_context, current_variable, or_current, scope_of,
+};
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{IntoPyObjectExt, pyclass, pymethods};
 use sqlbuild_host::entries::models::ExecutorHost;
-
-use crate::bindings::_helpers::cost_telemetry::values::process_object;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
-const CONTEXT_VARIABLE_NAME: &str = "sqlbuild_cost_resource_context";
-const DEFAULT_PHASE: &str = "execute";
-const DEFAULT_ATTEMPT: i64 = 1;
-
-static CURRENT: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
-
-fn current_variable(py: Python<'_>) -> PyResult<&Bound<'_, PyAny>> {
-    process_object(&CURRENT, py, || {
-        let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("default", py.None())?;
-        imported(py, "contextvars", "ContextVar")?.call((CONTEXT_VARIABLE_NAME,), Some(&options))
-    })
-}
-
-/// The active `CostResourceContext`, or `None`.
-pub(crate) fn current_context(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    current_variable(py)?.call_method0("get")
-}
-
 /// A `with` scope that makes one resource context current, or does nothing without one.
 #[pyclass(module = "sqlbuild._native")]
-pub(crate) struct CostScope {
-    context: Option<Py<PyAny>>,
-    token: Option<Py<PyAny>>,
+#[derive(Debug)]
+pub struct CostScope {
+    pub(crate) context: Option<Py<PyAny>>,
+    pub(crate) token: Option<Py<PyAny>>,
 }
 
 #[pymethods]
@@ -61,27 +42,10 @@ impl CostScope {
     }
 }
 
-fn or_current<'py>(
-    value: Bound<'py, PyAny>,
-    current: &Bound<'py, PyAny>,
-    field: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    if !value.is_none() || current.is_none() {
-        return Ok(value);
-    }
-    native_field(current, field)
-}
-
-fn scope_of(context: Bound<'_, PyAny>) -> CostScope {
-    CostScope {
-        context: Some(context.unbind()),
-        token: None,
-    }
-}
-
 /// Run-cost execution context entry points.
 #[pyclass(module = "sqlbuild._native", frozen)]
-pub(crate) struct CostContext;
+#[derive(Debug)]
+pub struct CostContext;
 
 #[pymethods]
 impl CostContext {
@@ -92,7 +56,7 @@ impl CostContext {
 
     #[staticmethod]
     #[pyo3(signature = (**options))]
-    pub(crate) fn scope(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> PyResult<CostScope> {
+    pub fn scope(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> PyResult<CostScope> {
         let arguments: KeywordArguments<'_> = KeywordArguments::read(
             py,
             "scope",
@@ -139,7 +103,7 @@ impl CostContext {
 
     #[staticmethod]
     #[pyo3(signature = (**options))]
-    pub(crate) fn resource_scope(
+    pub fn resource_scope(
         py: Python<'_>,
         options: Option<Bound<'_, PyDict>>,
     ) -> PyResult<CostScope> {
@@ -186,10 +150,4 @@ impl CostContext {
         )?;
         Ok(scope_of(context))
     }
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<CostContext>()?;
-    module.add_class::<CostScope>()?;
-    Ok(())
 }

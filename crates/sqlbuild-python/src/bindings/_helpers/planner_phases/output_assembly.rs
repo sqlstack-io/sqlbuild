@@ -6,7 +6,6 @@ use crate::bindings::_helpers::planner_identity::staleness::build_stale_out_of_s
 use crate::bindings::_helpers::planner_migrations::fingerprint::with_migration_fingerprints;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
-use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::models::{
     PlanOutputContext, PlanOutputFields, PlanWarningContext, PlannedModelEntries,
     StoragePolicyContext,
@@ -33,6 +32,7 @@ use sqlbuild_python_project::planner_phases::main::strings::strings;
 use sqlbuild_python_project::planner_phases::main::text::text;
 use sqlbuild_python_project::planner_phases::main::tuple::tuple;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 
 fn concat<'py>(py: Python<'py>, parts: &[Bound<'py, PyAny>]) -> PyResult<Bound<'py, PyAny>> {
     let mut items: Vec<_> = Vec::new();

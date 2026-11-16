@@ -5,7 +5,6 @@ use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::freshness::state_io::write_source_freshness_records;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -18,6 +17,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_front::cost_context::models::CostContext;
 
 /// Observed records grouped by `(database, schema)` in first-seen order.
 type RecordsByLocation<'py> = Vec<(

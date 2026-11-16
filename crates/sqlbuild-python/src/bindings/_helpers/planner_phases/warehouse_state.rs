@@ -10,7 +10,6 @@ use crate::bindings::_helpers::planner_migrations::models::{
 use crate::bindings::_helpers::planner_migrations::old_name_planning::plan_old_name_views as plan_old_name_migration_views;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
-use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::models::PlannerWarehouseState;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_warehouse::fingerprint_cache::MigrationFingerprintCache;
@@ -22,6 +21,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_project::graph::main::project::compiled_graph_keys::compiled_graph_keys;
 use sqlbuild_python_project::planner_phases::main::native::native;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::planner_scope::models::PlannerScopeResolution;
 use std::time::Instant;
 
 fn progress(runtime: &Bound<'_, PyAny>, message: &str) -> PyResult<()> {
