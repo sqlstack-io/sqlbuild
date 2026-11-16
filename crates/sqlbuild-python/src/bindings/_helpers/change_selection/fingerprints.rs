@@ -13,7 +13,7 @@ use serde_json::{Map, Value};
 use sqlbuild_analysis::definition_changes::main::definition_digest::definition_digest;
 use sqlbuild_pysource::rule_evidence::main::project_import_closure::project_import_closure;
 
-use crate::bindings::_helpers::records::models::NativeRecord;
+use sqlbuild_python_base::records::models::NativeRecord;
 
 /// Fields that document a definition without changing what it does.
 const DOCUMENTATION_FIELDS: [&str; 2] = ["description", "location"];

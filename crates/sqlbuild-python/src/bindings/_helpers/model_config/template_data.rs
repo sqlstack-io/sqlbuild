@@ -10,8 +10,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::scenario_command::main::format_captured_at::format_captured_at;
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
 use crate::bindings::_helpers::compile_context::input_reads::{context_read, environment_read};
 use crate::bindings::_helpers::model_config::config_errors::config_exception;
 use crate::bindings::_helpers::model_config::config_templates::{
@@ -19,8 +17,11 @@ use crate::bindings::_helpers::model_config::config_templates::{
     resolve_effective_vars,
 };
 use crate::bindings::_helpers::model_config::unicode_environment::unicode_environment;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const UUID_MODULE: &str = "uuid";
 const ENVIRONMENT_READ: &str = "env";

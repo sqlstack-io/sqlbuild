@@ -26,10 +26,6 @@ use sqlbuild_scopes::scope_report::models::{
     ScopeResult,
 };
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::scopes::scope_lookup::NativeScopeLookup;
 use crate::bindings::_helpers::scopes::scope_objects::{
     ScopeClasses, read_completeness, read_declaration, read_index,
@@ -39,6 +35,11 @@ use crate::bindings::_helpers::scopes::scope_report_objects::{
     list_object, move_object, read_declaration_target, read_filters, read_optional_target,
     read_result, read_target, report_object,
 };
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 type PyObject = Py<PyAny>;
 

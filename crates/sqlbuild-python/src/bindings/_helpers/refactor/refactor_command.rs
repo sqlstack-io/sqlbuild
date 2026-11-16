@@ -36,18 +36,19 @@ use sqlbuild_refactor::refactoring::models::{
 };
 use sqlbuild_refactor::refactoring::types::Originals;
 
-use crate::bindings::_helpers::boundary::panics::{NativeCompilerError, compiler_guard};
 use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::lineage::lineage_index::lineage_key;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::refactor::offline_compile::{OfflineCompile, compile_for_refactor};
 use crate::bindings::_helpers::refactor::refactor_facts::{
     declaration_placement, model_facts, refactor_facts, unit_test_rebindings,
 };
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const STAGING_PREFIX: &str = "sqb-refactor-";
 const MOVE_COMMAND: &str = "mv";
@@ -89,7 +90,7 @@ fn refactor_error(py: Python<'_>, error: RefactorError) -> PyErr {
         RefactorErrorKind::Write => user_error(py, (error.message, WRITE_ERROR_CODE, error.help)),
         RefactorErrorKind::Value => class(ErrorId::RefactorValue),
         RefactorErrorKind::Io => class(ErrorId::RefactorIO),
-        RefactorErrorKind::Internal => NativeCompilerError::new_err(error.message),
+        RefactorErrorKind::Internal => native_compiler_error(error.message),
     }
 }
 

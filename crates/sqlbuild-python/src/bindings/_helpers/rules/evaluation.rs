@@ -3,8 +3,8 @@
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 #[pyfunction]
 fn run_custom_host_json(py: Python<'_>, spec_json: &str) -> PyResult<String> {

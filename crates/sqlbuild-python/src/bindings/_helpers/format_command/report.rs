@@ -8,7 +8,7 @@ use sqlbuild_core::format_command::models::{LintFinding, LintReport, RuleFixLine
 use sqlbuild_core::text::main::python_splitlines::python_splitlines;
 
 use crate::bindings::_helpers::format_command::run::FormatOutcome;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const FAULT_SEVERITY: &str = "fault";
 const APPLIED_STATUS: &str = "applied";

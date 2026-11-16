@@ -19,15 +19,17 @@ use sqlbuild_state::freshness::models::{
 };
 use sqlbuild_state::freshness::types::TimestampParser;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cursor::values::{DATETIME_MODULE, local_date_time};
-use crate::bindings::_helpers::records::construct::{enum_member, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
 use crate::bindings::_helpers::state_rows::timestamps::{
     date_time_typed, in_utc, offset_aware, presumed_utc,
 };
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 const TIMESTAMP_KIND: &str = "timestamp";
 const INTEGER_KIND: &str = "integer";
@@ -68,7 +70,7 @@ pub(crate) fn record_event_id(record: &Bound<'_, PyAny>) -> PyResult<String> {
 }
 
 fn raised(py: Python<'_>, class: NativeAttr, message: String) -> PyErr {
-    match registry::native(py, class).and_then(|class| class.call1((message,))) {
+    match native_attr(py, class).and_then(|class| class.call1((message,))) {
         Ok(error) => PyErr::from_value(error),
         Err(error) => error,
     }

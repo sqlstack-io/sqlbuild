@@ -7,8 +7,8 @@ use pyo3::{IntoPyObjectExt, pyclass, pymethods};
 use sqlbuild_cli::argv::main::cli_namespace_defaults::cli_namespace_defaults;
 use sqlbuild_cli::argv::models::NamespaceDefault;
 
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Typed namespace for all CLI arguments across all commands.
 #[pyclass(module = "sqlbuild._native", dict, frozen)]

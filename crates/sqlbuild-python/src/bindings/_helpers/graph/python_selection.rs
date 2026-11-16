@@ -1,5 +1,6 @@
 //! Python node and unified SQL/Python selector resolution, and the Python node graph indexes.
 
+use sqlbuild_python_base::positional_record;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
@@ -23,14 +24,14 @@ use sqlbuild_analysis::python_selection::models::{
     SqlSelectionGraph,
 };
 
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::compiled_project::job_catalog::needed_jobs;
 use crate::bindings::_helpers::graph::project_graph::{CompiledProjectGraph, NativeProjectGraph};
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
 
 type NameRows = Vec<(String, Vec<String>)>;
 positional_record! {

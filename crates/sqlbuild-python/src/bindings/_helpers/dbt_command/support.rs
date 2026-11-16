@@ -3,9 +3,9 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyBool;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 /// `sys.stdout` or `sys.stderr`, looked up when written.
 pub(crate) fn stream<'py>(py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {

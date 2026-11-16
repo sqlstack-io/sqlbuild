@@ -35,7 +35,6 @@ use crate::bindings::_helpers::input_loops::model_loop_named::{
     SQL_HOOK_DECLARATION, named_usages,
 };
 use crate::bindings::_helpers::input_loops::model_loop_visibility::ModelVisibility;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::declaration_expansion::{
     DeclarationExpansion, ExpandedDeclarations, ExpansionClasses, ExpansionConsumer,
     expand_declarations,
@@ -44,6 +43,7 @@ use crate::bindings::_helpers::render::sql_macro_host::SqlMacroSource;
 use crate::bindings::_helpers::sqltext::declaration_references::declaration_scan;
 use crate::bindings::_helpers::sqltext::static_sql::{InterpolationSources, interpolated};
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const REFERENCES_METHOD: &str = "references";
 const STATEMENT_ATTRIBUTE: &str = "statement";

@@ -92,3 +92,10 @@ pub(crate) struct TemporalCastDialectTestCase {
     pub(crate) dialect: polyglot_sql::DialectType,
     pub(crate) expected_warnings: usize,
 }
+
+pub(crate) struct MappedNormalizationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_fragment: &'static str,
+}

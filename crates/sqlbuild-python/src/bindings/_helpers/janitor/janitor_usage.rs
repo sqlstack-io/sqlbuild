@@ -10,14 +10,15 @@ use sqlbuild_cli::diff_report::errors::DiffUserError;
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_model_config::model_validation::main::fixed_duration_seconds::fixed_duration_seconds;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::build_progress::transient_status::TransientStatusReporter;
 use crate::bindings::_helpers::diff_report::support::cli_error;
 use crate::bindings::_helpers::janitor::janitor_keys::{Folded, Key, record, tuple};
 use crate::bindings::_helpers::janitor::janitor_planning::completed;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const START_MESSAGE: &str = "Checking relation usage...";
 const INCOMPLETE_USAGE_CODE: &str = "C503";
@@ -41,7 +42,7 @@ fn flag(py: Python<'_>, value: bool) -> Bound<'_, PyAny> {
 
 fn lifecycle(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     call_with(
-        &host::entry(py, ExecutorHost::OperationLifecycle)?,
+        &host_entry(py, ExecutorHost::OperationLifecycle)?,
         &[
             ("operation_kind", text(py, "janitor")),
             ("operation_name", text(py, "janitor_usage_check")),

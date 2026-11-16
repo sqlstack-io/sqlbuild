@@ -10,9 +10,10 @@ use sqlbuild_cli::compute_logs::models::{
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const EPOCH_TEXT: &str = "1970-01-01T00:00:00+00:00";
 const UTC_OFFSET: &str = "+00:00";
@@ -34,7 +35,7 @@ fn exception_class(kind: ComputeLogErrorKind) -> ExecutorHost {
 
 /// The Python exception for a storage rejection of `kind`.
 pub(crate) fn rejection(py: Python<'_>, kind: ComputeLogErrorKind, message: &str) -> PyErr {
-    match host::entry(py, exception_class(kind)).and_then(|class| class.call1((message,))) {
+    match host_entry(py, exception_class(kind)).and_then(|class| class.call1((message,))) {
         Ok(error) => PyErr::from_value(error),
         Err(error) => error,
     }
@@ -68,7 +69,7 @@ pub(crate) fn capture_id(value: &Bound<'_, PyAny>) -> PyResult<String> {
 /// The stream index of a `ComputeLogStream` member: stdout, stderr or diagnostics.
 pub(crate) fn stream_index(stream: &Bound<'_, PyAny>) -> PyResult<usize> {
     let py = stream.py();
-    if stream.is_instance(&host::entry(py, ExecutorHost::ComputeLogStream)?)? {
+    if stream.is_instance(&host_entry(py, ExecutorHost::ComputeLogStream)?)? {
         let value: String = native_field(stream, "value")?.extract()?;
         if let Some(index) = STREAM_VALUES.iter().position(|name| *name == value) {
             return Ok(index);
@@ -127,7 +128,7 @@ pub(crate) fn document(metadata: &Bound<'_, PyAny>) -> PyResult<CaptureDocument>
         i64::from(version.eq(1)?)
     };
     let completion =
-        if metadata.is_instance(&host::entry(py, ExecutorHost::FinalCaptureMetadata)?)? {
+        if metadata.is_instance(&host_entry(py, ExecutorHost::FinalCaptureMetadata)?)? {
             Some(CaptureCompletion {
                 completed_at: instant(&native_field(metadata, "completed_at")?)?,
                 exit_code: count(py, &native_field(metadata, "exit_code")?)?,
@@ -195,7 +196,7 @@ pub(crate) fn metadata_model<'py>(
         ("run_id", document.run_id.as_deref().into_bound_py_any(py)?),
     ];
     let Some(completion) = &document.completion else {
-        return call_with(&host::entry(py, ExecutorHost::CaptureMetadata)?, &fields);
+        return call_with(&host_entry(py, ExecutorHost::CaptureMetadata)?, &fields);
     };
     fields.extend([
         (
@@ -217,7 +218,7 @@ pub(crate) fn metadata_model<'py>(
         ),
     ]);
     call_with(
-        &host::entry(py, ExecutorHost::FinalCaptureMetadata)?,
+        &host_entry(py, ExecutorHost::FinalCaptureMetadata)?,
         &fields,
     )
 }
@@ -228,7 +229,7 @@ pub(crate) fn inventory_item<'py>(
     entry: &InventoryEntry,
 ) -> PyResult<Bound<'py, PyAny>> {
     call_with(
-        &host::entry(py, ExecutorHost::CaptureInventoryItem)?,
+        &host_entry(py, ExecutorHost::CaptureInventoryItem)?,
         &[
             (
                 "invocation_id",

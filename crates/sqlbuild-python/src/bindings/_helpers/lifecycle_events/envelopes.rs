@@ -17,14 +17,14 @@ use sqlbuild_core::lifecycle_events::main::publishable_hook_name::publishable_ho
 use sqlbuild_core::lifecycle_events::main::run_bounds_problem::run_bounds_problem;
 use sqlbuild_core::lifecycle_events::models::{HookFacts, SequenceFact};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::lifecycle_events::payloads::validation_error;
 use crate::bindings::_helpers::lifecycle_events::validation::{
     frozen_json, known_event_check, optional_text_check, required_text_check, schema_version_check,
     timestamp_check,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const EVENT_REQUIRED_TEXT: [&str; 5] = [
     "event_id",

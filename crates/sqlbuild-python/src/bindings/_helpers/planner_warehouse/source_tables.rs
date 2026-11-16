@@ -1,19 +1,14 @@
 //! Selected-scope validation that external source tables exist in the warehouse.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::discovery::locations::yaml_entry_line;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::synced_copy::SyncedCopyAdapter;
 use crate::bindings::_helpers::planner_phases::objects::{planner_error, tuple};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::{
     MISSING_SOURCE_TABLE_CODE, RUN_BOUNDED, WILDCARD_TABLE_CHARACTER,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
 use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -25,6 +20,13 @@ use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_help::missing_source_tables_help;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_message::missing_source_tables_message;
 use sqlbuild_analysis::planner_warehouse::models::MissingSourceTable;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use std::collections::HashMap;
 
 fn selected_source_readers(scope: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Vec<String>>> {
@@ -141,7 +143,7 @@ pub(crate) fn check_selected_source_tables_exist<'py>(
         .call1((native_field(adapter, "metadata_inspection_concurrency")?,))?
         .extract()?;
     let probes = call_with(
-        &host::entry(py, RUN_BOUNDED)?,
+        &host_entry(py, RUN_BOUNDED)?,
         &[
             ("tasks", tuple(py, tasks)?),
             (

@@ -4,12 +4,12 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::planner_fixtures::main::empty_fixture_marker::empty_fixture_marker;
 
-use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::planner_strategy::fixture_sql::complete_empty_fixture_sql;
 use crate::bindings::_helpers::planner_strategy::fixture_values::{diagnostic, label};
 use crate::bindings::_helpers::planner_strategy::models::RelationFixturePlanningContext;
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 pub(crate) struct PreparedFixtures<'py> {
     /// Each fixture's key with its Python key, in request order.

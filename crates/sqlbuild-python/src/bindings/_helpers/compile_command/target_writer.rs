@@ -18,9 +18,6 @@ use sqlbuild_host::compile_context::main::record_compile_timing::record_compile_
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::analysis::sql_test_comparisons::single_comparison_sql;
-use crate::bindings::_helpers::boundary::python_calls::{
-    KeywordArguments, call_with, imported, keywords, within,
-};
 use crate::bindings::_helpers::compile_command::artifact_batch::ArtifactBatch;
 use crate::bindings::_helpers::compile_command::constants::RACY_WINDOW_NS;
 use crate::bindings::_helpers::compile_command::reuse_recording::{
@@ -40,17 +37,25 @@ use crate::bindings::_helpers::compile_outputs::runtime_target::{
     compiled_sql_test_path, planned_sql_test_path,
 };
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::construct::{enum_member, error_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::fields::path_posix_text;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::sql_test_glue::models::SqlTestPlanOptions;
 use crate::bindings::_helpers::sql_test_glue::plan_driver::planned_rows;
 use crate::bindings::_helpers::sql_test_glue::plan_driver::sql_test_model_chain_names_by_key;
 use crate::bindings::_helpers::sql_test_glue::planning::PlanRow;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::main::log_debug_message::log_debug_message;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::path_posix_text::path_posix_text;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const COMPILED_DIR: &str = "compiled";
 const MODELS_DIR: &str = "models";
@@ -401,7 +406,7 @@ fn planned_artifacts<'py>(
         return Ok(Vec::new());
     }
     let lifecycle: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::OperationLifecycle)?,
+        &host_entry(py, ExecutorHost::OperationLifecycle)?,
         &[
             ("operation_kind", "project".into_bound_py_any(py)?),
             ("operation_name", "sql_test_planning".into_bound_py_any(py)?),
@@ -479,7 +484,7 @@ fn log_cache_misses(
         }
         format!("records {}", shown.join(","))
     };
-    host::log_debug_message(
+    log_debug_message(
         py,
         SQL_TEST_CACHE_LOGGER,
         &format!("SQL test artifact cache missed: {reasons} ({detail})"),

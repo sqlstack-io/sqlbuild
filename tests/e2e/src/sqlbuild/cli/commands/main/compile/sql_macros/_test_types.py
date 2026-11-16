@@ -136,3 +136,13 @@ class SqlMacroBodyRulesTestCase:
     expected_returncode: int
     expected_fragments: tuple[str, ...]
     expected_absent_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SqlMacroWaveTestCase:
+    """A chain of models, one per analysis wave, each calling a macro once with a wrong type."""
+
+    description: str
+    files: dict[str, str]
+    wave_count: int
+    expected_finding: str

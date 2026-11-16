@@ -26,16 +26,19 @@ use sqlbuild_analysis::sql_macros::models::{
 use sqlbuild_analysis::sql_macros::types::{ConstantShape, SqlMacroHost, SqlMacroScope};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::bindings::_helpers::records::construct::{
-    enum_member, new_helped_error, new_record, new_record_with,
-};
-use crate::bindings::_helpers::records::fields::{field as native_field, field_text, path_posix};
-use crate::bindings::_helpers::records::ids::ErrorId;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::render::declaration_expansion::{
     DeclarationExpansion, ExpandedDeclarations, expand_declarations, usage_visibility,
 };
 use crate::bindings::_helpers::sqltext::declaration_references::declaration_scan;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::field_text::field_text;
+use sqlbuild_python_base::records::main::fields::path_posix::path_posix;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const SQL_LANGUAGE: &str = "sql";
 const UNKNOWN_CODE: &str = "P001";

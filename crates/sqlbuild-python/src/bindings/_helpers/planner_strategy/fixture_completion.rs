@@ -23,7 +23,7 @@ use crate::bindings::_helpers::planner_strategy::models::{
     ExpectedTypes, RelationFixturePlanningContext,
 };
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Completed fixture SQL and inferred columns by Python fixture key, expected types and diagnostics.
 pub(crate) struct FixtureCompletion<'py, 'a> {

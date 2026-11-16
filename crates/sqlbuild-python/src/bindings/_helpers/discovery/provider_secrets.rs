@@ -6,9 +6,9 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
 use crate::bindings::_helpers::native_host::provider_settings::missing_secrets;
-use crate::bindings::_helpers::records::construct::new_annotated_error;
-use crate::bindings::_helpers::records::fields::field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// Discovered collections of sinks that run with every command.
 const SINK_COLLECTIONS: [&str; 2] = ["event_exporters", "command_output_sinks"];

@@ -7,17 +7,20 @@ use sqlbuild_analysis::review_command::constants::UNKNOWN_REVIEW_DATABASE_CODE;
 use sqlbuild_analysis::review_command::main::review_schema_name::review_schema_name;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords};
 use crate::bindings::_helpers::build_command::support::{boolean, none, text};
 use crate::bindings::_helpers::command_runtime::connection::resolve_target_connection_config;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::janitor::janitor_keys::utc_datetime;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
-use crate::bindings::_helpers::records::fields::{field as native_field, replaced};
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::review_command::planning::{ReviewProject, ReviewSettings};
 use crate::bindings::_helpers::review_command::support::review_error;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Where the review builds and where its ownership marker goes.
 pub(crate) struct ReviewSchema {
@@ -166,7 +169,7 @@ pub(crate) fn create_review_schema(
 ) -> PyResult<()> {
     let py: Python<'_> = adapter.py();
     call_with(
-        &host::entry(py, ExecutorHost::CreateReviewSchema)?,
+        &host_entry(py, ExecutorHost::CreateReviewSchema)?,
         &[
             ("adapter", adapter.clone()),
             ("connection", connection.clone()),
@@ -188,7 +191,7 @@ pub(crate) fn drop_review_schema(
 ) -> PyResult<bool> {
     let py: Python<'_> = adapter.py();
     call_with(
-        &host::entry(py, ExecutorHost::DropReviewSchema)?,
+        &host_entry(py, ExecutorHost::DropReviewSchema)?,
         &[
             ("adapter", adapter.clone()),
             ("connection", connection.clone()),

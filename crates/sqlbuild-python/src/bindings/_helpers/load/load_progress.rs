@@ -12,12 +12,13 @@ use sqlbuild_core::load_command::main::render_load_spinner_line::render_load_spi
 use sqlbuild_core::load_command::models::{LoadResultText, LoadSpinnerRow, LoadStatus};
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, within};
 use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::terminal::start_spinner;
 use crate::bindings::_helpers::build_progress::transient_lines::shared_transient_line_coordinator;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const LOADER_NODE_KEY: &str = "sqlbuild_loader_node";
 const SPINNER_TICK_SECONDS: f64 = 0.1;
@@ -37,7 +38,7 @@ fn optional_text(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {
 pub(crate) fn load_result_text(result: &Bound<'_, PyAny>) -> PyResult<LoadResultText> {
     let py: Python<'_> = result.py();
     let log_kind: Bound<'_, PyAny> =
-        host::entry(py, AdapterHost::LifeCycleEventKind)?.getattr("LOG")?;
+        host_entry(py, AdapterHost::LifeCycleEventKind)?.getattr("LOG")?;
     let mut log_messages: Vec<String> = Vec::new();
     for event in native_field(result, "lifecycle_events")?.try_iter()? {
         let event: Bound<'_, PyAny> = event?;

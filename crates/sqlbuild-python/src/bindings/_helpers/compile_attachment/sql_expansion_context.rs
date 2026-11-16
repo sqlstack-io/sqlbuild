@@ -6,8 +6,6 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods};
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_attachment::declaration_scope::build_declaration_scope;
 use crate::bindings::_helpers::compile_attachment::declaration_scope::rebind_declaration_scope;
 use crate::bindings::_helpers::compile_attachment::effective_config::{
@@ -16,13 +14,15 @@ use crate::bindings::_helpers::compile_attachment::effective_config::{
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_collection_rendering;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::render::declaration_indexes::public_declaration_indexes;
 use pyo3::IntoPyObjectExt;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Build the declaration scope of `discovered`; a static scope lends only its index to macros.
 fn declaration_scope<'py>(
@@ -31,7 +31,7 @@ fn declaration_scope<'py>(
     sql_lexical_syntax: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
-    let loaded_macros: Bound<'py, PyAny> = host::entry(py, UserCodeHost::LoadProjectMacros)?
+    let loaded_macros: Bound<'py, PyAny> = host_entry(py, UserCodeHost::LoadProjectMacros)?
         .call1((native_field(discovered, "macro_files")?,))?;
     if !static_scope.is_none() {
         let rebound: Bound<'py, PyAny> =

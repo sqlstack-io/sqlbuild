@@ -1,11 +1,11 @@
 //! Report a scope index's error findings as individual compile diagnostics.
 
 use crate::bindings::_helpers::compile_context::diagnostic_collector::report_compile_diagnostic;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const ERROR_SEVERITY: &str = "error";
 

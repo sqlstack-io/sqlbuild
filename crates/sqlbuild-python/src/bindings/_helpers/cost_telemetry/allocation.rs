@@ -10,14 +10,15 @@ use sqlbuild_core::cost_allocation::models::{
 };
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::cost_telemetry::values::{
     instant_micros, native_decimal, python_decimal,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PENDING_MESSAGE: &str = "Snowflake query history is not complete yet.";
 
@@ -119,7 +120,7 @@ pub(crate) fn summary_object<'py>(
     let mut fields: Vec<(&str, Bound<'py, PyAny>)> = vec![
         (
             "status",
-            host::entry(py, ExecutorHost::CostStatus)?.getattr(state.status)?,
+            host_entry(py, ExecutorHost::CostStatus)?.getattr(state.status)?,
         ),
         ("usd_per_credit", usd_per_credit.clone()),
         ("rate_source", rate_source.clone()),
@@ -160,7 +161,7 @@ pub(crate) fn summary_object<'py>(
             ),
         ]);
     }
-    call_with(&host::entry(py, ExecutorHost::RunCostSummary)?, &fields)
+    call_with(&host_entry(py, ExecutorHost::RunCostSummary)?, &fields)
 }
 
 /// The allocation that prices queries, or `None` while the run's history is pending.

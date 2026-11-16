@@ -10,7 +10,8 @@ use crate::bindings::_helpers::analysis::relation_names::{
     RelationRow, extract_sql_relation_names,
 };
 use crate::bindings::_helpers::native_host::consumption_state::optional_text;
-use crate::bindings::_helpers::records::fields::{field as native_field, mapping_items};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 /// Function calls, `__udf("name")(...)`, parsed as plain calls; their reads are declared inputs.
 const FUNCTION_CALLS: [&str; 2] = ["__udf", "__table_fn"];

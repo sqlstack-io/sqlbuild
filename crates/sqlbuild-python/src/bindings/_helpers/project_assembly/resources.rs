@@ -12,9 +12,9 @@ use sqlbuild_analysis::assembly::project::models::{SyntaxCheck, SyntaxFailure, S
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::input_loops::model_loop_prepass::pooled;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const SYNTAX_CHECK_CONTEXT: &str = "native SQL syntax check";
 

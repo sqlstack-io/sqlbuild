@@ -8,7 +8,7 @@ from collections.abc import Callable, Iterable
 from fensu import Fault, RuleContext
 
 from scripts.fensu_policy.constants import (
-    NATIVE_BINDINGS_ROOT,
+    NATIVE_BINDINGS_ROOTS,
     NATIVE_BUDGET_SEPARATOR,
     NATIVE_CROSSING_PATTERNS,
     NATIVE_EDGE_PATHS,
@@ -37,7 +37,7 @@ _PYCLASS_MODULE: re.Pattern[str] = re.compile(
 def is_checked_binding(*, path: str) -> bool:
     """Whether `path` is non-test bindings source; tests live under `tests/` or in `tests.rs`."""
 
-    if not path.startswith(NATIVE_BINDINGS_ROOT) or not path.endswith(NATIVE_RUST_SUFFIX):
+    if not path.startswith(NATIVE_BINDINGS_ROOTS) or not path.endswith(NATIVE_RUST_SUFFIX):
         return False
     parts: list[str] = path.split("/")
     name: str = parts[-1]

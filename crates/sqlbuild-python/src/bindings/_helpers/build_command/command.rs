@@ -8,7 +8,6 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cli::person_login::main::sync_after_build::sync_after_build;
 use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::build_command::completion::{
     complete_direct_build, finalize_exceptional_cost, finalize_no_work_with_timings,
     record_pending_cost, write_partial_timings,
@@ -27,17 +26,19 @@ use crate::bindings::_helpers::discovery::provider_secrets::{
     consumer_uses, provider_uses, require_used_secrets, sink_uses,
 };
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::observations::source_capture::{
     arm_source_capture, take_source_capture,
 };
 use crate::bindings::_helpers::recall::console::write_stderr;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 fn run_with_providers(context: &BuildContext<'_>) -> PyResult<i32> {
     let py: Python<'_> = context.py();
     let session: Bound<'_, PyAny> = call_with(
-        &host::entry(py, UserCodeHost::BuildProviderSession)?,
+        &host_entry(py, UserCodeHost::BuildProviderSession)?,
         &[(
             "discovered_providers",
             context.get("discovered_inputs")?.getattr("providers")?,
@@ -61,7 +62,7 @@ fn run_planned_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -
     }
     run_defer_clone_prephase(context)?;
     let cache_scope: Bound<'_, PyAny> = call_with(
-        &host::entry(context.py(), AdapterHost::RelationMetadataCacheScope)?,
+        &host_entry(context.py(), AdapterHost::RelationMetadataCacheScope)?,
         &[("adapter", context.get("adapter")?)],
     )?;
     within(&cache_scope, |_| run_cached_build(context, providers))
@@ -165,7 +166,7 @@ fn run_within_limits(
     context.worker = worker;
     let limits: Bound<'_, PyAny> = context.get("execution_limits")?;
     let deadline: Bound<'_, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::ExecutionDeadlineScope)?,
+        &host_entry(py, ExecutorHost::ExecutionDeadlineScope)?,
         &[
             (
                 "max_duration_seconds",
@@ -215,7 +216,7 @@ pub(crate) fn run_build(
         .and_then(|value| pyo3::Bound::new(py, value))
         .map(pyo3::Bound::into_any)?;
     let reporting: Bound<'_, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::ProcessResourceReporting)?,
+        &host_entry(py, ExecutorHost::ProcessResourceReporting)?,
         &[("enabled", native_field(request, "debug")?)],
     )?;
     within(&reporting, |_| {

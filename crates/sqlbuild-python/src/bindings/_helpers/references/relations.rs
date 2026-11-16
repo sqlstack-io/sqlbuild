@@ -9,9 +9,9 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::analysis::relation_names::{
     RelationRow, extract_sql_relation_names,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 const RUNTIME_RELATION_PREFIX: &str = "SELECT 1 FROM ";
 
@@ -34,7 +34,7 @@ fn relation_name<'py>(
     keywords.set_item("name", name)?;
     keywords.set_item("schema", schema)?;
     keywords.set_item("database", database)?;
-    host::entry(py, ExecutorHost::RelationName)?.call((), Some(&keywords))
+    host_entry(py, ExecutorHost::RelationName)?.call((), Some(&keywords))
 }
 
 /// Relations named in `sql` and temporary tables it creates, or None if unparseable.
@@ -110,7 +110,7 @@ fn runtime_project_relations<'py>(
     relations: &Bound<'py, PyAny>,
     dialect: Option<&str>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let relation_type: Bound<'py, PyAny> = host::entry(py, ExecutorHost::ProjectRelation)?;
+    let relation_type: Bound<'py, PyAny> = host_entry(py, ExecutorHost::ProjectRelation)?;
     let resolved: Bound<'py, PyDict> = PyDict::new(py);
     for item in mapping_items(relations)?.try_iter()? {
         let (reference, qualified): (Bound<'py, PyAny>, String) = item?.extract()?;
@@ -131,7 +131,7 @@ fn runtime_project_relations<'py>(
         resolved.set_item(relation, py.None())?;
     }
     keyword_call(
-        &host::entry(py, ExecutorHost::ProjectRelationIndex)?,
+        &host_entry(py, ExecutorHost::ProjectRelationIndex)?,
         &[("relations", PyTuple::new(py, resolved.keys())?.into_any())],
     )
 }

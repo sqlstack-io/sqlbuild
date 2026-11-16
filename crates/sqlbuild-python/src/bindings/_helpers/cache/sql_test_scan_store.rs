@@ -12,9 +12,9 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cache::native_store::current_code_identity;
 use crate::bindings::_helpers::cache::native_store::{open_store, save_store};
+use sqlbuild_python_base::boundary::main::imported::imported;
 
 const SCAN_CACHE_LOGGER: &str = "sqlbuild.compile";
 

@@ -13,7 +13,7 @@ use crate::bindings::_helpers::location_command::constants::{
 use crate::bindings::_helpers::native_host::provider_settings::{
     missing_secrets, provider_class_settings, setting_rows,
 };
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 /// How a consumer's code runs inside other snapshot nodes, besides its own node.
 #[derive(Clone, Copy)]

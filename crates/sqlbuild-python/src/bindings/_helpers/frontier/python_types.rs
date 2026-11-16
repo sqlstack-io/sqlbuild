@@ -5,9 +5,9 @@ use pyo3::types::{PyBytes, PyBytesMethods, PyStringMethods, PyTuple};
 
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::frontier::encoder::qualified_name;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The Python classes and functions the encoder checks values against.
 pub(crate) struct PythonTypes<'py> {

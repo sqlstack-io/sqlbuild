@@ -19,13 +19,13 @@ use crate::bindings::_helpers::graph::python_node_graph::{
     python_node_graph, run_selection_from_inputs,
 };
 use crate::bindings::_helpers::graph::python_selection::python_node_names;
-use crate::bindings::_helpers::native_host::host::{
-    flush_console, module_installed, python_executable,
-};
 use crate::bindings::_helpers::planner_selection::unit_tests::split_project_unit_test_selectors;
-use crate::bindings::_helpers::records::construct::new_helped_error;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::native_host::main::flush_console::flush_console;
+use sqlbuild_python_base::native_host::main::module_installed::module_installed;
+use sqlbuild_python_base::native_host::main::python_executable::python_executable;
+use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// The prefix of a Python test module's file name.
 const TEST_MODULE_PREFIX: &str = "test_";

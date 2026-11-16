@@ -40,7 +40,6 @@ use sqlbuild_state::execution_history::models::{
 };
 use sqlbuild_state::execution_history::types::UtcTime;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::execution_history::appends::prepared_batch;
 use crate::bindings::_helpers::execution_history::conversion::{
     checked, event_filter_spec, exact_int, history_error_of_kind, new_namespace, now,
@@ -51,12 +50,13 @@ use crate::bindings::_helpers::execution_history::conversion::{
 use crate::bindings::_helpers::execution_history::statements::{
     column, execute, execute_plain, execute_query, fetch_one, tuple_of,
 };
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::sqlite_connection::{
     SqliteConnection, SqliteCursor, sqlite_params,
 };
 use crate::bindings::_helpers::native_threads::reentrant_lock::ReentrantLock;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const SQLITE_MODULE: &str = "sqlite3";
 const PATHLIB_MODULE: &str = "pathlib";
@@ -634,8 +634,8 @@ impl SqliteExecutionHistory {
                 Some(record) => native_field(record, "cursor")?,
                 None => py.None().into_bound(py),
             };
-            crate::bindings::_helpers::boundary::python_calls::call_with(
-                &host::entry(py, ExecutorHost::EventPage)?,
+            sqlbuild_python_base::boundary::main::call_with::call_with(
+                &host_entry(py, ExecutorHost::EventPage)?,
                 &[
                     ("records", tuple_of(py, records)?.into_any()),
                     ("next_cursor", next_cursor),
@@ -703,8 +703,8 @@ impl SqliteExecutionHistory {
                 }
                 None => py.None().into_bound(py),
             };
-            crate::bindings::_helpers::boundary::python_calls::call_with(
-                &host::entry(py, ExecutorHost::RunPage)?,
+            sqlbuild_python_base::boundary::main::call_with::call_with(
+                &host_entry(py, ExecutorHost::RunPage)?,
                 &[
                     ("records", run_records(py, &runs)?.into_any()),
                     ("next_cursor", next_cursor),

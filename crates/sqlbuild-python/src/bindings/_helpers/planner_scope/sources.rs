@@ -5,18 +5,18 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::graph::keys::native_key;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_scope::loaders::intermediate_map;
 use crate::bindings::_helpers::planner_scope::values::{edges, keys};
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, pyfunction};
 use pyo3::types::PyDictMethods;
 use pyo3::types::{PyBool, PyDict, PyTuple};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;
 use sqlbuild_analysis::planner_scope::constants::SOURCE;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 #[pyfunction]
 #[pyo3(signature = (*, project, selected_keys, upstream_deps = None))]
@@ -67,7 +67,7 @@ pub(crate) fn build_source_load_entries<'py>(
     is_reload: bool,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py = execution_order.py();
-    let kinds = host::entry(py, ExecutorHost::ExecutionResourceKind)?;
+    let kinds = host_entry(py, ExecutorHost::ExecutionResourceKind)?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
     for key in execution_order.try_iter()? {
         let key = key?;

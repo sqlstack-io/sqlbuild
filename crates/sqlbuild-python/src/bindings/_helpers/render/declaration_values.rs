@@ -7,20 +7,24 @@ use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyInt, PyList, PyString, P
 use pyo3::{IntoPyObject, pyclass, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{
-    enum_member, new_record, new_record_with, record_class,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::fields::mapping_values;
-use crate::bindings::_helpers::records::ids::{ErrorId, NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
 use crate::bindings::_helpers::scopes::declaration_contexts::NativeDeclarationContexts;
 use crate::bindings::_helpers::scopes::scope_lookup::build_scope_lookup;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 const NO_DECLARATION_KIND: u8 = 255;
 /// Declaration kinds by their native code: enum 0, constant 1, macro 2.
@@ -377,7 +381,7 @@ fn rendered_constant<'py>(
             native_field(declaration, "name")?.str()?
         );
         return Err(PyErr::from_value(
-            registry::native(declaration.py(), NativeAttr::SqlValueValidationError)?
+            native_attr(declaration.py(), NativeAttr::SqlValueValidationError)?
             .call1((format!(
                 "{context} rendered value is {size} bytes; maximum is {MAX_SQL_VALUE_SIZE} bytes"
             ),))?,
@@ -403,9 +407,8 @@ pub(crate) fn constant_declaration_sql<'py>(
         Ok(rendered) => return Ok(rendered),
         Err(error) => error,
     };
-    let rendering_error: Bound<'py, PyAny> = host::entry(py, ExecutorHost::SqlValueRenderingError)?;
-    let validation_error: Bound<'py, PyAny> =
-        registry::native(py, NativeAttr::SqlValueValidationError)?;
+    let rendering_error: Bound<'py, PyAny> = host_entry(py, ExecutorHost::SqlValueRenderingError)?;
+    let validation_error: Bound<'py, PyAny> = native_attr(py, NativeAttr::SqlValueValidationError)?;
     let raised: Bound<'py, PyAny> = error.value(py).clone().into_any();
     if !(raised.is_instance(&rendering_error)? || raised.is_instance(&validation_error)?) {
         return Err(error);

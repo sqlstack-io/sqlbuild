@@ -14,20 +14,22 @@ use crate::bindings::_helpers::analysis::schema_request::{
 };
 use crate::bindings::_helpers::analysis_session::stage_functions::infer_native_query_columns;
 use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_sql;
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_driver::stage_work::count_stage;
-use crate::bindings::_helpers::records::construct::{enum_from_value, enum_member, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::semantic_shapes::constants::SOURCE_REBINDING_ANALYSES;
 use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
 use crate::bindings::_helpers::semantic_shapes::shapes::{
     model_inputs, project_shapes, published_shape,
 };
 use crate::bindings::models::BindingPositions;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_sqltext::resolution::main::unquoted_column_name::unquoted_column_name;
 
 const BINDING_UNKNOWN_TABLE_INTERNAL_CODE: &str = "B000";

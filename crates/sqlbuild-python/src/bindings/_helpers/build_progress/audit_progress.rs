@@ -16,13 +16,14 @@ use sqlbuild_core::nested_progress::main::render_audit_row::render_audit_row;
 use sqlbuild_core::nested_progress::main::render_group_header::render_group_header;
 use sqlbuild_core::nested_progress::models::AuditAggregate;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, within};
 use crate::bindings::_helpers::build_progress::result_text::{audit_text, optional, text};
 use crate::bindings::_helpers::build_progress::terminal::{
     CLEAR_LINE, HIDE_CURSOR, SHOW_CURSOR, claim, consume_terminal, flush, projector, release,
     shared_lines, tty_flag, write,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The identity an audit plan entry or result reports to the progress projector.
 fn resource_id(value: &Bound<'_, PyAny>, name_field: &str) -> PyResult<String> {

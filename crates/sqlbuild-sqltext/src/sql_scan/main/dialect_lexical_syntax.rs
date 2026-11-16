@@ -24,7 +24,10 @@ pub fn dialect_lexical_syntax(dialect: &str) -> LexicalSyntax {
             line_comment_prefixes: lines(&["--", "# ", "#!", "//"]),
             ..LexicalSyntax::default()
         },
-        "databricks" | "duckdb" => LexicalSyntax {
+        "databricks" => LexicalSyntax {
+            backslash_escape_quotes: strings(&["'", "\""]),
+            raw_string_prefix: true,
+            nested_block_comments: true,
             line_comment_prefixes: lines(&["--"]),
             ..LexicalSyntax::default()
         },

@@ -10,11 +10,11 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_cache::module_digests::main::module_digests_metadata::module_digests_metadata as metadata_text;
 use sqlbuild_core::json::models::JsonValue;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cache::native_store::digest_files;
 use crate::bindings::_helpers::frontier::encoder::emit_error;
 use crate::bindings::_helpers::macro_bridge::store_keys::text;
-use crate::bindings::_helpers::records::fields::mapping_items;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 
 /// The fields of one stored row: a path and its digest.
 const MODULE_DIGEST_ROW_FIELDS: usize = 2;

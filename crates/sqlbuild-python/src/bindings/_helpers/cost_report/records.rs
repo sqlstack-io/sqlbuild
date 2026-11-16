@@ -6,16 +6,17 @@ use sqlbuild_core::cost_report::errors::CostArtifactError;
 use sqlbuild_core::cost_report::models::{CostResource, CostRun, CostSummary};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The `CostArtifactError` Python raised for the same artifact.
 pub(crate) fn artifact_error(py: Python<'_>, error: &CostArtifactError) -> PyErr {
-    match registry::native(py, NativeAttr::CostArtifactError)
+    match native_attr(py, NativeAttr::CostArtifactError)
         .and_then(|class| class.call1((error.message.as_str(),)))
     {
         Ok(instance) => PyErr::from_value(instance),
@@ -173,7 +174,7 @@ fn summary_object<'py>(
     let fields: Bound<'py, PyDict> = PyDict::new(py);
     fields.set_item(
         "status",
-        host::entry(py, ExecutorHost::CostStatus)?.call1((cost.status.as_str(),))?,
+        host_entry(py, ExecutorHost::CostStatus)?.call1((cost.status.as_str(),))?,
     )?;
     fields.set_item("usd_per_credit", builders.decimal(&cost.usd_per_credit)?)?;
     fields.set_item("rate_source", &cost.rate_source)?;
@@ -197,7 +198,7 @@ fn summary_object<'py>(
     fields.set_item("method", &cost.method)?;
     fields.set_item("limitations", PyTuple::new(py, &cost.limitations)?)?;
     fields.set_item("message", &cost.message)?;
-    host::entry(py, ExecutorHost::RunCostSummary)?.call((), Some(&fields))
+    host_entry(py, ExecutorHost::RunCostSummary)?.call((), Some(&fields))
 }
 
 /// A plain run as the `CostRunRecord` it was read from.

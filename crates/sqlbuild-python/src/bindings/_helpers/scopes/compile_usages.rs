@@ -20,9 +20,12 @@ use sqlbuild_scopes::scope_index::models::{
 };
 
 use crate::bindings::_helpers::compile_context::diagnostic_collector::report_compile_diagnostic;
-use crate::bindings::_helpers::records::construct::{error_class, new_record};
-use crate::bindings::_helpers::records::fields::{field as native_field, mapping_items};
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The folder a scope path is relative to when its owner names none.
 pub(crate) const CURRENT_FOLDER: &str = ".";

@@ -4,12 +4,12 @@ use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use pyo3::pymethods;
 use pyo3::types::{PyDict, PyFrozenSet};
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::planner_entries::models::{
     ModelPlanContext, PlanEntryBuildInputs, PlannerRelationsContext,
 };
-use crate::bindings::_helpers::records::construct::enum_member;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// The argument `name`, or `default()` when it was not passed.
 fn value_or<'py>(

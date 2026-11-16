@@ -14,12 +14,9 @@ use sqlbuild_core::query_command::main::render_query_json::render_query_json;
 use sqlbuild_core::query_command::models::QueryDisplay;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::build_progress::transient_status::delayed_status;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::native_host::connections::connection_failure;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
@@ -27,9 +24,13 @@ use crate::bindings::_helpers::query_command::query_values::{
     decimal_instance, display_text, json_cell, python_json_rows, strict_width,
 };
 use crate::bindings::_helpers::query_command::text_output::{LONG_FORMAT, render_text};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const JSON_FORMAT: &str = "json";
 const STATEMENT_OK: &str = "OK\n";
@@ -194,7 +195,7 @@ fn run_sql<'py>(
             )
         });
     let queried: PyResult<Bound<'py, PyAny>> = queried.map_err(|error| {
-        let adapter_error: bool = host::entry(py, AdapterHost::AdapterUserError)
+        let adapter_error: bool = host_entry(py, AdapterHost::AdapterUserError)
             .is_ok_and(|class| error.value(py).is_instance(&class).unwrap_or(false));
         if adapter_error || !error.is_instance_of::<PyException>(py) {
             return error;

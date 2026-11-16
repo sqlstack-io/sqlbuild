@@ -4,10 +4,10 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_core::nested_progress::main::audit_resource_id::audit_resource_id as audit_id;
 use sqlbuild_core::nested_progress::main::sql_test_resource_id::sql_test_resource_id as sql_test_id;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The exact stable identity of one plain or parameterised SQL test.
 #[pyfunction]

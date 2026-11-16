@@ -8,11 +8,11 @@ use sqlbuild_analysis::required_columns::errors::RequiredColumnsError;
 use sqlbuild_analysis::required_columns::main::resolve_required_columns::resolve_required_columns as resolve;
 use sqlbuild_analysis::required_columns::models::{ColumnRead, ReferenceInput};
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// CTE-aware column reads of `query_sql`, resolved to the external resources it references.
 #[pyfunction]

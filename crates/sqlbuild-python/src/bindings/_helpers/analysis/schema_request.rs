@@ -7,10 +7,10 @@ use pyo3::types::PyDict;
 use sqlbuild_analysis::semantic_validation::main::normalize::normalize_analysis_sql;
 use sqlbuild_analysis::semantic_validation::models::NormalizationInput;
 
-use crate::bindings::_helpers::boundary::panics::value_error;
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::ids::RecordId;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const GENERIC_DIALECT: &str = "generic";
 

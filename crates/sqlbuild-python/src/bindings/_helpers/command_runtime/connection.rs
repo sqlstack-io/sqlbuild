@@ -16,7 +16,6 @@ use sqlbuild_config::command_connection::main::snowflake_key_warning::snowflake_
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported, keywords};
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::command_runtime::warehouses::{WarehouseInputs, apply_warehouse};
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
@@ -24,8 +23,11 @@ use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_ada
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
 use crate::bindings::_helpers::dbt_interop::profile_connection::resolve_raw_dbt_profile_connection;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const ATTACH_KEY: &str = "attach";
 const ATTACH_PATH_KEY: &str = "path";
@@ -66,7 +68,7 @@ fn warn(py: Python<'_>, message: &str) -> PyResult<()> {
 }
 
 fn dbt_profile_error(py: Python<'_>) -> PyErr {
-    match host::entry(py, ThirdPartyHost::DbtProfileError)
+    match host_entry(py, ThirdPartyHost::DbtProfileError)
         .and_then(|class| class.call1((DBT_PROFILE_REQUIRES_PROJECT,)))
     {
         Ok(instance) => PyErr::from_value(instance),

@@ -7,23 +7,26 @@ use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost};
 use sqlbuild_state::freshness::main::single_value_problem::single_value_problem;
 use sqlbuild_state::freshness::models::QueryShape;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, within};
 use crate::bindings::_helpers::freshness::support::{
     OBSERVATION_ERROR, exception_text, freshness_error, presumed_utc_datetime, presumed_utc_value,
     text,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::constants::{DATA_VERSION_FIELD, OBSERVED_AT_FIELD};
-use crate::bindings::_helpers::records::construct::{
-    enum_from_value, enum_member, new_record, new_record_with,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::references::source_relations::render_source_read;
 use crate::bindings::_helpers::state_rows::freshness::{normalize, version_hash};
 use crate::bindings::_helpers::state_rows::timestamps::{in_utc, offset_aware};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::constants::DATA_VERSION_FIELD;
+use sqlbuild_python_base::records::constants::OBSERVED_AT_FIELD;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
+use sqlbuild_python_base::records::types::RecordId;
 
 const ADAPTER_STRATEGY: &str = "adapter";
 const COLUMN_STRATEGY: &str = "column";
@@ -98,7 +101,7 @@ fn lifecycle<'py>(
     item_count: Option<usize>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let attributes: Bound<'py, PyAny> = call_with(
-        &host::entry(py, ExecutorHost::OperationAttributes)?,
+        &host_entry(py, ExecutorHost::OperationAttributes)?,
         &[
             ("phase", text(py, "observe")),
             ("strategy", text(py, strategy)),
@@ -115,10 +118,7 @@ fn lifecycle<'py>(
         options.push(("metadata", metadata.into_any()));
     }
     options.push(("attributes", attributes));
-    call_with(
-        &host::entry(py, ExecutorHost::OperationLifecycle)?,
-        &options,
-    )
+    call_with(&host_entry(py, ExecutorHost::OperationLifecycle)?, &options)
 }
 
 fn observation<'py>(
@@ -335,7 +335,7 @@ fn metadata_unknown<'py>(
     let py: Python<'py> = source_name.py();
     let name: String = source_name.str()?.extract()?;
     let unavailable: Bound<'py, PyAny> =
-        host::entry(py, AdapterHost::TableFreshnessStatus)?.getattr("UNAVAILABLE")?;
+        host_entry(py, AdapterHost::TableFreshnessStatus)?.getattr("UNAVAILABLE")?;
     if native_field(metadata, "status")?.eq(unavailable)? {
         let message: Bound<'py, PyAny> = native_field(metadata, "message")?;
         let message: String = if message.is_truthy()? {
@@ -444,7 +444,7 @@ fn observe_adapter_batch_inner<'py>(
     let py: Python<'py> = observer.adapter.py();
     let unknown_sources: Bound<'py, PyDict> = PyDict::new(py);
     let requests: Bound<'py, PyDict> = PyDict::new(py);
-    let request_class: Bound<'py, PyAny> = host::entry(py, AdapterHost::TableFreshnessRequest)?;
+    let request_class: Bound<'py, PyAny> = host_entry(py, AdapterHost::TableFreshnessRequest)?;
     for source in sources {
         let name: Bound<'py, PyAny> = native_field(source, "name")?;
         if let Some(message) = unsupported_message(&observer.adapter, source)? {
@@ -482,7 +482,7 @@ fn observe_adapter_batch_inner<'py>(
             ("requests", PyTuple::new(py, unique.keys())?.into_any()),
         ],
     )?;
-    let metadata_class: Bound<'py, PyAny> = host::entry(py, AdapterHost::TableFreshnessMetadata)?;
+    let metadata_class: Bound<'py, PyAny> = host_entry(py, AdapterHost::TableFreshnessMetadata)?;
     let observations: Bound<'py, PyDict> = PyDict::new(py);
     for (name, request) in requests.iter() {
         let missing: Bound<'py, PyAny> = call_with(

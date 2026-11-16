@@ -1,14 +1,14 @@
 //! Resolve the selected, stale-warning and inspection scopes of one plan.
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyTuple;
 use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 #[pyfunction]
 #[pyo3(signature = (*, project, selection, policies))]

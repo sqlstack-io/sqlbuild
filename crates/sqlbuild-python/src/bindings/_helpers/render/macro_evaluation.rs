@@ -14,12 +14,12 @@ use sqlbuild_render::macro_calls::main::macro_call_names::macro_call_names as sc
 use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_sites as scan_sites;
 use sqlbuild_render::macro_calls::models::{MacroCallScan, MacroCallSite};
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::macro_arguments::parsed_arguments;
 use crate::bindings::_helpers::render::macro_expansion::{
     ExpansionClasses, NativeMacroExpansion, raised,
 };
 use crate::bindings::_helpers::render::macro_expansion_facts::ResourceRef;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const CONTEXT_PARAMETER: &str = "ctx";
 const SURROGATE_HELP: &str = "Return valid Unicode text from the macro; lone surrogates usually \

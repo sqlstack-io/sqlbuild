@@ -13,17 +13,17 @@ use sqlbuild_analysis::manifest::models::ManifestInput;
 use sqlbuild_core::json::errors::JsonEmitError;
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::graph::views::native_graph_from_edges;
 use crate::bindings::_helpers::manifest::rows::{
     ProjectRows, plan_input, project_rows, python_hooks,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const DATETIME_MODULE: &str = "datetime";
 
@@ -90,7 +90,7 @@ pub(crate) fn build_manifest(options: Option<&Bound<'_, PyDict>>) -> PyResult<Py
         .call_method1("now", (utc,))?
         .call_method0("isoformat")?
         .extract()?;
-    let hook_identities: Bound<'_, PyAny> = host::entry(py, UserCodeHost::BuildHookIdentities)?
+    let hook_identities: Bound<'_, PyAny> = host_entry(py, UserCodeHost::BuildHookIdentities)?
         .call1((native_field(&project, "hook_functions")?,))?;
     compiler_guard(|| {
         let python_hooks = python_hooks(&project, &hook_identities)?;

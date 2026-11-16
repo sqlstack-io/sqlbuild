@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyDict;
@@ -12,6 +11,7 @@ use sqlbuild_core::clone_text::main::render_clone_fingerprint_interrupted_line::
 use sqlbuild_core::clone_text::main::render_clone_fingerprint_progress_line::render_clone_fingerprint_progress_line;
 use sqlbuild_core::clone_text::main::render_clone_item_line::render_clone_item_line;
 use sqlbuild_core::clone_text::models::{CloneItemText, CloneStatusKind, FingerprintProgress};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 fn optional_text(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if value.is_none() {

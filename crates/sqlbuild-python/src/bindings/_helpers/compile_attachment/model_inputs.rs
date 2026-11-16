@@ -10,7 +10,6 @@ use sqlbuild_analysis::assembly::project::main::sql_analysis_opt_out_help::sql_a
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::attachments::cursor_intrinsics::reserved_cursor_markers;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::compile_attachment::model_config::native_model_config_session;
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::compiled_views::model_input_view::NativeModelInput;
@@ -20,24 +19,29 @@ use crate::bindings::_helpers::input_loops::model_loop::{LoopSwitches, NativeMod
 use crate::bindings::_helpers::model_config::contract_classes::contract_classes;
 use crate::bindings::_helpers::model_config::model_validator::NativeModelValidator;
 use crate::bindings::_helpers::model_config::unicode_environment::unicode_environment;
-use crate::bindings::_helpers::records::construct::{
-    enum_member, new_record, new_record_with, record_class,
-};
 use crate::bindings::_helpers::render::declaration_values::ConstantRendering;
 use crate::bindings::_helpers::render::macro_expansion_result::macro_expansion_classes;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
 
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 /// The explicit reference call kinds and the `SqlResourceRefKind` member each resolves to.
 const EXPLICIT_REFERENCE_KINDS: [(&str, &str); 3] =
     [("ref", "MODEL"), ("source", "SOURCE"), ("seed", "SEED")];
 
 /// The explicit reference call kinds mapped to their `SqlResourceRefKind` members.
 fn explicit_reference_kinds(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
-    let kinds: Bound<'_, PyAny> = host::entry(py, UserCodeHost::SqlResourceRefKind)?;
+    let kinds: Bound<'_, PyAny> = host_entry(py, UserCodeHost::SqlResourceRefKind)?;
     let built: Bound<'_, PyDict> = PyDict::new(py);
     for (call_kind, member) in EXPLICIT_REFERENCE_KINDS {
         built.set_item(call_kind, native_field(&kinds, member)?)?;
@@ -81,7 +85,7 @@ fn macro_inputs<'py>(context: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>
             ("macro_context", native_field(context, "macro_context")?),
             (
                 "bridge",
-                host::entry(py, UserCodeHost::ActiveMacroBridge)?.call0()?,
+                host_entry(py, UserCodeHost::ActiveMacroBridge)?.call0()?,
             ),
             (
                 "scoped",
@@ -137,7 +141,7 @@ fn sql_hook_inputs<'py>(
             ),
             (
                 "sql_resource_ref",
-                host::entry(py, UserCodeHost::SqlResourceRef)?,
+                host_entry(py, UserCodeHost::SqlResourceRef)?,
             ),
             ("explicit_kinds", explicit_reference_kinds(py)?.into_any()),
             (

@@ -14,12 +14,12 @@ use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, VisibleDeclarations, compile_error,
 };
 use crate::bindings::_helpers::input_loops::model_loop_inputs::reference_row;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::macro_expansion::{
     ExpansionOutput, NativeMacroExpansion, StateInput, expanded,
 };
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
 use sqlbuild_project::models::ReferenceRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Fields of `_VisibleModelDeclarations` a `DeclarationResolutionContext` is built from.
 const CONTEXT_FIELDS: [&str; 9] = [

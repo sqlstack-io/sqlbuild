@@ -10,9 +10,9 @@ use sqlbuild_sqltext::code_scanner::main::scanner_non_code_end::scanner_non_code
 use sqlbuild_sqltext::code_scanner::models::CodeScanner;
 use sqlbuild_sqltext::sql_scan::models::Unclosed;
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::sqltext::lexical_syntax::LexicalSyntaxInput;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// One SQL text scanned under an adapter's lexical rules, or the generic compiler rules.
 #[pyclass(module = "sqlbuild._native", frozen)]

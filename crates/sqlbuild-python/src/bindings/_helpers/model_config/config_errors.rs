@@ -7,8 +7,8 @@ use sqlbuild_model_config::errors::{ConfigError, ErrorClass};
 
 use crate::bindings::_helpers::model_config::config_values::config_value_type_error;
 use crate::bindings::_helpers::model_config::errors::NativeConfigError;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 const EXPECTED_STRING: &str = "a string";
 

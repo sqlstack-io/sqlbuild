@@ -7,21 +7,25 @@ use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyStringMethods, PyTu
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported, keywords};
 use crate::bindings::_helpers::discovery::guidance::explicit_references_help;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{
-    enum_member, new_record, new_record_with, record_class,
-};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::render::declaration_values::resolved_declaration_context;
 use crate::bindings::_helpers::render::macro_call_rows::{SpanRow, span_row};
 use crate::bindings::_helpers::render::macro_expansion::{
     ExpansionOutput, NativeMacroExpansion, StateInput, expanded,
 };
 use crate::bindings::_helpers::sqltext::sql_references::extract_references;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const TYPED_REFERENCE_FUNCTIONS: [(&str, &str); 3] = [
     ("model", "__ref"),
@@ -89,7 +93,7 @@ fn generated_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
 
 fn built_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let declaration_kind: Bound<'_, PyAny> = record_class(py, RecordId::DeclarationKind)?;
-    let ref_kind: Bound<'_, PyAny> = host::entry(py, UserCodeHost::SqlResourceRefKind)?;
+    let ref_kind: Bound<'_, PyAny> = host_entry(py, UserCodeHost::SqlResourceRefKind)?;
     let ref_kinds: Bound<'_, PyDict> = PyDict::new(py);
     let ref_functions: Bound<'_, PyDict> = PyDict::new(py);
     for (kind, function) in TYPED_REFERENCE_FUNCTIONS {
@@ -129,17 +133,17 @@ fn built_classes(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
             ),
             (
                 "resource_ref",
-                host::entry(py, UserCodeHost::SqlResourceRef)?,
+                host_entry(py, UserCodeHost::SqlResourceRef)?,
             ),
             ("ref_kinds", ref_kinds.into_any()),
             ("ref_functions", ref_functions.into_any()),
             (
                 "relation_renderer",
-                host::entry(py, UserCodeHost::RelationRenderer)?,
+                host_entry(py, UserCodeHost::RelationRenderer)?,
             ),
             (
                 "invocation_context",
-                host::entry(py, UserCodeHost::MacroInvocationContext)?,
+                host_entry(py, UserCodeHost::MacroInvocationContext)?,
             ),
             ("generated", generated_classes(py)?.into_any()),
             ("int_type", imported(py, BUILTINS_MODULE, "int")?),
@@ -201,7 +205,7 @@ pub(crate) fn macro_output(request: ExpansionRequest<'_>) -> PyResult<Option<Exp
         macro_expansion_classes(py)?.unbind(),
     )?;
     let expansion: Bound<'_, NativeMacroExpansion> = Bound::new(py, expansion)?;
-    let bridge: Bound<'_, PyAny> = host::entry(py, UserCodeHost::ActiveMacroBridge)?.call0()?;
+    let bridge: Bound<'_, PyAny> = host_entry(py, UserCodeHost::ActiveMacroBridge)?.call0()?;
     expanded(&expansion, request.sql.to_str()?, &bridge).map(Some)
 }
 

@@ -3,9 +3,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::bindings::_helpers::records::construct::new_record;
-use crate::bindings::_helpers::records::fields::field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::sqltext::authored_values::map_to_python;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -14,6 +11,9 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods, PyTuple};
 use pyo3::{FromPyObject, IntoPyObject, IntoPyObjectExt, pyclass, pymethods};
 use sqlbuild_discovery::model_files::main::model_file_stem::model_file_stem;
 use sqlbuild_discovery::models::LineColumnSpan;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
 const FIELD_NAMES: [&str; 10] = [

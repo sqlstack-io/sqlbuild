@@ -6,9 +6,10 @@ use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, P
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{FromPyObject, intern, pyclass, pymethods};
 
-use crate::bindings::_helpers::boundary::panics::{compiler_error, compiler_guard};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::scopes::declaration_resolution::ResolutionInputs;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_scopes::scope_index::main::classify_resource::classify_resource;
 use sqlbuild_scopes::scope_index::models::{
     ConsumerResource, GrantEntry, VisibilityReason, VisibilityTable, VisibleEntry,

@@ -20,7 +20,6 @@ use sqlbuild_analysis::lineage_graph::main::analysis_dialect::analysis_dialect;
 use sqlbuild_analysis::lineage_graph::models::AnalysisDialect;
 use sqlbuild_analysis::semantic_validation::models as validation;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_reads::star_flags;
 use crate::bindings::_helpers::lineage::column_lineage_graph::{
@@ -31,11 +30,12 @@ use crate::bindings::_helpers::lineage::project_schema::{
     fast_schema, inferred_names, rich_schema,
 };
 use crate::bindings::_helpers::project_assembly::syntax_checks::model_placeholders;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::models::ProjectCatalog;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const FAST_MODE: &str = "fast";
 const RICH_MODE: &str = "rich";

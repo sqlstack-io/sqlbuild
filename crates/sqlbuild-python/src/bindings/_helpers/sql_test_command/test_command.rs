@@ -24,8 +24,6 @@ use sqlbuild_host::models::{SqlTestExecutionResult, SqlTestOutcome};
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::build_progress::nested_progress::NestedCommandProgressCallbacks;
 use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
@@ -47,14 +45,8 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
-use crate::bindings::_helpers::records::construct::{error_class, new_helped_error};
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
@@ -66,6 +58,18 @@ use crate::bindings::_helpers::sql_test_command::python_tests::{
 use crate::bindings::_helpers::sql_test_command::timeouts::{
     RunTimeout, TimeoutKind, resolve_run_timeout,
 };
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Why `--since` selected each test, by inspection label.
 type SelectionReasons = HashMap<String, Vec<String>>;
@@ -596,7 +600,7 @@ fn run_tests<'py>(
     )?;
     let executed: PyResult<Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>> = (|| {
         let callbacks: Bound<'py, PyAny> = call_with(
-            &host::entry(py, ExecutorHost::TestPipelineCallbacks)?,
+            &host_entry(py, ExecutorHost::TestPipelineCallbacks)?,
             &[
                 (
                     "on_connection_start",
@@ -616,7 +620,7 @@ fn run_tests<'py>(
             ],
         )?;
         call_with(
-            &host::entry(py, ExecutorHost::RunTestPipeline)?,
+            &host_entry(py, ExecutorHost::RunTestPipeline)?,
             &[
                 ("plan", plan_output),
                 (
@@ -645,7 +649,7 @@ pub(crate) fn timeout_record<'py>(
     py: Python<'py>,
     timeout: &RunTimeout,
 ) -> PyResult<Bound<'py, PyAny>> {
-    host::entry(py, ExecutorHost::RunItemTimeouts)?.call((), Some(&timeout.keywords(py)?))
+    host_entry(py, ExecutorHost::RunItemTimeouts)?.call((), Some(&timeout.keywords(py)?))
 }
 
 /// Write the summary and failures; returns the exit code and the `--json` document.

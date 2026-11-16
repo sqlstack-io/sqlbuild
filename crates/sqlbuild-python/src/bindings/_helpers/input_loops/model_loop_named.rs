@@ -10,7 +10,7 @@ use sqlbuild_scopes::scope_index::models::{
 };
 
 use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const NAME_FIELD: &str = "name";
 const PATH_FIELD: &str = "path";

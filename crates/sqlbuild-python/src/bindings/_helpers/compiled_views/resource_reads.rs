@@ -12,7 +12,7 @@ use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
 use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;
 use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// A resource's graph facts without constructing its public keys or dependency tuple.
 pub(crate) fn graph_row(resource: &Bound<'_, PyAny>) -> PyResult<ResourceRow> {

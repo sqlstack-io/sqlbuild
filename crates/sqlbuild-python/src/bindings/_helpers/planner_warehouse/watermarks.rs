@@ -10,10 +10,10 @@ use crate::bindings::_helpers::planner_strategy::cursor_types::classify_cursor_s
 use crate::bindings::_helpers::planner_warehouse::constants::{
     CURSOR_TYPE_INTEGER, CURSOR_TYPE_TIMESTAMP, WATERMARK_CONTRACT_CODE,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::{PyDict, PyDictMethods};
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use std::collections::HashMap;
 
 const CONTRACT_KEY: &str = "contract";

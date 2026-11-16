@@ -2,13 +2,13 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyTuple};
 use sqlbuild_analysis::lineage::models::{LineageColumn, LineageSource};
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const LOGGING_MODULE: &str = "logging";
 const LINEAGE_LOGGER: &str = "sqlbuild.lineage";
@@ -172,6 +172,6 @@ pub(crate) fn log_lineage_event(
     fields.set_item("message", message)?;
     fields.set_item("sqlbuild_model", model_name)?;
     fields.set_item("sqlbuild_error", error)?;
-    let _ = host::entry(py, ExecutorHost::LogDebugEvent)?.call((), Some(&fields))?;
+    let _ = host_entry(py, ExecutorHost::LogDebugEvent)?.call((), Some(&fields))?;
     Ok(())
 }

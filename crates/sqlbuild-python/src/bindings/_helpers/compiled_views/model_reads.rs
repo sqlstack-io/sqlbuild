@@ -6,8 +6,8 @@ use crate::bindings::_helpers::compile_driver::stage_work::{COMPILED_VIEW_FALLBA
 use crate::bindings::_helpers::compiled_views::compiled_model_view::{
     DeclaredRow, LineageInput, NativeCompiledModel,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_project::types::InferredRow;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// One lineage output with its transform kind and confidence values, and its sources.
 pub(crate) struct LineageFactRow {

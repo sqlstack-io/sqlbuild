@@ -5,9 +5,9 @@ use pyo3::types::PyTuple;
 use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 
 use crate::bindings::_helpers::native_host::header_projection::FamilyProjection;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// Parsed family specs stay native until a public schema attribute needs records.
 pub(crate) struct HeaderFamilies {

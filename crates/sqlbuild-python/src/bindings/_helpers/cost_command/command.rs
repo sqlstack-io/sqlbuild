@@ -13,13 +13,13 @@ use sqlbuild_core::cost_command::main::validate_cost_request::validate_cost_requ
 use sqlbuild_core::cost_command::models::{CostReport, CostReportOptions};
 use sqlbuild_core::cost_report::main::cost_timestamp::cost_timestamp;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cost_command::bounds::{parse_bound, parse_since};
 use crate::bindings::_helpers::cost_command::refresh::refresh_pending_cost_run;
 use crate::bindings::_helpers::cost_command::refusal::cost_error;
 use crate::bindings::_helpers::cost_report::store;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::records::fields::field;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 /// Preserve Python's datetime parsing at the public request edge, then leave Python records behind.
 fn instant(value: &Bound<'_, PyAny>) -> PyResult<i128> {

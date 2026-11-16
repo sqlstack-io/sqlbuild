@@ -12,13 +12,13 @@ use sqlbuild_state::microbatches::models::{
     ReplayState, ReplayVersions, RequirementFact, TextInterval,
 };
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::microbatches::conversion::{
     BoundParser, enum_text, optional_text, timestamp,
 };
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const COMPLETION_RECORD_TYPES: [&str; 2] = ["partition_completion", "synthetic_completion"];
 const ORDINARY_COMPLETION: &str = "partition_completion";
@@ -29,7 +29,7 @@ fn python_intervals<'py>(
     py: Python<'py>,
     intervals: &[TextInterval],
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let class: Bound<'py, PyAny> = host::entry(py, ExecutorHost::MicrobatchInterval)?;
+    let class: Bound<'py, PyAny> = host_entry(py, ExecutorHost::MicrobatchInterval)?;
     let built: Vec<Bound<'py, PyAny>> = intervals
         .iter()
         .map(|interval| {
@@ -51,7 +51,7 @@ fn python_coverage<'py>(
     events: &[Bound<'py, PyAny>],
 ) -> PyResult<Bound<'py, PyAny>> {
     let projected_class: Bound<'py, PyAny> =
-        host::entry(py, ExecutorHost::ProjectedMicrobatchInterval)?;
+        host_entry(py, ExecutorHost::ProjectedMicrobatchInterval)?;
     let mut projected: Vec<Bound<'py, PyAny>> = Vec::with_capacity(projection.segments.len());
     for segment in &projection.segments {
         let event: &Bound<'py, PyAny> = &events[segment.completion];
@@ -78,7 +78,7 @@ fn python_coverage<'py>(
         )?);
     }
     call_with(
-        &host::entry(py, ExecutorHost::MicrobatchCoverageProjection)?,
+        &host_entry(py, ExecutorHost::MicrobatchCoverageProjection)?,
         &[
             ("intervals", PyTuple::new(py, projected)?.into_any()),
             (
@@ -205,12 +205,12 @@ fn replay<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAn
         )
     };
     call_with(
-        &host::entry(py, ExecutorHost::ReplayRequirementProjection)?,
+        &host_entry(py, ExecutorHost::ReplayRequirementProjection)?,
         &[
             ("requirement", requirement),
             (
                 "state",
-                host::entry(py, ExecutorHost::ReplayRequirementState)?
+                host_entry(py, ExecutorHost::ReplayRequirementState)?
                     .getattr(replay_state_member(projection.state))?,
             ),
             ("missing", selected(&projection.missing)?.into_any()),

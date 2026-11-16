@@ -13,17 +13,20 @@ use sqlbuild_core::dbt_plan::main::dbt_plan_argvs::dbt_plan_argvs;
 use sqlbuild_core::dbt_plan::main::dbt_required_selector_terms::dbt_required_selector_terms;
 use sqlbuild_core::dbt_plan::models::{DbtPlanArgvRequest, DbtPlanArgvs, DbtReferencedModel};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, keywords};
 use crate::bindings::_helpers::dbt_interop::cli::{option_values, raised};
 use crate::bindings::_helpers::dbt_interop::graph::{
     PlannerResolver, planner_resolver, resolve_dbt_interop_sqlbuild_selection, texts,
 };
 use crate::bindings::_helpers::dbt_interop::manifest::resolve_sqlbuild_model_dbt_refs;
 use crate::bindings::_helpers::dbt_interop::plan::build_dbt_interop_plan;
-use crate::bindings::_helpers::records::construct::enum_from_value;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const PLAN_OPTIONS: (&[&str], &[&str]) = (
     &[

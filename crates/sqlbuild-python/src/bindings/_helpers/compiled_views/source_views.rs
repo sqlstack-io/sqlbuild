@@ -6,6 +6,7 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{IntoPyObjectExt, pyclass, pymethods};
 use sqlbuild_analysis::compiled_project::models::SchemaColumnFact;
+use sqlbuild_python_base::positional_record;
 
 use sqlbuild_project::models as project_models;
 
@@ -16,8 +17,8 @@ use crate::bindings::_helpers::compiled_views::model_input_view::{InputViewClass
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::compiled_views::relation_keys::audit_key_rows;
 use crate::bindings::_helpers::graph::project_graph::ResourceRow;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 
 const SOURCE_RESOURCE: &str = "source";
 

@@ -2,15 +2,15 @@
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_migrations::column_objects::replace;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyBool;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 fn label<'py>(location: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let qualified = native_field(location, "qualified_name")?;
@@ -75,7 +75,7 @@ pub(super) fn migration_with_execution<'py>(
     )?;
     let transfer = native_field(&stage, "transfer")?;
     let fallback = if native_field(&stage, "fallback_statements")?.is_truthy()? {
-        host::entry(py, AdapterHost::MigrationTransfer)?.getattr("COPY")?
+        host_entry(py, AdapterHost::MigrationTransfer)?.getattr("COPY")?
     } else {
         py.None().into_bound(py)
     };

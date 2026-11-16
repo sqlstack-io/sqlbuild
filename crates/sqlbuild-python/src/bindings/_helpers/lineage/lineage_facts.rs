@@ -4,12 +4,14 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PySlice, PyTuple, PyTupleMethods};
+use sqlbuild_python_base::positional_record;
 
-use crate::bindings::_helpers::boundary::call_arguments::call_argument;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::call_argument::call_argument;
+use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::types::RecordId;
 
 /// `ColumnTransformKind` members by native transform code.
 const TRANSFORM_KINDS: [&str; 6] = [

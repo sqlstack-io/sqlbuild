@@ -17,12 +17,12 @@ use crate::bindings::_helpers::build_command::support::{boolean, text};
 use crate::bindings::_helpers::clone::clone_command::run_clone_command;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::dagster_invocation::access::string_tuple as texts;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::review_command::planning::ReviewSettings;
 use crate::bindings::_helpers::review_command::support::{quietly, review_error};
 use crate::bindings::_helpers::sql_test_command::test_command::run_test_command;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const FAILED_STATUS: &str = "failed";
 const AUDIT_KIND: &str = "audit";

@@ -20,13 +20,7 @@ use sqlbuild_scopes::scope_index::models::{
     ScopeDeferral, ScopeIndex, ScopeInputs, ScopeKind,
 };
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::discovery::model_file_record::{ModelFileTexts, NativeModelFile};
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::{
-    field as native_field, mapping_values, path_stem,
-};
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::scopes::relationship_scan::{
     RelationshipScanSettings, ScenarioRow, TestFileRow, scanned_relationships,
 };
@@ -35,7 +29,14 @@ use crate::bindings::_helpers::scopes::scope_objects::{
     ScopeClasses, field, optional_item, root_object, value_of,
 };
 use crate::bindings::_helpers::scopes::scope_validation::replace;
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
+use sqlbuild_python_base::records::main::fields::path_stem::path_stem;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 /// Why `UnindexableScopeError` is raised; discovery only yields normalized project paths.
 const UNINDEXABLE_SCOPE_MESSAGE: &str = "Native scope indexing could not place a discovered path or resource kind. Discovery always yields normalized project-relative paths, so this is a SQLBuild bug; please file an issue with the project layout";

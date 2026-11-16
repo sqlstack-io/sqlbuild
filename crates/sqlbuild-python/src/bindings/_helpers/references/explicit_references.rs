@@ -24,17 +24,20 @@ use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_pysource::literal_sql::main::literal_sql_calls::literal_sql_calls;
 use sqlbuild_pysource::literal_sql::models::FunctionSource;
 
-use crate::bindings::_helpers::boundary::panics::compiler_error;
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::graph::execution_gates::model_python_hook_names;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record, record_class};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_items;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::references::reference_facts::{ProjectFacts, project_facts};
-use crate::bindings::types::CompilerDetach;
+use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_record::new_record;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::types::CompilerDetach;
 
 const EXPLICIT_REFERENCES_CONTEXT: &str = "native explicit-reference checks";
 const REFERENCE_MODELS_MODULE: &str = "sqlbuild.compiler.references.models";
@@ -215,7 +218,7 @@ fn loader_owners<'py>(
                 .insert(native_field(&source, "name")?.extract()?);
         }
     }
-    let read_definition = host::entry(py, UserCodeHost::ReadLoaderDefinition)?;
+    let read_definition = host_entry(py, UserCodeHost::ReadLoaderDefinition)?;
     let mut owners: Vec<PythonSqlOwner<'py>> = Vec::new();
     for loader in native_field(discovered_inputs, "loader_functions")?.try_iter()? {
         let loader: Bound<'py, PyAny> = loader?;

@@ -7,9 +7,9 @@ use pyo3::types::{
 use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 
 use crate::bindings::_helpers::graph::node_set::PyNodeSet;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 
 /// `PythonNodeGraph.selected_sql_refs(selected_names=...)`: SQL references of the selected closure.
 pub(crate) fn graph_selected_sql_refs(

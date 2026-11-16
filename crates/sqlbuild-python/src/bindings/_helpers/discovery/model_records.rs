@@ -9,15 +9,16 @@ use sqlbuild_discovery::model_files::models::{DiscoveredModelFile, ModelFileOpti
 use sqlbuild_discovery::models::{DiscoveredFile, FileOutcome, StageFailure};
 use std::path::Path;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
 use crate::bindings::_helpers::discovery::faults::{FileFaults, record_tuple};
 use crate::bindings::_helpers::discovery::model_file_record::DiscoveredPaths;
 use crate::bindings::_helpers::discovery::project_files::{model_record, path_object};
 use crate::bindings::_helpers::discovery::raised::{failure_error, read_error, stage_error};
 use crate::bindings::_helpers::discovery::snapshot::{in_snapshot, project_root, project_tree};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::models::NativeProjectTree;
 use sqlbuild_discovery::model_files::main::model_file_options::model_file_options;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const PATHLIB_MODULE: &str = "pathlib";
 const STEM_ATTRIBUTE: &str = "stem";

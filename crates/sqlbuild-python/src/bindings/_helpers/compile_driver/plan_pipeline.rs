@@ -7,7 +7,6 @@ use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
 use crate::bindings::_helpers::compile_driver::pipeline::{
     compiled_phase, progress, timing_tracker,
@@ -20,17 +19,21 @@ use crate::bindings::_helpers::compile_driver::selection_phases::{
     apply_unit_test_selectors, resolve_configured_rule_selection,
 };
 use crate::bindings::_helpers::frontier::stage_capture::write_plan_capture;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::construct::{error_class, new_annotated_error};
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced;
-use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use crate::bindings::_helpers::rules::early_sql_lint::EarlySqlLint;
 use crate::bindings::_helpers::rules::results::{format_rules_result, rules_progress};
 use crate::bindings::_helpers::rules::rule_dispatch::evaluate_rules;
 use crate::bindings::_helpers::rules::rules_config::load_rules_config_with_cache;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced::replaced;
+use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_base::records::types::RecordId;
 
 const GENERIC_DIALECT: &str = "generic";
 
@@ -53,7 +56,7 @@ pub(crate) fn run_compile_pipeline<'py>(
         apply_unit_test_selectors(&arguments.value("options")?, &discovered)?;
     let hooks: Bound<'py, PyAny> = arguments.value("hooks")?;
     let hooks: Bound<'py, PyAny> = if hooks.is_none() {
-        host::entry(py, ExecutorHost::ConnectionHooks)?.call0()?
+        host_entry(py, ExecutorHost::ConnectionHooks)?.call0()?
     } else {
         hooks
     };

@@ -10,11 +10,11 @@ use sqlbuild_core::cost_command::constants::ISO_DATE_LENGTH;
 use sqlbuild_core::cost_command::errors::CostCommandError;
 use sqlbuild_core::cost_command::main::is_zero_cost_duration::is_zero_cost_duration;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cost_command::refusal::cost_error;
-use crate::bindings::_helpers::records::construct::record_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::record_class::record_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::RecordId;
 
 const DATETIME_MODULE: &str = "datetime";
 const MINUTE_TO_DAY_DURATION_UNITS: [&str; 3] = ["m", "h", "d"];

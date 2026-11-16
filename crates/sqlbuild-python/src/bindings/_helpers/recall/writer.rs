@@ -9,9 +9,9 @@ use pyo3::types::{PyBytes, PyBytesMethods};
 use serde_json::{Map, Value};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::recall::sinks::lifecycle_event_object;
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The one stream a writer publishes to.
 #[derive(Debug)]
@@ -91,7 +91,7 @@ impl RecallWriter {
                 "this RecallWriter belongs to a command-output sink; use publish_command_output",
             ));
         };
-        if !event.is_instance(&host::entry(py, ExecutorHost::LifecycleEvent)?)? {
+        if !event.is_instance(&host_entry(py, ExecutorHost::LifecycleEvent)?)? {
             return Err(PyTypeError::new_err(
                 "publish_lifecycle expects a LifecycleEvent",
             ));
@@ -117,7 +117,7 @@ impl RecallWriter {
                 "this RecallWriter belongs to a lifecycle-event sink; use publish_lifecycle",
             ));
         };
-        if !record.is_instance(&host::entry(py, ExecutorHost::CommandOutputRecord)?)? {
+        if !record.is_instance(&host_entry(py, ExecutorHost::CommandOutputRecord)?)? {
             return Err(PyTypeError::new_err(
                 "publish_command_output expects a CommandOutputRecord",
             ));

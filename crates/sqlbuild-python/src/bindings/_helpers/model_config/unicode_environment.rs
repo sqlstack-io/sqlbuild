@@ -6,9 +6,9 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyBytesMethods, PyDict, PyDictMethods, PyString};
 use pyo3::{pyclass, pymethods};
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::ids::ErrorId;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::types::ErrorId;
 
 /// `os.environ`, raising a clear error for a value holding undecodable bytes.
 #[pyclass(module = "sqlbuild._native", frozen, mapping)]

@@ -1316,7 +1316,13 @@ pub(crate) async fn read_metadata_page(
         Some(reader) => reader,
         None => match open_location_runtime(options, script, Vec::new()) {
             Ok(reader) => reader,
-            Err(_) => return Ok(Some((state, None))),
+            Err(error) => {
+                drop(write_output(&[(
+                    Stream::Stderr,
+                    &format!("Warehouse metadata reader did not start: {error}\n"),
+                )]));
+                return Ok(Some((state, None)));
+            }
         },
     };
     tokio::pin!(stopped);
@@ -1338,11 +1344,23 @@ pub(crate) async fn read_metadata_page(
                 state.reader = Some(reader);
                 Ok(Some((state, None)))
             }
-            Ok((reader, Err(_))) => {
+            Ok((reader, Err(error))) => {
+                drop(write_output(&[(
+                    Stream::Stderr,
+                    &format!("Warehouse metadata reader failed: {error}\n"),
+                )]));
                 stop_location_runtime(Some(reader)).await?;
                 Ok(Some((state, None)))
             }
-            Err(_) => Ok(Some((state, None))),
+            Err(_) => {
+                drop(write_output(&[(
+                    Stream::Stderr,
+                    &format!(
+                        "Warehouse metadata read did not answer within {METADATA_POLL_SECONDS}s.\n"
+                    ),
+                )]));
+                Ok(Some((state, None)))
+            }
         },
     }
 }

@@ -4,10 +4,10 @@ use pyo3::prelude::{Bound, Py, PyAny, PyModule, PyModuleMethods, PyResult, Pytho
 use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::analysis::normalization_results::normalization_results;
-use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::models::Positional;
-use crate::bindings::types::CompilerDetach;
 use sqlbuild_analysis::semantic_validation::models::DiagnosticRow;
+use sqlbuild_python_base::boundary::main::value_error::value_error;
+use sqlbuild_python_base::types::CompilerDetach;
 
 #[pyfunction]
 pub(crate) fn normalize_analysis_sql(

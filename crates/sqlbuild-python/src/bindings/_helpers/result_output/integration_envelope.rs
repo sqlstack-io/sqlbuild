@@ -11,9 +11,9 @@ use sqlbuild_core::integration_results::main::normalize_integration_record::norm
 use sqlbuild_core::integration_results::main::strip_optional_enrichment::strip_optional_enrichment;
 use sqlbuild_core::json::models::JsonValue;
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::integration_values::{json_value, validation_error};
 use crate::bindings::_helpers::scopes::scope_report_objects::json_to_python;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// One decoded part of a record: its fields as attributes, and as a dictionary.
 fn field(fields: &Py<PyDict>, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {

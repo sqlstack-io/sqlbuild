@@ -394,8 +394,9 @@ impl AnalysisSession {
                 )
             })
             .collect();
+        let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
         let findings: Vec<Vec<SqlMacroFinding>> =
-            check_sql_macro_arguments(&self.request.dialect, &batch);
+            check_sql_macro_arguments(&self.request.dialect, &batch, &pool);
         for ((model, _, _), found) in inputs.iter().zip(findings) {
             if let Some(outcome) = self.outcomes[*model].as_mut() {
                 outcome.sql_macro_findings = found;

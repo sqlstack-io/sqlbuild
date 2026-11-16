@@ -7,7 +7,8 @@ use sqlbuild_analysis::semantic_validation::models as validation;
 use sqlbuild_analysis::semantic_validation::models::Expansion;
 use sqlbuild_analysis::semantic_validation::types::Relations;
 
-use crate::bindings::types::{FromPositional, IntoPositional};
+use sqlbuild_python_base::types::FromPositional;
+use sqlbuild_python_base::types::IntoPositional;
 use std::collections::HashMap;
 
 #[derive(FromPyObject, Debug)]

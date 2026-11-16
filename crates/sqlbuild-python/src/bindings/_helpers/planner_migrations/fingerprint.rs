@@ -1,15 +1,15 @@
 //! Migration identity binding with unchanged metadata and hash format.
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::planner_migrations::main::{migration_fingerprint, migration_ref_names};
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use std::collections::BTreeMap;
 
 /// Hash normalized SQL and non-storage metadata through rename identities.
@@ -89,7 +89,7 @@ pub(crate) fn with_migration_fingerprints<'py>(
     cache: &Bound<'py, PyAny>,
     dialect: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    use crate::bindings::_helpers::boundary::python_calls::call_with;
+    use sqlbuild_python_base::boundary::main::call_with::call_with;
     let py = entries.py();
     let mut attached: Vec<Bound<'py, pyo3::PyAny>> = Vec::new();
     for entry in entries.try_iter()? {

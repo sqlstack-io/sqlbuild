@@ -15,15 +15,18 @@ use sqlbuild_cache::digest::main::sha256_hex::sha256_hex;
 use sqlbuild_core::json::main::dumps::dumps;
 use sqlbuild_core::json::models::{JsonDialect, JsonInteger, JsonValue, StdlibJsonOptions};
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported, within};
 use crate::bindings::_helpers::cost_telemetry::health::mark_ledger_failure;
 use crate::bindings::_helpers::cost_telemetry::values::process_object;
 use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
-use crate::bindings::_helpers::records::construct::new_record_with;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::ids::{NativeAttr, RecordId};
-use crate::bindings::_helpers::records::registry;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
+use sqlbuild_python_base::records::types::NativeAttr;
+use sqlbuild_python_base::records::types::RecordId;
 
 static LEDGER_LOCK: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
@@ -238,7 +241,7 @@ pub(crate) fn read_ledger<'py>(
                     error.get_type(py).name()?
                 );
                 let artifact_error: Bound<'py, PyAny> =
-                    registry::native(py, NativeAttr::CostArtifactError)?.call1((message,))?;
+                    native_attr(py, NativeAttr::CostArtifactError)?.call1((message,))?;
                 mark_failure(run_id, &artifact_error)?;
             }
             Err(error) => return Err(error),

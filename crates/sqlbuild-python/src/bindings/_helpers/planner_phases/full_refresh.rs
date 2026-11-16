@@ -5,12 +5,12 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_phases::constants::FULL_REFRESH_DISABLED_REBUILD_CODE;
 use crate::bindings::_helpers::planner_phases::objects::{frozenset, planner_error, strings};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyBool;
 use sqlbuild_analysis::planner_warehouse::main::full_rebuild_cause::full_rebuild_cause;
 use sqlbuild_analysis::planner_warehouse::models::FullRebuildFacts;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const FULL_REFRESH_KEY: &str = "full_refresh";
 

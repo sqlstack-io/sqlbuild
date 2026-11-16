@@ -16,10 +16,10 @@ use sqlbuild_state::events::main::migration_event_id::migration_event_id;
 use sqlbuild_state::events::main::old_name_view_event_id::old_name_view_event_id;
 use sqlbuild_state::events::models::{EventRelation, StateCell, StateColumnType, StateValue};
 
-use crate::bindings::_helpers::boundary::keyword_request::Request;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::timestamps::{date_time_typed, presumed_utc};
+use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 fn emit_error(error: JsonEmitError) -> PyErr {
     PyValueError::new_err(format!("{error:?}"))
@@ -110,7 +110,7 @@ pub(crate) fn typed_insert_sql(
 /// `SqlValueRenderingError(message)` for an ill-typed value.
 fn rendering_error(py: Python<'_>) -> impl Fn(StateSqlError) -> PyErr + '_ {
     move |error: StateSqlError| {
-        let raised = host::entry(py, ExecutorHost::SqlValueRenderingError)
+        let raised = host_entry(py, ExecutorHost::SqlValueRenderingError)
             .and_then(|class| class.call1((error.0,)));
         match raised {
             Ok(exception) => PyErr::from_value(exception),

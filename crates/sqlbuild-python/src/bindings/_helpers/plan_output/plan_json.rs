@@ -5,7 +5,6 @@ use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::plan_display::constants::SYNCED_COPY_KEY;
 
-use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_outputs::json_report::indented_json;
 use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
 use crate::bindings::_helpers::plan_output::cursor_details::{
@@ -19,7 +18,8 @@ use crate::bindings::_helpers::plan_output::safety::{future_cursor_safety, maxim
 use crate::bindings::_helpers::plan_output::values::{
     any, dict, enum_value, iso, items, list, mapped, optional_enum_value, relation_name, text,
 };
-use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The plan JSON key of what `--changed` would run, hold back and skip.
 pub(crate) const CHANGED_KEY: &str = "changed";

@@ -35,8 +35,11 @@ def get_native_layering_errors(root: Path) -> tuple[str, ...]:
         reachable: set[str] = _reachable(
             direct=members[name] | lock_graph.get(name, set()), graph=lock_graph
         )
-        if name != layers.python_boundary and _reaches(reachable=reachable, package=PYO3_PACKAGE):
-            errors.append(f"{name} depends on {PYO3_PACKAGE}; only {layers.python_boundary} may.")
+        if name not in layers.python_boundary and _reaches(
+            reachable=reachable, package=PYO3_PACKAGE
+        ):
+            allowed: str = ", ".join(layers.python_boundary)
+            errors.append(f"{name} depends on {PYO3_PACKAGE}; only {allowed} may.")
         if rank[name] < rank[layers.polyglot_floor] and _reaches(
             reachable=reachable, package=POLYGLOT_PACKAGE
         ):
@@ -52,7 +55,7 @@ def _declared_layers(workspace: dict[str, Any]) -> NativeLayers | None:
         return None
     return NativeLayers(
         order=tuple(metadata.get("order", ())),
-        python_boundary=str(metadata.get("python-boundary", "")),
+        python_boundary=tuple(metadata.get("python-boundary", ())),
         polyglot_floor=str(metadata.get("polyglot-floor", "")),
     )
 
@@ -65,8 +68,10 @@ def _order_errors(*, layers: NativeLayers, members: dict[str, set[str]]) -> list
         errors.append(f"Workspace crate {name} is missing from the native layer order.")
     for name in sorted(set(layers.order) - members.keys()):
         errors.append(f"Native layer order lists {name}, which is not a workspace crate.")
+    if not layers.python_boundary:
+        errors.append("The native layers must list at least one python-boundary crate.")
     for role, name in (
-        ("python-boundary", layers.python_boundary),
+        *(("python-boundary", name) for name in layers.python_boundary),
         ("polyglot-floor", layers.polyglot_floor),
     ):
         if name not in layers.order:

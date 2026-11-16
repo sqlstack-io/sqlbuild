@@ -10,8 +10,6 @@ use sqlbuild_core::cost_command::main::accepts_cost_refresh::accepts_cost_refres
 use sqlbuild_core::cost_command::models::CostCoverage;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_target_config;
@@ -21,10 +19,13 @@ use crate::bindings::_helpers::cost_report::functions::read_cost_run;
 use crate::bindings::_helpers::cost_report::functions::resolve_cost_run;
 use crate::bindings::_helpers::cost_report::functions::write_cost_run;
 use crate::bindings::_helpers::cost_telemetry::values::cost_aware;
-use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::replaced_keywords;
+use sqlbuild_python_base::boundary::main::call_with::call_with;
+use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 
 /// Collection budget of an explicit `sqb cost` refresh, which a user waits for on purpose.
 const REFRESH_BUDGET_SECONDS: f64 = 300.0;
@@ -132,7 +133,7 @@ fn refresh(py: Python<'_>, request: &Bound<'_, PyAny>) -> PyResult<()> {
         return Ok(());
     }
     let none_capability: Bound<'_, PyAny> =
-        host::entry(py, ExecutorHost::CostCapability)?.getattr("NONE")?;
+        host_entry(py, ExecutorHost::CostCapability)?.getattr("NONE")?;
     if adapter
         .call_method0("cost_capability")?
         .eq(none_capability)?

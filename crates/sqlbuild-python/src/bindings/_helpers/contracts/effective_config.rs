@@ -2,7 +2,6 @@
 
 use std::hash::{Hash, Hasher};
 
-use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, PyStringMethods, Python,
 };
@@ -21,6 +20,7 @@ use sqlbuild_config::effective::models::{
     TargetLayer,
 };
 use sqlbuild_config::effective::types::Entries;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const UTF8: &str = "utf-8";
 const SURROGATE_PASS: &str = "surrogatepass";

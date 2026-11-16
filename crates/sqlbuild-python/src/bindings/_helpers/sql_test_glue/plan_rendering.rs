@@ -1,18 +1,18 @@
 //! Adapter rendering and declared cursor-window boundaries for native test planning.
 
-use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::sql_test_glue::plan_values::{model_payload, string};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use sqlbuild_python_base::boundary::main::call_with::call_with;
 
-use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::sql_test_glue::constants::SENTINEL;
 use crate::bindings::_helpers::sql_test_glue::cursor_window::{
     declared_window_cursor_models, declares_cursor_window, render_test_cursor_intrinsics,
 };
+use sqlbuild_python_base::records::main::construct::error_class::error_class;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::types::ErrorId;
 
 pub(super) fn mentions(sql: &str) -> bool {
     ["__cursor_start", "__cursor_end"]

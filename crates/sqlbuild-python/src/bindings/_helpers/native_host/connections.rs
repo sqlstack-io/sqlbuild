@@ -4,7 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::native_host::host;
+use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 
 /// The coded error to raise for a failed `adapter.connect`, or the failure itself when coded.
 pub(crate) fn connection_failure(adapter: &Bound<'_, PyAny>, error: &PyErr) -> PyErr {
@@ -13,7 +13,7 @@ pub(crate) fn connection_failure(adapter: &Bound<'_, PyAny>, error: &PyErr) -> P
         let options: Bound<'_, PyDict> = PyDict::new(py);
         options.set_item("adapter", adapter)?;
         options.set_item("error", error.value(py))?;
-        host::entry(py, ExecutorHost::RaiseWarehouseConnectionFailure)?.call((), Some(&options))
+        host_entry(py, ExecutorHost::RaiseWarehouseConnectionFailure)?.call((), Some(&options))
     })();
     match raised {
         Ok(_) => error.clone_ref(py),
