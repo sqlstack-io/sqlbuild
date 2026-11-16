@@ -21,7 +21,7 @@ macro_rules! rule {
             remediation: $remediation.into(),
             guidance: None,
             implementation_fingerprint: native_build_identity().into(),
-            enabled_by_default: true,
+            enabled_by_default: !matches!($family, "performance"),
             project_wide: matches!(
                 $code,
                 "SQBRDECLARATION201"
@@ -374,6 +374,22 @@ pub(crate) fn catalogue() -> Vec<RuleMetadata> {
             "empty-input-only-test",
             "SQL unit tests must not only prove that empty inputs produce no rows",
             "Mock representative input rows and assert concrete transformed output in __expected__<model> or a targeted __assert__ CTE, or delete this test. An empty-input test is legitimate only when it asserts concrete output, for example a global aggregate that must return one zero-valued summary row compared against expected rows. List a reviewed exception by test name in [rules.rule_options.SQBRTEST203] allowed_tests.",
+        ),
+        rule!(
+            "SQBRPERFORMANCE101",
+            RuleScope::Model,
+            "performance",
+            "flatten-parent-copy",
+            "flattened rows must not copy the parent element whose child array they flatten",
+            "Read the fields you need from the parent (o.value:customer_id), or remove the flattened child array first with OBJECT_DELETE(o.value, 'lines').",
+        ),
+        rule!(
+            "SQBRPERFORMANCE102",
+            RuleScope::Model,
+            "performance",
+            "json-finer-grain",
+            "semi-structured columns must not repeat on a finer grain than their input",
+            "Keep the payload on the coarser model and join to it when needed, or select only the fields this grain needs.",
         ),
         rule!(
             "SQBRTEST301",

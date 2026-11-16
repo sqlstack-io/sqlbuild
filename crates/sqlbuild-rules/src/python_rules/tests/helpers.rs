@@ -6,7 +6,7 @@ use fensu_native::{NativeProjectPlane, NativeRuleContext, evaluate_core_rules};
 use crate::engine::_helpers::memo::{evaluate_rows, prepare};
 use crate::models::{EvaluateRequest, RowsRequest, RuleMetadata, RuleScope, RulesConfig};
 use crate::python_rules::tests::test_types::CachedRuns;
-use crate::rules::_helpers::catalogue::{catalogue, select};
+use crate::rules::_helpers::dispatch::catalogue::{catalogue, select};
 
 /// How many distinct `SQBRPYTHON` codes the catalogue holds.
 pub(super) fn distinct_python_codes(rules: &[RuleMetadata]) -> usize {

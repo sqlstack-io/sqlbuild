@@ -137,6 +137,7 @@ pub(crate) fn finish_rule_run<'py>(
                 "skipped_type_proof_rules",
                 record_field(plan, "skipped_type_proof_rules")?,
             ),
+            ("skipped_models", record_field(result, "skipped_models")?),
         ],
     )
 }

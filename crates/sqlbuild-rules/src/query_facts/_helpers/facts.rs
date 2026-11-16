@@ -1,3 +1,4 @@
+use crate::query_facts::_helpers::flatten::{flatten_call, flatten_input, whole_values};
 use crate::query_facts::_helpers::shape::stub_call;
 use crate::query_facts::_helpers::tokens::{ComparisonOperator, QueryTokens, SelectTokens};
 use crate::query_facts::constants::{
@@ -340,6 +341,7 @@ impl Builder<'_> {
                     )
                 }),
             start: range.and_then(|range| self.tokens.leaf_start(&range)),
+            whole_values: whole_values(value),
         })
     }
 
@@ -599,10 +601,25 @@ fn relation(expression: &Expression, tokens: &QueryTokens<'_>) -> RelationFacts 
                     last,
                     alias: name,
                 },
+                RelationFacts::Flatten { input, .. } => RelationFacts::Flatten {
+                    alias: name.map(|name| name.to_ascii_lowercase()),
+                    input,
+                },
                 other => other,
             }
         }
         Expression::Table(table) => table_relation(table, tokens),
+        Expression::Lateral(lateral) => match flatten_call(expression) {
+            Some(function) => RelationFacts::Flatten {
+                alias: lateral.alias.as_ref().map(|alias| alias.to_ascii_lowercase()),
+                input: flatten_input(function),
+            },
+            None => RelationFacts::Other,
+        },
+        Expression::Function(_) if flatten_call(expression).is_some() => RelationFacts::Flatten {
+            alias: None,
+            input: flatten_call(expression).and_then(flatten_input),
+        },
         Expression::Pivot(pivot) if !pivot.unpivot => {
             if pivot.fields.iter().any(|field| {
                 matches!(field, Expression::In(list)

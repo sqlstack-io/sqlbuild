@@ -1,0 +1,9 @@
+name = "orders"
+adapter = "snowflake"
+
+[connection]
+database = "ANALYTICS"
+schema = "ORDERS"
+
+[rules]
+select = ["SQBRPERFORMANCE101", "SQBRPERFORMANCE102"]

@@ -56,6 +56,7 @@ fn request_options<'py>(context: &BuildContext<'py>) -> PyResult<Bound<'py, PyAn
         &[
             ("no_sql_validation", field("no_sql_validation")?),
             ("no_cache", field("no_cache")?),
+            ("verbose", field("verbose")?),
             ("selected_target", field("selected_target")?),
             ("defer_to", field("defer_to")?),
             ("defer_sources_to", field("defer_sources_to")?),

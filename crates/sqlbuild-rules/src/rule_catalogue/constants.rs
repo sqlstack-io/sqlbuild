@@ -33,7 +33,15 @@ pub(crate) const LAYOUT_RULE_PREFIXES: [&str; 2] = ["SQBRPROJECT2", "SQBRDECLARA
 pub(crate) const TEST_RULE_PREFIX: &str = "SQBRTEST";
 pub(crate) const GRAPH_EDGE_RULE_CODE: &str = "SQBRGRAPH101";
 pub(crate) const REPLACEABLE_SKILL_STATES: [&str; 3] = ["fresh", "missing", "stale"];
-pub(crate) const RULE_EXAMPLES: [(&str, &str); 28] = [
+pub(crate) const RULE_EXAMPLES: [(&str, &str); 30] = [
+    (
+        "SQBRPERFORMANCE101",
+        "SELECT o.value:customer_id, l.value:sku FROM raw_orders r, LATERAL FLATTEN(r.payload:orders) o, LATERAL FLATTEN(o.value:lines) l.",
+    ),
+    (
+        "SQBRPERFORMANCE102",
+        "order_lines (order_id, line_no) selects o.payload:status, not the whole orders payload keyed by order_id.",
+    ),
     (
         "SQLCLEAN040",
         "Compute category_key in an input CTE, then JOIN categories AS c ON o.category_key = c.category_key.",

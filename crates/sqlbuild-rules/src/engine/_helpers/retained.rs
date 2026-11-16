@@ -152,6 +152,7 @@ impl RowWriter {
             empty_input_only_test_count: _,
             payload_digest: _,
             stripped: _,
+            json_grain,
         } = model;
         self.flag(*sql_analysis_disabled);
         self.text(name);
@@ -217,6 +218,10 @@ impl RowWriter {
         self.declarations(constant_declarations);
         self.record.put_u64(u64::from(*declared_audit_count));
         self.record.put_u64(u64::from(*targeting_test_count));
+        let grain: Option<Value> = json_grain
+            .as_ref()
+            .map(|grain| serde_json::to_value(grain).unwrap_or(Value::Null));
+        self.optional_value(grain.as_ref());
     }
 }
 
@@ -386,6 +391,11 @@ impl RowReader<'_> {
             empty_input_only_test_count: 0,
             payload_digest: None,
             stripped: false,
+            json_grain: self
+                .optional_value()?
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|_| StoreDecodeError)?,
         })
     }
 }

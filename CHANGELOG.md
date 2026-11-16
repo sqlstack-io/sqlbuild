@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.233.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.233.0...v0.233.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* stabilise Recall tests, janitor preserve targets and helper-class identity ([#1512](https://github.com/sqlstack-io/sqlbuild/issues/1512)) ([9ca1f7a](https://github.com/sqlstack-io/sqlbuild/commit/9ca1f7a3fb838373a0ace63ea5b26b7a2c19511d))
+
+
+### Performance Improvements
+
+* keep the build identity out of sqlbuild-rules so edits stop rebuilding it ([#1510](https://github.com/sqlstack-io/sqlbuild/issues/1510)) ([2172ec1](https://github.com/sqlstack-io/sqlbuild/commit/2172ec189430c85a2f773c8c1513f5ec2baec858))
+
 ## [0.233.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.232.1...v0.233.0) (2026-11-16)
 
 
