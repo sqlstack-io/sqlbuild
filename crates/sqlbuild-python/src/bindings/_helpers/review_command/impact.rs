@@ -7,11 +7,11 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyFrozenSet, PyString};
 use sqlbuild_analysis::review_command::models::NodeComparison;
 
-use crate::bindings::_helpers::lineage::column_lineage_graph::ProjectColumnLineage;
-use crate::bindings::_helpers::lineage::project_lineage::build_project_column_lineage;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::lineage::main::build_project_column_lineage::build_project_column_lineage;
+use sqlbuild_python_compile::lineage::models::ProjectColumnLineage;
 use sqlbuild_python_project::compiled_views::main::compiled_models::inferred_names::inferred_names;
 use sqlbuild_python_project::compiled_views::main::compiled_models::model_name::model_name;
 use sqlbuild_python_project::compiled_views::main::project::compiled_models::compiled_models;

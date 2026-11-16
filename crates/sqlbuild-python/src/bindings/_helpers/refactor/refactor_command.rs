@@ -36,7 +36,6 @@ use sqlbuild_refactor::refactoring::models::{
 };
 use sqlbuild_refactor::refactoring::types::Originals;
 
-use crate::bindings::_helpers::lineage::lineage_index::lineage_key;
 use crate::bindings::_helpers::refactor::offline_compile::{OfflineCompile, compile_for_refactor};
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
@@ -46,6 +45,7 @@ use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_compile::lineage::main::lineage_key::lineage_key;
 use sqlbuild_python_front::refactor::main::declaration_placement::declaration_placement;
 use sqlbuild_python_front::refactor::main::model_facts::model_facts;
 use sqlbuild_python_front::refactor::main::refactor_facts::refactor_facts;

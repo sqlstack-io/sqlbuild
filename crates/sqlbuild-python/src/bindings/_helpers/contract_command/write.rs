@@ -4,8 +4,6 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
 
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::format_command::files::write_file_atomically;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -15,6 +13,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::build_compiled_project::build_compiled_project;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::refactor::main::edit_contract_model::edit_contract_model;
 use sqlbuild_python_front::refactor::main::edit_contract_source::edit_contract_source;
 use sqlbuild_python_front::refactor::main::remaining_contract_findings::remaining_contract_findings;

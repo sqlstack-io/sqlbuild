@@ -1,0 +1,37 @@
+[package]
+name = "sqlbuild-python-compile"
+description = "The compile layer of the sqlbuild._native bindings: the compile driver and command, input loops, project assembly, analysis and the analysis session, rules, lineage, semantic checks, compile deltas and outputs, the DAG artifact, manifest, frontier and auditing."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fensu-policy.workspace = true
+pyo3.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlbuild-analysis.workspace = true
+sqlbuild-attachments.workspace = true
+sqlbuild-cache.workspace = true
+sqlbuild-cli.workspace = true
+sqlbuild-config.workspace = true
+sqlbuild-core.workspace = true
+sqlbuild-discovery.workspace = true
+sqlbuild-host.workspace = true
+sqlbuild-model-config.workspace = true
+sqlbuild-project.workspace = true
+sqlbuild-pysource.workspace = true
+sqlbuild-python-base.workspace = true
+sqlbuild-python-front.workspace = true
+sqlbuild-python-project.workspace = true
+sqlbuild-render.workspace = true
+sqlbuild-rules.workspace = true
+sqlbuild-scopes.workspace = true
+sqlbuild-sqltext.workspace = true
+sqlclean.workspace = true
+
+[lints]
+workspace = true

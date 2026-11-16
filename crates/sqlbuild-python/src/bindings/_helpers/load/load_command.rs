@@ -21,10 +21,6 @@ use sqlbuild_host::entries::models::{AdapterHost, ExecutorHost, UserCodeHost};
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compile_driver::targets::{
-    TargetSettingsValues, selected_target_settings,
-};
 use crate::bindings::_helpers::load::load_progress::{
     LoadCallbackRelay, LoadProgressReporter, load_result_text,
 };
@@ -44,6 +40,9 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::selected_target_settings::selected_target_settings;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
+use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::compile_attachment::main::build_effective_runtime_config::build_effective_runtime_config;
 use sqlbuild_python_front::compile_attachment::main::build_effective_target_config::build_effective_target_config;

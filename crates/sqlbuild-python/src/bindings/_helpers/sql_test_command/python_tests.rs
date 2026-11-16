@@ -13,7 +13,6 @@ use sqlbuild_core::cli_text::main::format_phase_line::format_phase_line;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_discovery::python_paths::main::python_test_paths::python_test_paths;
 
-use crate::bindings::_helpers::compile_driver::pipeline_entries::project_graph;
 use sqlbuild_python_base::build_progress::main::terminal::flush::flush;
 use sqlbuild_python_base::build_progress::main::terminal::write::write;
 use sqlbuild_python_base::native_host::main::flush_console::flush_console;
@@ -22,6 +21,7 @@ use sqlbuild_python_base::native_host::main::python_executable::python_executabl
 use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_compile::compile_driver::main::setup::project_graph::project_graph;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_names::python_node_names;
 use sqlbuild_python_project::graph::main::python_nodes::run_selection_from_inputs::run_selection_from_inputs;

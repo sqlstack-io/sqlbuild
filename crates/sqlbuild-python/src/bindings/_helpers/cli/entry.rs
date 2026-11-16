@@ -32,8 +32,8 @@ use crate::bindings::_helpers::cli::termination::{
     CommandTerminated, TERMINATED_MESSAGE, TerminationHandler, handle_sigterm, interrupting_signal,
     signal_exit_code, terminated, terminated_exit,
 };
-use crate::bindings::_helpers::compile_command::constants::COMPILE_COMMAND_NAME;
-use crate::bindings::_helpers::compile_command::report::format_compile_error_json;
+use sqlbuild_python_compile::compile_command::constants::COMPILE_COMMAND_NAME;
+use sqlbuild_python_compile::compile_command::main::invocation::format_compile_error_json::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
 use crate::bindings::_helpers::diff_report::output::render_diff_error_json;
 use sqlbuild_python_base::native_host::models::InterruptHandler;
@@ -47,7 +47,7 @@ use crate::bindings::_helpers::recall::session::{
     InvocationRecall, effective_selection, finish_invocation_recall, start_invocation_recall,
 };
 use crate::bindings::_helpers::recall::sinks::{RecallLifecycleSink, publish_lifecycle_event};
-use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
+use sqlbuild_python_compile::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use crate::bindings::_helpers::workspace_commands::commands::maintain_sqlbuild_skills;
 use sqlbuild_cli::launcher::constants::LAUNCH_RECORD_OPTION;
 use sqlbuild_core::cli_text::main::format_coded_error::format_coded_error;

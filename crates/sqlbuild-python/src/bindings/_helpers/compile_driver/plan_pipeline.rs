@@ -8,23 +8,9 @@ use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 use sqlbuild_rules::rule_results::main::format_skipped_models::format_skipped_models;
 
-use crate::bindings::_helpers::compile_driver::phases::monotonic;
-use crate::bindings::_helpers::compile_driver::pipeline::{
-    compiled_phase, progress, timing_tracker,
-};
-use crate::bindings::_helpers::compile_driver::pipeline_entries::project_graph;
 use crate::bindings::_helpers::compile_driver::plan_result::{
     PlanningInputs, connection_with_hooks, pipeline_result,
 };
-use crate::bindings::_helpers::compile_driver::selection_phases::{
-    apply_unit_test_selectors, resolve_configured_rule_selection,
-};
-use crate::bindings::_helpers::frontier::stage_capture::write_plan_capture;
-use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
-use crate::bindings::_helpers::rules::early_sql_lint::EarlySqlLint;
-use crate::bindings::_helpers::rules::results::{format_rules_result, rules_progress};
-use crate::bindings::_helpers::rules::rule_dispatch::evaluate_rules;
-use crate::bindings::_helpers::rules::rules_config::load_rules_config_with_cache;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -35,6 +21,20 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::compiled_phase::compiled_phase;
+use sqlbuild_python_compile::compile_driver::main::setup::progress::progress;
+use sqlbuild_python_compile::compile_driver::main::setup::project_graph::project_graph;
+use sqlbuild_python_compile::compile_driver::main::setup::timing_tracker::timing_tracker;
+use sqlbuild_python_compile::compile_driver::main::stages::apply_unit_test_selectors::apply_unit_test_selectors;
+use sqlbuild_python_compile::compile_driver::main::stages::monotonic::monotonic;
+use sqlbuild_python_compile::compile_driver::main::stages::resolve_configured_rule_selection::resolve_configured_rule_selection;
+use sqlbuild_python_compile::frontier::main::write_plan_capture::write_plan_capture;
+use sqlbuild_python_compile::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
+use sqlbuild_python_compile::rules::main::checking::format_rules_result::format_rules_result;
+use sqlbuild_python_compile::rules::main::checking::rules_progress::rules_progress;
+use sqlbuild_python_compile::rules::main::configuration::load_rules_config_with_cache::load_rules_config_with_cache;
+use sqlbuild_python_compile::rules::main::rule::evaluate_rules::evaluate_rules;
+use sqlbuild_python_compile::rules::models::EarlySqlLint;
 
 const GENERIC_DIALECT: &str = "generic";
 

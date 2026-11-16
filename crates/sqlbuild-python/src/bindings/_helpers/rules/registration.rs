@@ -1,55 +1,72 @@
 //! Register the native rules, lint and DSL header functions.
 
-use crate::bindings::_helpers::rules::{fix_facts::compile_facts, fix_verdict::fix_verdict};
 use pyo3::prelude::{Bound, PyModule, PyResult};
-use pyo3::{types::PyModuleMethods, wrap_pyfunction};
+use pyo3::types::PyModuleMethods;
 
-use crate::bindings::_helpers::rules::{
-    catalogue, custom_rule_cache, custom_rule_evidence, dsl_headers, early_sql_lint, evaluation,
-    guidance, lint, lint_expansion, lint_sql_bodies, lint_text, results, rule_api, rule_cache,
-    rule_plan, rule_run, rules_config, run_lint, selection, sql_document, sql_rules,
-};
+use sqlbuild_python_compile::rules::main::checking::register_dsl_headers::register_dsl_headers;
+use sqlbuild_python_compile::rules::main::checking::register_evaluation::register_evaluation;
+use sqlbuild_python_compile::rules::main::checking::register_lint::register_lint;
+use sqlbuild_python_compile::rules::main::checking::register_project_tree_queries::register_project_tree_queries;
+use sqlbuild_python_compile::rules::main::checking::register_results::register_results;
+use sqlbuild_python_compile::rules::main::configuration::register_catalogue::register_catalogue;
+use sqlbuild_python_compile::rules::main::configuration::register_guidance::register_guidance;
+use sqlbuild_python_compile::rules::main::configuration::register_rules_config::register_rules_config;
+use sqlbuild_python_compile::rules::main::configuration::register_selection::register_selection;
+use sqlbuild_python_compile::rules::main::custom::register_custom_evaluation::register_custom_evaluation;
+use sqlbuild_python_compile::rules::main::custom::register_custom_host_observation::register_custom_host_observation;
+use sqlbuild_python_compile::rules::main::custom::register_custom_rule_cache::register_custom_rule_cache;
+use sqlbuild_python_compile::rules::main::custom::register_custom_rule_evidence::register_custom_rule_evidence;
+use sqlbuild_python_compile::rules::main::fact::register_fact_encoder::register_fact_encoder;
+use sqlbuild_python_compile::rules::main::fix::compile_facts_function::compile_facts_function;
+use sqlbuild_python_compile::rules::main::fix::fix_verdict_function::fix_verdict_function;
+use sqlbuild_python_compile::rules::main::fix::plan_rule_fixes_function::plan_rule_fixes_function;
+use sqlbuild_python_compile::rules::main::lint::lint_file_role_function::lint_file_role_function;
+use sqlbuild_python_compile::rules::main::lint::prepare_lint_body_function::prepare_lint_body_function;
+use sqlbuild_python_compile::rules::main::lint::register_early_sql_lint::register_early_sql_lint;
+use sqlbuild_python_compile::rules::main::lint::register_lint_expansion::register_lint_expansion;
+use sqlbuild_python_compile::rules::main::lint::register_lint_sql_bodies::register_lint_sql_bodies;
+use sqlbuild_python_compile::rules::main::lint::register_lint_text::register_lint_text;
+use sqlbuild_python_compile::rules::main::lint::register_run_lint::register_run_lint;
+use sqlbuild_python_compile::rules::main::rule::register_rule_api::register_rule_api;
+use sqlbuild_python_compile::rules::main::rule::register_rule_cache::register_rule_cache;
+use sqlbuild_python_compile::rules::main::rule::register_rule_dispatch::register_rule_dispatch;
+use sqlbuild_python_compile::rules::main::rule::register_rule_plan::register_rule_plan;
+use sqlbuild_python_compile::rules::main::rule::register_rule_run::register_rule_run;
+use sqlbuild_python_compile::rules::main::sql::register_fixture_formatting::register_fixture_formatting;
+use sqlbuild_python_compile::rules::main::sql::register_sql_document::register_sql_document;
+use sqlbuild_python_compile::rules::main::sql::register_sql_rules::register_sql_rules;
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    rule_api::register(module)?;
-    sql_document::register(module)?;
-    crate::bindings::_helpers::rules::project_tree_queries::register(module)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::rules::lint_headers::lint_file_role,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::rules::lint_preparation::prepare_lint_body,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
-        crate::bindings::_helpers::rules::fix_session::plan_rule_fixes,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(compile_facts, module)?)?;
-    module.add_function(wrap_pyfunction!(fix_verdict, module)?)?;
-    evaluation::register(module)?;
-    lint::register(module)?;
-    lint_text::register(module)?;
-    crate::bindings::_helpers::rules::fixture_formatting::register(module)?;
-    lint_expansion::register(module)?;
-    lint_sql_bodies::register(module)?;
-    dsl_headers::register(module)?;
-    custom_rule_evidence::register(module)?;
-    rule_cache::register(module)?;
-    rule_run::register(module)?;
-    rule_plan::register(module)?;
-    sql_rules::register(module)?;
-    early_sql_lint::register(module)?;
-    custom_rule_cache::register(module)?;
-    catalogue::register(module)?;
-    rules_config::register(module)?;
-    run_lint::register(module)?;
-    selection::register(module)?;
-    results::register(module)?;
-    guidance::register(module)?;
-    crate::bindings::_helpers::rules::custom_evaluation::register(module)?;
-    crate::bindings::_helpers::rules::fact_encoder::register(module)?;
-    crate::bindings::_helpers::rules::custom_host_observation::register(module)?;
-    crate::bindings::_helpers::rules::rule_dispatch::register(module)
+    register_rule_api(module)?;
+    register_sql_document(module)?;
+    register_project_tree_queries(module)?;
+    module.add_function(lint_file_role_function(module)?)?;
+    module.add_function(prepare_lint_body_function(module)?)?;
+    module.add_function(plan_rule_fixes_function(module)?)?;
+    module.add_function(compile_facts_function(module)?)?;
+    module.add_function(fix_verdict_function(module)?)?;
+    register_evaluation(module)?;
+    register_lint(module)?;
+    register_lint_text(module)?;
+    register_fixture_formatting(module)?;
+    register_lint_expansion(module)?;
+    register_lint_sql_bodies(module)?;
+    register_dsl_headers(module)?;
+    register_custom_rule_evidence(module)?;
+    register_rule_cache(module)?;
+    register_rule_run(module)?;
+    register_rule_plan(module)?;
+    register_sql_rules(module)?;
+    register_early_sql_lint(module)?;
+    register_custom_rule_cache(module)?;
+    register_catalogue(module)?;
+    register_rules_config(module)?;
+    register_run_lint(module)?;
+    register_selection(module)?;
+    register_results(module)?;
+    register_guidance(module)?;
+    register_custom_evaluation(module)?;
+    register_fact_encoder(module)?;
+    register_custom_host_observation(module)?;
+    register_rule_dispatch(module)
 }

@@ -38,9 +38,7 @@ use crate::bindings::_helpers::change_selection::selection::{
     ChangedProject, changed_project, tests_and_models, with_since_section,
 };
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
-use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
-use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::statement_report::StatementReport;
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
@@ -70,6 +68,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::setup::build_static_pipeline_result::build_static_pipeline_result;
+use sqlbuild_python_compile::compile_outputs::main::write_test_runtime_target::write_test_runtime_target;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_planner::planner_entries::main::plans::build_test_command_plan::build_test_command_plan;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;

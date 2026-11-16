@@ -18,7 +18,6 @@ use crate::bindings::_helpers::build_progress::progress_text::with_verbose_inspe
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::{changed_json, changed_text};
@@ -32,6 +31,7 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
+use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
 use sqlbuild_python_planner::consumption::main::changed_policy::changed_policy;
 use sqlbuild_python_planner::consumption::main::policy_line::policy_line;

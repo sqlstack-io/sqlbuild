@@ -4441,11 +4441,9 @@ dependencies = [
  "rayon",
  "rusqlite",
  "rustc-hash",
- "serde",
  "serde_json",
  "signal-hook",
  "sqlbuild-analysis",
- "sqlbuild-attachments",
  "sqlbuild-cache",
  "sqlbuild-cli",
  "sqlbuild-config",
@@ -4454,20 +4452,18 @@ dependencies = [
  "sqlbuild-host",
  "sqlbuild-model-config",
  "sqlbuild-orchestration",
- "sqlbuild-project",
  "sqlbuild-pysource",
  "sqlbuild-python-base",
+ "sqlbuild-python-compile",
  "sqlbuild-python-front",
  "sqlbuild-python-planner",
  "sqlbuild-python-project",
  "sqlbuild-recall",
  "sqlbuild-refactor",
- "sqlbuild-render",
  "sqlbuild-rules",
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlbuild-state",
- "sqlclean",
 ]
 
 [[package]]
@@ -4492,6 +4488,36 @@ dependencies = [
  "sqlbuild-orchestration",
  "sqlbuild-rules",
  "sqlbuild-state",
+]
+
+[[package]]
+name = "sqlbuild-python-compile"
+version = "0.0.0"
+dependencies = [
+ "fensu-policy",
+ "pyo3",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sqlbuild-analysis",
+ "sqlbuild-attachments",
+ "sqlbuild-cache",
+ "sqlbuild-cli",
+ "sqlbuild-config",
+ "sqlbuild-core",
+ "sqlbuild-discovery",
+ "sqlbuild-host",
+ "sqlbuild-model-config",
+ "sqlbuild-project",
+ "sqlbuild-pysource",
+ "sqlbuild-python-base",
+ "sqlbuild-python-front",
+ "sqlbuild-python-project",
+ "sqlbuild-render",
+ "sqlbuild-rules",
+ "sqlbuild-scopes",
+ "sqlbuild-sqltext",
+ "sqlclean",
 ]
 
 [[package]]

@@ -9,7 +9,6 @@ use crate::bindings::_helpers::command_runtime::connection::{
     anchor_local_database_path, with_dbt_profile,
 };
 use crate::bindings::_helpers::command_runtime::warehouses::apply_command_warehouse;
-use crate::bindings::_helpers::compile_driver::deferral::resolve_model_deferral_inputs;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -25,6 +24,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_compile::compile_driver::main::stages::resolve_model_deferral_inputs::resolve_model_deferral_inputs;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_planner::planner_entries::main::plans::build_display_only_sqlbuild_plan::build_display_only_sqlbuild_plan;
 use sqlbuild_python_planner::planner_entries::main::plans::build_execution_plan::build_execution_plan;
