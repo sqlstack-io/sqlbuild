@@ -1195,6 +1195,7 @@ export class MockOperate {
 		return structuredClone({
 			...job,
 			nodeCount: resolved.filter((n) => snapshotNode(n)?.kind !== 'source').length,
+			nodes: resolved,
 			resolvedNodes: resolved,
 			lastRun: view ? { id: view.id, status: view.status, startedAt: view.startedAt, endedAt: view.endedAt } : null,
 			triggerIds: TRIGGER_DEFS.filter((t) => t.jobKey === key).map((t) => triggerId(t.name)),

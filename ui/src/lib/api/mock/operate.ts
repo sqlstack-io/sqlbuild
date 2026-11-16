@@ -35,7 +35,7 @@ export const SNAPSHOT_GENERATION = 42;
 type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 
 type JobDef = Known<
-	Omit<JobDetail, 'nodeCount' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'memberOf' | 'cursorType' | 'groupMembers'>,
+	Omit<JobDetail, 'nodeCount' | 'nodes' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'memberOf' | 'cursorType' | 'groupMembers'>,
 	'members' | 'overlap' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
 >;
 

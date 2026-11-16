@@ -19,7 +19,7 @@
 	import { formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
-	import type { MemberInfo } from '$lib/lineage/member-graph';
+	import { memberLinks, type MemberInfo } from '$lib/lineage/member-graph';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import { formatMs } from '$lib/build-area/labels';
@@ -35,10 +35,12 @@
 	const memberJobs = createResource(async (client, scope) => {
 		if (job.data?.kind !== 'group') return null;
 		const jobs = await client.listJobs(scope);
-		return new Map<string, MemberInfo>(jobs.map((j) => [j.key, { nodeCount: j.nodeCount, lastRun: j.lastRun }]));
+		return new Map<string, MemberInfo>(jobs.map((j) => [j.key, { nodeCount: j.nodeCount, lastRun: j.lastRun, description: j.description, nodes: j.nodes }]));
 	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
+	// Why each member waits for another, node by node, from the catalog's lineage.
+	const links = $derived(def?.groupMembers && memberJobs.data && catalog.data ? memberLinks(def.groupMembers, memberJobs.data, catalog.data) : new Map());
 	const runs = $derived(jobRuns.data ?? []);
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
 	const showCost = $derived(runs.some((r) => r.cost !== null));
@@ -143,7 +145,7 @@
 						<p class="faint graph-wait">{def.groupMembers ? 'This group has no member jobs.' : "The server doesn't report this group's member jobs."}</p>
 					{:else if def.kind === 'group'}
 						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
-						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} />
+						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} />
 					{:else if catalog.data}
 						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} onselect={(keys) => (picked = keys)} />
 					{:else}

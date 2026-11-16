@@ -1,25 +1,26 @@
 <script lang="ts">
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import { to } from '$lib/paths';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
 	import type { MemberCardData } from './member-graph';
 
-	// A job group's member job, drawn as a Lineage card; the whole card opens the job's page.
-	let { data }: NodeProps = $props();
+	// A job group's member job, drawn as a Lineage card; clicking it opens the member in place, as a folder opens on Lineage.
+	let { data, selected }: NodeProps = $props();
 	const d = $derived(data as MemberCardData);
 	const tone = $derived(d.lastRun ? runStatusTone[d.lastRun.status] : 'var(--sb-text-faint)');
 	const when = $derived(d.lastRun?.startedAt ? formatAgo(d.lastRun.startedAt, app.now) : '');
 </script>
 
-<a class="node" href={to(`/jobs/${d.jobKey}`)} title="Open {d.jobKey}">
+<div class="node" class:selected class:expandable={d.expandable} title={d.expandable ? `Show the nodes of ${d.jobKey}` : d.jobKey}>
 	<Handle type="target" position={Position.Left} class="node-handle" />
 	<div class="head">
 		<WorkflowIcon size={14} strokeWidth={1.75} class="glyph" />
 		<span class="name">{d.jobKey}</span>
 		{#if d.nodeCount !== null}<span class="count">{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>{/if}
+		{#if d.expandable}<ChevronRightIcon size={13} class="glyph" />{/if}
 	</div>
 	<div class="status" style:--tone={tone}>
 		<i></i>
@@ -32,11 +33,10 @@
 		{#if d.waitsFor}<span class="waits">waits for {d.waitsFor}</span>{/if}
 	</div>
 	<Handle type="source" position={Position.Right} class="node-handle" />
-</a>
+</div>
 
 <style>
 	.node {
-		display: block;
 		width: 236px;
 		height: 62px;
 		overflow: hidden;
@@ -44,12 +44,18 @@
 		border-radius: 2px;
 		background: var(--card);
 		color: var(--foreground);
-		cursor: pointer;
 		font-family: var(--font-sans);
 		transition: border-color 0.15s;
 	}
+	.node.expandable {
+		cursor: pointer;
+	}
 	.node:hover {
 		border-color: color-mix(in srgb, var(--foreground) 35%, transparent);
+	}
+	.node.selected {
+		border-color: var(--primary);
+		box-shadow: 0 0 0 1px var(--primary);
 	}
 	.head {
 		display: flex;
@@ -85,6 +91,7 @@
 		border-top: 1px solid var(--border);
 		background: color-mix(in srgb, var(--tone) 9%, var(--card));
 		font-size: 11px;
+		white-space: nowrap;
 	}
 	.status i {
 		width: 7px;
