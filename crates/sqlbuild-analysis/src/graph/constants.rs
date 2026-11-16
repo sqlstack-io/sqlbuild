@@ -19,6 +19,11 @@ pub(crate) const TAG_KIND: &str = "tag";
 pub(crate) const PATH_KIND: &str = "path";
 pub(crate) const TEST_KIND: &str = "test";
 pub(crate) const JOB_KIND: &str = "job";
+pub(crate) const NODE_KIND_KIND: &str = "kind";
+/// The node kinds `kind:` selects, as the catalog names them: SQL resources, then Python nodes.
+pub(crate) const SELECTABLE_NODE_KINDS: [&str; 9] = [
+    "model", "source", "seed", "udf", "table_fn", "task", "asset", "loader", "check",
+];
 /// Selector kinds Python parses but `sqb compile` cannot map to a compiled resource.
 pub(crate) const UNMAPPED_KINDS: [&str; 4] = ["task", "asset", "loader", "check"];
 pub(crate) const SUGGESTION_CUTOFF: f64 = 0.8;
