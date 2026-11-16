@@ -129,8 +129,9 @@ const SYNC_STAGE: Record<Exclude<Wire['WarehouseSyncFailure'], 'busy'>, string> 
 	delivery: 'sending results to the server'
 };
 
-/** What held up a table's newest sync; a build holding the warehouse file is a wait, not a failure. */
-const syncProblemOf = (failure: Wire['WarehouseSyncFailure']) => (failure === 'busy' ? 'Waiting for a build that holds the warehouse file' : `Failed while ${SYNC_STAGE[failure]}`);
+/** What held up a table's newest sync, with a failed read's warehouse error; a build holding the warehouse file is a wait, not a failure. */
+const syncProblemOf = (failure: Wire['WarehouseSyncFailure'], error?: string | null) =>
+	failure === 'busy' ? 'Waiting for a build that holds the warehouse file' : `Failed while ${SYNC_STAGE[failure]}${error ? `: ${error}` : ''}`;
 
 type Sync = Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: 'warehouse_sync' }> } };
 
@@ -152,6 +153,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 			recordsSent: health.records_sent,
 			elapsedMs: health.elapsed_millis,
 			failure: health.failure ? syncProblemOf(health.failure) : null,
+			error: health.error ?? null,
 			waiting: health.failure === 'busy',
 			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null
 		}))
@@ -171,7 +173,7 @@ export function toWarehouseConnection(location: Location, observations: Wire['Lo
 export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][]): WarehouseSync | null {
 	const { syncs, newest } = syncsOf(observations);
 	if (!syncs.length) return null;
-	const failing = [...newest.values()].flatMap(({ report: { health } }) => (health.failure && health.failure !== 'busy' ? [`${health.table}: failed while ${SYNC_STAGE[health.failure]}`] : []));
+	const failing = [...newest.values()].flatMap(({ report: { health } }) => (health.failure && health.failure !== 'busy' ? [`${health.table}: ${syncProblemOf(health.failure, health.error).replace(/^F/, 'f')}`] : []));
 	return {
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,
 		lastError: failing.length ? failing.sort().join('\n') : null,

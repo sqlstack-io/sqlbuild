@@ -113,7 +113,7 @@ def test_given_case_distinct_postgres_relations_when_reading_catalog_then_column
             _ = adapter.execute(connection=connection, sql=sql)
         adapter.close(connection)
         page: Any = warehouse_history_page(project, "catalog")
-        assert (page is not None) is test_case.expected_page_delivered
+        assert ("failed" not in page) is test_case.expected_page_delivered
         assert page == {"records": fixture["postgres_records"], "next_after": None}
 
 
@@ -167,7 +167,7 @@ def test_given_non_authoritative_adapter_scope_when_reading_catalog_then_no_page
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert (json.loads(result.stdout) is not None) is test_case.expected_page_delivered
+    assert ("failed" not in json.loads(result.stdout)) is test_case.expected_page_delivered
     assert (
         "Warehouse metadata read (catalog) failed: ValueError: catalog listing is not "
         "authoritative for this namespace; scan incomplete. No page delivered."
