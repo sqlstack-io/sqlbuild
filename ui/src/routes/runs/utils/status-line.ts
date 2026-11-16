@@ -50,5 +50,7 @@ export function statusLine(row: RunRow, now: number): StatusLine {
 			};
 		case 'cancelled':
 			return { text: run.statusReason?.startsWith('Cancelled') ? run.statusReason : 'Cancelled', tone: 'muted' };
+		case 'skipped':
+			return { text: run.statusReason ? run.statusReason.charAt(0).toUpperCase() + run.statusReason.slice(1) : 'Skipped', tone: 'muted', title: 'Its group did not run it because a job it depends on failed' };
 	}
 }

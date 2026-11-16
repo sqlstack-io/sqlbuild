@@ -444,6 +444,140 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
     }
 }
 
+#[test]
+fn given_a_member_the_group_skips_when_sensors_and_alerts_watch_it_then_it_is_skipped_not_failed() {
+    for backend in [Backend::Sqlite, Backend::Postgres] {
+        run(async {
+            let fixture = open_test_store(backend).await.expect("required backend");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = crate::runs::tests::helpers::snapshot(location);
+            input.nodes.get_mut("orders").expect("orders").definition["deps"] =
+                json!(["customers"]);
+            input.documents.insert(
+                "jobs".into(),
+                json!({
+                    "staging_job": {"description": "Stage customers", "selection": ["customers"]},
+                    "marts_job": {"description": "Build orders", "selection": ["orders"]},
+                    "report_job": {"description": "Report on inventory", "selection": ["inventory"]}
+                }),
+            );
+            input.documents.insert(
+                "groups".into(),
+                json!({"nightly_job_group": {
+                    "description": "Stage then build orders", "selection": ["customers", "orders"],
+                    "jobs": {"staging_job": [], "marts_job": ["staging_job"]},
+                    "dependency_failure": {"marts_job": "skip"}
+                }}),
+            );
+            let mut sensors = serde_json::Map::new();
+            for kind in ["skipped", "failed", "completed"] {
+                sensors.insert(
+                    format!("marts_{kind}"),
+                    json!({
+                        "description": "Report when marts ends", "job_key": "report_job",
+                        "when": {"kind": "run_event", "job_key": "marts_job", "kinds": [kind]},
+                        "minimum_interval_seconds": 1
+                    }),
+                );
+            }
+            input.documents.insert("triggers".into(), json!(sensors));
+            publish_snapshot(store, &input).await.expect("publish");
+            let context = AuditContext {
+                actor: "test-admin".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            request_job_run(
+                store,
+                (&context, None),
+                &JobRunRequest {
+                    run_id: Uuid::now_v7(),
+                    location_id: location,
+                    target: "development".into(),
+                    job_key: "nightly_job_group".into(),
+                    reason: "Build the nightly group".into(),
+                    priority: 0,
+                    window: None,
+                    full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
+                },
+            )
+            .await
+            .expect("request group");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::new();
+            let scope = (location, "development");
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("start group");
+            let staging = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim staging")
+                .expect("staging ready");
+            finish(store, &staging, (NodeOutcome::Failed, RunOutcome::Failed)).await;
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("skip marts");
+            let runs = list_runs(store, scope, 100).await.expect("runs");
+            let marts = runs
+                .iter()
+                .find(|record| record.job_key.as_deref() == Some("marts_job"))
+                .expect("marts run");
+            assert_eq!(marts.status, RunStatus::Skipped, "{backend:?}");
+            let alerts = crate::runs::tests::helpers::rows(
+                store,
+                "SELECT run_id FROM recall_events WHERE event_type='platform_run_failed'",
+                vec![],
+            )
+            .await;
+            assert_eq!(
+                alerts
+                    .iter()
+                    .map(|row| row["run_id"].as_str().unwrap_or_default().to_owned())
+                    .collect::<Vec<_>>(),
+                vec![staging.request.run_id.to_string()],
+                "{backend:?}: only the failed member alerts"
+            );
+            let mut fired: BTreeMap<String, usize> = BTreeMap::new();
+            for trigger in list_triggers(store, location, "development")
+                .await
+                .expect("triggers")
+            {
+                let Some(requested) = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                    .await
+                    .expect("begin evaluation")
+                else {
+                    continue;
+                };
+                let count = complete_builtin_sensor(store, &lease, &requested)
+                    .await
+                    .expect("complete evaluation");
+                if count > 0 {
+                    fired.insert(trigger.name.clone(), count);
+                }
+            }
+            assert_eq!(
+                fired,
+                BTreeMap::from([
+                    ("marts_completed".to_owned(), 1),
+                    ("marts_skipped".to_owned(), 1),
+                ]),
+                "{backend:?}: a skipped member fires skipped, never failed"
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
 fn node_finished(node_key: &str, outcome: NodeOutcome) -> RunChange {
     RunChange::NodeFinished {
         node_key: node_key.into(),

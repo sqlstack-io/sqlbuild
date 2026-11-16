@@ -148,7 +148,7 @@ CREATE TABLE sqb_runs (
     authored_json {json},
     write_set_digest TEXT NOT NULL,
     rewrite_history BOOLEAN NOT NULL DEFAULT FALSE,
-    status TEXT NOT NULL CHECK (status IN ('queued', 'launched', 'running', 'unresponsive', 'success', 'warn', 'partial', 'failed', 'cancelled')),
+    status TEXT NOT NULL CHECK (status IN ('queued', 'launched', 'running', 'unresponsive', 'success', 'warn', 'partial', 'failed', 'cancelled', 'skipped')),
     status_reason TEXT,
     queued_at {time} NOT NULL,
     launched_at {time},
@@ -289,7 +289,7 @@ CREATE TABLE sqb_run_requests (
     PRIMARY KEY (trigger_id, run_key)
 );
 CREATE INDEX sqb_runs_terminal_cursor ON sqb_runs(location_id, target, job_key, last_event_storage_id)
-WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled');
+WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled', 'skipped');
 CREATE INDEX sqb_runs_parent ON sqb_runs(parent_run_id) WHERE parent_run_id IS NOT NULL;
 CREATE TABLE sqb_warehouse_freshness (
     event_id {uuid} PRIMARY KEY,

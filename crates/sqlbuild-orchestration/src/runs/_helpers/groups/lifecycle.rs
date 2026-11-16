@@ -183,7 +183,7 @@ async fn skip_blocked_members(
             transaction,
             request.run_id,
             RunChange::Finished {
-                outcome: RunOutcome::Failed,
+                outcome: RunOutcome::Skipped,
                 reason: format!("skipped because {failed_job} did not succeed"),
                 exit_code: None,
             },

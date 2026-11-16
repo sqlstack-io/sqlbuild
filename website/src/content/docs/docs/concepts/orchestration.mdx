@@ -132,12 +132,14 @@ on_failure = "skip"
 | --- | --- | --- |
 | `wait_for` | `job` (default) | A member starts once the jobs it reads from have finished |
 | `on_failure` | `partial` (default) | Build what can still be built; nodes downstream of a failed node are skipped |
-| | `skip` | Don't run the member; all its nodes end skipped and the member ends `failed` |
+| | `skip` | Don't run the member; all its nodes end skipped and the member ends `skipped` |
 | | `run` | Run every node of the member regardless |
 
 - `[dependencies.<job>]` overrides the group's settings for one member, and must name a job in
   `jobs`. Overrides live in the group file because a job can belong to several groups.
-- A member skipped by `skip` counts as failed for the jobs that depend on it.
+- A skipped member raises no failure alert and fires `run_event` sensors with `kinds=["skipped"]`,
+  not `"failed"`. The jobs that depend on it react to it as they would to a failure, since what
+  they read was not built.
 - A member job's own `[retry]` runs it again inside the group run, and the jobs that depend on it
   wait for its final attempt before `on_failure` applies. A group's `[retry]` reruns the whole
   group's failures once the group run ends; see
@@ -214,6 +216,8 @@ A `run_event` on a job also fires for that job's runs inside a job group. Each m
 run ends with its own outcome as soon as it finishes, while the rest of the group may still be
 running, and `executed_successfully` checks that member's nodes. Moving a job into a group therefore
 keeps every sensor that watches it. A sensor on the group fires once, when the whole group run ends.
+`kinds` takes `success`, `warn`, `partial`, `failed`, `cancelled`, `skipped` (a member its group
+did not run) or `completed` for any of them.
 
 A sensor without `when` decorates a function that polls and returns `RunRequest(run_key=...)`
 values or a `SkipReason`. A sensor also takes `minimum_interval_seconds` (default 30),

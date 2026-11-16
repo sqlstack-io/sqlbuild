@@ -2904,7 +2904,7 @@ export interface components {
             occurred_at?: string | null;
         };
         /** @enum {string} */
-        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text. */
         RunEventRecord: {
             /** Format: int64 */
@@ -2979,7 +2979,7 @@ export interface components {
          * @description Terminal outcomes cannot be confused with a request to change an active status.
          * @enum {string}
          */
-        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Captured output and error text of a run's invocations; both can quote warehouse data. */
         RunOutput: {
             /** @description Invocation failures and error diagnostics, oldest first. */
@@ -3152,7 +3152,7 @@ export interface components {
             statement_id: string;
         };
         /** @enum {string} */
-        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled";
+        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled" | "skipped";
         /** @description Inclusive typed CLI cursor bounds; the native planner derives exclusive execution ends. */
         RunWindow: {
             /** Format: date-time */

@@ -1351,6 +1351,46 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             },
         ),
         SnapshotDiscoveryTestCase(
+            description="a run_event on a group member can watch for the group skipping it",
+            files={
+                "orchestration/jobs/source_orders_job.toml": (
+                    'name = "source_orders_job"\ndescription = "Orders."\nselect = "orders"\n'
+                ),
+                "orchestration/jobs/inventory_job.toml": (
+                    'name = "inventory_job"\ndescription = "Inventory."\nselect = "stg_orders"\n'
+                ),
+                "orchestration/job_groups/source_job_group.toml": (
+                    'name = "source_job_group"\ndescription = "Source orders."\n'
+                    'jobs = ["source_orders_job"]\n'
+                ),
+                "orchestration/sensors/on_orders_sensor.py": (
+                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
+                    "on_orders = sensor(\n"
+                    "    'on_orders_sensor',\n"
+                    "    description='Build inventory when the group skips orders.',\n"
+                    "    when=run_event(job='source_orders_job', kinds=[RunEventKind.SKIPPED]),\n"
+                    "    run='inventory_job',\n"
+                    ")\n"
+                ),
+            },
+            expected_jobs=("inventory_job", "source_orders_job"),
+            expected_groups={"source_job_group": {"source_orders_job": []}},
+            expected_sensors={
+                "on_orders_sensor": {
+                    "description": "Build inventory when the group skips orders.",
+                    "job_key": "inventory_job",
+                    "when": {
+                        "kind": "run_event",
+                        "job_key": "source_orders_job",
+                        "kinds": ["skipped"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 2},
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="any-run node selectors freeze canonical keys without a source job reference",
             files={**duckshop_orchestration("node_orders")},
             expected_jobs=("inventory_job", "source_orders_job"),

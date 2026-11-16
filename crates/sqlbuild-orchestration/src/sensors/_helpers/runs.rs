@@ -28,7 +28,7 @@ pub(crate) async fn consume_run_events(
         transaction,
         &format!("SELECT r.run_id,r.status,r.last_event_storage_id FROM sqb_runs r \
          WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 AND r.last_event_storage_id>$4 \
-         AND r.status IN ('success','warn','partial','failed','cancelled') AND NOT {SUPERSEDED_CHILD} \
+         AND r.status IN ('success','warn','partial','failed','cancelled','skipped') AND NOT {SUPERSEDED_CHILD} \
          ORDER BY r.last_event_storage_id LIMIT 100"),
         vec![
             Parameter::Id(evaluation.location_id),

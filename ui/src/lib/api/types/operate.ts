@@ -18,6 +18,7 @@ export const RUN_STATUSES = [
 	'partial',
 	'failed',
 	'cancelled',
+	'skipped',
 	'presumed_failed'
 ] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];

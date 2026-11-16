@@ -195,8 +195,8 @@ fn given_a_failed_member_when_its_dependents_react_then_each_dependency_policy_a
                     .expect("member run");
                 assert_eq!(
                     (record.status, record.launched_at),
-                    (RunStatus::Failed, None),
-                    "{description}: {member} ends without launching"
+                    (RunStatus::Skipped, None),
+                    "{description}: {member} ends skipped without launching"
                 );
                 let nodes = rows(
                     store,
