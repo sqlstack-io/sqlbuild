@@ -33,11 +33,6 @@ use crate::bindings::_helpers::compile_outputs::artifacts::{
 use crate::bindings::_helpers::compile_outputs::runtime_target::{
     compiled_sql_test_path, planned_sql_test_path,
 };
-use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::sql_test_glue::models::SqlTestPlanOptions;
-use crate::bindings::_helpers::sql_test_glue::plan_driver::planned_rows;
-use crate::bindings::_helpers::sql_test_glue::plan_driver::sql_test_model_chain_names_by_key;
-use crate::bindings::_helpers::sql_test_glue::planning::PlanRow;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -56,6 +51,11 @@ use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use sqlbuild_python_base::records::main::fields::path_posix_text::path_posix_text;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
+use sqlbuild_python_project::sql_test_glue::main::planned_rows::planned_rows;
+use sqlbuild_python_project::sql_test_glue::main::sql_test_model_chain_names_by_key::sql_test_model_chain_names_by_key;
+use sqlbuild_python_project::sql_test_glue::models::PlanRow;
+use sqlbuild_python_project::sql_test_glue::models::SqlTestPlanOptions;
 
 const COMPILED_DIR: &str = "compiled";
 const MODELS_DIR: &str = "models";

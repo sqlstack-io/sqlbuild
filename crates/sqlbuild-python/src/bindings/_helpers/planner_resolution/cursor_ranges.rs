@@ -3,11 +3,9 @@
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::plan_output::display::resolve_bounded_cursor_override;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::cursor_bounds::compute_cursor_bounds;
 use crate::bindings::_helpers::planner_resolution::cursor_bounds::duration;
 use crate::bindings::_helpers::planner_resolution::cursor_policies::{
@@ -46,6 +44,8 @@ use sqlbuild_python_front::cursor::models::CursorSession;
 use sqlbuild_python_front::model_config::main::config::config_cursor_bound::config_cursor_bound as typed_cursor_bound;
 use sqlbuild_python_front::model_config::main::config::config_text_object::config_text_object;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::planner_phases::main::object::object;
 use std::cmp::Ordering;
 
 const INCREMENTAL: &str = "incremental";
@@ -362,8 +362,7 @@ fn model_cursor_snapshot<'py>(
     model: &Bound<'py, PyAny>,
     snapshot: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    native_field(snapshot, "cursor_snapshots")?
-        .call_method1("get", (model_reads::name_object(model)?,))
+    native_field(snapshot, "cursor_snapshots")?.call_method1("get", (name_object(model)?,))
 }
 
 fn without_destination<'py>(cursor_snapshot: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
@@ -556,7 +555,7 @@ pub(crate) fn model_cursor_overrides<'py>(
         }
     }
     let session = CursorSession::new(py)?;
-    let name = model_reads::name_object(model)?.str()?;
+    let name = name_object(model)?.str()?;
     let cursor_start = config_bound(model, "cursor_start")?;
     let cursor_end = config_bound(model, "cursor_end")?;
     if !resolved_start.is_none()

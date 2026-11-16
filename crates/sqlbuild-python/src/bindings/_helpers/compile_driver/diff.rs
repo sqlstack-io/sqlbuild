@@ -13,8 +13,6 @@ use sqlbuild_analysis::diff_selection::main::resolve_diff_selection::resolve_dif
 use sqlbuild_analysis::diff_selection::models::DiffGraph;
 
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::graph::views::project_lineage_views;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
@@ -23,6 +21,9 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::model_reads::model_key::model_key;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::graph::main::views::project_lineage_views::project_lineage_views;
 
 /// Indexes of the `CompiledObjectKey`s a diff graph names, assigned on first sight.
 struct KeyIndexes<'py> {
@@ -166,13 +167,13 @@ fn diff_model_names<'py>(
     let mut names: Vec<Bound<'py, PyAny>> = Vec::new();
     for model in native_field(project, "models")?.try_iter()? {
         let model: Bound<'py, PyAny> = model?;
-        let key: Bound<'py, PyAny> = model_reads::model_key(&model)?;
+        let key: Bound<'py, PyAny> = model_key(&model)?;
         let chosen: bool = match keys.indexes.get_item(&key)? {
             Some(index) => selected.contains(&index.extract::<usize>()?),
             None => false,
         };
         if chosen && native_field(&key, "resource_type")?.eq(&model_type)? {
-            names.push(model_reads::name_object(&model)?);
+            names.push(name_object(&model)?);
         }
     }
     PyTuple::new(py, names)

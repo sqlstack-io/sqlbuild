@@ -1,6 +1,8 @@
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    crate::bindings::_helpers::references::relations::register(module)?;
-    crate::bindings::_helpers::references::source_relations::register(module)
+    sqlbuild_python_project::references::main::register_relations::register_relations(module)?;
+    sqlbuild_python_project::references::main::register_source_relations::register_source_relations(
+        module,
+    )
 }

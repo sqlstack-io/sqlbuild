@@ -4436,7 +4436,6 @@ name = "sqlbuild-python"
 version = "0.233.0"
 dependencies = [
  "chrono",
- "chrono-tz",
  "fensu-policy",
  "pyo3",
  "rayon",
@@ -4444,7 +4443,6 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "signal-hook",
  "sqlbuild-analysis",
  "sqlbuild-attachments",
@@ -4461,6 +4459,7 @@ dependencies = [
  "sqlbuild-pysource",
  "sqlbuild-python-base",
  "sqlbuild-python-front",
+ "sqlbuild-python-project",
  "sqlbuild-recall",
  "sqlbuild-refactor",
  "sqlbuild-render",
@@ -4469,7 +4468,6 @@ dependencies = [
  "sqlbuild-sqltext",
  "sqlbuild-state",
  "sqlclean",
- "tokio",
  "uuid",
 ]
 
@@ -4524,6 +4522,36 @@ dependencies = [
  "sqlbuild-sqltext",
  "sqlbuild-state",
  "stacker",
+ "uuid",
+]
+
+[[package]]
+name = "sqlbuild-python-project"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "pyo3",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlbuild-analysis",
+ "sqlbuild-attachments",
+ "sqlbuild-cache",
+ "sqlbuild-cli",
+ "sqlbuild-config",
+ "sqlbuild-core",
+ "sqlbuild-cursor",
+ "sqlbuild-discovery",
+ "sqlbuild-host",
+ "sqlbuild-model-config",
+ "sqlbuild-orchestration",
+ "sqlbuild-project",
+ "sqlbuild-pysource",
+ "sqlbuild-python-base",
+ "sqlbuild-python-front",
+ "sqlbuild-rules",
+ "sqlbuild-sqltext",
+ "tokio",
  "uuid",
 ]
 

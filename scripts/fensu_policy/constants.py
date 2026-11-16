@@ -287,6 +287,7 @@ NATIVE_BINDINGS_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-python/src/",
     "crates/sqlbuild-python-base/src/",
     "crates/sqlbuild-python-front/src/",
+    "crates/sqlbuild-python-project/src/",
 )
 NATIVE_CROSSING_PATTERNS: tuple[str, ...] = (
     r"\.getattr\(",

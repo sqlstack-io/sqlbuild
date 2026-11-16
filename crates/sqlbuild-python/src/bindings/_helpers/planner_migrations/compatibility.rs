@@ -1,7 +1,5 @@
 //! Convert existing planner contracts for origin compatibility checks.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::model_reads::inferred_rows;
 use crate::bindings::_helpers::planner_changes::detect::detect_model_changes;
 use crate::bindings::_helpers::planner_migrations::models::{
     CompatibilityCheck, MigrationCompatibilityResult,
@@ -20,6 +18,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::model_config::main::config::config_value::config_value;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compiled_views::main::model_reads::inferred_rows::inferred_rows;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
 
 fn config(model: &Bound<'_, PyAny>, key: &str) -> PyResult<Option<String>> {
     config_value(model.py(), &model_values(model)?, key)?.extract()
@@ -92,12 +92,9 @@ pub(super) fn check_migration_compatibility<'py>(
         );
     }
     let relations = PyDict::new(py);
-    relations.set_item(model_reads::name_object(&model)?, relation)?;
+    relations.set_item(name_object(&model)?, relation)?;
     let columns = PyDict::new(py);
-    columns.set_item(
-        model_reads::name_object(&model)?,
-        check.origin_columns.clone(),
-    )?;
+    columns.set_item(name_object(&model)?, check.origin_columns.clone())?;
     let snapshot = new_record_with(
         py,
         RecordId::WarehouseSnapshot,

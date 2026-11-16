@@ -1,6 +1,5 @@
 //! Gather live candidate evidence without changing adapter inspection ownership.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::column_objects::{
     config, definition_hash, lower,
 };
@@ -8,11 +7,14 @@ use crate::bindings::_helpers::planner_migrations::models::{
     ColumnCandidate, ColumnMigrationInputs, MigrationPhase,
 };
 use crate::bindings::_helpers::planner_migrations::projections::parse_query_shape;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::model_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 pub(super) fn candidates<'py>(
     (phase, columns): (&MigrationPhase<'py>, &ColumnMigrationInputs<'py>),
@@ -36,7 +38,7 @@ pub(super) fn candidates<'py>(
         if !materialized.eq("incremental")? && !materialized.eq("snapshot")? {
             continue;
         }
-        let name = model_reads::name_object(&model)?;
+        let name = name_object(&model)?;
         if columns.full_refresh_model_names.contains(&name)?
             || !native_field(&snapshot, "existing_relations")?.contains(&name)?
         {
@@ -45,7 +47,7 @@ pub(super) fn candidates<'py>(
         let warehouse = native_field(&snapshot, "existing_columns")?
             .call_method1("get", (&name, PyTuple::empty(py)))?;
         let declared = PyDict::new(py);
-        let schema = model_reads::schema_entry(&model)?;
+        let schema = schema_entry(&model)?;
         if !schema.is_none() {
             for column in native_field(&schema, "columns")?.try_iter()? {
                 let column = column?;
@@ -82,7 +84,7 @@ pub(super) fn candidates<'py>(
         };
         let current = parse_query_shape(
             py,
-            &model_reads::query_sql(&model)?.extract::<String>()?,
+            &query_sql(&model)?.extract::<String>()?,
             dialect.extract::<Option<String>>()?.as_deref(),
         )?;
         result.push(ColumnCandidate {

@@ -16,7 +16,6 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 
 use sqlbuild_host::entries::models::UserCodeHost;
 
-use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::rules::catalogue::{
     resolved_ignore_selectors, rule_catalogue, select_rules,
 };
@@ -53,6 +52,7 @@ use sqlbuild_python_base::records::main::construct::new_record_with::new_record_
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
 use sqlbuild_rules::models::RowsRequest;
 use std::sync::Arc;
 

@@ -22,7 +22,6 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_command_invo
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::planner_entries::command_plans::build_seed_command_plan;
 use crate::bindings::_helpers::planner_entries::command_plans::read_selected_seed_fingerprints;
@@ -39,6 +38,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_project::compiled_project::models::WorkerBuild;
+use sqlbuild_python_project::compiled_project::types::VerifiedRun;
 
 const SUCCESS_STATUS: &str = "success";
 const FAILED_STATUS: &str = "failed";

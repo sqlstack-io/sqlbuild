@@ -26,12 +26,12 @@ use crate::bindings::_helpers::change_selection::definition_snapshot::{
     declaration_uses, definition_snapshot, project_wide_keys,
 };
 use crate::bindings::_helpers::change_selection::environment_nodes::with_current_dependencies;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_scenario::graph::plan_scenario_graph;
 use crate::bindings::_helpers::scenario_command::setup::{flush, write};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_views::main::model_reads::deps::deps;
+use sqlbuild_python_project::compiled_views::main::project_reads::sql_tests::sql_tests;
+use sqlbuild_python_project::graph::main::keys::native_key::native_key;
 
 const MACRO_TEST_MODE: &str = "macro";
 /// The JSON document key of the changes and selection of a `--since` run.
@@ -107,7 +107,7 @@ fn relation_keys((refs, sources, seeds): (&[String], &[String], &[String])) -> V
 /// The sources `model` reads, other than `mocked` ones, as node keys.
 fn read_sources(model: &Bound<'_, PyAny>, mocked: &[String]) -> PyResult<Vec<String>> {
     let mut keys: Vec<String> = Vec::new();
-    for dependency in model_reads::deps(model)?.try_iter()? {
+    for dependency in deps(model)?.try_iter()? {
         let (kind, name) = native_key(&dependency?)?;
         if kind == SOURCE_KIND && !mocked.contains(&name) {
             keys.push(node_key(SOURCE_KIND, &name));
@@ -239,7 +239,7 @@ impl ChangedProject {
                 continue;
             };
             item.executed.extend(read_sources(model, &mocked_sources)?);
-            for dependency in model_reads::deps(model)?.try_iter()? {
+            for dependency in deps(model)?.try_iter()? {
                 let (kind, dependency_name) = native_key(&dependency?)?;
                 if kind == SEED_KIND && !mocked_seeds.contains(&dependency_name) {
                     item.executed.push(node_key(SEED_KIND, &dependency_name));
@@ -328,14 +328,22 @@ pub(crate) fn tests_and_models<'py>(
     project: &Bound<'py, PyAny>,
 ) -> PyResult<(ByName<'py>, ByName<'py>)> {
     let mut tests: ByName<'py> = HashMap::new();
-    for test in project_reads::sql_tests(project)?.try_iter()? {
+    for test in sql_tests(project)?.try_iter()? {
         let test: Bound<'py, PyAny> = test?;
         tests.insert(native_field(&test, "name")?.extract()?, test);
     }
     let mut models: ByName<'py> = HashMap::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in
+        sqlbuild_python_project::compiled_views::main::project_reads::models::models(project)?
+            .try_iter()?
+    {
         let model: Bound<'py, PyAny> = model?;
-        models.insert(model_reads::model_name(&model)?, model);
+        models.insert(
+            sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name(
+                &model,
+            )?,
+            model,
+        );
     }
     Ok((tests, models))
 }

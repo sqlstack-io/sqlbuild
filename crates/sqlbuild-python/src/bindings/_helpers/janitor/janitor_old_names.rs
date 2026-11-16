@@ -9,7 +9,6 @@ use sqlbuild_analysis::janitor_planning::main::old_name_request_matches::old_nam
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::janitor::janitor_facts::{
     SchemaRelations, Warehouse, model_destinations,
 };
@@ -21,6 +20,7 @@ use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_front::state_rows::main::migrations::read_histories::read_histories as read_view_histories;
 use sqlbuild_python_front::state_rows::main::migrations::stored_columns_binding::stored_columns_binding;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
 
 const IS_COMPATIBILITY_VIEW: ExecutorHost = ExecutorHost::IsCompatibilityView;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
@@ -219,7 +219,7 @@ fn project_destinations<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bound<'py,
     let py: Python<'py> = project.py();
     let destinations: Bound<'py, PyDict> = PyDict::new(py);
     for (key, model) in model_destinations(project)? {
-        destinations.set_item(key.to_python(py)?, model_reads::name_object(&model)?)?;
+        destinations.set_item(key.to_python(py)?, name_object(&model)?)?;
     }
     Ok(destinations)
 }
@@ -377,7 +377,10 @@ pub(crate) fn pending_migration_origins(
         if listed.contains(&destination.folded()) {
             continue;
         }
-        let model_name: String = model_reads::model_name(&model)?;
+        let model_name: String =
+            sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name(
+                &model,
+            )?;
         for origin in migration_origin_keys(&raw, destination.database.as_deref(), &schemas) {
             let folded: Folded = Key {
                 database: origin.database,

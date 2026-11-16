@@ -22,10 +22,6 @@ use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::header_metadata::main::parse_measurement_policy::parse_measurement_policy;
 use sqlbuild_sqltext::sql_references::models::SqlReference;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    AuditBlockRow, AuditFileRow, AuditSettings,
-};
-use crate::bindings::_helpers::compiled_views::audit_views::{AttachedAudit, AuditHandles};
 use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, NativeModelLoop, compile_error, helped_compile_error,
 };
@@ -47,6 +43,11 @@ use sqlbuild_python_front::model_config::models::HeaderAudits;
 use sqlbuild_python_front::model_config::models::HeaderColumns;
 use sqlbuild_python_front::model_config::models::NativeModelValidator;
 use sqlbuild_python_front::model_config::models::PyNode;
+use sqlbuild_python_project::compiled_project::models::AuditBlockRow;
+use sqlbuild_python_project::compiled_project::models::AuditFileRow;
+use sqlbuild_python_project::compiled_project::models::AuditSettings;
+use sqlbuild_python_project::compiled_views::models::AuditHandles;
+use sqlbuild_python_project::compiled_views::types::AttachedAudit;
 
 const THRESHOLDS_KEY: &str = "thresholds";
 const MINIMUM_SAMPLES_KEY: &str = "minimum_samples";

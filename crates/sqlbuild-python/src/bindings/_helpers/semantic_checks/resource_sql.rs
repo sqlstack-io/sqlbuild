@@ -13,9 +13,6 @@ use sqlbuild_analysis::semantic_checks::models::{
     ResourceSqlFailure, ResourceSqlKind, ResourceSqlRequest, SqlTestSqlInput,
 };
 
-use crate::bindings::_helpers::compiled_views::audit_views::audit_reference_rows;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::models::ProjectCatalog;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
@@ -26,6 +23,9 @@ use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::types::CompilerDetach;
+use sqlbuild_python_project::analysis::models::ProjectCatalog;
+use sqlbuild_python_project::compiled_views::main::audit_views::audit_reference_rows::audit_reference_rows;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
 
 const SQL_ANALYSIS_CONFIG_KEY: &str = "sql_analysis";
 const MODEL_HOOK_KEYS: [&str; 2] = ["pre_hooks", "post_hooks"];

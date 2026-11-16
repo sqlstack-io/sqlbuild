@@ -4,17 +4,6 @@ use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{
-    AttachedSqlTests, AuditFileRow, AuditSettings, FunctionRow, FunctionSettings,
-    ResourceAttachment, ScenarioRow, SourceRow, SourceSettings, SqlTestSettings, TestFileRow,
-};
-use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
-use crate::bindings::_helpers::compiled_views::audit_views::NativeAuditInput;
-use crate::bindings::_helpers::compiled_views::function_views::{
-    AttachedFunction, NativeFunctionInput,
-};
-use crate::bindings::_helpers::compiled_views::seed_views::{SeedParts, SeedViews};
-use crate::bindings::_helpers::compiled_views::source_views::{AttachedSource, NativeSourceInput};
 use crate::bindings::_helpers::input_loops::audit_loop::{
     AttachmentOwner, model_owner, resource_owner,
 };
@@ -22,6 +11,25 @@ use crate::bindings::_helpers::input_loops::model_loop::NativeModelLoop;
 use crate::bindings::_helpers::input_loops::resource_diagnostics::resource_diagnostics;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_project::models::AuditFileRow;
+use sqlbuild_python_project::compiled_project::models::AuditSettings;
+use sqlbuild_python_project::compiled_project::models::FunctionRow;
+use sqlbuild_python_project::compiled_project::models::FunctionSettings;
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
+use sqlbuild_python_project::compiled_project::models::ResourceAttachment;
+use sqlbuild_python_project::compiled_project::models::ScenarioRow;
+use sqlbuild_python_project::compiled_project::models::SqlTestSettings;
+use sqlbuild_python_project::compiled_project::models::TestFileRow;
+use sqlbuild_python_project::compiled_project::types::AttachedSqlTests;
+use sqlbuild_python_project::compiled_project::types::SourceRow;
+use sqlbuild_python_project::compiled_project::types::SourceSettings;
+use sqlbuild_python_project::compiled_views::models::NativeAuditInput;
+use sqlbuild_python_project::compiled_views::models::NativeFunctionInput;
+use sqlbuild_python_project::compiled_views::models::NativeSourceInput;
+use sqlbuild_python_project::compiled_views::models::SeedParts;
+use sqlbuild_python_project::compiled_views::types::AttachedFunction;
+use sqlbuild_python_project::compiled_views::types::AttachedSource;
+use sqlbuild_python_project::compiled_views::types::SeedViews;
 
 const RELATIVE_PATH_ATTRIBUTE: &str = "relative_path";
 const SOURCE_OWNER: &str = "source";

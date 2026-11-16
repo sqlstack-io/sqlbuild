@@ -7,10 +7,6 @@ use sqlbuild_attachments::cursor_intrinsics::main::intrinsic_free::intrinsic_fre
 use sqlbuild_attachments::cursor_intrinsics::models::IntrinsicCheck;
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::{SourceRow, SourceSettings};
-use crate::bindings::_helpers::compiled_views::source_views::{
-    AttachedSource, SourceHandles, replaced,
-};
 use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, NativeModelLoop, compile_error, record_reads,
 };
@@ -39,6 +35,11 @@ use sqlbuild_python_front::scopes::models::NativeDeclarationContexts;
 use sqlbuild_python_front::sqltext::main::declaration_scan::declaration_scan;
 use sqlbuild_python_front::sqltext::main::interpolated::interpolated;
 use sqlbuild_python_front::sqltext::models::InterpolationSources;
+use sqlbuild_python_project::compiled_project::types::SourceRow;
+use sqlbuild_python_project::compiled_project::types::SourceSettings;
+use sqlbuild_python_project::compiled_views::main::source_views::replaced::replaced;
+use sqlbuild_python_project::compiled_views::models::SourceHandles;
+use sqlbuild_python_project::compiled_views::types::AttachedSource;
 
 const MACRO_TOKEN: char = '@';
 const NATIVE_CONTEXTS_ATTRIBUTE: &str = "native_contexts";

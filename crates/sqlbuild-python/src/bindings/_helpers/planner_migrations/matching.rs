@@ -1,6 +1,5 @@
 //! Fingerprint cache callbacks around native one-to-one migration matching.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::models::{
     FingerprintInputs, ModelMigrationRequest,
 };
@@ -12,6 +11,9 @@ use sqlbuild_analysis::planner_migrations::models::MigrationCandidate;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn variants<'py>(
@@ -19,7 +21,7 @@ fn variants<'py>(
     model: &Bound<'py, PyAny>,
     maps: Bound<'py, PyAny>,
 ) -> PyResult<Vec<String>> {
-    let name = model_reads::name_object(model)?;
+    let name = name_object(model)?;
     let metadata = inputs.metadata_jsons.get_item(name)?;
     let cache = native_field(&inputs.fingerprints, "fingerprint")?;
     let mut hashes: Vec<String> = Vec::new();
@@ -27,7 +29,7 @@ fn variants<'py>(
         let hash: Option<String> = call_with(
             &cache,
             &[
-                ("query_sql", model_reads::query_sql(model)?),
+                ("query_sql", query_sql(model)?),
                 ("metadata_json", metadata.clone()),
                 ("ref_identities", map?),
                 ("dialect", inputs.dialect.clone()),
@@ -54,7 +56,7 @@ pub(super) fn match_migration_fingerprints<'py>(
     let mut by_name: BTreeMap<String, Bound<'py, PyAny>> = BTreeMap::new();
     let mut names: Vec<String> = Vec::new();
     for model in models {
-        let name: String = model_reads::model_name(model)?;
+        let name: String = model_name(model)?;
         if new_names.contains(&name) {
             names.push(name.clone());
         }
@@ -93,7 +95,7 @@ pub(super) fn migration_destination_fingerprints<'py>(
     let result = PyDict::new(py);
     for request in requests {
         let model = &request.model;
-        let name = model_reads::name_object(model)?;
+        let name = name_object(model)?;
         if mapping_get(&inputs.metadata_jsons, &name)?.is_none() {
             continue;
         }

@@ -1,6 +1,5 @@
 //! Host column migration planning while Python owns warehouse inspection.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::column_objects::replace;
 use crate::bindings::_helpers::planner_migrations::known_input_columns::KnownInputColumns;
 use crate::bindings::_helpers::planner_migrations::models::{
@@ -14,6 +13,8 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_project::compiled_views::main::model_reads::destination::destination;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
 
 /// Decide column renames and return the existing planning result model.
 #[pyfunction(name = "plan_column_migrations")]
@@ -81,7 +82,7 @@ pub(crate) fn plan_column_migrations<'py>(
     let state = super::state_inspection::inspection(&runtime, None)?;
     let schemas = PySet::empty(py)?;
     for candidate in &candidates {
-        let schema = native_field(&model_reads::destination(&candidate.model)?, "schema")?;
+        let schema = native_field(&destination(&candidate.model)?, "schema")?;
         if !schema.is_none() {
             schemas.add(schema)?;
         }
@@ -108,10 +109,7 @@ pub(crate) fn plan_column_migrations<'py>(
             &native_field(&state, "column_events")?,
             &inputs,
         )?;
-        let physical = mapping_get(
-            &columns.physical_relations,
-            model_reads::name_object(&candidate.model)?,
-        )?;
+        let physical = mapping_get(&columns.physical_relations, name_object(&candidate.model)?)?;
         let checked = super::column_entries::checked(&runtime, candidate, decided, &physical)?;
         for hint in super::column_entries::hints(candidate, &checked.entries)?.try_iter()? {
             hints.push(hint?);

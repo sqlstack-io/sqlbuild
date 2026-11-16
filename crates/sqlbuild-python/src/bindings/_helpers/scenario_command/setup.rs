@@ -27,7 +27,6 @@ use crate::bindings::_helpers::command_runtime::connection::resolve_project_conn
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::run_compile_only_pipeline;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -43,6 +42,7 @@ use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_front::contracts::main::resolve_effective_scenario_config::resolve_effective_scenario_config;
 use sqlbuild_python_front::discovery::main::failures::sql_analysis_guidance::sql_analysis_guidance;
+use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
 
 const METADATA_MODULE: &str = "importlib.metadata";
 const DISTRIBUTION_NAME: &str = "sqlbuild";

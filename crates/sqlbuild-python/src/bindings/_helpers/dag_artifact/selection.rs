@@ -17,11 +17,11 @@ use sqlbuild_analysis::dag_artifact::models::{
 use sqlbuild_analysis::planner_selection::main::unit_test_selector_rejection::unit_test_selector_rejection;
 use sqlbuild_host::entries::models::ThirdPartyHost;
 
-use crate::bindings::_helpers::planner_selection::carrier::Carrier;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+use sqlbuild_python_project::planner_selection::models::Carrier;
 
 const PATHLIB_MODULE: &str = "pathlib";
 const JSON_MODULE: &str = "json";

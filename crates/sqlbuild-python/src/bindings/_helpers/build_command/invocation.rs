@@ -14,7 +14,6 @@ use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionPro
 use crate::bindings::_helpers::build_progress::progress_reporters::PlanningProgressReporter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::build_command::main::boolean::boolean;
@@ -32,6 +31,7 @@ use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::reso
 use sqlbuild_python_front::contracts::main::resolve_target_config::resolve_target_config;
 use sqlbuild_python_front::contracts::main::resolve_target_name::resolve_target_name;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
+use sqlbuild_python_project::compiled_project::models::WorkerBuild;
 
 const DEFER_CONFLICT_CODE: &str = "C408";
 

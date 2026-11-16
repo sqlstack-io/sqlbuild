@@ -9,10 +9,6 @@ use sqlbuild_analysis::planner_strategy::main::lineage_reference::lineage_refere
 use sqlbuild_analysis::planner_strategy::models::{ProducerFacts, ReferenceIdentity};
 use sqlbuild_analysis::planner_strategy::types::ReferenceGraph;
 
-use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_input_roles;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::resource_reads;
-use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_strategy::microbatches::{
     CAP_ACTIONS, microbatch_limit_config,
 };
@@ -22,6 +18,10 @@ use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_front::model_config::main::config::config_text_is::config_text_is;
 use sqlbuild_python_front::model_config::main::config::model_values::model_values;
+use sqlbuild_python_project::compile_attachment::main::resolve_cursor_input_roles::resolve_cursor_input_roles;
+use sqlbuild_python_project::compiled_views::main::model_reads::config::config;
+use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
+use sqlbuild_python_project::native_host::models::ModelLookup;
 
 const MICROBATCH_MODE: &str = "microbatch";
 
@@ -44,7 +44,9 @@ fn mapped_references<'py>(
 }
 
 fn references<'py>(owner: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    resource_reads::references(owner)?.try_iter()?.collect()
+    sqlbuild_python_project::compiled_views::main::resource_reads::references::references(owner)?
+        .try_iter()?
+        .collect()
 }
 
 /// Whether a model's `incremental_mode` is microbatch.
@@ -90,7 +92,7 @@ impl<'py> ReferenceGraph for ProjectLineage<'py> {
 
     fn producer_facts(&self, name: &str) -> PyResult<ProducerFacts> {
         let producer = self.models_by_name.get(self.functions_by_name.py(), name)?;
-        let values: Bound<'py, PyAny> = native_field(&model_reads::config(&producer)?, "values")?;
+        let values: Bound<'py, PyAny> = native_field(&config(&producer)?, "values")?;
         let capped: bool = match microbatch_limit_config(&values)?.1 {
             Some(action) => CAP_ACTIONS.contains(&text(&action)?.as_str()),
             None => false,
@@ -131,7 +133,7 @@ pub(crate) fn resolve_lineage_reference<'py>(
         models_by_name,
         functions_by_name,
     };
-    let name: String = model_reads::model_name(model)?;
+    let name: String = model_name(model)?;
     lineage_reference(&graph, (&name, references(model)?), input_name)
         .map_err(|failure| lineage_error(py, failure))
 }
@@ -154,7 +156,7 @@ pub(crate) fn reject_capped_watermark_inputs<'py>(
         models_by_name,
         functions_by_name,
     };
-    let name: String = model_reads::model_name(model)?;
+    let name: String = model_name(model)?;
     let inputs: Vec<String> = watermark_names(model)?;
     match capped_watermark_input(&graph, (&name, references(model)?), inputs) {
         Ok(None) => Ok(()),

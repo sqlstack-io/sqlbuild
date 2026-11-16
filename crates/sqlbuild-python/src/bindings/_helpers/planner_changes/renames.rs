@@ -1,8 +1,8 @@
 //! Model renames that downstream `__ref` names may have been rewritten for.
 
-use crate::bindings::_helpers::fingerprints::query_hashes::compute_query_hash;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
+use sqlbuild_python_project::fingerprints::main::compute_query_hash::compute_query_hash;
 use std::collections::BTreeSet;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -13,9 +13,6 @@ use sqlbuild_analysis::planner_changes::main::origin_reference_names::origin_ref
 use sqlbuild_analysis::planner_changes::models::{NameSpan, RenameCandidate};
 use sqlbuild_rules::lint_text::main::neutralize_interpolation::neutralize_interpolation;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::planner_identity::hashing::baselined_model_query_hash;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
@@ -24,6 +21,12 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::model_reads::model_name::model_name;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::compiled_views::main::model_reads::references::references;
+use sqlbuild_python_project::planner_identity::main::baselined_model_query_hash::baselined_model_query_hash;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
 
 const GENERIC_DIALECT: &str = "generic";
 const FINAL_NEWLINE: &str = "\n";
@@ -235,13 +238,12 @@ fn changed_referencing_query(
     let ref_kind: Bound<'_, PyAny> = enum_member(py, RecordId::SqlReferenceKind, "REF")?;
     let dialect: Option<String> = native_field(snapshot, "column_dialect")?.extract()?;
     for model in selected {
-        let recorded: Bound<'_, PyAny> =
-            mapping_get(&recorded_models, model_reads::name_object(&model)?)?;
+        let recorded: Bound<'_, PyAny> = mapping_get(&recorded_models, name_object(&model)?)?;
         if recorded.is_none() {
             continue;
         }
         let mut references_models: bool = false;
-        for reference in model_reads::references(&model)?.try_iter()? {
+        for reference in references(&model)?.try_iter()? {
             if native_field(&reference?, "ref_kind")?.eq(&ref_kind)? {
                 references_models = true;
                 break;
@@ -250,11 +252,8 @@ fn changed_referencing_query(
         if references_models
             && baselined_model_query_hash(
                 py,
-                &model_reads::model_name(&model)?,
-                (
-                    &model_reads::query_sql(&model)?.extract::<String>()?,
-                    dialect.as_deref(),
-                ),
+                &model_name(&model)?,
+                (&query_sql(&model)?.extract::<String>()?, dialect.as_deref()),
                 &recorded,
             )? != native_field(&recorded, "definition_hash")?.extract::<String>()?
         {

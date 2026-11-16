@@ -1,10 +1,5 @@
 //! Static plans for commands that do not build models, and direct seed identity reads.
 
-use crate::bindings::_helpers::compiled_views::function_reads;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::compiled_views::seed_reads;
-use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use crate::bindings::_helpers::planner_entries::models::RelationsRequest;
 use crate::bindings::_helpers::planner_entries::plan_output::{
     function_entry, selected_test_entries, test_selected,
@@ -15,7 +10,6 @@ use crate::bindings::_helpers::planner_entries::values::{
 };
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
 use crate::bindings::_helpers::planner_identity::metadata::build_seed_identity;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes;
 use crate::bindings::_helpers::planner_strategy::audit_entries::build_selected_audit_entries;
 use crate::bindings::_helpers::planner_strategy::model_entries::extract_seed_columns;
@@ -33,6 +27,15 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::function_reads::deps::deps;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
+use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
+use sqlbuild_python_project::compiled_views::main::project_reads::sql_tests::sql_tests;
+use sqlbuild_python_project::compiled_views::main::seed_reads::schema_entry::schema_entry;
+use sqlbuild_python_project::compiled_views::main::seed_reads::seed_file::seed_file;
+use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
+use sqlbuild_python_project::planner_phases::main::object::object;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Optional fields of a static command plan; absent ones take `PlanOutput` defaults.
@@ -162,10 +165,10 @@ pub(crate) fn build_audit_command_plan<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
     let materializations = PyDict::new(py);
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in models(project)?.try_iter()? {
         let model = model?;
         materializations.set_item(
-            model_reads::name_object(&model)?,
+            name_object(&model)?,
             native_field(&materialization_of(&model)?, "value")?,
         )?;
     }
@@ -203,9 +206,15 @@ fn called_function_keys<'py>(
 ) -> PyResult<Bound<'py, PySet>> {
     let py: Python<'py> = project.py();
     let functions: Bound<'py, PyDict> = PyDict::new(py);
-    for function in project_reads::functions(project)?.try_iter()? {
+    for function in
+        sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(project)?
+            .try_iter()?
+    {
         let function = function?;
-        functions.set_item(function_reads::key(&function)?, function)?;
+        functions.set_item(
+            sqlbuild_python_project::compiled_views::main::function_reads::key::key(&function)?,
+            function,
+        )?;
     }
     let called: Bound<'py, PySet> = PySet::empty(py)?;
     let mut pending: Vec<Bound<'py, PyAny>> = direct;
@@ -217,7 +226,7 @@ fn called_function_keys<'py>(
         let Some(function) = functions.get_item(&key)? else {
             continue;
         };
-        for dependency in function_reads::deps(&function)?.try_iter()? {
+        for dependency in deps(&function)?.try_iter()? {
             let dependency = dependency?;
             if functions.contains(&dependency)? {
                 pending.push(dependency);
@@ -257,7 +266,7 @@ pub(crate) fn build_test_command_plan<'py>(
     )?;
     let (entries, warnings) = (selected.entries, selected.warnings);
     let mut case_names: BTreeSet<String> = BTreeSet::new();
-    for test in project_reads::sql_tests(&project)?.try_iter()? {
+    for test in sql_tests(&project)?.try_iter()? {
         let test = test?;
         let case_name = native_field(&test, "case_name")?;
         if !case_name.is_none() && test_selected(&test, &selected_keys, &selection)? {
@@ -274,9 +283,16 @@ pub(crate) fn build_test_command_plan<'py>(
     }
     let function_keys = called_function_keys(&project, function_keys)?;
     let mut functions: Vec<Bound<'py, PyAny>> = Vec::new();
-    for function in project_reads::functions(&project)?.try_iter()? {
+    for function in
+        sqlbuild_python_project::compiled_views::main::project_reads::functions::functions(
+            &project,
+        )?
+        .try_iter()?
+    {
         let function = function?;
-        if !function_keys.contains(function_reads::key(&function)?)? {
+        if !function_keys.contains(
+            sqlbuild_python_project::compiled_views::main::function_reads::key::key(&function)?,
+        )? {
             continue;
         }
         let fingerprint_sql = object(py, build_compiled_function_fingerprint_sql(&function)?)?;
@@ -334,14 +350,19 @@ pub(crate) fn build_seed_command_plan<'py>(
     };
     let selected_keys = native_field(scope, "selected_keys")?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for seed in project_reads::seeds(project)?.try_iter()? {
+    for seed in seeds(project)?.try_iter()? {
         let seed = seed?;
-        if !selected_keys.contains(seed_reads::key(&seed)?)? {
+        if !selected_keys
+            .contains(sqlbuild_python_project::compiled_views::main::seed_reads::key::key(&seed)?)?
+        {
             continue;
         }
         let identity = object(py, build_seed_identity(&seed)?)?;
         let (version_hash, metadata_json) = (identity.get_item(0)?, identity.get_item(1)?);
-        let previous = mapping_get(&existing, seed_reads::name(&seed)?)?;
+        let previous = mapping_get(
+            &existing,
+            sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?,
+        )?;
         let reason = if previous.is_none() {
             "FIRST_RUN"
         } else if native_field(&previous, "version_hash")?.ne(&version_hash)? {
@@ -353,17 +374,17 @@ pub(crate) fn build_seed_command_plan<'py>(
             py,
             RecordId::SeedPlanEntry,
             &[
-                ("key", seed_reads::key(&seed)?),
-                ("name", seed_reads::name(&seed)?),
-                ("destination", seed_reads::destination(&seed)?),
+                ("key", sqlbuild_python_project::compiled_views::main::seed_reads::key::key(&seed)?),
+                ("name", sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?),
+                ("destination", sqlbuild_python_project::compiled_views::main::seed_reads::destination::destination(&seed)?),
                 (
                     "file_path",
-                    native_field(&seed_reads::seed_file(&seed)?, "file_path")?,
+                    native_field(&seed_file(&seed)?, "file_path")?,
                 ),
                 ("columns", object(py, extract_seed_columns(&seed)?)?),
                 (
                     "csv_settings",
-                    native_field(&seed_reads::schema_entry(&seed)?, "csv_settings")?,
+                    native_field(&schema_entry(&seed)?, "csv_settings")?,
                 ),
                 ("fingerprint_definition", metadata_json.clone()),
                 ("fingerprint_version_hash", version_hash),
@@ -409,7 +430,10 @@ pub(crate) fn read_selected_seed_fingerprints<'py>(
         BTreeMap::new();
     for seed in seeds.try_iter()? {
         let seed = seed?;
-        let destination = seed_reads::destination(&seed)?;
+        let destination =
+            sqlbuild_python_project::compiled_views::main::seed_reads::destination::destination(
+                &seed,
+            )?;
         let schema = native_field(&destination, "schema")?;
         if schema.is_none() {
             continue;
@@ -420,7 +444,10 @@ pub(crate) fn read_selected_seed_fingerprints<'py>(
             .entry((database.clone().unwrap_or_default(), schema.clone()))
             .or_insert_with(|| ((database, schema), BTreeSet::new()))
             .1
-            .insert(seed_reads::name(&seed)?.extract()?);
+            .insert(
+                sqlbuild_python_project::compiled_views::main::seed_reads::name::name(&seed)?
+                    .extract()?,
+            );
     }
     let fingerprints = PyDict::new(py);
     let mut relations_by_target: Vec<Bound<'py, PyAny>> = Vec::new();

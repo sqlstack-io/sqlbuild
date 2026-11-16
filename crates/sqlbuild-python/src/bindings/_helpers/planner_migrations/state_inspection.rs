@@ -1,7 +1,7 @@
 //! Read-only warehouse evidence gathered once for all model migrations in one plan.
 
-use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_project::fingerprints::main::read_latest_fingerprints::read_latest_fingerprints;
 use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{

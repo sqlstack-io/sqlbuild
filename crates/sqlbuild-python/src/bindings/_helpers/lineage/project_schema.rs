@@ -5,8 +5,9 @@ use sqlbuild_analysis::lineage::models::{
     LineageResourceType, LineageSchemaResource, RichSchemaResource,
 };
 
-use crate::bindings::_helpers::compiled_views::model_reads::{declared_rows, inferred_rows};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::compiled_views::main::model_reads::declared_rows::declared_rows;
+use sqlbuild_python_project::compiled_views::main::model_reads::inferred_rows::inferred_rows;
 
 type TypedColumns = Vec<(String, Option<String>)>;
 

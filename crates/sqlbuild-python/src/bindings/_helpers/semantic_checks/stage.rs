@@ -6,8 +6,6 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRef
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use crate::bindings::_helpers::analysis_session::session::NativeModelAnalysisSession;
-use crate::bindings::_helpers::compiled_views::model_reads::output_proven;
 use crate::bindings::_helpers::rules::early_builtin_rules::start_early_rules;
 use crate::bindings::_helpers::semantic_checks::completion::completed_diagnostics;
 use crate::bindings::_helpers::semantic_checks::metadata::metadata_diagnostics;
@@ -15,10 +13,12 @@ use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
 use crate::bindings::_helpers::semantic_checks::type_recovery::{
     StageShared, items, recovered_types,
 };
-use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::main::native_compiler_error::native_compiler_error;
 use sqlbuild_python_base::boundary::models::Request;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::analysis::models::ProjectCatalog;
+use sqlbuild_python_project::analysis_session::models::NativeModelAnalysisSession;
+use sqlbuild_python_project::compiled_views::main::model_reads::output_proven::output_proven;
 
 const NO_CATALOG_MESSAGE: &str =
     "NativeCompilerError: native semantic completion: the project has no analysis catalog";

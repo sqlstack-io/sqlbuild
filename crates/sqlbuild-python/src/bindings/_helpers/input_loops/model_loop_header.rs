@@ -17,7 +17,6 @@ use sqlbuild_model_config::header_metadata::models::ParsedColumn;
 use sqlbuild_model_config::model_validation::models::ColumnMigration;
 use sqlbuild_model_config::types::NodeKind;
 
-use crate::bindings::_helpers::compiled_project::schema_facts::family_fact;
 use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, compile_error, config_error,
 };
@@ -46,6 +45,7 @@ use sqlbuild_python_front::model_config::models::HeaderColumns;
 use sqlbuild_python_front::model_config::models::HeaderFamilies;
 use sqlbuild_python_front::model_config::models::NativeColumnSpec;
 use sqlbuild_python_front::model_config::types::HeaderValue;
+use sqlbuild_python_project::compiled_project::main::schema_facts::family_fact::family_fact;
 
 const DESCRIPTION_KEY: &str = "description";
 const COLUMNS_KEY: &str = "columns";

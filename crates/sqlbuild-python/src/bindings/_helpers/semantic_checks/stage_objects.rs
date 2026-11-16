@@ -2,7 +2,6 @@
 
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::compiled_views::records::project_with;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString};
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
@@ -11,6 +10,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::records::project_with::project_with;
 
 const COMPILE_TYPES_MODULE: &str = "sqlbuild.compiler.compile.types";
 

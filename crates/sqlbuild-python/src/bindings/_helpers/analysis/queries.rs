@@ -27,9 +27,11 @@ fn parse_warehouse_type(py: Python<'_>, spelling: &str, dialect: &str) -> PyResu
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    crate::bindings::_helpers::analysis::binding_catalog::register(module)?;
+    sqlbuild_python_project::analysis::main::register_binding_catalog::register_binding_catalog(
+        module,
+    )?;
     crate::bindings::_helpers::analysis::required_columns::register(module)?;
-    crate::bindings::_helpers::references::explicit_references::register(module)?;
+    sqlbuild_python_project::references::main::register_explicit_references::register_explicit_references(module)?;
     crate::bindings::_helpers::analysis::binding_locations::register(module)?;
     module.add_function(wrap_pyfunction!(query_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(parse_warehouse_type, module)?)?;

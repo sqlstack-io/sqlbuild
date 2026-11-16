@@ -18,7 +18,6 @@ use sqlbuild_cli::diff_report::types::DiffNamedValue;
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::compile_driver::diff::run_diff_pipeline;
-use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::dagster_invocation::access::string_tuple as texts;
 use crate::bindings::_helpers::diff_report::command::target_max_full_rows;
 use crate::bindings::_helpers::diff_report::facts::diff_facts;
@@ -78,7 +77,10 @@ fn models_named<'py>(
     names: &[String],
 ) -> PyResult<Vec<(String, Bound<'py, PyAny>)>> {
     let mut models: Vec<(String, Bound<'py, PyAny>)> = Vec::new();
-    for model in project_reads::models(project)?.try_iter()? {
+    for model in
+        sqlbuild_python_project::compiled_views::main::project_reads::models::models(project)?
+            .try_iter()?
+    {
         let model: Bound<'py, PyAny> = model?;
         let name: String = native_field(&model, "name")?.extract()?;
         if names.contains(&name) {

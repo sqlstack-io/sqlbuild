@@ -11,7 +11,6 @@ use sqlbuild_orchestration::sensors::models::{
     CustomSensorOutcome, SensorCondition, SensorEvaluationRequest,
 };
 
-use crate::bindings::_helpers::compiled_project::snapshot_declarations::python_declarations;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -24,6 +23,7 @@ use sqlbuild_python_front::discovery::main::python_files::provider_by_name::prov
 use sqlbuild_python_front::discovery::main::python_files::provider_usages::provider_usages;
 use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
+use sqlbuild_python_project::compiled_project::main::snapshot_declarations::python_declarations::python_declarations;
 
 pub(crate) fn evaluate_sensor(
     py: Python<'_>,

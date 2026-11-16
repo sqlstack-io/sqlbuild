@@ -40,7 +40,6 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_com
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
@@ -70,6 +69,8 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_project::compiled_project::models::WorkerBuild;
+use sqlbuild_python_project::compiled_project::types::VerifiedRun;
 
 /// Why `--since` selected each test, by inspection label.
 type SelectionReasons = HashMap<String, Vec<String>>;

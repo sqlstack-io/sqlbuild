@@ -1,15 +1,16 @@
 //! Adapt immutable migration fingerprints without changing their persisted representation.
 
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::fingerprints::query_hashes::compute_query_hash;
 use crate::bindings::_helpers::planner_migrations::column_objects::{replace, text};
 use crate::bindings::_helpers::planner_migrations::constants::MIGRATION_MODEL_NAME_METADATA_KEY;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::state_rows::main::event_rows::presumed_utc::presumed_utc;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
+use sqlbuild_python_project::compiled_views::main::model_reads::query_sql::query_sql;
+use sqlbuild_python_project::fingerprints::main::compute_query_hash::compute_query_hash;
+use sqlbuild_python_project::planner_phases::main::object::object;
 
 pub(super) fn applies(
     model: &Bound<'_, PyAny>,
@@ -17,7 +18,7 @@ pub(super) fn applies(
     snapshot: &Bound<'_, PyAny>,
 ) -> PyResult<bool> {
     let own = native_field(&native_field(snapshot, "fingerprints")?, "models")?
-        .call_method1("get", (model_reads::name_object(model)?,))?;
+        .call_method1("get", (name_object(model)?,))?;
     Ok(own.is_none()
         || presumed_utc(&native_field(&own, "ts")?)?
             < presumed_utc(&native_field(event, "created_at")?)?)
@@ -45,18 +46,21 @@ pub(super) fn handover<'py>(
     if let Ok(payload) = payload.cast::<PyDict>()
         && payload.contains(key)?
     {
-        payload.set_item(key, model_reads::name_object(model)?)?;
+        payload.set_item(key, name_object(model)?)?;
         let kwargs = PyDict::new(py);
         kwargs.set_item("sort_keys", true)?;
         kwargs.set_item("separators", (",", ":"))?;
         kwargs.set_item("default", imported(py, "builtins", "str")?)?;
         metadata = native_field(&json, "dumps")?.call((payload,), Some(&kwargs))?;
     }
-    let destination = model_reads::destination(model)?;
+    let destination =
+        sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+            model,
+        )?;
     replace(
         fingerprint,
         &[
-            ("node_name", model_reads::name_object(model)?),
+            ("node_name", name_object(model)?),
             ("target_database", native_field(&destination, "database")?),
             ("target_schema", native_field(&destination, "schema")?),
             ("target_name", native_field(&destination, "name")?),
@@ -88,14 +92,14 @@ pub(super) fn equivalent<'py>(
     replace(
         &handover,
         &[
-            ("definition", model_reads::query_sql(model)?),
+            ("definition", query_sql(model)?),
             (
                 "definition_hash",
                 object(
                     py,
                     compute_query_hash(
                         py,
-                        &model_reads::query_sql(model)?.extract::<String>()?,
+                        &query_sql(model)?.extract::<String>()?,
                         dialect.extract::<Option<String>>()?.as_deref(),
                     )?,
                 )?,

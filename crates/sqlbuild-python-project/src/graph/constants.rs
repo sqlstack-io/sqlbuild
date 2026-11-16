@@ -1,0 +1,12 @@
+//! Public constants of graph.
+
+use crate::graph::_helpers::getters::read_compiled_project_graph;
+use crate::graph::models::CompiledProjectGraph;
+use sqlbuild_python_base::records::main::registry::class_of::class_of;
+use sqlbuild_python_base::records::models::GetterEntry;
+
+/// The getter readers of this module's native pyclasses.
+pub const GETTERS: &[GetterEntry] = &[GetterEntry {
+    class: class_of::<CompiledProjectGraph>,
+    read: read_compiled_project_graph,
+}];

@@ -29,8 +29,6 @@ use crate::bindings::_helpers::load::load_selection::{
     LoadProject, LoaderDefaults, loader_defaults, loader_write_schemas, target_vars,
 };
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
-use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
-use crate::bindings::_helpers::references::source_relations::render_source_relation;
 use crate::bindings::_helpers::result_output::documents::format_load_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
@@ -54,6 +52,8 @@ use sqlbuild_python_front::discovery::main::sources::consumer_uses::consumer_use
 use sqlbuild_python_front::discovery::main::sources::require_used_secrets::require_used_secrets;
 use sqlbuild_python_front::discovery::main::sources::sink_uses::sink_uses;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
+use sqlbuild_python_project::planner_selection::main::reject_unit_test_selectors::reject_unit_test_selectors;
+use sqlbuild_python_project::references::main::render_source_relation::render_source_relation;
 
 const LOADER_NODE_KEY: &str = "sqlbuild_loader_node";
 const EXECUTION_COMMAND: &str = "sqb load";

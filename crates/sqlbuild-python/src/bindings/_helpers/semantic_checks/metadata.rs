@@ -13,15 +13,12 @@ use sqlbuild_analysis::semantic_checks::models::{
 use sqlbuild_analysis::semantic_validation::models as validation;
 use sqlbuild_model_config::header_metadata::constants::ACCEPTED_VALUES_ARGUMENT;
 
-use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::compiled_views::model_reads::binding_validated;
 use crate::bindings::_helpers::semantic_checks::failures::semantic_error;
 use crate::bindings::_helpers::semantic_checks::inputs::{
     column_names, resource_sql_diagnostics, sql_test_columns,
 };
 use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
 use crate::bindings::_helpers::semantic_checks::type_recovery::items;
-use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
 use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_project::models::ModelMetadataTexts;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
@@ -32,6 +29,9 @@ use sqlbuild_python_base::types::CompilerDetach;
 use sqlbuild_python_front::model_config::models::AuditInstance;
 use sqlbuild_python_front::model_config::types::HeaderValue;
 use sqlbuild_python_front::model_config::types::PyConfigNode;
+use sqlbuild_python_project::compiled_views::main::model_reads::binding_validated::binding_validated;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
+use sqlbuild_python_project::semantic_shapes::main::project_shapes::project_shapes;
 
 /// `SqlReferenceKind.UDF` and `SqlReferenceKind.TABLE_FUNCTION` values.
 const FUNCTION_REFERENCE_KINDS: [&str; 2] = ["udf", "table_fn"];

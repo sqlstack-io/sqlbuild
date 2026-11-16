@@ -14,21 +14,9 @@ use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_discovery::project_validation::main::validate_orchestration_names::validate_orchestration_names;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
-use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
-use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
-    compile_declarations, python_declarations,
-};
-use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
-use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
-use crate::bindings::_helpers::compiled_project::snapshot_roles::compile_project_roles;
-use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::graph::python_selection::ProjectSelection;
 use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
 use crate::bindings::_helpers::location_command::snapshot_providers::providers_document;
-use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_identity::identities::direct_model_version_identities;
-use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
-use crate::bindings::_helpers::planner_scope::values::project_graph;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::orchestration_reads::main::environment_hash::environment_hash;
 use sqlbuild_python_base::records::main::fields::field::field;
@@ -36,6 +24,17 @@ use sqlbuild_python_front::discovery::main::project::named_node_rows::named_node
 use sqlbuild_python_front::discovery::main::project::project_facts::project_facts;
 use sqlbuild_python_front::discovery::main::project::validation_error::validation_error;
 use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
+use sqlbuild_python_project::compiled_project::main::snapshot_declarations::compile_declarations::compile_declarations;
+use sqlbuild_python_project::compiled_project::main::snapshot_declarations::python_declarations::python_declarations;
+use sqlbuild_python_project::compiled_project::main::snapshot_models::model_nodes::model_nodes;
+use sqlbuild_python_project::compiled_project::main::snapshot_resources::resource_nodes::resource_nodes;
+use sqlbuild_python_project::compiled_project::main::snapshot_roles::compile_project_roles::compile_project_roles;
+use sqlbuild_python_project::compiled_project::models::NativeOrchestrationSnapshot;
+use sqlbuild_python_project::compiled_views::models::NativeProjectView;
+use sqlbuild_python_project::graph::models::ProjectSelection;
+use sqlbuild_python_project::planner_identity::main::execution_deps::execution_deps;
+use sqlbuild_python_project::planner_scope::main::build_planner_scope::build_planner_scope;
+use sqlbuild_python_project::planner_scope::main::project_graph::project_graph;
 
 /// The Python node kind whose functions load sources.
 const LOADER_KIND: &str = "loader";

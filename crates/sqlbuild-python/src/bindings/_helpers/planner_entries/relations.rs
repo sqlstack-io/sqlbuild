@@ -1,20 +1,13 @@
 //! Relation locations and source metadata for plan entry construction.
 
-use crate::bindings::_helpers::compiled_views::audit_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_entries::models::{
     PlannerRelationsContext, RelationsRequest,
 };
 use crate::bindings::_helpers::planner_entries::values::planner_model;
-use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::locations::build_function_locations;
 use crate::bindings::_helpers::planner_resolution::locations::build_model_locations;
 use crate::bindings::_helpers::planner_resolution::locations::build_seed_locations;
 use crate::bindings::_helpers::planner_resolution::refs::apply_deferred_locations;
-use crate::bindings::_helpers::planner_scope::retained::scope_data;
-use crate::bindings::_helpers::planner_scope::sources::source_load_map;
-use crate::bindings::_helpers::planner_scope::values::keys;
 use crate::bindings::_helpers::planner_strategy::audit_entries::audit_is_selected;
 use crate::bindings::_helpers::planner_warehouse::semantic_sources::semantic_source_columns;
 use crate::bindings::_helpers::planner_warehouse::source_columns::gather_source_inspection;
@@ -29,6 +22,16 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_values::mapping_values;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::main::audit_reads::scope_deps::scope_deps;
+use sqlbuild_python_project::compiled_views::main::project_reads::audits::audits;
+use sqlbuild_python_project::compiled_views::main::project_reads::functions::functions;
+use sqlbuild_python_project::compiled_views::main::project_reads::models::models;
+use sqlbuild_python_project::compiled_views::main::project_reads::seeds::seeds;
+use sqlbuild_python_project::graph::main::keys::native_key::native_key;
+use sqlbuild_python_project::planner_phases::main::object::object;
+use sqlbuild_python_project::planner_scope::main::keys::keys;
+use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
+use sqlbuild_python_project::planner_scope::main::source_load_map::source_load_map;
 use std::collections::HashSet;
 
 /// Relation keys needed to render selected audits without selecting those relations.
@@ -37,10 +40,10 @@ fn selected_audit_relation_keys(
     selected_keys: &HashSet<ObjectKey>,
 ) -> PyResult<HashSet<ObjectKey>> {
     let mut keys: HashSet<ObjectKey> = HashSet::new();
-    for audit in project_reads::audits(project)?.try_iter()? {
+    for audit in audits(project)?.try_iter()? {
         let audit = audit?;
         if audit_is_selected(&audit, selected_keys)? {
-            for dependency in audit_reads::scope_deps(&audit)?.try_iter()? {
+            for dependency in scope_deps(&audit)?.try_iter()? {
                 keys.insert(native_key(&dependency?)?);
             }
         }
@@ -103,15 +106,9 @@ pub(crate) fn planner_relations_context<'py>(
         deferral
     };
     let selected_keys = native_field(&scope, "selected_keys")?;
-    let mut model_locations = object(
-        py,
-        build_model_locations(&project_reads::models(&project)?)?,
-    )?;
-    let mut seed_locations = object(py, build_seed_locations(&project_reads::seeds(&project)?)?)?;
-    let function_locations = object(
-        py,
-        build_function_locations(&project_reads::functions(&project)?)?,
-    )?;
+    let mut model_locations = object(py, build_model_locations(&models(&project)?)?)?;
+    let mut seed_locations = object(py, build_seed_locations(&seeds(&project)?)?)?;
+    let function_locations = object(py, build_function_locations(&functions(&project)?)?)?;
     let deferred_locations = native_field(&deferral, "deferred_locations")?;
     if !deferred_locations.is_none() {
         let applied = object(

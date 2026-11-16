@@ -13,12 +13,6 @@ use sqlbuild_rules::project_tree::main::resolve_project_path::resolve_project_pa
 use sqlbuild_rules::project_tree::main::tracked_text_path::tracked_text_path;
 use sqlbuild_rules::project_tree::models::ProjectTreeEntry;
 
-use crate::bindings::_helpers::compiled_views::audit_views::NativeCompiledAudit;
-use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
-use crate::bindings::_helpers::compiled_views::function_views::NativeCompiledFunction;
-use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::compiled_views::seed_views::NativeCompiledSeed;
-use crate::bindings::_helpers::compiled_views::source_views::NativeCompiledSource;
 use crate::bindings::_helpers::rules::fact_encoder::{
     Encoded, FactEncoder, FactFailure, error_digest, value_digest,
 };
@@ -31,6 +25,12 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as record_field_or_attribute;
 use sqlbuild_python_base::records::main::fields::record_spec::record_spec;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledAudit;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledFunction;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledModel;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledSeed;
+use sqlbuild_python_project::compiled_views::models::NativeCompiledSource;
+use sqlbuild_python_project::compiled_views::models::NativeProjectView;
 
 const MODEL_RECORD: &str = "sqlbuild._native.Model";
 const MATERIALIZED: &str = "materialized";

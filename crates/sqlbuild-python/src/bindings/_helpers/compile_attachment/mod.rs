@@ -1,4 +1,3 @@
-pub(crate) mod cursor_roles;
 pub(crate) mod declaration_scope;
 pub(crate) mod model_config;
 pub(crate) mod model_inputs;

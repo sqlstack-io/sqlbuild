@@ -2,7 +2,6 @@
 
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_migrations::column_objects::config;
 use crate::bindings::_helpers::planner_migrations::models::ModelMigrationDeclaration;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
@@ -11,6 +10,7 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::state_rows::main::migrations::newest_move::newest_move;
+use sqlbuild_python_project::compiled_views::main::model_reads::name_object::name_object;
 
 pub(super) fn identity(item: &Bound<'_, PyAny>) -> PyResult<bool> {
     let materialized = config(item, "materialized")?;
@@ -111,11 +111,14 @@ pub(super) fn resumed<'py>(
     let target = native_field(&native_field(runtime, "project")?, "effective_target_name")?;
     let events = native_field(state, "events")?;
     for item in models {
-        let name = model_reads::name_object(item)?;
+        let name = name_object(item)?;
         if !unbuilt.contains(&name)? || !(history(item)? || identity(item)?) {
             continue;
         }
-        let destination = model_reads::destination(item)?;
+        let destination =
+            sqlbuild_python_project::compiled_views::main::model_reads::destination::destination(
+                item,
+            )?;
         let event = newest(&events, &destination)?;
         if event.is_none() {
             continue;

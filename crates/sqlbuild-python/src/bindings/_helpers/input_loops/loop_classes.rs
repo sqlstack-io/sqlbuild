@@ -378,10 +378,7 @@ pub(crate) fn model_loop_classes<'py>(
         py,
         vec![(
             "declaration_rows",
-            pyo3::wrap_pyfunction!(
-                crate::bindings::_helpers::compiled_views::records::declaration_rows,
-                py
-            )?
+            sqlbuild_python_project::compiled_views::main::records::declaration_rows_function::declaration_rows_function(py)?
             .into_any(),
         )],
     )?;

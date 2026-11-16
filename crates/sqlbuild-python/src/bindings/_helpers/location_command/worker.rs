@@ -27,11 +27,6 @@ use crate::bindings::_helpers::cli::dispatch::{Invocation, command_facts, wareho
 use crate::bindings::_helpers::command_runtime::warehouses::{
     WarehouseInputs, configured_warehouses,
 };
-use crate::bindings::_helpers::compiled_project::constants::SQL_TEST_KEY_PREFIX;
-use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::{NodeKeys, WorkerBuild};
-use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
-use crate::bindings::_helpers::compiled_views::project_reads::sql_tests;
 use crate::bindings::_helpers::freshness::freshness_command::run_freshness_command;
 use crate::bindings::_helpers::location_command::command::compile_snapshot;
 use crate::bindings::_helpers::location_command::constants::{
@@ -52,6 +47,12 @@ use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_front::discovery::main::project::configured_changes::configured_changes;
+use sqlbuild_python_project::compiled_project::constants::SQL_TEST_KEY_PREFIX;
+use sqlbuild_python_project::compiled_project::models::NativeOrchestrationSnapshot;
+use sqlbuild_python_project::compiled_project::models::NativeOrchestrationWorker;
+use sqlbuild_python_project::compiled_project::models::WorkerBuild;
+use sqlbuild_python_project::compiled_project::types::NodeKeys;
+use sqlbuild_python_project::compiled_views::main::project_reads::sql_tests::sql_tests;
 
 /// Each audit and SQL test the snapshot publishes, with the node keys it checks.
 fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Vec<String>> {

@@ -14,23 +14,10 @@ use sqlbuild_rules::lint_text::constants::{DEFAULT_LINE_WIDTH, DEFAULT_MAX_DESCR
 use sqlbuild_rules::lint_text::main::resolve_format_settings::resolve_format_settings;
 use sqlbuild_rules::lint_text::models::FormatSettings;
 
-use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditBlockRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::DiagnosticSettings;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::FunctionRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::FunctionSettings;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::LoaderRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::ScenarioRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::SourceRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::TestBlockRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::TestCaseRow;
-use crate::bindings::_helpers::compiled_project::attachment_inputs::TestFileRow;
-use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::input_loops::resource_attachment::{
     attach_audits, attach_functions, attach_sources, attach_sql_tests,
 };
 use crate::bindings::_helpers::input_loops::resource_diagnostics::resource_diagnostics;
-use crate::bindings::_helpers::sql_test_glue::constants::SQL_TEST_CTE_SCAN_ALGORITHM;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -44,6 +31,19 @@ use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::NativeAttr;
 use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_project::compiled_project::models::AuditBlockRow;
+use sqlbuild_python_project::compiled_project::models::AuditFileRow;
+use sqlbuild_python_project::compiled_project::models::DiagnosticSettings;
+use sqlbuild_python_project::compiled_project::models::FunctionRow;
+use sqlbuild_python_project::compiled_project::models::FunctionSettings;
+use sqlbuild_python_project::compiled_project::models::NativeCompiledProject;
+use sqlbuild_python_project::compiled_project::models::ScenarioRow;
+use sqlbuild_python_project::compiled_project::models::TestBlockRow;
+use sqlbuild_python_project::compiled_project::models::TestFileRow;
+use sqlbuild_python_project::compiled_project::types::LoaderRow;
+use sqlbuild_python_project::compiled_project::types::SourceRow;
+use sqlbuild_python_project::compiled_project::types::TestCaseRow;
+use sqlbuild_python_project::sql_test_glue::constants::SQL_TEST_CTE_SCAN_ALGORITHM;
 
 const YAML_FILE_SUFFIXES: [&str; 2] = [".yml", ".yaml"];
 const PATHLIB_MODULE: &str = "pathlib";
