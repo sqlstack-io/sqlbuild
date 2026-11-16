@@ -14,12 +14,13 @@
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatDuration, formatIn, formatStamp } from '$lib/format/time';
 	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
-	import { kindLine } from '$lib/build-area/labels';
+	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
 	import { formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
-	import { memberLinks, type MemberInfo } from '$lib/lineage/member-graph';
+	import { memberLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
+	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import { formatMs } from '$lib/build-area/labels';
@@ -53,6 +54,18 @@
 	// Nodes picked in the graph, by catalog key. A job runs with or without them; a group's pick runs as an ad-hoc command.
 	let picked = $state<string[]>([]);
 	let graph = $state<{ clear: () => void }>();
+	// On a group's graph: the member job, or one of its nodes, selected.
+	let memberSelection = $state<MemberSelection | null>(null);
+	$effect(() => {
+		if (def?.kind === 'group') picked = memberSelection?.node ? [memberSelection.node] : [];
+	});
+	function clearSelection() {
+		graph?.clear();
+		memberSelection = null;
+	}
+	const selectedMember = $derived(memberSelection && !memberSelection.node ? memberSelection.member : null);
+	const memberFacts = $derived(selectedMember ? (memberJobs.data?.get(selectedMember) ?? null) : null);
+	const memberWaits = $derived(selectedMember && def?.groupMembers ? waitReasons(selectedMember, def.groupMembers, links) : []);
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 	const pickedNodes = $derived(picked.map((k) => byKey.get(k)).filter((n) => !!n));
 	const canRunPicked = $derived(app.client.supports('launchAdhocRun'));
@@ -83,11 +96,11 @@
 
 <AppTopbar title="Jobs">
 	{#if picked.length && def?.kind === 'job'}
-		<Button variant="ghost" onclick={() => graph?.clear()}>Clear selection</Button>
+		<Button variant="ghost" onclick={clearSelection}>Clear selection</Button>
 		<GatedButton size="bar" requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run all but {picked.length}</GatedButton>
 		<GatedButton size="bar" requires="job.run" variant="default" onclick={() => run(picked)}><PlayIcon class="size-3.5 fill-current stroke-none" />Run {picked.length} selected</GatedButton>
 	{:else if picked.length && canRunPicked}
-		<Button variant="ghost" onclick={() => graph?.clear()}>Clear selection</Button>
+		<Button variant="ghost" onclick={clearSelection}>Clear selection</Button>
 		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(pickedNodes.map((n) => n.key))))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run {picked.length} selected</GatedButton>
 	{:else}
 		<GatedButton
@@ -145,7 +158,7 @@
 						<p class="faint graph-wait">{def.groupMembers ? 'This group has no member jobs.' : "The server doesn't report this group's member jobs."}</p>
 					{:else if def.kind === 'group'}
 						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
-						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} />
+						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} bind:selection={memberSelection} />
 					{:else if catalog.data}
 						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} onselect={(keys) => (picked = keys)} />
 					{:else}
@@ -154,7 +167,48 @@
 				</div>
 
 				<aside class="rail sb-scroll" class:sections={!pickedNodes.length}>
-					{#if pickedNodes.length === 1}
+					{#if selectedMember}
+						<InspectorHead title={selectedMember} href={to(`/jobs/${selectedMember}`)} linkLabel="Open job ↗" linkTitle="Open the page of {selectedMember}">
+							{#snippet meta()}
+								<span>Job in {name}</span>
+								{#if memberFacts?.nodeCount !== null && memberFacts?.nodeCount !== undefined}<span>{memberFacts.nodeCount} node{memberFacts.nodeCount === 1 ? '' : 's'}</span>{/if}
+							{/snippet}
+						</InspectorHead>
+						<InspectorSection title="Description">
+							{#if memberFacts?.description}<p class="about-text">{memberFacts.description}</p>{:else}<p class="faint">No description.</p>{/if}
+						</InspectorSection>
+						<InspectorSection title="Waits for">
+							{#if memberWaits.length}
+								{#each memberWaits as w (w.upstream)}
+									<div class="wait">
+										<a class="mono" href={to(`/jobs/${w.upstream}`)}>{w.upstream}</a>
+										{#if w.reasons.length}
+											<ul class="reasons">
+												{#each w.reasons as r (`${r.from}>${r.to}`)}
+													<li><a class="mono" href={to(`/catalog/${r.to}`)} title={r.to}>{shortName(r.to)}</a> reads <a class="mono" href={to(`/catalog/${r.from}`)} title={r.from}>{shortName(r.from)}</a></li>
+												{/each}
+												{#if w.more}<li class="faint">+{w.more} more</li>{/if}
+											</ul>
+										{:else}
+											<p class="faint">Runs after it; no lineage between their nodes explains the wait.</p>
+										{/if}
+									</div>
+								{/each}
+							{:else}
+								<p class="faint">Doesn't wait for another job in this group.</p>
+							{/if}
+						</InspectorSection>
+						<InspectorSection title="Last run">
+							{#if memberFacts?.lastRun}
+								{@const r = memberFacts.lastRun}
+								<dl>
+									<div><dt>Status</dt><dd><a href={to(`/runs/${r.id}`)}><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}{r.startedAt ? ` · ${formatAgo(r.startedAt, app.now)}` : ''}</a></dd></div>
+								</dl>
+							{:else}
+								<p class="faint">No runs yet.</p>
+							{/if}
+						</InspectorSection>
+					{:else if pickedNodes.length === 1}
 						{@const n = pickedNodes[0]}
 						<p class="label">{kindLine(n)}</p>
 						<h2 class="mono">{n.key}</h2>
@@ -171,7 +225,7 @@
 							{#each pickedNodes as n (n.key)}<li><a href={to(`/catalog/${n.key}`)} class="mono">{n.key}</a></li>{/each}
 						</ul>
 					{:else}
-						{#if def.description}<p class="about">{def.description}</p>{/if}
+						{#if def.description}<InspectorSection title="Description"><p class="about-text">{def.description}</p></InspectorSection>{/if}
 						<InspectorSection title="Recent runs">
 							{#snippet meta()}{#if runs.length}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (tab = 'runs')}>All runs →</Button>{/if}{/snippet}
 							{#if finished.length}
@@ -373,10 +427,23 @@
 	.rail.sections {
 		padding: 0;
 	}
-	.about {
-		padding: 16px 16px 14px;
-		border-bottom: 1px solid var(--border);
+	.about-text {
+		color: var(--muted-foreground);
+		font-size: 13px;
 		line-height: 1.5;
+	}
+	.wait + .wait {
+		margin-top: 10px;
+	}
+	.reasons {
+		margin-top: 4px;
+		padding-left: 12px;
+		border-left: 1px solid var(--border);
+	}
+	.reasons li {
+		padding: 1px 0;
+		color: var(--muted-foreground);
+		font-size: 12px;
 	}
 	.spaced {
 		margin-top: 12px;

@@ -30,6 +30,7 @@
 	import SqlViewer from '$lib/components/code/sql-viewer.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
+	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
 	import { tick, untrack } from 'svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
@@ -945,17 +946,13 @@
 				</div>
 			</div>
 		{:else}
-			<div class="inspector-head">
-				<div class="flex items-center gap-2">
-					<span class="truncate text-[15px] font-semibold" title={String(primary?.data.name ?? '')}>{primary?.data.label ?? primary?.data.name}</span>
-					{#if d}<a href={to(`/catalog/${primarySlug}`)} class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
-				</div>
-				<div class="inspector-meta">
+			<InspectorHead title={String(primary?.data.label ?? primary?.data.name ?? '')} hint={String(primary?.data.name ?? '')} href={d ? to(`/catalog/${primarySlug}`) : undefined} linkLabel="Catalog ↗" linkTitle="Open in Catalog">
+				{#snippet meta()}
 					<!-- From the selected card, so the header names the node at once, before its detail arrives. -->
 					<span>{primary?.data.kind}</span>
 					{#if primary?.data.group}<span>{primary.data.group}</span>{/if}
-				</div>
-			</div>
+				{/snippet}
+			</InspectorHead>
 		{/if}
 		<div class="insp-body">
 			{#if !scaleMode && !primary}
@@ -1523,36 +1520,6 @@
 	}
 	.browser-row strong {
 		font: 500 12.5px var(--font-sans);
-	}
-	.inspector-head {
-		padding: 14px 16px 12px;
-		border-bottom: 1px solid var(--border);
-	}
-	.inspector-meta span + span::before {
-		content: '·';
-		margin-right: 12px;
-		color: var(--sb-text-faint);
-	}
-	.inspector-meta {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 4px 12px;
-		margin-top: 6px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.head-link {
-		flex: 0 0 auto;
-		padding: 3px 8px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.head-link:hover {
-		background: var(--sb-hover);
-		color: var(--foreground);
 	}
 	.check-row {
 		display: flex;
