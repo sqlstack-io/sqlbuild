@@ -105,6 +105,25 @@ export function planHref(selection: string[] = [], verb: LaunchVerb = 'build', n
 /** The plan of `sqb build --changed`: what changed, what runs downstream of it, and what waits for its job. */
 export const CHANGED_PLAN_HREF = planHref([], 'build', { flags: { '--changed': true } });
 
+/** The "Build N changed" button's main label, its lighter bracketed part (null without one), and its tooltip. */
+export type ChangedBuildLabel = { label: string; extra: string | null; tooltip: string };
+
+/**
+ * The label of the button that opens `CHANGED_PLAN_HREF`: `Build 30 changed (+65)` in a top bar,
+ * `Build 30 changed (+65 downstream)` in the overview banner. `downstream` is how many more nodes the
+ * plan runs beyond the changed ones; the brackets are left out at 0 and when it is unknown (null).
+ */
+export function changedBuildLabel(changed: number, downstream: number | null, place: 'bar' | 'banner'): ChangedBuildLabel {
+	const nodes = changed === 1 ? '1 changed node' : `${changed} changed nodes`;
+	const reaches = changed === 1 ? 'it reaches' : 'they reach';
+	const reach = downstream === null ? ` and the downstream nodes ${reaches}` : downstream === 0 ? '' : ` and the ${downstream} downstream ${downstream === 1 ? 'node' : 'nodes'} ${reaches}`;
+	return {
+		label: `Build ${changed} changed`,
+		extra: downstream ? (place === 'bar' ? ` (+${downstream})` : ` (+${downstream} downstream)`) : null,
+		tooltip: `Plan a build of the ${nodes}${reach}. You review the plan before anything runs.`
+	};
+}
+
 /** The review page for rerunning runs, opened before anything reruns; `nodes` only for one run's selected nodes. */
 export function rerunHref(runIds: string[], mode: RerunMode, nodes: string[] = []): string {
 	const query = new URLSearchParams([...runIds.map((id) => ['run', id]), ['mode', mode], ...nodes.map((n) => ['node', n])]);

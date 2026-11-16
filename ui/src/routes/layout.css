@@ -224,6 +224,12 @@
 	}
 }
 
+/* The lighter bracketed part of a button label, e.g. the "(+65)" of "Build 30 changed (+65)". */
+.label-extra {
+	opacity: 0.72;
+	font-weight: 400;
+}
+
 /* Shared list-table treatment (Catalog/Runs/Jobs/Triggers/Checks/Providers).
    Dagster-like: row dividers only, muted sentence-case header, one text scale,
    mono only for genuinely code-y values (.code / <code>). */

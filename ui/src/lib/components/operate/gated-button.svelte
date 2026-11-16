@@ -13,6 +13,7 @@
 		disabled = false,
 		reason,
 		busy = false,
+		hint,
 		onclick,
 		children
 	}: {
@@ -23,12 +24,14 @@
 		disabled?: boolean;
 		reason?: string;
 		busy?: boolean;
+		/** The tooltip while the button can be used. */
+		hint?: string;
 		onclick?: () => void;
 		children: Snippet;
 	} = $props();
 
 	const needed = $derived((Array.isArray(requires) ? requires : [requires]).filter((c) => !app.can(c)));
-	const title = $derived(needed.length ? `You don't have permission to do this (${needed.join(', ')})` : disabled ? reason : undefined);
+	const title = $derived(needed.length ? `You don't have permission to do this (${needed.join(', ')})` : disabled ? reason : hint);
 </script>
 
 <span class="gated" {title}>
