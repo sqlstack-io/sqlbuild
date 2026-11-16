@@ -20,6 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     PythonLoaderPersistedResultBuildE2ETestCase,
     PythonLoaderStatusResultBuildE2ETestCase,
     PythonPersistedResultBuildE2ETestCase,
+    PythonTargetConfigBuildE2ETestCase,
     PythonTargetIsolationBuildE2ETestCase,
     SelectionAwareStalenessBuildE2ETestCase,
 )
@@ -1806,6 +1807,127 @@ def test_given_loader_status_result_when_building_then_persists_loader_status_ro
         )
         == test_case.expected_rows
     )
+
+
+_TARGET_CONFIG_RECORDER: str = (
+    "import dataclasses, json\n"
+    "from pathlib import Path\n\n"
+    "def record(ctx, node):\n"
+    "    line = {'node': node, **dataclasses.asdict(ctx.target_config)}\n"
+    "    with Path(__file__).parents[1].joinpath('target_config.jsonl').open('a') as out:\n"
+    "        out.write(json.dumps(line) + '\\n')\n"
+)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonTargetConfigBuildE2ETestCase(
+            description="local override of schema and loader_schema",
+            project_target_lines='schema = "dev"\nloader_schema = "raw_dev"\n',
+            local_target_lines='schema = "dev_local"\nloader_schema = "raw_local"\n',
+            expected_settings={
+                "name": "dev",
+                "database": None,
+                "schema": "dev_local",
+                "loader_schema": "raw_local",
+                "database_preserved": False,
+                "schema_preserved": False,
+            },
+        ),
+        PythonTargetConfigBuildE2ETestCase(
+            description="loader_schema falls back to the target schema",
+            project_target_lines='schema = "dev"\n',
+            local_target_lines='schema = "dev_local"\n',
+            expected_settings={
+                "name": "dev",
+                "database": None,
+                "schema": "dev_local",
+                "loader_schema": "dev_local",
+                "database_preserved": False,
+                "schema_preserved": False,
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_local_target_override_when_running_python_then_every_context_sees_resolved_target(
+    test_case: PythonTargetConfigBuildE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="python_target_config_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "python_target_config_project"\n'
+                'adapter = "duckdb"\n'
+                'default_target = "dev"\n\n'
+                "[connection]\n"
+                'database = "python_target_config_project.duckdb"\n\n'
+                "[targets.dev]\n" + test_case.project_target_lines
+            ),
+            "python/recorder.py": _TARGET_CONFIG_RECORDER,
+            "python/tasks/configured.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.tasks import task\n\n"
+                "@task\n"
+                "def configured_task(ctx):\n"
+                "    '''Test task configured_task.'''\n"
+                "    record(ctx, 'task')\n"
+                "    return ctx.result()\n"
+            ),
+            "python/loaders/raw.py": (
+                "from python.recorder import record\n"
+                "from sqlbuild.loaders import loader\n\n"
+                "@loader\n"
+                "def raw_orders(ctx):\n"
+                "    '''Test loader raw_orders.'''\n"
+                "    record(ctx, 'loader')\n"
+                "    return [{'order_id': 1}]\n"
+            ),
+            "python/checks/configured.py": (
+                "from python.recorder import record\n"
+                "from python.tasks.configured import configured_task\n"
+                "from sqlbuild.checks import check\n\n"
+                "@check(depends_on=configured_task)\n"
+                "def configured_check(ctx):\n"
+                "    '''Test check configured_check.'''\n"
+                "    record(ctx, 'check')\n"
+                "    return ctx.pass_(message='recorded')\n"
+            ),
+            "sources/raw.yml": (
+                "sources:\n"
+                "  - name: raw_orders\n    description: Test source raw_orders.\n"
+                "    managed: true\n"
+                "    write_strategy: table\n"
+                "    columns:\n"
+                "      - name: order_id\n"
+                "        type: INTEGER\n"
+            ),
+        },
+    )
+    (project_dir / "sqlbuild_local.toml").write_text(
+        "[targets.dev]\n" + test_case.local_target_lines, encoding="utf-8"
+    )
+
+    results: list[subprocess.CompletedProcess[str]] = [
+        run_sqb(command=("--no-color", *command), project_dir=project_dir)
+        for command in (
+            ("build", "--select", "configured_task", "raw_orders"),
+            ("load", "--select", "raw_orders"),
+            ("check", "--select", "configured_check"),
+        )
+    ]
+
+    for result in results:
+        assert result.returncode == 0, result.stdout + result.stderr
+    recorded: list[dict[str, object]] = [
+        json.loads(line)
+        for line in (project_dir / "target_config.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert {str(line.pop("node")) for line in recorded} == {"task", "loader", "check"}
+    assert all(line == test_case.expected_settings for line in recorded), recorded
 
 
 @pytest.mark.parametrize(
