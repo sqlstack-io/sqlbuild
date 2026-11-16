@@ -31,7 +31,7 @@
 			<section class="panel">
 				<div class="status-top">
 					<StatusLabel tone={freshnessTone} label={node.sourceFreshness ? `Freshness ${node.sourceFreshness.status}` : 'No freshness check'} />
-					{#if node.sourceFreshness}<span class="muted" title={formatStamp(node.sourceFreshness.loadedAt)}>newest data loaded {formatAgo(node.sourceFreshness.loadedAt, app.now)}</span>{/if}
+					{#if node.sourceFreshness}<span class="muted" title={formatStamp(node.sourceFreshness.loadedAt)}>Loaded {formatAgo(node.sourceFreshness.loadedAt, app.now)}</span>{/if}
 				</div>
 				{#if node.sourceFreshness}
 					<div class="stat-grid">
@@ -62,7 +62,7 @@
 					<!-- raw-button: a stale notice that is clickable as a whole, opening its lineage or drift -->
 					<button class="drift-hint {r.reason}" onclick={() => (r.reason === 'behind' ? onTab('lineage') : onSql('drift'))} disabled={r.reason !== 'behind' && !hasDrift}>
 						<GitCompareIcon size={14} />
-						<span><b>Stale · {staleReasonLabel(r)}</b> · {staleReasonDetail(r)}</span>
+						<span title={staleReasonDetail(r)}><b>Stale · {staleReasonLabel(r)}</b> · {r.reason === 'changed' ? r.detail : r.upstream.map(shortName).join(', ')}</span>
 						{#if r.reason === 'behind' || hasDrift}<em>{r.reason === 'behind' ? 'View lineage →' : 'View drift →'}</em>{/if}
 					</button>
 				{/each}
@@ -146,7 +146,7 @@
 				{#each node.jobs as j (j.key)}
 					<a class="job-row" href={to(`/jobs/${j.key}`)}><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${j.triggerIds.length} ${j.triggerIds.length === 1 ? 'trigger' : 'triggers'}` : ' · manual'}</small></a>
 				{:else}
-					<p class="muted">No job selects this node.</p>
+					<p class="muted">No jobs.</p>
 				{/each}
 			</section>
 		{/if}

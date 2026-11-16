@@ -67,7 +67,7 @@
 		{/if}
 	</div>
 
-	<Panel title="Columns" note={!compared ? `${warehouse.columns.length} in the warehouse` : mismatched ? `${mismatched} differ from the code` : 'All match the code'}>
+	<Panel title="Columns" note={!compared ? `${warehouse.columns.length} columns` : mismatched ? `${mismatched} differ` : 'All match'}>
 		<DataTable class="static" embedded columns={columnColumns} rows={warehouse.columns} key={(c) => c.name} empty="No columns reported.">
 			{#snippet row(c)}
 					<tr>
@@ -81,7 +81,7 @@
 	</Panel>
 
 	{#if microbatch}
-		<Panel title="Microbatch coverage" note="Tracked only for concurrent microbatch models · {microbatch.cursorColumn} · {microbatch.batchSize} batches · complete up to {bound(microbatch.contiguousFrontier)}">
+		<Panel title="Microbatch coverage" help="Tracked only for concurrent microbatch models" note="{microbatch.cursorColumn} · {microbatch.batchSize} batches · complete to {bound(microbatch.contiguousFrontier)}">
 			<div class="batches">
 				{#each microbatch.batches as b (b.start)}
 					<a class="batch" href={b.runId ? to(`/runs/${b.runId}`) : undefined} style:background={batchTone[b.state]} title="{bound(b.start)} – {bound(b.end)} · {batchLabel[b.state]}{b.runId ? ` · ${b.runId}` : ''}"><span class="sr-only">{batchLabel[b.state]}</span></a>
@@ -91,7 +91,7 @@
 				<span><i style:background={batchTone.complete}></i>complete</span>
 				<span title="Holes between completed partitions"><i style:background={batchTone.gap}></i>{microbatch.knownGaps} known {microbatch.knownGaps === 1 ? 'gap' : 'gaps'}</span>
 				<span><i style:background={batchTone.replay_required}></i>replay required</span>
-				<span class="muted">{microbatch.batchesTruncated ? 'Newest batches shown · ' : ''}tracked since {bound(microbatch.earliest)}</span>
+				<span class="muted">{microbatch.batchesTruncated ? 'Newest only · ' : ''}since {bound(microbatch.earliest)}</span>
 			</div>
 		</Panel>
 	{/if}

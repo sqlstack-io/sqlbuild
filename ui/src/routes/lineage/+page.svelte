@@ -1149,12 +1149,12 @@
 					{#each d.runs.slice(0, 3) as run, i (i)}
 						<a class="mini-run" href={run.runId ? to(`/runs/${run.runId}`) : undefined}>
 							<i style:background={nodeOutcomeTone[run.outcome]}></i>
-							<span class="mini-run-main"><b>{nodeOutcomeLabel[run.outcome]}</b><span>{run.jobKey ?? (run.runId ? 'started by hand' : `from the command line · ${shortRunId(run.fingerprintRunId ?? '')}`)}</span></span>
+							<span class="mini-run-main"><b>{nodeOutcomeLabel[run.outcome]}</b><span>{run.jobKey ?? (run.runId ? 'Manual' : `CLI · ${shortRunId(run.fingerprintRunId ?? '')}`)}</span></span>
 							<span class="mini-run-meta">{formatMs(run.durationMs)} · {formatAgo(run.startedAt, app.now)}</span>
 							{#if run.message}<em>{run.message}</em>{/if}
 						</a>
 					{:else}
-						<span class="section-meta">No builds recorded in this location.</span>
+						<span class="section-meta">No builds yet.</span>
 					{/each}
 				</InspectorSection>
 			{/if}

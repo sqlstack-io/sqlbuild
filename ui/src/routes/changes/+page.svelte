@@ -184,7 +184,7 @@
 								<a class="run" href={to(`/runs/${r.id}`)} title="{r.id} · {runStatusLabel[r.status]} · {formatStamp(r.startedAt ?? r.queuedAt)}">
 									<i style:background={runStatusTone[r.status]}></i>
 									<code>{shortRunId(r.id)}</code>
-									<span class="faint">{r.jobKey ?? 'started by hand'} · {formatAgo(r.startedAt ?? r.queuedAt, app.now)}</span>
+									<span class="faint">{r.jobKey ?? 'Manual'} · {formatAgo(r.startedAt ?? r.queuedAt, app.now)}</span>
 								</a>
 							{/each}
 						</div>
