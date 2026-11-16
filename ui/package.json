@@ -13,12 +13,14 @@
 		"test": "vitest run",
 		"gen:command-table": "node scripts/extract-command-table.mjs",
 		"check:command-table": "node scripts/extract-command-table.mjs --check",
-		"check:checkboxes": "node scripts/check-checkboxes.mjs"
+		"check:checkboxes": "node scripts/check-checkboxes.mjs",
+		"test:e2e": "playwright test"
 	},
 	"devDependencies": {
 		"@fontsource-variable/inter": "^5.2.8",
 		"@internationalized/date": "^3.12.2",
 		"@lucide/svelte": "^1.17.0",
+		"@playwright/test": "^1.64.1",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",

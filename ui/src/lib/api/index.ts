@@ -1,6 +1,7 @@
 import type { ApiClient } from './client';
 import { createHttpClient } from './http-client';
 import { MockApiClient, type MockOptions } from './mock/mock-client';
+import { awkward } from './mock/awkward';
 import { replayFetch, type Recording } from './replay';
 import { LocalChangeBus } from './signals';
 import { to } from '$lib/paths';
@@ -32,7 +33,8 @@ async function loadRecording(): Promise<Recording> {
 /**
  * The client the app uses: the server, or the mock with `?mock` or `VITE_SQB_MOCK=1`.
  * With the mock, `?as=<role>`, `?events=none|all` and `?live=reconnecting|offline`
- * adjust it for demos.
+ * adjust it for demos, and `?awkward` stretches every list to thousands of rows with very long
+ * names, for the layout test.
  */
 export function createClient(search: URLSearchParams, onUnauthorized: () => void = () => {}): ApiClient {
 	if (DEMO) return createHttpClient({ onUnauthorized, fetch: replayFetch(loadRecording), changes: new LocalChangeBus() });
@@ -40,9 +42,10 @@ export function createClient(search: URLSearchParams, onUnauthorized: () => void
 	const role = search.get('as');
 	const events = search.get('events');
 	const live = search.get('live');
-	return new MockApiClient({
+	const mock = new MockApiClient({
 		role: ROLES.find((r) => r === role),
 		events: EVENTS.find((e) => e === events),
 		connection: LIVE.find((l) => l === live)
 	});
+	return search.has('awkward') ? awkward(mock) : mock;
 }
