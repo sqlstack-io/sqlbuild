@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.233.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.232.1...v0.233.0) (2026-11-16)
+
+
+### Features
+
+* sqb dev terminal screen, one foreground sign-in and bounded warehouse read retries ([#1509](https://github.com/sqlstack-io/sqlbuild/issues/1509)) ([7d35d90](https://github.com/sqlstack-io/sqlbuild/commit/7d35d9020ab1c5c7bb95b0d82b7bfb96cdb4c540))
+
 ## [0.232.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.232.0...v0.232.1) (2026-11-15)
 
 
