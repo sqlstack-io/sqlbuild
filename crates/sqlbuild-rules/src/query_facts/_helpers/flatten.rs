@@ -1,8 +1,8 @@
 //! FLATTEN facts: the element each FLATTEN reads, and the whole elements a select item copies.
 
+use sqlquack_syntax::Expression;
 use sqlquack_syntax::expressions::functions::models::Function;
 use sqlquack_syntax::expressions::names::models::Literal;
-use sqlquack_syntax::{Expression, ExpressionWalk};
 
 use crate::query_facts::models::{FlattenInput, WholeValue};
 
@@ -83,7 +83,19 @@ fn literal_key(expression: &Expression) -> Option<String> {
     (!key.is_empty()).then(|| key.trim_matches('"').to_ascii_lowercase())
 }
 
+/// Functions whose result embeds each argument whole.
+const EMBEDDING_FUNCTIONS: [&str; 5] = [
+    "object_construct",
+    "object_construct_keep_null",
+    "object_insert",
+    "array_construct",
+    "array_construct_compact",
+];
+
 /// Every `<alias>.value` `expression` copies whole, with the keys `OBJECT_DELETE` removes from it.
+///
+/// Only the value itself, casts and parentheses around it, and the constructors that embed it
+/// count; any other function of the value, such as a hash or a path into it, does not copy it.
 pub(crate) fn whole_values(expression: &Expression) -> Vec<WholeValue> {
     let mut found: Vec<WholeValue> = Vec::new();
     let mut pending: Vec<(&Expression, Vec<String>)> = vec![(expression, Vec::new())];
@@ -97,9 +109,10 @@ pub(crate) fn whole_values(expression: &Expression) -> Vec<WholeValue> {
                     });
                 }
             }
-            Expression::JSONExtract(_) | Expression::Subscript(_) if path_root(node).is_some() => {}
-            Expression::Function(function)
-                if is_path_function(function) && path_root(node).is_some() => {}
+            Expression::Paren(paren) => pending.push((&paren.this, removed)),
+            Expression::Cast(cast) | Expression::TryCast(cast) | Expression::SafeCast(cast) => {
+                pending.push((&cast.this, removed));
+            }
             Expression::Function(function)
                 if function.name.eq_ignore_ascii_case("object_delete") =>
             {
@@ -108,7 +121,14 @@ pub(crate) fn whole_values(expression: &Expression) -> Vec<WholeValue> {
                     pending.push((object, args.filter_map(literal_key).collect()));
                 }
             }
-            _ => pending.extend(node.children().into_iter().map(|child| (child, Vec::new()))),
+            Expression::Function(function)
+                if EMBEDDING_FUNCTIONS
+                    .iter()
+                    .any(|name| function.name.eq_ignore_ascii_case(name)) =>
+            {
+                pending.extend(function.args.iter().map(|arg| (arg, Vec::new())));
+            }
+            _ => {}
         }
     }
     found

@@ -375,6 +375,30 @@ fn given_dialect_sql_when_reading_query_facts_then_findings_match_the_authored_s
             expected_faults: &[("SQBRPERFORMANCE101", 1, 8, "line_json copies o.value whole")],
         },
         QueryFactsTestCase {
+            description: "a function that only reads the parent, such as a hash, copies nothing",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT MD5(TO_VARCHAR(o.value)) AS line_hash, TYPEOF(o.value) AS kind\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[],
+        },
+        QueryFactsTestCase {
+            description: "the parent cast and wrapped in an array is still a whole copy",
+            dialect: "snowflake",
+            query_sql: concat!(
+                "SELECT ARRAY_CONSTRUCT((o.value::object)) AS line_json\n",
+                orders_flattened!()
+            ),
+            select: FLATTEN_RULE,
+            enum_columns: &[],
+            columns: json!([]),
+            expected_faults: &[("SQBRPERFORMANCE101", 1, 8, "line_json copies o.value whole")],
+        },
+        QueryFactsTestCase {
             description: "an element no deeper FLATTEN reads is fine",
             dialect: "snowflake",
             query_sql: "SELECT o.value AS order_json FROM __ref(\"raw_orders\") r, LATERAL FLATTEN(input => r.payload:orders) o",

@@ -44,6 +44,9 @@ pub(crate) fn evaluate(
 }
 
 /// An input of `column` whose key is a strict subset of one of the model's keys.
+///
+/// An input key that already covers another model key does not count: that model key proves
+/// the model has one row per input row.
 fn coarser_input<'a>(
     column: &'a GrainColumn,
     grain: &'a JsonGrain,
@@ -51,6 +54,13 @@ fn coarser_input<'a>(
     column.inputs.iter().find_map(|input| {
         let keys = grain.input_keys.get(input)?;
         keys.iter().find_map(|input_key| {
+            if grain
+                .model_keys
+                .iter()
+                .any(|model_key| subset(model_key, input_key))
+            {
+                return None;
+            }
             grain
                 .model_keys
                 .iter()
@@ -61,12 +71,15 @@ fn coarser_input<'a>(
 }
 
 fn strict_subset(smaller: &[String], larger: &[String]) -> bool {
-    smaller.len() < larger.len()
-        && smaller.iter().all(|column| {
-            larger
-                .iter()
-                .any(|other| other.eq_ignore_ascii_case(column))
-        })
+    smaller.len() < larger.len() && subset(smaller, larger)
+}
+
+fn subset(smaller: &[String], larger: &[String]) -> bool {
+    smaller.iter().all(|column| {
+        larger
+            .iter()
+            .any(|other| other.eq_ignore_ascii_case(column))
+    })
 }
 
 /// Where the root select projects `name`, following the left branch of set operations.

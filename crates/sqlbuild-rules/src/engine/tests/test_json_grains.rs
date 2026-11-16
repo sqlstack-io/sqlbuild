@@ -60,6 +60,19 @@ fn given_grain_facts_when_evaluating_json_finer_grain_then_only_coarser_inputs_a
             expected_faults: &[],
         },
         JsonGrainTestCase {
+            description: "another declared model key on the input's grain proves one row per input row",
+            dialect: "snowflake",
+            name: "order_payload_dated",
+            select: RULE,
+            query_sql: LINES_SQL,
+            json_grain: json!({
+                "model_keys": [["order_id", "line_no"], ["ORDER_ID"]],
+                "columns": [{"name": "payload", "data_type": "VARIANT", "inputs": ["ref:orders"]}],
+                "input_keys": {"ref:orders": [["order_id"]]},
+            }),
+            expected_faults: &[],
+        },
+        JsonGrainTestCase {
             description: "an input keyed by another column is not coarser",
             dialect: "snowflake",
             name: "order_lines_enriched",
