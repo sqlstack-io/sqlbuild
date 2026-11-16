@@ -1857,3 +1857,36 @@ def failed_load(tmp_path: Path, project: Path) -> tuple[dict[str, Any], int, str
         with pytest.raises(HTTPError) as missing:
             _ = current_snapshot(api, "development")
     return report["report"]["health"], missing.value.code, log.read_text()
+
+
+def plan_before_sync(
+    tmp_path: Path, project: Path, settings: dict[str, object]
+) -> tuple[dict[str, Any], str]:
+    """Serve `project` until it publishes, then plan from its copy without waiting for a sync."""
+    control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+    log: Path = tmp_path / "location.log"
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "dev",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        _ = wait_for_generation(api, "dev", 1, location, log)
+        request_id: str = request_plan(control, [], settings)
+        result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
+    return result["result_json"]["outcome"], log.read_text()

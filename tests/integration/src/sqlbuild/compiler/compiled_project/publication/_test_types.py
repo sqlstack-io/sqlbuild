@@ -512,3 +512,11 @@ class RulesAtLoadTestCase:
     expected_health: dict[str, Any] = field(default_factory=dict)
     expected_terminal: str = ""
     expected_rule_evaluations: int = 0
+
+
+@dataclass(frozen=True)
+class SyncedFreshnessTestCase:
+    description: str
+    files: dict[str, str]
+    expected_absent: str
+    expected_line: str

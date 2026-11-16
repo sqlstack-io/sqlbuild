@@ -18,6 +18,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ChangedPlanPreviewTestCase,
     HeldPlanTestCase,
     PlanPreviewTestCase,
+    SyncedFreshnessTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
     request_plan,
@@ -28,6 +29,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     changed_runs,
     live_plan,
     location_process,
+    plan_before_sync,
     plan_from_copy,
     plans_from_copy,
     run_sqb,
@@ -437,3 +439,54 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
     assert log.count(_HELD) == test_case.expected_held_plans, log
     assert log.count(_SYNCED_READING) == test_case.expected_held_plans + 1, log
     assert "Warehouse connected" not in log, "a synced copy opens no warehouse connection"
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SyncedFreshnessTestCase(
+            description="a warehouse source's metadata freshness is unknown, not a failed lookup",
+            files={
+                "sqlbuild_project.toml": (
+                    'name = "orders"\nadapter = "snowflake"\ndefault_target = "dev"\n'
+                    '[connections.warehouse]\naccount = "example-account"\nuser = "example_user"\n'
+                    '[targets.dev]\nconnection = "warehouse"\ndatabase = "ANALYTICS"\n'
+                    'schema = "DEV"\n'
+                ),
+                "sources/raw.yml": dedent(
+                    """
+                    sources:
+                      - name: raw_orders
+                        description: Raw orders.
+                        database: RAW
+                        schema: SHOP
+                        table: ORDERS
+                        columns:
+                          - name: order_id
+                            type: VARCHAR
+                    """
+                ).strip()
+                + "\n",
+                "models/orders.sql": (
+                    "MODEL (description 'Orders.', materialized table);\n"
+                    'SELECT order_id FROM __source("raw_orders")\n'
+                ),
+            },
+            expected_absent="Freshness metadata  FAIL",
+            expected_line="Freshness metadata  OK (1 source, 1 unknown)",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_synced_copy_when_a_preview_reads_source_freshness_then_it_is_unknown_without_a_failure(
+    test_case: SyncedFreshnessTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(project_dir=project, files=test_case.files)
+
+    outcome, log = plan_before_sync(tmp_path, project, {"changed": True})
+
+    assert outcome["kind"] == "plan", log
+    assert "error" not in outcome["document"], outcome
+    assert test_case.expected_absent not in log, log
+    assert test_case.expected_line in log, log

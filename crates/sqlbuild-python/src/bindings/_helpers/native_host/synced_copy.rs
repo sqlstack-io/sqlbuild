@@ -57,6 +57,8 @@ const FINGERPRINT_STORE: &str = "__sqlbuild_synced_fingerprints";
 const FINGERPRINT_STORE_COLUMNS: [&str; 2] = ["state_database", "state_schema"];
 const MODEL_NODE_TYPE: &str = "model";
 
+/// Why a plan preview leaves a source's freshness unknown; its plan lists freshness as unknown.
+pub(crate) const PREVIEW_MESSAGE: &str = "a plan preview does not observe source freshness";
 /// Items a preview reports as known only once the run plans live.
 pub(crate) const PREVIEW_UNKNOWNS: [&str; 4] = [
     "source freshness",
@@ -446,6 +448,28 @@ impl SyncedCopyAdapter {
             columns.set_item(&record.name, self.columns(py, record)?)?;
         }
         Ok(columns)
+    }
+
+    /// Each table's freshness is unavailable: the copy holds past observations, not the table's state now.
+    #[pyo3(name = "get_tables_freshness_metadata", signature = (*, connection, requests))]
+    fn tables_freshness_metadata<'py>(
+        &self,
+        py: Python<'py>,
+        connection: Bound<'py, PyAny>,
+        requests: Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        drop(connection);
+        let unavailable =
+            host::entry(py, AdapterHost::TableFreshnessMetadata)?.getattr("unavailable")?;
+        let outcome = call_with(
+            &unavailable,
+            &[("message", PyString::new(py, PREVIEW_MESSAGE).into_any())],
+        )?;
+        let metadata: Bound<'py, PyDict> = PyDict::new(py);
+        for request in requests.try_iter()? {
+            metadata.set_item(request?, &outcome)?;
+        }
+        Ok(metadata)
     }
 
     #[pyo3(name = "get_columns_for_relations", signature = (*, connection, relations))]
