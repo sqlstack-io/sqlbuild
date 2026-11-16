@@ -1,4 +1,6 @@
 <script lang="ts">
+	import LockIcon from '@lucide/svelte/icons/lock';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
@@ -84,7 +86,7 @@
 				<StatusLabel tone={account.disabled ? 'var(--sb-text-faint)' : 'var(--sb-success)'} label={account.disabled ? 'Disabled' : 'Active'} muted={account.disabled} />
 				<div class="ml-auto flex items-center gap-2">
 					{#if account.name === app.user?.name}
-						<span class="muted">This is you</span>
+						<span class="muted">You</span>
 					{:else}
 						<GatedButton requires="user.manage" size="sm" variant={account.disabled ? 'outline' : 'destructive'} {busy} onclick={() => toggle(account)}>{account.disabled ? 'Enable' : 'Disable'}</GatedButton>
 					{/if}
@@ -94,7 +96,7 @@
 		{#if error}<p class="err px-6 pt-3">{error}</p>{/if}
 
 		{#if d.accounts.data && !account}
-			<p class="muted px-6 py-4">No person named <code>{name}</code>. They appear here after they first sign in.</p>
+			<p class="muted px-6 py-4">No person named <code>{name}</code>.<HelpTip text="People appear after their first sign-in" /></p>
 		{:else if account}
 			<PageBody padding="20px 24px 40px">
 				<div class="columns">
@@ -103,7 +105,7 @@
 							{#if app.can('role.assign')}
 								<AssignmentList principal={account} assignments={d.assignments.data ?? []} rolesByLocation={d.rolesByLocation} onchange={changed} />
 							{:else}
-								<p class="muted">Seeing roles requires “Give roles and approve role changes” (role.assign).</p>
+								<p class="muted" title="Seeing roles requires “Give roles and approve role changes”"><LockIcon size={12} class="inline" /> No access (role.assign)</p>
 							{/if}
 						</Panel>
 

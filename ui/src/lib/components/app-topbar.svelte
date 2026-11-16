@@ -54,7 +54,7 @@
 			<span class="connection"><span class="h-[7px] w-[7px] rounded-full" style:background={connectionTone[app.connection]}></span>{connectionLabel[app.connection]}</span>
 			{#if snapshot !== undefined}
 				<span class="text-[var(--sb-text-faint)]">·</span>
-				<span class="whitespace-nowrap">{snapshot ? `Version ${snapshot.generation}, deployed ${formatAgo(snapshot.publishedAt, app.now)}` : 'nothing deployed yet'}</span>
+				<span class="whitespace-nowrap">{snapshot ? `v${snapshot.generation} · ${formatAgo(snapshot.publishedAt, app.now)}` : 'Not deployed'}</span>
 			{/if}
 		</span>
 		{#if app.client.supports('getWarehouseSync')}

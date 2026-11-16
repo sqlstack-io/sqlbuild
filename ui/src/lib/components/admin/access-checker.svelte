@@ -177,7 +177,7 @@
 							<ArrowRightIcon size={12} />
 							<span class="step">
 								{#if g.via === 'base' && g.baseRole && g.baseRole !== g.role}which includes {builtInLabel(g.baseRole)}{:else if g.via === 'base'}a built-in role{:else}an addition{/if}
-								{g.selector ? 'on' : 'on every node'}
+								{g.selector ? 'on' : 'all nodes'}
 								{#if g.selector}<code>{g.selector}</code>{/if}
 							</span>
 							<ArrowRightIcon size={12} />
@@ -195,7 +195,7 @@
 					</ul>
 				{/if}
 				{#if result.wouldBeGrantedBy.length}
-					<div class="group-title">Roles that would allow it here</div>
+					<div class="group-title">Would allow</div>
 					<p>
 						{#each result.wouldBeGrantedBy as r, i (r)}{#if i},&nbsp;{/if}{#if canSeeRoles}<a href={to(roleHref(r))}>{r}</a>{:else}{r}{/if}{/each}
 					</p>

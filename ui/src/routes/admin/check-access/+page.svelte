@@ -29,20 +29,13 @@
 <AppTopbar title="Check access" />
 
 <PageBody padding="20px 24px 32px">
-	{#if !canCheckOthers}<p class="lede">You can check your own access; checking others needs “Give roles” or “See the audit log”.</p>{/if}
-	<div class="max-w-[1100px]">
+	<div class="max-w-[1100px]" title={canCheckOthers ? undefined : 'Checking others needs “Give roles” or “See the audit log”'}>
 		<AccessChecker principals={canCheckOthers ? (accounts.data ?? []) : []} {initial} />
 	</div>
 	<p class="back"><a href={to(`/admin/people`)}>← People</a></p>
 </PageBody>
 
 <style>
-	.lede {
-		max-width: 860px;
-		margin-bottom: 18px;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
 	.back {
 		margin-top: 24px;
 		font-size: 12.5px;

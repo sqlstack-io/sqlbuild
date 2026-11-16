@@ -95,7 +95,7 @@
 					<td>
 						{#if role}<a class="link" href={to(roleHref(a.role))}>{a.role}</a>{:else}<span>{a.role}</span>{/if}
 						{#if role}<div class="cell-desc">{roleSummary(role)}</div>{/if}
-						{#if a.stale}<div class="cell-desc warn">This role no longer exists in the code, so it gives nothing</div>{/if}
+						{#if a.stale}<div class="cell-desc warn" title="Grants nothing">Removed from code</div>{/if}
 						{#if isOwnLastAdmin(a)}<div class="cell-desc warn"><TriangleAlertIcon size={11} /> Your last admin role: removing it locks you out of administration</div>{/if}
 					</td>
 					<td class="muted">{scopeWords(a.scope.locationId, locations)}</td>
