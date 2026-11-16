@@ -3201,5 +3201,109 @@ paths = ["crates/sqlbuild-python-front/src/authored_values/models.rs", "crates/s
 reason = "SqlValueClasses::load and CursorSession::new each load the record classes their own conversions need; CursorSession's to_utc and utc_offset each turn the zone call's result into their own value."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/analysis_session/models.rs", "crates/sqlbuild-python-project/src/compiled_project/models.rs", "crates/sqlbuild-python-project/src/compiled_views/models.rs", "crates/sqlbuild-python-project/src/graph/models.rs", "crates/sqlbuild-python-project/src/resource_views/models.rs"]
+reason = "Each positional record converts its own fields; models.rs holds only records, so these are the conversions positional_record! writes, written out once per record."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/getters.rs"]
+reason = "Each matches its own native class's attribute names to its own getters; only the cast-and-dispatch shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/model_inputs/model_input_view.rs", "crates/sqlbuild-python-project/src/resource_views/_helpers/audit_views.rs", "crates/sqlbuild-python-project/src/resource_views/_helpers/function_views.rs", "crates/sqlbuild-python-project/src/resource_views/_helpers/seed_views.rs", "crates/sqlbuild-python-project/src/resource_views/_helpers/source_views.rs"]
+reason = "Each borrows its own record from the compiled project owner by index; only the borrow-and-read shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/getters.rs"]
+reason = "Each matches its own native class's attribute names to its own getters; only the cast-and-dispatch shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_project/_helpers/project.rs", "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_models/compiled_model_view.rs", "crates/sqlbuild-python/src/bindings/_helpers/input_loops/audit_loop.rs", "crates/sqlbuild-python/src/bindings/_helpers/input_loops/resource_diagnostics.rs", "crates/sqlbuild-python/src/bindings/_helpers/plan_output/python_identity.rs"]
+reason = "Each reads an optional text value from its own Python mapping; consolidating these readers across the binding crates is a separate change."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/models.rs"]
+reason = "Each getter reads its own cached projection through the view's shared read helper."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/project_view.rs", "crates/sqlbuild-python-project/src/graph/_helpers/nodes/keys.rs", "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/compiled.rs", "crates/sqlbuild-python/src/bindings/_helpers/record_behaviours/macros.rs", "crates/sqlbuild-python/src/bindings/_helpers/rules/catalogue.rs"]
+reason = "Each reads a resource key's type and name into its own native key; consolidating the key readers across the binding crates is a separate change."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_project/models.rs"]
+reason = "Each records its own per-resource fact into its own resource list by index."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_project/models.rs"]
+reason = "Each returns a view of its own resource list by index after its own bounds check."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/analysis_session/models.rs", "crates/sqlbuild-python-project/src/compiled_project/models.rs", "crates/sqlbuild-python-project/src/compiled_views/models.rs"]
+reason = "Each positional record converts its own fields; models.rs holds only records, so these are the conversions positional_record! writes, written out once per record."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/getters.rs"]
+reason = "Each matches its own native class's attribute names to its own getters; only the cast-and-dispatch shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-front/src/render/_helpers/expansion/macro_modules.rs", "crates/sqlbuild-python-project/src/graph/_helpers/project/project_graph.rs", "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_selection.rs"]
+reason = "Each builds its own index from its own node list; only the index-building loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/sql_test_glue/_helpers/plan/plan_driver.rs"]
+reason = "Each Python entry reads its own keyword arguments and calls the shared planner with its own options."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/janitor/janitor_facts.rs", "crates/sqlbuild-python/src/bindings/_helpers/review_command/comparison.rs"]
+reason = "One selects compiled models by name, the other keys a project field's nodes by destination; only the collecting loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/resource_views/models.rs"]
+reason = "Each builds its own resource's key from its own record; only the key construction is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/project_snapshot/models.rs"]
+reason = "Each worker report forwards one distinct check event with its own fields."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/planner_migrations/planning_origin.rs"]
+reason = "One returns the first model destination's database, the other collects every model destination's schema; only the loop over compiled models is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/_helpers/project/project_view.rs", "crates/sqlbuild-python-project/src/compiled_views/models.rs"]
+reason = "Each compiled view reads its own field set from the Python boundary."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_project/_helpers/project.rs", "crates/sqlbuild-python/src/bindings/_helpers/rules/rows.rs"]
+reason = "Each converts the declaration row of its own consumer into its own declaration type."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/assembly/analysis_session/_helpers/session.rs", "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_models/compiled_model_view.rs"]
+reason = "The analysis session and the compiled model view each build lineage inputs from their own row types."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/models.rs"]
+reason = "Each getter reads its own cached projection through the view's shared read helper."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/models.rs"]
+reason = "The compiled model and the model input each borrow their own record from the same owner; only the borrow is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_views/models.rs"]
+reason = "The compiled model and the model input each read the reference rows of their own record."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/fingerprints/main/select_latest_fingerprints.rs", "crates/sqlbuild-python-project/src/references/main/match_project_relation.rs"]
+reason = "Each public entry forwards to its own helper with the same arguments."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/planner_phases/_helpers/objects.rs", "crates/sqlbuild-python-project/src/planner_phases/main/construct.rs"]
+reason = "Each public entry forwards to its own helper with the same arguments."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-project/src/compiled_project/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/reference_resolver.rs"]
+reason = "Each returns its own stored Python handle bound to the interpreter; only the bind-and-clone is alike."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-rules/src/python_rules/_helpers/units/orchestration.rs", "crates/sqlbuild-rules/src/python_rules/_helpers/units/providers.rs"]
 reason = "Each is one rule family's entry point: return early when no rule is selected, then run its own layout, module and import checks. Parsing, project modules and import resolution share files_naming, project_modules and rejected_import_faults."
