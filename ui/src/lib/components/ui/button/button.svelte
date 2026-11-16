@@ -37,8 +37,10 @@
 				"icon-sm": "size-[26px]",
 				// Inside a chip or a search field: removing a filter, clearing the text.
 				"icon-xs": "size-5 [&_svg:not([class*='size-'])]:size-3",
-				// A link sized by the text around it.
-				inline: "h-auto gap-1 p-0 text-[length:inherit] font-normal",
+				// A link sized by the text around it, never larger than the UI's 13 px text: placed beside
+				// rows in a container without a text size of its own, it would otherwise take the
+				// browser's 14 px and stand out from the 12.5 px rows it sits with.
+				inline: "h-auto gap-1 p-0 text-[length:min(1em,13px)] font-normal",
 			},
 		},
 		defaultVariants: {
