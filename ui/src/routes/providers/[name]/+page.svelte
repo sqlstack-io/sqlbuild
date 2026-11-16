@@ -1,4 +1,5 @@
 <script lang="ts">
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -62,7 +63,8 @@
 					<div class="flex flex-col p-6">
 						<div class="text-[var(--sb-text-faint)] mb-4 flex max-w-[760px] items-center gap-2 rounded-[2px] border border-[var(--border-subtle)] bg-[var(--sb-surface-low)] px-3 py-2 text-[11.5px]">
 							<LockIcon size={12} />
-							<span>Values come from each location's environment and never reach the server. Declared in <code>{provider.sourceFile}</code>.</span>
+							<span>Declared in <code>{provider.sourceFile}</code></span>
+							<HelpTip text="Values come from each location's environment and never reach the server" />
 						</div>
 						{#if provider.settings.length}
 							<DataTable class="settings static" embedded columns={settingColumns} rows={provider.settings} key={(f) => f.name} empty="This provider declares no settings.">

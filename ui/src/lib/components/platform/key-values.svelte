@@ -1,13 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import HelpTip from '$lib/components/help-tip.svelte';
 
-	type Row = { label: string; value?: string; title?: string; tone?: string; mono?: boolean; content?: Snippet };
+	// Label and value pairs. A value is a short fact; `help` puts the explanation in a "?" after the label.
+	type Row = { label: string; value?: string; title?: string; help?: string; tone?: string; mono?: boolean; content?: Snippet };
 	let { rows }: { rows: Row[] } = $props();
 </script>
 
 <dl class="key-values">
 	{#each rows as row (row.label)}
-		<dt>{row.label}</dt>
+		<dt>{row.label}{#if row.help}<HelpTip text={row.help} label="About {row.label}" />{/if}</dt>
 		<dd class:mono={row.mono} style:color={row.tone} title={row.title ?? row.value}>
 			{#if row.content}{@render row.content()}{:else}{row.value ?? '—'}{/if}
 		</dd>
@@ -23,6 +25,9 @@
 		font-size: 12.5px;
 	}
 	dt {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 		color: var(--muted-foreground);
 	}
 	dd {

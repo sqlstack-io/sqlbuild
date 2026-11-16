@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::credentials::models::Action;
-use crate::runs::types::CommandPlanner;
+use crate::runs::types::{CommandPlanner, PreparedPublication};
+use crate::snapshots::models::WriterNode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -885,4 +886,144 @@ impl Default for RunLogRetention {
             count: crate::runs::constants::DEFAULT_RUN_LOG_RETENTION_COUNT,
         }
     }
+}
+
+/// Prepared publications by snapshot ID; snapshots never change, so an entry stays valid until evicted.
+#[derive(Debug)]
+pub struct PublicationCache {
+    pub(crate) slots: std::sync::Mutex<SnapshotSlots<CachedPublication>>,
+}
+
+impl PublicationCache {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            slots: std::sync::Mutex::new(SnapshotSlots::new()),
+        }
+    }
+}
+
+impl Default for PublicationCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Values built once per snapshot, least recently used first out within each location and target.
+#[derive(Debug)]
+pub(crate) struct SnapshotSlots<T> {
+    /// Counts lookups, so a larger `used` is more recent.
+    pub(crate) clock: u64,
+    pub(crate) slots: Vec<SnapshotSlot<T>>,
+}
+
+impl<T> SnapshotSlots<T> {
+    pub(crate) const fn new() -> Self {
+        Self {
+            clock: 0,
+            slots: Vec::new(),
+        }
+    }
+}
+
+/// One snapshot's value, built by the first request that needs it while later ones wait.
+#[derive(Debug)]
+pub(crate) struct SnapshotSlot<T> {
+    pub(crate) scope: (Uuid, String),
+    pub(crate) snapshot_id: Uuid,
+    pub(crate) used: u64,
+    pub(crate) cell: std::sync::Arc<tokio::sync::OnceCell<std::sync::Arc<T>>>,
+}
+
+/// What every plan of one publication shares: the planner's index, each node's write-set facts and every node key.
+#[derive(Debug)]
+pub(crate) struct CachedPublication {
+    pub(crate) prepared: std::sync::Arc<dyn PreparedPublication>,
+    pub(crate) writers: BTreeMap<String, WriterNode>,
+    pub(crate) node_keys: BTreeSet<String>,
+}
+
+/// A selection to evaluate, as typed: `select` and `exclude` each hold space-separated selectors, as `sqb build -s … --exclude …` takes them.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SelectionQuery {
+    #[serde(default)]
+    pub select: String,
+    #[serde(default)]
+    pub exclude: String,
+    /// How many sorted keys to skip.
+    pub offset: Option<u32>,
+    /// Page size; defaults to 1,000, clamped to 1..10,000.
+    pub limit: Option<u32>,
+}
+
+/// The nodes `sqb build --select … --exclude …` selects in the current publication, or why it refuses the selectors.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionEvaluation {
+    /// The publication evaluated; `None` before the first one.
+    pub snapshot_id: Option<Uuid>,
+    /// Every selected node, across all pages.
+    pub count: u64,
+    /// One page of the selected `kind:name` keys, sorted.
+    pub keys: Vec<String>,
+    /// The offset of the next page, when there is one.
+    pub next_offset: Option<u32>,
+    pub error: Option<SelectionProblem>,
+}
+
+/// Why `sqb` refuses a selection, where, and what might have been meant.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionProblem {
+    /// The selector error code, such as `S007`; `None` when the selection as a whole is refused.
+    pub code: Option<String>,
+    pub message: String,
+    /// `sqb`'s own help line, such as "did you mean 'orders'?".
+    pub help: Option<String>,
+    /// The selector token the error comes from, when one token causes it.
+    pub location: Option<SelectionLocation>,
+    /// Replacements for that whole token, closest first.
+    pub suggestions: Vec<String>,
+}
+
+/// One selector token in the request's `select` or `exclude` text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionLocation {
+    pub field: SelectionField,
+    pub token: String,
+    /// Where the token starts and ends in its field, in UTF-16 code units, as JavaScript indexes strings.
+    pub start: u32,
+    pub end: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectionField {
+    Select,
+    Exclude,
+}
+
+/// The values each selector type takes in the current publication, with how many nodes each one selects.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SelectionVocabulary {
+    /// The publication described; `None` before the first one.
+    pub snapshot_id: Option<Uuid>,
+    /// `tag:` values: the SQL resources and Python nodes with each tag.
+    pub tags: Vec<VocabularyEntry>,
+    /// `path:` folders such as `models/staging`: the nodes below each, at any depth.
+    pub paths: Vec<VocabularyEntry>,
+    /// `job:` names: the nodes each job or job group selects.
+    pub jobs: Vec<VocabularyEntry>,
+    /// `source:` names, one node each.
+    pub sources: Vec<VocabularyEntry>,
+    /// `seed:` names, one node each.
+    pub seeds: Vec<VocabularyEntry>,
+    /// `kind:` values: the nodes of each kind.
+    pub kinds: Vec<VocabularyEntry>,
+}
+
+/// One selector value and the number of nodes it selects.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct VocabularyEntry {
+    pub value: String,
+    pub count: u64,
 }

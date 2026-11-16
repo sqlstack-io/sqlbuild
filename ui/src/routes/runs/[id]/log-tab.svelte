@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
+	import { plural } from '$lib/format/plural';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -59,11 +61,10 @@
 	const byCategory = $derived(entries.filter(kindShown));
 	const byLevel = $derived(entries.filter((e) => levelShown(e) && e.category !== 'output'));
 	const shown = $derived(entries.filter((e) => levelShown(e) && kindShown(e) && matches(e)));
-	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: byCategory.filter((e) => l.value === 'all' || e.level === l.value).length })));
-	const kindOptions = $derived([
-		{ value: 'all' as const, label: 'All kinds', count: byLevel.length },
-		...present.map((c) => ({ value: c.value, label: c.label, count: byLevel.filter((e) => e.category === c.value).length }))
-	]);
+	const levelCounts = $derived(countBy(byCategory, (e) => e.level));
+	const categoryCounts = $derived(countBy(byLevel, (e) => e.category));
+	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? byCategory.length : (levelCounts.get(l.value) ?? 0) })));
+	const kindOptions = $derived([{ value: 'all' as const, label: 'All kinds', count: byLevel.length }, ...present.map((c) => ({ value: c.value, label: c.label, count: categoryCounts.get(c.value) ?? 0 }))]);
 
 	function toggle<T>(set: Set<T>, value: T): Set<T> {
 		const next = new Set(set);
@@ -119,7 +120,7 @@
 					{:else}
 						<span class="dot" style:background={e.tone}></span><span title={e.title}>{e.text}</span>
 						{#if e.queries.length}
-							<DisclosureButton open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} class="ml-2 gap-0.5 text-[11.5px]">{e.queries.length} {e.queries.length === 1 ? 'query' : 'queries'}</DisclosureButton>
+							<DisclosureButton open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} class="ml-2 gap-0.5 text-[11.5px]">{plural(e.queries.length, 'query', 'queries')}</DisclosureButton>
 						{/if}
 					{/if}
 					{#if e.statementId && e.nodeKey && onstatement && e.category === 'queries'}

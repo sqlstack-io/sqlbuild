@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -8,10 +9,10 @@
 	// THAT column's lineage chain (one small COL node per model it flows through,
 	// transform-lens tags on each hop). Bounded by a column's depth, not by the
 	// model's column count — so it scales to 100+ columns.
-	import '@xyflow/svelte/dist/style.css';
-	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
+	import type { Node, Edge } from '@xyflow/svelte';
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import { LABEL_MIN_ZOOM } from '$lib/lineage/fit';
 	import ColCellNode from '$lib/components/lineage/col-cell-node.svelte';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { layoutGraph } from '$lib/lineage/layout';
 	import { highlightSqlbuild } from '$lib/sql/highlight';
 	import { tick } from 'svelte';
@@ -355,11 +356,7 @@
 			}}
 		>
 			{#if selectedCol}
-				<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView fitViewOptions={{ padding: 0.12, maxZoom: 1, minZoom: 0.3 }} minZoom={0.1} nodesDraggable proOptions={{ hideAttribution: true }}>
-					<FlowController bind:fitView={fitFn} fitFloor={0.3} />
-					<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-					<Controls />
-				</SvelteFlow>
+				<GraphCanvas bind:nodes bind:edges bind:fit={fitFn} readable={false} fitOnInit {nodeTypes} fitViewOptions={{ padding: 0.12, maxZoom: 1, minZoom: LABEL_MIN_ZOOM }} nodesDraggable />
 
 			{:else}
 				<div class="text-[var(--sb-text-faint)] grid h-full place-items-center text-[12px]">Select a column to trace its lineage.</div>
@@ -370,7 +367,7 @@
 			<aside class="derivation sb-scroll">
 				<div class="dv-head">
 					<strong>How it's derived</strong>
-					<span>{hops.length - 1} {hops.length - 1 === 1 ? 'step' : 'steps'} from source</span>
+					<span>{plural(hops.length - 1, 'step')} from source</span>
 				</div>
 				<ol class="dv-steps">
 					{#each hops as st (st.cid)}

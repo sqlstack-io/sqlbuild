@@ -53,3 +53,10 @@ pub(crate) const SUPERSEDED_CHILD: &str = "EXISTS(SELECT 1 FROM sqb_runs s WHERE
 pub(crate) const MEMBER_RETRYING_EVENT: &str = "run_member_retrying";
 /// The group run event recorded when a retried member succeeds.
 pub(crate) const MEMBER_RECOVERED_EVENT: &str = "run_member_recovered";
+
+/// Prepared publications kept per location and target: the current snapshot and the one before it.
+pub(crate) const PUBLICATIONS_PER_TARGET: usize = 2;
+
+/// Selected keys per page of a selection evaluation, and the most a request may ask for.
+pub(crate) const SELECTION_PAGE_DEFAULT: u32 = 1_000;
+pub(crate) const SELECTION_PAGE_MAX: u32 = 10_000;

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
+	import { readValues } from '$lib/list/choice';
+	import { folderSelections } from '$lib/selection/folders';
 	import { openRow, to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -10,6 +13,8 @@
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
+	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
+	import { createSelection } from '$lib/state/selection.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -17,7 +22,7 @@
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import StaleBadges from '$lib/components/build-area/stale-badges.svelte';
 	import { planHref } from '$lib/run/command';
-	import { topFolder } from '$lib/lineage/catalog-graph';
+	import { folderOf } from '$lib/lineage/catalog-graph';
 	import { app } from '$lib/state/app.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
@@ -30,12 +35,23 @@
 
 	const catalog = useCatalogNodes();
 	const all = $derived(catalog.data ?? []);
+	const byKindTab = $derived(countBy(all, (n) => kindTabOf(n.kind)));
 
 	const params = page.url.searchParams;
 	let query = $state(params.get('q') ?? '');
 	let kindFilter = $state<'all' | KindTab>(parseKindTab(params.get('kind')) ?? 'all');
-	let groupFilter = $state(params.get('group') ?? '');
-	let statusFilter = $state<StatusFilter | ''>(params.get('stale') ? 'stale' : '');
+	let statusFilter = $state<StatusFilter[]>(params.get('stale') ? ['stale'] : []);
+	// What `sqb build -s … --exclude …` selects, kept in the URL; Status only changes the view.
+	const selection = createSelection({ url: true, replaces: ['group'] });
+	// Older links name top-level folders with `?group=`: once the nodes are known, each becomes its selection.
+	let linkedGroups = readValues(params, 'group');
+	$effect(() => {
+		if (!linkedGroups.length || !all.length) return;
+		const folders = folderSelections(all);
+		if (!selection.select) selection.select = linkedGroups.map((g) => folders.get(g) ?? '').filter(Boolean).join(' ');
+		linkedGroups = [];
+	});
+	const selectionNames = $derived(all.map((n) => ({ value: shortName(n.key), hint: folderOf(n) })));
 	// Nodes picked elsewhere, such as a provider's code from its Used by tab.
 	let picked = $state<ReadonlySet<string>>(new Set((params.get(NODES_PARAM) ?? '').split(',').filter(Boolean)));
 	function clearPicked() {
@@ -45,8 +61,7 @@
 		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
 	}
 
-	const matchesStatus = (n: CatalogNode, f: StatusFilter | '') =>
-		!f ||
+	const matchesStatus = (n: CatalogNode, f: StatusFilter) =>
 		(f === 'stale' && !!n.stale?.length) ||
 		(f === 'changed' && !!n.stale?.some((s) => s.reason !== 'behind')) ||
 		(f === 'behind' && !!n.stale?.some((s) => s.reason === 'behind')) ||
@@ -54,7 +69,6 @@
 		(f === 'warn' && n.lastOutcome === 'warn');
 
 	const kinds = $derived(KIND_TABS.filter((k) => all.some((n) => kindTabOf(n.kind) === k)));
-	const groups = $derived([...new Set(all.map(topFolder))].sort());
 	/** Outcome and staleness come together; a server that reports neither leaves them unknown. */
 	const showBuildState = $derived(all.some((n) => n.stale !== null));
 	const showChecks = $derived(all.some((n) => n.checks !== null));
@@ -64,10 +78,10 @@
 	const filtered = $derived(
 		all.filter((n) => {
 			if (picked.size && !picked.has(n.key)) return false;
+			if (!selection.has(n.key)) return false;
 			if (kindFilter !== 'all' && kindTabOf(n.kind) !== kindFilter) return false;
 			// A filter whose control is hidden, for example from a shared link, never narrows the list.
-			if (groups.length > 1 && groupFilter && topFolder(n) !== groupFilter) return false;
-			if (showBuildState && !matchesStatus(n, statusFilter)) return false;
+			if (showBuildState && statusFilter.length && !statusFilter.some((f) => matchesStatus(n, f))) return false;
 			const q = query.trim().toLowerCase();
 			return !q || [n.key, n.description, kindLine(n), ...n.tags].some((s) => s.toLowerCase().includes(q));
 		})
@@ -86,6 +100,7 @@
 		{ value: 'failed', label: 'Last build failed' },
 		{ value: 'warn', label: 'Last build warned' }
 	];
+	const byStatus = $derived(countBy(all, (n) => statusOptions.filter((o) => matchesStatus(n, o.value)).map((o) => o.value)));
 
 	const ROW_H = 52;
 	const tableColumns = $derived<TableColumn[]>([
@@ -106,6 +121,11 @@
 </AppTopbar>
 
 
+<SelectionBar {selection} names={selectionNames} total={all.length}>
+	{#snippet view()}
+		{#if showBuildState}<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />{/if}
+	{/snippet}
+</SelectionBar>
 <ListToolbar
 	loading={catalog.data === undefined}
 	bind:query
@@ -123,14 +143,12 @@
 		{#if picked.size}<Button variant="outline" size="sm" class="mr-1.5" onclick={clearPicked} title="Show every node">{picked.size} picked<XIcon /></Button>{/if}
 		<SegmentedFilter loading={catalog.data === undefined}
 			bind:value={kindFilter}
-			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: kindTabLabel[k], count: all.filter((n) => kindTabOf(n.kind) === k).length }))]}
+			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: kindTabLabel[k], count: byKindTab.get(k) ?? 0 }))]}
 		/>
-		{#if showBuildState}<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: all.filter((n) => matchesStatus(n, o.value)).length }))} />{/if}
-		{#if groups.length > 1}<ChoiceFilter label="Folder" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: all.filter((n) => topFolder(n) === g).length }))} />{/if}
 	{/snippet}
 </ListToolbar>
 
-<DataTable class="catalog" columns={tableColumns} rows={filtered} key={(n) => n.key} rowHeight={ROW_H} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet. Deploy the project to see its models, sources and seeds here.'}>
+<DataTable class="catalog" columns={tableColumns} rows={filtered} key={(n) => n.key} rowHeight={ROW_H} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet.'}>
 	{#snippet row(n)}
 				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
 				<tr onclick={(e) => linksNodes && openRow(e, `/catalog/${n.key}`)}>

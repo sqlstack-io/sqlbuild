@@ -4,6 +4,7 @@
 
 import type { PlanChanged, PlanDocument, PlanModel, PlanWarning, Trigger } from '$lib/api';
 import { formatIn } from '$lib/format/time';
+import { plural } from '$lib/format/plural';
 
 export type PlanEntry = {
 	name: string;
@@ -139,7 +140,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	if (isFullRefresh(plan)) {
 		const counts = new Map<string, number>();
 		for (const m of active) counts.set(m.materialization_type, (counts.get(m.materialization_type) ?? 0) + 1);
-		add('Full refresh', [...counts].map(([kind, n]) => ({ name: kind, value: `${n} ${n === 1 ? 'model' : 'models'}`, detail: [] })), true);
+		add('Full refresh', [...counts].map(([kind, n]) => ({ name: kind, value: `${plural(n, 'model')}`, detail: [] })), true);
 	} else {
 		const starts = plan.synced_copy?.cursor_window_starts ?? {};
 		for (const [reason, title] of REASON_GROUPS) add(title, active.filter((m) => m.reason === reason).map((m) => changedEntry(m, reason, starts[m.name])), true);
@@ -204,8 +205,8 @@ export function jobRefreshText(job: string, triggers: Pick<Trigger, 'jobKey' | '
 	const mine = triggers.filter((t) => t.jobKey === job);
 	const live = mine.filter((t) => t.state === 'running');
 	if (mine.length && !live.length) return `job ${job} is paused`;
-	if (schedulerStopped && live.length) return `job ${job} · can’t start until the scheduler is running again`;
+	if (schedulerStopped && live.length) return `job ${job} · scheduler stopped`;
 	const next = live.flatMap((t) => (t.nextDueAt ? [t.nextDueAt] : [])).sort()[0];
 	if (next) return `job ${job} · next run ${formatIn(next, now)}`;
-	return live.some((t) => t.type === 'sensor') ? `job ${job} · when its sensor fires` : `job ${job}`;
+	return live.some((t) => t.type === 'sensor') ? `job ${job} · on sensor` : `job ${job}`;
 }

@@ -22,6 +22,7 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import { CI_ACCOUNT, DEMO_USER, OPS_USER, SCHEDULER, SENSOR_DAEMON } from './principals';
+import { BIG_GROUP, bigGroupFile, bigGroupSelect, bigGroupShape } from './big-group';
 import { resolveSelection, writeSetOf } from './operate-graph';
 import type { RunEnd, RunRecord, RunScript } from './run-detail';
 
@@ -77,7 +78,7 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'core_build',
 		kind: 'job',
 		description: 'Staging and marts models',
-		select: 'group:staging group:marts',
+		select: 'path:models/staging path:models/marts',
 		exclude: [],
 		members: [],
 		overlap: 'skip',
@@ -95,7 +96,7 @@ export const JOB_DEFS: JobDef[] = [
 			`core_build = job(
     "core_build",
     description="Staging and marts models",
-    select=["group:staging", "group:marts"],
+    select=["path:models/staging", "path:models/marts"],
     overlap="skip",
     on_failure=on_failure(retries=2, retry_delay_seconds=600),
     concurrency_groups=[warehouse_heavy],
@@ -109,7 +110,7 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'marts_only',
 		kind: 'job',
 		description: 'Marts models only, reading the current staging layer',
-		select: 'group:marts',
+		select: 'path:models/marts',
 		exclude: [],
 		members: [],
 		overlap: 'queue',
@@ -127,7 +128,7 @@ export const JOB_DEFS: JobDef[] = [
 			`marts_only = job(
     "marts_only",
     description="Marts models only, reading the current staging layer",
-    select="group:marts",
+    select="path:models/marts",
     targets=["prod", "staging"],
     owner="analytics",
 )`
@@ -137,7 +138,7 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'activity_microbatch',
 		kind: 'job',
 		description: 'Incremental activity models, four microbatches at a time',
-		select: 'group:activity',
+		select: 'path:models/activity',
 		exclude: [],
 		members: [],
 		overlap: 'queue',
@@ -155,7 +156,7 @@ export const JOB_DEFS: JobDef[] = [
 			`activity_microbatch = job(
     "activity_microbatch",
     description="Incremental activity models, four microbatches at a time",
-    select="group:activity",
+    select="path:models/activity",
     settings={"--max-microbatches": 4},
     owner="analytics",
     schedule=schedule(cron="{cron:activity_microbatch}", timezone="UTC",
@@ -224,7 +225,7 @@ export const JOB_DEFS: JobDef[] = [
 		key: 'reporting_exports',
 		kind: 'job',
 		description: 'Reporting tables and the revenue export',
-		select: 'group:reporting group:exports',
+		select: 'path:models/reporting export_revenue_csv',
 		exclude: [],
 		members: [],
 		overlap: 'queue',
@@ -242,7 +243,7 @@ export const JOB_DEFS: JobDef[] = [
 			`reporting_exports = job(
     "reporting_exports",
     description="Reporting tables and the revenue export",
-    select=["group:reporting", "group:exports"],
+    select=["path:models/reporting", "export_revenue_csv"],
     concurrency_groups=[warehouse_heavy],
     priority=10,
     targets=["prod"],
@@ -310,6 +311,52 @@ export const JOB_DEFS: JobDef[] = [
 		)
 	}
 ];
+
+// A large group of small jobs, to see how a big group draws (see big-group.ts).
+const BIG = bigGroupShape();
+JOB_DEFS.push(
+	...BIG.members.map(
+		(key): JobDef => ({
+			key,
+			kind: 'job',
+			description: `Warehouse step ${key.replace('_', ' ')}`,
+			select: bigGroupSelect(key),
+			exclude: [],
+			members: [],
+			overlap: 'queue',
+			onFailure: null,
+			concurrencyGroups: [],
+			priority: 0,
+			sourceFile: bigGroupFile(key),
+			settings: {},
+			targets: null,
+			owner: 'data-platform',
+			criticalNodes: [],
+			declaration: decl(bigGroupFile(key), 1, `${key} = job("${key}", select="${bigGroupSelect(key)}")`)
+		})
+	),
+	{
+		key: BIG_GROUP,
+		kind: 'group',
+		description: 'Every warehouse step, in stages',
+		select: null,
+		exclude: [],
+		members: BIG.members,
+		overlap: 'queue',
+		onFailure: null,
+		concurrencyGroups: [],
+		priority: 0,
+		sourceFile: 'orchestration/warehouse.py',
+		settings: {},
+		targets: null,
+		owner: 'data-platform',
+		criticalNodes: [],
+		declaration: decl('orchestration/warehouse.py', 60, `${BIG_GROUP} = job_group("${BIG_GROUP}", jobs=[...])`)
+	}
+);
+
+/** Waits a group declares instead of those its members' lineage gives: the big group's whole upstreams. */
+export const DECLARED_WAITS: Record<string, ReadonlyMap<string, string[]>> = { [BIG_GROUP]: BIG.waits };
 
 export function jobDef(key: string | null): JobDef | undefined {
 	return key ? JOB_DEFS.find((j) => j.key === key) : undefined;

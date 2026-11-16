@@ -62,7 +62,7 @@
 						<div><dt>{row.label}</dt><dd class:faint={row.value === null}>{row.value ?? '—'}</dd></div>
 					{/each}
 				</dl>
-				{#if !g.details}<p class="note">The location doesn't publish its connection settings yet. Secrets are never shown.</p>{/if}
+				{#if !g.details}<p class="note" title="Secrets are never shown">Settings not published</p>{/if}
 				<DataTable class="users static" embedded columns={userColumns} rows={g.users} key={(c) => c.id} empty="No location uses this connection.">
 					{#snippet row(c)}
 							<tr>
@@ -116,7 +116,7 @@
 			</Panel>
 		{/each}
 	{:else}
-		{#if connections.data}<p class="muted">No location you can see in full has reported yet.</p>{:else if !connections.error}<Loading />{/if}
+		{#if connections.data}<p class="muted" title="Only locations you can see in full are listed">Nothing reported yet.</p>{:else if !connections.error}<Loading />{/if}
 	{/each}
 </PageBody>
 

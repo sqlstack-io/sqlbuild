@@ -42,6 +42,8 @@ mod test_node_errors;
 mod test_permissions;
 #[path = "test_project_limits.rs"]
 mod test_project_limits;
+#[path = "test_publication_cache.rs"]
+mod test_publication_cache;
 #[path = "test_requests.rs"]
 mod test_requests;
 #[path = "test_reruns.rs"]
@@ -50,5 +52,7 @@ mod test_reruns;
 mod test_retries;
 #[path = "test_run_logs.rs"]
 mod test_run_logs;
+#[path = "test_selection.rs"]
+mod test_selection;
 #[path = "test_types.rs"]
 pub(crate) mod test_types;

@@ -2,6 +2,7 @@ import type { components } from '$control/schema.d.ts';
 import { ApiError } from './client';
 import type { Iso } from './types';
 import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, SensorEvaluation, SensorEvaluationOutcome, Tick, Trigger, TriggerDetail, TriggerKind, TriggerStateEvent, TriggerStateEventKind } from './types/operate';
+import { plural } from '$lib/format/plural';
 
 type Wire = components['schemas'];
 
@@ -30,7 +31,7 @@ export function triggerKindOf(declaration: Wire['TriggerDeclaration']): TriggerK
 export function cadenceOf(declaration: Wire['TriggerDeclaration']): string {
 	if (isSchedule(declaration)) {
 		const s = declaration.schedule;
-		return s.kind === 'cron' ? `${s.expression} (${s.timezone})` : `${s.times.length} calendar time${s.times.length === 1 ? '' : 's'}`;
+		return s.kind === 'cron' ? `${s.expression} (${s.timezone})` : `${plural(s.times.length, 'calendar time')}`;
 	}
 	const w = declaration.when;
 	if (w.kind === 'run_event') return `when ${w.job_key} ${w.kinds.join(' or ')}`;

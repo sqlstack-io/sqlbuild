@@ -88,7 +88,8 @@
 		onselect={pickData}
 	/>
 	{#if fullRefresh}
-		<p class="note">Every model in this run is rebuilt from scratch, replacing all of its data. Recorded in the audit log.</p>
+		<!-- copy-allow: consequence warning -->
+		<p class="note">Rebuilds every model from scratch, replacing all data. Audited.</p>
 	{/if}
 		{#if ranged}
 			{#if cursorType === 'timestamp'}
@@ -113,7 +114,8 @@
 					{/if}
 				</div>
 			{/if}
-			<p class="note">Incremental models reprocess this range, replacing what was built for it. Recorded in the audit log.</p>
+			<!-- copy-allow: consequence warning -->
+			<p class="note">Replaces data built for this range. Audited.</p>
 		{/if}
 </div>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { setInUiExplanation } from '../utils';
 	import PageBody from '$lib/components/page-body.svelte';
 	import { to } from '$lib/paths';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -50,7 +51,7 @@
 	{#if t}
 		{#if app.can('trigger.toggle')}<input class="reason" bind:value={reason} placeholder="Why? (saved in the history)" aria-label="Reason for the change" />{/if}
 		{#if t.state !== t.defaultState}
-			<GatedButton size="bar" requires="trigger.toggle" {busy} onclick={resetDefault}>Reset to the code's setting ({t.defaultState === 'running' ? 'on' : 'paused'})</GatedButton>
+			<GatedButton size="bar" requires="trigger.toggle" {busy} onclick={resetDefault}>Reset to code ({t.defaultState === 'running' ? 'on' : 'paused'})</GatedButton>
 		{/if}
 		{#if t.state === 'running'}
 			<GatedButton size="bar" requires="trigger.toggle" {busy} onclick={() => setState('paused')}>Pause</GatedButton>
@@ -66,7 +67,7 @@
 		<span class="font-display text-[17px] font-semibold">{t?.name ?? id}</span>
 		{#if t}
 			<span class="sb-status" style:--tone={t.state === 'running' ? 'var(--sb-success)' : 'var(--sb-text-faint)'}><span></span>{t.state === 'running' ? 'on' : 'paused'}</span>
-			<span class="faint">{t.state === t.defaultState ? 'as in the code' : `set in UI; the code sets this to ${t.defaultState === 'running' ? 'on' : 'paused'}`}</span>
+			{#if t.state !== t.defaultState}<span class="faint" title={setInUiExplanation(t)}>Set in UI</span>{/if}
 			<span class="faint" title={triggerKindHelp[t.kind]}>· {triggerKindLabel[t.kind]} · {t.cadence}</span>
 		{/if}
 	</div>
@@ -96,13 +97,13 @@
 			</PageBody>
 
 			<aside class="rail sb-scroll">
-				<h3>How it works</h3>
+				<h3>Definition</h3>
 				<dl>
 					<div><dt>Kind</dt><dd title={triggerKindHelp[t.kind]}>{triggerKindLabel[t.kind]}</dd></div>
-					<div><dt>Runs</dt><dd>{#if t.jobKey}<a href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}its own code only{/if}</dd></div>
+					<div><dt>Runs</dt><dd>{#if t.jobKey}<a href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span title="Runs its own code; starts no job">Own code</span>{/if}</dd></div>
 					{#if t.cron}<div><dt>Cron</dt><dd><code>{t.cron}</code></dd></div>{/if}
 					{#if t.timezone}<div><dt>Time zone</dt><dd>{t.timezone}</dd></div>{/if}
-					{#if t.catchUp}<div><dt>After downtime</dt><dd title="Catch-up policy: {t.catchUp.mode}">{t.catchUp.mode === 'latest' ? 'at most one run, for the latest missed time' : `runs for each missed time, up to ${t.catchUp.max}`}</dd></div>{/if}
+					{#if t.catchUp}<div><dt>After downtime</dt><dd title="Catch-up policy ({t.catchUp.mode}): {t.catchUp.mode === 'latest' ? 'at most one run, for the latest missed time' : `a run for each missed time, up to ${t.catchUp.max}`}">{t.catchUp.mode === 'latest' ? 'Latest only' : `Each missed · max ${t.catchUp.max}`}</dd></div>{/if}
 					{#if t.targets}<div><dt>Targets</dt><dd>{t.targets.join(', ')}</dd></div>{/if}
 					<div><dt>In the code</dt><dd>{t.defaultState === 'running' ? 'on' : 'paused'}</dd></div>
 					{#if t.sourceFile}<div><dt>Defined in</dt><dd><code>{t.sourceFile}</code></dd></div>{/if}
@@ -117,18 +118,18 @@
 							<p class:faint={i > 0}>{formatStamp(due)} <span class="faint">{formatIn(due, app.now)}</span></p>
 						{/each}
 					{:else}
-						<p class="faint">No upcoming times. Check the calendar below.</p>
+						<p class="faint">No upcoming times.</p>
 					{/if}
 				{/if}
 
 				{#if t.calendar}
 					<h3 title="Calendar horizon">Calendar</h3>
 					<dl>
-						{#if t.calendar.horizon}<div><dt>Worked out ahead</dt><dd>{t.calendar.horizon}</dd></div>{/if}
-						<div><dt>Known until</dt><dd class:warn={t.calendar.low}>{#if t.calendar.storedUntil}{formatStamp(t.calendar.storedUntil)} <span class="faint">{Date.parse(t.calendar.storedUntil) > app.now ? formatIn(t.calendar.storedUntil, app.now) : formatAgo(t.calendar.storedUntil, app.now)}</span>{:else}no times stored{/if}</dd></div>
+						{#if t.calendar.horizon}<div><dt title="How far ahead times are computed">Horizon</dt><dd>{t.calendar.horizon}</dd></div>{/if}
+						<div><dt>Known until</dt><dd class:warn={t.calendar.low}>{#if t.calendar.storedUntil}{formatStamp(t.calendar.storedUntil)} <span class="faint">{Date.parse(t.calendar.storedUntil) > app.now ? formatIn(t.calendar.storedUntil, app.now) : formatAgo(t.calendar.storedUntil, app.now)}</span>{:else}—{/if}</dd></div>
 						{#if t.calendar.lastRefreshedAt}<div><dt>Last updated</dt><dd>{formatAgo(t.calendar.lastRefreshedAt, app.now)}</dd></div>{/if}
 						{#if t.calendar.nextRefreshAt}<div><dt>Next update</dt><dd title={formatStamp(t.calendar.nextRefreshAt)}>{Date.parse(t.calendar.nextRefreshAt) > app.now ? formatIn(t.calendar.nextRefreshAt, app.now) : `due ${formatAgo(t.calendar.nextRefreshAt, app.now)}`}</dd></div>{/if}
-						{#if t.calendar.lowHorizonWarningBelow}<div><dt>Warns when under</dt><dd>{t.calendar.lowHorizonWarningBelow}</dd></div>{/if}
+						{#if t.calendar.lowHorizonWarningBelow}<div><dt>Warn below</dt><dd>{t.calendar.lowHorizonWarningBelow}</dd></div>{/if}
 					</dl>
 				{/if}
 
@@ -261,9 +262,5 @@
 	}
 	a {
 		color: var(--primary);
-	}
-	.sb-scroll {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border-strong) transparent;
 	}
 </style>

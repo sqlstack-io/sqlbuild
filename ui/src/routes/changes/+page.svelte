@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
+	import { plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
@@ -58,6 +60,7 @@
 		{ value: 'roles', label: 'Roles' },
 		{ value: 'environment', label: 'Environment' }
 	];
+	const byArea = $derived(countBy(all, (c) => areaOptions.filter((o) => hasArea(c, o.value)).map((o) => o.value)));
 </script>
 
 <AppTopbar title="Changes">
@@ -66,7 +69,7 @@
 
 <ListToolbar loading={changes.data === undefined} bind:query placeholder="Search nodes, commits, authors" total="{filtered.length} of {all.length} deploys">
 	{#snippet filters()}
-		<SegmentedFilter loading={changes.data === undefined} bind:value={area} options={areaOptions.map((o) => ({ ...o, count: all.filter((c) => hasArea(c, o.value)).length }))} />
+		<SegmentedFilter loading={changes.data === undefined} bind:value={area} options={areaOptions.map((o) => ({ ...o, count: byArea.get(o.value) ?? 0 }))} />
 	{/snippet}
 </ListToolbar>
 
@@ -145,7 +148,7 @@
 								{:else if app.client.supports('getRole')}<a class="key" href={to(`/admin/roles/${encodeURIComponent(r.role)}`)}>{r.role}</a>
 								{:else}<code>{r.role}</code>{/if}
 								<span class="detail">
-									{#if r.coverage}<b>now covers {r.coverage.after} {r.coverage.after === 1 ? 'node' : 'nodes'}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
+									{#if r.coverage}<b>now covers {plural(r.coverage.after, 'node')}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
 								</span>
 							</div>
 						{/each}
@@ -170,7 +173,7 @@
 							{@const pct = percentChange(cc.before, cc.after)}
 							<div class="row">
 								<a class="key" href={to(`/jobs/${cc.jobKey}`)}>{cc.jobKey}</a>
-								<span class="detail">{formatCredits(cc.before)} → {formatCredits(cc.after)} per run <b class:up={pct > 0} class:down={pct < 0}>{pct > 0 ? '+' : ''}{pct}%</b> <span class="faint">over {cc.runsAfter} {cc.runsAfter === 1 ? 'run' : 'runs'} since {c.gitRevision ? `revision ${shortRevision(c.gitRevision)}` : 'this deploy'}</span></span>
+								<span class="detail">{formatCredits(cc.before)} → {formatCredits(cc.after)} per run <b class:up={pct > 0} class:down={pct < 0}>{pct > 0 ? '+' : ''}{pct}%</b> <span class="faint">over {plural(cc.runsAfter, 'run')} since {c.gitRevision ? `revision ${shortRevision(c.gitRevision)}` : 'this deploy'}</span></span>
 							</div>
 						{/each}
 					</section>
@@ -184,7 +187,7 @@
 								<a class="run" href={to(`/runs/${r.id}`)} title="{r.id} · {runStatusLabel[r.status]} · {formatStamp(r.startedAt ?? r.queuedAt)}">
 									<i style:background={runStatusTone[r.status]}></i>
 									<code>{shortRunId(r.id)}</code>
-									<span class="faint">{r.jobKey ?? 'started by hand'} · {formatAgo(r.startedAt ?? r.queuedAt, app.now)}</span>
+									<span class="faint">{r.jobKey ?? 'Manual'} · {formatAgo(r.startedAt ?? r.queuedAt, app.now)}</span>
 								</a>
 							{/each}
 						</div>

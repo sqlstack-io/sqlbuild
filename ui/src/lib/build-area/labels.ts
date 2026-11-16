@@ -113,14 +113,26 @@ export function kindLine(node: Pick<CatalogNode, 'kind' | 'materialization'>): s
 	return node.materialization ?? nodeKindLabel[node.kind].toLowerCase();
 }
 
+/** What a check looks at, as a short fact; `runScopePhaseHelp` says when. */
 export const runScopePhaseLabel: Record<RunScopePhase, string> = {
-	delta_and_final: 'Each new batch before it is written, then the whole table',
-	final: 'Whole table, after writing'
+	delta_and_final: 'Each batch + full table',
+	final: 'Full table'
 };
 
+export const runScopePhaseHelp: Record<RunScopePhase, string> = {
+	delta_and_final: "Each new batch is checked before it's written, then the whole table",
+	final: 'Checked against the whole table after the build writes it'
+};
+
+/** How a check decides its result, as a short fact; `evaluationModeHelp` explains it. */
 export const evaluationModeLabel: Record<EvaluationMode, string> = {
-	violations: 'Fails if any rows break the rule',
-	measurement: 'Measures a value'
+	violations: 'Any failing row',
+	measurement: 'Measured value'
+};
+
+export const evaluationModeHelp: Record<EvaluationMode, string> = {
+	violations: 'Fails when any row breaks the rule',
+	measurement: 'Compares a measured value with thresholds'
 };
 
 export const attachmentLabel: Record<CheckAttachment, string> = {
@@ -171,14 +183,14 @@ export function shortRunId(id: string): string {
 
 /** "run-4f2a" for scheduler builds, "from the command line · 0f9a3c27" otherwise. */
 export function buildSourceLabel(build: Pick<NodeBuild, 'runId' | 'fingerprintRunId'>): string {
-	return build.runId ?? `from the command line · ${shortRunId(build.fingerprintRunId)}`;
+	return build.runId ?? `CLI · ${shortRunId(build.fingerprintRunId)}`;
 }
 
 /** Versions for the SQL viewer's drift mode, newest first. */
 export function sqlVersions(builds: BuiltDefinition[], now: number): SqlVersion[] {
 	return builds.map((b, i) => ({
 		id: i === 0 ? 'built' : b.build.fingerprintRunId,
-		label: i === 0 ? 'Last build' : b.build.runId ? `Build ${b.build.runId}` : 'Build from the command line',
+		label: i === 0 ? 'Last build' : b.build.runId ? `Build ${b.build.runId}` : 'CLI build',
 		detail: `${i === 0 || !b.build.runId ? `${buildSourceLabel(b.build)} · ` : ''}${formatAgo(b.build.builtAt, now)} · ${formatStamp(b.build.builtAt)}`,
 		raw: b.raw,
 		compiled: b.compiled

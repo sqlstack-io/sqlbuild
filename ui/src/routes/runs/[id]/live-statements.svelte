@@ -15,7 +15,7 @@
 				<LoaderIcon size={14} class="spin" />
 				<span class="what">Running statement {st.sequence} · <b>{st.nodeKey}</b></span>
 				<span class="num">{formatSpan((app.now - Date.parse(st.startedAt)) / 1000)}</span>
-				<span class="num faint">{st.rowsSoFar != null ? `${st.rowsSoFar.toLocaleString('en-GB')} rows so far` : 'no row count yet'}</span>
+				<span class="num faint">{st.rowsSoFar != null ? `${st.rowsSoFar.toLocaleString('en-GB')} rows` : '—'}</span>
 			</button>
 		{/each}
 		{#if statements.length > 3}<span class="faint more">+{statements.length - 3} more running</span>{/if}

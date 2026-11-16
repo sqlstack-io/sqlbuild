@@ -1,7 +1,9 @@
-use crate::graph::constants::{INTERSECTION_SEPARATOR, JOB_KIND, PATH_KIND, TAG_KIND};
+use crate::graph::constants::{
+    INTERSECTION_SEPARATOR, JOB_KIND, NODE_KIND_KIND, PATH_KIND, TAG_KIND,
+};
 use crate::graph::models::ParsedSelector;
 
-/// The atoms of `selection` that name one node: bare or typed names, without `+`, globs, tags, paths or jobs.
+/// The atoms of `selection` that name one node: bare or typed names, without `+`, globs, tags, paths, jobs or kinds.
 #[must_use]
 pub fn named_selector_atoms(selection: &str) -> Vec<String> {
     selection
@@ -20,7 +22,7 @@ fn names_one_node(atom: &str) -> bool {
             upstream: false,
             downstream: false,
         }) => {
-            ![TAG_KIND, PATH_KIND, JOB_KIND].contains(&kind.as_str())
+            ![TAG_KIND, PATH_KIND, JOB_KIND, NODE_KIND_KIND].contains(&kind.as_str())
                 && !crate::graph::_helpers::selectors::is_pattern(&value)
         }
         _ => false,

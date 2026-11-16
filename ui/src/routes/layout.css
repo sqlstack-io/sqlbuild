@@ -222,6 +222,28 @@
 	html {
 		@apply font-sans;
 	}
+	/* One thin, themed scrollbar for every scroll area, so no page shows the browser's default. */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--border-strong) transparent;
+	}
+	*::-webkit-scrollbar {
+		width: 9px;
+		height: 9px;
+	}
+	*::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	*::-webkit-scrollbar-thumb {
+		background: var(--border-strong);
+		border-radius: 2px;
+		border: 2px solid transparent;
+		background-clip: content-box;
+	}
+	*::-webkit-scrollbar-thumb:hover {
+		background: var(--muted-foreground);
+		background-clip: content-box;
+	}
 }
 
 /* The lighter bracketed part of a button label, e.g. the "(+65)" of "Build 30 changed (+65)". */

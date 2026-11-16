@@ -542,6 +542,61 @@ export type SnapshotNode = {
 	upstream: string[];
 };
 
+// ---- selections (the selection bar) ----
+
+/** A selection as typed: each text holds space-separated selectors, as `sqb build -s … --exclude …` takes them. */
+export type SelectionRequest = {
+	select: string;
+	exclude: string;
+	/** Sorted keys to skip. */
+	offset?: number;
+	/** Page size; the server defaults to 1,000 and allows up to 10,000. */
+	limit?: number;
+};
+
+/** The token a refused selection comes from: its field and its range there, in JavaScript string indexes. */
+export type SelectionLocation = { field: 'select' | 'exclude'; token: string; start: number; end: number };
+
+/** Why `sqb` refuses a selection; `code` is null when the selection as a whole is refused. */
+export type SelectionProblem = {
+	code: string | null;
+	message: string;
+	/** `sqb`'s own help line, such as "did you mean 'orders'?". */
+	help: string | null;
+	location: SelectionLocation | null;
+	/** Whole-token replacements, closest first. */
+	suggestions: string[];
+	/**
+	 * The comma part of the located token `sqb` refuses: its selector type (`null` for a bare name or
+	 * folder) and value, as typed. The server does not report it yet, so it is null from the server.
+	 */
+	refused: { part: number; type: string | null; value: string } | null;
+};
+
+/** What `sqb build --select … --exclude …` selects in the current publication: one page of keys and the total. */
+export type SelectionEvaluation = {
+	snapshotId: string | null;
+	count: number;
+	keys: string[];
+	nextOffset: number | null;
+	error: SelectionProblem | null;
+};
+
+/** One selector value and how many nodes it selects. */
+export type VocabularyEntry = { value: string; count: number };
+
+/** The values each selector type takes in the current publication, for autocomplete. */
+export type SelectionVocabulary = {
+	snapshotId: string | null;
+	tags: VocabularyEntry[];
+	/** Folders such as `models/staging`, counting the nodes below each at any depth. */
+	paths: VocabularyEntry[];
+	jobs: VocabularyEntry[];
+	sources: VocabularyEntry[];
+	seeds: VocabularyEntry[];
+	kinds: VocabularyEntry[];
+};
+
 // ---- ad-hoc runs (the plan page) ----
 
 export type LaunchVerb = 'build' | 'test' | 'seed' | 'audit' | 'freshness' | 'load';

@@ -3,6 +3,7 @@
 // a pair stands for. Pure; no side effects.
 
 import type { Edge, Node } from '@xyflow/svelte';
+import { plural } from '$lib/format/plural';
 
 /** One node-level link: `from` feeds `to`. */
 export type NodeLink = { from: string; to: string };
@@ -23,7 +24,7 @@ export function edgeStyle(count: number, state: EdgeState = 'neutral', dashed = 
 }
 
 /** "3 lineage links from orders to marts". */
-export const linksTitle = (count: number, from: string, to: string) => `${count} lineage link${count === 1 ? '' : 's'} from ${from} to ${to}`;
+export const linksTitle = (count: number, from: string, to: string) => `${plural(count, 'lineage link')} from ${from} to ${to}`;
 
 /**
  * One edge per pair of visible ends: each link joins `standIn(from)` and `standIn(to)`, and links

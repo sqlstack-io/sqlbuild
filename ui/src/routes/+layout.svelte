@@ -44,7 +44,7 @@
 	<div class="grid h-screen place-items-center p-8">
 		<div class="max-w-md text-center">
 			<h1 class="text-[15px] font-semibold">No locations to show</h1>
-			<p class="text-muted-foreground mt-2 text-[13px]">Either nothing is deployed yet, or you have no role on a location. Ask an administrator for access, then reload this page.</p>
+			<p class="text-muted-foreground mt-2 text-[13px]">Nothing deployed, or no access. Ask an administrator.</p>
 		</div>
 	</div>
 {:else if !app.scope}
@@ -65,7 +65,7 @@
 				<div class="text-muted-foreground grid flex-1 place-items-center p-8 text-center text-[13px]">
 					<div>
 						<h1 class="text-foreground text-[15px] font-semibold">Not available on this server yet</h1>
-						<p class="mt-2">This server version doesn't provide this page. Choose another page from the menu.</p>
+						<p class="mt-2">Not on this server version.</p>
 					</div>
 				</div>
 			{/if}

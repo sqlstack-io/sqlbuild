@@ -1,4 +1,4 @@
-//! A group orders a warehouse round trip by lineage, SQL to task to loader to models, on both stores.
+//! A group orders a warehouse round trip by its nearest lineage, SQL to task to loader to models, on both stores.
 
 use std::collections::BTreeMap;
 
@@ -30,8 +30,8 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
             expected_waits: json!({
                 "orders_job": [],
                 "score_job": ["orders_job"],
-                "ingest_job": ["orders_job", "score_job"],
-                "report_job": ["ingest_job", "orders_job", "score_job"],
+                "ingest_job": ["score_job"],
+                "report_job": ["ingest_job", "orders_job"],
             }),
             expected_order: &["orders_job", "score_job", "ingest_job", "report_job"],
         },
@@ -41,8 +41,8 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
             expected_waits: json!({
                 "orders_job": [],
                 "score_job": ["orders_job"],
-                "ingest_job": ["orders_job", "score_job"],
-                "report_job": ["ingest_job", "orders_job", "score_job"],
+                "ingest_job": ["score_job"],
+                "report_job": ["ingest_job", "orders_job"],
             }),
             expected_order: &["orders_job", "score_job", "ingest_job", "report_job"],
         },

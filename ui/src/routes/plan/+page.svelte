@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { noun, plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -351,7 +352,7 @@
 			{#if shown?.verb}
 				<div class="summary">
 					{#if shown.verb !== 'build'}
-						<b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
+						<b>{picked.length}</b> {noun(picked.length, 'node')}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
 					{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code" title="Option">{value === true ? name : `${name}=${value}`}</span>{/each}
 					<div class="tabs">
@@ -370,7 +371,7 @@
 					<div class="graph"><ScopeGraph keys={graphKeys} catalog={catalog.data} onselect={() => {}} /></div>
 				{/if}
 			{:else if tab === 'checks' && shown?.verb === 'build' && plan}
-				<p class="faint graph-note">{planChecks.length} {planChecks.length === 1 ? 'check' : 'checks'} <HelpTip text="Checks run after the models they check, and a failing error check stops what depends on it." /></p>
+				<p class="faint graph-note">{plural(planChecks.length, 'check')} <HelpTip text="Checks run after the models they check, and a failing error check stops what depends on it." /></p>
 				<DataTable class="static compact" embedded columns={checkColumns} rows={planChecks} key={(c) => c.id} empty="No checks in this plan.">
 					{#snippet row(c)}
 						<tr>
@@ -403,7 +404,6 @@
 					<RotateCwIcon size={16} class="animate-spin" />
 					<div>
 						<div>{waiting === 'plan' ? 'Planning on the location…' : 'Checking the command…'}</div>
-						<div class="faint">{waiting === 'plan' ? 'Reading the current warehouse state' : 'Resolving what it selects'}</div>
 					</div>
 				</div>
 			</div>

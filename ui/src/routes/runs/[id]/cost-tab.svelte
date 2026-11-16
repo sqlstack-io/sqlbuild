@@ -37,7 +37,7 @@
 
 <div class="cost" data-testid="run-cost">
 	<div class="total">
-		<span class="label">Estimated query cost{#if counted}&nbsp;<HelpTip text="Estimated from the warehouse's query history: each query's share of its warehouse's credits. Idle time and the 60-second minimum are not included." />{/if}</span>
+		<span class="label">Estimated query cost&nbsp;<HelpTip text="Estimated from the warehouse's query history: each query's share of its warehouse's credits. Idle time and the 60-second minimum are not included. Cost appears after the location syncs this run's query history from a Snowflake warehouse; other warehouses show duration only." /></span>
 		<strong>{summary.text}</strong>
 		{#if summary.note}<span class="note">{summary.note}</span>{/if}
 		{#if counted && cost.usd == null}
@@ -46,7 +46,7 @@
 	</div>
 
 	{#if counted && cost.resources.length}
-		<h4>By node <span>most expensive first</span></h4>
+		<h4>By node</h4>
 		<DataTable class="static compact" embedded columns={nodeColumns} rows={shown} key={(r) => r.nodeKey} empty="No cost for the selected nodes.">
 			{#snippet row(r)}
 					<tr>
@@ -74,8 +74,6 @@
 					</tr>
 			{/snippet}
 		</DataTable>
-	{:else if cost.status === 'none'}
-		<p class="foot">Cost appears after the location syncs this run's query history from a Snowflake warehouse. Other warehouses show duration only.</p>
 	{/if}
 </div>
 
@@ -102,27 +100,17 @@
 	.note {
 		color: var(--sb-warn, var(--muted-foreground));
 	}
-	.hint,
-	.foot {
+	.hint {
 		color: var(--muted-foreground);
 	}
 	.hint {
 		flex-basis: 100%;
 		font-size: 12px;
 	}
-	.foot {
-		margin-top: 10px;
-		font-size: 12px;
-	}
 	h4 {
 		margin: 14px 0 6px;
 		font-size: 12.5px;
 		font-weight: 600;
-	}
-	h4 span {
-		margin-left: 6px;
-		color: var(--sb-text-faint);
-		font-weight: 400;
 	}
 	.mono {
 		font-family: var(--font-mono);

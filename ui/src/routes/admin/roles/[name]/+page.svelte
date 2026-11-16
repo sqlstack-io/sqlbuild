@@ -71,7 +71,7 @@
 						<p class="desc">{r.description}</p>
 
 						{#if r.source === 'built_in'}
-							<Panel title="What it allows" help="On every node, in the locations it's given.">
+							<Panel title="Permissions" help="On every node, in the locations it's given.">
 								<ul class="actions">
 									{#each ownActions as a (a)}<li><PermissionName action={a} risk /></li>{/each}
 								</ul>
@@ -135,7 +135,7 @@
 							</Panel>
 
 							{#if r.selectors.length}
-								<Panel title="What the selectors match today" help="Selectors can match more nodes as the project grows, so watch the growth.">
+								<Panel title="Matched nodes" help="Selectors can match more nodes as the project grows, so watch the growth.">
 									<ul class="selectors">
 										{#each r.selectors as s (s.selector)}
 											<li>
@@ -167,7 +167,7 @@
 					</div>
 
 					<div class="min-w-0">
-						<Panel title="Who has it" note={plural(r.holders, 'account')}>
+						<Panel title="Holders" note={plural(r.holders, 'account')}>
 							<ul class="holders">
 								{#each r.assignments as a (a.id)}
 									<li class:stale={a.stale}>

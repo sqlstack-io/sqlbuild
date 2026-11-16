@@ -11,7 +11,7 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { evaluationTone, shortRunId } from '$lib/operate/labels';
 
-	const outcomeText: Record<string, string> = { requested: 'checking…', completed: 'done', failed: 'failed', timed_out: 'took too long', abandoned: 'gave up' };
+	const outcomeText: Record<string, string> = { requested: 'Checking…', completed: 'Done', failed: 'Failed', timed_out: 'Timed out', abandoned: 'Abandoned' };
 
 	let { trigger }: { trigger: TriggerDetail } = $props();
 	const sensor = $derived(trigger.sensor!);
@@ -54,17 +54,17 @@
 </script>
 
 <section>
-	<h3>When it starts a run</h3>
+	<h3>Condition</h3>
 	<p><code>{sensor.condition}</code></p>
 	{#each sensor.nodeConditions as c (c)}<p class="faint">and {c}</p>{/each}
-	<p class="faint">
-		{sensor.minimumIntervalSeconds ? `Checks at most every ${sensor.minimumIntervalSeconds}s` : 'Checks each time something relevant happens'}{sensor.timeoutSeconds ? ` · a check is stopped if it takes over ${sensor.timeoutSeconds}s` : ''}
+	<p class="faint" title={[sensor.minimumIntervalSeconds ? `Checks at most every ${sensor.minimumIntervalSeconds}s` : 'Checks each time something relevant happens', sensor.timeoutSeconds ? `a check is stopped if it takes over ${sensor.timeoutSeconds}s` : ''].filter(Boolean).join('; ')}>
+		{sensor.minimumIntervalSeconds ? `Min interval ${sensor.minimumIntervalSeconds}s` : 'On every event'}{sensor.timeoutSeconds ? ` · timeout ${sensor.timeoutSeconds}s` : ''}
 	</p>
 	{#if trigger.kind === 'platform_sensor'}
 		<p class="faint"><a href={to(`/locations/${app.locationId}#problems`)}>Problems it handled ↗</a></p>
 	{/if}
 	{#if changed}
-		<p class="warn" title="Fingerprint {sensor.lastEvaluatedFingerprint} → {sensor.currentFingerprint}">Its code changed since it last checked. The next check uses the new code.</p>
+		<p class="warn" title="The next check uses the new code. Fingerprint {sensor.lastEvaluatedFingerprint} → {sensor.currentFingerprint}">Code changed since last check</p>
 	{/if}
 </section>
 
@@ -79,7 +79,8 @@
 	</div>
 	{#if confirmReset}
 		<div class="confirm">
-			<p>The next check looks at everything again from the start. Anything it already started a run for (same run key) doesn't start a second run.</p>
+			<!-- copy-allow: consequence of a reset -->
+			<p>Re-reads everything from the start. Runs with an existing run key aren't repeated.</p>
 			<input bind:value={reason} placeholder="Why? (saved in the history)" />
 			<div class="row">
 				<GatedButton requires="sensor.reset_cursor" variant="default" size="sm" {busy} onclick={resetCursor}>Start over</GatedButton>
@@ -102,7 +103,7 @@
 					<td class="num">{e.runRequests}</td>
 					<td class:err={!!e.error} class:faint={!e.error}>
 						{e.error ?? e.skipReason ?? ''}
-						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped while {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each} ran</span>{/if}
+						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped · {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each}</span>{/if}
 						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="sb-tag ml-1.5" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
 					</td>
 				</tr>
@@ -113,7 +114,7 @@
 
 {#if trigger.runRequests}
 <section>
-	<h3 title="Run requests by run key">Runs it started · {trigger.runRequests.length}</h3>
+	<h3 title="Run requests by run key">Runs · {trigger.runRequests.length}</h3>
 	{#if trigger.runRequests.length}
 		<DataTable class="static compact" embedded columns={requestColumns} rows={trigger.runRequests} key={(r) => r.runKey} empty="No runs requested yet.">
 			{#snippet row(r)}
@@ -126,7 +127,7 @@
 			{/snippet}
 		</DataTable>
 	{:else}
-		<p class="faint">{trigger.jobKey ? 'It hasn’t started any runs yet.' : 'This sensor only runs its own code; it doesn’t start runs.'}</p>
+		<p class="faint">{trigger.jobKey ? 'It hasn’t started any runs yet.' : 'No job'}</p>
 	{/if}
 </section>
 {/if}

@@ -2,7 +2,28 @@ import { describe, expect, it } from 'vitest';
 import type { CatalogNode, JobGroupMember, StaleReason } from '$lib/api';
 import { layoutFolderGraph } from './folder-graph';
 import { toggled, withOpen } from './member-expand';
-import { edgeTitle, edgeWidth, innerId, memberGraph, memberLinks, memberNodeId, needsBuilding, pairKey, waitReasons, type MemberEdgeData, type MemberInfo } from './member-graph';
+import { bigGroupFile, bigGroupShape } from '$lib/api/mock/big-group';
+import { declarationFolder, memberFolderTree } from './member-folders';
+import {
+	directWaits,
+	edgeTitle,
+	edgeWidth,
+	innerId,
+	layoutMemberGraph,
+	litEdges,
+	memberFolderBoxId,
+	memberFolderCardId,
+	memberGraph,
+	memberLinks,
+	memberNodeId,
+	memberReach,
+	needsBuilding,
+	pairKey,
+	transitiveReduction,
+	waitReasons,
+	type MemberEdgeData,
+	type MemberInfo
+} from './member-graph';
 
 const member = (jobKey: string, stage: number, waitsFor: string[] = []): JobGroupMember => ({
 	jobKey,
@@ -81,9 +102,10 @@ describe('member graph edges at the visible level', () => {
 		const box = nodes.find((n) => n.id === memberNodeId('orders'))!;
 		expect(box.type).toBe('memberBox');
 		expect(nodes.filter((n) => n.parentId === box.id).map((n) => n.id)).toEqual([innerId('orders', 'model:orders'), innerId('orders', 'model:order_lines')]);
+		// customers also feeds order_lines directly, but that edge follows from customers > orders >
+		// order_lines, so only the first is drawn.
 		expect(pairs(edges)).toEqual([
 			`${memberNodeId('customers')} > ${innerId('orders', 'model:orders')}`,
-			`${memberNodeId('customers')} > ${innerId('orders', 'model:order_lines')}`,
 			`${innerId('orders', 'model:order_lines')} > ${memberNodeId('shipments')}`,
 			`${memberNodeId('inventory')} > ${memberNodeId('shipments')}`,
 			// Lineage inside the expanded member.
@@ -139,5 +161,99 @@ describe('expand state', () => {
 		expect([...open]).toEqual(['customers', 'orders']);
 		expect([...toggled(open, 'customers')]).toEqual(['orders']);
 		expect([...withOpen(open, 'orders')]).toEqual(['customers', 'orders']);
+	});
+});
+
+describe('a large group whose waits list every member upstream', () => {
+	const shape = bigGroupShape();
+	const big = shape.members.map((m) => member(m, 0, shape.waits.get(m)));
+	const closure = [...shape.waits.values()].reduce((n, w) => n + w.length, 0);
+	const reduction = [...shape.direct.values()].reduce((n, w) => n + w.length, 0);
+	const ends = (e: { data?: unknown }) => e.data as MemberEdgeData;
+
+	it('draws only the direct waits: the transitive reduction, far fewer than the waits listed', () => {
+		const { edges } = memberGraph(big, new Map());
+		expect(shape.members.length).toBeGreaterThanOrEqual(40);
+		expect(edges).toHaveLength(reduction);
+		expect(closure).toBeGreaterThan(4 * reduction);
+		expect(edges.length).toBeLessThanOrEqual(2 * shape.members.length);
+		expect(new Set(edges.map((e) => `${ends(e).from}>${ends(e).to}`))).toEqual(new Set([...shape.direct].flatMap(([m, ups]) => ups.map((u) => `${u}>${m}`))));
+		expect(directWaits(big).direct).toEqual(shape.direct);
+	});
+
+	it('lights a member’s whole upstream and downstream, implied waits included', () => {
+		const { nodes, edges } = memberGraph(big, new Map());
+		const reach = memberReach(big);
+		const focus = 'join_c';
+		const lit = litEdges(memberNodeId(focus), edges, nodes, reach);
+		const related = new Set([focus, ...reach.up.get(focus)!, ...reach.down.get(focus)!]);
+		expect(reach.up.get(focus)).toEqual(new Set(shape.waits.get(focus)));
+		for (const e of edges.filter((e) => lit.has(e.id))) expect(related.has(ends(e).from) && related.has(ends(e).to)).toBe(true);
+		// Every member upstream is reached through lit edges, and the rest of the graph is dimmed.
+		const litFrom = new Set(edges.filter((e) => lit.has(e.id)).map((e) => ends(e).from));
+		for (const u of reach.up.get(focus)!) expect(litFrom.has(u)).toBe(true);
+		expect(lit.size).toBeLessThan(edges.length);
+	});
+
+	it('lists a member’s direct waits first, then each implied one with the wait it comes through', () => {
+		const waits = waitReasons('clean_a', big, new Map());
+		const direct = shape.direct.get('clean_a')!;
+		expect(waits.filter((w) => w.through === undefined).map((w) => w.upstream)).toEqual(direct);
+		const implied = waits.filter((w) => w.through !== undefined);
+		expect(implied.map((w) => w.upstream).sort()).toEqual(shape.waits.get('clean_a')!.filter((u) => !direct.includes(u)).sort());
+		for (const w of implied) expect(direct).toContain(w.through);
+		expect(waits.findIndex((w) => w.through !== undefined)).toBe(direct.length);
+	});
+
+	it('puts members with no waits either way in a compact block under the graph', () => {
+		const { nodes, edges } = memberGraph(big, new Map());
+		const placed = layoutMemberGraph(nodes, edges);
+		const at = (m: string) => placed.find((n) => n.id === memberNodeId(m))!.position;
+		const graphBottom = Math.max(...shape.members.filter((m) => !shape.alone.includes(m)).map((m) => at(m).y));
+		const block = shape.alone.map(at);
+		for (const p of block) expect(p.y).toBeGreaterThan(graphBottom);
+		expect(new Set(block.map((p) => p.y)).size).toBe(1);
+	});
+});
+
+describe('transitive reduction', () => {
+	const e = (source: string, target: string) => ({ source, target });
+	it('drops an edge a longer path implies, keeps what only it joins, and survives a cycle', () => {
+		expect(transitiveReduction([e('a', 'c'), e('a', 'b'), e('b', 'c')])).toEqual([e('a', 'b'), e('b', 'c')]);
+		expect(transitiveReduction([e('a', 'b'), e('c', 'b')])).toHaveLength(2);
+		expect(transitiveReduction([e('a', 'b'), e('b', 'a'), e('a', 'c'), e('b', 'c')])).toHaveLength(3);
+		expect(transitiveReduction([e('a', 'c'), e('a', 'b'), e('b', 'c')], (x) => x.source !== 'a' || x.target !== 'c')).toHaveLength(3);
+	});
+});
+
+describe('a large group drawn by the folders its members are declared in', () => {
+	const shape = bigGroupShape();
+	const big = shape.members.map((m) => member(m, 0, shape.waits.get(m)));
+	const tree = memberFolderTree(shape.members, (m) => declarationFolder(bigGroupFile(m)));
+	const stages = ['stage', 'clean', 'join', 'enrich', 'aggregate', 'publish', 'housekeeping'].map((s) => `jobs/warehouse/${s}`);
+
+	it('draws each closed folder as one card, a lone member as its own card, and one line per pair of cards', () => {
+		const { nodes, edges } = memberGraph(big, new Map(), { folders: { tree, open: new Set() } });
+		expect(nodes.filter((n) => n.type === 'folder').map((n) => n.id).sort()).toEqual(stages.map(memberFolderCardId).sort());
+		// load_a and publish_e are each alone in their folder, so they are drawn as themselves.
+		expect(nodes.filter((n) => n.type === 'member').map((n) => n.id).sort()).toEqual([memberNodeId('load_a'), memberNodeId('publish_e')].sort());
+		const pairs = edges.map((e) => `${e.source} > ${e.target}`).sort();
+		const card = (s: string) => memberFolderCardId(`jobs/warehouse/${s}`);
+		expect(pairs).toEqual(
+			[
+				`${memberNodeId('load_a')} > ${card('stage')}`,
+				...['stage', 'clean', 'join', 'enrich', 'aggregate'].map((s, i, all) => `${card(s)} > ${card(all[i + 1] ?? 'publish')}`),
+				`${card('aggregate')} > ${memberNodeId('publish_e')}`
+			].sort()
+		);
+		// The line between two folders stands for every wait between their members, and lights with them.
+		const stageToClean = edges.find((e) => e.source === card('stage') && e.target === card('clean'))!;
+		expect((stageToClean.data as MemberEdgeData).pairs).toHaveLength(10);
+	});
+
+	it('draws an open folder as a box around its members, with the lines between members again', () => {
+		const { nodes, edges } = memberGraph(big, new Map(), { folders: { tree, open: new Set(tree.folders.keys()) } });
+		expect(nodes.filter((n) => n.parentId === memberFolderBoxId('jobs/warehouse/clean')).map((n) => n.id)).toEqual(['clean_a', 'clean_b', 'clean_c', 'clean_d', 'clean_e'].map(memberNodeId));
+		expect(edges).toHaveLength([...shape.direct.values()].reduce((n, w) => n + w.length, 0));
 	});
 });

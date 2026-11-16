@@ -12,8 +12,8 @@
 	const tableColumns: TableColumn[] = [
 		{ id: 'role', label: 'Role', minWidth: 220 },
 		{ id: 'source', label: 'Defined in', width: '180px' },
-		{ id: 'gives', label: 'What it gives', width: '34%', truncate: false },
-		{ id: 'holders', label: 'Who has it', width: '110px', align: 'right' }
+		{ id: 'gives', label: 'Permissions', width: '34%', truncate: false },
+		{ id: 'holders', label: 'Holders', width: '110px', align: 'right' }
 	];
 </script>
 
@@ -28,7 +28,7 @@
 					<td><RoleSourceBadge role={r} /></td>
 					<td>
 						{roleSummary(r)}
-						{#if r.recentlyMatched}<div class="cell-desc growth" title="Selectors match more nodes than a week ago">+{plural(r.recentlyMatched, 'node')} matched this week</div>{/if}
+						{#if r.recentlyMatched}<div class="cell-desc growth" title="Selectors match more nodes than a week ago">+{plural(r.recentlyMatched, 'node')} this week</div>{/if}
 					</td>
 					<td class="num">{r.holders}</td>
 				</tr>

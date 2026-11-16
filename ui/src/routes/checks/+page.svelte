@@ -20,16 +20,25 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel } from '$lib/build-area/labels';
+	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel } from '$lib/build-area/labels';
 	import { checkValue, kindLabel, outcomeOf, parseOutcomeFilter, type OutcomeFilter } from './utils';
+	import { countBy } from '$lib/list/count-by';
+	import { matchesAny, readValues } from '$lib/list/choice';
+	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
+	import { createSelection } from '$lib/state/selection.svelte';
+	import { readSelectionParams } from '$lib/selection/command';
 
 	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
 	const all = $derived(checks.data ?? []);
 
 	let query = $state(page.url.searchParams.get('q') ?? '');
 	let outcomeFilter = $state<OutcomeFilter>(parseOutcomeFilter(page.url.searchParams.get('outcome')));
-	let attachment = $state<CheckAttachment | ''>('');
-	let nodeFilter = $state(page.url.searchParams.get('node') ?? '');
+	let attachment = $state<CheckAttachment[]>([]);
+	// The nodes checked: a selection, as `sqb` reads one. Older links name nodes with `?node=a&node=b`;
+	// a bare name selects that node, so they become the selection.
+	const linked = readSelectionParams(page.url.searchParams);
+	const selection = createSelection({ url: true, initial: linked.select || linked.exclude ? linked : { select: readValues(page.url.searchParams, 'node').join(' '), exclude: '' }, replaces: ['node'] });
+	const attachmentSet = $derived(new Set(attachment));
 
 	const bucket = (c: Check): Exclude<OutcomeFilter, 'all'> => {
 		const o = outcomeOf(c);
@@ -39,19 +48,22 @@
 	const filtered = $derived(
 		all.filter((c) => {
 			if (outcomeFilter !== 'all' && bucket(c) !== outcomeFilter) return false;
-			if (attachment && c.attachment !== attachment) return false;
-			if (nodeFilter && c.node !== nodeFilter) return false;
+			if (!matchesAny(attachmentSet, c.attachment)) return false;
+			if (!selection.hasName(c.node)) return false;
 			const q = query.trim().toLowerCase();
 			return !q || [c.name, c.node ?? '', c.column ?? '', kindLabel(c)].some((s) => s.toLowerCase().includes(q));
 		})
 	);
+	const byBucket = $derived(countBy(all, bucket));
 	const counts = $derived({
 		all: all.length,
-		failing: all.filter((c) => bucket(c) === 'failing').length,
-		warn: all.filter((c) => bucket(c) === 'warn').length,
-		pass: all.filter((c) => bucket(c) === 'pass').length,
-		other: all.filter((c) => bucket(c) === 'other').length
+		failing: byBucket.get('failing') ?? 0,
+		warn: byBucket.get('warn') ?? 0,
+		pass: byBucket.get('pass') ?? 0,
+		other: byBucket.get('other') ?? 0
 	});
+	const byAttachment = $derived(countBy(all, (c) => c.attachment));
+	const byNode = $derived(countBy(all, (c) => c.node));
 	const outcomeOptions: { value: OutcomeFilter; label: string }[] = [
 		{ value: 'all', label: 'All' },
 		{ value: 'failing', label: 'Failing' },
@@ -72,7 +84,7 @@
 		{ id: 'outcome', label: 'Outcome', width: '120px' },
 		{ id: 'node', label: 'Attached to', width: '240px' },
 		{ id: 'severity', label: 'Severity', width: '100px' },
-		{ id: 'phase', label: 'Checks', width: '120px' },
+		{ id: 'phase', label: 'Scope', width: '150px' },
 		{ id: 'mode', label: 'Result type', width: '130px' },
 		{ id: 'result', label: 'Result', width: '100px', align: 'right' },
 		...(hasRecent ? [{ id: 'recent', label: 'Recent', width: '100px' }] : []),
@@ -86,6 +98,7 @@
 </AppTopbar>
 
 
+<SelectionBar {selection} names={nodes.map((n) => ({ value: n, hint: '', count: byNode.get(n) ?? 0 }))} total={nodes.length} build={false} />
 <ListToolbar
 	loading={checks.data === undefined}
 	bind:query
@@ -98,12 +111,11 @@
 >
 	{#snippet filters()}
 		<SegmentedFilter loading={checks.data === undefined} bind:value={outcomeFilter} options={outcomeOptions.map((o) => ({ ...o, count: counts[o.value] }))} />
-		<ChoiceFilter label="Attached to" bind:value={attachment} options={(['model', 'source', 'seed', 'end'] as CheckAttachment[]).map((a) => ({ value: a, label: attachmentLabel[a], count: all.filter((c) => c.attachment === a).length }))} />
-		<ChoiceFilter label="Node" bind:value={nodeFilter} options={nodes.map((n) => ({ value: n, label: n, count: all.filter((c) => c.node === n).length }))} />
+		<ChoiceFilter multiple label="Attached to" bind:values={attachment} options={(['model', 'source', 'seed', 'end'] as CheckAttachment[]).map((a) => ({ value: a, label: attachmentLabel[a], count: byAttachment.get(a) ?? 0 }))} />
 	{/snippet}
 </ListToolbar>
 
-<DataTable class="checks" columns={tableColumns} rows={filtered} key={(c) => c.id} rowHeight={ROW_H} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet. Add audits or tests to a model and they show up here after the next deploy.'}>
+<DataTable class="checks" columns={tableColumns} rows={filtered} key={(c) => c.id} rowHeight={ROW_H} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet.'}>
 	{#snippet row(c)}
 				{@const o = outcomeOf(c)}
 				<tr onclick={(e) => openRow(e, `/checks/${c.id}`)}>
@@ -122,8 +134,8 @@
 						{:else}<span class="muted">{attachmentLabel[c.attachment]}</span>{/if}
 					</td>
 					<td class="muted capitalize">{c.severity}</td>
-					<td class="muted">{runScopePhaseLabel[c.runScopePhase]}</td>
-					<td class="muted">{evaluationModeLabel[c.evaluationMode]}</td>
+					<td class="muted" title={runScopePhaseHelp[c.runScopePhase]}>{runScopePhaseLabel[c.runScopePhase]}</td>
+					<td class="muted" title={evaluationModeHelp[c.evaluationMode]}>{evaluationModeLabel[c.evaluationMode]}</td>
 					<td class="num" style:color={o === 'pass' ? 'var(--muted-foreground)' : checkOutcomeTone[o]}>{checkValue(c.latest, c.evaluationMode)}</td>
 					{#if hasRecent}<td><span class="mini-strip">{#each c.recentOutcomes ?? [] as r, i (i)}<i style:background={checkOutcomeTone[r as CheckOutcome]}></i>{/each}</span></td>{/if}
 					<td><RelativeTime value={formatAgo(c.latest?.evaluatedAt, app.now)} exact={formatStamp(c.latest?.evaluatedAt)} /></td>

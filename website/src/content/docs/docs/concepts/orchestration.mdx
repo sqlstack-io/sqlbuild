@@ -95,7 +95,10 @@ reports a job or sensor `select` that names more than three nodes one by one; se
 ## Group jobs
 
 A job group runs its jobs as one run. A job waits for another job in the group when it reads a node
-that job builds.
+that job builds, directly or through nodes no job in the group builds. It waits only for the
+nearest such jobs: what they read is their own wait, so a node further upstream, such as a function
+many jobs build, adds no more waits. A job never waits for the other jobs that build a node it
+builds itself.
 
 ```toml
 # orchestration/job_groups/daily_orders_job_group.toml

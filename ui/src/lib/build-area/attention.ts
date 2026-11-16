@@ -7,6 +7,7 @@ import { formatAgo } from '$lib/format/time';
 import { runStatusLabel } from '$lib/status';
 import { shortName } from '$lib/build-area/labels';
 import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
+import { plural } from '$lib/format/plural';
 
 export type AttentionTone = 'error' | 'warning' | 'stale' | 'info';
 
@@ -33,7 +34,6 @@ export type AttentionView = {
 /** A heartbeat gap shorter than this reads as a pause, not an outage: the run carries on when its worker reports again. */
 export const UNRESPONSIVE_OUTAGE_MS = 5 * 60_000;
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const minutes = (seconds: number | null) => (seconds === null ? '—' : seconds % 3600 === 0 ? `${seconds / 3600}h` : `${Math.round(seconds / 60)}m`);
 const waitText = (waits: QueueWait[]) => waits.map((w) => describeWait(w).map((p) => p.text).join('')).join(' · ');
 

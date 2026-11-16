@@ -2,6 +2,7 @@
 
 import type { ConnectionDetails, ConnectionTest, WarehouseConnection } from '$lib/api';
 import { formatAgo, formatIn } from '$lib/format/time';
+import { plural } from '$lib/format/plural';
 
 const AUTH_LABEL: Record<string, string> = {
 	key_pair: 'Key pair',
@@ -62,7 +63,7 @@ export function lastFullSync(tables: WarehouseConnection['tables']): string | nu
  * mirrored · next in 17m"; facts the server does not report are left out.
  */
 export function syncSummary(c: Pick<WarehouseConnection, 'tables' | 'nextSyncAt'>, now: number): string {
-	const parts = [`${c.tables.length} ${c.tables.length === 1 ? 'table' : 'tables'}`];
+	const parts = [`${plural(c.tables.length, 'table')}`];
 	const full = lastFullSync(c.tables);
 	parts.push(full ? `last full sync ${formatAgo(full, now)}` : 'no full sync yet');
 	if (c.tables.length && c.tables.every((t) => t.mirroredTotal !== null)) {

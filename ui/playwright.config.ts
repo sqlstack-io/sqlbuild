@@ -6,6 +6,11 @@ export default defineConfig({
 	testDir: './e2e',
 	timeout: 120_000,
 	fullyParallel: true,
+	// Timing guards run once the rest has finished, so they have the machine to themselves.
+	projects: [
+		{ name: 'layout', testIgnore: /perf\.spec\.ts/ },
+		{ name: 'perf', testMatch: /perf\.spec\.ts/, dependencies: ['layout'] }
+	],
 	use: {
 		baseURL: process.env.UI_URL || 'http://127.0.0.1:4175',
 		launchOptions: process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}

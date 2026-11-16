@@ -28,10 +28,10 @@
 	const emptyText = $derived.by(() => {
 		if (filtered) return 'No runs match these filters. Clear a filter or widen the date range.';
 		if (p.tab === 'active') return 'Nothing is running or waiting right now.';
-		if (p.tab === 'queued') return 'Nothing is waiting. Runs queue here while the data they write is busy or all slots are in use.';
+		if (p.tab === 'queued') return 'Nothing queued.';
 		if (p.tab === 'failed') return 'No failed runs.';
 		if (p.tab === 'cancelled') return 'No cancelled runs.';
-		return 'No runs yet for this target. Start one from Jobs, or with New run.';
+		return 'No runs yet.';
 	});
 
 	function filterBy(key: TokenKey, value: string) {

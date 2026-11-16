@@ -16,6 +16,8 @@
 		icon?: Component<{ class?: string }>;
 		onclick?: () => void;
 		pressed?: boolean;
+		/** What the count means, when its label is a single word. */
+		title?: string;
 	};
 
 	let {
@@ -64,7 +66,7 @@
 					{#if c.icon}<c.icon class="size-3.5" />{:else}<i style:background={c.tone}></i>{/if}{c.count} {c.label}
 				</Button>
 			{:else}
-				<span class:reserved={c.count === 0} aria-hidden={c.count === 0 ? 'true' : undefined} title="{c.count} {c.label}"><i style:background={c.tone}></i>{c.count} {c.label}</span>
+				<span class:reserved={c.count === 0} aria-hidden={c.count === 0 ? 'true' : undefined} title={c.title ? `${c.count} · ${c.title}` : `${c.count} ${c.label}`}><i style:background={c.tone}></i>{c.count} {c.label}</span>
 			{/if}
 		{/each}
 		<b>{total}</b>

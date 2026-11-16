@@ -18,6 +18,8 @@
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { app } from '$lib/state/app.svelte';
+	import { countBy } from '$lib/list/count-by';
+	import { matchesAny, toggleValue } from '$lib/list/choice';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
@@ -32,14 +34,19 @@
 
 	let query = $state('');
 	let type = $state<'all' | 'schedule' | 'sensor'>('all');
-	let kind = $state<TriggerKind | ''>('');
-	let stateFilter = $state<TriggerState | 'set_in_ui' | ''>('');
+	let kind = $state<TriggerKind[]>([]);
+	let stateFilter = $state<(TriggerState | 'set_in_ui')[]>([]);
 	const all = $derived(triggers.data ?? []);
+	const byType = $derived(countBy(all, (t) => t.type));
+	const kindSet = $derived(new Set(kind));
+	const byKind = $derived(countBy(all, (t) => t.kind));
+	/** Any of the chosen states; "set in UI" matches a trigger whose state differs from its code. */
+	const matchesState = (t: Trigger) => !stateFilter.length || stateFilter.some((f) => (f === 'set_in_ui' ? setInUi(t) : t.state === f));
 	const filtered = $derived(
 		all.filter((t) => {
 			if (type !== 'all' && t.type !== type) return false;
-			if (kind && t.kind !== kind) return false;
-			if (stateFilter === 'set_in_ui' ? !setInUi(t) : stateFilter && t.state !== stateFilter) return false;
+			if (!matchesAny(kindSet, t.kind)) return false;
+			if (!matchesState(t)) return false;
 			const q = query.trim().toLowerCase();
 			return !q || `${t.name} ${t.jobKey ?? ''} ${t.cadence} ${t.description}`.toLowerCase().includes(q);
 		})
@@ -92,7 +99,7 @@
 
 	function nextDue(t: Trigger): string {
 		if (t.state === 'paused') return '—';
-		if (t.type === 'sensor') return 'When its condition is met';
+		if (t.type === 'sensor') return 'On condition';
 		if (!t.nextDueAt) return '—';
 		if (Date.parse(t.nextDueAt) < app.now) return `Late: was due ${formatAgo(t.nextDueAt, app.now)}`;
 		return formatIn(t.nextDueAt, app.now);
@@ -104,7 +111,7 @@
 		{ id: 'runs', label: 'Runs', width: '18%' },
 		{ id: 'status', label: 'Status', width: '130px' },
 		{ id: 'next', label: 'Next run', width: '190px' },
-		{ id: 'tick', label: 'Last time due', width: '170px', title: 'What happened the last time it was due (its last tick)' },
+		{ id: 'tick', label: 'Last tick', width: '170px', title: 'What happened the last time it was due (its last tick)' },
 		{ id: 'last', label: 'Last run', width: '170px' }
 	]);
 </script>
@@ -126,8 +133,8 @@
 			label: 'set in UI',
 			reserve: true,
 			icon: PinIcon,
-			pressed: stateFilter === 'set_in_ui',
-			onclick: () => (stateFilter = stateFilter === 'set_in_ui' ? '' : 'set_in_ui')
+			pressed: stateFilter.includes('set_in_ui'),
+			onclick: () => (stateFilter = toggleValue(stateFilter, 'set_in_ui'))
 		}
 	]}
 >
@@ -136,14 +143,15 @@
 			bind:value={type}
 			options={[
 				{ value: 'all', label: 'All' },
-				{ value: 'schedule', label: 'Schedules', count: all.filter((t) => t.type === 'schedule').length },
-				{ value: 'sensor', label: 'Sensors', count: all.filter((t) => t.type === 'sensor').length }
+				{ value: 'schedule', label: 'Schedules', count: byType.get('schedule') ?? 0 },
+				{ value: 'sensor', label: 'Sensors', count: byType.get('sensor') ?? 0 }
 			]}
 		/>
-		<ChoiceFilter label="Kind" bind:value={kind} options={(Object.keys(triggerKindLabel) as TriggerKind[]).map((k) => ({ value: k, label: triggerKindLabel[k], count: all.filter((t) => t.kind === k).length }))} />
+		<ChoiceFilter multiple label="Kind" bind:values={kind} options={(Object.keys(triggerKindLabel) as TriggerKind[]).map((k) => ({ value: k, label: triggerKindLabel[k], count: byKind.get(k) ?? 0 }))} />
 		<ChoiceFilter
+			multiple
 			label="Status"
-			bind:value={stateFilter}
+			bind:values={stateFilter}
 			options={[
 				{ value: 'running', label: 'On' },
 				{ value: 'paused', label: 'Paused' },
@@ -162,7 +170,7 @@
 	{/snippet}
 </ListToolbar>
 
-<DataTable columns={tableColumns} rows={filtered} key={(t) => t.id} resource={triggers} empty={all.length ? 'Nothing matches the filter.' : 'No schedules or sensors yet. Declare them in the project code and deploy.'}>
+<DataTable columns={tableColumns} rows={filtered} key={(t) => t.id} resource={triggers} empty={all.length ? 'Nothing matches the filter.' : 'No schedules or sensors yet.'}>
 	{#snippet head(c)}
 		{#if c.id === 'sel'}<input type="checkbox" checked={allSelected} onchange={toggleAll} class="sb-check" aria-label="Select all" disabled={!canToggle} />{/if}
 	{/snippet}
@@ -201,7 +209,7 @@
 						</span>
 					</td>
 					<td>
-						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Runs its own code</span>{/if}
+						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Own code</span>{/if}
 					</td>
 					<td class="status-col">
 						<span class="status-cell">

@@ -1,6 +1,5 @@
 <script lang="ts">
-	import '@xyflow/svelte/dist/style.css';
-	import { Background, Controls, Panel, SvelteFlow, type Edge, type Node } from '@xyflow/svelte';
+	import type { Edge, Node } from '@xyflow/svelte';
 	import { tick, untrack } from 'svelte';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import type { CatalogNode, JobGroupMember } from '$lib/api';
@@ -8,9 +7,10 @@
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FolderNode from '$lib/components/lineage/folder-node.svelte';
 	import TooManyCard from '$lib/components/lineage/too-many-card.svelte';
-	import FlowController from '$lib/lineage/flow-controller.svelte';
+	import GraphCanvas from '$lib/components/graph/graph-canvas.svelte';
+	import GraphToolbar from '$lib/components/graph/graph-toolbar.svelte';
 	import { GROUPED_ABOVE } from '$lib/lineage/catalog-graph';
-	import { folderGraph, folderTree, layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
+	import { MAX_DRAWN, expandAll, folderGraph, folderTree, layoutFolderGraph, tooManyToDraw, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { jobGraph, layoutJobGraph, type JobBox } from '$lib/lineage/job-graph';
 	import JobBoxNode from './job-box-node.svelte';
 	import CountEdge from './count-edge.svelte';
@@ -48,17 +48,55 @@
 	// Each folder as one card; starts on for a graph as large as the one Lineage opens by folder.
 	let grouped = $state(untrack(() => keys.length > GROUPED_ABOVE));
 	let open = $state<ReadonlySet<string>>(new Set());
+	// Focus: only the selected nodes and the nodes they read or feed, as on Lineage.
+	// Read from the drawn nodes: writing state from the library's selection callback stops its updates.
+	const selectedKeys = $derived(nodes.filter((n) => n.selected && n.type === 'asset').map((n) => n.id));
+	let focusKeys = $state<ReadonlySet<string> | null>(null);
+	const shownKeys = $derived(focusKeys ? keys.filter((k) => focusKeys!.has(k)) : keys);
 	const inScope = $derived.by(() => {
-		const wanted = new Set(keys);
+		const wanted = new Set(shownKeys);
 		return catalog.filter((n) => wanted.has(n.key));
 	});
+	function toggleFocus() {
+		if (focusKeys) {
+			focusKeys = null;
+			return;
+		}
+		const picked = new Set(selectedKeys);
+		const around = new Set(picked);
+		for (const n of catalog) {
+			if (picked.has(n.key)) for (const up of n.upstream) around.add(up);
+			if (n.upstream.some((up) => picked.has(up))) around.add(n.key);
+		}
+		focusKeys = around;
+	}
+	let expandNote = $state('');
+	function expandEverything() {
+		const result = expandAll(tree, open);
+		open = result.open;
+		expandNote = result.complete ? '' : `Opened ${result.opened} of ${result.total} folders: the graph draws at most ${MAX_DRAWN.toLocaleString('en')} cards`;
+	}
+	/** Back to how the graph opened: no focus, folders closed, every box open, laid out and fitted again. */
+	async function reset() {
+		focusKeys = null;
+		open = new Set();
+		collapsed = new Set();
+		grouped = keys.length > GROUPED_ABOVE;
+		expandNote = '';
+		await tick();
+		// A reset that changed what is drawn is laid out, and fitted, once the new cards are measured.
+		if (laidOut !== shape) return;
+		if (nodes.length) nodes = folderMode ? layoutFolderGraph(nodes, edges) : layoutJobGraph(nodes, edges);
+		await tick();
+		requestAnimationFrame(() => fit?.());
+	}
 	const tree = $derived(folderTree(inScope));
 	const closeFolder = (folder: string) => (open = withFolderClosed(open, folder));
 	const openFolder = (folder: string) => (open = new Set([...open, folder]));
 
 	const graph = $derived.by(() => {
 		if (canGroup && grouped) return folderGraph(inScope, open, { tree, onclose: closeFolder });
-		const next = jobGraph(keys, catalog, boxes, members, collapsed);
+		const next = jobGraph(shownKeys, catalog, boxes, members, collapsed);
 		for (const n of next.nodes) if (n.type === 'job') n.data = { ...n.data, ontoggle: toggle };
 		return next;
 	});
@@ -104,28 +142,25 @@
 	});
 </script>
 
-<div class="graph sb-flow" class:unfitted={!fitted && nodes.length > 0}>
-	<SvelteFlow
+<div class="scope-graph">
+	<GraphToolbar
+		folders={canGroup ? { on: grouped, toggle: () => (grouped = !grouped) } : undefined}
+		expand={folderMode && !tooMany ? { all: expandEverything, collapse: () => ((open = new Set()), (expandNote = '')), canCollapse: open.size > 0, note: expandNote } : undefined}
+		focus={{ on: !!focusKeys, can: selectedKeys.length > 0, toggle: toggleFocus, title: 'Show only the selected nodes and what they read or feed' }}
+		onreset={reset}
+	/>
+	<GraphCanvas
 		bind:nodes
 		bind:edges
+		bind:fit
+		bind:fitted
 		{nodeTypes}
 		{edgeTypes}
 		nodesDraggable={false}
 		multiSelectionKey={['Meta', 'Control', 'Shift']}
-		minZoom={0.1}
-		proOptions={{ hideAttribution: true }}
 		onnodeclick={({ node }) => node.type === 'folder' && openFolder(String(node.data.group))}
 		onselectionchange={({ nodes: picked }) => onselect(picked.filter((n) => n.type === 'asset').map((n) => n.id))}
-	>
-		<FlowController bind:fitView={fit} bind:fitted />
-		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
-		<Controls showLock={false} />
-		{#if canGroup && keys.length > GROUPED_ABOVE && !tooMany}
-			<Panel position="top-left">
-				<Button variant={grouped ? 'default' : 'outline'} size="bar" onclick={() => (grouped = !grouped)} title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}><FolderIcon />Folders</Button>
-			</Panel>
-		{/if}
-	</SvelteFlow>
+	/>
 	{#if tooMany}
 		<TooManyCard count={graph.nodes.length}>
 			{#snippet actions()}
@@ -137,28 +172,18 @@
 </div>
 
 <style>
-	.graph {
+	.scope-graph {
 		position: relative;
+		display: flex;
 		height: 100%;
+		flex-direction: column;
 		overflow: hidden;
 		border: 1px solid var(--border);
 		border-radius: 2px;
 		background: var(--sb-inset);
 	}
-	.unfitted :global(.svelte-flow__viewport),
-	.unfitted :global(.svelte-flow__controls) {
-		/* Not visibility: Svelte Flow sets each measured card visible, which would override it. */
-		opacity: 0;
-	}
-	.graph :global(.svelte-flow__node-asset),
-	.graph :global(.svelte-flow__node-folder) {
+	.scope-graph :global(.svelte-flow__node-asset),
+	.scope-graph :global(.svelte-flow__node-folder) {
 		cursor: pointer;
-	}
-	.graph :global(.svelte-flow__controls-button) {
-		background: var(--card);
-		border-bottom: 1px solid var(--border);
-	}
-	.graph :global(.svelte-flow__controls-button svg) {
-		fill: var(--muted-foreground);
 	}
 </style>

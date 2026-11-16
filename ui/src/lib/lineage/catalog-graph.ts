@@ -77,7 +77,8 @@ export function folderOf(node: CatalogNode): string {
 export const topFolder = (node: CatalogNode): string => folderOf(node).split('/')[0];
 
 /** A closed folder's card; `label` is its path below the open folder around it, when there is one. */
-export type GroupCard = { group: string; label?: string; count: number; ok: number; stale: number; failed: number; dimmed?: boolean };
+/** `noun` names what the folder counts: nodes, or jobs on a group's graph. */
+export type GroupCard = { group: string; label?: string; count: number; ok: number; stale: number; failed: number; dimmed?: boolean; noun?: string; empty?: string };
 
 /** A folder's card: how many nodes it holds, and how many last built fine, are stale or failed. */
 export function groupCard(group: string, members: CatalogNode[]): GroupCard {

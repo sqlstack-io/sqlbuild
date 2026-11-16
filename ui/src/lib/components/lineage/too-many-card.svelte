@@ -9,7 +9,7 @@
 <div class="graph-too-many">
 	<div class="too-many-card" role="status">
 		<strong>Too many nodes to draw at once</strong>
-		<p>This view has {count.toLocaleString('en')} cards; the graph draws at most {MAX_DRAWN.toLocaleString('en')}.</p>
+		<p>{count.toLocaleString('en')} cards · limit {MAX_DRAWN.toLocaleString('en')}</p>
 		{#if actions}<div class="too-many-actions">{@render actions()}</div>{/if}
 	</div>
 </div>

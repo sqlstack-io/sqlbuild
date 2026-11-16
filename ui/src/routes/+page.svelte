@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { plural, noun } from '$lib/format/plural';
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
@@ -19,6 +21,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { catalogNodes, useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { folderCatalogHref, folderSelections } from '$lib/selection/folders';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
@@ -30,6 +33,8 @@
 	import OverviewCost from './overview-cost.svelte';
 
 	const catalog = useCatalogNodes();
+	/** Each top-level folder as a selection, for the folder rows' links to the catalog. */
+	const folderSelection = $derived(folderSelections(catalog.data ?? []));
 	// Reads again when the shared listing changes, which node status changes update; until it is held
 	// the overview waits for it rather than listing every node a second time.
 	const overview = createResource((client, scope) => {
@@ -109,7 +114,7 @@
 	{#if partial}
 		<section class="surface-panel partial">
 			<h2>You can see only part of {app.location?.name} · {app.target?.name}</h2>
-			<p>The Overview sums up the whole target, so it needs view on every node in it. An administrator can give you view on the rest.</p>
+			<p>Needs view on every node in this target. Ask an administrator.</p>
 			{#if otherPages.length}
 				<p>Pages you can use:</p>
 				<ul>
@@ -139,7 +144,7 @@
 							<!-- The out-of-date alert below already counts these. -->
 							{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
 							{#if m.stale?.behind && !staleListed}<span><i class="status-dot behind"></i><b>{m.stale.behind}</b> behind</span>{/if}
-							{#if m.checks.failing}<a class="fact-link" href={to(FAILING_CHECKS_HREF)}><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</a>{/if}
+							{#if m.checks.failing}<a class="fact-link" href={to(FAILING_CHECKS_HREF)}><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {noun(m.checks.failing, 'check')}</a>{/if}
 						</div>
 					{/if}
 					{#if latest}<a href={to(`/runs/${latest.id}`)}>View latest run →</a>{/if}
@@ -162,7 +167,7 @@
 								<small>{view.since}</small>
 								<span class="issue-ack">
 									{#if 'acknowledged' in item && canAcknowledge}
-										<Button variant="ghost" size="sm" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
+										<Button variant="ghost" size="sm" title="Mark handled for everyone (audited)" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
 											<BellOffIcon />Acknowledge
 										</Button>
 									{/if}
@@ -230,7 +235,7 @@
 						<div class="metric">
 							<span class="metric-label">Stale</span>
 							<div><strong class="stale-value">{m.stale.nodes}</strong><small>nodes</small></div>
-							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late{/if}</span>
+							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {plural(m.stale.sources, 'source')} late{/if}</span>
 						</div>
 					{/if}
 					{#if m.cost}
@@ -246,13 +251,13 @@
 			<div class="lower-grid" class:single={!showGroups}>
 				{#if showGroups}<section class="surface-panel">
 					<div class="panel-heading">
-						<div><h2>Build status by folder</h2><span>Current, stale and failed nodes in each top-level folder</span></div>
+						<div><h2>Build status by folder</h2></div>
 						<a href={to(`/catalog`)}>Open catalog →</a>
 					</div>
 					<div class="groups">
 						<div class="group-row head"><span>Folder</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
 						{#each folders.rows as g (g.group)}
-							<a class="group-row" href={to(`/catalog?group=${encodeURIComponent(g.group)}`)} title="Open {g.group} in the catalog">
+							<a class="group-row" href={to(folderCatalogHref(folderSelection.get(g.group) ?? ''))} title="Open {g.group} in the catalog">
 								<span>{g.group}</span>
 								<span class="group-bar" title="{g.current} of {g.total} current">
 									<i class="fresh" style:width="{(g.current / g.total) * 100}%"></i>
@@ -265,7 +270,7 @@
 								<b class:error-text={g.failed}>{g.failed || '—'}</b>
 							</a>
 						{:else}
-							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet. Deploy the project to see its models here.{/if}</div>
+							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet.{/if}</div>
 						{/each}
 						{#if collapsedHidden}
 							<Button variant="link" size="inline" class="mx-4 mt-1 self-start text-[12px]" aria-expanded={showAllFolders} onclick={() => (showAllFolders = !showAllFolders)}>{showAllFolders ? 'Show fewer' : `Show all ${groups.length} folders`}</Button>
@@ -274,7 +279,7 @@
 				</section>{/if}
 				<section class="surface-panel">
 					<div class="panel-heading">
-						<div><h2>Recent changes</h2><span>Recent deploys</span></div>
+						<div><h2>Recent deploys</h2></div>
 						<a href={to(`/changes`)}>All changes →</a>
 					</div>
 					<div>
@@ -302,7 +307,7 @@
 			{#if showTimeline}
 				<section class="surface-panel flex min-w-0 flex-col">
 					<div class="panel-heading">
-						<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
+						<div><h2>Activity <HelpTip text="Past runs and the next scheduled times" /></h2><span>Past and upcoming</span></div>
 						<a href={to(`/runs?view=timeline`)}>Open full timeline →</a>
 					</div>
 					<RunTimeline scroll={false} stickyTop={0} />

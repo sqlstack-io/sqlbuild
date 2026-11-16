@@ -4,6 +4,9 @@ import { LocalChangeBus, type ConnectionState } from '../signals';
 import { stateOf } from '../node-states';
 import type {
 	AdhocRunCheck,
+	SelectionEvaluation,
+	SelectionRequest,
+	SelectionVocabulary,
 	PlanResult,
 	AdhocRunRequest,
 	Bootstrap,
@@ -319,6 +322,16 @@ export class MockApiClient implements ApiClient {
 	async listSnapshotNodes(scope: Scope): Promise<SnapshotNode[]> {
 		this.#location(scope);
 		return this.#operate.listSnapshotNodes(scope);
+	}
+
+	async evaluateSelection(scope: Scope, request: SelectionRequest): Promise<SelectionEvaluation> {
+		this.#location(scope);
+		return this.#operate.evaluateSelection(scope, request);
+	}
+
+	async selectionVocabulary(scope: Scope): Promise<SelectionVocabulary> {
+		this.#location(scope);
+		return this.#operate.selectionVocabulary(scope);
 	}
 
 	async checkAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<AdhocRunCheck> {

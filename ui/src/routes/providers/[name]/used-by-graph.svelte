@@ -85,7 +85,7 @@
 				</div>
 			</div>
 			<div class="col">
-				<h4>Code using it · {allNodes.length}</h4>
+				<h4>Used by · {allNodes.length}</h4>
 				{#each graph.groups as g (g.kind)}
 					{@const isOpen = open.has(g.kind)}
 					<div class="box group" data-id="group:{g.kind}">
@@ -109,14 +109,14 @@
 				{/each}
 			</div>
 			<div class="col">
-				<h4>Jobs that run it · {graph.jobs.length}</h4>
+				<h4>Jobs · {graph.jobs.length}</h4>
 				{#each graph.jobs as job (job)}
 					<a class="box job" data-id="job:{job}" href={to(`/jobs/${job}`)}>
 						<div class="title">{job}</div>
 						<div class="sub">{(provider.jobNodes[job] ?? []).length} of its nodes use this provider</div>
 					</a>
 				{:else}
-					<p class="none">No job runs this code.</p>
+					<p class="none">No jobs.</p>
 				{/each}
 			</div>
 		</div>

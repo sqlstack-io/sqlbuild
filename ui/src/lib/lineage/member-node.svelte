@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plural } from '$lib/format/plural';
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
@@ -7,6 +8,7 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
 	import type { MemberCardData } from './member-graph';
+	import CompactFace from '$lib/components/graph/compact-face.svelte';
 
 	// A job group's member job, drawn as a Lineage card; clicking it opens the member in place, as a
 	// folder opens on Lineage, and "Open job" goes to the job's own page.
@@ -16,6 +18,10 @@
 	const tone = $derived(d.lastRun ? runStatusTone[d.lastRun.status] : d.needs.changed ? 'var(--sb-stale)' : d.needs.behind ? 'var(--sb-behind)' : 'var(--sb-text-faint)');
 	const needsTitle = $derived(
 		[d.needs.changed && `${d.needs.changed} changed since their last build`, d.needs.behind && `${d.needs.behind} behind an upstream rebuild`].filter(Boolean).join(', ')
+	);
+	// Zoomed out, the card's colour: a failed or running run first, then needing a build, then the last run.
+	const faceTone = $derived(
+		d.lastRun && !['success', 'warn'].includes(d.lastRun.status) ? tone : d.needs.changed ? 'var(--sb-stale)' : d.needs.behind ? 'var(--sb-behind)' : tone
 	);
 	const when = $derived(d.lastRun?.startedAt ? formatAgo(d.lastRun.startedAt, app.now) : '');
 </script>
@@ -29,7 +35,7 @@
 	</div>
 	<div class="facts">
 		{#if d.expandable}<ChevronRightIcon size={12} class="glyph" />{/if}
-		{#if d.nodeCount !== null}<span>{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>{/if}
+		{#if d.nodeCount !== null}<span>{plural(d.nodeCount, 'node')}</span>{/if}
 		{#if d.waitsFor}<span class="waits">waits for {d.waitsFor}</span>{/if}
 		{#if d.needs.changed || d.needs.behind}
 			<span class="needs" title="Needs building: {needsTitle}">
@@ -47,11 +53,13 @@
 			<span class="label faint">No runs yet</span>
 		{/if}
 	</div>
+	<CompactFace title={d.jobKey} tone={faceTone} height={80} />
 	<Handle type="source" position={Position.Right} class="node-handle" />
 </div>
 
 <style>
 	.node {
+		position: relative;
 		width: 236px;
 		height: 82px;
 		overflow: hidden;

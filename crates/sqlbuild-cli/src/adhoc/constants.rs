@@ -174,3 +174,10 @@ pub(crate) const REFUSED_DESTS: [(&str, &str, &str); 23] = [
     ("since", "--since", "it needs the worker's Git checkout"),
     ("explain", "--explain", "it needs the worker's Git checkout"),
 ];
+
+/// Replacements suggested for a selector value nothing matches: at most this many, at least this similar.
+pub(crate) const SUGGESTION_LIMIT: usize = 3;
+pub(crate) const SUGGESTION_CUTOFF: f64 = 0.6;
+
+/// The folder of a node at the project root, which no `path:` selector names.
+pub(crate) const PROJECT_FOLDER: &str = ".";
