@@ -3,7 +3,7 @@ import type { SelectionProblem, SelectionVocabulary } from '$lib/api';
 import { backspace, choose, comma, commit, EMPTY, fieldOf, fieldText, finished, replacePart, replaceToken, toggleExpansion, type FieldState } from './field';
 import { readingText } from './reading';
 import { parseSelection } from './syntax';
-import { pickedValues, toggleValueIn } from './picker';
+import { pickedValues, setValuesIn, toggleValueIn } from './picker';
 import { buildHref, copyCommand, problemParts, problemToken, readSelectionParams, writeSelectionParams } from './command';
 import { suggest } from './suggest';
 
@@ -97,6 +97,13 @@ describe('chip value picker', () => {
 		expect(pickedValues(tokens, 0, 0)).toEqual(['a', 'b']);
 		expect(pickedValues(tokens, 1, 0)).toEqual(['a', 'b']);
 		expect(toggleValueIn(tokens, 1, 0, 'a')).toEqual(['+tag:b,path:x', 'other']);
+	});
+
+	it('sets the picked values at once, as Select all and Clear do', () => {
+		const tokens = ['tag:a', 'x'];
+		expect(setValuesIn(tokens, 0, 0, ['a', 'b', 'c'])).toEqual(['tag:a', 'tag:b', 'tag:c', 'x']);
+		expect(setValuesIn(['tag:a', 'tag:b', 'tag:c', 'x'], 1, 0, ['c'])).toEqual(['tag:c', 'x']);
+		expect(setValuesIn(['tag:a', 'x'], 0, 0, [])).toEqual(['x']);
 	});
 });
 

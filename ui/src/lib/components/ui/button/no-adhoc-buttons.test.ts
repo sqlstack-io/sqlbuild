@@ -16,6 +16,7 @@ const SHARED = new Set([
 	'lib/components/copy-button.svelte',
 	'lib/components/list/filter-button.svelte',
 	'lib/components/list/choice-filter.svelte',
+	'lib/components/selection/selection-chip.svelte',
 	'lib/components/help-tip.svelte',
 	'lib/components/shell/scope-switcher.svelte',
 	'lib/components/list/segmented-filter.svelte',

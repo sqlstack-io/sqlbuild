@@ -32,3 +32,20 @@ export function toggleValueIn(tokens: readonly string[], at: number, part: numbe
 	const after = Math.max(...sibs.map((s) => s.token));
 	return [...tokens.slice(0, after + 1), parts.join(','), ...tokens.slice(after + 1)];
 }
+
+/** The picker of part `part` of token `at` set to exactly `values`: copies added for new values, removed for dropped ones. Every copy gone removes the chip. */
+export function setValuesIn(tokens: readonly string[], at: number, part: number, values: readonly string[]): string[] {
+	let out = [...tokens];
+	let anchor = at;
+	for (const v of values) if (!pickedValues(out, anchor, part).includes(v)) out = toggleValueIn(out, anchor, part, v);
+	for (const v of pickedValues(out, anchor, part)) {
+		if (values.includes(v)) continue;
+		const sibs = siblings(out, anchor, part);
+		const gone = sibs.find((s) => s.value === v)!.token;
+		const next = sibs.find((s) => s.value !== v)?.token;
+		out = out.filter((_, i) => i !== gone);
+		if (next === undefined) break;
+		anchor = next > gone ? next - 1 : next;
+	}
+	return out;
+}
