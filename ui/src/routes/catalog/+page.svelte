@@ -2,7 +2,7 @@
 	import { openRow, to } from '$lib/paths';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import type { CatalogNode, NodeKind } from '$lib/api';
+	import type { CatalogNode } from '$lib/api';
 	import ListToolbar from '$lib/components/list/list-toolbar.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
@@ -16,19 +16,19 @@
 	import { planHref } from '$lib/run/command';
 	import { topFolder } from '$lib/lineage/catalog-graph';
 	import { app } from '$lib/state/app.svelte';
-	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
-	import { NODE_KINDS, kindLine, nodeIcon, nodeIconKey, nodeKindPlural, shortName, shortRunId } from '$lib/build-area/labels';
+	import { KIND_TABS, kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, parseKindTab, shortName, shortRunId, type KindTab } from '$lib/build-area/labels';
 
 	type StatusFilter = 'stale' | 'changed' | 'behind' | 'failed' | 'warn';
 
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['runs', 'checks', 'snapshot', 'node_status']);
+	const catalog = useCatalogNodes();
 	const all = $derived(catalog.data ?? []);
 
 	const params = page.url.searchParams;
 	let query = $state(params.get('q') ?? '');
-	let kindFilter = $state<'all' | NodeKind>((NODE_KINDS as string[]).includes(params.get('kind') ?? '') ? (params.get('kind') as NodeKind) : 'all');
+	let kindFilter = $state<'all' | KindTab>(parseKindTab(params.get('kind')) ?? 'all');
 	let groupFilter = $state(params.get('group') ?? '');
 	let statusFilter = $state<StatusFilter | ''>(params.get('stale') ? 'stale' : '');
 
@@ -40,7 +40,7 @@
 		(f === 'failed' && n.lastOutcome === 'failed') ||
 		(f === 'warn' && n.lastOutcome === 'warn');
 
-	const kinds = $derived(NODE_KINDS.filter((k) => all.some((n) => n.kind === k)));
+	const kinds = $derived(KIND_TABS.filter((k) => all.some((n) => kindTabOf(n.kind) === k)));
 	const groups = $derived([...new Set(all.map(topFolder))].sort());
 	/** Outcome and staleness come together; a server that reports neither leaves them unknown. */
 	const showBuildState = $derived(all.some((n) => n.stale !== null));
@@ -50,7 +50,7 @@
 
 	const filtered = $derived(
 		all.filter((n) => {
-			if (kindFilter !== 'all' && n.kind !== kindFilter) return false;
+			if (kindFilter !== 'all' && kindTabOf(n.kind) !== kindFilter) return false;
 			// A filter whose control is hidden, for example from a shared link, never narrows the list.
 			if (groups.length > 1 && groupFilter && topFolder(n) !== groupFilter) return false;
 			if (showBuildState && !matchesStatus(n, statusFilter)) return false;
@@ -100,7 +100,7 @@
 	{#snippet filters()}
 		<SegmentedFilter loading={catalog.data === undefined}
 			bind:value={kindFilter}
-			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: nodeKindPlural[k], count: all.filter((n) => n.kind === k).length }))]}
+			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: kindTabLabel[k], count: all.filter((n) => kindTabOf(n.kind) === k).length }))]}
 		/>
 		{#if showBuildState}<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: all.filter((n) => matchesStatus(n, o.value)).length }))} />{/if}
 		{#if groups.length > 1}<ChoiceFilter label="Folder" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: all.filter((n) => topFolder(n) === g).length }))} />{/if}

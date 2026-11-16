@@ -9,7 +9,16 @@ type Read = (client: ApiClient, scope: Scope, match: RegExpMatchArray, search: U
 const started = new Map<string, { at: number; promise: Promise<unknown> }>();
 let base: ApiClient | null = null;
 
-const keyOf = (method: PropertyKey, args: unknown[]) => `${String(method)}|${JSON.stringify(args)}`;
+/** Large arguments, such as a held node listing, are told apart by identity rather than written out. */
+const identities = new WeakMap<object, number>();
+let nextIdentity = 0;
+const LARGE = 100;
+const argKey = (arg: unknown) => {
+	if (!Array.isArray(arg) || arg.length < LARGE) return arg;
+	if (!identities.has(arg)) identities.set(arg, ++nextIdentity);
+	return `#${identities.get(arg)}`;
+};
+const keyOf = (method: PropertyKey, args: unknown[]) => `${String(method)}|${JSON.stringify(args.map(argKey))}`;
 
 /**
  * Wraps the client so a page's first reads, already started by `prefetch` before the switch, are

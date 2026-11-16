@@ -14,9 +14,11 @@
 	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { untrack } from 'svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
-	import { kindLine, nodeIcon, nodeIconKey, nodeKindPlural, shortName, sqlVersions } from '$lib/build-area/labels';
+	import { kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, shortName, sqlVersions } from '$lib/build-area/labels';
 	import { cardData } from '$lib/lineage/catalog-graph';
 	import OverviewTab from './overview-tab.svelte';
 	import DriftTab from './drift-tab.svelte';
@@ -29,14 +31,15 @@
 	let { name }: { name: string } = $props();
 	const COST_DAYS = 30;
 
-	const res = createResource((client, scope) => client.getCatalogNode(scope, name), ['runs', 'checks', 'snapshot', 'node_status', 'warehouse_sync']);
+	const catalog = useCatalogNodes();
+	// The shared listing, when held, saves the detail read from listing every node again; it is not a dependency.
+	const res = createResource((client, scope) => client.getCatalogNode(scope, name, untrack(() => catalog.data)), ['runs', 'checks', 'snapshot', 'node_status', 'warehouse_sync']);
 	const n = $derived(res.data ?? null);
 	// Checks and migrations link nodes by bare name; settle on the node key so the graph and links agree.
 	$effect(() => {
 		if (n && n.key !== name) goto(to(`/catalog/${n.key}${page.url.search}`), { replaceState: true });
 	});
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs']);
-	const colLineage = createResource((client, scope) => client.getColumnLineage(scope, name), ['snapshot']);
+	const colLineage = createResource((client, scope) => client.getColumnLineage(scope, name, untrack(() => catalog.data)), ['snapshot']);
 	const costs = createResource((client, scope) => (n && client.supports('listNodeCosts') ? client.listNodeCosts(scope, n.key, COST_DAYS) : Promise.resolve([])), ['runs', 'warehouse_sync']);
 
 	const tabs = $derived.by<[Tab, string][]>(() => {
@@ -92,7 +95,7 @@
 
 <div class="asset-page">
 	<header class="asset-header">
-		<nav class="crumbs"><a href={to(`/catalog`)}>Catalog</a><span>/</span>{#if n}<a href={to(`/catalog?kind=${n.kind}`)}>{nodeKindPlural[n.kind]}</a>{/if}</nav>
+		<nav class="crumbs"><a href={to(`/catalog`)}>Catalog</a><span>/</span>{#if n}<a href={to(`/catalog?kind=${kindTabOf(n.kind)}`)}>{kindTabLabel[kindTabOf(n.kind)]}</a>{/if}</nav>
 		<div class="title-row">
 			<Glyph size={18} strokeWidth={1.75} />
 			<h2 title={name}>{shortName(n?.key ?? name)}</h2>

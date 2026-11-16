@@ -15,6 +15,7 @@
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { runStatusLabel } from '$lib/status';
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
@@ -24,7 +25,14 @@
 	import { pagesBeyondTarget } from '$lib/nav';
 	import OverviewCost from './overview-cost.svelte';
 
-	const overview = createResource((client, scope) => client.overview(scope), ['runs', 'checks', 'node_status', 'snapshot', 'platform_events', 'triggers']);
+	const catalog = useCatalogNodes();
+	// Reads again when the shared listing changes, which node status changes update; until it is held
+	// the overview waits for it rather than listing every node a second time.
+	const overview = createResource((client, scope) => {
+		const nodes = catalog.data;
+		if (!nodes && !catalog.error) return new Promise<never>(() => {});
+		return client.overview(scope, nodes);
+	}, ['runs', 'checks', 'snapshot', 'platform_events', 'triggers']);
 	const data = $derived(overview.data ?? null);
 	// Null data means the person may view only part of the target, so the page offers others instead.
 	// A reload keeps the previous data, so only a settled, error-free null counts.

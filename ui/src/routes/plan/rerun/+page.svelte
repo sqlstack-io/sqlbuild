@@ -17,6 +17,7 @@
 	import { rerunHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { runStatusLabel } from '$lib/status';
 	import { rerunChoices } from '../../runs/[id]/utils';
 
@@ -29,7 +30,7 @@
 	const remaining = $derived(runIds.filter((id) => !done.has(id)));
 
 	const details = createResource(async (client, scope) => (await Promise.all(runIds.map((id) => client.getRunDetail(scope, id)))).filter((d): d is RunDetail => !!d), runIds.map((id) => `run:${id}`));
-	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot']);
+	const catalog = useCatalogNodes();
 	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
 
 	const can = (c: Capability) => app.can(c);

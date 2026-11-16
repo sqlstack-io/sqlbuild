@@ -1,14 +1,21 @@
 import type { components } from '$control/schema.d.ts';
 import { shortName } from '$lib/build-area/labels';
 import { cardStatus } from '$lib/lineage/catalog-graph';
-import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, ColumnLens, ColumnLineage, MicrobatchCoverage, NodeJob, NodeOutcome, NodeRunEntry, StaleReason, WarehouseObject } from './types/build';
+import { withBehind } from './node-states';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, ColumnLens, ColumnLineage, MicrobatchCoverage, NodeJob, NodeOutcome, NodeRunEntry, NodeState, NodeStates, NodeStatusDelta, WarehouseObject } from './types/build';
 import type { NodeKind } from './types/operate';
 
 type Wire = components['schemas'];
 
-/** The catalog shows models, seeds and sources; audits, functions, macros and hooks are not catalog nodes. */
-function kindOf(wire: Wire['CatalogNodeRecord']): NodeKind | null {
-	if (wire.kind === 'source' || wire.kind === 'seed') return wire.kind;
+/** Snapshot kinds that are graph nodes under their own name; models take theirs from the materialization. */
+const GRAPH_KINDS: ReadonlySet<string> = new Set<NodeKind>(['source', 'seed', 'asset', 'loader', 'task', 'udf', 'table_fn']);
+
+/**
+ * Every graph node kind is a catalog node: models, sources, seeds, Python nodes and functions.
+ * Audits, SQL tests, scenarios, checks, macros and hooks are not.
+ */
+export function kindOf(wire: Pick<Wire['CatalogNodeRecord'], 'kind' | 'materialization'>): NodeKind | null {
+	if (GRAPH_KINDS.has(wire.kind)) return wire.kind as NodeKind;
 	if (wire.kind !== 'model') return null;
 	if (wire.materialization === 'view') return 'view';
 	return wire.materialization?.startsWith('incremental') ? 'incremental' : 'table';
@@ -24,11 +31,11 @@ function kindOf(wire: Wire['CatalogNodeRecord']): NodeKind | null {
 export function toCatalogNode(wire: Wire['CatalogNodeRecord']): CatalogNode | null {
 	const kind = kindOf(wire);
 	if (!kind) return null;
-	const outcome = wire.last_outcome?.status;
+	const state = toNodeState(wire);
 	return {
 		key: wire.node_key,
 		kind,
-		materialization: kind === 'source' || kind === 'seed' ? null : (wire.materialization ?? null),
+		materialization: kind === 'source' || kind === 'seed' || kind === 'udf' || kind === 'table_fn' ? null : (wire.materialization ?? null),
 		group: null,
 		tags: wire.tags,
 		description: wire.description ?? '',
@@ -36,57 +43,46 @@ export function toCatalogNode(wire: Wire['CatalogNodeRecord']): CatalogNode | nu
 		upstream: wire.dependencies,
 		relation: wire.relation ? { database: wire.relation.database ?? null, schema: wire.relation.schema, name: wire.relation.name } : null,
 		columnCount: wire.column_count ?? 0,
+		lastBuild: state.lastBuild,
+		lastOutcome: state.lastOutcome,
+		stale:
+			state.definitionChanged && state.lastBuild
+				? [{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: state.lastBuild.builtAt }]
+				: [],
+		sourceFreshness: null,
+		checks: state.checks
+	};
+}
+
+/** A node's build state, from its listing record or the node-states map, which carry the same fields. */
+export function toNodeState(wire: Wire['NodeState']): NodeState {
+	const outcome = wire.last_outcome?.status;
+	return {
 		lastBuild: wire.last_build
 			? { fingerprintRunId: wire.last_build.run_id, runId: null, jobKey: null, builtAt: wire.last_build.observed_at, fingerprint: wire.last_build.version_hash }
 			: null,
 		lastOutcome: outcome === 'success' || outcome === 'warn' || outcome === 'failed' ? outcome : null,
-		stale:
-			wire.definition_changed && wire.last_build
-				? [{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: wire.last_build.observed_at }]
-				: [],
-		sourceFreshness: null,
+		definitionChanged: wire.definition_changed,
 		// A recording from an older server, such as the static demo's, has no counts: unknown, not zero.
 		checks: wire.checks ?? null
 	};
 }
 
-/**
- * When the data a node reads last changed: its own last build, or for a view, which reads its
- * upstream when queried, the newest data behind it. Null when nothing behind it is built.
- */
-function dataTimes(listed: Map<string, CatalogNode>): (key: string) => number | null {
-	const memo = new Map<string, number | null>();
-	const at = (key: string): number | null => {
-		if (memo.has(key)) return memo.get(key) ?? null;
-		memo.set(key, null);
-		const node = listed.get(key);
-		let time = node?.lastBuild ? Date.parse(node.lastBuild.builtAt) : null;
-		if (node?.kind === 'view') {
-			const upstream = node.upstream.flatMap((k) => at(k) ?? []);
-			time = upstream.length ? Math.max(...upstream) : null;
-		}
-		memo.set(key, time);
-		return time;
-	};
-	return at;
+export function toNodeStates(wire: Wire['NodeStates']): NodeStates {
+	return { snapshotId: wire.snapshot_id, version: wire.version, states: Object.fromEntries(Object.entries(wire.states).map(([key, state]) => [key, toNodeState(state)])) };
 }
 
 /**
- * Upstream nodes with newer data than this node's own last build. Views read their upstream when
- * queried, so they are never behind, and an unbuilt node is not built yet rather than behind.
+ * The changed states a `node_status` notice carries, or null for a notice without them, as an
+ * older server sends. Malformed states are dropped rather than applied.
  */
-function behindOf(node: CatalogNode, dataAt: (key: string) => number | null): StaleReason[] {
-	const builtAt = node.lastBuild?.builtAt;
-	if (!builtAt || node.kind === 'view') return [];
-	const newer = node.upstream.flatMap((key) => {
-		const at = dataAt(key);
-		return at !== null && at > Date.parse(builtAt) ? [{ key, at }] : [];
-	});
-	if (!newer.length) return [];
-	const since = new Date(Math.min(...newer.map((n) => n.at))).toISOString();
-	const names = newer.map((n) => shortName(n.key));
-	const detail = `${names.length === 1 ? names[0] : `${names.length} upstream nodes`} ${names.length === 1 ? 'has' : 'have'} newer data than this build.`;
-	return [{ reason: 'behind', upstream: newer.map((n) => n.key), detail, since }];
+export function toNodeStatusDelta(data: unknown): NodeStatusDelta | null {
+	if (!data || typeof data !== 'object') return null;
+	const { version, previous_version: previousVersion, states, full } = data as { version?: unknown; previous_version?: unknown; states?: unknown; full?: unknown };
+	if (typeof version !== 'number' || typeof previousVersion !== 'number') return null;
+	if (full === true) return { version, previousVersion, full: true };
+	if (!states || typeof states !== 'object') return null;
+	return { version, previousVersion, states: Object.fromEntries(Object.entries(states as Record<string, Wire['NodeState']>).map(([key, state]) => [key, toNodeState(state)])) };
 }
 
 /** Catalog nodes in listing order, keeping only dependencies that are themselves listed. */
@@ -94,8 +90,7 @@ export function toCatalogNodes(wire: Wire['CatalogNodeRecord'][]): CatalogNode[]
 	const nodes = wire.flatMap((node) => toCatalogNode(node) ?? []);
 	const keys = new Set(nodes.map((node) => node.key));
 	const linked = nodes.map((node) => ({ ...node, upstream: node.upstream.filter((key) => keys.has(key)) }));
-	const dataAt = dataTimes(new Map(linked.map((node) => [node.key, node])));
-	return linked.map((node) => ({ ...node, stale: [...(node.stale ?? []), ...behindOf(node, dataAt)] }));
+	return withBehind(linked);
 }
 
 /** Passing, warning and failing by each check's newest result; checks without one count only towards the total. */

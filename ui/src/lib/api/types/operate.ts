@@ -191,7 +191,8 @@ export type RunNodeStatus =
 	/** The run ended (lost worker, never started) before this node ran. */
 	| 'not_run';
 
-export type NodeKind = 'source' | 'loader' | 'seed' | 'view' | 'table' | 'incremental' | 'task';
+/** Graph node kinds: SQL models by materialization, sources and seeds, Python nodes (asset, loader, task) and functions (udf, table_fn). */
+export type NodeKind = 'source' | 'loader' | 'seed' | 'view' | 'table' | 'incremental' | 'task' | 'asset' | 'udf' | 'table_fn';
 
 export type SkippedBecauseOf = {
 	nodeKey: string;

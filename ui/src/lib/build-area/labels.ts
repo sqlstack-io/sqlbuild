@@ -5,6 +5,9 @@ import Download from '@lucide/svelte/icons/download';
 import Eye from '@lucide/svelte/icons/eye';
 import GitMerge from '@lucide/svelte/icons/git-merge';
 import Layers from '@lucide/svelte/icons/layers';
+import Package from '@lucide/svelte/icons/package';
+import SquareFunction from '@lucide/svelte/icons/square-function';
+import TableProperties from '@lucide/svelte/icons/table-properties';
 import Sprout from '@lucide/svelte/icons/sprout';
 import Table2 from '@lucide/svelte/icons/table-2';
 import Workflow from '@lucide/svelte/icons/workflow';
@@ -30,7 +33,10 @@ export const nodeKindLabel: Record<NodeKind, string> = {
 	view: 'View',
 	table: 'Table',
 	incremental: 'Incremental',
-	task: 'Task'
+	task: 'Task',
+	asset: 'Asset',
+	udf: 'Function',
+	table_fn: 'Table function'
 };
 
 export const nodeKindPlural: Record<NodeKind, string> = {
@@ -40,10 +46,44 @@ export const nodeKindPlural: Record<NodeKind, string> = {
 	view: 'Views',
 	table: 'Tables',
 	incremental: 'Incremental',
-	task: 'Tasks'
+	task: 'Tasks',
+	asset: 'Assets',
+	udf: 'Functions',
+	table_fn: 'Table functions'
 };
 
-export const NODE_KINDS: NodeKind[] = ['source', 'loader', 'seed', 'view', 'table', 'incremental', 'task'];
+export const NODE_KINDS: NodeKind[] = ['source', 'loader', 'seed', 'view', 'table', 'incremental', 'task', 'asset', 'udf', 'table_fn'];
+
+/** The Catalog's kind tabs: SQL kinds one by one, Python nodes together, and functions together. */
+export type KindTab = 'source' | 'seed' | 'view' | 'table' | 'incremental' | 'python' | 'functions';
+
+export const KIND_TABS: KindTab[] = ['source', 'seed', 'view', 'table', 'incremental', 'python', 'functions'];
+
+export const PYTHON_KINDS: readonly NodeKind[] = ['asset', 'loader', 'task'];
+export const FUNCTION_KINDS: readonly NodeKind[] = ['udf', 'table_fn'];
+
+export function kindTabOf(kind: NodeKind): KindTab {
+	if (PYTHON_KINDS.includes(kind)) return 'python';
+	if (FUNCTION_KINDS.includes(kind)) return 'functions';
+	return kind as KindTab;
+}
+
+export const kindTabLabel: Record<KindTab, string> = {
+	source: 'Sources',
+	seed: 'Seeds',
+	view: 'Views',
+	table: 'Tables',
+	incremental: 'Incremental',
+	python: 'Python',
+	functions: 'Functions'
+};
+
+/** A tab from a link, which may name a kind, such as `loader`, or a tab, such as `python`. */
+export function parseKindTab(value: string | null): KindTab | null {
+	if (!value) return null;
+	if ((KIND_TABS as string[]).includes(value)) return value as KindTab;
+	return (NODE_KINDS as string[]).includes(value) ? kindTabOf(value as NodeKind) : null;
+}
 
 /** Icon key used by the lineage cards, from the node kind and materialization. */
 export function nodeIconKey(node: Pick<CatalogNode, 'kind' | 'materialization'>): string {
@@ -62,7 +102,10 @@ export const nodeIcon: Record<string, typeof Table2> = {
 	merge: GitMerge,
 	delete_insert: Layers,
 	microbatch: Layers,
-	task: Workflow
+	task: Workflow,
+	asset: Package,
+	udf: SquareFunction,
+	table_fn: TableProperties
 };
 
 /** `incremental · merge` style kind line, falling back to the node kind. */
