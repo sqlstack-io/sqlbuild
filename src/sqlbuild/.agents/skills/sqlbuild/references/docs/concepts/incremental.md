@@ -64,7 +64,8 @@ table more than once.
 
 ### delete_insert
 
-Deletes the rows the new delta replaces, then inserts the delta. Requires either `cursor` or `unique_key`.
+Deletes the rows the new delta replaces, then inserts the delta. Requires `cursor`, `unique_key` or
+`replace_key`.
 
 ```sql
 MODEL (
@@ -85,12 +86,34 @@ Which rows it deletes depends on the model's settings:
 | Settings | Rows deleted before the insert |
 |----------|--------------------------------|
 | `cursor` | Rows whose cursor falls in the replay window |
-| `unique_key` | Rows whose key appears in the delta |
-| `cursor` and `unique_key` | Rows in the replay window, and rows whose key appears in the delta |
+| `unique_key` | Rows whose key appears in the delta. The key must hold one row per value; for groups of rows per value, use `replace_key` |
+| `replace_key` | Rows whose `replace_key` values appear in the delta |
+| `cursor` and `unique_key` or `replace_key` | Rows in the replay window, and rows whose key appears in the delta |
 | `incremental_mode microbatch` | Rows in the batch's window; a `unique_key` only matches rows in diff and review |
 
 With both a cursor and a key, a row whose cursor value moved out of the window, such as an order
 updated after its first load, replaces its earlier version instead of adding a second row.
+
+`unique_key` promises one row per key. Use `replace_key` when a key value covers a group of rows
+that each load replaces whole, such as the lines of one forecast version:
+
+```sql
+MODEL (
+  description "Forecast lines, several per forecast version",
+  materialized incremental,
+  incremental_strategy delete_insert,
+  replace_key [forecast_version],
+);
+
+SELECT forecast_version, product_id, forecast_month, quantity
+FROM __ref("stg_forecast_lines")
+```
+
+A delta holding version `2026-06` deletes every `2026-06` row and inserts the new ones. Other
+versions keep their rows. A model sets `unique_key` or `replace_key`, not both, and `replace_key`
+is valid only with `delete_insert` and not with `incremental_mode microbatch`. BigQuery rejects
+`replace_key` with `A012` when planning; every other adapter replaces groups. Rules that need a
+proven key, such as `SQLCLEAN018`, use `unique_key` and never `replace_key`.
 
 ### merge
 
