@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { countBy } from '$lib/list/count-by';
 	import { openRow, to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -30,6 +31,8 @@
 
 	const catalog = useCatalogNodes();
 	const all = $derived(catalog.data ?? []);
+	const byKindTab = $derived(countBy(all, (n) => kindTabOf(n.kind)));
+	const byFolder = $derived(countBy(all, topFolder));
 
 	const params = page.url.searchParams;
 	let query = $state(params.get('q') ?? '');
@@ -123,10 +126,10 @@
 		{#if picked.size}<Button variant="outline" size="sm" class="mr-1.5" onclick={clearPicked} title="Show every node">{picked.size} picked<XIcon /></Button>{/if}
 		<SegmentedFilter loading={catalog.data === undefined}
 			bind:value={kindFilter}
-			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: kindTabLabel[k], count: all.filter((n) => kindTabOf(n.kind) === k).length }))]}
+			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: kindTabLabel[k], count: byKindTab.get(k) ?? 0 }))]}
 		/>
 		{#if showBuildState}<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: all.filter((n) => matchesStatus(n, o.value)).length }))} />{/if}
-		{#if groups.length > 1}<ChoiceFilter label="Folder" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: all.filter((n) => topFolder(n) === g).length }))} />{/if}
+		{#if groups.length > 1}<ChoiceFilter label="Folder" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: byFolder.get(g) ?? 0 }))} />{/if}
 	{/snippet}
 </ListToolbar>
 
