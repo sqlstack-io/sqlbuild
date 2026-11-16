@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::python_rules::tests::helpers::{owned_faults, python_rule_faults};
@@ -118,6 +119,7 @@ def test_given_raw_order_when_mapping_then_status_is_normalised(test_case: RowMa
 #[test]
 fn given_project_python_tests_when_evaluating_test_rules_then_reports_misplaced_and_unconventional_tests()
  {
+    install_test_identity();
     let test_cases = [
         PythonRunTestCase {
             description: "tests mirroring a unit, its helpers and a provider, with dataclass cases, report nothing",

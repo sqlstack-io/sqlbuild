@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
@@ -21,6 +22,7 @@ use crate::models::SpeculativeAnswer;
 #[test]
 fn given_speculative_rows_when_answering_then_result_and_writes_match_ordinary_evaluation()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         SpeculativeRowsTestCase {
             description: "identical cached request uses the speculation",
@@ -99,6 +101,7 @@ fn given_speculative_rows_when_answering_then_result_and_writes_match_ordinary_e
 #[test]
 fn given_speculative_rows_when_discarded_or_stopped_then_nothing_is_written() -> Result<(), String>
 {
+    install_test_identity();
     let test_cases = [
         SpeculativeStopTestCase {
             description: "discarding after it ran a while",

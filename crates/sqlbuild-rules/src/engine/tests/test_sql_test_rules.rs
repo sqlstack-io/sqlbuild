@@ -1,11 +1,13 @@
 use crate::engine::_helpers::evaluation::evaluate_json;
 use crate::engine::tests::{helpers, test_types};
+use crate::tests::helpers::install_test_identity;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
 #[test]
 fn given_sql_test_facts_when_evaluating_project_rules_then_returns_expected_faults()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let mut misplaced_test = helpers::sql_test_fact(
         "quality/test_orders__paid.sql",
@@ -267,6 +269,7 @@ fn given_sql_test_facts_when_evaluating_project_rules_then_returns_expected_faul
 #[test]
 fn given_test_fact_change_when_evaluating_cached_project_rule_then_project_rule_reruns_over_cached_models()
 -> Result<(), String> {
+    install_test_identity();
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let test_cases = [test_types::SqlTestRulesCacheTestCase {
         description: "test fact change re-evaluates the project rule and reuses the model",

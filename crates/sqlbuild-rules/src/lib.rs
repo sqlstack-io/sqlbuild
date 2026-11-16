@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod build_identity;
 pub mod configuration;
 pub mod constants;
 pub mod custom_host_pool;
@@ -23,3 +24,6 @@ pub mod rule_results;
 pub mod rules;
 pub mod scope_metadata;
 pub mod types;
+
+#[cfg(test)]
+mod tests;

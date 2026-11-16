@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -15,6 +16,7 @@ use crate::models::{EvaluateRequest, Fault, Model, RetainedRows, RowsEvaluation,
 #[test]
 fn given_retained_rows_when_evaluating_without_sql_then_only_cached_findings_stand_in()
 -> Result<(), String> {
+    install_test_identity();
     let test_cases = [
         RetainedRowsTestCase {
             description: "the findings cached by the retaining evaluation stand in",

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/sqlbuild-build-features",
+    "crates/sqlbuild-build-identity",
     "crates/sqlbuild-core",
     "crates/sqlbuild-cursor",
     "crates/sqlbuild-process-ownership",
@@ -33,6 +34,7 @@ resolver = "2"
 [workspace.metadata.native-layers]
 order = [
     "sqlbuild-build-features",
+    "sqlbuild-build-identity",
     "sqlbuild-core",
     "sqlbuild-cursor",
     "sqlbuild-process-ownership",
@@ -162,6 +164,7 @@ utoipa = { version = "5", features = ["chrono", "uuid"] }
 sqlbuild-analysis = { path = "crates/sqlbuild-analysis" }
 sqlbuild-attachments = { path = "crates/sqlbuild-attachments" }
 sqlbuild-build-features = { path = "crates/sqlbuild-build-features" }
+sqlbuild-build-identity = { path = "crates/sqlbuild-build-identity" }
 sqlbuild-cache = { path = "crates/sqlbuild-cache" }
 sqlbuild-cli = { path = "crates/sqlbuild-cli" }
 sqlbuild-config = { path = "crates/sqlbuild-config" }

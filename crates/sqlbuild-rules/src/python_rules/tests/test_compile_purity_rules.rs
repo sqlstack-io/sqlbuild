@@ -1,3 +1,4 @@
+use crate::tests::helpers::install_test_identity;
 use serde_json::json;
 
 use crate::python_rules::tests::helpers::{owned_faults, python_rule_faults};
@@ -125,6 +126,7 @@ def deferred_runner():
 #[test]
 fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_calls_reaching_external_systems()
  {
+    install_test_identity();
     let test_cases = [
         PythonRunTestCase {
             description: "static specs, node bodies, main() and provider methods report nothing",
@@ -250,6 +252,7 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
 
 #[test]
 fn given_a_boundary_naming_a_module_when_evaluating_compile_time_purity_then_the_run_fails() {
+    install_test_identity();
     let test_cases = [PythonRunFailureTestCase {
         description: "a module is not a loader boundary",
         files: &[
