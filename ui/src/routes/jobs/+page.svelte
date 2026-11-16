@@ -45,14 +45,15 @@
 
 	let query = $state('');
 	let kind = $state<JobKind | 'all'>('all');
-	let lastRun = $state<'problems' | 'active' | 'never' | ''>('');
+	type LastRun = 'problems' | 'active' | 'never';
+	let lastRun = $state<LastRun[]>([]);
+	const matchesLastRun = (j: (typeof all)[number], f: LastRun) =>
+		f === 'problems' ? !!j.lastRun && isProblemRun(j.lastRun.status) : f === 'active' ? !!j.lastRun && isActiveRun(j.lastRun.status) : !j.lastRun;
 	const all = $derived(jobs.data ?? []);
 	const filtered = $derived(
 		all.filter((j) => {
 			if (kind !== 'all' && j.kind !== kind) return false;
-			if (lastRun === 'problems' && !(j.lastRun && isProblemRun(j.lastRun.status))) return false;
-			if (lastRun === 'active' && !(j.lastRun && isActiveRun(j.lastRun.status))) return false;
-			if (lastRun === 'never' && j.lastRun) return false;
+			if (lastRun.length && !lastRun.some((f) => matchesLastRun(j, f))) return false;
 			const q = query.trim().toLowerCase();
 			return !q || `${j.key} ${j.description} ${j.select ?? ''} ${(j.members ?? []).join(' ')}`.toLowerCase().includes(q);
 		})
@@ -98,9 +99,9 @@
 			]}
 		/>
 		<ChoiceFilter
+			multiple
 			label="Last run"
-			bind:value={lastRun}
-			all="Any"
+			bind:values={lastRun}
 			options={[
 				{ value: 'problems', label: 'Failed or partial' },
 				{ value: 'active', label: 'Active' },

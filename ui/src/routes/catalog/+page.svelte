@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { countBy } from '$lib/list/count-by';
+	import { matchesAny, readValues, writeValues } from '$lib/list/choice';
 	import { openRow, to } from '$lib/paths';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -37,8 +38,17 @@
 	const params = page.url.searchParams;
 	let query = $state(params.get('q') ?? '');
 	let kindFilter = $state<'all' | KindTab>(parseKindTab(params.get('kind')) ?? 'all');
-	let groupFilter = $state(params.get('group') ?? '');
-	let statusFilter = $state<StatusFilter | ''>(params.get('stale') ? 'stale' : '');
+	// Several folders are `?group=a&group=b`; a link with one, as before, still works.
+	let groupFilter = $state(readValues(params, 'group'));
+	let statusFilter = $state<StatusFilter[]>(params.get('stale') ? ['stale'] : []);
+	const groupSet = $derived(new Set(groupFilter));
+	$effect(() => {
+		const next = writeValues(page.url.searchParams, 'group', groupFilter);
+		if (next.toString() === page.url.searchParams.toString()) return;
+		const url = new URL(page.url);
+		url.search = next.toString();
+		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+	});
 	// Nodes picked elsewhere, such as a provider's code from its Used by tab.
 	let picked = $state<ReadonlySet<string>>(new Set((params.get(NODES_PARAM) ?? '').split(',').filter(Boolean)));
 	function clearPicked() {
@@ -48,8 +58,7 @@
 		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
 	}
 
-	const matchesStatus = (n: CatalogNode, f: StatusFilter | '') =>
-		!f ||
+	const matchesStatus = (n: CatalogNode, f: StatusFilter) =>
 		(f === 'stale' && !!n.stale?.length) ||
 		(f === 'changed' && !!n.stale?.some((s) => s.reason !== 'behind')) ||
 		(f === 'behind' && !!n.stale?.some((s) => s.reason === 'behind')) ||
@@ -69,8 +78,8 @@
 			if (picked.size && !picked.has(n.key)) return false;
 			if (kindFilter !== 'all' && kindTabOf(n.kind) !== kindFilter) return false;
 			// A filter whose control is hidden, for example from a shared link, never narrows the list.
-			if (groups.length > 1 && groupFilter && topFolder(n) !== groupFilter) return false;
-			if (showBuildState && !matchesStatus(n, statusFilter)) return false;
+			if (groups.length > 1 && !matchesAny(groupSet, topFolder(n))) return false;
+			if (showBuildState && statusFilter.length && !statusFilter.some((f) => matchesStatus(n, f))) return false;
 			const q = query.trim().toLowerCase();
 			return !q || [n.key, n.description, kindLine(n), ...n.tags].some((s) => s.toLowerCase().includes(q));
 		})
@@ -89,6 +98,7 @@
 		{ value: 'failed', label: 'Last build failed' },
 		{ value: 'warn', label: 'Last build warned' }
 	];
+	const byStatus = $derived(countBy(all, (n) => statusOptions.filter((o) => matchesStatus(n, o.value)).map((o) => o.value)));
 
 	const ROW_H = 52;
 	const tableColumns = $derived<TableColumn[]>([
@@ -128,8 +138,8 @@
 			bind:value={kindFilter}
 			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: kindTabLabel[k], count: byKindTab.get(k) ?? 0 }))]}
 		/>
-		{#if showBuildState}<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: all.filter((n) => matchesStatus(n, o.value)).length }))} />{/if}
-		{#if groups.length > 1}<ChoiceFilter label="Folder" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: byFolder.get(g) ?? 0 }))} />{/if}
+		{#if showBuildState}<ChoiceFilter multiple label="Status" bind:values={statusFilter} options={statusOptions.map((o) => ({ ...o, count: byStatus.get(o.value) ?? 0 }))} />{/if}
+		{#if groups.length > 1}<ChoiceFilter multiple label="Folder" bind:values={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: byFolder.get(g) ?? 0 }))} />{/if}
 	{/snippet}
 </ListToolbar>
 

@@ -18,6 +18,8 @@
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { app } from '$lib/state/app.svelte';
+	import { countBy } from '$lib/list/count-by';
+	import { matchesAny, toggleValue } from '$lib/list/choice';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
@@ -32,14 +34,18 @@
 
 	let query = $state('');
 	let type = $state<'all' | 'schedule' | 'sensor'>('all');
-	let kind = $state<TriggerKind | ''>('');
-	let stateFilter = $state<TriggerState | 'set_in_ui' | ''>('');
+	let kind = $state<TriggerKind[]>([]);
+	let stateFilter = $state<(TriggerState | 'set_in_ui')[]>([]);
 	const all = $derived(triggers.data ?? []);
+	const kindSet = $derived(new Set(kind));
+	const byKind = $derived(countBy(all, (t) => t.kind));
+	/** Any of the chosen states; "set in UI" matches a trigger whose state differs from its code. */
+	const matchesState = (t: Trigger) => !stateFilter.length || stateFilter.some((f) => (f === 'set_in_ui' ? setInUi(t) : t.state === f));
 	const filtered = $derived(
 		all.filter((t) => {
 			if (type !== 'all' && t.type !== type) return false;
-			if (kind && t.kind !== kind) return false;
-			if (stateFilter === 'set_in_ui' ? !setInUi(t) : stateFilter && t.state !== stateFilter) return false;
+			if (!matchesAny(kindSet, t.kind)) return false;
+			if (!matchesState(t)) return false;
 			const q = query.trim().toLowerCase();
 			return !q || `${t.name} ${t.jobKey ?? ''} ${t.cadence} ${t.description}`.toLowerCase().includes(q);
 		})
@@ -126,8 +132,8 @@
 			label: 'set in UI',
 			reserve: true,
 			icon: PinIcon,
-			pressed: stateFilter === 'set_in_ui',
-			onclick: () => (stateFilter = stateFilter === 'set_in_ui' ? '' : 'set_in_ui')
+			pressed: stateFilter.includes('set_in_ui'),
+			onclick: () => (stateFilter = toggleValue(stateFilter, 'set_in_ui'))
 		}
 	]}
 >
@@ -140,10 +146,11 @@
 				{ value: 'sensor', label: 'Sensors', count: all.filter((t) => t.type === 'sensor').length }
 			]}
 		/>
-		<ChoiceFilter label="Kind" bind:value={kind} options={(Object.keys(triggerKindLabel) as TriggerKind[]).map((k) => ({ value: k, label: triggerKindLabel[k], count: all.filter((t) => t.kind === k).length }))} />
+		<ChoiceFilter multiple label="Kind" bind:values={kind} options={(Object.keys(triggerKindLabel) as TriggerKind[]).map((k) => ({ value: k, label: triggerKindLabel[k], count: byKind.get(k) ?? 0 }))} />
 		<ChoiceFilter
+			multiple
 			label="Status"
-			bind:value={stateFilter}
+			bind:values={stateFilter}
 			options={[
 				{ value: 'running', label: 'On' },
 				{ value: 'paused', label: 'Paused' },

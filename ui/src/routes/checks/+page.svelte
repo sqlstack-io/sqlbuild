@@ -23,14 +23,25 @@
 	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel } from '$lib/build-area/labels';
 	import { checkValue, kindLabel, outcomeOf, parseOutcomeFilter, type OutcomeFilter } from './utils';
 	import { countBy } from '$lib/list/count-by';
+	import { matchesAny, readValues, writeValues } from '$lib/list/choice';
 
 	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
 	const all = $derived(checks.data ?? []);
 
 	let query = $state(page.url.searchParams.get('q') ?? '');
 	let outcomeFilter = $state<OutcomeFilter>(parseOutcomeFilter(page.url.searchParams.get('outcome')));
-	let attachment = $state<CheckAttachment | ''>('');
-	let nodeFilter = $state(page.url.searchParams.get('node') ?? '');
+	let attachment = $state<CheckAttachment[]>([]);
+	// Several nodes are `?node=a&node=b`; a link with one, as before, still works.
+	let nodeFilter = $state(readValues(page.url.searchParams, 'node'));
+	const attachmentSet = $derived(new Set(attachment));
+	const nodeSet = $derived(new Set(nodeFilter));
+	$effect(() => {
+		const params = writeValues(page.url.searchParams, 'node', nodeFilter);
+		if (params.toString() === page.url.searchParams.toString()) return;
+		const url = new URL(page.url);
+		url.search = params.toString();
+		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+	});
 
 	const bucket = (c: Check): Exclude<OutcomeFilter, 'all'> => {
 		const o = outcomeOf(c);
@@ -40,8 +51,8 @@
 	const filtered = $derived(
 		all.filter((c) => {
 			if (outcomeFilter !== 'all' && bucket(c) !== outcomeFilter) return false;
-			if (attachment && c.attachment !== attachment) return false;
-			if (nodeFilter && c.node !== nodeFilter) return false;
+			if (!matchesAny(attachmentSet, c.attachment)) return false;
+			if (!matchesAny(nodeSet, c.node)) return false;
 			const q = query.trim().toLowerCase();
 			return !q || [c.name, c.node ?? '', c.column ?? '', kindLabel(c)].some((s) => s.toLowerCase().includes(q));
 		})
@@ -102,8 +113,8 @@
 >
 	{#snippet filters()}
 		<SegmentedFilter loading={checks.data === undefined} bind:value={outcomeFilter} options={outcomeOptions.map((o) => ({ ...o, count: counts[o.value] }))} />
-		<ChoiceFilter label="Attached to" bind:value={attachment} options={(['model', 'source', 'seed', 'end'] as CheckAttachment[]).map((a) => ({ value: a, label: attachmentLabel[a], count: byAttachment.get(a) ?? 0 }))} />
-		<ChoiceFilter label="Node" bind:value={nodeFilter} options={nodes.map((n) => ({ value: n, label: n, count: byNode.get(n) ?? 0 }))} />
+		<ChoiceFilter multiple label="Attached to" bind:values={attachment} options={(['model', 'source', 'seed', 'end'] as CheckAttachment[]).map((a) => ({ value: a, label: attachmentLabel[a], count: byAttachment.get(a) ?? 0 }))} />
+		<ChoiceFilter multiple label="Node" bind:values={nodeFilter} options={nodes.map((n) => ({ value: n, label: n, count: byNode.get(n) ?? 0 }))} />
 	{/snippet}
 </ListToolbar>
 

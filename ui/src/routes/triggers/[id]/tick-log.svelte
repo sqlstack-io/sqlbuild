@@ -6,15 +6,18 @@
 	import { TICK_OUTCOMES, type Tick, type TickOutcome } from '$lib/api';
 	import ChoiceFilter from '$lib/components/list/choice-filter.svelte';
 	import { formatStamp } from '$lib/format/time';
+	import { countBy } from '$lib/list/count-by';
 	import { formatSeconds, shortRunId, tickOutcomeHelp, tickOutcomeText, tickOutcomeTone } from '$lib/operate/labels';
 
 	let { ticks }: { ticks: Tick[] } = $props();
 
 	const LATE_AFTER_SECONDS = 60;
-	let outcome = $state<TickOutcome | 'late' | ''>('');
-	const filtered = $derived(
-		ticks.filter((t) => (outcome === 'late' ? t.lateBySeconds > LATE_AFTER_SECONDS || t.catchUp : !outcome || t.outcome === outcome))
-	);
+	let outcome = $state<(TickOutcome | 'late')[]>([]);
+	const isLate = (t: Tick) => t.lateBySeconds > LATE_AFTER_SECONDS || t.catchUp;
+	/** Each tick under its outcome, and under "late" too when it was. */
+	const tagsOf = (t: Tick): (TickOutcome | 'late')[] => (isLate(t) ? [t.outcome, 'late'] : [t.outcome]);
+	const filtered = $derived(ticks.filter((t) => !outcome.length || tagsOf(t).some((o) => outcome.includes(o))));
+	const byOutcome = $derived(countBy(ticks, tagsOf));
 	// The server records no reason per tick; the column shows only where one exists.
 	const showWhy = $derived(ticks.some((t) => t.reason !== null));
 	const tickColumns = $derived<TableColumn[]>([
@@ -29,11 +32,12 @@
 
 <div class="bar">
 	<ChoiceFilter
+		multiple
 		label="Outcome"
-		bind:value={outcome}
+		bind:values={outcome}
 		options={[
-			...TICK_OUTCOMES.map((o) => ({ value: o, label: tickOutcomeText[o], count: ticks.filter((t) => t.outcome === o).length })),
-			{ value: 'late' as const, label: 'Late', title: 'Late, or made up after downtime', count: ticks.filter((t) => t.lateBySeconds > LATE_AFTER_SECONDS || t.catchUp).length }
+			...TICK_OUTCOMES.map((o) => ({ value: o, label: tickOutcomeText[o], count: byOutcome.get(o) ?? 0 })),
+			{ value: 'late' as const, label: 'Late', title: 'Late, or made up after downtime', count: byOutcome.get('late') ?? 0 }
 		]}
 	/>
 	<span class="faint" title="One entry (tick) per due time">{filtered.length} ticks</span>
