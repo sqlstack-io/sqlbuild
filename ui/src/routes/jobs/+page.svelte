@@ -120,9 +120,9 @@
 					<td>
 						<div class="cell-name">
 							{#if j.kind === 'group'}<LayersIcon size={15} strokeWidth={1.75} />{:else}<WorkflowIcon size={15} strokeWidth={1.75} />{/if}
-							<div class="min-w-0">
-								<a href={to(`/jobs/${j.key}`)}>{j.key}</a>
-								<div class="cell-desc">{j.description}</div>
+							<div class="job-name min-w-0">
+								<a class="one-line" href={to(`/jobs/${j.key}`)} title={j.key}>{j.key}</a>
+								<div class="cell-desc" title={j.description}>{j.description}</div>
 							</div>
 						</div>
 					</td>
@@ -135,7 +135,7 @@
 									<a class="more" href={to(`/jobs/${j.key}`)} title={members.hidden.join(', ')} onclick={(e) => e.stopPropagation()}>+{members.hidden.length} more</a>
 								{/if}
 							{:else}
-								<code>{j.select}</code>
+								<code class="selection" title={j.select}>{j.select}</code>
 							{/if}
 						</td>
 					{/if}
@@ -190,6 +190,20 @@
 </div>
 
 <style>
+	/* Descriptions don't wrap, so without a width limit one long description widens the whole column
+	   and pushes the rest of the table off-screen. */
+	.job-name {
+		max-width: 420px;
+	}
+	.selection {
+		display: -webkit-box;
+		max-width: 520px;
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		overflow-wrap: anywhere;
+	}
 	.one-line {
 		display: block;
 		overflow: hidden;

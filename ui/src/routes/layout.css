@@ -303,7 +303,10 @@
 .sb-list .cell-name a:hover {
 	color: var(--primary);
 }
+/* Descriptions don't wrap; the width limit stops one long description widening its column and
+   pushing the rest of the table off-screen. */
 .sb-list .cell-desc {
+	max-width: 480px;
 	margin-top: 1px;
 	overflow: hidden;
 	color: var(--muted-foreground);
