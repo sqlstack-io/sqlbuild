@@ -27,8 +27,10 @@ pub(super) async fn plan_location(
     (client, session_id, generation): (&LocationWorkClient, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Value>, ControlError> {
-    let argv = match plan_arguments(options, (selection, settings)) {
-        Ok(argv) => argv,
+    let (argv, select) = match plan_arguments(options, settings)
+        .and_then(|argv| Ok((argv, selected_names(selection)?)))
+    {
+        Ok(planned) => planned,
         Err(message) => return Ok(Some(plan_failure(&message))),
     };
     let consumption: bool = settings
@@ -62,6 +64,7 @@ pub(super) async fn plan_location(
     };
     let request = json!({"plan": {
         "argv": argv,
+        "select": select,
         "copy": planned.path.to_string_lossy(),
         "version": planned.version,
         "consumption": planned.consumption,
@@ -150,10 +153,11 @@ fn hold_copy(
     Ok(held)
 }
 
-/// The `sqb plan` command line of a frozen request: JSON output, its flags and its node names.
+/// The `sqb plan` command line of a frozen request: JSON output and its flags; the frozen node names
+/// travel beside it, so the runtime need not parse one `--select` per node.
 fn plan_arguments(
     options: &LocationServe,
-    (selection, settings): (&BTreeSet<String>, &BTreeMap<String, Value>),
+    settings: &BTreeMap<String, Value>,
 ) -> Result<Vec<String>, String> {
     let mut argv: Vec<String> = vec![
         "--project-dir".into(),
@@ -165,13 +169,19 @@ fn plan_arguments(
         "--no-color".into(),
     ];
     argv.extend(accepted_settings_arguments(PLAN_COMMAND, settings)?);
-    for key in selection {
-        let (_, name) = key
-            .split_once(':')
-            .ok_or_else(|| "the plan request names an invalid node".to_owned())?;
-        argv.extend(["--select".to_owned(), name.to_owned()]);
-    }
     Ok(argv)
+}
+
+/// The node names of a frozen selection, each selected as `--select <name>` would.
+fn selected_names(selection: &BTreeSet<String>) -> Result<Vec<String>, String> {
+    selection
+        .iter()
+        .map(|key| {
+            key.split_once(':')
+                .map(|(_, name)| name.to_owned())
+                .ok_or_else(|| "the plan request names an invalid node".to_owned())
+        })
+        .collect()
 }
 
 async fn run_plan(

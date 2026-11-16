@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use pyo3::PyErr;
 use pyo3::exceptions::{PyBaseException, PyException, PyValueError};
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
-use pyo3::types::PyString;
+use pyo3::types::{PyList, PyString};
 use serde_json::{Value, json};
 use sqlbuild_orchestration::warehouse_metadata::main::location_reads::preview_state_parts::preview_state_parts;
 use sqlbuild_orchestration::warehouse_metadata::models::PreviewCopy;
@@ -65,6 +65,7 @@ pub(super) fn runtime_plan<'py>(
 ) -> PyResult<Value> {
     let argv: Vec<String> = serde_json::from_value(request["argv"].clone())
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let select: Vec<String> = serde_json::from_value(request["select"].clone()).unwrap_or_default();
     let state: Arc<WarehouseState> = requested_state(request)?;
     let planned = (|| -> PyResult<(i32, Option<String>)> {
         let argv: Vec<Bound<'_, PyString>> =
@@ -72,6 +73,9 @@ pub(super) fn runtime_plan<'py>(
         let args = field(&parse_cli_invocation(py, argv, false)?, "args")?;
         if args.is_none() {
             return Err(PyException::new_err("the plan command line is invalid"));
+        }
+        if !select.is_empty() {
+            args.setattr("select", PyList::new(py, &select)?)?;
         }
         let project = match held {
             Some((discovered, compiled)) => PlanProject::Held {
