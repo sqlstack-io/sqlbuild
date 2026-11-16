@@ -18,6 +18,8 @@
 	import { planHref } from '$lib/run/command';
 	import { formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
+	import MemberGraph from '$lib/lineage/member-graph.svelte';
+	import type { MemberInfo } from '$lib/lineage/member-graph';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import { formatMs } from '$lib/build-area/labels';
@@ -28,25 +30,18 @@
 	const jobRuns = createResource((client, scope) => client.listRuns(scope, { jobKey: name, limit: 50 }), ['runs']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
 	const catalog = useCatalogNodes();
-	// Each member's nodes and last run, so a group's graph can box every member job around what it builds.
-	// Reading `job.data` here reloads it with the job; it stays null until the job has loaded.
-	const members = createResource(async (client, scope) => {
-		const detail = job.data;
-		if (!detail) return null;
-		const keys = detail.groupMembers?.map((m) => m.jobKey) ?? [];
-		if (!keys.length) return { nodes: new Map<string, string[]>(), lastRuns: new Map() };
+	// A group's members as the jobs list reports them: node count and last run, for the member graph.
+	// Reading `job.data` here reloads it with the job; it stays null for a plain job or until the job has loaded.
+	const memberJobs = createResource(async (client, scope) => {
+		if (job.data?.kind !== 'group') return null;
 		const jobs = await client.listJobs(scope);
-		const details = await Promise.all(keys.map((k) => client.getJob(scope, k)));
-		return {
-			nodes: new Map(keys.map((k, i) => [k, details[i]?.resolvedNodes ?? []])),
-			lastRuns: new Map(jobs.map((j) => [j.key, j.lastRun]))
-		};
+		return new Map<string, MemberInfo>(jobs.map((j) => [j.key, { nodeCount: j.nodeCount, lastRun: j.lastRun }]));
 	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
 	const runs = $derived(jobRuns.data ?? []);
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
-		const showCost = $derived(runs.some((r) => r.cost !== null));
+	const showCost = $derived(runs.some((r) => r.cost !== null));
 	const canToggle = $derived(app.can('trigger.toggle'));
 	// A run is always reviewed on the plan page before it starts.
 	function run(keys: string[]) {
@@ -68,12 +63,6 @@
 		return took.length ? took[Math.floor(took.length / 2)] : null;
 	});
 	const hasSettings = $derived(!!def && (!!def.overlap || !!def.onFailure || def.priority !== null || !!def.targets || !!(def.settings && Object.keys(def.settings).length) || !!def.concurrency?.length || (def.concurrency === null && def.concurrencyGroups.length > 0)));
-	// A group draws each member job, in run order, as a box around the nodes it builds.
-	const boxes = $derived(
-		def?.kind === 'group'
-			? [...(def.groupMembers ?? [])].sort((a, b) => a.stage - b.stage).map((m) => ({ jobKey: m.jobKey, nodes: members.data?.nodes.get(m.jobKey) ?? [], lastRun: members.data?.lastRuns.get(m.jobKey) }))
-			: []
-	);
 	let actionError = $state<string | null>(null);
 
 	async function toggleTrigger(t: Trigger) {
@@ -150,10 +139,15 @@
 		{#if tab === 'overview'}
 			<div class="flex min-h-0 flex-1">
 				<div class="canvas">
-					{#if catalog.data && (def.kind !== 'group' || members.data)}
-						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} {boxes} members={def.groupMembers ?? []} onselect={(keys) => (picked = keys)} />
+					{#if def.kind === 'group' && !def.groupMembers?.length}
+						<p class="faint graph-wait">{def.groupMembers ? 'This group has no member jobs.' : "The server doesn't report this group's member jobs."}</p>
+					{:else if def.kind === 'group'}
+						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
+						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} />
+					{:else if catalog.data}
+						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={catalog.data} onselect={(keys) => (picked = keys)} />
 					{:else}
-						{#if catalog.error ?? members.error}<p class="faint graph-wait">{catalog.error ?? members.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
+						{#if catalog.error}<p class="faint graph-wait">{catalog.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
 					{/if}
 				</div>
 
