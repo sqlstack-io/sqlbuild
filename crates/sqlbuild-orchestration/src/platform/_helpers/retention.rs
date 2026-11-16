@@ -84,7 +84,6 @@ pub(crate) async fn retain(
     while prune_state_history(store, state_history).await?.1 {
         tokio::task::yield_now().await;
     }
-    reclaim_sqlite_space(store).await?;
     drain(store, PLATFORM_EVENTS, |now| {
         vec![
             Parameter::Time(now - TimeDelta::days(HEARTBEAT_RETENTION_DAYS)),

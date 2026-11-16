@@ -1,11 +1,12 @@
-//! One maintenance role per server: health alerts and WAL resets every cycle, retention every minute.
+//! One maintenance role per server: health alerts and WAL resets every cycle, retention and SQLite
+//! space reclamation every minute.
 
 use std::time::{Duration, Instant};
 
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::platform::_helpers::retention::{retain, wal_checkpoint};
+use crate::platform::_helpers::retention::{reclaim_sqlite_space, retain, wal_checkpoint};
 use crate::platform::_helpers::watchdog::scan_health;
 use crate::platform::models::RetentionPolicies;
 use crate::store::errors::ControlError;
@@ -39,6 +40,12 @@ pub async fn run_maintenance(
                     }
                     reported = retained;
                 }
+                Err(error) if error.transient() => {}
+                Err(error) => return Err(error),
+            }
+            // A busy store keeps its free pages until a later pass; retention has already run.
+            match reclaim_sqlite_space(store).await {
+                Ok(_) => {}
                 Err(error) if error.transient() => {}
                 Err(error) => return Err(error),
             }
