@@ -49,8 +49,8 @@ fn given_replace_key_when_planning_then_only_bigquery_refuses_it() {
             .as_deref(),
         Some(
             "model 'forecast_lines' sets replace_key, but adapter 'bigquery' cannot replace groups of \
-             rows; use unique_key with one row per key, or replace groups on Snowflake, Databricks, \
-             PostgreSQL or DuckDB"
+             rows; use unique_key with one row per key, or replace groups on any adapter other \
+             than BigQuery"
         )
     );
 }

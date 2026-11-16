@@ -13,8 +13,8 @@ pub fn group_replacement_refusal(
     unsupported.then(|| {
         format!(
             "model '{model_name}' sets replace_key, but adapter '{adapter_name}' cannot replace \
-             groups of rows; use unique_key with one row per key, or replace groups on \
-             Snowflake, Databricks, PostgreSQL or DuckDB"
+             groups of rows; use unique_key with one row per key, or replace groups on any \
+             adapter other than BigQuery"
         )
     })
 }
