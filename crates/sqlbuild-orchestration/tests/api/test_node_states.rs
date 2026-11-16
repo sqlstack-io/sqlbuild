@@ -88,7 +88,9 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
             let listed = read("nodes", &admin, None).await.expect("nodes");
             let first_tag = etag(&listed);
             let nodes: Vec<Value> = listed.json().await.expect("node list");
-            let unchanged = read("nodes", &admin, Some(&first_tag)).await.expect("revalidate");
+            let unchanged = read("nodes", &admin, Some(&first_tag))
+                .await
+                .expect("revalidate");
             let other_tag = read("nodes", &admin, Some("\"elsewhere:1\""))
                 .await
                 .expect("other tag")
@@ -144,7 +146,10 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
 
             let member = roles.member.bearer.clone();
             let denied = [
-                read("nodes", &member, None).await.expect("member nodes").status(),
+                read("nodes", &member, None)
+                    .await
+                    .expect("member nodes")
+                    .status(),
                 read("nodes", &member, Some(&first_tag))
                     .await
                     .expect("member revalidation")
@@ -161,10 +166,9 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
                 test_case.description
             );
 
-            let mut feed = opened(
-                request_person_feed(&client, &api, (location, "development", &admin)).await,
-            )
-            .await;
+            let mut feed =
+                opened(request_person_feed(&client, &api, (location, "development", &admin)).await)
+                    .await;
             ingest_fingerprints(
                 store,
                 (location, "development"),
@@ -205,10 +209,7 @@ fn given_held_node_states_when_people_revalidate_and_builds_land_then_only_chang
                 test_case.description
             );
             assert_eq!(
-                (
-                    &recovered["version"],
-                    &recovered["states"]["model:orders"]
-                ),
+                (&recovered["version"], &recovered["states"]["model:orders"]),
                 (&json!(2), &pushed["states"]["model:orders"]),
                 "{}: a client with a version gap recovers the pushed state from node-states",
                 test_case.description
@@ -317,7 +318,9 @@ fn given_builds_of_many_nodes_when_states_refresh_then_large_changes_ask_clients
             let names: Vec<&str> = names.iter().map(String::as_str).collect();
             let mut input = orders_snapshot(location, &names);
             input.generation = 2;
-            publish_snapshot(store, &input).await.expect("wide snapshot");
+            publish_snapshot(store, &input)
+                .await
+                .expect("wide snapshot");
             let session_id = reader(store, location).await;
             let (cache, _) = start_node_states(store, &tokio::sync::broadcast::channel(1).0);
             let mut updates = cache.updates.subscribe();
@@ -421,7 +424,10 @@ fn builds(session_id: Uuid, (generation, names): (i64, &[&str]), at: &str) -> Me
 }
 
 /// The next `count` events' data by topic, because one commit's events arrive in either order.
-async fn notices(feed: &mut crate::api::tests::test_types::SseConnection, count: usize) -> Vec<Value> {
+async fn notices(
+    feed: &mut crate::api::tests::test_types::SseConnection,
+    count: usize,
+) -> Vec<Value> {
     let mut notices = Vec::new();
     for _ in 0..count {
         notices.push(next_notice(feed).await.expect("change event"));

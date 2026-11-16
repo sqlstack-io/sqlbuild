@@ -50,13 +50,7 @@ pub(crate) async fn subscribe(
     } else {
         ChangeSubscriber::Location(sensitive(bearer(&headers)?)?)
     };
-    stream_changes(
-        (store, cache),
-        feed,
-        subscriber,
-        (location_id, target),
-    )
-    .await
+    stream_changes((store, cache), feed, subscriber, (location_id, target)).await
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/changes",
@@ -94,13 +88,7 @@ pub(crate) async fn subscribe_person(
         session,
         default_role,
     };
-    stream_changes(
-        (store, cache),
-        feed,
-        subscriber,
-        (location_id, target),
-    )
-    .await
+    stream_changes((store, cache), feed, subscriber, (location_id, target)).await
 }
 
 fn sensitive(value: &str) -> Result<HeaderValue, ControlError> {

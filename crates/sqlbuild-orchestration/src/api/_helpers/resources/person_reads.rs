@@ -139,7 +139,10 @@ fn cached_json(json: CachedJson, headers: &HeaderMap) -> Response {
         StatusCode::NOT_MODIFIED.into_response()
     } else {
         (
-            [(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))],
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
             json.body,
         )
             .into_response()

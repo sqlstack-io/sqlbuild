@@ -159,13 +159,14 @@ pub(crate) fn schedule_refresh(
             entry.dirty.store(false, Ordering::SeqCst);
             {
                 let _refreshing = entry.refresh.lock().await;
-                if let Err(error) = refresh_view(&cache, (location_id, &target), (&entry, true)).await {
+                if let Err(error) =
+                    refresh_view(&cache, (location_id, &target), (&entry, true)).await
+                {
                     eprintln!("Node states refresh failed; the next change retries: {error}");
                 }
             }
             entry.scheduled.store(false, Ordering::SeqCst);
-            if !entry.dirty.load(Ordering::SeqCst) || entry.scheduled.swap(true, Ordering::SeqCst)
-            {
+            if !entry.dirty.load(Ordering::SeqCst) || entry.scheduled.swap(true, Ordering::SeqCst) {
                 return;
             }
         }

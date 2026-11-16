@@ -59,10 +59,7 @@ fn held_targets(
     cache: &NodeStateCache,
     scope: Option<(Uuid, &str)>,
 ) -> Vec<((Uuid, String), Arc<TargetCache>)> {
-    let targets = cache
-        .targets
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let targets = cache.targets.lock().unwrap_or_else(PoisonError::into_inner);
     targets
         .iter()
         .filter(|((location_id, _), entry)| {
