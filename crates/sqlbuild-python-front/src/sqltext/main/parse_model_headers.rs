@@ -7,7 +7,6 @@ use pyo3::pyfunction;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::types::CompilerDetach;
 
-/// Parse model headers.
 #[pyfunction]
 pub fn parse_model_headers(
     py: Python<'_>,

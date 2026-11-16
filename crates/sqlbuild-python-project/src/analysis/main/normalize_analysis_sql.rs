@@ -5,7 +5,6 @@ use pyo3::pyfunction;
 use sqlbuild_python_base::boundary::main::value_error::value_error;
 use sqlbuild_python_base::types::CompilerDetach;
 
-/// Normalize analysis sql.
 #[pyfunction]
 pub fn normalize_analysis_sql(
     py: Python<'_>,

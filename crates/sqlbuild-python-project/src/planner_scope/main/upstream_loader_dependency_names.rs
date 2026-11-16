@@ -4,7 +4,6 @@ use crate::planner_scope::_helpers::values::{dependency_names, loader_graph, loa
 use pyo3::prelude::{Bound, PyAny, PyResult, pyfunction};
 use pyo3::types::PyTuple;
 
-/// Upstream loader dependency names.
 #[pyfunction]
 #[pyo3(signature = (*, loader_function, loader_functions))]
 pub fn upstream_loader_dependency_names<'py>(

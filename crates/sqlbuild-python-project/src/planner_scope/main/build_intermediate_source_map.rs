@@ -5,7 +5,6 @@ use crate::planner_scope::main::keys::keys;
 use pyo3::prelude::{Bound, PyAny, PyResult, pyfunction};
 use pyo3::types::PyDict;
 
-/// Build intermediate source map.
 #[pyfunction]
 #[pyo3(signature = (*, project, selected_keys))]
 pub fn build_intermediate_source_map<'py>(
