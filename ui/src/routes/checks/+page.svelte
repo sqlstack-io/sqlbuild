@@ -20,15 +20,13 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel } from '$lib/build-area/labels';
-	import { checkValue, kindLabel, outcomeOf } from './utils';
-
-	type OutcomeFilter = 'all' | 'failing' | 'warn' | 'pass' | 'other';
+	import { checkValue, kindLabel, outcomeOf, parseOutcomeFilter, type OutcomeFilter } from './utils';
 
 	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
 	const all = $derived(checks.data ?? []);
 
 	let query = $state(page.url.searchParams.get('q') ?? '');
-	let outcomeFilter = $state<OutcomeFilter>('all');
+	let outcomeFilter = $state<OutcomeFilter>(parseOutcomeFilter(page.url.searchParams.get('outcome')));
 	let attachment = $state<CheckAttachment | ''>('');
 	let nodeFilter = $state(page.url.searchParams.get('node') ?? '');
 

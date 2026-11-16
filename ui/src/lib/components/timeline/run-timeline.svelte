@@ -154,6 +154,10 @@
 			.map((name) => ({ name }))
 	);
 
+	// The name column fits the longest job name, within limits; longer names truncate and show in full on hover.
+	const longestName = $derived(Math.max(0, ...(timeline.data?.jobKeys ?? []).map((j) => j.length)));
+	const gutter = $derived(`clamp(200px, calc(${longestName}ch + 30px), 380px)`);
+
 	const tone = (r: Bar) => (r.status === 'projected' ? 'transparent' : runStatusTone[r.status]);
 	const label = (r: Bar) => (r.status === 'projected' ? 'Scheduled' : runStatusLabel[r.status]);
 	const barClass = (r: Bar) => (r.status === 'projected' ? 'scheduled' : r.status === 'success' ? 'ok' : r.status);
@@ -168,7 +172,7 @@
 	}
 </script>
 
-<div class="tl" class:fill={scroll && maxHeight == null} style:--sticky-top="{stickyTop}px">
+<div class="tl" class:fill={scroll && maxHeight == null} style:--sticky-top="{stickyTop}px" style:--gutter={gutter}>
 	<div class="tl-controls">
 		{#if showSearch}
 			<label class="tl-search">

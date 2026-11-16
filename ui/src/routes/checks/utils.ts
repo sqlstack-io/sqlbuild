@@ -2,6 +2,16 @@
 
 import type { Check, CheckEvaluation, CheckOutcome, EvaluationMode } from '$lib/api';
 
+/** The outcome buckets the Checks list filters by. */
+export type OutcomeFilter = 'all' | 'failing' | 'warn' | 'pass' | 'other';
+
+const OUTCOME_FILTERS: readonly OutcomeFilter[] = ['all', 'failing', 'warn', 'pass', 'other'];
+
+/** The `?outcome=` filter from a link, e.g. the overview's failing-checks count; anything else shows all. */
+export function parseOutcomeFilter(value: string | null): OutcomeFilter {
+	return OUTCOME_FILTERS.find((f) => f === value) ?? 'all';
+}
+
 export function outcomeOf(check: Pick<Check, 'latest'>): CheckOutcome {
 	return check.latest?.outcome ?? 'skipped';
 }

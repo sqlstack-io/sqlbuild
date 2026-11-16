@@ -84,6 +84,7 @@
 	const showGroups = $derived(!!data?.groups?.length);
 	const showTimeline = $derived(app.client.supports('timeline'));
 	const canAcknowledge = $derived(app.client.supports('acknowledgeRun'));
+	const FAILING_CHECKS_HREF = '/checks?outcome=failing';
 
 </script>
 
@@ -128,7 +129,7 @@
 							<!-- The out-of-date alert below already counts these. -->
 							{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
 							{#if m.stale?.behind && !staleListed}<span><i class="status-dot behind"></i><b>{m.stale.behind}</b> behind</span>{/if}
-							{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
+							{#if m.checks.failing}<a class="fact-link" href={to(FAILING_CHECKS_HREF)}><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</a>{/if}
 						</div>
 					{/if}
 					{#if latest}<a href={to(`/runs/${latest.id}`)}>View latest run →</a>{/if}
@@ -213,7 +214,7 @@
 					<div class="metric">
 						<span class="metric-label">Checks passing</span>
 						<div><strong>{m.checks.passing}</strong><small>of {m.checks.total}</small></div>
-						<span class:warning-note={m.checks.warning + m.checks.failing > 0}>{m.checks.failing} failing · {m.checks.warning} warning</span>
+						<span class:warning-note={m.checks.warning + m.checks.failing > 0}>{#if m.checks.failing}<a class="metric-link" href={to(FAILING_CHECKS_HREF)}>{m.checks.failing} failing</a>{:else}0 failing{/if} · {m.checks.warning} warning</span>
 					</div>
 					{#if m.stale}
 						<div class="metric">
@@ -231,18 +232,6 @@
 					{/if}
 				{/if}
 			</section>
-
-			{#if showTimeline}
-				<section class="surface-panel flex min-w-0 flex-col">
-					<div class="panel-heading">
-						<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
-						<a href={to(`/runs?view=timeline`)}>Open full timeline →</a>
-					</div>
-					<RunTimeline scroll={false} stickyTop={0} />
-				</section>
-			{/if}
-
-			<OverviewCost />
 
 			<div class="lower-grid" class:single={!showGroups}>
 				{#if showGroups}<section class="surface-panel">
@@ -291,6 +280,18 @@
 					</div>
 				</section>
 			</div>
+
+			{#if showTimeline}
+				<section class="surface-panel flex min-w-0 flex-col">
+					<div class="panel-heading">
+						<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
+						<a href={to(`/runs?view=timeline`)}>Open full timeline →</a>
+					</div>
+					<RunTimeline scroll={false} stickyTop={0} />
+				</section>
+			{/if}
+
+			<OverviewCost />
 		</div>
 	{/if}
 </div>
@@ -352,7 +353,8 @@
 	.health-copy strong { font-size: 13px; }
 	.health-copy span { margin-top: 2px; color: var(--muted-foreground); font-size: 12px; }
 	.health-facts { display: flex; gap: 20px; margin-left: 44px; color: var(--muted-foreground); font: 12px var(--font-sans); }
-	.health-facts span { display: flex; align-items: center; gap: 6px; }
+	.health-facts span, .health-facts .fact-link { display: flex; align-items: center; gap: 6px; }
+	.health-facts .fact-link:hover, .metric-link:hover { color: var(--foreground); text-decoration: underline; }
 	.health-facts b { color: var(--foreground); font-weight: 500; }
 	.health-head > a, .panel-heading > a { margin-left: auto; color: var(--primary); font: 500 12.5px var(--font-sans); white-space: nowrap; }
 	.metric-strip { display: grid; min-height: 98px; grid-template-columns: repeat(var(--metrics), minmax(0, 1fr)); overflow: hidden; }
