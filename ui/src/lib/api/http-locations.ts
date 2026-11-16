@@ -116,6 +116,16 @@ export function instancesOf(observations: Wire['LocationHealthObservation'][], n
 }
 
 /** A location's page from its health observations and newest snapshot; locations never send compile error text, so a failed reload shows only as its health. */
+/** The rule findings that failed the newest load, as `sqb compile` prints them; null when that load had none or a newer one connected. */
+export function loadErrorOf(observations: Wire['LocationHealthObservation'][], health: LocationHealth): string | null {
+	const rules = health === 'falling_back' ? latestOf(observations, 'compile_failed')?.report.health.rules : undefined;
+	if (!rules) return null;
+	const noun = rules.finding_count === 1 ? 'rule finding' : 'rule findings';
+	const lines = rules.findings.map((f) => `${f.path ? `${f.path}${f.line ? `:${f.line}` : ''} ` : ''}[${f.code}] ${f.message}`);
+	const more = rules.finding_count - rules.findings.length;
+	return [`Compile failed: ${rules.finding_count} ${noun}`, ...lines, ...(more > 0 ? [`… and ${more} more`] : [])].join('\n');
+}
+
 export function toLocationDetail(location: Location, observations: Wire['LocationHealthObservation'][], published: Wire['PublishedSnapshot'] | null, now: number): LocationDetail {
 	const { health } = healthOf(observations, now);
 	return {
@@ -125,7 +135,7 @@ export function toLocationDetail(location: Location, observations: Wire['Locatio
 		createdAt: null,
 		brokenDeployPolicy: null,
 		failedDeploy: null,
-		lastLoadError: null,
+		lastLoadError: loadErrorOf(observations, health),
 		instances: instancesOf(observations, now),
 		target: location.target,
 		snapshot: snapshotOf(published),

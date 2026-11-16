@@ -119,12 +119,12 @@ async fn watch_location(
             Stream::Stderr,
             &format!("Compiling location generation {generation} in an isolated interpreter...\n"),
         )]));
-        let Some((published, refresh_at, locations)) =
+        let Some(load) =
             compile_generation(&requests, generation, &watch.observed.0, stopped.as_mut()).await?
         else {
             return Ok(());
         };
-        if published {
+        if let Ok((refresh_at, locations)) = load {
             watch.retry_at = refresh_at;
             published_generation = Some(generation);
             let mut sync = metadata_sync(
@@ -168,11 +168,11 @@ async fn watch_location(
             {
                 return Ok(());
             }
-        } else {
+        } else if let Err(rules) = load {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
             tokio::select! {
                 result = &mut stopped => return result,
-                () = report_location_health(options, bearer, poll.session_id, LocationHealth::CompileFailed { generation }) => {},
+                () = report_location_health(options, bearer, poll.session_id, LocationHealth::CompileFailed { generation, rules }) => {},
             }
             drop(write_output(&[(
                 Stream::Stderr,

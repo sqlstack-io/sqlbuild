@@ -503,3 +503,12 @@ class HeldPlanTestCase:
     expected_runs: tuple[tuple[str, ...], ...]
     expected_compiles: int
     expected_held_plans: int
+
+
+@dataclass(frozen=True)
+class RulesAtLoadTestCase:
+    description: str
+    model_sql: str
+    expected_health: dict[str, Any] = field(default_factory=dict)
+    expected_terminal: str = ""
+    expected_rule_evaluations: int = 0

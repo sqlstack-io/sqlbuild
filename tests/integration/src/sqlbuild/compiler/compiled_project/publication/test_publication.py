@@ -26,7 +26,7 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     METADATA,
-    TYPE_PROOF_FILES,
+    PUBLISHABLE_FILES,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     PlainHttpWarningTestCase,
@@ -64,7 +64,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
     project_dir: Path = tmp_path / "project"
     duckshop: Path = Path("benchmarks/duckshop/project")
     files: dict[str, str] = (
-        TYPE_PROOF_FILES
+        PUBLISHABLE_FILES
         | {
             path.relative_to(duckshop).as_posix(): path.read_text()
             for path in [
@@ -73,7 +73,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
             ]
         }
         | {
-            "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+            "models/orders.sql": PUBLISHABLE_FILES["models/orders.sql"].replace(
                 "MODEL (", "MODEL (tags ['edge_case'],", 1
             ),
         }
@@ -101,7 +101,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         assert frozenset(initial["nodes"]) == test_case.expected_nodes
         assert initial["nodes"]["model:orders"]["definition"]["deps"] == ["model:stg_orders"]
         edited: dict[str, str] = files | {
-            "models/stg_orders.sql": TYPE_PROOF_FILES["models/stg_orders.sql"].replace(
+            "models/stg_orders.sql": PUBLISHABLE_FILES["models/stg_orders.sql"].replace(
                 "CAST(5 AS INTEGER)", "CAST(9 AS INTEGER)"
             )
         }
@@ -195,8 +195,8 @@ def test_given_a_code_location_when_publishing_from_cli_then_compilation_isolate
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    files: dict[str, str] = TYPE_PROOF_FILES | {
-        "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+    files: dict[str, str] = PUBLISHABLE_FILES | {
+        "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
         + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
         + f'\n[targets.{json.dumps(test_case.target)}]\nschema = "main"\n',
         "orchestration/jobs/daily_orders_job.toml": (
@@ -339,9 +339,9 @@ def test_given_a_plain_http_server_when_a_location_publishes_then_only_a_non_loo
     project_dir: Path = tmp_path / "project"
     write_files(
         project_dir=project_dir,
-        files=TYPE_PROOF_FILES
+        files=PUBLISHABLE_FILES
         | {
-            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
         },

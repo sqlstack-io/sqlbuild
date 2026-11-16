@@ -24,6 +24,7 @@ use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
+use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
 use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, preview_changed};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
@@ -443,7 +444,7 @@ pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
     Ok(plan(request, (PlanProject::Compiled, None))?.0)
 }
 
-/// A location's preview from the synced copy at `copy`; variables or an external dbt manifest compile again.
+/// A location's preview from the copy at `copy`, without rules, which ran at load; vars or a dbt manifest recompile.
 pub(crate) fn location_plan<'py>(
     request: &Bound<'py, PyAny>,
     (held, copy): (PlanProject<'_, 'py>, &str),
@@ -456,6 +457,7 @@ pub(crate) fn location_plan<'py>(
         .is_none(),
         PlanProject::Compiled => false,
     };
+    let _rules = RulesAtLoadScope::enter();
     let project: PlanProject<'_, 'py> =
         if external_manifest || native_field(request, "cli_vars")?.is_truthy()? {
             PlanProject::Compiled

@@ -30,6 +30,7 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
     WarehouseInputs, configured_warehouses,
 };
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
+use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{NodeKeys, WorkerBuild};
@@ -379,6 +380,7 @@ pub(super) fn execute_worker<'py>(
         record_compiled_vars(py, (&owner, &frozen), (arguments, input, &project))?;
         let (request, scope) = command_request(py, &discovered, arguments, &owner)?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
+        let _rules = RulesAtLoadScope::enter();
         within(&scope, |_| {
             run_cancellable(py, &worker, (&request, &discovered))
         })

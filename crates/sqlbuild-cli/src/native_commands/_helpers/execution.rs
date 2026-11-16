@@ -88,12 +88,12 @@ use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
+    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationLoad,
     LocationMetadataPage, LocationMetadataSync, LocationRuntimeRequest, LocationServe,
     LocationWatch, LostStdout, MetadataReply, NativeCommand, NativeInvocation, ProjectLocation,
     ReadFailure, ScanToken, SyncProgress,
 };
-use crate::native_commands::types::LocationPublication;
+use crate::native_commands::types::LoadOutcome;
 use crate::server_config::models::ServerSection;
 use crate::workers::main::docker_image_sources::docker_image_sources;
 use crate::workers::main::open_development_workers::open_development_workers;
@@ -237,7 +237,7 @@ pub(crate) async fn compile_generation(
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(bool, Option<Instant>, Vec<WarehouseStateLocation>)>, ControlError> {
+) -> Result<Option<LoadOutcome>, ControlError> {
     let (reply, publication) = oneshot::channel();
     requests
         .send(LocationRuntimeRequest::Publish(LocationCompileRequest {
@@ -256,8 +256,8 @@ pub(crate) async fn compile_generation(
         result = &mut stopped => { result?; return Ok(None); },
         result = publication => result.map_err(|_| ControlError::Invalid("location compiler stopped before replying".into()))?,
     };
-    let record = match result {
-        Ok(record) => record,
+    let load = match result {
+        Ok(load) => load,
         Err(error) => {
             drop(write_output(&[(
                 Stream::Stderr,
@@ -265,26 +265,26 @@ pub(crate) async fn compile_generation(
                     "Location compiler failed; generation {generation} may already be published: {error}\n"
                 ),
             )]));
-            None
+            LocationLoad {
+                published: None,
+                rules: None,
+            }
         }
     };
-    let published = record.is_some();
-    let mut refresh_at = None;
-    let mut locations: Vec<WarehouseStateLocation> = Vec::new();
-    if let Some((record, refresh, state_locations)) = record {
-        refresh_at = refresh
-            .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
-        locations = state_locations;
-        let output = serde_json::to_string(&record)
-            .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
-            return Err(ControlError::Invalid(format!(
-                "Snapshot {} was published, but result delivery failed",
-                record.snapshot_id
-            )));
-        }
+    let Some((record, refresh, locations)) = load.published else {
+        return Ok(Some(Err(load.rules)));
+    };
+    let refresh_at = refresh
+        .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
+    let output =
+        serde_json::to_string(&record).map_err(|error| ControlError::Invalid(error.to_string()))?;
+    if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
+        return Err(ControlError::Invalid(format!(
+            "Snapshot {} was published, but result delivery failed",
+            record.snapshot_id
+        )));
     }
-    Ok(Some((published, refresh_at, locations)))
+    Ok(Some(Ok((refresh_at, locations))))
 }
 
 /// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
@@ -310,7 +310,7 @@ pub(crate) async fn exchange_location_plan(
 pub(crate) async fn exchange_location_generation(
     compiler: &mut LocationCompiler,
     generation: i64,
-) -> Result<Option<LocationPublication>, ControlError> {
+) -> Result<LocationLoad, ControlError> {
     compiler
         .stdin
         .write_all(format!("{generation}\n").as_bytes())

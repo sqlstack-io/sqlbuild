@@ -64,3 +64,11 @@ pub(crate) struct InstallationTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_storage: StorageKind,
 }
+
+pub(crate) struct CompileFailureTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) finding_count: u64,
+    pub(crate) listed: usize,
+    pub(crate) message_chars: usize,
+    pub(crate) expected_accepted: bool,
+}

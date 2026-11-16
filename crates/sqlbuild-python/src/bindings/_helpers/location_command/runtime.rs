@@ -50,20 +50,24 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     options.set_item("generation", generation)?;
                     let arguments = location_arguments(py, Some(options.clone()))?;
                     held = None;
-                    let record = match publish_location(py, &arguments) {
-                        Ok((published, project)) => {
+                    let (published, rules) = match publish_location(py, &arguments) {
+                        Ok(Ok((published, project))) => {
                             held = Some(project);
-                            Some(published)
+                            (Some(published), None)
                         }
+                        Ok(Err(rules)) => (None, Some(rules)),
                         Err(error) => {
                             write_stderr(
                                 py,
                                 &format!("Location compilation/publication failed: {error}\n"),
                             )?;
-                            None
+                            (None, None)
                         }
                     };
-                    serde_json::to_string(&record)
+                    serde_json::to_string(&serde_json::json!({
+                        "published": published,
+                        "rules": rules,
+                    }))
                 } else if let Some(plan) = request.get(PLAN_REQUEST) {
                     serde_json::to_string(&runtime_plan(py, held.as_ref(), plan)?)
                 } else if WarehouseHistoryKind::ALL

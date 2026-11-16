@@ -13,6 +13,7 @@ use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 use sqlbuild_orchestration::declarations::models::{
     Schedule, TriggerDeclaration, TriggerDefinition,
 };
+use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
@@ -22,6 +23,7 @@ use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSn
 use crate::bindings::_helpers::compiled_project::snapshot_execution::NodeKeys;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
+use crate::bindings::_helpers::location_command::load_rules::load_rules;
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
 use crate::bindings::_helpers::location_command::snapshot::{
     build_orchestration_snapshot, orchestration_snapshot,
@@ -205,7 +207,7 @@ pub(super) type Published = (
 pub(super) fn publish_location<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
-) -> PyResult<(Published, HeldProject<'py>)> {
+) -> PyResult<Result<(Published, HeldProject<'py>), LocationRuleFailure>> {
     if arguments
         .value("action")?
         .extract::<Option<String>>()?
@@ -228,6 +230,9 @@ pub(super) fn publish_location<'py>(
         .extract::<std::path::PathBuf>()?;
     let input = metadata(py, arguments, &directory)?;
     let ((mut snapshot, _, compiled), project) = compile_location(py, arguments, &input)?;
+    if let Some(failure) = load_rules(py, arguments, (&project, &compiled))? {
+        return Ok(Err(failure));
+    }
     add_connection(
         &mut snapshot.input,
         (&project, &arguments.value("selected_target")?),
@@ -278,10 +283,10 @@ pub(super) fn publish_location<'py>(
             PyValueError::new_err(message)
         })?;
     status(py, "Location snapshot published.")?;
-    Ok((
+    Ok(Ok((
         (record, refresh_at, locations.into_iter().collect()),
         (project.discovered, compiled),
-    ))
+    )))
 }
 
 /// One-shot publication and the supervisor's private stdio runtime share the same compiler path.
@@ -334,7 +339,12 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
-        let ((record, _, _), _) = publish_location(py, &arguments)?;
+        let ((record, _, _), _) = publish_location(py, &arguments)?.map_err(|failure| {
+            PyValueError::new_err(format!(
+                "Compile failed: {} rule findings",
+                failure.finding_count
+            ))
+        })?;
         let output = serde_json::to_string(&record)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         write_console(py, "stdout", &format!("{output}\n")).map_err(|error| {

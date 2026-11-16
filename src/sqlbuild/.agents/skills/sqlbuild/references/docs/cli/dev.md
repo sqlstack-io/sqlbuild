@@ -19,9 +19,11 @@ Development location: 01a1d7ff-0b3a-7631-ba35-e44d44d072f2
 Authentication disabled on loopback; triggers start paused
 ```
 
-The location compiles the project and publishes it to the server. When you save a model,
-orchestration file or other project input, it compiles and publishes again, so the UI and the
-next run use the new version.
+The location compiles the project, runs its [Rules](../concepts/rules.md), and publishes it to
+the server. When you save a model, orchestration file or other project input, it compiles and
+publishes again, so the UI and the next run use the new version. A compile error or a Rule finding
+leaves the previous version published and prints, for example, `Compile failed: 1 rule finding`
+with the findings.
 
 ## Options
 

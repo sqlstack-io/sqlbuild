@@ -2050,6 +2050,7 @@ export interface components {
             generation: number;
             /** @enum {string} */
             kind: "compile_failed";
+            rules?: null | components["schemas"]["LocationRuleFailure"];
         } | {
             /**
              * Format: int64
@@ -2107,6 +2108,21 @@ export interface components {
             /** Format: uuid */
             session_id: string;
             target: string;
+        };
+        /** @description Configured rules that failed a location's load: how many findings, and the first of them. */
+        LocationRuleFailure: {
+            /** Format: int64 */
+            finding_count: number;
+            /** @description At most `MAX_REPORTED_RULE_FINDINGS`, in the rules' order. */
+            findings: components["schemas"]["LocationRuleFinding"][];
+        };
+        /** @description One rule finding as `sqb compile` prints it. */
+        LocationRuleFinding: {
+            code: string;
+            /** Format: int64 */
+            line?: number | null;
+            message: string;
+            path?: string | null;
         };
         /** @description Only named location operations cross this boundary, never arbitrary SQL or Python. */
         LocationWork: {

@@ -39,6 +39,9 @@ pub enum LocationHealth {
     Heartbeat {},
     CompileFailed {
         generation: i64,
+        /// The configured rules' findings when they failed the load; absent for other failures and from older locations.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rules: Option<LocationRuleFailure>,
     },
     Connection {
         generation: i64,
@@ -149,6 +152,27 @@ pub struct LocationHealthQuery {
     pub target: Option<String>,
 }
 
+/// Configured rules that failed a location's load: how many findings, and the first of them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationRuleFailure {
+    pub finding_count: u64,
+    /// At most `MAX_REPORTED_RULE_FINDINGS`, in the rules' order.
+    pub findings: Vec<LocationRuleFinding>,
+}
+
+/// One rule finding as `sqb compile` prints it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationRuleFinding {
+    pub code: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<u64>,
+}
+
 /// Receipt time belongs to the server; consumers derive freshness rather than storing availability.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LocationHealthObservation {
@@ -196,7 +220,7 @@ impl LocationState {
         for observation in own {
             let seen = observation.received_at;
             match observation.report.health {
-                LocationHealth::CompileFailed { generation }
+                LocationHealth::CompileFailed { generation, .. }
                     if failed.is_none_or(|(at, _)| seen > at) =>
                 {
                     failed = Some((seen, generation));
