@@ -6,23 +6,19 @@ import ast
 import hashlib
 import inspect
 import linecache
-import sys
 import textwrap
 from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType
+from types import FunctionType, ModuleType
 from typing import Any, cast
-
-_CLASS_FIRSTLINENO_VERSION: tuple[int, int] = (3, 13)
-_FINDSOURCE_PARSES_FILE_PER_CLASS: bool = sys.version_info < _CLASS_FIRSTLINENO_VERSION
 
 
 def normalized_source(*, obj: object, class_starts: Callable[..., dict[str, int]]) -> str:
-    """`inspect.getsource(obj)` dedented and stripped, finding classes through `class_starts`."""
+    """`inspect.getsource(obj)` dedented and stripped; classes read from their own file."""
 
     try:
         target: object = inspect.unwrap(cast(Any, obj))
-        if not (_FINDSOURCE_PARSES_FILE_PER_CLASS and inspect.isclass(target)):
+        if not inspect.isclass(target):
             return textwrap.dedent(inspect.getsource(cast(Any, obj))).strip()
         lines, start = _class_location(cast(type, target), class_starts=class_starts)
         return textwrap.dedent("".join(inspect.getblock(lines[start:]))).strip()
@@ -33,8 +29,9 @@ def normalized_source(*, obj: object, class_starts: Callable[..., dict[str, int]
 def source_file(obj: object) -> Path | None:
     """The file `inspect` reads `obj`'s source from, or `None` when it has none."""
 
+    anchor: FunctionType | None = class_anchor(obj) if inspect.isclass(obj) else None
     try:
-        raw_path: str | None = inspect.getsourcefile(cast(Any, obj))
+        raw_path: str | None = inspect.getsourcefile(cast(Any, anchor or obj))
     except TypeError:
         return None
     if raw_path is None:
@@ -66,6 +63,25 @@ def called_references(source: str) -> tuple[tuple[str, ...], ...]:
     return tuple(sorted(refs))
 
 
+def class_anchor(cls: type) -> FunctionType | None:
+    """A method from `cls`'s body; its file and globals hold when the module leaves sys.modules."""
+
+    prefix: str = f"{cls.__qualname__}."
+    value: object
+    for value in vars(cls).values():
+        function: object = inspect.unwrap(
+            cast(Any, value.__func__ if isinstance(value, staticmethod | classmethod) else value)
+        )
+        if (
+            isinstance(function, FunctionType)
+            and function.__module__ == cls.__module__
+            and function.__qualname__.startswith(prefix)
+            and not function.__code__.co_filename.startswith("<")
+        ):
+            return function
+    return None
+
+
 def _reference_parts(node: ast.AST) -> tuple[str, ...] | None:
     if isinstance(node, ast.Name):
         return (node.id,)
@@ -86,22 +102,25 @@ def parse_class_starts(lines: list[str]) -> dict[str, int]:
 def _class_location(
     cls: type, *, class_starts: Callable[..., dict[str, int]]
 ) -> tuple[list[str], int]:
-    """The lines and start index `inspect.findsource` returns for `cls` on Python 3.12."""
+    """The lines and start index `inspect.findsource` returns for `cls`, read from its own file."""
 
-    file: str | None = inspect.getsourcefile(cls)
-    if file:
-        linecache.checkcache(file)
-    else:
-        file = inspect.getfile(cls)
-        if not (file.startswith("<") and file.endswith(">")):
-            raise OSError("source code not available")
+    path: Path | None = source_file(cls)
+    if path is None:
+        raise OSError("source code not available")
+    file: str = str(path)
+    linecache.checkcache(file)
     module: ModuleType | None = inspect.getmodule(cls, file)
     lines: list[str] = (
         linecache.getlines(file, module.__dict__) if module else linecache.getlines(file)
     )
     if not lines:
         raise OSError("could not get source code")
-    start: int | None = class_starts(file=file, lines=lines).get(cls.__qualname__)
+    first_line: object = vars(cls).get("__firstlineno__")
+    start: int | None = (
+        first_line - 1
+        if isinstance(first_line, int)
+        else class_starts(file=file, lines=lines).get(cls.__qualname__)
+    )
     if start is None:
         raise OSError("could not find class definition")
     return lines, start

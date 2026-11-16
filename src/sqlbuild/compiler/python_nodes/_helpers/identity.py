@@ -9,11 +9,11 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import asdict
 from pathlib import Path
-from types import ModuleType
+from types import FunctionType, ModuleType
 from typing import Any, cast
 
 from sqlbuild._native import PythonIdentityDependency, PythonNodeIdentity
-from sqlbuild.compiler.python_nodes._helpers.object_source import hash_text
+from sqlbuild.compiler.python_nodes._helpers.object_source import class_anchor, hash_text
 from sqlbuild.compiler.python_nodes.classes.identity_pass import IdentityPass
 
 _IGNORED_PATH_PARTS: frozenset[str] = frozenset(
@@ -182,9 +182,11 @@ def _visit_object(
             collected_dependencies: dict[tuple[str, str], PythonIdentityDependency] = dependencies
             collected_dependencies[key] = dependency
 
-    globals_map: Mapping[str, object] | None = getattr(
-        inspect.unwrap(cast(Any, obj)), "__globals__", None
+    target_object: object = inspect.unwrap(cast(Any, obj))
+    anchor: FunctionType | None = (
+        class_anchor(target_object) if inspect.isclass(target_object) else None
     )
+    globals_map: Mapping[str, object] | None = getattr(anchor or target_object, "__globals__", None)
     if globals_map is None:
         module: ModuleType | None = memo.module(obj)
         if module is None:

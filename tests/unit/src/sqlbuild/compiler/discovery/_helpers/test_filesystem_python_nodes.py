@@ -558,6 +558,35 @@ def test_given_python_root_helper_edit_when_rediscovering_then_node_identity_cha
             project_files=_HELPER_PACKAGE_FILES,
             expected_dependency_path="python/helpers/clean.py",
         ),
+        RestoredPythonPackageIdentityTestCase(
+            description="helper called from a helper class method stays a dependency",
+            unrelated_files={"site/python/__init__.py": "", "site/python/orders.py": "X = 1\n"},
+            project_files={
+                "python/helpers/__init__.py": "",
+                "python/helpers/text.py": """
+def strip_status(value):
+    return value.strip().lower()
+""",
+                "python/helpers/cleaner.py": """
+from .text import strip_status
+
+
+class Cleaner:
+    def run(self, value):
+        return strip_status(value)
+""",
+                "python/orders.py": """
+import python.helpers.cleaner
+from sqlbuild.tasks import task
+
+
+@task
+def orders(ctx):
+    return python.helpers.cleaner.Cleaner().run(" Shipped ")
+""",
+            },
+            expected_dependency_path="python/helpers/text.py",
+        ),
     ],
     ids=lambda case: case.description,
 )
