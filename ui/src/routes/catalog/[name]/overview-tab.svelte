@@ -10,7 +10,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseLabel, shortName } from '$lib/build-area/labels';
+	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName } from '$lib/build-area/labels';
 	import { driftLabel, driftOf, type Tab } from './utils';
 
 	let { node, onTab, onSql }: { node: CatalogNodeDetail; onTab: (tab: Tab) => void; onSql: (mode: 'raw' | 'compiled' | 'drift') => void } = $props();
@@ -92,7 +92,7 @@
 				<div class="rows">
 					{#each node.checkResults as c (c.id)}
 						{@const o = c.latest?.outcome ?? 'skipped'}
-						<a class="row" href={to(`/checks/${c.id}`)}><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /><code>{c.name}</code><span class="muted ml-auto">{runScopePhaseLabel[c.runScopePhase]} · {c.severity}</span></a>
+						<a class="row" href={to(`/checks/${c.id}`)}><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /><code>{c.name}</code><span class="muted ml-auto" title={runScopePhaseHelp[c.runScopePhase]}>{runScopePhaseLabel[c.runScopePhase]} · {c.severity}</span></a>
 					{/each}
 				</div>
 			</section>

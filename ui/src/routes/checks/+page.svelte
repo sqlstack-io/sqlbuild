@@ -20,7 +20,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel } from '$lib/build-area/labels';
+	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel } from '$lib/build-area/labels';
 	import { checkValue, kindLabel, outcomeOf, parseOutcomeFilter, type OutcomeFilter } from './utils';
 
 	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
@@ -72,7 +72,7 @@
 		{ id: 'outcome', label: 'Outcome', width: '120px' },
 		{ id: 'node', label: 'Attached to', width: '240px' },
 		{ id: 'severity', label: 'Severity', width: '100px' },
-		{ id: 'phase', label: 'Checks', width: '120px' },
+		{ id: 'phase', label: 'Scope', width: '150px' },
 		{ id: 'mode', label: 'Result type', width: '130px' },
 		{ id: 'result', label: 'Result', width: '100px', align: 'right' },
 		...(hasRecent ? [{ id: 'recent', label: 'Recent', width: '100px' }] : []),
@@ -103,7 +103,7 @@
 	{/snippet}
 </ListToolbar>
 
-<DataTable class="checks" columns={tableColumns} rows={filtered} key={(c) => c.id} rowHeight={ROW_H} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet. Add audits or tests to a model and they show up here after the next deploy.'}>
+<DataTable class="checks" columns={tableColumns} rows={filtered} key={(c) => c.id} rowHeight={ROW_H} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet.'}>
 	{#snippet row(c)}
 				{@const o = outcomeOf(c)}
 				<tr onclick={(e) => openRow(e, `/checks/${c.id}`)}>
@@ -122,8 +122,8 @@
 						{:else}<span class="muted">{attachmentLabel[c.attachment]}</span>{/if}
 					</td>
 					<td class="muted capitalize">{c.severity}</td>
-					<td class="muted">{runScopePhaseLabel[c.runScopePhase]}</td>
-					<td class="muted">{evaluationModeLabel[c.evaluationMode]}</td>
+					<td class="muted" title={runScopePhaseHelp[c.runScopePhase]}>{runScopePhaseLabel[c.runScopePhase]}</td>
+					<td class="muted" title={evaluationModeHelp[c.evaluationMode]}>{evaluationModeLabel[c.evaluationMode]}</td>
 					<td class="num" style:color={o === 'pass' ? 'var(--muted-foreground)' : checkOutcomeTone[o]}>{checkValue(c.latest, c.evaluationMode)}</td>
 					{#if hasRecent}<td><span class="mini-strip">{#each c.recentOutcomes ?? [] as r, i (i)}<i style:background={checkOutcomeTone[r as CheckOutcome]}></i>{/each}</span></td>{/if}
 					<td><RelativeTime value={formatAgo(c.latest?.evaluatedAt, app.now)} exact={formatStamp(c.latest?.evaluatedAt)} /></td>

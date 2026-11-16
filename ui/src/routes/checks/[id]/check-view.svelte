@@ -20,7 +20,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
-	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel, shortRunId, thresholdLabel } from '$lib/build-area/labels';
+	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel, shortRunId, thresholdLabel } from '$lib/build-area/labels';
 	import { errorMessage } from '$lib/platform/labels';
 	import { cellText, checkValue, kindLabel, outcomeOf } from '../utils';
 
@@ -90,7 +90,7 @@
 		<code class="title">{c?.name ?? id}</code>
 		{#if c}
 			<StatusLabel tone={checkOutcomeTone[outcome]} label={checkOutcomeLabel[outcome]} />
-			<span class="faint">{c.severity} severity · {runScopePhaseLabel[c.runScopePhase].toLowerCase()} · {evaluationModeLabel[c.evaluationMode].toLowerCase()}</span>
+			<span class="faint" title="{c.severity} severity · {runScopePhaseHelp[c.runScopePhase]} · {evaluationModeHelp[c.evaluationMode]}">{c.severity} · {runScopePhaseLabel[c.runScopePhase].toLowerCase()} · {evaluationModeLabel[c.evaluationMode].toLowerCase()}</span>
 		{/if}
 	</div>
 	{#if res.error}<div class="msg err">Couldn't load this check: {res.error}</div>{:else if res.data === null}<div class="msg">There's no check <code>{id}</code> in the version deployed to {app.location?.name}.</div>{/if}
@@ -99,7 +99,7 @@
 		<div class="flex min-h-0 flex-1">
 			<PageBody padding="18px 24px">
 				{#if c.description}<p class="description">{c.description}</p>{/if}
-				<Panel title="Recent results" note="Last {c.history.length} times it ran">
+				<Panel title="Recent results" note="Last {c.history.length}">
 					<OutcomeStrip outcomes={[...c.history].reverse().map((e) => e.outcome)} tones={checkOutcomeTone} caption="Last {c.history.length} results" />
 				</Panel>
 
@@ -128,18 +128,18 @@
 
 				{#if evidenceError}<div class="msg err">{evidenceError}</div>{/if}
 				{#if evidence}
-					<Panel title="Evidence" note="Sample rows stored with the result · this read is recorded in the audit log">
+					<Panel title="Evidence" note="Sample rows" audited>
 						{#snippet actions()}<Button variant="link" size="inline" onclick={() => { evidence = null; evidenceFor = null; }}>Close</Button>{/snippet}
 						<DataTable class="static evidence" embedded columns={evidence.columns.map((col, i) => ({ id: `${i}`, label: col, minWidth: 100 }))} rows={evidence.rows.map((cells, i) => ({ cells, i }))} key={(r) => r.i} empty="No rows were stored.">
 							{#snippet row(r)}
 								<tr>{#each r.cells as v, j (j)}<td class="mono">{cellText(v)}</td>{/each}</tr>
 							{/snippet}
 						</DataTable>
-						{#if evidence.truncated}<p class="faint note">More rows matched than were stored.</p>{/if}
+						{#if evidence.truncated}<p class="faint note" title="More rows matched than were stored">Truncated</p>{/if}
 					</Panel>
 				{/if}
 
-				<Panel title="SQL that ran" note="The latest time · reading it is recorded in the audit log">
+				<Panel title="SQL that ran" note="Last run" audited>
 					{#if sql}
 						{#if sql.executionError}<div class="msg err">{sql.executionError}</div>{/if}
 						{#if sql.evidenceError}<div class="msg err">Evidence couldn't be collected: {sql.evidenceError}</div>{/if}
@@ -149,9 +149,9 @@
 							<p class="faint">No SQL was stored with the latest result.</p>
 						{/each}
 					{:else if !app.can('view.sql')}
-						<p class="faint locked"><LockIcon size={13} /> You don't have permission to see SQL (view.sql)</p>
+						<p class="faint locked"><LockIcon size={13} /> No access (view.sql)</p>
 					{:else}
-						<GatedButton requires="view.sql" size="sm" busy={sqlBusy} onclick={showSql}>Show SQL and errors</GatedButton>
+						<GatedButton requires="view.sql" size="sm" busy={sqlBusy} onclick={showSql} hint="Includes execution errors · viewing is audited">Show SQL</GatedButton>
 						{#if sqlError}<div class="msg err">{sqlError}</div>{/if}
 					{/if}
 				</Panel>
@@ -164,8 +164,8 @@
 						{ label: 'Attached to', value: c.node ? `${c.node}${c.column ? `.${c.column}` : ''}` : attachmentLabel[c.attachment], mono: !!c.node },
 						{ label: 'Target type', value: attachmentLabel[c.attachment] },
 						{ label: 'Severity', value: c.severity },
-						{ label: 'Checks', value: runScopePhaseLabel[c.runScopePhase], title: c.runScopePhase },
-						{ label: 'Result type', value: evaluationModeLabel[c.evaluationMode], title: c.evaluationMode },
+						{ label: 'Scope', value: runScopePhaseLabel[c.runScopePhase], title: c.runScopePhase, help: runScopePhaseHelp[c.runScopePhase] },
+						{ label: 'Result type', value: evaluationModeLabel[c.evaluationMode], title: c.evaluationMode, help: evaluationModeHelp[c.evaluationMode] },
 						{ label: 'Thresholds', value: c.thresholds.length ? c.thresholds.map(thresholdLabel).join(' · ') : '—' }
 					]}
 				/>

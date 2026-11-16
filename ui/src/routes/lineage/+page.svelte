@@ -58,7 +58,7 @@
 	import { catalogNodes as sharedCatalog, useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
+	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseHelp, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
 	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
@@ -1126,7 +1126,7 @@
 					{#each d.checkResults as c (c.id)}
 						<a class="check-row" href={to(`/checks/${c.id}`)}>
 							<i style:background={checkOutcomeTone[c.latest?.outcome ?? 'skipped']}></i><code>{c.name}</code>
-							<span>{runScopePhaseLabel[c.runScopePhase]}</span>
+							<span title={runScopePhaseHelp[c.runScopePhase]}>{runScopePhaseLabel[c.runScopePhase]}</span>
 						</a>
 					{/each}
 				</InspectorSection>
