@@ -867,7 +867,7 @@
 			variant="ghost"
 			aria-pressed={grouped}
 			onclick={() => regroup({ grouped: !grouped, expanded: new Set(), fit: true })}
-			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
+			title={grouped ? 'Draw every node' : 'One card per folder'}
 		>
 			<FolderIcon />Folders
 		</Button>
@@ -972,7 +972,7 @@
 			<div class="graph-too-many">
 				<div class="too-many-card" role="status">
 					<strong>Too many nodes to draw at once</strong>
-					<p>This view has {tooManyCount.toLocaleString('en')} cards; the graph draws at most {MAX_DRAWN.toLocaleString('en')}.</p>
+					<p>{tooManyCount.toLocaleString('en')} cards · limit {MAX_DRAWN.toLocaleString('en')}</p>
 					<div class="too-many-actions">
 						{#if !grouped}<Button variant="outline" size="bar" onclick={() => regroup({ grouped: true, expanded: new Set(), fit: true })}><FolderIcon size={13} />Show folders</Button>{/if}
 						{#if !staleOnly && outOfDateCount > 0 && outOfDateCount <= MAX_DRAWN}<Button variant="outline" size="bar" onclick={showOutOfDate}>Show the {outOfDateCount.toLocaleString('en')} out of date</Button>{/if}

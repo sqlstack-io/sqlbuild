@@ -1,4 +1,5 @@
 <script lang="ts">
+	import HelpTip from '$lib/components/help-tip.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Loading from '$lib/components/loading.svelte';
@@ -109,7 +110,7 @@
 	{#if partial}
 		<section class="surface-panel partial">
 			<h2>You can see only part of {app.location?.name} · {app.target?.name}</h2>
-			<p>The Overview sums up the whole target, so it needs view on every node in it. An administrator can give you view on the rest.</p>
+			<p>Needs view on every node in this target. Ask an administrator.</p>
 			{#if otherPages.length}
 				<p>Pages you can use:</p>
 				<ul>
@@ -162,7 +163,7 @@
 								<small>{view.since}</small>
 								<span class="issue-ack">
 									{#if 'acknowledged' in item && canAcknowledge}
-										<Button variant="ghost" size="sm" title="Mark as handled for everyone; recorded in the audit log" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
+										<Button variant="ghost" size="sm" title="Mark handled for everyone (audited)" disabled={acknowledging === item.run.id} onclick={() => acknowledge(item.run.id, true)}>
 											<BellOffIcon />Acknowledge
 										</Button>
 									{/if}
@@ -246,7 +247,7 @@
 			<div class="lower-grid" class:single={!showGroups}>
 				{#if showGroups}<section class="surface-panel">
 					<div class="panel-heading">
-						<div><h2>Build status by folder</h2><span>Current, stale and failed nodes in each top-level folder</span></div>
+						<div><h2>Build status by folder</h2></div>
 						<a href={to(`/catalog`)}>Open catalog →</a>
 					</div>
 					<div class="groups">
@@ -265,7 +266,7 @@
 								<b class:error-text={g.failed}>{g.failed || '—'}</b>
 							</a>
 						{:else}
-							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet. Deploy the project to see its models here.{/if}</div>
+							<div class="empty">{#if overview.data === undefined && !overview.error}<Loading />{:else}Nothing deployed yet.{/if}</div>
 						{/each}
 						{#if collapsedHidden}
 							<Button variant="link" size="inline" class="mx-4 mt-1 self-start text-[12px]" aria-expanded={showAllFolders} onclick={() => (showAllFolders = !showAllFolders)}>{showAllFolders ? 'Show fewer' : `Show all ${groups.length} folders`}</Button>
@@ -274,7 +275,7 @@
 				</section>{/if}
 				<section class="surface-panel">
 					<div class="panel-heading">
-						<div><h2>Recent changes</h2><span>Recent deploys</span></div>
+						<div><h2>Recent deploys</h2></div>
 						<a href={to(`/changes`)}>All changes →</a>
 					</div>
 					<div>
@@ -302,7 +303,7 @@
 			{#if showTimeline}
 				<section class="surface-panel flex min-w-0 flex-col">
 					<div class="panel-heading">
-						<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
+						<div><h2>Activity <HelpTip text="Past runs and the next scheduled times" /></h2><span>Past and upcoming</span></div>
 						<a href={to(`/runs?view=timeline`)}>Open full timeline →</a>
 					</div>
 					<RunTimeline scroll={false} stickyTop={0} />

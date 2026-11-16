@@ -41,7 +41,7 @@
 			</button>
 		{/if}
 		<a href={to(`/jobs/${d.jobKey}`)} class="name">{d.jobKey}</a>
-		<span class="faint" title={d.drawnElsewhere ? `${d.drawnElsewhere} of them ${d.drawnElsewhere === 1 ? 'is' : 'are'} drawn in a job that builds fewer nodes` : undefined}>{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>
+		<span class="faint" title={d.drawnElsewhere ? `${d.drawnElsewhere} also in a smaller job` : undefined}>{d.nodeCount} node{d.nodeCount === 1 ? '' : 's'}</span>
 		{#if d.lastRun}
 			<!-- The dot carries the status, so the header fits a box one card wide. -->
 			<a href={to(`/runs/${d.lastRun.id}`)} class="last" title="Last run of {d.jobKey}: {runStatusLabel[d.lastRun.status]}">
