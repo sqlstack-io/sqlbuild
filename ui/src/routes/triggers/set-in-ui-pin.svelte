@@ -34,7 +34,7 @@
 				onclick={() => {
 					open = false;
 					onreset();
-				}}>Reset to the code's setting</Button
+				}}>Reset to code</Button
 			>
 		</span>
 	</Popover.Content>

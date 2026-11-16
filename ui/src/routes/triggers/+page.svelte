@@ -92,7 +92,7 @@
 
 	function nextDue(t: Trigger): string {
 		if (t.state === 'paused') return '—';
-		if (t.type === 'sensor') return 'When its condition is met';
+		if (t.type === 'sensor') return 'On condition';
 		if (!t.nextDueAt) return '—';
 		if (Date.parse(t.nextDueAt) < app.now) return `Late: was due ${formatAgo(t.nextDueAt, app.now)}`;
 		return formatIn(t.nextDueAt, app.now);
@@ -104,7 +104,7 @@
 		{ id: 'runs', label: 'Runs', width: '18%' },
 		{ id: 'status', label: 'Status', width: '130px' },
 		{ id: 'next', label: 'Next run', width: '190px' },
-		{ id: 'tick', label: 'Last time due', width: '170px', title: 'What happened the last time it was due (its last tick)' },
+		{ id: 'tick', label: 'Last tick', width: '170px', title: 'What happened the last time it was due (its last tick)' },
 		{ id: 'last', label: 'Last run', width: '170px' }
 	]);
 </script>
@@ -162,7 +162,7 @@
 	{/snippet}
 </ListToolbar>
 
-<DataTable columns={tableColumns} rows={filtered} key={(t) => t.id} resource={triggers} empty={all.length ? 'Nothing matches the filter.' : 'No schedules or sensors yet. Declare them in the project code and deploy.'}>
+<DataTable columns={tableColumns} rows={filtered} key={(t) => t.id} resource={triggers} empty={all.length ? 'Nothing matches the filter.' : 'No schedules or sensors yet.'}>
 	{#snippet head(c)}
 		{#if c.id === 'sel'}<input type="checkbox" checked={allSelected} onchange={toggleAll} class="sb-check" aria-label="Select all" disabled={!canToggle} />{/if}
 	{/snippet}
@@ -201,7 +201,7 @@
 						</span>
 					</td>
 					<td>
-						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Runs its own code</span>{/if}
+						{#if t.jobKey}<a class="link" href={to(`/jobs/${t.jobKey}`)}>{t.jobKey}</a>{:else}<span class="muted" title="It runs its own code, e.g. to post a message, and starts no job">Own code</span>{/if}
 					</td>
 					<td class="status-col">
 						<span class="status-cell">
