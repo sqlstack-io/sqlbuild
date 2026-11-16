@@ -16,6 +16,10 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { isActiveRun, isProblemRun, runStatusLabel, runStatusTone } from '$lib/status';
 	import { jobPolicyText, overlapHelp } from '$lib/operate/labels';
+	import { capItems, capLines } from './utils';
+
+	/** Group members drawn on the first line; the rest fold into "+N more" on the second. */
+	const MEMBERS_SHOWN = 3;
 
 	const jobs = createResource((client, scope) => client.listJobs(scope), ['jobs', 'runs', 'snapshot']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
@@ -125,7 +129,11 @@
 					{#if showSelection}
 						<td>
 							{#if j.kind === 'group'}
-								<span class="muted">Group{#if j.members} · {j.members.join(', ')}{/if}</span>
+								{@const members = capItems(j.members ?? [], MEMBERS_SHOWN)}
+								<div class="muted one-line" title={j.members?.join(', ')}>Group{#if members.shown.length} · {members.shown.join(', ')}{/if}</div>
+								{#if members.hidden.length}
+									<a class="more" href={to(`/jobs/${j.key}`)} title={members.hidden.join(', ')} onclick={(e) => e.stopPropagation()}>+{members.hidden.length} more</a>
+								{/if}
 							{:else}
 								<code>{j.select}</code>
 							{/if}
@@ -137,8 +145,9 @@
 						{#if jobTriggers.length === 0}
 							<span class="muted" title="No schedule or sensor starts it; start it from its page">Only by hand</span>
 						{:else}
+							{@const capped = capLines(jobTriggers)}
 							<div class="flex flex-col gap-1">
-								{#each jobTriggers as t (t.id)}
+								{#each capped.shown as t (t.id)}
 									<div class="flex items-center gap-2.5">
 										<span title={canToggle ? (t.state === 'running' ? `Pause ${t.name}: it stops starting runs` : `Turn ${t.name} on`) : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
 											<button
@@ -152,9 +161,12 @@
 												aria-label="{t.state === 'running' ? 'Pause' : 'Turn on'} {t.name}"
 											></button>
 										</span>
-										<a class:muted={t.state === 'paused'} href={to(`/triggers/${t.id}`)} title={t.cadence}>{t.name}</a>
+										<a class:muted={t.state === 'paused'} class="one-line" href={to(`/triggers/${t.id}`)} title="{t.name} · {t.cadence}">{t.name}</a>
 									</div>
 								{/each}
+								{#if capped.hidden.length}
+									<a class="more" href={to(`/jobs/${j.key}`)} title={capped.hidden.map((t) => `${t.name}${t.state === 'paused' ? ' (paused)' : ''}`).join('\n')} onclick={(e) => e.stopPropagation()}>+{capped.hidden.length} more</a>
+								{/if}
 							</div>
 						{/if}
 					</td>
@@ -178,6 +190,21 @@
 </div>
 
 <style>
+	.one-line {
+		display: block;
+		overflow: hidden;
+		max-width: 360px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.more {
+		color: var(--muted-foreground);
+		font-size: 12px;
+	}
+	.more:hover {
+		color: var(--primary);
+		text-decoration: underline;
+	}
 	.nowrap {
 		white-space: nowrap;
 	}
