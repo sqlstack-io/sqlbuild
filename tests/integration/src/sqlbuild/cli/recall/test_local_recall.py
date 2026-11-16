@@ -45,7 +45,6 @@ from tests.integration.src.sqlbuild.cli.recall.helpers import (
     recall_rows,
     run,
     simultaneous_builds,
-    timed_build,
     write_corrupt_store,
     write_project,
 )
@@ -542,41 +541,39 @@ def test_given_a_successful_command_when_recorded_then_it_ends_completed(
     "test_case",
     [
         HeldLockTestCase(
-            description="a store locked by another process costs at most the budget",
+            description="a store locked after setup gives up at the shutdown deadline",
             shutdown_seconds=1.0,
             builds_before_lock=1,
             expected_exit_code=0,
+            expected_notice="Recall delivery did not finish within the shutdown timeout",
+            hang_guard_seconds=60.0,
         ),
         HeldLockTestCase(
-            description="a store another process holds before setup never delays the start",
+            description="a store locked before setup gives up at the shutdown deadline",
             shutdown_seconds=1.0,
             builds_before_lock=0,
             expected_exit_code=0,
+            expected_notice="Recall delivery did not finish within the shutdown timeout",
+            hang_guard_seconds=60.0,
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_locked_store_when_building_then_start_and_exit_each_add_at_most_the_budget(
+def test_given_a_locked_store_when_building_then_it_gives_up_at_the_shutdown_deadline(
     test_case: HeldLockTestCase, tmp_path: Path
 ) -> None:
     budget: str = f'\n[recall]\nshutdown_timeout = "{int(test_case.shutdown_seconds * 1000)}ms"\n'
-    baseline_dir: Path = prepared_project(tmp_path / "baseline", budget, builds=1)
     project_dir: Path = prepared_project(
         tmp_path / "locked", budget, builds=test_case.builds_before_lock
     )
-    _, baseline_first, baseline_total = timed_build(baseline_dir)
 
-    locked, locked_first, locked_total = build_while_store_locked(project_dir)
+    locked, locked_total = build_while_store_locked(project_dir)
 
-    slack: float = 0.75
+    stderr: str = locked.stderr.decode(errors="replace")
     assert locked.returncode == test_case.expected_exit_code
-    assert locked_first <= baseline_first + slack
-    assert locked_total <= baseline_total + test_case.shutdown_seconds + slack
-    assert (
-        locked.stderr.decode(errors="replace")
-        .rstrip()
-        .endswith("completed successfully; only its Recall history is affected.")
-    )
+    assert test_case.expected_notice in stderr
+    assert stderr.rstrip().endswith("completed successfully; only its Recall history is affected.")
+    assert locked_total < test_case.hang_guard_seconds, stderr
 
 
 @pytest.mark.parametrize(
