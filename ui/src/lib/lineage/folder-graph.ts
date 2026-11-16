@@ -12,8 +12,6 @@ import { layoutLayer, type LayoutItem } from './job-graph';
  */
 export const MAX_DRAWN = 600;
 
-export const TOO_MANY_MESSAGE = 'Too many nodes to draw at once — open a folder or zoom in';
-
 /** Whether a graph has more cards and boxes than the browser lays out. */
 export const tooManyToDraw = (graph: { nodes: unknown[] }) => graph.nodes.length > MAX_DRAWN;
 
@@ -91,6 +89,14 @@ export function withFolderClosed(open: ReadonlySet<string>, folder: string): Set
 	return new Set([...open].filter((f) => f !== folder && !f.startsWith(`${folder}/`)));
 }
 
+/** What stands for a node in the folder graph: the node when every folder around it is open, otherwise the outermost closed folder's card. */
+export function standInOf(tree: FolderTree, open: ReadonlySet<string>): (key: string) => string {
+	return (key) => {
+		const closed = (tree.chains.get(key) ?? []).find((f) => !open.has(f));
+		return closed === undefined ? key : folderCardId(closed);
+	};
+}
+
 /** Every node in the folder and the folders inside it. */
 function members(tree: FolderTree, folder: string, byKey: Map<string, CatalogNode>): CatalogNode[] {
 	const f = tree.folders.get(folder)!;
@@ -130,10 +136,7 @@ export function folderGraph(
 	};
 	for (const root of tree.roots) place(root, null);
 
-	const standIn = (key: string) => {
-		const closed = (tree.chains.get(key) ?? []).find((f) => !open.has(f));
-		return closed === undefined ? key : folderCardId(closed);
-	};
+	const standIn = standInOf(tree, open);
 	const pairs = new Map<string, Edge>();
 	for (const n of nodes) {
 		const target = standIn(n.key);

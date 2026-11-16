@@ -6,6 +6,8 @@
 	import { SvelteFlow, Background, Controls, type Node, type Edge } from '@xyflow/svelte';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FolderNode from '$lib/components/lineage/folder-node.svelte';
+	import StubNode from '$lib/components/lineage/stub-node.svelte';
+	import XIcon from '@lucide/svelte/icons/x';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import NodeFieldsPopover from '$lib/components/lineage/node-fields-popover.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -46,8 +48,9 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
 	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
-	import { GROUPED_ABOVE, catalogGraph, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
-	import { MAX_DRAWN, TOO_MANY_MESSAGE, folderGraph, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
+	import { GROUPED_ABOVE, cardData, cardStatus, folderOf } from '$lib/lineage/catalog-graph';
+	import { MAX_DRAWN, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
+	import { FOLDERS_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
 	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
 
 	let browserOpen = $state(false);
@@ -55,7 +58,7 @@
 	let neighbourhoodOnly = $state(false);
 	let modelQuery = $state('');
 
-	const nodeTypes = { asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode };
+	const nodeTypes = { asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode, stub: StubNode };
 	// Automatic fits stop at a zoom where cards stay readable; the fit button and the wheel go further, to the whole graph.
 	const FIT_FLOOR = 0.3;
 
@@ -77,13 +80,26 @@
 	let grouped = $state(false);
 	let expanded = $state<ReadonlySet<string>>(new Set());
 	const tree = $derived<FolderTree>(folderTree(catalog.data ?? []));
+	// The side list's folder tree opens and closes on its own; its chevrons never change what is drawn.
+	let treeOpen = $state<ReadonlySet<string>>(new Set());
+	// Folders picked in the side list: the canvas draws only them, with stubs for lineage outside them.
+	// Kept in the URL so a reload or a shared link shows the same folders.
+	let selectedFolders = $state<string[]>([]);
+	// "Show the N out of date" from the too-many card: only nodes that are out of date.
+	let staleOnly = $state(false);
+	// "Pick folders" highlights the side list until a folder is picked.
+	let pickHighlight = $state(false);
 	// Laying out thousands of cards in the browser would hang the page, so past the cap nothing is drawn.
 	let tooMany = $state(false);
-	const graphOf = (data: CatalogNode[]) => (grouped ? folderGraph(data, expanded, { tree: folderTree(data), onclose: closeFolder }) : catalogGraph(data));
+	let tooManyCount = $state(0);
+	const graphOf = (data: CatalogNode[]) =>
+		lineageGraph(data, { grouped, open: expanded, selected: selectedFolders, staleOnly, tree: folderTree(data), onclose: closeFolder, onadd: addFolder });
 	/** Shows the graph, or the cap's message instead of a graph too large to lay out. */
 	function draw(graph: { nodes: Node[]; edges: Edge[] }, selected: ReadonlySet<string>) {
 		tooMany = tooManyToDraw(graph);
+		tooManyCount = graph.nodes.length;
 		if (tooMany) {
+			pendingCentre = null;
 			nodes = [];
 			edges = [];
 			// The side list can still open and close folders.
@@ -108,7 +124,16 @@
 						initialised = true;
 						const focus = latest.find((n) => n.key === initialFocus) ?? null;
 						grouped = latest.length > GROUPED_ABOVE;
-						if (focus) expanded = withFoldersOpen(folderTree(latest), focus.key, expanded);
+						const latestTree = folderTree(latest);
+						selectedFolders = parseFolders(page.url.searchParams.get(FOLDERS_PARAM), latestTree);
+						if (selectedFolders.length) {
+							expanded = new Set([...expanded, ...foldersToOpen(latestTree, selectedFolders)]);
+							treeOpen = new Set(selectedFolders.flatMap((f) => foldersToOpen(latestTree, [f]).filter((open) => open !== f)));
+						}
+						if (focus) {
+							expanded = withFoldersOpen(latestTree, focus.key, expanded);
+							treeOpen = withFoldersOpen(latestTree, focus.key, treeOpen);
+						}
 						draw(graphOf(latest), new Set(focus ? [focus.key] : []));
 					})
 				);
@@ -146,6 +171,43 @@
 	}
 	function closeFolder(folder: string) {
 		setOpen(withFolderClosed(expanded, folder));
+	}
+	/** Opens or closes a folder in the side list only. */
+	function toggleTreeFolder(folder: string) {
+		treeOpen = treeOpen.has(folder) ? withFolderClosed(treeOpen, folder) : new Set([...treeOpen, folder]);
+	}
+
+	/** Draws only the given folders, or every folder when empty, and keeps the choice in the URL. */
+	function setFolderSelection(next: string[]) {
+		selectedFolders = next;
+		pickHighlight = false;
+		const url = new URL(page.url);
+		const param = foldersParam(next);
+		if (param) url.searchParams.set(FOLDERS_PARAM, param);
+		else url.searchParams.delete(FOLDERS_PARAM);
+		if (url.search !== page.url.search) void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+		regroup({ expanded: new Set([...expanded, ...foldersToOpen(tree, next)]) });
+	}
+	/** Adds a folder to what is drawn: a stub's click, Ctrl/⌘-click or a tree checkbox. */
+	function addFolder(folder: string) {
+		setFolderSelection(withFolderAdded(selectedFolders, folder));
+	}
+	/** A click on a tree folder draws only it; Ctrl/⌘-click adds or removes it. */
+	function pickFolder(folder: string, event: MouseEvent) {
+		setFolderSelection(event.metaKey || event.ctrlKey ? withFolderToggled(selectedFolders, folder) : [folder]);
+	}
+	function clearSelection() {
+		staleOnly = false;
+		setFolderSelection([]);
+	}
+	function showOutOfDate() {
+		staleOnly = true;
+		regroup({});
+	}
+	function pickFolders() {
+		browserOpen = true;
+		modelQuery = '';
+		pickHighlight = true;
 	}
 
 	// Scale testing: /lineage?models=2000 swaps in a synthetic warehouse-shaped graph.
@@ -363,6 +425,15 @@
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
 	/** Nodes whose own definition changed, which `sqb build --changed` starts from. */
 	const changedCount = $derived(catalogNodes.filter((c) => c.stale?.some((r) => r.reason === 'changed')).length);
+	const outOfDateCount = $derived(catalogNodes.filter((c) => (c.stale?.length ?? 0) > 0).length);
+	/** The toolbar chip's text, e.g. "orders, inventory"; empty when every folder is drawn. */
+	const selectionLabel = $derived.by(() => {
+		const parts = selectedFolders.length > 3 ? [...selectedFolders.slice(0, 3), `${selectedFolders.length - 3} more`] : [...selectedFolders];
+		if (staleOnly) parts.push(`${outOfDateCount.toLocaleString('en')} out of date`);
+		return parts.join(', ');
+	});
+	/** Whether a tree folder is drawn because a folder around it is selected. */
+	const inSelectedFolder = (folder: string) => selectedFolders.some((s) => folder.startsWith(`${s}/`));
 	const kindOptions = $derived(NODE_KINDS.filter((k) => catalogNodes.some((n) => n.kind === k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: catalogNodes.filter((n) => n.kind === k).length })));
 	const groupOptions = $derived([...new Set(catalogNodes.flatMap((n) => (n.group === null ? [] : [n.group])))].map((g) => ({ value: g, label: g, count: catalogNodes.filter((n) => n.group === g).length })));
 	const statusOptions = [
@@ -402,7 +473,7 @@
 		const rows: BrowserRow[] = [];
 		const visit = (id: string, depth: number) => {
 			const f = tree.folders.get(id)!;
-			const open = expanded.has(id);
+			const open = treeOpen.has(id);
 			rows.push({ type: 'folder', id, label: f.label, depth, count: folderCounts.get(id) ?? 0, open });
 			if (!open) return;
 			for (const sub of f.folders) visit(sub, depth + 1);
@@ -416,13 +487,15 @@
 	// immediate upstream/downstream of the selected model (for the Lineage tab); with folders drawn,
 	// from the catalog, as an edge to a closed folder doesn't name the node it reaches
 	const nameOf = (id: string) => nodes.find((n) => n.id === id)?.data.name ?? id;
+	// A narrowed graph leaves out neighbours and draws stubs in their place, so it lists from the catalog too.
+	const fromCatalog = $derived(grouped || selectedFolders.length > 0 || staleOnly);
 	const upstream = $derived(
-		!primary ? [] : grouped ? (catalogByKey.get(primary.id)?.upstream ?? []) : edges.filter((e) => e.target === primary.id).map((e) => nameOf(e.source))
+		!primary ? [] : fromCatalog ? (catalogByKey.get(primary.id)?.upstream ?? []) : edges.filter((e) => e.target === primary.id).map((e) => nameOf(e.source))
 	);
 	const downstream = $derived(
 		!primary
 			? []
-			: grouped
+			: fromCatalog
 				? catalogNodes.filter((n) => n.upstream.includes(primary.id)).map((n) => n.key)
 				: edges.filter((e) => e.source === primary.id).map((e) => nameOf(e.target))
 	);
@@ -456,7 +529,53 @@
 		if (id) selectModel(id);
 	}
 
-	async function selectModel(id: string) {
+	/**
+	 * A node picked in the side list: drawn if it is outside what is shown, then selected and centred,
+	 * as Focus does. The node's own folder joins the selection; "out of date only" ends if it is current.
+	 */
+	async function revealNode(id: string) {
+		const listedNode = catalogByKey.get(id);
+		if (!scaleMode && listedNode) {
+			treeOpen = withFoldersOpen(tree, id, treeOpen);
+			const outsideFolders = selectedFolders.length > 0 && !inSelection(tree, id, selectedFolders);
+			const outsideStale = staleOnly && !listedNode.stale?.length;
+			if (outsideStale) staleOnly = false;
+			const own = tree.chains.get(id)?.at(-1);
+			if (outsideFolders && own) setFolderSelection(withFolderAdded(selectedFolders, own));
+			else if (outsideStale) regroup({});
+		}
+		await selectModel(id, true);
+	}
+
+	/** Where a card sits on the canvas; a card inside a folder box is placed relative to the box. */
+	function absolutePosition(id: string): { x: number; y: number } | null {
+		let node = nodes.find((n) => n.id === id);
+		if (!node) return null;
+		let { x, y } = node.position;
+		while (node?.parentId) {
+			node = nodes.find((n) => n.id === node!.parentId);
+			if (node) {
+				x += node.position.x;
+				y += node.position.y;
+			}
+		}
+		return { x, y };
+	}
+	/** A node to centre on once the layout under way has placed it. */
+	let pendingCentre: string | null = null;
+	function centreOn(id: string): boolean {
+		const node = nodes.find((n) => n.id === id);
+		const at = absolutePosition(id);
+		if (!node || !at || !graphPanel || !setFlowViewport || !node.measured?.width) return false;
+		const { width, height } = graphPanel.getBoundingClientRect();
+		const zoom = Math.max(viewport.zoom, 0.75);
+		const w = node.measured.width;
+		const h = node.measured.height ?? 61;
+		setFlowViewport({ zoom, x: width / 2 - (at.x + w / 2) * zoom, y: height / 2 - (at.y + h / 2) * zoom });
+		return true;
+	}
+
+	async function selectModel(id: string, centre = false) {
 		neighbourhoodOnly = false;
 		if (scaleLayout) {
 			focusKeep = null;
@@ -470,7 +589,12 @@
 		nodes = nodes.map((node) => ({ ...node, hidden: false, selected: node.id === id }));
 		edges = edges.map((edge) => ({ ...edge, hidden: false }));
 		await tick();
-		fitFlow?.({ duration: 220 });
+		if (!centre) {
+			fitFlow?.({ duration: 220 });
+			return;
+		}
+		// A redrawn graph is still to be laid out; the layout centres on the node once it has placed it.
+		if (lastLayoutKey === '' || !centreOn(id)) pendingCentre = id;
 	}
 
 	async function toggleNeighbourhood() {
@@ -547,7 +671,11 @@
 		nodes = layout(nodes, edges);
 		const w = window as unknown as { __sbLayouts?: number[] };
 		(w.__sbLayouts ??= []).push(performance.now() - layoutStart);
-		tick().then(() => fitFlow?.({ duration: 0 }));
+		tick().then(() => {
+			const centre = pendingCentre;
+			pendingCentre = null;
+			if (!centre || !centreOn(centre)) fitFlow?.({ duration: 0 });
+		});
 	});
 
 	const layout = (n: Node[], e: Edge[]) => (grouped ? layoutFolderGraph(n, e) : layoutGraph(n, e));
@@ -586,7 +714,7 @@
 			fitScaleGraph();
 			return;
 		}
-		if (grouped && expanded.size) regroup({ expanded: new Set() });
+		if (grouped && expanded.size) regroup({ expanded: new Set(foldersToOpen(tree, selectedFolders)) });
 		nodes = nodes.map((node) => ({ ...node, hidden: false }));
 		edges = edges.map((edge) => ({ ...edge, hidden: false }));
 		nodes = layout(nodes, edges);
@@ -645,13 +773,19 @@
 	<span class="toolbar-sep"></span>
 	{#if !scaleMode}
 		<button
-			onclick={() => regroup({ grouped: !grouped, expanded: new Set() })}
+			onclick={() => regroup({ grouped: !grouped, expanded: new Set(foldersToOpen(tree, selectedFolders)) })}
 			class="toolbar-action"
 			class:focus-active={grouped}
 			title={grouped ? 'Draw every node' : 'Draw each folder as one card; click a folder to open it'}
 		>
 			<FolderIcon size={13} /> Folders
 		</button>
+		{#if selectionLabel}
+			<span class="selection-chip" title="Showing {selectionLabel}">
+				<span>Showing: {selectionLabel}</span>
+				<button onclick={clearSelection} aria-label="Show every folder" title="Show every folder"><XIcon size={12} /></button>
+			</span>
+		{/if}
 	{/if}
 	<NodeFieldsPopover />
 	<button
@@ -681,24 +815,26 @@
 
 <div class="lineage-stage relative flex min-h-0 flex-1">
 	{#if browserOpen}
-		<aside class="model-browser">
+		<aside class="model-browser" class:pick={pickHighlight}>
 			<div class="browser-heading">
-				<span>Models</span>
+				<span>Nodes</span>
 				<b>{browserNodes.length}</b>
 			</div>
 			<div class="browser-list sb-scroll">
 				{#each browserRows as row (`${row.type}:${row.id}`)}
 					{#if row.type === 'folder'}
-						<button class="browser-group" style:padding-left="{6 + row.depth * 14}px" onclick={() => (row.open ? closeFolder(row.id) : openFolder(row.id))} aria-expanded={row.open} title={row.id}>
-							<ChevronRightIcon size={13} class={row.open ? 'rotate-90' : ''} />
-							<span>{row.label}</span><b>{row.count}</b>
-						</button>
+						{@const picked = selectedFolders.includes(row.id)}
+						<div class="browser-group" class:picked class:shown={!picked && inSelectedFolder(row.id)} style:padding-left="{2 + row.depth * 14}px">
+							<button class="tree-chevron" onclick={() => toggleTreeFolder(row.id)} aria-expanded={row.open} aria-label="{row.open ? 'Collapse' : 'Expand'} {row.id}"><ChevronRightIcon size={13} class={row.open ? 'rotate-90' : ''} /></button>
+							<button class="tree-label" onclick={(event) => pickFolder(row.id, event)} title="Show only {row.id}; Ctrl/⌘-click to add it"><span>{row.label}</span><b>{row.count}</b></button>
+							<input type="checkbox" class="sb-check tree-check" checked={picked} onchange={() => setFolderSelection(withFolderToggled(selectedFolders, row.id))} aria-label="Add {row.id} to the folders shown" />
+						</div>
 					{:else}
 						<button
 							class="browser-row"
 							style:padding-left="{24 + row.depth * 14}px"
 							class:selected={selectedIds.has(row.id)}
-							onclick={() => selectModel(row.id)}
+							onclick={() => revealNode(row.id)}
 							title={String(row.node.data.name)}
 						>
 							<i class="browser-status {String(row.node.data.status)}"></i>
@@ -739,7 +875,17 @@
 			<Controls />
 		</SvelteFlow>
 		{#if tooMany}
-			<div class="graph-too-many" title="The graph draws at most {MAX_DRAWN.toLocaleString()} cards at once">{TOO_MANY_MESSAGE}</div>
+			<div class="graph-too-many">
+				<div class="too-many-card" role="status">
+					<strong>Too many nodes to draw at once</strong>
+					<p>This view has {tooManyCount.toLocaleString('en')} cards; the graph draws at most {MAX_DRAWN.toLocaleString('en')}.</p>
+					<div class="too-many-actions">
+						{#if !grouped}<Button variant="outline" size="sm" onclick={() => regroup({ grouped: true, expanded: new Set(foldersToOpen(tree, selectedFolders)) })}><FolderIcon size={13} />Show folders</Button>{/if}
+						{#if !staleOnly && outOfDateCount > 0 && outOfDateCount <= MAX_DRAWN}<Button variant="outline" size="sm" onclick={showOutOfDate}>Show the {outOfDateCount.toLocaleString('en')} out of date</Button>{/if}
+						<Button variant="outline" size="sm" onclick={pickFolders}>Pick folders</Button>
+					</div>
+				</div>
+			</div>
 		{:else if !scaleMode && !fitted && !catalog.error && catalog.data?.length !== 0}
 			<div class="graph-loading"><div><Loading lines={4} /></div></div>
 		{/if}
@@ -1655,21 +1801,122 @@
 		display: flex;
 		width: 100%;
 		align-items: center;
-		gap: 6px;
+		gap: 2px;
 		margin-top: 6px;
-		padding: 5px 6px;
-		border: 0;
+		padding: 1px 6px 1px 2px;
 		border-radius: 2px;
-		background: transparent;
 		color: var(--muted-foreground);
 		font-size: 12px;
 		font-weight: 600;
 		text-transform: capitalize;
 	}
+	.browser-group.picked {
+		background: var(--sidebar-accent);
+		color: var(--primary);
+	}
+	.browser-group.shown {
+		color: var(--foreground);
+	}
+	.tree-chevron {
+		display: grid;
+		width: 20px;
+		height: 22px;
+		flex: 0 0 20px;
+		place-items: center;
+		border-radius: 2px;
+	}
+	.tree-chevron:hover {
+		background: var(--sb-hover);
+	}
+	.tree-label {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		align-items: center;
+		gap: 6px;
+		padding: 4px 0;
+		text-align: left;
+		text-transform: inherit;
+	}
+	/* The checkbox adds a folder to the selection; it shows on hover, and stays while checked. */
+	.tree-check {
+		flex: 0 0 auto;
+		margin-left: 6px;
+		opacity: 0;
+	}
+	.browser-group:hover .tree-check,
+	.tree-check:checked,
+	.tree-check:focus-visible {
+		opacity: 1;
+	}
+	.model-browser.pick {
+		box-shadow: inset 0 0 0 2px var(--primary);
+		animation: pick-pulse 1.2s ease-in-out 2;
+	}
+	@keyframes pick-pulse {
+		50% {
+			box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent);
+		}
+	}
+	.selection-chip {
+		display: inline-flex;
+		max-width: 280px;
+		height: 25px;
+		align-items: center;
+		gap: 4px;
+		padding: 0 4px 0 9px;
+		border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+		border-radius: 13px;
+		background: var(--sidebar-accent);
+		color: var(--primary);
+		font-size: 12px;
+	}
+	.selection-chip > span {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.selection-chip button {
+		display: grid;
+		width: 18px;
+		height: 18px;
+		flex: 0 0 18px;
+		place-items: center;
+		border-radius: 50%;
+	}
+	.selection-chip button:hover {
+		background: color-mix(in srgb, var(--primary) 15%, transparent);
+	}
+	.too-many-card {
+		max-width: 420px;
+		padding: 20px 22px;
+		border: 1px solid var(--border);
+		border-radius: 2px;
+		background: var(--card);
+		box-shadow: var(--sb-elev);
+		color: var(--muted-foreground);
+	}
+	.too-many-card strong {
+		display: block;
+		color: var(--foreground);
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.too-many-card p {
+		margin: 6px 0 14px;
+		font-size: 12.5px;
+	}
+	.too-many-actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 8px;
+	}
 	.browser-group:first-child {
 		margin-top: 0;
 	}
-	.browser-group:hover {
+	.browser-group:not(.picked):hover {
 		background: var(--sb-hover);
 		color: var(--foreground);
 	}
