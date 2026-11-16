@@ -1,6 +1,9 @@
-//! Record why one group member waits for another, and name the waits that close a cycle.
+//! Read what a group member waits for, record why, and name the waits that close a cycle.
 
 use std::collections::{BTreeMap, BTreeSet};
+
+use crate::declarations::constants::{LOADER_KIND, SOURCE_KIND, SOURCE_LOADER_POINTER};
+use crate::snapshots::models::SnapshotInput;
 
 /// Keep the first reason found for a wait: the first lineage edge.
 pub(crate) fn record_wait(
@@ -42,4 +45,32 @@ pub(crate) fn describe_cycle(
         })
         .collect::<Vec<_>>()
         .join("; ")
+}
+
+/// A node's published `deps`, and for a source its loader, whose upstream Python it waits for too.
+pub(crate) fn upstream_keys<'a>(input: &'a SnapshotInput, key: &str) -> Vec<&'a str> {
+    let Some(node) = input.nodes.get(key) else {
+        return Vec::new();
+    };
+    let mut upstream: Vec<&'a str> = node
+        .definition
+        .get("deps")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
+        .collect();
+    if node.kind == SOURCE_KIND
+        && let Some(loader) = node
+            .definition
+            .pointer(SOURCE_LOADER_POINTER)
+            .and_then(serde_json::Value::as_str)
+        && let Some((loader_key, _)) = input
+            .nodes
+            .get_key_value(&format!("{LOADER_KIND}:{loader}"))
+        && !upstream.contains(&loader_key.as_str())
+    {
+        upstream.push(loader_key);
+    }
+    upstream
 }

@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::declarations::_helpers::group_waits::{describe_cycle, record_wait};
+use crate::declarations::_helpers::group_waits::{describe_cycle, record_wait, upstream_keys};
 use crate::declarations::models::{GroupWaits, JobDefinition};
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
@@ -42,25 +42,18 @@ fn lineage_dependencies(
             if !seen.insert(key) {
                 continue;
             }
-            if let Some(node) = input.nodes.get(key)
-                && let Some(upstream) = node
-                    .definition
-                    .get("deps")
-                    .and_then(serde_json::Value::as_array)
-            {
-                for upstream in upstream.iter().filter_map(serde_json::Value::as_str) {
-                    if let Some(owners) = owners.get(upstream)
-                        && !owners.contains(name.as_str())
-                    {
-                        for owner in owners {
-                            dependencies.insert((*owner).to_owned());
-                            reasons = record_wait(reasons, (name, owner), || {
-                                format!("{key} reads {upstream}")
-                            });
-                        }
+            for upstream in upstream_keys(input, key) {
+                if let Some(owners) = owners.get(upstream)
+                    && !owners.contains(name.as_str())
+                {
+                    for owner in owners {
+                        dependencies.insert((*owner).to_owned());
+                        reasons = record_wait(reasons, (name, owner), || {
+                            format!("{key} reads {upstream}")
+                        });
                     }
-                    pending.push(upstream);
                 }
+                pending.push(upstream);
             }
         }
         edges.insert(name.clone(), dependencies);

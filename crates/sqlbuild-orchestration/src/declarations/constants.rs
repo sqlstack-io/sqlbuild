@@ -9,3 +9,10 @@ pub(crate) const DEFER_SETTING_PREFIX: &str = "defer_";
 
 /// How many due times a person's trigger listing gives for each running schedule.
 pub(crate) const UPCOMING_TIMES: usize = 5;
+
+/// The published kind of a source node, which group ordering follows to its loader.
+pub(crate) const SOURCE_KIND: &str = "source";
+/// The published kind of a loader node.
+pub(crate) const LOADER_KIND: &str = "loader";
+/// Where a published source names the loader that fills it.
+pub(crate) const SOURCE_LOADER_POINTER: &str = "/entry/loader";
