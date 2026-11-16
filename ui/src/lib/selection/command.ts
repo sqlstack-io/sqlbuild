@@ -51,8 +51,8 @@ const NAMED: Record<string, string> = { tag: 'tag', job: 'job', kind: 'node kind
 
 /**
  * The problem in the design's words, from its structured fields: "No tag called finanse.", "No node
- * called orders.", "No folder models/x.". Without them (the server does not report the refused
- * part yet) it is `sqb`'s own message.
+ * called orders.", "No folder models/x.". Without them (a selection refused as a whole) it is `sqb`'s
+ * own message.
  */
 export function problemText(problem: SelectionProblem): string {
 	const r = problem.refused;

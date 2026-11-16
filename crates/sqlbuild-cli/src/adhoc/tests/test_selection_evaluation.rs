@@ -1,9 +1,11 @@
 //! A selection evaluates as `sqb build` resolves it, refusals point at their token, and the vocabulary counts nodes.
 
-use sqlbuild_orchestration::runs::models::{SelectionField, SelectionProblem};
+use sqlbuild_orchestration::runs::models::{SelectionField, SelectionProblem, SelectionRefusal};
 
 use crate::adhoc::tests::helpers::{orders_publication, owned_evaluation};
-use crate::adhoc::tests::test_types::{SelectionEvaluationTestCase, VocabularyTestCase};
+use crate::adhoc::tests::test_types::{
+    RefusedPartTestCase, SelectionEvaluationTestCase, VocabularyTestCase,
+};
 
 #[test]
 fn given_typed_selections_when_evaluated_then_keys_or_located_refusals_match_sqb_build() {
@@ -88,6 +90,7 @@ fn given_typed_selections_when_evaluated_then_keys_or_located_refusals_match_sqb
             .map_err(|problem| {
                 Box::new(SelectionProblem {
                     help: None,
+                    refused: None,
                     ..*problem
                 })
             });
@@ -153,6 +156,105 @@ fn given_a_publication_when_its_vocabulary_is_read_then_each_value_counts_the_no
             .collect();
         assert_eq!(
             actual, test_case.expected_entries,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_refused_selectors_when_evaluated_then_the_refused_part_its_type_and_value_are_reported() {
+    let test_cases = [
+        RefusedPartTestCase {
+            description: "a missing tag",
+            select: "tag:finanse",
+            expected_code: Some("S000"),
+            expected_refused: Some(("tag:finanse", 0, "tag", "finanse")),
+        },
+        RefusedPartTestCase {
+            description: "a folder with no models",
+            select: "path:models/mart",
+            expected_code: Some("S009"),
+            expected_refused: Some(("path:models/mart", 0, "path", "models/mart")),
+        },
+        RefusedPartTestCase {
+            description: "an unknown job",
+            select: "job:carrier_sink",
+            expected_code: Some("S007"),
+            expected_refused: Some(("job:carrier_sink", 0, "job", "carrier_sink")),
+        },
+        RefusedPartTestCase {
+            description: "an unknown source",
+            select: "source:raw_shipment",
+            expected_code: Some("S007"),
+            expected_refused: Some(("source:raw_shipment", 0, "source", "raw_shipment")),
+        },
+        RefusedPartTestCase {
+            description: "an unknown seed",
+            select: "seed:currencies",
+            expected_code: Some("S007"),
+            expected_refused: Some(("seed:currencies", 0, "seed", "currencies")),
+        },
+        RefusedPartTestCase {
+            description: "an unknown kind",
+            select: "kind:modle",
+            expected_code: Some("S007"),
+            expected_refused: Some(("kind:modle", 0, "kind", "modle")),
+        },
+        RefusedPartTestCase {
+            description: "an unknown unit test",
+            select: "test:orders_unique",
+            expected_code: Some("S007"),
+            expected_refused: Some(("test:orders_unique", 0, "test", "orders_unique")),
+        },
+        RefusedPartTestCase {
+            description: "an unknown bare name",
+            select: "custmers",
+            expected_code: Some("S007"),
+            expected_refused: Some(("custmers", 0, "name", "custmers")),
+        },
+        RefusedPartTestCase {
+            description: "a name pattern matching nothing",
+            select: "missing_*",
+            expected_code: Some("S007"),
+            expected_refused: Some(("missing_*", 0, "glob", "missing_*")),
+        },
+        RefusedPartTestCase {
+            description: "the second comma part, with its + marker kept in the part but not the value",
+            select: "tag:orders,+tag:finanse",
+            expected_code: Some("S000"),
+            expected_refused: Some(("+tag:finanse", 1, "tag", "finanse")),
+        },
+        RefusedPartTestCase {
+            description: "a selection refused as a whole names no part",
+            select: "customers --exclude customers",
+            expected_code: None,
+            expected_refused: None,
+        },
+    ];
+    let publication = orders_publication();
+    for test_case in test_cases {
+        let (select, exclude) = test_case
+            .select
+            .split_once(" --exclude ")
+            .unwrap_or((test_case.select, ""));
+        let problem = publication.evaluate(select, exclude).err();
+        assert_eq!(
+            (
+                problem.as_ref().and_then(|problem| problem.code.clone()),
+                problem.and_then(|problem| problem.refused),
+            ),
+            (
+                test_case.expected_code.map(str::to_owned),
+                test_case
+                    .expected_refused
+                    .map(|(part, index, selector_type, value)| SelectionRefusal {
+                        part: part.to_owned(),
+                        index,
+                        selector_type: selector_type.to_owned(),
+                        value: value.to_owned(),
+                    }),
+            ),
             "{}",
             test_case.description
         );

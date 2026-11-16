@@ -36,6 +36,7 @@ pub async fn evaluate_selection(
                 help: None,
                 location: None,
                 suggestions: Vec::new(),
+                refused: None,
             }),
         });
     };

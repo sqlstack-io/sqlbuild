@@ -567,8 +567,9 @@ export type SelectionProblem = {
 	/** Whole-token replacements, closest first. */
 	suggestions: string[];
 	/**
-	 * The comma part of the located token `sqb` refuses: its selector type (`null` for a bare name or
-	 * folder) and value, as typed. The server does not report it yet, so it is null from the server.
+	 * The comma part of the located token `sqb` refuses: its index among the token's parts, its selector
+	 * type (`null` for a bare name or name pattern) and its value without type prefix or `+` markers.
+	 * Null when the selection is refused as a whole or the part is a path between two nodes.
 	 */
 	refused: { part: number; type: string | null; value: string } | null;
 };

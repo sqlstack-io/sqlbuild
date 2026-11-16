@@ -213,6 +213,7 @@ impl crate::runs::types::PreparedPublication for ExactKeyPublication {
                             end: u32::try_from(start + token.len()).unwrap_or_default(),
                         }),
                         suggestions: Vec::new(),
+                        refused: None,
                     }));
                 }
                 keys.insert(token.to_owned());
