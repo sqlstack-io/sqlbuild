@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SelectionChips from '$lib/components/selection/selection-chips.svelte';
 	import { plural } from '$lib/format/plural';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
@@ -281,8 +282,7 @@
 							{/if}
 						</InspectorSection>
 						<InspectorSection title="Definition">
-							{#if def.select}<p class="label">Selection</p><p class="code">{def.select}</p>{/if}
-							{#if def.exclude.length}<p class="label">Excludes</p><p class="code">{def.exclude.join(' ')}</p>{/if}
+							{#if def.select || def.exclude.length}<p class="label">Selection</p><div class="chips"><SelectionChips select={def.select ?? ''} exclude={def.exclude.join(' ')} /></div>{/if}
 							<dl>
 								{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
 								{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
@@ -460,14 +460,8 @@
 	.spaced {
 		margin-top: 12px;
 	}
-	.code {
-		margin-bottom: 10px;
-		padding: 6px 8px;
-		border-radius: 4px;
-		background: var(--sb-inset);
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		overflow-wrap: anywhere;
+	.chips {
+		margin: 3px 0 10px;
 	}
 
 	.label {
