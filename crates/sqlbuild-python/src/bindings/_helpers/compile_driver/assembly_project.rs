@@ -24,7 +24,6 @@ use crate::bindings::_helpers::compile_driver::assembly_models::{
     binding_rows, compiled_models, project_binding_diagnostics,
 };
 use crate::bindings::_helpers::compile_driver::assembly_sql_tests::assembled_sql_tests;
-use crate::bindings::_helpers::compile_driver::stage_work::{SEMANTIC_COMPLETION, count_stage};
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::contracts::spec_resolution::{
     resolve_effective_adapter_name, resolve_effective_scenario_config,
@@ -37,6 +36,8 @@ use crate::bindings::_helpers::semantic_checks::stage::{
 };
 use pyo3::IntoPyObjectExt;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::compile_driver::constants::SEMANTIC_COMPLETION;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -115,7 +116,7 @@ pub(crate) fn assembled_project<'py>(
     let native: Bound<'py, PyAny> = native_project_facts(inputs, &context, names, &native_session)?;
     let resources: Bound<'py, PyAny> = native_field(&native, "resources")?;
     let scope_index: Bound<'py, PyAny> = scope_index_with_compile_usages(inputs)?;
-    if crate::bindings::_helpers::compile_context::delta::injection().is_none() {
+    if sqlbuild_python_base::compile_context::main::delta::injection::injection().is_none() {
         report_scope_index_errors(&scope_index)?;
     }
     let target_values: Bound<'py, PyAny> = effective_target_values(inputs)?;

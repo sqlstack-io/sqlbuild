@@ -41,6 +41,13 @@ pub(crate) fn error_class(py: Python<'_>, id: ErrorId) -> PyResult<Bound<'_, PyA
     Ok(classes[id as usize].bind(py).clone())
 }
 
+/// The native `id` exception raised with `message`, or the error looking it up or raising it.
+pub(crate) fn new_plain_error(py: Python<'_>, id: ErrorId, message: &str) -> PyErr {
+    error_class(py, id)
+        .and_then(|class| class.call1((message,)))
+        .map_or_else(|error| error, PyErr::from_value)
+}
+
 /// A raisable native `id` error carrying `message` and the diagnostic `code`.
 pub(crate) fn new_error(py: Python<'_>, id: ErrorId, message: String, code: &str) -> PyErr {
     let raised = (|| {

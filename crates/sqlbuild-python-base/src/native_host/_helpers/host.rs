@@ -12,6 +12,7 @@ use sqlbuild_host::entries::models::HostId;
 use sqlbuild_host::entries::types::HostEntries;
 
 use crate::boundary::main::within::within;
+use crate::build_progress::main::progress::write_persistent::write_persistent;
 
 /// One entry's target module path and attribute name.
 type Target = (Py<PyString>, Py<PyString>);
@@ -69,12 +70,10 @@ pub(crate) fn entry<'py>(py: Python<'py>, id: impl Into<HostId>) -> PyResult<Bou
     PythonHost(py).entry(id.into())
 }
 
-/// Write through the interpreter's live console, respecting redirection and surfacing delivery errors.
+/// Write through the live console, clearing then redrawing any spinner line; errors surface.
 pub(crate) fn write_console(py: Python<'_>, stream: &str, text: &str) -> PyResult<()> {
     let stream = py.import("sys")?.getattr(stream)?;
-    stream.call_method1("write", (text,))?;
-    stream.call_method0("flush")?;
-    Ok(())
+    write_persistent(py, &stream, text)
 }
 
 /// Flush the interpreter's live console `stream` so text written before a child process appears first.
@@ -128,4 +127,20 @@ pub(crate) fn log_warning_message(py: Python<'_>, logger: &str, message: &str) -
         .call1((logger,))?
         .call_method1("warning", (message,))
         .map(|_| ())
+}
+
+/// Run `body` inside one Python-node identity pass, so the identities it builds share source work.
+pub(crate) fn within_identity_pass<'py, T>(
+    py: Python<'py>,
+    body: impl FnOnce() -> PyResult<T>,
+) -> PyResult<T> {
+    let identity_pass: Bound<'py, PyAny> = entry(py, UserCodeHost::PythonIdentityPass)?.call0()?;
+    within(&identity_pass, |_| body())
+}
+
+/// The host exception class `id` raised with `message`, or the error looking it up or raising it.
+pub(crate) fn host_error(py: Python<'_>, id: impl Into<HostId>, message: &str) -> PyErr {
+    entry(py, id)
+        .and_then(|class| class.call1((message,)))
+        .map_or_else(|error| error, PyErr::from_value)
 }

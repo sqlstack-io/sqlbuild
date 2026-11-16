@@ -19,12 +19,12 @@ use crate::bindings::_helpers::analysis_session::session::{
     ContractRow, ExpressionShapesRow, FamilyRow, NativeModelAnalysisSession, PivotModelRow,
     PivotRequestRow, infer_expression_source_shapes, prove_dynamic_column_contracts,
 };
-use crate::bindings::_helpers::compile_driver::stage_work::{
-    EXPRESSION_SHAPE_BATCHES, EXPRESSION_SHAPES_INFERRED, count_stage,
-};
 use crate::bindings::_helpers::model_config::header_families::family_specs;
 use crate::bindings::models::ProjectCatalog;
 use sqlbuild_python_base::boundary::models::Request;
+use sqlbuild_python_base::compile_driver::constants::EXPRESSION_SHAPE_BATCHES;
+use sqlbuild_python_base::compile_driver::constants::EXPRESSION_SHAPES_INFERRED;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

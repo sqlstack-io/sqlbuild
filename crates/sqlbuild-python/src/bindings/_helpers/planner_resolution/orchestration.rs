@@ -9,7 +9,8 @@ use crate::bindings::_helpers::cursor::scalars::sentinel_to_token;
 use crate::bindings::_helpers::model_config::typed_config::{
     config_node_of, config_text_is, config_text_object, config_value, model_values,
 };
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_resolution::cursor_model::{

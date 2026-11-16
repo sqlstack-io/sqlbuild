@@ -2,7 +2,6 @@
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
@@ -15,7 +14,6 @@ use crate::bindings::_helpers::discovery::provider_secrets::{
 use crate::bindings::_helpers::graph::algorithms::transitive_closure_many;
 use crate::bindings::_helpers::graph::execution_gates::sql_ref_key;
 use crate::bindings::_helpers::graph::python_lifecycle::build_python_sql_run_lifecycle;
-use crate::bindings::_helpers::native_host::connections::connection_failure;
 use crate::bindings::_helpers::planner_entries::command_plans::build_relation_command_plan;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_selection::selectors::parse_project_selector;
@@ -33,6 +31,8 @@ use sqlbuild_core::check_command::main::validate_check_selection::validate_check
 use sqlbuild_core::check_command::models::CheckResultText;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
+use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;

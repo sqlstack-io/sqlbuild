@@ -7,8 +7,8 @@ use sqlbuild_core::constants::PANIC_MESSAGE;
 use sqlbuild_core::panics::main::is_compiler_panic::is_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 
-use crate::bindings::_helpers::type_system::normalization::normalization_error;
 use sqlbuild_python_base::boundary::main::compiler_error::compiler_error;
+use sqlbuild_python_base::type_system::main::normalization_error::normalization_error;
 
 const SEMANTIC_CONTEXT: &str = "native semantic completion";
 /// The wheel's `TypeError` for `tokenize(sql, dialect=None)`.

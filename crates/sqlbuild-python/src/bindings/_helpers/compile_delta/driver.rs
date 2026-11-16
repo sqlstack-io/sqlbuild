@@ -12,20 +12,10 @@ use sqlbuild_cache::project_reuse::main::read_delta_output::read_delta_output;
 use sqlbuild_cache::project_reuse::models::{DeltaBase, DeltaCandidate, ProjectFileChanges};
 use sqlbuild_cache::project_reuse::types::ImageSections;
 
-use crate::bindings::_helpers::build_progress::progress::{
-    NativeProgressProjector, current_projector,
-};
 use crate::bindings::_helpers::compile_command::constants::TARGET_DIRECTORY_NAME;
 use crate::bindings::_helpers::compile_command::reuse_attempt::reuse_debug;
 use crate::bindings::_helpers::compile_command::reuse_recording::{
     RecordedCompileOutput, print_to,
-};
-use crate::bindings::_helpers::compile_context::delta::BaseRules;
-use crate::bindings::_helpers::compile_context::delta::ERRORS_ON_DELTA_PATH;
-use crate::bindings::_helpers::compile_context::delta::PendingRules;
-use crate::bindings::_helpers::compile_context::delta::{
-    CapturedDiagnostic, CapturedModel, CapturedTest, DeltaInjection, ImageCapture, RecordMerge,
-    start_capture, take_capture, take_delta_unsupported, with_injection,
 };
 use crate::bindings::_helpers::compile_delta::image::{
     ImageGate, ImageRelations, ImageRules, ProjectImage,
@@ -39,6 +29,21 @@ use crate::bindings::_helpers::rules::custom_evaluation::stored_custom_rule_refu
 use sqlbuild_discovery::header_changes::main::custom_rule_reads::custom_rule_reads;
 use sqlbuild_discovery::header_changes::main::header_change::header_change;
 use sqlbuild_discovery::header_changes::models::HeaderChange;
+use sqlbuild_python_base::build_progress::main::progress::current_projector::current_projector;
+use sqlbuild_python_base::build_progress::models::NativeProgressProjector;
+use sqlbuild_python_base::compile_context::constants::ERRORS_ON_DELTA_PATH;
+use sqlbuild_python_base::compile_context::main::delta::start_capture::start_capture;
+use sqlbuild_python_base::compile_context::main::delta::take_capture::take_capture;
+use sqlbuild_python_base::compile_context::main::delta::take_delta_unsupported::take_delta_unsupported;
+use sqlbuild_python_base::compile_context::main::delta::with_injection::with_injection;
+use sqlbuild_python_base::compile_context::models::BaseRules;
+use sqlbuild_python_base::compile_context::models::CapturedDiagnostic;
+use sqlbuild_python_base::compile_context::models::CapturedModel;
+use sqlbuild_python_base::compile_context::models::CapturedTest;
+use sqlbuild_python_base::compile_context::models::DeltaInjection;
+use sqlbuild_python_base::compile_context::models::ImageCapture;
+use sqlbuild_python_base::compile_context::models::PendingRules;
+use sqlbuild_python_base::compile_context::models::RecordMerge;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Set to `1` to always compile the whole project.
@@ -294,7 +299,7 @@ fn lent_injection(
         yaml_store: store_path
             .parent()
             .and_then(std::path::Path::parent)
-            .map(crate::bindings::_helpers::compile_context::yaml_cache::yaml_store_path),
+            .map(sqlbuild_python_base::compile_context::main::yaml_cache::yaml_store_path::yaml_store_path),
         project_dir,
         source_paths: image
             .models
@@ -1247,8 +1252,10 @@ pub(crate) fn commit(
     for line in &stderr_lines {
         print_to(py, STDERR, line.as_str())?;
     }
-    crate::bindings::_helpers::compile_context::delta::set_pending_image(image);
-    crate::bindings::_helpers::compile_context::delta::set_record_merge(Some(merge));
+    sqlbuild_python_base::compile_context::main::delta::set_pending_image::set_pending_image(image);
+    sqlbuild_python_base::compile_context::main::delta::set_record_merge::set_record_merge(Some(
+        merge,
+    ));
     crate::bindings::_helpers::compile_driver::command::store_and_print(
         (&request, attempt),
         &output,

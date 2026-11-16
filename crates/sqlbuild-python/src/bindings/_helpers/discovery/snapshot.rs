@@ -8,6 +8,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods};
 use pyo3::{pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_discovery::models::ProjectRoot;
 use sqlbuild_discovery::tree::models::ProjectTree;
+use sqlbuild_python_base::boundary::main::context_variable::context_variable;
 use std::path::PathBuf;
 
 use crate::bindings::_helpers::discovery::raised::discovery_error;
@@ -28,19 +29,8 @@ const SURROGATE_PASS: &str = "surrogatepass";
 static ACTIVE_SNAPSHOT: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 /// The context variable holding the active snapshot, created once per interpreter.
-fn active_variable(py: Python<'_>) -> PyResult<&Bound<'_, PyAny>> {
-    ACTIVE_SNAPSHOT
-        .get_or_try_init(py, || {
-            let keywords: Bound<'_, PyDict> = PyDict::new(py);
-            keywords.set_item("default", py.None())?;
-            Ok::<_, pyo3::PyErr>(
-                py.import("contextvars")?
-                    .getattr("ContextVar")?
-                    .call((SNAPSHOT_VARIABLE,), Some(&keywords))?
-                    .unbind(),
-            )
-        })
-        .map(|variable| variable.bind(py))
+fn active_variable(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    context_variable(py, &ACTIVE_SNAPSHOT, SNAPSHOT_VARIABLE)
 }
 
 /// The active snapshot when it belongs to `project_dir`.

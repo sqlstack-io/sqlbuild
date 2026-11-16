@@ -17,8 +17,8 @@ use crate::bindings::_helpers::cost_command::bounds::{parse_bound, parse_since};
 use crate::bindings::_helpers::cost_command::refresh::refresh_pending_cost_run;
 use crate::bindings::_helpers::cost_command::refusal::cost_error;
 use crate::bindings::_helpers::cost_report::store;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use sqlbuild_python_base::boundary::main::imported::imported;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::fields::field::field;
 
 /// Preserve Python's datetime parsing at the public request edge, then leave Python records behind.

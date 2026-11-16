@@ -16,9 +16,9 @@ use sqlbuild_core::progress::models::{ExpectationStep, InspectionRecord};
 use sqlbuild_core::progress::types::DifferenceSample;
 use sqlbuild_host::entries::models::AdapterHost;
 
-use crate::bindings::_helpers::build_progress::progress::write_persistent;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_progress::main::progress::write_persistent::write_persistent;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 

@@ -26,13 +26,11 @@ use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use crate::bindings::_helpers::build_progress::nested_progress::NestedCommandProgressCallbacks;
-use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::{
     format_expectation_detail, format_expectation_name, write_execution_header,
 };
 use crate::bindings::_helpers::build_progress::result_text::{test_label, test_result_label};
-use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::change_selection::base_snapshot::{
     BaseComparison, base_comparison, base_variant,
 };
@@ -46,7 +44,6 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
 use crate::bindings::_helpers::result_output::documents::test_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
@@ -62,7 +59,10 @@ use crate::bindings::_helpers::sql_test_command::timeouts::{
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
+use sqlbuild_python_base::build_progress::main::transient_status::status_reporter::status_reporter;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_helped_error::new_helped_error;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

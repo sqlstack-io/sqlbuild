@@ -2,6 +2,7 @@
 
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
+use crate::bindings::_helpers::observations::source_capture::capture_source_columns;
 use crate::bindings::_helpers::planner_phases::objects::{frozenset, text, tuple};
 use crate::bindings::_helpers::planner_warehouse::constants::{
     COLUMN_INFO, METADATA_NAME_FILTER_LIMIT, RELATION_LOOKUP,

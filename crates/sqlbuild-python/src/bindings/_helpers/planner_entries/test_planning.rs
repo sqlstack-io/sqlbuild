@@ -14,11 +14,11 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::PyDict;
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 
-use crate::bindings::_helpers::native_threads::exit_signal::signal_interpreter_exit;
 use crate::bindings::_helpers::planner_entries::plan_output::plan_selected_sql_tests;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_threads::main::signal_interpreter_exit::signal_interpreter_exit;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::types::RecordId;
 

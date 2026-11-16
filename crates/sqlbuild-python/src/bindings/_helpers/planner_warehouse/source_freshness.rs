@@ -5,7 +5,8 @@ use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::freshness::planning::{
     build_direct_source_freshness_planning_result, build_direct_source_freshness_propagation_result,
 };
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_phases::objects::{native, replace, text, tuple};
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_SCOPE;
@@ -26,9 +27,6 @@ use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::RecordId;
 use std::collections::BTreeSet;
 
 /// One warning per reason that left configured source freshness unknown.

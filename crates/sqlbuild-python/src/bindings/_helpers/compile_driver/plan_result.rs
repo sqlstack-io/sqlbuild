@@ -27,8 +27,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
 use crate::bindings::_helpers::graph::python_node_graph::run_selection_from_inputs;
-use crate::bindings::_helpers::native_host::connections::connection_failure;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;

@@ -1,5 +1,6 @@
 //! Latest fingerprint rows decoded into `Fingerprint` models and indexed into a `FingerprintSet`.
 
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::ffi::CString;
 
 use pyo3::exceptions::{PyUnicodeDecodeError, PyValueError};
@@ -13,7 +14,6 @@ use sqlbuild_analysis::fingerprint_storage::main::decode_storage::decode_storage
 use sqlbuild_analysis::fingerprint_storage::main::latest_index::latest_index;
 use sqlbuild_analysis::fingerprint_storage::main::selected_positions::selected_positions;
 use sqlbuild_analysis::fingerprint_storage::models::{FingerprintIdentity, LatestIndex};
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -28,10 +28,7 @@ const TIMESTAMP_COLUMN: usize = 11;
 
 /// `FingerprintInputError(message)`.
 pub(crate) fn fingerprint_input_error(py: Python<'_>, message: &str) -> PyErr {
-    match error_class(py, ErrorId::FingerprintInput).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::FingerprintInput, message)
 }
 
 /// The `FingerprintSet` of fetched latest rows, a model winning a node-name collision.

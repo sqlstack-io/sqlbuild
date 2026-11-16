@@ -55,7 +55,7 @@ type RecordBuilder<'py, T> =
 
 fn options() -> PyResult<SqlTestFileOptions> {
     Ok(sql_test_file_options(
-        crate::bindings::_helpers::compile_context::delta::injection()
+        sqlbuild_python_base::compile_context::main::delta::injection::injection()
             .map(|injection| std::sync::Arc::new(injection.test_paths.clone())),
     ))
 }

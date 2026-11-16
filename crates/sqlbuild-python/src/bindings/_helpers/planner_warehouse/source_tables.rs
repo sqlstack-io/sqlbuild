@@ -6,6 +6,7 @@ use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::discovery::locations::yaml_entry_line;
 use crate::bindings::_helpers::native_host::dialect::Dialect;
 use crate::bindings::_helpers::planner_phases::objects::planner_error;
+use crate::bindings::_helpers::planner_phases::objects::tuple;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::{
     MISSING_SOURCE_TABLE_CODE, WILDCARD_TABLE_CHARACTER,
@@ -26,10 +27,7 @@ use sqlbuild_analysis::planner_warehouse::models::MissingSourceTable;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
-use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
 use std::collections::HashMap;
 
 fn selected_source_readers(scope: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Vec<String>>> {

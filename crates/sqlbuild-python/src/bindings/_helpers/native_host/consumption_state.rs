@@ -16,7 +16,7 @@ use sqlbuild_state::consumption::models::{
 };
 use sqlbuild_state::freshness::constants::STRING_STATE_VALUE_TYPE;
 
-use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
+use sqlbuild_python_base::contracts::main::render_state_sql_literal::render_state_sql_literal;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

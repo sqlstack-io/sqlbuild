@@ -1,11 +1,12 @@
 //! The active command's warehouse group, `--warehouse` override and CLI vars.
 
+use sqlbuild_python_base::boundary::main::context_variable::context_variable as shared_context_variable;
 use std::sync::Mutex;
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
-use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::types::{PyDict, PyTuple};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 
 use sqlbuild_config::command_connection::constants::COMMAND_WAREHOUSE_GROUPS;
@@ -21,19 +22,7 @@ const CONTEXT_NAME: &str = "sqlbuild_command_warehouse_scope";
 static CONTEXT: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 fn context_variable(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
-    Ok(CONTEXT
-        .get_or_try_init(py, || {
-            let keywords: Bound<'_, PyDict> = PyDict::new(py);
-            keywords.set_item("default", py.None())?;
-            Ok::<_, pyo3::PyErr>(
-                py.import("contextvars")?
-                    .getattr("ContextVar")?
-                    .call((CONTEXT_NAME,), Some(&keywords))?
-                    .unbind(),
-            )
-        })?
-        .bind(py)
-        .clone())
+    shared_context_variable(py, &CONTEXT, CONTEXT_NAME)
 }
 
 /// Installs one command's warehouse scope for the duration of a `with` block.

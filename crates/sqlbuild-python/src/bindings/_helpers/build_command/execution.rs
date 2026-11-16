@@ -15,9 +15,6 @@ use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::lifecycle::{
     DirectPythonLifecycle, LifecycleInputs, prepare_direct_python_lifecycle,
 };
-use crate::bindings::_helpers::build_command::support::{
-    boolean, display_text, emit, frozenset, joined, keyword_relay, line_writer, none, text, tuple,
-};
 use crate::bindings::_helpers::build_progress::build_callbacks::{
     BuildProgressCallbacks, batch_complete_callback, check_callback,
 };
@@ -39,7 +36,6 @@ use crate::bindings::_helpers::cursor::overrides::{cursor_integer, cursor_timest
 use crate::bindings::_helpers::freshness::publication::append_freshness_records;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
 use crate::bindings::_helpers::native_host::consumption_state::recorder_callbacks;
-use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::observations::publication::append_build_observations;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
 use crate::bindings::_helpers::sql_test_command::test_command::timeout_record;
@@ -47,7 +43,18 @@ use crate::bindings::_helpers::sql_test_command::timeouts::{TimeoutKind, resolve
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::build_command::main::boolean::boolean;
+use sqlbuild_python_base::build_command::main::display_text::display_text;
+use sqlbuild_python_base::build_command::main::emit::emit;
+use sqlbuild_python_base::build_command::main::frozenset::frozenset;
+use sqlbuild_python_base::build_command::main::joined::joined;
+use sqlbuild_python_base::build_command::main::keyword_relay::keyword_relay;
+use sqlbuild_python_base::build_command::main::line_writer::line_writer;
+use sqlbuild_python_base::build_command::main::none::none;
+use sqlbuild_python_base::build_command::main::text::text;
+use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;

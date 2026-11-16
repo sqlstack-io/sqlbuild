@@ -17,9 +17,6 @@ use sqlbuild_model_config::header_metadata::models::ParsedColumn;
 use sqlbuild_model_config::model_validation::models::ColumnMigration;
 use sqlbuild_model_config::types::NodeKind;
 
-use crate::bindings::_helpers::compile_driver::stage_work::{
-    NATIVE_HEADER_COLUMNS, PARSED_HEADER_COLUMNS, count_stage,
-};
 use crate::bindings::_helpers::compiled_project::schema_facts::family_fact;
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::input_loops::model_loop::{
@@ -42,6 +39,9 @@ use crate::bindings::_helpers::model_config::header_metadata::{
 };
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, typed_values};
 use sqlbuild_discovery::model_files::models::{HeaderFacts, NativeColumn};
+use sqlbuild_python_base::compile_driver::constants::NATIVE_HEADER_COLUMNS;
+use sqlbuild_python_base::compile_driver::constants::PARSED_HEADER_COLUMNS;
+use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const DESCRIPTION_KEY: &str = "description";

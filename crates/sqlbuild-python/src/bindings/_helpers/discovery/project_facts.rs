@@ -1,6 +1,5 @@
 //! The facts cross-file validation reads, taken from Python's `DiscoveredProjectInputs`.
 
-use crate::bindings::_helpers::compile_context::delta::injection;
 use crate::bindings::_helpers::discovery::model_file_record::{ModelFileTexts, NativeModelFile};
 use pyo3::FromPyObject;
 use pyo3::exceptions::{PyTypeError, PyValueError};
@@ -12,6 +11,7 @@ use sqlbuild_discovery::project_validation::models::{
     ProjectFacts, SchemaFileFact, ScopedDeclarationsFact, SeedEntryFact, SeedFileFact, SourceFact,
     SourceFileFact, TestBlockFact, TestFileFact,
 };
+use sqlbuild_python_base::compile_context::main::delta::injection::injection;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::path_stem::path_stem;
 

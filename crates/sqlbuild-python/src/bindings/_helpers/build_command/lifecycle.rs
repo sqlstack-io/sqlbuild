@@ -14,9 +14,6 @@ use sqlbuild_core::build_command::models::PythonNodeRow;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::build_command::support::{
-    boolean, emit, frozenset, or_none, text, tuple,
-};
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_python_relation_targets;
 use crate::bindings::_helpers::graph::python_lifecycle::{
@@ -27,6 +24,12 @@ use crate::bindings::_helpers::planner_scope::loaders::build_intermediate_source
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::build_command::main::boolean::boolean;
+use sqlbuild_python_base::build_command::main::emit::emit;
+use sqlbuild_python_base::build_command::main::frozenset::frozenset;
+use sqlbuild_python_base::build_command::main::or_none::or_none;
+use sqlbuild_python_base::build_command::main::text::text;
+use sqlbuild_python_base::build_command::main::tuple::tuple;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;

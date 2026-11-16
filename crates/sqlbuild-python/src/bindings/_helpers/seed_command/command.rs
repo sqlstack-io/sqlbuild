@@ -17,7 +17,6 @@ use sqlbuild_core::seed_command::main::seed_exit_code::seed_exit_code;
 use sqlbuild_core::seed_command::models::SeedRow;
 use sqlbuild_host::entries::models::ExecutorHost;
 
-use crate::bindings::_helpers::build_progress::progress::current_native_progress_projector;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
@@ -34,6 +33,7 @@ use crate::bindings::_helpers::result_output::documents::write_execution_json_ou
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::build_progress::main::progress::current_native_progress_projector::current_native_progress_projector;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;

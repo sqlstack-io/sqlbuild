@@ -16,7 +16,6 @@ use sqlbuild_core::freshness_text::models::{FreshnessSourceResult, FreshnessStat
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
-use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
@@ -25,13 +24,14 @@ use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_ada
 use crate::bindings::_helpers::freshness::freshness_observe::{PreviousState, observe_freshness};
 use crate::bindings::_helpers::freshness::observation::Observer;
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
-use crate::bindings::_helpers::native_host::connections::connection_failure;
 use crate::bindings::_helpers::planner_selection::selectors::{
     expand_project_upstream_keys, select_project_graph,
 };
 use crate::bindings::_helpers::planner_selection::unit_tests::reject_unit_test_selectors;
-use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
+use sqlbuild_python_base::command_runtime::main::resolve_cli_adapter::resolve_cli_adapter;
+use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
+use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::types::RecordId;
 

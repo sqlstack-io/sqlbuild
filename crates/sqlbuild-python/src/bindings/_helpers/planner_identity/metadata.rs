@@ -25,10 +25,12 @@ use crate::bindings::_helpers::model_config::typed_config::{config_value, model_
 use crate::bindings::_helpers::planner_identity::hashing::{
     baselined_function_definition_hash, function_definition_hash,
 };
-use crate::bindings::_helpers::planner_identity::json_values::{COMPACT, SPACED, sorted_dumps};
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::main::within::within;
+use sqlbuild_python_base::planner_identity::constants::COMPACT;
+use sqlbuild_python_base::planner_identity::constants::SPACED;
+use sqlbuild_python_base::planner_identity::main::sorted_dumps::sorted_dumps;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;

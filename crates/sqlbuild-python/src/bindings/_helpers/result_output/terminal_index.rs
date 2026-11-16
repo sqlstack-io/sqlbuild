@@ -1,5 +1,6 @@
 //! The invocation-scoped index of canonical lifecycle facts that result output projects from.
 
+use sqlbuild_python_base::build_progress::main::progress::terminal_request::terminal_request;
 use std::sync::{Mutex, MutexGuard};
 
 use pyo3::exceptions::PyRuntimeError;
@@ -14,7 +15,6 @@ use sqlbuild_core::terminal_events::main::consume_terminal_fact::consume_termina
 use sqlbuild_core::terminal_events::main::latest_resource_terminal::latest_resource_terminal;
 use sqlbuild_core::terminal_events::main::lifecycle_terminal::lifecycle_terminal;
 use sqlbuild_core::terminal_events::models::{TerminalFact, TerminalIndex, TerminalRequest};
-use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::main::registry::native_attr::native_attr;
@@ -23,10 +23,6 @@ use sqlbuild_python_base::records::types::NativeAttr;
 /// The module attribute holding the `ContextVar` of the installed index.
 const CONTEXT_ATTRIBUTE: &str = "_terminal_event_index_context";
 const CONTEXT_NAME: &str = "sqlbuild_terminal_event_index";
-const CLAIM_OPTIONS: (&[&str], &[&str]) = (
-    &["resource_name"],
-    &["resource_id", "resource_attempt_id", "attempt_number"],
-);
 
 struct IndexState {
     index: TerminalIndex,
@@ -183,16 +179,9 @@ impl TerminalEventIndex {
         py: Python<'_>,
         options: Option<Bound<'_, PyDict>>,
     ) -> PyResult<Option<TerminalEventClaim>> {
-        let arguments: KeywordArguments<'_> =
-            KeywordArguments::read(py, "claim_resource_terminal", options, CLAIM_OPTIONS)?;
         self.claim(
             py,
-            &TerminalRequest {
-                resource_name: arguments.value("resource_name")?.extract()?,
-                resource_id: arguments.value("resource_id")?.extract()?,
-                resource_attempt_id: arguments.value("resource_attempt_id")?.extract()?,
-                attempt_number: arguments.value("attempt_number")?.extract()?,
-            },
+            &terminal_request(py, "claim_resource_terminal", options)?,
         )
     }
 

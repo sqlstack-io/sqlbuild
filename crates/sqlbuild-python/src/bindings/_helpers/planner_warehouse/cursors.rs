@@ -11,7 +11,8 @@ use crate::bindings::_helpers::cursor::scalars::compare_values;
 use crate::bindings::_helpers::cursor::scalars::render_value;
 use crate::bindings::_helpers::cursor::scalars::to_inclusive;
 use crate::bindings::_helpers::model_config::typed_config::{config_cursor_bound, model_values};
-use crate::bindings::_helpers::native_host::dialect::{Dialect, Syntax};
+use crate::bindings::_helpers::native_host::dialect::Dialect;
+use crate::bindings::_helpers::native_host::dialect::Syntax;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
     by_name, config_str, model_key, native_member, optional_text, planner_model, text, tuple,

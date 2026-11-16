@@ -10,8 +10,6 @@ use sqlbuild_host::models::{
     SqlTestExecutionResult, SqlTestOutcome,
 };
 
-use crate::bindings::_helpers::compile_outputs::json_report::indented_json;
-use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::plan_output::values::{any, dict, items, text};
 use crate::bindings::_helpers::result_output::aggregation::RetainedBuildResults;
 use crate::bindings::_helpers::result_output::assets::{
@@ -23,7 +21,9 @@ use crate::bindings::_helpers::result_output::checks::{
 };
 use crate::bindings::_helpers::result_output::projection::{Projection, rounded};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 const JSON_VERSION: i64 = 1;

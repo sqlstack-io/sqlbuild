@@ -1,5 +1,6 @@
 //! The public declaration indexes: enums, constants and resolved reusable model schemas.
 
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use std::collections::HashMap;
 
 use pyo3::prelude::{
@@ -7,17 +8,13 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
-use sqlbuild_python_base::records::main::construct::error_class::error_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::ErrorId;
 
 /// `CompileInputError(message)`.
 fn compile_input_error(py: Python<'_>, message: String) -> PyErr {
-    match error_class(py, ErrorId::CompileInput).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    new_plain_error(py, ErrorId::CompileInput, &message)
 }
 
 fn text(owner: &Bound<'_, PyAny>, name: &str) -> PyResult<String> {

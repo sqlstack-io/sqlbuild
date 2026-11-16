@@ -5,6 +5,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyInt, PyList, PyString, PyStringMethods, PyTuple};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_python_base::native_host::main::host_error::host_error;
 use sqlbuild_state::execution_history::constants::ENVELOPE_TEXT_FIELDS;
 use sqlbuild_state::execution_history::errors::{HistoryError, HistoryErrorKind};
 use sqlbuild_state::execution_history::models::{
@@ -39,10 +40,7 @@ fn exception_class(kind: HistoryErrorKind) -> ExecutorHost {
 
 /// The execution history exception for a rejection of `kind`.
 pub(crate) fn rejection(py: Python<'_>, kind: HistoryErrorKind, message: &str) -> PyErr {
-    match host_entry(py, exception_class(kind)).and_then(|class| class.call1((message,))) {
-        Ok(error) => PyErr::from_value(error),
-        Err(error) => error,
-    }
+    host_error(py, exception_class(kind), message)
 }
 
 /// An `ExecutionHistoryStorageError`.
