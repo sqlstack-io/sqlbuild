@@ -22,7 +22,7 @@ use crate::query_facts::models::{
 use crate::rules::_helpers::domain_layout::folder_layer_details;
 use crate::rules::_helpers::{
     contract_name_types, dynamic_contracts, explicit_output_types, flatten_parent_copy,
-    model_layers, numeric_decisions, sql_test_rules, typed_contract_columns,
+    json_finer_grain, model_layers, numeric_decisions, sql_test_rules, typed_contract_columns,
 };
 use crate::rules::models::{
     FaultCollector, ModelEvaluationRequest, ProjectEvaluationRequest, ResolvedThresholdOverride,
@@ -221,6 +221,11 @@ fn evaluate_model_inner(request: ModelEvaluationRequest<'_>) -> Result<Vec<Fault
     {
         flatten_parent_copy::evaluate(&parsed, rule, &faults);
     }
+    if let Some(rule) = metadata("SQBRPERFORMANCE102")
+        && request.dialect.eq_ignore_ascii_case(SNOWFLAKE_DIALECT)
+    {
+        json_finer_grain::evaluate(&parsed, rule, &faults);
+    }
     evaluate_naming_rules(&parsed, config, selected, &faults);
     evaluate_literal_rules(&parsed, selected, &faults);
     evaluate_test_rules(TestRuleEvaluation {
@@ -340,7 +345,7 @@ fn requires_model_query(rule: &RuleMetadata) -> bool {
     !rule.custom
         && (rule.code.starts_with("SQBRMODEL")
             || rule.code.starts_with("SQBRCONTRACT")
-            || rule.code == "SQBRPERFORMANCE101"
+            || rule.code.starts_with("SQBRPERFORMANCE")
             || matches!(
                 rule.code.as_str(),
                 "SQBRGRAPH102"

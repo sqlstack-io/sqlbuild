@@ -5,6 +5,7 @@ pub mod dynamic_contracts;
 pub mod evaluation;
 pub mod explicit_output_types;
 pub mod flatten_parent_copy;
+pub mod json_finer_grain;
 pub mod model_layers;
 pub mod numeric_decisions;
 pub mod sql_test_rules;

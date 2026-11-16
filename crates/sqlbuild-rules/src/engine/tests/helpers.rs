@@ -11,9 +11,9 @@ use crate::engine::main::answer_speculative_rows::answer_speculative_rows;
 use crate::engine::main::discard_speculative_rows::discard_speculative_rows;
 use crate::engine::main::retained_request::retained_request;
 use crate::models::{
-    Column, Declaration, DeclarationMember, DynamicColumnFamily, EvaluateRequest, Fault, Model,
-    Reference, RetainedRows, RowsEvaluation, RowsRequest, RulesConfig, SpeculativeAnswer,
-    SpeculativeRows,
+    Column, Declaration, DeclarationMember, DynamicColumnFamily, EvaluateRequest, Fault,
+    GrainColumn, JsonGrain, Model, Reference, RetainedRows, RowsEvaluation, RowsRequest,
+    RulesConfig, SpeculativeAnswer, SpeculativeRows,
 };
 
 use crate::engine::_helpers::evaluation::evaluate_json;
@@ -734,6 +734,20 @@ pub(crate) fn every_field_model() -> Model {
         empty_input_only_test_count: 0,
         payload_digest: Some("digest".to_owned()),
         stripped: false,
+        json_grain: Some(JsonGrain {
+            model_keys: vec![vec!["order_id".to_owned(), "line_id".to_owned()]],
+            columns: vec![GrainColumn {
+                name: "order_json".to_owned(),
+                data_type: Some("VARIANT".to_owned()),
+                inputs: vec!["ref:orders".to_owned()],
+            }],
+            input_keys: BTreeMap::from([(
+                "ref:orders".to_owned(),
+                vec![vec!["order_id".to_owned()]],
+            )]),
+            backs_published_view: true,
+            skipped: Some("no lineage".to_owned()),
+        }),
     }
 }
 
