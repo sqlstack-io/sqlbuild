@@ -9,14 +9,21 @@ test.use({ viewport: { width: 1440, height: 1000 } });
 
 const FRAGMENT = 'enough_to_show_17';
 
-async function openChecks(page: Page) {
-	await page.goto('/checks?mock&awkward');
-	await page.waitForLoadState('networkidle');
-	await expect(page.locator('table.sb-table tbody tr').first()).toBeVisible();
+/**
+ * The list's drawn data rows: not the spacers, and not the loading row shown until the checks arrive.
+ * The mock answers after a delay, which `networkidle` doesn't wait for (it makes no requests), so tests
+ * wait for these rows rather than for the network.
+ */
+const DATA_ROWS = 'table.sb-table tbody tr:not(.spacer):not(.load-row)';
+
+/** Opens Checks, `query` added to the URL, once its checks are drawn. */
+async function openChecks(page: Page, query = '') {
+	await page.goto(`/checks?mock&awkward${query}`);
+	await expect(page.locator(DATA_ROWS).first()).toBeVisible();
 }
 
 /** The "Attached to" cell's full text (`node` or `node.column`) of each drawn row. */
-const nodeCells = (page: Page) => page.locator('table.sb-table tbody tr:not(.spacer) td:nth-child(3)').evaluateAll((cells) => cells.map((c) => (c as HTMLElement).title));
+const nodeCells = (page: Page) => page.locator(`${DATA_ROWS} td:nth-child(3)`).evaluateAll((cells) => cells.map((c) => (c as HTMLElement).title));
 const onNode = (cell: string, node: string) => cell === node || cell.startsWith(`${node}.`);
 
 /** Problems with the open panel's rows: labels spilling out of their row, counts outside the panel. */
@@ -107,8 +114,8 @@ test('an old single-node link still filters to that node', async ({ page }) => {
 	await page.getByRole('button', { name: /^Node/ }).click();
 	const node = await page.locator('.choice-panel .cf-row').nth(3).getAttribute('title');
 	await page.keyboard.press('Escape');
-	await page.goto(`/checks?mock&awkward&node=${encodeURIComponent(node!)}`);
-	await page.waitForLoadState('networkidle');
+	// The button reads the link at once; the rows come with the checks, so wait for those.
+	await openChecks(page, `&node=${encodeURIComponent(node!)}`);
 	await expect(page.getByRole('button', { name: /^Node/ })).toContainText(`Node:${node!.slice(0, 20)}`);
 	const cells = await nodeCells(page);
 	expect(cells.length).toBeGreaterThan(0);
