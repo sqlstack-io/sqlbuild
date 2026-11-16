@@ -10,8 +10,8 @@ use sqlbuild_core::plan_display::main::model_resource_type::model_resource_type;
 use sqlbuild_core::plan_display::models::ModelLabelFacts;
 
 use crate::bindings::_helpers::build_progress::result_text::text;
-use crate::bindings::_helpers::plan_output::display::optional_facts;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_planner::plan_output::main::optional_facts::optional_facts;
 
 const SOURCE_TYPE: &str = "source";
 const SQL_TEST_TYPE: &str = "sql_test";

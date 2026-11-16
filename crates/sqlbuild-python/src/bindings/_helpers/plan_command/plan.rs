@@ -20,12 +20,8 @@ use crate::bindings::_helpers::command_runtime::preview_target::validate_preview
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::run_compile_pipeline;
-use crate::bindings::_helpers::consumption::policy::{changed_policy, policy_line};
-use crate::bindings::_helpers::consumption::recorder::{ChangedDecision, preview_changed};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::{changed_json, changed_text};
-use crate::bindings::_helpers::plan_output::plan_json::{CHANGED_KEY, format_plan_json};
-use crate::bindings::_helpers::plan_output::plan_text::format_plan;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -37,6 +33,13 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_base::warehouse_access::models::SyncedCopyAdapter;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
+use sqlbuild_python_planner::consumption::main::changed_policy::changed_policy;
+use sqlbuild_python_planner::consumption::main::policy_line::policy_line;
+use sqlbuild_python_planner::consumption::main::preview_changed::preview_changed;
+use sqlbuild_python_planner::consumption::models::ChangedDecision;
+use sqlbuild_python_planner::plan_output::constants::CHANGED_KEY;
+use sqlbuild_python_planner::plan_output::main::format_plan::format_plan;
+use sqlbuild_python_planner::plan_output::main::format_plan_json::format_plan_json;
 
 const COMMAND_NAME: &str = "plan";
 const DEFAULT_SECTION_ENTRIES: i64 = 50;

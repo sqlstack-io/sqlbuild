@@ -23,8 +23,6 @@ use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pi
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::planner_entries::command_plans::build_seed_command_plan;
-use crate::bindings::_helpers::planner_entries::command_plans::read_selected_seed_fingerprints;
 use crate::bindings::_helpers::result_output::documents::format_seed_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
@@ -38,6 +36,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced_keywords::replaced_keywords;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
+use sqlbuild_python_planner::planner_entries::main::plans::build_seed_command_plan::build_seed_command_plan;
+use sqlbuild_python_planner::planner_entries::main::plans::read_selected_seed_fingerprints::read_selected_seed_fingerprints;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 

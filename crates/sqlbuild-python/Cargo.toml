@@ -31,7 +31,6 @@ sqlbuild-cache.workspace = true
 sqlbuild-cli.workspace = true
 sqlbuild-config.workspace = true
 sqlbuild-core.workspace = true
-sqlbuild-cursor.workspace = true
 sqlbuild-discovery.workspace = true
 sqlbuild-host.workspace = true
 sqlbuild-model-config.workspace = true
@@ -41,6 +40,7 @@ sqlbuild-pysource.workspace = true
 sqlbuild-python-base.workspace = true
 sqlbuild-python-front.workspace = true
 sqlbuild-python-project.workspace = true
+sqlbuild-python-planner.workspace = true
 sqlbuild-recall.workspace = true
 sqlbuild-refactor.workspace = true
 sqlbuild-render.workspace = true
@@ -49,7 +49,6 @@ sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlbuild-state.workspace = true
 sqlclean.workspace = true
-uuid.workspace = true
 
 [lints]
 workspace = true

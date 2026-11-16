@@ -23,7 +23,6 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_com
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
-use crate::bindings::_helpers::planner_entries::command_plans::build_audit_command_plan;
 use crate::bindings::_helpers::result_output::documents::{
     audit_execution_json, audit_projection, write_execution_json_output,
 };
@@ -42,6 +41,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::command_runtime::main::resolve_concurrency::resolve_concurrency;
 use sqlbuild_python_front::cost_context::models::CostContext;
+use sqlbuild_python_planner::planner_entries::main::plans::build_audit_command_plan::build_audit_command_plan;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::VerifiedRun;
 

@@ -25,8 +25,8 @@ use crate::bindings::_helpers::janitor::janitor_keys::{
     Folded, Key, SchemaKey, archive_timestamp, days, folded_schema, optional, record,
     relation_age_timestamp, sorted_schemas, text, timestamp_fields, tuple, utc_datetime,
 };
-use crate::bindings::_helpers::planner_scenario::artifacts::is_scenario_artifact_physical_name;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_planner::planner_scenario::main::is_scenario_artifact_physical_name::is_scenario_artifact_physical_name;
 use sqlbuild_python_project::relation_naming::main::shared_error::shared_error;
 
 /// Protection rules for one plan.

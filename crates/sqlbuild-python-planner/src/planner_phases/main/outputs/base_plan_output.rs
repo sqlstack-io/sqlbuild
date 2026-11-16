@@ -1,0 +1,43 @@
+//! The plan output's base fields from the planned entries, relations and source freshness.
+
+use crate::planner_phases::_helpers::outputs::output_assembly;
+use crate::planner_phases::models::PlanOutputContext;
+use crate::planner_phases::models::PlanOutputFields;
+use crate::planner_phases::models::PlannedModelEntries;
+use pyo3::prelude::Bound;
+use pyo3::prelude::PyAny;
+use pyo3::prelude::PyResult;
+
+/// The plan output's base fields from the planned entries, relations and source freshness.
+#[inline]
+pub fn base_plan_output<'py>(
+    PlanOutputContext {
+        runtime,
+        warehouse,
+        identities,
+        overrides,
+    }: PlanOutputContext<'_, 'py>,
+    PlannedModelEntries {
+        execution_scope,
+        reconciliation,
+        entries,
+        source_freshness,
+    }: PlannedModelEntries<'_, 'py>,
+    planned_sql_tests: &Bound<'py, PyAny>,
+) -> PyResult<PlanOutputFields<'py>> {
+    output_assembly::base_plan_output(
+        PlanOutputContext {
+            runtime,
+            warehouse,
+            identities,
+            overrides,
+        },
+        PlannedModelEntries {
+            execution_scope,
+            reconciliation,
+            entries,
+            source_freshness,
+        },
+        planned_sql_tests,
+    )
+}
