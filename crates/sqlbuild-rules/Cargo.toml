@@ -35,6 +35,7 @@ toml.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+stats_alloc.workspace = true
 
 [lints]
 workspace = true
